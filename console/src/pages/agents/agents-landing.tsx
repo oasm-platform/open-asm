@@ -9,10 +9,8 @@ import { restoreApprovalMode } from '@/hooks/use-approval-mode';
 import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
-import type { ConversationResponseDto } from '@/services/apis/gen/queries';
-import { useAgentsControllerGetConversations } from '@/services/apis/gen/queries';
 import { getRouteApi, useNavigate } from '@tanstack/react-router';
-import { MessageSquare, Plus, Sparkles } from 'lucide-react';
+import { Plus, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { v7 as uuidv7 } from 'uuid';
 // import AgentIcon from './components/agent-icon';
@@ -22,7 +20,7 @@ import {
   CONVERSATION_STARTERS,
 } from './components/landing-constants';
 
-const routeApi = getRouteApi('/_authed/agents/');
+const routeApi = getRouteApi('/_authed/aistudio/');
 
 export default function AgentsLandingPage() {
   const navigate = useNavigate();
@@ -42,24 +40,9 @@ export default function AgentsLandingPage() {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
 
-  const { data: conversationsData } = useAgentsControllerGetConversations(
-    { limit: 3, sortBy: 'updatedAt', sortOrder: 'DESC' },
-    {
-      query: {
-        queryKey: ['/api/agents/conversations', selectedWorkspaceId],
-        enabled: !!selectedWorkspaceId,
-      },
-    },
-  );
-
   const { hasProviderConnected } = useLLMConfigs({
     enabled: !!selectedWorkspaceId,
   });
-
-  const conversations: ConversationResponseDto[] = useMemo(
-    () => conversationsData?.data ?? [],
-    [conversationsData],
-  );
 
   // Randomly select 5 suggestions from the pool and shuffle them
   const quickSuggestions = useMemo(() => {
@@ -82,7 +65,7 @@ export default function AgentsLandingPage() {
         workerId: selectedWorkerId,
       };
       void navigate({
-        to: '/agents/conversations/$conversationId',
+        to: '/aistudio/conversations/$conversationId',
         params: { conversationId: newConversationId },
         state: navState,
       });
@@ -108,16 +91,12 @@ export default function AgentsLandingPage() {
     handleSendMessage(suggestion);
   };
 
-  const handleSelectConversation = useCallback(
-    (conversationId: string) => {
-      void navigate({ to: `/agents/conversations/${conversationId}` });
-    },
-    [navigate],
-  );
-
   if (!hasProviderConnected) {
     return (
-      <Page className="w-full md:w-2/3 lg:w-1/2 mx-auto" permission="agent.read">
+      <Page
+        className="w-full md:w-2/3 lg:w-1/2 mx-auto"
+        permission="agent.read"
+      >
         <div className="flex h-[calc(100vh-8rem)] flex-col items-center justify-center gap-8">
           <div className="flex flex-col items-center gap-4 text-center">
             <div className="rounded-full bg-muted p-4 ring-1 ring-border">
@@ -145,20 +124,23 @@ export default function AgentsLandingPage() {
 
   return (
     <Page className="w-full md:w-2/3 lg:w-1/2 mx-auto" permission="agent.read">
-      <div className="flex h-[calc(100vh-8rem)] flex-col items-center justify-center gap-8">
-        {/* Hero */}
-        <div className="flex flex-col items-center gap-3 text-center">
-          <div className="rounded-full bg-muted p-3 ring-1 ring-border">
-            <Sparkles className="h-6 w-6 text-foreground" />
+      {/* The prompt input is the only in-flow element, so it sits at the
+          vertical centre (nudged up by the bottom padding); the hero and the
+          suggestions hang off it without shifting it. */}
+      <div className="flex h-[calc(100vh-8rem)] flex-col items-center justify-center pb-24">
+        <div className="relative w-full max-w-2xl">
+          {/* Hero */}
+          <div className="absolute inset-x-0 bottom-full mb-8 flex flex-col items-center gap-3 text-center">
+            <div className="rounded-full bg-muted p-3 ring-1 ring-border">
+              <Sparkles className="h-6 w-6 text-foreground" />
+            </div>
+            <TypewriterText
+              texts={CONVERSATION_STARTERS}
+              className="hidden sm:inline text-xl font-medium text-foreground max-w-lg"
+            />
           </div>
-          <TypewriterText
-            texts={CONVERSATION_STARTERS}
-            className="hidden sm:inline text-xl font-medium text-foreground max-w-lg"
-          />
-        </div>
 
-        {/* Input area */}
-        <div className="w-full max-w-2xl flex flex-col gap-3">
+          {/* Input area */}
           <AgentPromptInput
             onSubmit={handleSendMessage}
             isSending={isSending}
@@ -173,43 +155,18 @@ export default function AgentsLandingPage() {
           />
 
           {/* Quick suggestions */}
-          <Suggestions>
-            {quickSuggestions.map((suggestion) => (
-              <Suggestion
-                key={suggestion}
-                onClick={handleSuggestionClick}
-                suggestion={suggestion}
-              />
-            ))}
-          </Suggestions>
-        </div>
-
-        {/* Recent conversations */}
-        {conversations.length > 0 && (
-          <div className="w-full max-w-2xl flex flex-col gap-1">
-            <p className="text-xs font-medium text-muted-foreground px-1 mb-1">
-              Recent conversations
-            </p>
-            {conversations.map((conv) => (
-              <button
-                key={conv.id}
-                onClick={() => handleSelectConversation(conv.id)}
-                className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors text-left"
-              >
-                <MessageSquare className="h-4 w-4 shrink-0" />
-                <span className="truncate">
-                  {conv.title ?? 'New conversation'}
-                </span>
-              </button>
-            ))}
-            <button
-              onClick={() => void navigate({ to: '/agents/conversations' })}
-              className="text-xs text-muted-foreground hover:text-accent-foreground transition-colors mt-1 py-1 px-3 text-left"
-            >
-              View all conversations →
-            </button>
+          <div className="absolute inset-x-0 top-full mt-3">
+            <Suggestions>
+              {quickSuggestions.map((suggestion) => (
+                <Suggestion
+                  key={suggestion}
+                  onClick={handleSuggestionClick}
+                  suggestion={suggestion}
+                />
+              ))}
+            </Suggestions>
           </div>
-        )}
+        </div>
       </div>
     </Page>
   );

@@ -28,7 +28,7 @@ export function WorkspaceSwitcher() {
   const { data: session } = useQuery(sessionQueryOptions);
   const currentUserId = session?.user?.id;
 
-  const itemHeightClass = 'h-10';
+  const itemHeightClass = 'h-9';
   const navigate = useNavigate();
   const currentWorkspace = workspaces.find((ws) => ws.id === selectedWorkspace);
   if (isLoading) {
@@ -47,8 +47,7 @@ export function WorkspaceSwitcher() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
-              size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              className="h-9 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <div className="grid flex-1 text-start text-sm leading-tight">
                 <span className="truncate font-semibold">

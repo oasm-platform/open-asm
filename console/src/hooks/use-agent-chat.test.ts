@@ -33,7 +33,7 @@ vi.mock('ai', async (importOriginal) => {
 });
 
 vi.mock('@tanstack/react-router', () => ({
-  useLocation: () => ({ state: null, pathname: '/agents/conversations/c1' }),
+  useLocation: () => ({ state: null, pathname: '/aistudio/conversations/c1' }),
   useNavigate: () => vi.fn(),
 }));
 

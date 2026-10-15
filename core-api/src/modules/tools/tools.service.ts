@@ -134,6 +134,14 @@ export class ToolsService {
   }
 
   /**
+   * Whether the connector manifest flags this tool as an AI agent tool.
+   * Built-in tools have no manifest entry → false.
+   */
+  private isAgentTool(toolName: string): boolean {
+    return this.connectorRegistry.getConnector(toolName)?.agentTool === true;
+  }
+
+  /**
    * Checks whether at least one ToolConfigProfile exists for a workspace+tool pair.
    */
   async hasProfile(workspaceId: string, toolId: string): Promise<boolean> {
@@ -459,7 +467,14 @@ export class ToolsService {
         };
       });
 
-      return getManyResponse({ query, data: toolsWithProfiles, total });
+      return getManyResponse({
+        query,
+        data: toolsWithProfiles.map((tool) => ({
+          ...tool,
+          agentTool: this.isAgentTool(tool.name),
+        })),
+        total,
+      });
     } else {
       // No workspaceId — simple paginated query
       const [data, total] = await this.toolsRepository.findAndCount({
@@ -472,6 +487,9 @@ export class ToolsService {
         },
         order,
       });
+      for (const tool of data) {
+        tool.agentTool = this.isAgentTool(tool.name);
+      }
       return getManyResponse({ query, data, total });
     }
   }
@@ -514,8 +532,9 @@ export class ToolsService {
       : new Set<string>();
 
     const enrichedTools = combinedTools.map((tool) => {
+      const agentTool = this.isAgentTool(tool.name);
       if (tool.type === WorkerType.BUILT_IN) {
-        return { ...tool, isReady: true };
+        return { ...tool, isReady: true, agentTool };
       }
       const hasConfigProfile = workspaceId
         ? profileToolIds.has(tool.id!)
@@ -523,7 +542,12 @@ export class ToolsService {
       // Connector without a config schema needs no config → installed means ready.
       const needsConfig =
         this.connectorRegistry.getConnectorSchema(tool.name) !== null;
-      return { ...tool, hasConfigProfile, isReady: needsConfig ? hasConfigProfile : true };
+      return {
+        ...tool,
+        hasConfigProfile,
+        isReady: needsConfig ? hasConfigProfile : true,
+        agentTool,
+      };
     });
 
     return {
@@ -547,6 +571,8 @@ export class ToolsService {
     if (!tool) {
       throw new NotFoundException(`Tool with ID "${id}" not found.`);
     }
+
+    tool.agentTool = this.isAgentTool(tool.name);
 
     // If tool is built-in, it's always considered installed and ready
     if (tool.type === WorkerType.BUILT_IN) {

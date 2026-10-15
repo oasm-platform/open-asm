@@ -2,7 +2,18 @@ import { usePermission } from '@/hooks/usePermission';
 import { useSession } from '@/utils/authClient';
 import { useNavigate, useParams } from '@tanstack/react-router';
 import { useEffect, useMemo, type JSX } from 'react';
-import { Loader2 } from 'lucide-react';
+import {
+  Building2,
+  Info,
+  KeyRound,
+  Loader2,
+  Palette,
+  Plug,
+  ScrollText,
+  ShieldCheck,
+  SlidersHorizontal,
+  Users,
+} from 'lucide-react';
 import ApiKeysSettings from './components/api-keys-settings';
 import AuditLogSettings from './components/audit-log-settings';
 import BrandNameAndLogoSettings from './components/brand-name-and-logo';
@@ -24,6 +35,7 @@ interface SettingsTabItem {
   id: string;
   label: string;
   path: string;
+  icon: JSX.Element;
   content?: TabContentProps;
   component?: JSX.Element;
   /** Permission key required to see this tab (e.g. 'workspace.read'). Omit to always show. */
@@ -49,6 +61,7 @@ export const settingsTabGroups: SettingsTabGroup[] = [
         id: 'general',
         label: 'General',
         path: '/settings/general',
+        icon: <Building2 />,
         content: {
           title: 'Workspace settings',
           description: 'Manage your workspace settings',
@@ -60,6 +73,7 @@ export const settingsTabGroups: SettingsTabGroup[] = [
         id: 'apikeys',
         label: 'API keys',
         path: '/settings/apikeys',
+        icon: <KeyRound />,
         content: {
           title: 'API Keys',
           description: 'Manage your workspace API keys',
@@ -71,6 +85,7 @@ export const settingsTabGroups: SettingsTabGroup[] = [
         id: 'members',
         label: 'Members',
         path: '/settings/members',
+        icon: <Users />,
         content: {
           title: 'Members',
           description: 'Manage members, invitations and permission groups',
@@ -82,6 +97,7 @@ export const settingsTabGroups: SettingsTabGroup[] = [
         id: 'audit',
         label: 'Audit log',
         path: '/settings/audit',
+        icon: <ScrollText />,
         content: {
           title: 'Audit log',
           description: 'View and export workspace activity',
@@ -99,6 +115,7 @@ export const settingsTabGroups: SettingsTabGroup[] = [
         id: 'preferences',
         label: 'Preferences',
         path: '/settings/preferences',
+        icon: <SlidersHorizontal />,
         content: {
           title: 'Preferences',
           description: 'Manage your account preferences',
@@ -109,6 +126,7 @@ export const settingsTabGroups: SettingsTabGroup[] = [
         id: 'security',
         label: 'Security',
         path: '/settings/security',
+        icon: <ShieldCheck />,
         content: {
           title: 'Security',
           description: 'Manage your account security settings',
@@ -125,6 +143,7 @@ export const settingsTabGroups: SettingsTabGroup[] = [
         id: 'mcp',
         label: 'MCP Connect',
         path: '/settings/mcp',
+        icon: <Plug />,
         content: {
           title: 'MCP Connect',
           description: 'Connect to OASM server via MCP protocol',
@@ -143,6 +162,7 @@ export const settingsTabGroups: SettingsTabGroup[] = [
         id: 'brand',
         label: 'Brand name and logo',
         path: '/settings/brand',
+        icon: <Palette />,
         content: {
           title: 'Brand name and logo',
           description: 'Customize your brand name and logo',
@@ -153,6 +173,7 @@ export const settingsTabGroups: SettingsTabGroup[] = [
         id: 'about',
         label: 'About',
         path: '/settings/about',
+        icon: <Info />,
         content: {
           title: 'About',
           description:

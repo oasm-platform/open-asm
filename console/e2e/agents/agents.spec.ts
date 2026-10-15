@@ -2,7 +2,7 @@ import { test, expect } from '../helpers/auth';
 
 test.describe('AI Agents', () => {
   test('agents landing page renders', async ({ adminPage: page }) => {
-    await page.goto('/agents');
+    await page.goto('/aistudio');
     await expect(page.getByText('Agents')).toBeVisible();
   });
 

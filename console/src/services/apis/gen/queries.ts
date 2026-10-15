@@ -1340,6 +1340,7 @@ export type Tool = {
   availableWorkersCount?: number;
   hasConfigProfile?: ToolHasConfigProfile;
   isReady?: boolean;
+  agentTool?: boolean;
 };
 
 export type User = {

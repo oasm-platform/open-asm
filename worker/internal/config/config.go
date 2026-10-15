@@ -70,8 +70,8 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("max_concurrency", 0) // 0 = auto-size from available CPU/RAM
 	viper.SetDefault("grpc_host", "localhost")
 	viper.SetDefault("grpc_port", 16276)
-	viper.SetDefault("tool_path", "oasm-tools")
-	viper.SetDefault("workspace_root", "agent-sessions")
+	viper.SetDefault("tool_path", DataPath("oasm-tools"))
+	viper.SetDefault("workspace_root", DataPath("agent-sessions"))
 	viper.SetDefault("connector_port", 26276)
 	viper.SetDefault("connector_addr", "") // REQUIRED dial address for connector containers; empty fails fast unless connector_addr_allow_autodetect is set
 	viper.SetDefault("connector_addr_allow_autodetect", false)

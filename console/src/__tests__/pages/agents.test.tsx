@@ -30,16 +30,6 @@ vi.mock('@/hooks/use-llm-configs', () => ({
   })),
 }));
 
-vi.mock('@/services/apis/gen/queries', async () => {
-  const actual = await vi.importActual('@/services/apis/gen/queries');
-  return {
-    ...actual,
-    useAgentsControllerGetConversations: vi.fn(() => ({
-      data: { data: [] },
-    })),
-  };
-});
-
 vi.mock('@/components/agent-settings-dialog', () => ({
   AgentSettingsDialog: () => <div data-testid="agent-settings-dialog">AgentSettingsDialog</div>,
 }));
@@ -79,8 +69,8 @@ describe('Agents Page', () => {
     } as unknown as ReturnType<typeof useLLMConfigs>);
 
     renderWithProviders(<AgentsLandingPage />, {
-      routePath: '/_authed/agents/',
-      initialEntries: ['/_authed/agents/'],
+      routePath: '/_authed/aistudio/',
+      initialEntries: ['/_authed/aistudio/'],
     });
 
     await waitFor(() => {
@@ -100,48 +90,13 @@ describe('Agents Page', () => {
     } as unknown as ReturnType<typeof useLLMConfigs>);
 
     renderWithProviders(<AgentsLandingPage />, {
-      routePath: '/_authed/agents/',
-      initialEntries: ['/_authed/agents/'],
+      routePath: '/_authed/aistudio/',
+      initialEntries: ['/_authed/aistudio/'],
     });
 
     await waitFor(() => {
       expect(screen.getByText('Connect an AI Provider')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Connect' })).toBeInTheDocument();
-    });
-  });
-
-  it('shows recent conversations when available', async () => {
-    const { useLLMConfigs } = await import('@/hooks/use-llm-configs');
-    const { useAgentsControllerGetConversations } = await import(
-      '@/services/apis/gen/queries'
-    );
-
-    vi.mocked(useLLMConfigs).mockReturnValue({
-      providers: [{ isConnected: true, configId: '1', providerId: 'openai', model: 'gpt-4' }],
-      connectedProviders: [{ isConnected: true, configId: '1', providerId: 'openai', model: 'gpt-4' }],
-      preferredProvider: undefined,
-      hasProviderConnected: true,
-      isLoading: false,
-    } as unknown as ReturnType<typeof useLLMConfigs>);
-
-    vi.mocked(useAgentsControllerGetConversations).mockReturnValue({
-      data: {
-        data: [
-          { id: 'conv-1', title: 'Test Conversation 1', updatedAt: '2026-01-01' },
-          { id: 'conv-2', title: 'Test Conversation 2', updatedAt: '2026-01-02' },
-        ],
-      },
-    } as ReturnType<typeof useAgentsControllerGetConversations>);
-
-    renderWithProviders(<AgentsLandingPage />, {
-      routePath: '/_authed/agents/',
-      initialEntries: ['/_authed/agents/'],
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText('Recent conversations')).toBeInTheDocument();
-      expect(screen.getByText('Test Conversation 1')).toBeInTheDocument();
-      expect(screen.getByText('Test Conversation 2')).toBeInTheDocument();
     });
   });
 });
