@@ -33,6 +33,7 @@ import {
 } from './dto/get-vulnerability.dto';
 import { VulnerabilityDismissal } from './entities/vulnerability-dismissal.entity';
 import { Vulnerability } from './entities/vulnerability.entity';
+import { compileVulnerabilityFilter } from './vulnerability-filter';
 
 @Injectable()
 export class VulnerabilitiesService {
@@ -115,6 +116,7 @@ export class VulnerabilitiesService {
       createdTo,
       tags,
       targetId,
+      filter,
     } = query;
 
     const { sortBy } = query;
@@ -196,6 +198,9 @@ export class VulnerabilitiesService {
       });
       queryBuilder.andWhere(`(${conditions})`, params);
     }
+
+    const compiled = filter && compileVulnerabilityFilter(filter, 'vf');
+    if (compiled) queryBuilder.andWhere(compiled.sql, compiled.params);
 
     const [vulnerabilities, total] = await queryBuilder.getManyAndCount();
 
