@@ -25,6 +25,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { firstValueFrom } from 'rxjs';
 import { In, Repository } from 'typeorm';
 import { AgentsApprovalsService } from './agents.approvals';
+import { AgentsConfigService, maskApiKey } from './agents.config';
 import { AgentsMemoriesService } from './agents.memories';
 import { AgentModeDto, GetAgentModesResponseDto } from './dto/agent-mode.dto';
 import {
@@ -82,11 +83,15 @@ export class AgentsService {
     private readonly httpService: HttpService,
     private readonly workersService: WorkersService,
     private readonly approvals: AgentsApprovalsService,
+    private readonly agentsConfig: AgentsConfigService,
   ) {}
 
-  private maskApiKey(apiKey: string): string {
-    if (apiKey.length <= 4) return '****';
-    return '*'.repeat(apiKey.length - 4) + apiKey.slice(-4);
+  private async getDefaultLLMConfigId(
+    workspaceId: string,
+    userId: string,
+  ): Promise<string | undefined> {
+    const config = await this.agentsConfig.find(workspaceId, userId);
+    return config?.modelsConfig.default?.llmConfigId;
   }
 
   getAgentModes(): AgentModeDto[] {
@@ -136,9 +141,10 @@ export class AgentsService {
   private toLLMConfigResponse(
     config: AgentLLMConfig,
     dek: Buffer | null,
+    defaultLLMConfigId: string | undefined,
   ): LLMConfigResponseDto {
     const apiKeyMasked = config.apiKey
-      ? this.maskApiKey(decryptWithDEK(config.apiKey, dek))
+      ? maskApiKey(decryptWithDEK(config.apiKey, dek))
       : '****';
     return {
       id: config.id,
@@ -146,8 +152,7 @@ export class AgentsService {
       name: config.name,
       model: config.model,
       apiUrl: config.apiUrl,
-      contextWindow: config.contextWindow,
-      isPreferred: config.isPreferred,
+      isPreferred: config.id === defaultLLMConfigId,
       apiKeyMasked,
       createdAt: config.createdAt,
       updatedAt: config.updatedAt,
@@ -178,12 +183,6 @@ export class AgentsService {
     // Use first model from the list as default
     const defaultModel = models[0].id;
 
-    // First config in workspace becomes preferred automatically
-    const totalConfigs = await this.llmConfigRepository.count({
-      where: { workspaceId, userId },
-    });
-    const isPreferred = totalConfigs === 0;
-
     if (!dto.apiKey) {
       dto.apiKey = 'not_set';
     }
@@ -200,11 +199,24 @@ export class AgentsService {
       model: dto.model || defaultModel,
       apiUrl: dto.apiUrl,
       createdBy: userId,
-      isPreferred,
     });
 
     const saved = await this.llmConfigRepository.save(config);
-    return this.toLLMConfigResponse(saved, dek);
+    // The first connection becomes the default model
+    let defaultLLMConfigId = await this.getDefaultLLMConfigId(
+      workspaceId,
+      userId,
+    );
+    if (!defaultLLMConfigId) {
+      await this.agentsConfig.setDefaultModel(
+        workspaceId,
+        userId,
+        saved.id,
+        saved.model,
+      );
+      defaultLLMConfigId = saved.id;
+    }
+    return this.toLLMConfigResponse(saved, dek, defaultLLMConfigId);
   }
 
   async getLLMProvidersStatus(
@@ -216,8 +228,15 @@ export class AgentsService {
     });
 
     const dek = await this.workspaceEncryption.getDEK(workspaceId);
+    const defaultLLMConfigId = await this.getDefaultLLMConfigId(
+      workspaceId,
+      userId,
+    );
     const configMap = new Map(
-      configs.map((c) => [c.provider, this.toLLMConfigResponse(c, dek)]),
+      configs.map((c) => [
+        c.provider,
+        this.toLLMConfigResponse(c, dek, defaultLLMConfigId),
+      ]),
     );
 
     return llmProviderSupported.map((provider) => ({
@@ -248,13 +267,17 @@ export class AgentsService {
     });
 
     const dek = await this.workspaceEncryption.getDEK(workspaceId);
+    const defaultLLMConfigId = await this.getDefaultLLMConfigId(
+      workspaceId,
+      userId,
+    );
 
     return configs.map((config) => {
       const providerMeta = llmProviderSupported.find(
         (p) => p.id === config.provider,
       );
       const apiKey = config.apiKey ? decryptWithDEK(config.apiKey, dek) : '';
-      const apiKeyMasked = config.apiKey ? this.maskApiKey(apiKey) : '****';
+      const apiKeyMasked = config.apiKey ? maskApiKey(apiKey) : '****';
       return {
         providerId: config.provider,
         providerName: providerMeta?.name ?? config.provider,
@@ -264,7 +287,7 @@ export class AgentsService {
         name: config.name,
         model: config.model,
         apiUrl: config.apiUrl,
-        isPreferred: config.isPreferred,
+        isPreferred: config.id === defaultLLMConfigId,
         apiKeyMasked,
         createdAt: config.createdAt,
         updatedAt: config.updatedAt,
@@ -296,10 +319,26 @@ export class AgentsService {
     if (dto.provider !== undefined) config.provider = dto.provider;
     if (dto.model !== undefined) config.model = dto.model;
     if (dto.apiUrl !== undefined) config.apiUrl = dto.apiUrl;
-    if (dto.isPreferred !== undefined) config.isPreferred = dto.isPreferred;
 
     const saved = await this.llmConfigRepository.save(config);
-    return this.toLLMConfigResponse(saved, dek);
+    // Picking a model on the default connection changes the default model
+    let defaultLLMConfigId = await this.getDefaultLLMConfigId(
+      workspaceId,
+      userId,
+    );
+    if (
+      dto.isPreferred ||
+      (dto.model !== undefined && defaultLLMConfigId === saved.id)
+    ) {
+      await this.agentsConfig.setDefaultModel(
+        workspaceId,
+        userId,
+        saved.id,
+        saved.model,
+      );
+      defaultLLMConfigId = saved.id;
+    }
+    return this.toLLMConfigResponse(saved, dek, defaultLLMConfigId);
   }
 
   async deleteLLMConfig(
@@ -316,6 +355,7 @@ export class AgentsService {
     }
 
     await this.llmConfigRepository.remove(config);
+    await this.agentsConfig.removeLLMConfigRefs(workspaceId, userId, id);
   }
 
   async setPreferredLLMConfig(
@@ -331,25 +371,14 @@ export class AgentsService {
       throw new NotFoundException('LLM config not found');
     }
 
-    // Unset all other preferred configs scoped to this member
-    await this.llmConfigRepository.update(
-      { workspaceId, userId, isPreferred: true },
-      { isPreferred: false },
+    await this.agentsConfig.setDefaultModel(
+      workspaceId,
+      userId,
+      config.id,
+      config.model,
     );
-
-    config.isPreferred = true;
-    const saved = await this.llmConfigRepository.save(config);
     const dek = await this.workspaceEncryption.getDEK(workspaceId);
-    return this.toLLMConfigResponse(saved, dek);
-  }
-
-  async getPreferredLLMConfig(
-    workspaceId: string,
-    userId: string,
-  ): Promise<AgentLLMConfig | null> {
-    return this.llmConfigRepository.findOne({
-      where: { workspaceId, userId, isPreferred: true },
-    });
+    return this.toLLMConfigResponse(config, dek, config.id);
   }
 
   async getModelsForProvider(

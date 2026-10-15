@@ -10,6 +10,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentsCompletionsService } from './agents.completions';
 import { AgentsController } from './agents.controller';
 import { AgentsApprovalsService } from './agents.approvals';
+import { AgentsConfigService } from './agents.config';
+import { AgentConfig } from './entities/agent-config.entity';
 import { AgentCommandApproval } from './entities/agent-command-approval.entity';
 import { AgentsMemoriesService } from './agents.memories';
 import { AgentsService } from './agents.service';
@@ -39,6 +41,7 @@ import { HttpModule } from '@nestjs/axios';
       AgentMCPConfig,
       AgentSkill,
       AgentCommandApproval,
+      AgentConfig,
     ]),
     AssetsModule,
     TargetsModule,
@@ -58,6 +61,7 @@ import { HttpModule } from '@nestjs/axios';
     AgentsMemoriesService,
     AgentsSkillsService,
     AgentsApprovalsService,
+    AgentsConfigService,
   ],
   exports: [
     AgentsService,

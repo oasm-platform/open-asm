@@ -2,20 +2,12 @@ import { BaseEntity } from '@/common/entities/base.entity';
 import { User } from '@/modules/auth/entities/user.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsBoolean,
-  IsEnum,
-  IsNumber,
-  IsOptional,
-  IsString,
-  IsUUID,
-} from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import { Column, Entity, Index, JoinColumn, ManyToOne, Relation } from 'typeorm';
 import { LLMProvider } from '../enums/agent.enums';
 
 @Entity('agent_llm_configs')
 @Index('IDX_llm_config_workspaceId', ['workspace'])
-@Index('IDX_llm_config_workspace_user_pref', ['workspace', 'userId', 'isPreferred'])
 export class AgentLLMConfig extends BaseEntity {
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
   @IsUUID()
@@ -60,40 +52,8 @@ export class AgentLLMConfig extends BaseEntity {
   @Column({ type: 'varchar', length: 500, nullable: true })
   apiUrl?: string;
 
-  @ApiProperty({ example: false, default: false })
-  @IsBoolean()
-  @Column({ type: 'boolean', default: false })
-  isPreferred: boolean;
-
-  @ApiProperty({
-    example: 8192,
-    description: 'Custom context window size in tokens. Overrides API-provided value.',
-    required: false,
-  })
-  @IsOptional()
-  @Column({ type: 'integer', nullable: true })
-  contextWindow?: number;
-
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
   @IsUUID()
   @Column({ type: 'uuid' })
   createdBy: string;
-
-  @ApiProperty({
-    description: 'Max output tokens for agent mode',
-    required: false,
-  })
-  @IsOptional()
-  @IsNumber()
-  @Column({ type: 'int', nullable: true })
-  maxOutputTokens?: number;
-
-  @ApiProperty({
-    description: 'Max tool call steps per iteration',
-    required: false,
-  })
-  @IsOptional()
-  @IsNumber()
-  @Column({ type: 'int', nullable: true })
-  maxSteps?: number;
 }

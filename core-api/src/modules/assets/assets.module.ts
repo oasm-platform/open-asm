@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AgentConfig } from '../agents/entities/agent-config.entity';
 import { AgentLLMConfig } from '../agents/entities/agent-llm-config.entity';
 import { Job } from '../jobs-registry/entities/job.entity';
 import { Target } from '../targets/entities/target.entity';
@@ -33,6 +34,7 @@ import { TlsCertificate } from './entities/tls-certificate.entity';
       HttpStatusCode,
       DnsRecord,
       AgentLLMConfig,
+      AgentConfig,
     ]),
     TechnologyModule,
     WorkspacesModule,

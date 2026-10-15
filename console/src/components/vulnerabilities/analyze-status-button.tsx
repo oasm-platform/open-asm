@@ -78,7 +78,7 @@ export function AnalyzeStatusButton({
 
     // If no LLM provider is connected, redirect to agent settings
     if (!llmLoading && !hasProviderConnected) {
-      openAgentSettings();
+      openAgentSettings('provider');
       return;
     }
 

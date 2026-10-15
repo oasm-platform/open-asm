@@ -28,6 +28,13 @@ import {
   type ApprovalResolvedEvent,
   type ApprovalSettings,
 } from './agents.approvals';
+import {
+  AgentsConfigService,
+  formatUserInstructions,
+  type ResolvedLLMConfig,
+  withAgentConfig,
+  withoutDisabledTools,
+} from './agents.config';
 import { AgentsMcpService } from './agents.mcp';
 import { AgentsMemoriesService } from './agents.memories';
 import { AgentsSkillsService } from './agents.skills';
@@ -99,7 +106,7 @@ interface StreamCreationParams {
 
 /** Parameters for building streamText call options */
 interface StreamTextOptions {
-  llmConfig: AgentLLMConfig;
+  llmConfig: ResolvedLLMConfig;
   model: LanguageModel;
   modelMessages: Array<{
     role: 'user' | 'assistant' | 'system';
@@ -152,6 +159,7 @@ export class AgentsCompletionsService {
     private readonly workspaceEncryption: WorkspaceEncryptionService,
     private readonly approvals: AgentsApprovalsService,
     private readonly workersService: WorkersService,
+    private readonly agentsConfig: AgentsConfigService,
   ) {
     this.loadAllPrompts();
   }
@@ -203,40 +211,33 @@ export class AgentsCompletionsService {
     return template;
   }
 
-  private async getPreferredLLMConfig(
-    workspaceId: string,
-    userId: string,
-  ): Promise<AgentLLMConfig | null> {
-    return this.llmConfigRepository.findOne({
-      where: { workspaceId, userId, isPreferred: true },
-    });
-  }
-
   private async resolveLLMConfig(
     workspaceId: string,
     userId: string,
     provider?: string,
     model?: string,
-  ): Promise<AgentLLMConfig> {
-    let llmConfig: AgentLLMConfig | null = null;
+  ): Promise<ResolvedLLMConfig> {
+    const agentConfig = await this.agentsConfig.find(workspaceId, userId);
 
     if (model && provider) {
-      llmConfig = await this.llmConfigRepository.findOne({
+      const llmConfig = await this.llmConfigRepository.findOne({
         where: {
           workspaceId,
           userId,
           provider: provider as LLMProvider,
         },
       });
+      if (llmConfig) return withAgentConfig(llmConfig, agentConfig);
     }
 
-    if (!llmConfig) {
-      llmConfig = await this.getPreferredLLMConfig(workspaceId, userId);
-    }
-
+    const llmConfig = await this.agentsConfig.getDefaultLLMConfig(
+      workspaceId,
+      userId,
+      agentConfig,
+    );
     if (!llmConfig) {
       throw new BadRequestException(
-        'No preferred LLM config found. Please create and set a preferred LLM config first.',
+        'No LLM provider connected. Please connect a provider first.',
       );
     }
 
@@ -314,7 +315,7 @@ export class AgentsCompletionsService {
 
   private async generateTitle(
     conversationId: string,
-    llmConfig: AgentLLMConfig,
+    llmConfig: ResolvedLLMConfig,
   ): Promise<void> {
     try {
       const messages = await this.messageRepository.find({
@@ -373,7 +374,7 @@ export class AgentsCompletionsService {
     conversationId: string,
     accumulatedText: string,
     accumulatedReasoning: string,
-    llmConfig: AgentLLMConfig,
+    llmConfig: ResolvedLLMConfig,
     assistantMsgMetadata: Record<string, unknown> | undefined,
   ): Promise<void> {
     try {
@@ -496,7 +497,10 @@ export class AgentsCompletionsService {
       });
 
       const model = await this.createLanguageModel(llmConfig, workspaceId);
-      const tools = this.agentTool.getTools(workspaceId, AgentMode.AGENT);
+      const tools = withoutDisabledTools(
+        this.agentTool.getTools(workspaceId, AgentMode.AGENT),
+        await this.agentsConfig.find(workspaceId, userId),
+      );
 
       let accumulatedText = '';
 
@@ -578,14 +582,18 @@ export class AgentsCompletionsService {
         'Worker is not available to agents in this workspace',
       );
     }
+    const agentConfig = await this.agentsConfig.find(workspaceId, userId);
     const newConversation = this.conversationRepository.create({
       ...(dto.conversationId ? { id: dto.conversationId } : {}),
       workspaceId,
       llmConfigId: llmConfig.id,
       title: dto.question.slice(0, 500),
       createdBy: userId,
-      agentMode: dto.agentMode,
-      approvalMode: dto.approvalMode ?? AgentApprovalMode.MANUAL,
+      agentMode: dto.agentMode ?? agentConfig?.defaultAgentMode ?? undefined,
+      approvalMode:
+        dto.approvalMode ??
+        agentConfig?.defaultApprovalMode ??
+        AgentApprovalMode.MANUAL,
       workerId: dto.workerId,
     });
     return this.conversationRepository.save(newConversation);
@@ -637,7 +645,7 @@ export class AgentsCompletionsService {
     dto: SendMessageDto,
     workspaceId: string,
     userId: string,
-  ): Promise<AgentLLMConfig> {
+  ): Promise<ResolvedLLMConfig> {
     // Get the base config from the conversation
     let llmConfig = await this.llmConfigRepository.findOne({
       where: { id: conversation.llmConfigId, workspaceId, userId },
@@ -658,15 +666,18 @@ export class AgentsCompletionsService {
     }
 
     // If user changed model within the same provider, override in memory only
-    // (Avoids writing to DB which would affect other conversations)
-    if (dto.model && dto.provider === llmConfig.provider) {
-      llmConfig = this.llmConfigRepository.create({
-        ...llmConfig,
-        model: dto.model,
-      });
-    }
+    // (Avoids writing to DB which would affect other conversations).
+    // Otherwise the default connection runs the agent's default model.
+    const agentConfig = await this.agentsConfig.find(workspaceId, userId);
+    const defaultRef = agentConfig?.modelsConfig.default;
+    const model =
+      dto.model && dto.provider === llmConfig.provider
+        ? dto.model
+        : defaultRef?.llmConfigId === llmConfig.id
+          ? defaultRef.model
+          : llmConfig.model;
 
-    return llmConfig;
+    return withAgentConfig(llmConfig, agentConfig, model);
   }
 
   /**
@@ -751,7 +762,7 @@ export class AgentsCompletionsService {
    */
   private async checkAndCompactMidLoop(
     conversationId: string,
-    llmConfig: AgentLLMConfig,
+    llmConfig: ResolvedLLMConfig,
     contextParts: string[],
     modelMessages: Array<{ role: string; content: string }>,
   ): Promise<boolean> {
@@ -797,7 +808,7 @@ export class AgentsCompletionsService {
    */
   private async generateEndOfConversationReport(
     conversationId: string,
-    llmConfig: AgentLLMConfig,
+    llmConfig: ResolvedLLMConfig,
   ): Promise<void> {
     try {
       const messages = await this.messageRepository.find({
@@ -865,7 +876,7 @@ export class AgentsCompletionsService {
    */
   private async saveAssistantMessage(
     conversationId: string,
-    llmConfig: AgentLLMConfig,
+    llmConfig: ResolvedLLMConfig,
   ): Promise<AgentMessage> {
     const assistantMessage = this.messageRepository.create({
       conversationId,
@@ -943,13 +954,17 @@ export class AgentsCompletionsService {
     const now = new Date();
     const currentTimeContext = `Current time: ${now.toISOString()} (${now.toLocaleString('en-US', { timeZoneName: 'short' })})`;
 
-    // Fetch STM and LTM concurrently
-    const [stmContext, ltmContext] = await Promise.all([
+    // Fetch STM, LTM and the user's agent config concurrently
+    const [stmContext, ltmContext, agentConfig] = await Promise.all([
       this.agentsMemories.stmFormatForPrompt(conversation.id),
       userId
         ? this.agentsMemories.ltmFormatForPrompt(workspaceId, userId)
         : Promise.resolve(''),
+      userId
+        ? this.agentsConfig.find(workspaceId, userId)
+        : Promise.resolve(null),
     ]);
+    const userContext = formatUserInstructions(agentConfig);
 
     const todos = await this.loadTodoItems(conversation.id);
     const planning = planningState(conversation.approvalMode, todos);
@@ -974,6 +989,7 @@ export class AgentsCompletionsService {
     return [
       modePrompt,
       systemPrompt,
+      userContext,
       summaryContext,
       currentTimeContext,
       ltmContext,
@@ -996,7 +1012,7 @@ export class AgentsCompletionsService {
    * The contextWindow column is set by the user when creating/updating
    * an LLM config. If not set, falls back to the default.
    */
-  private getModelContextWindow(llmConfig: AgentLLMConfig): number {
+  private getModelContextWindow(llmConfig: ResolvedLLMConfig): number {
     if (llmConfig.contextWindow && llmConfig.contextWindow > 0) {
       return llmConfig.contextWindow;
     }
@@ -1008,7 +1024,7 @@ export class AgentsCompletionsService {
    * estimated token usage vs the model's context window threshold (70%).
    */
   private shouldCompact(
-    llmConfig: AgentLLMConfig,
+    llmConfig: ResolvedLLMConfig,
     contextParts: string[],
     modelMessages: Array<{ role: string; content: string }>,
   ): boolean {
@@ -1048,7 +1064,7 @@ export class AgentsCompletionsService {
    */
   private async compactConversation(
     conversationId: string,
-    llmConfig: AgentLLMConfig,
+    llmConfig: ResolvedLLMConfig,
   ): Promise<void> {
     try {
       // Fetch recent messages for summarization
@@ -1123,7 +1139,7 @@ export class AgentsCompletionsService {
    */
   private async handlePostStreamCompaction(
     conversationId: string,
-    llmConfig: AgentLLMConfig,
+    llmConfig: ResolvedLLMConfig,
     contextParts: string[],
     modelMessages: Array<{ role: string; content: string }>,
   ): Promise<void> {
@@ -1897,8 +1913,8 @@ export class AgentsCompletionsService {
       };
     }
 
-    // Step 8: Determine agent mode
-    const agentMode = dto.agentMode || AgentMode.ASK;
+    // Step 8: Determine agent mode (a new conversation got the user's default)
+    const agentMode = dto.agentMode || conversation.agentMode || AgentMode.ASK;
 
     // Step 9: Create a placeholder message for the assistant (marks streaming)
     const assistantMessage = await this.saveAssistantMessage(
@@ -1976,8 +1992,12 @@ export class AgentsCompletionsService {
     };
 
     // Step 12: Build the combined stream with auto-continuation
+    const enabledTools = withoutDisabledTools(
+      tools,
+      await this.agentsConfig.find(workspaceId, userId),
+    );
     const toolSetArg: ToolSet | undefined =
-      Object.keys(tools).length > 0 ? tools : undefined;
+      Object.keys(enabledTools).length > 0 ? enabledTools : undefined;
 
     const stream = this.createContinuationStream({
       llmConfig,
