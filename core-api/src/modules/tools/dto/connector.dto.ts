@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
  * Connector metadata exposed by GET /tools/connectors/:slug. Mirrors the
@@ -45,10 +45,9 @@ export class ConnectorDto {
   @ApiProperty({ required: false })
   agentTool?: boolean;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     type: 'object',
     additionalProperties: true,
-    required: false,
     description:
       'JSON Schema of the inputs OASM passes to the connector on each run.',
   })
