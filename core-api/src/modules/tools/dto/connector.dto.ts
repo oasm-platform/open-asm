@@ -44,4 +44,13 @@ export class ConnectorDto {
 
   @ApiProperty({ required: false })
   agentTool?: boolean;
+
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: true,
+    required: false,
+    description:
+      'JSON Schema of the inputs OASM passes to the connector on each run.',
+  })
+  inputsSchema?: Record<string, unknown>;
 }

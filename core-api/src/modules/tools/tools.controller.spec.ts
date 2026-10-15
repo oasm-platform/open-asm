@@ -94,3 +94,46 @@ describe('ToolsController.getToolSchema', () => {
     expect(result).toEqual({ schema: null, source: null });
   });
 });
+
+describe('ToolsController.getConnectorBySlug', () => {
+  const inputsSchema = {
+    type: 'object',
+    properties: { target: { type: 'string', description: 'Scan target' } },
+    required: ['target'],
+  };
+  let mockConnectorRegistryService: Record<string, jest.Mock>;
+  let controller: ToolsController;
+
+  beforeEach(() => {
+    mockConnectorRegistryService = { getConnector: jest.fn() };
+    controller = new ToolsController(
+      {} as any,
+      mockConnectorRegistryService as any,
+    );
+  });
+
+  it('exposes the manifest inputsSchema', () => {
+    mockConnectorRegistryService.getConnector.mockReturnValue({
+      name: 'Nuclei',
+      slug: 'nuclei',
+      version: '1.0.0',
+      image: 'ghcr.io/oasm-platform/connector-nuclei:1.0.0',
+      capabilities: ['vulnerabilities'],
+      inputsSchema,
+      configSchema: { type: 'object' },
+    });
+
+    const result = controller.getConnectorBySlug({ slug: 'nuclei' });
+
+    expect(result.inputsSchema).toEqual(inputsSchema);
+    expect(result).not.toHaveProperty('configSchema');
+  });
+
+  it('throws NotFoundException for an unknown slug', () => {
+    mockConnectorRegistryService.getConnector.mockReturnValue(null);
+
+    expect(() => controller.getConnectorBySlug({ slug: 'nope' })).toThrow(
+      NotFoundException,
+    );
+  });
+});

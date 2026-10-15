@@ -5,6 +5,13 @@ import { AgentToolsTray } from '@/pages/agents/components/agent-tools-tray';
 
 const getManyToolsMock = vi.fn();
 const openSettingsMock = vi.fn();
+const motion = vi.hoisted(() => ({ reduce: false }));
+
+// Reduced motion skips exit animations, which never finish under jsdom.
+vi.mock('framer-motion', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('framer-motion')>()),
+  useReducedMotion: () => motion.reduce,
+}));
 
 vi.mock('@/hooks/useAgentSettingsDialog', () => ({
   useAgentSettingsDialog: () => ({ open: openSettingsMock }),
@@ -39,6 +46,7 @@ describe('AgentToolsTray', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    motion.reduce = false;
   });
 
   it('asks for every agent tool (the logos rotate through them)', async () => {
@@ -78,6 +86,39 @@ describe('AgentToolsTray', () => {
     expect(
       await screen.findByRole('img', { name: 't6' }),
     ).toBeInTheDocument();
+  });
+
+  it('stops after 10 steps and settles on the Connectors label', async () => {
+    motion.reduce = true;
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    getManyToolsMock.mockReturnValue({
+      data: { data: ['t1', 't2', 't3', 't4', 't5', 't6', 't7'].map(tool) },
+    });
+
+    renderWithProviders(
+      <AgentToolsTray agentMode="ask" onAgentModeChange={vi.fn()} />,
+    );
+    expect(await screen.findByText('T1')).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(9000);
+    });
+    expect(screen.queryByText('Connectors')).not.toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(await screen.findByText('Connectors')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryAllByRole('img')).toHaveLength(0),
+    );
+
+    // Settled for good: no further rotation.
+    await act(async () => {
+      vi.advanceTimersByTime(5000);
+    });
+    expect(screen.getByText('Connectors')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Agent tools' })).toBeInTheDocument();
   });
 
   it('shows the Agent toggle and one logo per tool', async () => {

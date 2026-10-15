@@ -1,12 +1,14 @@
+import { ToolInstallConfirmDialog } from "@/components/tools/tool-install-confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { cn } from "@/lib/utils";
 import {
   ToolsControllerGetManyToolsType,
   useToolsControllerInstallTool,
   useToolsControllerUninstallTool,
   type Tool,
 } from "@/services/apis/gen/queries";
-import { CheckCircle, Plus } from "lucide-react";
+import { CheckCircle, Download, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -53,12 +55,12 @@ const ToolInstallButton = ({
       },
       {
         onSuccess: () => {
-          toast.success("Tool added successfully");
+          toast.success("Tool installed successfully");
           if (onInstallChange) onInstallChange();
         },
         onError: () => {
           setIsInstalled(false);
-          toast.error("Failed to add tool");
+          toast.error("Failed to install tool");
         },
       },
     );
@@ -93,7 +95,7 @@ const ToolInstallButton = ({
     );
   };
 
-  // Installed: confirm-guarded uninstall keeps the CTA meaningful (Added /
+  // Installed: confirm-guarded uninstall keeps the CTA meaningful (Installed /
   // Built-in). Config lives in the Configuration tab, not here.
   if (isInstalled) {
     return (
@@ -105,7 +107,7 @@ const ToolInstallButton = ({
         trigger={
           <Button
             variant="outline"
-            className={className}
+            className={cn("min-w-32", className)}
             disabled={uninstallToolMutation.isPending || isBuiltIn}
           >
             {uninstallToolMutation.isPending ? (
@@ -113,7 +115,7 @@ const ToolInstallButton = ({
             ) : (
               <>
                 <CheckCircle className="mr-2 h-4 w-4" />
-                {isBuiltIn ? "Built-in" : "Added"}
+                {isBuiltIn ? "Built-in" : "Installed"}
               </>
             )}
           </Button>
@@ -122,46 +124,25 @@ const ToolInstallButton = ({
     );
   }
 
-  // Connectors add without a confirm dialog (the user then creates a
-  // configuration profile in the Configuration tab); other types keep the
-  // confirm gate.
-  if (tool.type === ToolsControllerGetManyToolsType.connector) {
-    return (
-      <Button
-        variant="default"
-        className={className}
-        onClick={handleInstall}
-        disabled={installToolMutation.isPending}
-      >
-        {installToolMutation.isPending ? (
-          "Adding..."
-        ) : (
-          <>
-            <Plus className="mr-2 h-4 w-4" />
-            Add
-          </>
-        )}
-      </Button>
-    );
-  }
-
   return (
-    <ConfirmDialog
-      title="Add Tool"
-      description={`Are you sure you want to add "${tool.name}"?`}
+    <ToolInstallConfirmDialog
+      tool={tool}
       onConfirm={handleInstall}
       trigger={
         <Button
           variant="default"
-          className={className}
+          className={cn("min-w-32 gap-2 font-semibold shadow-sm", className)}
           disabled={installToolMutation.isPending}
         >
           {installToolMutation.isPending ? (
-            "Adding..."
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              Installing...
+            </>
           ) : (
             <>
-              <Plus className="mr-2 h-4 w-4" />
-              Add
+              <Download className="size-4" />
+              Install
             </>
           )}
         </Button>
