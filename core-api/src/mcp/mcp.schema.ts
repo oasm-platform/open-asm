@@ -287,7 +287,13 @@ export const listToolsSchema = z
       .string()
       .optional()
       .describe(
-        'Search query to filter installed security tools/scanners by name.',
+        'Search query to filter security tools/scanners by name or description.',
+      ),
+    agentTool: z
+      .boolean()
+      .optional()
+      .describe(
+        'true → only tools the agent can use (built-in tools and connectors that support the agent), false → only the others, omit → all tools.',
       ),
   })
   .extend(getManyBaseRequestSchema.shape);

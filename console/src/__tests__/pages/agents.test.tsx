@@ -40,6 +40,10 @@ vi.mock('@/components/agent-prompt-input', () => ({
   default: () => <div data-testid="agent-prompt-input">AgentPromptInput</div>,
 }));
 
+vi.mock('@/pages/agents/components/agent-tools-tray', () => ({
+  AgentToolsTray: () => <div data-testid="agent-tools-tray">AgentToolsTray</div>,
+}));
+
 vi.mock('@/components/ai-elements/suggestion', () => ({
   Suggestion: ({ suggestion }: { suggestion: string }) => (
     <button data-testid="suggestion">{suggestion}</button>
@@ -72,6 +76,7 @@ describe('Agents Page', () => {
     await waitFor(() => {
       expect(screen.getByTestId('typewriter-text')).toBeInTheDocument();
       expect(screen.getByTestId('agent-prompt-input')).toBeInTheDocument();
+      expect(screen.getByTestId('agent-tools-tray')).toBeInTheDocument();
     });
   });
 

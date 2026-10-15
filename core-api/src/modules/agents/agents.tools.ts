@@ -589,28 +589,43 @@ export class AgentTool {
     };
   }
 
+  /**
+   * display_available_tools: security tools with their install/readiness
+   * state in this workspace. `agentTool` narrows the list to the tools the
+   * agent can use (built-in tools always count) or to the others.
+   */
   get listToolsTool(): (workspaceId: string) => any {
     return (workspaceId: string) => {
       const toolConfig: any = {
-        description:
-          'List installed security tools/scanners. Params: page, limit, q (search filter).',
+        description: [
+          'List security tools/scanners with their state in this workspace.',
+          'Each item: id, name, type (built_in or connector), category, description, agentTool, isInstalled, isReady.',
+          'agentTool=true means the agent can use the tool; a connector runs with run_tool only when agentTool, isInstalled and isReady are all true.',
+          'Params: page, limit, q (search by name or description), agentTool (true → only agent tools, false → only the others, omit → all).',
+        ].join('\n'),
         inputSchema: listToolsSchema,
         execute: async (params: z.infer<typeof listToolsSchema>) => {
-          const { page, limit, q } = params;
+          const { page, limit, q, agentTool } = params;
           const response = await this.toolsService.getManyTools({
             limit: limit ?? 100,
             page: page ?? 1,
             sortBy: 'createdAt',
             sortOrder: SortOrder.DESC,
             search: q,
+            agentTool,
+            workspaceId,
           });
           return {
             ...response,
             data: response.data.map((i) => ({
               id: i.id,
               name: i.name,
-              agentTool:
-                this.connectorRegistry.getConnector(i.name)?.agentTool === true,
+              type: i.type,
+              category: i.category,
+              description: i.description,
+              agentTool: i.agentTool ?? false,
+              isInstalled: i.isInstalled ?? false,
+              isReady: i.isReady ?? false,
             })),
           };
         },

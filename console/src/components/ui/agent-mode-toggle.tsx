@@ -15,24 +15,21 @@ import { CheckIcon, InfinityIcon, MonitorIcon } from 'lucide-react';
 import { memo } from 'react';
 import { toast } from 'sonner';
 
-interface AgentModeSelectProps {
+interface AgentModeToggleProps {
   value: string;
   onChange: (mode: string) => void;
-  selectedWorkerId?: string | null;
   onWorkerChange?: (workerId: string | null) => void;
 }
 
-export const AgentModeSelect = memo(function AgentModeSelect({
+/** The "Agent" button that switches between ask and agent mode. */
+export const AgentModeToggle = memo(function AgentModeToggle({
   value,
   onChange,
-  selectedWorkerId,
   onWorkerChange,
-}: AgentModeSelectProps) {
+}: AgentModeToggleProps) {
   const isAgent = value === SendMessageDtoAgentMode.agent;
   const { data } = useAgentsControllerGetAgentModes();
-
   const workers = data?.workers ?? [];
-
   const { openDialog } = useConnectWorkerState();
 
   const handleToggle = () => {
@@ -51,6 +48,42 @@ export const AgentModeSelect = memo(function AgentModeSelect({
     }
     onChange(next);
   };
+
+  return (
+    <PromptInputButton
+      onClick={handleToggle}
+      className={
+        isAgent
+          ? 'text-orange-500 flex items-center gap-2 bg-orange-500/10 border border-orange-500 hover:bg-orange-500/20 hover:text-orange-500'
+          : ''
+      }
+    >
+      <InfinityIcon size={16} />
+      <span>Agent</span>
+    </PromptInputButton>
+  );
+});
+
+interface AgentModeSelectProps {
+  value: string;
+  onChange: (mode: string) => void;
+  selectedWorkerId?: string | null;
+  onWorkerChange?: (workerId: string | null) => void;
+  /** False when the page renders AgentModeToggle somewhere else. */
+  showToggle?: boolean;
+}
+
+export const AgentModeSelect = memo(function AgentModeSelect({
+  value,
+  onChange,
+  selectedWorkerId,
+  onWorkerChange,
+  showToggle = true,
+}: AgentModeSelectProps) {
+  const isAgent = value === SendMessageDtoAgentMode.agent;
+  const { data } = useAgentsControllerGetAgentModes();
+
+  const workers = data?.workers ?? [];
 
   const handleWorkerSelect = (workerId: string) => {
     // Toggle selection: deselect if same worker is clicked again
@@ -121,17 +154,13 @@ export const AgentModeSelect = memo(function AgentModeSelect({
           </PromptInputActionMenuContent>
         </PromptInputActionMenu>
       )}
-      <PromptInputButton
-        onClick={handleToggle}
-        className={
-          isAgent
-            ? 'text-orange-500 flex items-center gap-2 bg-orange-500/10 border border-orange-500 hover:bg-orange-500/20 hover:text-orange-500'
-            : ''
-        }
-      >
-        <InfinityIcon size={16} />
-        <span>Agent</span>
-      </PromptInputButton>
+      {showToggle && (
+        <AgentModeToggle
+          value={value}
+          onChange={onChange}
+          onWorkerChange={onWorkerChange}
+        />
+      )}
     </>
   );
 });

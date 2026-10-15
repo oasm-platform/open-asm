@@ -26,6 +26,8 @@ interface ChatModelSwitcherProps {
   selectedConfigId: string | null;
   selectedModel: string | null;
   onSelectModel: (provider: string, model: string, configId: string) => void;
+  /** False hides the gear that opens the agent settings. */
+  showSettingsButton?: boolean;
 }
 
 interface ModelListProps {
@@ -115,6 +117,7 @@ export function ChatModelSwitcher({
   selectedConfigId,
   selectedModel,
   onSelectModel,
+  showSettingsButton = true,
 }: ChatModelSwitcherProps) {
   const { open: openSettings } = useAgentSettingsDialog();
   const [open, setOpen] = useState(false);
@@ -274,14 +277,16 @@ export function ChatModelSwitcher({
             </PopoverContent>
           </Popover>
         </div>
-        <button
-          type="button"
-          onClick={() => openSettings('provider')}
-          aria-label="Agent settings"
-          className="flex items-center gap-1.5 rounded-md p-1.5 text-sm hover:bg-accent transition-colors text-muted-foreground"
-        >
-          <Settings className="h-3.5 w-3.5" />
-        </button>
+        {showSettingsButton && (
+          <button
+            type="button"
+            onClick={() => openSettings('provider')}
+            aria-label="Agent settings"
+            className="flex items-center gap-1.5 rounded-md p-1.5 text-sm hover:bg-accent transition-colors text-muted-foreground"
+          >
+            <Settings className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
     </>
   );

@@ -4601,6 +4601,10 @@ export type ToolsControllerGetManyToolsParams = {
   category?: ToolsControllerGetManyToolsCategory;
   workspaceId?: string;
   providerId?: string;
+  /**
+   * true → only AI agent tools (built-in tools always count), false → only the others
+   */
+  agentTool?: boolean;
 };
 
 export type ToolsControllerGetManyToolsType =
