@@ -114,6 +114,7 @@ const JOB_SORTABLE_COLUMNS: string[] = [
 const orderJob = (job: WorkflowStepDefinition): WorkflowJob => ({
   ...(job.name ? { name: job.name } : {}),
   run: job.run,
+  ...(job.category ? { category: job.category as ToolCategory } : {}),
   // Authored `needs` may be a single string (legacy array form); the
   // definition is always stored canonical.
   ...(normalizeNeeds(job.needs).length ? { needs: normalizeNeeds(job.needs) } : {}),
@@ -1103,6 +1104,7 @@ export class JobsRegistryService {
           -- check if a new group should start
           case
             when lag(tools.name) over (partition by jobs."jobHistoryId" order by jobs."createdAt" desc) = tools.name
+             and lag(jobs.category) over (partition by jobs."jobHistoryId" order by jobs."createdAt" desc) = jobs.category
              and lag(targets.value) over (partition by jobs."jobHistoryId" order by jobs."createdAt" desc) = targets.value
             then 0 else 1
           end as is_new_group
@@ -1131,10 +1133,10 @@ export class JobsRegistryService {
         max(COALESCE("completedAt", "updatedAt")) as end_time,
         string_agg(status::text, ', ') as statuses,
         max(tool_description) as description,
-        max(tool_category) as tool_category,
+        tool_category,
         EXTRACT(EPOCH FROM (max(COALESCE("completedAt", "updatedAt")) - min("createdAt"))) as duration_seconds
       from grouped_with_id
-      group by grp_id, name, target, target_id, "jobHistoryId"
+      group by grp_id, name, tool_category, target, target_id, "jobHistoryId"
       order by "jobHistoryId", min("createdAt") desc
       limit 15;
     `,
@@ -1410,10 +1412,6 @@ export class JobsRegistryService {
     };
   }
 
-  /**
-   * Everything a run's views need from its workflow definition and job rows:
-   * the tool badges and the DAG steps.
-   */
   /** A run step's category: the declared one, else its tool's default. */
   private stepCategory(
     tool: Parameters<typeof resolveToolCategory>[0] | undefined,
@@ -1427,6 +1425,10 @@ export class JobsRegistryService {
     }
   }
 
+  /**
+   * Everything a run's views need from its workflow definition and job rows:
+   * the tool badges and the DAG steps.
+   */
   private async buildRunView(
     jobHistory: JobHistory,
     workspaceId: string,

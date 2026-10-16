@@ -608,6 +608,35 @@ export function reconcileStepStates(
   const byStep = new Map(
     summaries.map((entry) => [stepKey(entry.tool, entry.category), entry]),
   );
+  // A tool that runs in one step owns all of that tool's jobs in the run, so it
+  // is matched by tool alone: its default category may have changed mid-run
+  // (a deploy reordering the tool's categories) without stranding the step.
+  const stepsPerRun = new Map<string, number>();
+  for (const step of graph.steps) {
+    stepsPerRun.set(step.run, (stepsPerRun.get(step.run) ?? 0) + 1);
+  }
+  const byTool = new Map<string, StepJobSummary>();
+  for (const entry of summaries) {
+    const sum = byTool.get(entry.tool);
+    byTool.set(
+      entry.tool,
+      sum
+        ? {
+            tool: entry.tool,
+            total: sum.total + entry.total,
+            pending: sum.pending + entry.pending,
+            inProgress: sum.inProgress + entry.inProgress,
+            completed: sum.completed + entry.completed,
+            failed: sum.failed + entry.failed,
+            cancelled: sum.cancelled + entry.cancelled,
+            lastTerminalAt:
+              (sum.lastTerminalAt ?? '') > (entry.lastTerminalAt ?? '')
+                ? sum.lastTerminalAt
+                : entry.lastTerminalAt,
+          }
+        : entry,
+    );
+  }
   // Start from the stored state so entries that are not part of the current
   // graph survive — jobs dropped by the assets-discovery switch, and jobs of a
   // run whose workflow was edited after it started.
@@ -622,7 +651,10 @@ export function reconcileStepStates(
       ? { ...existing }
       : { status: 'pending', jobs: 0 };
 
-    const jobs = byStep.get(stepKey(step.run, step.category));
+    const jobs =
+      stepsPerRun.get(step.run) === 1
+        ? byTool.get(step.run)
+        : byStep.get(stepKey(step.run, step.category));
     if (!jobs || jobs.total === 0) {
       next[step.id] = current;
       continue;

@@ -205,7 +205,7 @@ export class ToolsController {
       homepage: connector.homepage,
       repositoryUrl: connector.repositoryUrl,
       supportUrl: connector.supportUrl,
-      capabilities: connector.capabilities.map((c) => c.name),
+      capabilities: (connector.capabilities ?? []).map((c) => c.name),
       categories: connectorCategories(connector.capabilities),
     };
   }

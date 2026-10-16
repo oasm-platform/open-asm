@@ -1192,6 +1192,29 @@ describe('JobsRegistryService', () => {
       expect(Object.keys(result.content!)).toEqual(['name', 'jobs']);
     });
 
+    it('should keep each job category in the stored definition', async () => {
+      mockJobHistoryRepository.findOne.mockResolvedValueOnce({
+        ...mockJobHistory,
+        workflow: {
+          ...mockJobHistory.workflow,
+          content: {
+            name: 'test-workflow',
+            jobs: {
+              ports: { run: 'nmap', category: 'ports_scanner' },
+              vulns: { run: 'nmap', category: 'vulnerabilities', needs: ['ports'] },
+            },
+          },
+        },
+      });
+
+      const result = await service.getJobHistoryWorkflow(mockWorkspaceId, mockHistoryId);
+
+      expect(result.content!.jobs).toEqual({
+        ports: { run: 'nmap', category: 'ports_scanner' },
+        vulns: { run: 'nmap', category: 'vulnerabilities', needs: ['ports'] },
+      });
+    });
+
     it('should include the run steps so the page can show state next to the definition', async () => {
       const result = await service.getJobHistoryWorkflow(
         mockWorkspaceId,
@@ -1214,6 +1237,23 @@ describe('JobsRegistryService', () => {
       await expect(
         service.getJobHistoryWorkflow(mockWorkspaceId, mockHistoryId),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getJobsTimeline', () => {
+    // Two categories of one tool on one target in one run (e.g. nmap ports,
+    // then nmap vulnerabilities) are separate steps and must stay separate bars.
+    it('starts a new group when the job category changes and groups by it', async () => {
+      const query = jest.fn().mockResolvedValue([]);
+      (mockDataSource as Record<string, unknown>).query = query;
+
+      await service.getJobsTimeline('ws-1');
+
+      const sql = (query.mock.calls[0][0] as string).replace(/\s+/g, ' ');
+      expect(sql).toContain(
+        'lag(jobs.category) over (partition by jobs."jobHistoryId" order by jobs."createdAt" desc) = jobs.category',
+      );
+      expect(sql).toContain('group by grp_id, name, tool_category, target, target_id, "jobHistoryId"');
     });
   });
 

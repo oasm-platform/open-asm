@@ -631,6 +631,22 @@ describe('reconcileStepStates', () => {
     expect(state.vulns).toMatchObject({ status: 'dispatched', jobs: 1 });
   });
 
+  // A tool used in one step can only have that step's jobs, so it is matched by
+  // tool alone: if a deploy reorders the tool's categories mid-run, its default
+  // changes but the jobs already created under the old one still count.
+  it('matches a single-step tool by tool even when its resolved category changed', () => {
+    const graph = withResolvedCategories(
+      buildWorkflowGraph(content({ scan: { run: 'nmap' } })),
+      () => 'vulnerabilities' as ToolCategory,
+    );
+
+    const state = reconcileStepStates(graph, stateOf({}), [
+      summary('nmap', { category: 'ports_scanner', total: 2, completed: 2 }),
+    ]);
+
+    expect(state.scan).toMatchObject({ status: 'done', jobs: 2 });
+  });
+
   it('marks a job done when every job row completed', () => {
     const state = reconcileStepStates(chain, stateOf({}), [
       summary('subfinder', { total: 3, completed: 3 }),

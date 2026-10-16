@@ -1,3 +1,4 @@
+import { UnrecoverableError } from 'bullmq';
 import { JobStatus, ToolCategory, WorkerType } from '@/common/enums/enum';
 import { DataAdapterService } from '@/modules/data-adapter/data-adapter.service';
 import { StorageService } from '@/modules/storage/storage.service';
@@ -247,12 +248,17 @@ describe('JobResultProcessor', () => {
       const misrouted = {
         ...baseBullJob,
         data: { ...baseBullJob.data, category: ToolCategory.VULNERABILITIES },
-        attemptsMade: 2,
+        // First attempt: a mismatch can never succeed, so it must not be retried.
+        attemptsMade: 0,
       } as unknown as Parameters<JobResultProcessor['process']>[0];
 
-      await expect(processor.process(misrouted)).rejects.toThrow(
+      const error = await processor.process(misrouted).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(UnrecoverableError);
+      expect((error as Error).message).toBe(
         'Result posted as "vulnerabilities" but job job-1 runs "http_probe"',
       );
+      expect(mockWorkflowRunnerService.onJobTerminal).toHaveBeenCalledWith(baseJob);
 
       expect(mockDataAdapterService.syncData).not.toHaveBeenCalled();
       expect(mockJobsRegistryService.handleJobError).toHaveBeenCalled();

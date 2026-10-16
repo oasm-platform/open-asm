@@ -868,11 +868,23 @@ export type GetManyGetManyWorkflowsResponseDtoDto = {
   pageCount: number;
 };
 
+export type ToolCategory = (typeof ToolCategory)[keyof typeof ToolCategory];
+
+export const ToolCategory = {
+  subdomains: 'subdomains',
+  http_probe: 'http_probe',
+  ports_scanner: 'ports_scanner',
+  vulnerabilities: 'vulnerabilities',
+  screenshot: 'screenshot',
+  url_discovery: 'url_discovery',
+} as const;
+
 export type WorkflowJobConfig = { [key: string]: unknown };
 
 export type WorkflowJob = {
   name?: string;
   run: string;
+  category?: ToolCategory;
   needs?: string[];
   allowFailure?: boolean;
   config?: WorkflowJobConfig;
@@ -1297,17 +1309,6 @@ export type PortsResultDto = {
   /** Open port numbers */
   payload: number[];
 };
-
-export type ToolCategory = (typeof ToolCategory)[keyof typeof ToolCategory];
-
-export const ToolCategory = {
-  subdomains: 'subdomains',
-  http_probe: 'http_probe',
-  ports_scanner: 'ports_scanner',
-  vulnerabilities: 'vulnerabilities',
-  screenshot: 'screenshot',
-  url_discovery: 'url_discovery',
-} as const;
 
 export type ToolCategorySpec = {
   name: ToolCategory;

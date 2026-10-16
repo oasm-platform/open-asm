@@ -134,6 +134,20 @@ describe('ToolsController.getConnectorBySlug', () => {
     expect(result).not.toHaveProperty('configSchema');
   });
 
+  it('returns empty capabilities and categories for an entry without capabilities', () => {
+    mockConnectorRegistryService.getConnector.mockReturnValue({
+      name: 'Broken',
+      slug: 'broken',
+      version: '1.0.0',
+      image: 'img',
+    });
+
+    const result = controller.getConnectorBySlug({ slug: 'broken' });
+
+    expect(result.capabilities).toEqual([]);
+    expect(result.categories).toEqual([]);
+  });
+
   it('throws NotFoundException for an unknown slug', () => {
     mockConnectorRegistryService.getConnector.mockReturnValue(null);
 
