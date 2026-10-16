@@ -47,7 +47,12 @@ export function ConnectorsManager() {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       {tools.map((tool) => (
-        <ToolCard key={tool.id} tool={tool} onNavigate={close} />
+        <ToolCard
+          key={tool.id}
+          tool={tool}
+          onNavigate={close}
+          openFrom="agent-settings"
+        />
       ))}
     </div>
   );

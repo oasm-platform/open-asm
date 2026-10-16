@@ -1,5 +1,6 @@
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Button } from '@/components/ui/button';
+import { SettingsHeaderActions } from '@/components/settings-header-actions';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import {
   useAgentsControllerDeleteWorkspaceMemory,
@@ -104,10 +105,7 @@ export function MemoryManager() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          Long-term memory content used by the AI agent
-        </p>
+      <SettingsHeaderActions>
         <Button
           size="sm"
           variant="outline"
@@ -121,7 +119,7 @@ export function MemoryManager() {
           )}
           Refresh
         </Button>
-      </div>
+      </SettingsHeaderActions>
 
       {isLoading ? (
         <div className="space-y-2">

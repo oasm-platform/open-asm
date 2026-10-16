@@ -6,7 +6,6 @@ import {
   CircleIcon,
   ClockIcon,
   ListChecksIcon,
-  WrenchIcon,
   XCircleIcon,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -154,7 +153,17 @@ export function ToolCallDisplay({
   );
 }
 
-/** One-line label of a tool call: name plus status badge. */
+/** Name color per status; completed keeps the surrounding text color */
+const labelTextClass: Record<ToolCallState['status'], string | undefined> = {
+  pending: 'tool-call-running',
+  executing: 'tool-call-running',
+  completed: undefined,
+  error: 'text-red-500',
+  rejected: 'text-amber-500',
+  'needs-plan': 'text-amber-500',
+};
+
+/** One-line label of a tool call: the name, colored by its status. */
 export function ToolCallLabel({
   toolCall,
   className,
@@ -163,24 +172,18 @@ export function ToolCallLabel({
   className?: string;
 }) {
   const config = statusConfig[toolCall.status];
-  const StatusIcon = config.icon;
 
   return (
-    <div className={cn('flex min-w-0 items-center gap-2 text-sm', className)}>
-      <WrenchIcon className="size-3.5 text-muted-foreground shrink-0" />
-      <span className="font-medium truncate">
+    <div
+      className={cn('flex min-w-0 items-center text-sm', className)}
+      title={config.label}
+    >
+      <span
+        className={cn('font-medium truncate', labelTextClass[toolCall.status])}
+      >
         {formatToolName(toolCall.toolName)}
       </span>
-      <Badge
-        variant="secondary"
-        className={cn(
-          'gap-1 rounded-full text-xs shrink-0',
-          toolCall.status === 'executing' && 'animate-pulse',
-        )}
-      >
-        <StatusIcon className={cn('size-3', config.color)} />
-        {config.label}
-      </Badge>
+      <span className="sr-only"> ({config.label})</span>
     </div>
   );
 }

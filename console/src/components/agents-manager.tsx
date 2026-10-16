@@ -2,6 +2,7 @@ import { ModelPicker } from '@/components/models-manager';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { SettingsHeaderActions } from '@/components/settings-header-actions';
 import {
   Sheet,
   SheetContent,
@@ -626,15 +627,20 @@ export function AgentsManager() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {isLoading ? 'Loading agents...' : `Total ${agents.length} items`}
-        </p>
-        <Button size="sm" onClick={() => show(null)} className="gap-1.5">
+      <SettingsHeaderActions>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => show(null)}
+          className="gap-1.5"
+        >
           <Plus className="size-3.5" />
           New Agent
         </Button>
-      </div>
+      </SettingsHeaderActions>
+      <p className="text-sm text-muted-foreground">
+        {isLoading ? 'Loading agents...' : `Total ${agents.length} items`}
+      </p>
 
       <AgentFormSheet open={open} onOpenChange={setOpen} agent={selected} />
 
