@@ -332,10 +332,11 @@ func TestProcessConnectorJobSendsExecuteJob(t *testing.T) {
 
 	jobsSrv.nextFn = func() (*pb.Job, error) {
 		return &pb.Job{
-			Id:     "job-exec-1",
-			Tool:   "nuclei",
-			Image:  "ghcr.io/open-asm/nuclei:1.0",
-			Inputs: inputs,
+			Id:       "job-exec-1",
+			Tool:     "nuclei",
+			Image:    "ghcr.io/open-asm/nuclei:1.0",
+			Inputs:   inputs,
+			Category: "vulnerabilities",
 		}, nil
 	}
 
@@ -365,6 +366,10 @@ func TestProcessConnectorJobSendsExecuteJob(t *testing.T) {
 	}
 	if ex.GetImage() != "ghcr.io/open-asm/nuclei:1.0" {
 		t.Fatalf("Image: got %q, want %q", ex.GetImage(), "ghcr.io/open-asm/nuclei:1.0")
+	}
+	// The connector runs the category the platform chose for this job.
+	if ex.GetCategory() != "vulnerabilities" {
+		t.Fatalf("Category: got %q, want %q", ex.GetCategory(), "vulnerabilities")
 	}
 	if ex.GetTraceId() != "" {
 		t.Fatalf("TraceId: got %q, want empty (worker does not set it)", ex.GetTraceId())

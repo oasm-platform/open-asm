@@ -722,6 +722,7 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 			TraceId:     spec.TraceID,
 			Inputs:      inputs,
 			Config:      configFields,
+			Category:    category,
 		})
 		if sendErr == nil {
 			break // delivered (immediately or queued) — hand off to the drain
