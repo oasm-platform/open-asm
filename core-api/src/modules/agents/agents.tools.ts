@@ -87,7 +87,7 @@ const SELF_GATED_TOOLS = new Set(['execute_remote_command']);
  * Built-in tools that only read OASM data, so MANUAL runs them without
  * asking. Not retrieve_web_page: a URL it fetches can carry data out.
  */
-const READ_ONLY_TOOLS = new Set([
+export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
   'enumerate_assets',
   'discover_vulnerabilities',
   'retrieve_targets',
@@ -1837,6 +1837,32 @@ export class AgentTool {
           }),
           emitter,
           isReadOnlyMcpTool(toolDef.metadata),
+        ),
+      ]),
+    ) as Record<string, ToolType>;
+  }
+
+  /**
+   * Applies the approval gate to tools built outside this class (e.g. the
+   * subagent tools), so PLAN mode still blocks them until a plan is approved.
+   */
+  gateTools(
+    tools: Record<string, ToolType>,
+    workspaceId: string,
+    conversationId: string,
+    approval: ApprovalSettings,
+    emitter: EventEmitter | undefined,
+    readOnly: boolean,
+  ): Record<string, ToolType> {
+    return Object.fromEntries(
+      Object.entries(tools).map(([name, toolDef]) => [
+        name,
+        this.withApproval(
+          name,
+          toolDef,
+          () => ({ ...approval, workspaceId, conversationId }),
+          emitter,
+          readOnly,
         ),
       ]),
     ) as Record<string, ToolType>;

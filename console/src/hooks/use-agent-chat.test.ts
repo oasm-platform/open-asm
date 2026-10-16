@@ -125,3 +125,32 @@ describe('useAgentChat approvals', () => {
     expect(result.current.pendingApproval?.approvalId).toBe('a1');
   });
 });
+
+describe('useAgentChat conversation stats', () => {
+  beforeEach(() => {
+    mocks.onData = undefined;
+    mocks.orvalClient.mockReset();
+  });
+
+  it('loads the metadata with the conversation and updates it after a turn', async () => {
+    mocks.orvalClient.mockResolvedValueOnce({
+      id: 'c1',
+      agentMode: 'ask',
+      metadata: { model: 'gpt-5', contextWindow: 400_000 },
+    });
+    const { result } = renderHook(() => useAgentChat({ conversationId: 'c1' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(result.current.conversationMeta).toEqual({
+      model: 'gpt-5',
+      contextWindow: 400_000,
+    });
+
+    const after = { model: 'gpt-5', contextWindow: 400_000, contextUsedTokens: 1_000 };
+    act(() => {
+      mocks.onData?.({ type: 'data-conversation-stats', data: { metadata: after } });
+    });
+    expect(result.current.conversationMeta).toEqual(after);
+  });
+});

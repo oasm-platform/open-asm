@@ -15,6 +15,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { ConversationMetadataDto } from './conversation-stats.dto';
 
 export class AgentTodoItemDto {
   @ApiProperty({
@@ -167,6 +168,17 @@ export class ConversationResponseDto {
   @IsOptional()
   @IsUUID()
   workerId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Current model, context window usage and token/cost stats (null before the first turn)',
+    type: ConversationMetadataDto,
+    nullable: true,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ConversationMetadataDto)
+  metadata?: ConversationMetadataDto | null;
 }
 
 export class GetConversationsResponseDto {

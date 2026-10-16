@@ -280,6 +280,9 @@ export const ChatConversation = ({
                     remoteExecuteEvents={
                       hasToolCalls ? remoteExecuteEvents : undefined
                     }
+                    selectedToolCallId={
+                      hasToolCalls ? selectedToolCallId : undefined
+                    }
                   />
                 );
               })}

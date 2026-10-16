@@ -143,16 +143,30 @@ export function ToolCallDisplay({
     return <PlanCallDisplay toolCall={toolCall} />;
   }
 
-  const config = statusConfig[toolCall.status];
-  const StatusIcon = config.icon;
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      className="flex items-center gap-2 text-sm"
     >
+      <ToolCallLabel toolCall={toolCall} />
+    </motion.div>
+  );
+}
+
+/** One-line label of a tool call: name plus status badge. */
+export function ToolCallLabel({
+  toolCall,
+  className,
+}: {
+  toolCall: ToolCallState;
+  className?: string;
+}) {
+  const config = statusConfig[toolCall.status];
+  const StatusIcon = config.icon;
+
+  return (
+    <div className={cn('flex min-w-0 items-center gap-2 text-sm', className)}>
       <WrenchIcon className="size-3.5 text-muted-foreground shrink-0" />
       <span className="font-medium truncate">
         {formatToolName(toolCall.toolName)}
@@ -167,6 +181,6 @@ export function ToolCallDisplay({
         <StatusIcon className={cn('size-3', config.color)} />
         {config.label}
       </Badge>
-    </motion.div>
+    </div>
   );
 }
