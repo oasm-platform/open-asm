@@ -89,6 +89,9 @@ export class WorkflowStepStatusDto {
   @ApiProperty()
   run: string;
 
+  @ApiProperty({ required: false, description: 'Category the step runs its tool in' })
+  category?: string;
+
   @ApiProperty({ type: [String], description: 'Ids of the jobs this one waits for' })
   needs: string[];
 

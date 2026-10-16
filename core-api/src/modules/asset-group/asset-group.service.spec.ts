@@ -1,3 +1,4 @@
+import { ToolCategory } from '@/common/enums/enum';
 import { BullMQName, CronSchedule } from '@/common/enums/enum';
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { getQueueToken } from '@nestjs/bullmq';
@@ -280,6 +281,30 @@ describe('AssetGroupService', () => {
         ['workflow-1'],
         '0 0 * * *',
         workspaceId,
+      );
+    });
+
+    it('should carry a per-tool category into the group workflow job', async () => {
+      mockAssetGroupRepo.findOne.mockResolvedValueOnce(undefined);
+      mockManager.find.mockResolvedValue([{ id: 'tool-1', name: 'nmap' }]);
+      mockWorkflowRepo.create.mockImplementation((data) => data);
+      mockWorkflowRepo.save.mockResolvedValue({ id: 'workflow-1' });
+      mockWorkflowService.addManyWorkflows.mockResolvedValue({ message: 'ok' });
+
+      await service.create(
+        {
+          name: 'Web Servers',
+          tools: [{ toolId: 'tool-1', category: ToolCategory.VULNERABILITIES }],
+        },
+        workspaceId,
+      );
+
+      expect(mockWorkflowRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.objectContaining({
+            jobs: { nmap: { run: 'nmap', category: 'vulnerabilities' } },
+          }),
+        }),
       );
     });
 

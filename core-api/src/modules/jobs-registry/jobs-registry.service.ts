@@ -233,9 +233,7 @@ export class JobsRegistryService {
     const entry = job.tool
       ? this.connectorRegistry.getConnector(job.tool.name)
       : null;
-    const schemaFields = getSensitiveFields(
-      entry?.configSchema ?? entry?.inputsSchema,
-    );
+    const schemaFields = getSensitiveFields(entry?.configSchema);
     // Synthesize a schema from the real keys: isSensitiveField() only needs the
     // property name plus a truthy object value to apply the name heuristic.
     const nameFields = getSensitiveFields({
@@ -307,7 +305,7 @@ export class JobsRegistryService {
         // If no config resolved but tool requires config (has schema), fail fast.
         if (!mergedConfig && (!config || Object.keys(config).length === 0)) {
           const entry = this.connectorRegistry.getConnector(tool.name);
-          const schema = entry?.configSchema ?? entry?.inputsSchema;
+          const schema = entry?.configSchema;
           if (schema) {
             throw new BadRequestException(
               `missing/default profile for connector "${tool.name}": tool requires configuration but no profile was provided or found`,
@@ -1416,6 +1414,19 @@ export class JobsRegistryService {
    * Everything a run's views need from its workflow definition and job rows:
    * the tool badges and the DAG steps.
    */
+  /** A run step's category: the declared one, else its tool's default. */
+  private stepCategory(
+    tool: Parameters<typeof resolveToolCategory>[0] | undefined,
+    declared: string | undefined,
+  ): string | undefined {
+    if (!tool) return declared;
+    try {
+      return resolveToolCategory(tool, declared).name;
+    } catch {
+      return declared;
+    }
+  }
+
   private async buildRunView(
     jobHistory: JobHistory,
     workspaceId: string,
@@ -1472,6 +1483,8 @@ export class JobsRegistryService {
   const tools = workflowJobs
     .map(([, job]) => installedToolsByName.get(job.run))
     .filter((tool): tool is NonNullable<typeof tool> => tool !== undefined)
+    // One entry per tool, even when several steps run it in different categories.
+    .filter((tool, index, all) => all.findIndex((t) => t.id === tool.id) === index)
     .map((tool) => ({
       id: tool.id,
       name: tool.name,
@@ -1507,6 +1520,7 @@ export class JobsRegistryService {
       id,
       name: job.name ?? id,
       run: job.run,
+      category: this.stepCategory(tool, job.category),
       needs: normalizeNeeds(job.needs),
       status: state?.status ?? this.toRunStepStatus(derived),
       reason: state?.reason,

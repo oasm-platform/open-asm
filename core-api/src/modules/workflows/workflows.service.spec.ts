@@ -281,18 +281,18 @@ describe('WorkflowsService', () => {
 
     it('rejects a tool that supports none of the triggered target types', async () => {
       toolRepository.find.mockResolvedValue([
-        { name: 'subfinder', targetTypes: [TargetType.DOMAIN] },
+        { name: 'subfinder', categories: [{ name: 'subdomains', targetTypes: [TargetType.DOMAIN] }] },
       ]);
 
       await expect(
         service.createWorkflow(dto(['ip.create'], 'subfinder'), user, workspace),
-      ).rejects.toThrow(/"subfinder" can only scan DOMAIN targets/);
+      ).rejects.toThrow(/"subfinder" \(subdomains\) can only scan DOMAIN targets/);
       expect(workflowRepository.save).not.toHaveBeenCalled();
     });
 
     it('allows partial overlap — the job is skipped at run time for other types', async () => {
       toolRepository.find.mockResolvedValue([
-        { name: 'subfinder', targetTypes: [TargetType.DOMAIN] },
+        { name: 'subfinder', categories: [{ name: 'subdomains', targetTypes: [TargetType.DOMAIN] }] },
       ]);
 
       await expect(
@@ -304,21 +304,61 @@ describe('WorkflowsService', () => {
       ).resolves.toBeDefined();
     });
 
-    it('treats a tool without declared target types as a host scanner', async () => {
-      toolRepository.find.mockResolvedValue([{ name: 'legacy', targetTypes: [] }]);
+    it('treats a category without declared target types as a host scanner', async () => {
+      toolRepository.find.mockResolvedValue([
+        { name: 'legacy', categories: [{ name: 'vulnerabilities', targetTypes: [] }] },
+      ]);
 
       await expect(
         service.createWorkflow(dto(['cidr.create'], 'legacy'), user, workspace),
       ).resolves.toBeDefined();
     });
 
-    it('skips the check for workflows without target triggers', async () => {
-      await service.createWorkflow(
-        { name: 'Scheduled', content: { name: 'Scheduled', jobs: { a: { name: 'A', run: 'nuclei' } } } },
-        user,
-        workspace,
-      );
-      expect(toolRepository.find).not.toHaveBeenCalled();
+    it('checks categories even for workflows without target triggers', async () => {
+      toolRepository.find.mockResolvedValue([
+        { name: 'nuclei', categories: [{ name: 'vulnerabilities', targetTypes: [] }] },
+      ]);
+
+      await expect(
+        service.createWorkflow(
+          {
+            name: 'Scheduled',
+            content: { name: 'Scheduled', jobs: { a: { name: 'A', run: 'nuclei', category: 'ports_scanner' } } },
+          },
+          user,
+          workspace,
+        ),
+      ).rejects.toThrow('Tool "nuclei" has no category "ports_scanner" (has: vulnerabilities)');
+    });
+
+    it('checks trigger target types against each step category', async () => {
+      toolRepository.find.mockResolvedValue([
+        {
+          name: 'nmap',
+          categories: [
+            { name: 'ports_scanner', targetTypes: [TargetType.IP] },
+            { name: 'vulnerabilities', targetTypes: [TargetType.DOMAIN] },
+          ],
+        },
+      ]);
+
+      await expect(
+        service.createWorkflow(
+          {
+            name: 'Custom',
+            content: {
+              name: 'Custom',
+              on: { target: ['ip.create'] },
+              jobs: {
+                ports: { run: 'nmap', category: 'ports_scanner' },
+                vulns: { run: 'nmap', category: 'vulnerabilities' },
+              },
+            },
+          },
+          user,
+          workspace,
+        ),
+      ).rejects.toThrow('"nmap" (vulnerabilities) can only scan DOMAIN targets');
     });
   });
 });

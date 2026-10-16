@@ -1,5 +1,7 @@
 import { ToolCategory } from '@/common/enums/enum';
 
+const KNOWN_TOOL_CATEGORIES = new Set<string>(Object.values(ToolCategory));
+
 /**
  * Workflow graph domain logic.
  *
@@ -18,6 +20,11 @@ export interface WorkflowStepDefinition {
   /** Display label; defaults to the job id. */
   name?: string;
   run: string;
+  /**
+   * Category to run the tool in; omitted → the tool's first category. Required
+   * on every job of a tool that runs in more than one job of the workflow.
+   */
+  category?: string;
   needs?: string | string[];
   /**
    * A fan-out step runs one job per asset/service, and some of those inputs are
@@ -47,6 +54,8 @@ export interface WorkflowStep {
   /** Display label: the definition's `name`, else the id. */
   name: string;
   run: string;
+  /** Declared category; the runner fills in the default (see withResolvedCategories). */
+  category?: ToolCategory;
   needs: string[];
   /** Original position — fallback ordering only. */
   order: number;
@@ -100,9 +109,10 @@ export interface WorkflowRunScope {
   assetIds?: string[];
 }
 
-/** Per-step job rollup the orchestrator computes from the `jobs` table. */
+/** Per-step job rollup (jobs of one tool in one category) from the `jobs` table. */
 export interface StepJobSummary {
   tool: string;
+  category?: string;
   total: number;
   pending: number;
   inProgress: number;
@@ -296,7 +306,8 @@ export function buildWorkflowGraph(content: {
   const errors: string[] = [];
   const steps: WorkflowStep[] = [];
   const byId = new Map<string, WorkflowStep>();
-  const byRun = new Map<string, WorkflowStep>();
+  const byRunCategory = new Map<string, WorkflowStep>();
+  const runs = new Map<string, { count: number; implicit: boolean }>();
 
   entries.forEach(([rawId, job], order) => {
     const id = rawId;
@@ -313,8 +324,19 @@ export function buildWorkflowGraph(content: {
       errors.push(`Duplicate job id "${id}"`);
       return;
     }
-    if (byRun.has(run)) {
-      errors.push(`Duplicate tool "${run}" — a tool may run once per workflow`);
+    const category = String(job.category ?? '').trim() || undefined;
+    if (category && !KNOWN_TOOL_CATEGORIES.has(category)) {
+      errors.push(`Unknown category "${category}" for job "${id}"`);
+      return;
+    }
+    const usage = runs.get(run) ?? { count: 0, implicit: false };
+    runs.set(run, { count: usage.count + 1, implicit: usage.implicit || !category });
+    const key = `${run}#${category ?? ''}`;
+    if (byRunCategory.has(key)) {
+      // A missing category is reported once, by the check after the loop.
+      if (category) {
+        errors.push(`Duplicate tool "${run}" with category "${category}"`);
+      }
       return;
     }
 
@@ -322,6 +344,7 @@ export function buildWorkflowGraph(content: {
       id,
       name: String(job.name ?? '').trim() || id,
       run,
+      ...(category ? { category: category as ToolCategory } : {}),
       needs: normalizeNeeds(job.needs),
       order,
       // Tolerate partial failure unless the author asked for strict.
@@ -331,8 +354,18 @@ export function buildWorkflowGraph(content: {
     };
     steps.push(step);
     byId.set(id, step);
-    byRun.set(run, step);
+    byRunCategory.set(key, step);
   });
+
+  for (const [run, usage] of runs) {
+    // A job without category means "the tool's default"; with the tool in
+    // several jobs that default could collide with an explicit one.
+    if (usage.count > 1 && usage.implicit) {
+      errors.push(
+        `Tool "${run}" runs in several jobs — set a different category on each`,
+      );
+    }
+  }
 
   const knownIds = steps.map((step) => step.id).join(', ');
   for (const step of steps) {
@@ -424,6 +457,7 @@ export function normalizeWorkflowContent<T extends { jobs?: WorkflowJobsInput }>
       // The id is the identity; a name is only worth storing when it differs.
       ...(step.name !== step.id ? { name: step.name } : {}),
       run: step.run,
+      ...(step.category ? { category: step.category } : {}),
       ...(step.needs.length > 0 ? { needs: step.needs } : {}),
       ...(step.allowFailure === false ? { allowFailure: false } : {}),
       ...(step.config !== undefined ? { config: step.config } : {}),
@@ -437,25 +471,40 @@ export function normalizeWorkflowContent<T extends { jobs?: WorkflowJobsInput }>
 }
 
 /**
- * Drops every job whose tool is in the SUBDOMAINS category when the workspace
- * has assets discovery disabled, and removes the edges pointing at them so
- * their dependents become roots instead of waiting forever.
+ * Returns the graph with every step carrying its effective category (the
+ * declared one, else the tool's default). Steps whose tool is unknown keep
+ * `category` undefined; their dispatch fails with the reason.
+ */
+export function withResolvedCategories(
+  graph: WorkflowGraph,
+  resolve: (step: WorkflowStep) => ToolCategory | undefined,
+): WorkflowGraph {
+  return indexGraph(
+    graph.steps.map((step) => {
+      const category = resolve(step);
+      return category ? { ...step, category } : step;
+    }),
+  );
+}
+
+/**
+ * Drops every step that runs the SUBDOMAINS category when the workspace has
+ * assets discovery disabled, and removes the edges pointing at them so their
+ * dependents become roots instead of waiting forever. Expects a graph from
+ * withResolvedCategories.
  *
- * A tool with an unknown category is kept — better to run it than to silently
+ * A step with an unknown category is kept — better to run it than to silently
  * drop a job.
  */
 export function filterGraphByAssetsDiscovery(
   graph: WorkflowGraph,
   isAssetsDiscovery: boolean,
-  toolCategoryByName: ReadonlyMap<string, ToolCategory>,
 ): WorkflowGraph {
   if (isAssetsDiscovery) return graph;
 
   const dropped = new Set(
     graph.steps
-      .filter(
-        (step) => toolCategoryByName.get(step.run) === ToolCategory.SUBDOMAINS,
-      )
+      .filter((step) => step.category === ToolCategory.SUBDOMAINS)
       .map((step) => step.id),
   );
   if (dropped.size === 0) return graph;
@@ -554,7 +603,11 @@ export function reconcileStepStates(
   summaries: readonly StepJobSummary[],
   now: () => string = () => new Date().toISOString(),
 ): WorkflowRunStepStates {
-  const byTool = new Map(summaries.map((entry) => [entry.tool, entry]));
+  const stepKey = (tool: string, category: string | undefined) =>
+    `${tool}#${category ?? ''}`;
+  const byStep = new Map(
+    summaries.map((entry) => [stepKey(entry.tool, entry.category), entry]),
+  );
   // Start from the stored state so entries that are not part of the current
   // graph survive — jobs dropped by the assets-discovery switch, and jobs of a
   // run whose workflow was edited after it started.
@@ -569,7 +622,7 @@ export function reconcileStepStates(
       ? { ...existing }
       : { status: 'pending', jobs: 0 };
 
-    const jobs = byTool.get(step.run);
+    const jobs = byStep.get(stepKey(step.run, step.category));
     if (!jobs || jobs.total === 0) {
       next[step.id] = current;
       continue;

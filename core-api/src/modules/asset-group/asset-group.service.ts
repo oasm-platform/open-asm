@@ -431,6 +431,7 @@ export class AssetGroupService {
               tool.name,
               {
                 run: tool.name,
+                ...(input?.category ? { category: input.category } : {}),
                 ...(config ? { config } : {}),
                 ...(input?.configProfileId
                   ? { configProfileId: input.configProfileId }

@@ -844,6 +844,7 @@ describe('JobsRegistryService', () => {
             id: 'test_step',
             name: 'Test Step',
             run: 'test-tool',
+            category: 'subdomains',
             needs: [],
             // Derived from the job rows for a run created before the engine.
             status: 'done',
@@ -1041,6 +1042,56 @@ describe('JobsRegistryService', () => {
           jobs: 0,
         },
       ]);
+    });
+
+    it('lists each step with its category and the legacy tool list once per tool', async () => {
+      mockJobHistoryRepository.findOne.mockResolvedValue({
+        ...mockJobHistory,
+        steps: {},
+        workflow: {
+          name: 'test-workflow',
+          content: {
+            jobs: {
+              ports: { run: 'nmap', category: 'ports_scanner' },
+              vulns: { run: 'nmap', category: 'vulnerabilities', needs: ['ports'] },
+              probe: { run: 'httpx', needs: ['vulns'] },
+            },
+          },
+        },
+      });
+      mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getExists: jest.fn().mockResolvedValue(true),
+      });
+      mockJobRepository.getRawMany.mockResolvedValue([]);
+      mockToolsService.getInstalledTools.mockResolvedValue({
+        data: [
+          {
+            id: 'tool-nmap',
+            name: 'nmap',
+            categories: [
+              { name: ToolCategory.PORTS_SCANNER, targetTypes: [] },
+              { name: ToolCategory.VULNERABILITIES, targetTypes: [] },
+            ],
+          },
+          {
+            id: 'tool-httpx',
+            name: 'httpx',
+            categories: [{ name: ToolCategory.HTTP_PROBE, targetTypes: [] }],
+          },
+        ],
+      });
+
+      const result = await service.getJobHistoryDetail(mockWorkspaceId, mockHistoryId);
+
+      expect(result.steps!.map((step) => [step.id, step.category])).toEqual([
+        ['ports', 'ports_scanner'],
+        ['vulns', 'vulnerabilities'],
+        ['probe', 'http_probe'],
+      ]);
+      expect(result.tools!.map((tool) => tool.name)).toEqual(['nmap', 'httpx']);
     });
 
     it('should throw NotFoundException when job history not found', async () => {

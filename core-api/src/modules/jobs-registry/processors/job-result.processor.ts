@@ -145,7 +145,7 @@ export class JobResultProcessor extends WorkerHost {
     try {
       // A result is shaped by the endpoint it was posted to; syncing it through
       // a different category's handler would write the wrong data.
-      if (category && category !== job.category) {
+      if (category && category !== (job.category as string)) {
         throw new Error(
           `Result posted as "${category}" but job ${job.id} runs "${job.category}"`,
         );

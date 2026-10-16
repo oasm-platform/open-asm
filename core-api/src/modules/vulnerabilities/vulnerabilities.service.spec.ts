@@ -38,7 +38,7 @@ describe('VulnerabilitiesService', () => {
   it('scan forwards inline config from the workflow first job to createNewJob', async () => {
     const config = { severity: ['critical', 'high'] };
     mockToolsService.getToolByNames.mockResolvedValue([
-      { name: 'nuclei', priority: 4, category: 'vulnerability' },
+      { name: 'nuclei', priority: 4 },
     ]);
     mockWorkflowRepository.findOne.mockResolvedValue({
       id: 'workflow-1',
@@ -61,7 +61,7 @@ describe('VulnerabilitiesService', () => {
 
   it('scan forwards undefined config when the workflow first job has none', async () => {
     mockToolsService.getToolByNames.mockResolvedValue([
-      { name: 'nuclei', priority: 4, category: 'vulnerability' },
+      { name: 'nuclei', priority: 4 },
     ]);
     mockWorkflowRepository.findOne.mockResolvedValue({
       id: 'workflow-1',
@@ -77,6 +77,22 @@ describe('VulnerabilitiesService', () => {
         config: undefined,
         configProfileId: undefined,
       }),
+    );
+  });
+
+  it('scan forwards the first job category', async () => {
+    mockToolsService.getToolByNames.mockResolvedValue([{ name: 'nuclei', priority: 4 }]);
+    mockWorkflowRepository.findOne.mockResolvedValue({
+      id: 'workflow-1',
+      content: {
+        jobs: { vuls_scan: { run: 'nuclei', category: 'vulnerabilities' } },
+      },
+    });
+
+    await service.scan('target-1', 'ws-1');
+
+    expect(mockJobRegistryService.createNewJob).toHaveBeenCalledWith(
+      expect.objectContaining({ category: 'vulnerabilities' }),
     );
   });
 
