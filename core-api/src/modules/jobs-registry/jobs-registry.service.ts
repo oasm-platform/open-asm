@@ -7,13 +7,11 @@ import {
 } from '@/common/constants/app.constants';
 import {
   BullMQName,
-  CATEGORY_DATA_SOURCE_MAP,
   EventTriggerType,
   JobPriority,
   JobRunType,
   JobStatus,
   ToolCategory,
-  DataSource as ToolDataSource,
   WorkerScope,
   WorkerType,
 } from '@/common/enums/enum';
@@ -48,6 +46,7 @@ import {
   getSensitiveFields,
   maskProfile,
 } from '../tools/validators/tool-config-profiles.crypto';
+import { resolveToolCategory } from '../tools/tool-categories';
 import { resolveToolTargetTypes } from '../tools/tool-target-types';
 import { builtInTools } from '../tools/tools-provider/built-in-tools';
 import { ToolsService } from '../tools/tools.service';
@@ -269,14 +268,15 @@ export class JobsRegistryService {
     jobRunType,
     configProfileId,
     config,
+    category,
   }: CreateJobs): Promise<Job[]> {
     if (!tool) {
       throw new Error('Tool is required for creating a job');
     }
 
-    if (!tool.category) {
-      throw new Error('Tool category is required for creating a job');
-    }
+    // Throws for a category the tool does not declare — the step fails with that message.
+    const categorySpec = resolveToolCategory(tool, category);
+    const jobCategory = categorySpec.name;
 
     // Detect connector jobs: Tool.name IS the connector slug
     const connectorEntry = this.connectorRegistry.getConnector(tool.name);
@@ -322,6 +322,7 @@ export class JobsRegistryService {
         );
         await this.persistFailedConfigJob({
           tool,
+          category: jobCategory,
           workflow,
           jobHistory: existingJobHistory,
           jobRunType,
@@ -377,20 +378,20 @@ export class JobsRegistryService {
     // host scanner never sees a repository (and vice versa) — whether the run
     // came from a trigger, a schedule, an asset group or a manual dispatch.
     // A step left with no eligible asset produces no job and is skipped.
-    const targetTypes = resolveToolTargetTypes(tool);
+    const targetTypes = resolveToolTargetTypes(categorySpec);
 
-    // Step 2: find appropriate data source based on tool category
+    // Step 2: find appropriate data source based on the job category
     if (
-      tool.category === ToolCategory.HTTP_PROBE ||
-      tool.category === ToolCategory.SCREENSHOT ||
-      tool.category === ToolCategory.URL_DISCOVERY
+      jobCategory === ToolCategory.HTTP_PROBE ||
+      jobCategory === ToolCategory.SCREENSHOT ||
+      jobCategory === ToolCategory.URL_DISCOVERY
     ) {
       // HTTP_PROBE must probe every enabled asset_service port; SCREENSHOT and
       // URL_DISCOVERY are HTTP-crawl follow-ups and must only target services
       // httpx actually confirmed live.
       const liveOnly =
-        tool.category === ToolCategory.SCREENSHOT ||
-        tool.category === ToolCategory.URL_DISCOVERY;
+        jobCategory === ToolCategory.SCREENSHOT ||
+        jobCategory === ToolCategory.URL_DISCOVERY;
       const assetServices = await this.findAssetServicesForJob(
         targetIds,
         assetIds,
@@ -413,7 +414,7 @@ export class JobsRegistryService {
           assetService, // Store the asset service reference
           jobName: tool.name,
           status: JobStatus.PENDING,
-          category: tool.category,
+          category: jobCategory,
           tool,
           priority: priority ?? 4,
           jobHistory,
@@ -441,7 +442,7 @@ export class JobsRegistryService {
         targetTypes,
       );
 
-      const filteredAssets = this.filterAssetsByCategory(assets, tool.category);
+      const filteredAssets = this.filterAssetsByCategory(assets, jobCategory);
 
       // Step 3: iterate tools and create jobs
       const defaultCommand = builtInTools.find(
@@ -454,7 +455,7 @@ export class JobsRegistryService {
           asset,
           jobName: tool.name,
           status: JobStatus.PENDING,
-          category: tool.category,
+          category: jobCategory,
           tool,
           priority: priority ?? 4,
           jobHistory,
@@ -489,6 +490,7 @@ export class JobsRegistryService {
    */
   private async persistFailedConfigJob(args: {
     tool: CreateJobs['tool'];
+    category: ToolCategory;
     workflow: CreateJobs['workflow'];
     jobHistory?: CreateJobs['jobHistory'];
     jobRunType: CreateJobs['jobRunType'];
@@ -500,6 +502,7 @@ export class JobsRegistryService {
   }): Promise<Job> {
     const {
       tool,
+      category,
       workflow,
       jobHistory: existingJobHistory,
       jobRunType,
@@ -524,7 +527,7 @@ export class JobsRegistryService {
     const failedJob = jobRepo.create({
       id: randomUUID(),
       status: JobStatus.FAILED,
-      category: tool.category,
+      category,
       tool,
       priority: tool.priority ?? JobPriority.BACKGROUND,
       jobHistory,
@@ -801,19 +804,9 @@ export class JobsRegistryService {
         });
       }
 
-      const toolDataSource = worker.tool?.category
-        ? CATEGORY_DATA_SOURCE_MAP[worker.tool.category]
-        : ToolDataSource.ASSET;
-
-      if (toolDataSource === ToolDataSource.ASSET_SERVICE) {
-        queryBuilder
-          .leftJoinAndSelect('jobs.assetService', 'assetService')
-          .andWhere('jobs.category = :category', {
-            category: worker.tool?.category,
-          });
-      } else {
-        queryBuilder.leftJoinAndSelect('jobs.assetService', 'assetService');
-      }
+      // Every claimed job carries its own asset/service; the tool filter above
+      // already scopes tool-bound workers.
+      queryBuilder.leftJoinAndSelect('jobs.assetService', 'assetService');
 
       // [OPT-4] SKIP LOCKED avoids workers blocking each other on the same rows
       const jobs = await queryBuilder
@@ -1100,7 +1093,7 @@ export class JobsRegistryService {
         select
           tools.name,
           tools.description as tool_description,
-          tools.category as tool_category,
+          jobs.category as tool_category,
           assets.value as asset_value,
           targets.value as target,
           targets.id as target_id,

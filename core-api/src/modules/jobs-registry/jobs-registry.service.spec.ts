@@ -29,6 +29,8 @@ import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
 import { JobsRegistryService } from './jobs-registry.service';
 
+const HOST = [TargetType.DOMAIN, TargetType.IP, TargetType.CIDR];
+
 describe('JobsRegistryService', () => {
   let service: JobsRegistryService;
 
@@ -784,7 +786,7 @@ describe('JobsRegistryService', () => {
         name: 'test-tool',
         description: 'A test tool',
         command: 'test-command',
-        category: ToolCategory.SUBDOMAINS,
+        categories: [{ name: ToolCategory.SUBDOMAINS, targetTypes: HOST }],
         version: '1.0',
         logoUrl: 'http://example.com/logo.png',
         isBuiltIn: true,
@@ -1742,14 +1744,14 @@ describe('JobsRegistryService', () => {
     const screenshotTool = {
       id: 'tool-ss',
       name: 'screenshot',
-      category: ToolCategory.SCREENSHOT,
+      categories: [{ name: ToolCategory.SCREENSHOT, targetTypes: HOST }],
       priority: 4,
     } as any;
 
     const httpProbeTool = {
       id: 'tool-hp',
       name: 'httpx',
-      category: ToolCategory.HTTP_PROBE,
+      categories: [{ name: ToolCategory.HTTP_PROBE, targetTypes: HOST }],
       priority: 4,
     } as any;
 
@@ -1913,35 +1915,35 @@ describe('JobsRegistryService', () => {
     const urlDiscoveryTool = {
       id: 'tool-ud',
       name: 'katana',
-      category: ToolCategory.URL_DISCOVERY,
+      categories: [{ name: ToolCategory.URL_DISCOVERY, targetTypes: HOST }],
       priority: 4,
     } as any;
 
     const screenshotTool = {
       id: 'tool-ss',
       name: 'screenshot',
-      category: ToolCategory.SCREENSHOT,
+      categories: [{ name: ToolCategory.SCREENSHOT, targetTypes: HOST }],
       priority: 4,
     } as any;
 
     const httpProbeTool = {
       id: 'tool-hp',
       name: 'httpx',
-      category: ToolCategory.HTTP_PROBE,
+      categories: [{ name: ToolCategory.HTTP_PROBE, targetTypes: HOST }],
       priority: 4,
     } as any;
 
     const subdomainsTool = {
       id: 'tool-sub',
       name: 'subfinder',
-      category: ToolCategory.SUBDOMAINS,
+      categories: [{ name: ToolCategory.SUBDOMAINS, targetTypes: HOST }],
       priority: 4,
     } as any;
 
     const portsScannerTool = {
       id: 'tool-ports',
       name: 'naabu',
-      category: ToolCategory.PORTS_SCANNER,
+      categories: [{ name: ToolCategory.PORTS_SCANNER, targetTypes: HOST }],
       priority: 3,
     } as any;
 
@@ -2084,10 +2086,65 @@ describe('JobsRegistryService', () => {
       expect(result.map((job) => job.asset.id)).toEqual(selectedAssetIds);
     });
 
+    describe('category selection', () => {
+      const nmap = {
+        id: 'tool-nmap',
+        name: 'nmap',
+        priority: 4,
+        categories: [
+          { name: ToolCategory.PORTS_SCANNER, targetTypes: [TargetType.DOMAIN, TargetType.IP] },
+          { name: ToolCategory.HTTP_PROBE, targetTypes: [TargetType.DOMAIN] },
+        ],
+      } as any;
+
+      it('defaults job.category and target types to the tool first category', async () => {
+        mockAssetQB.getMany.mockResolvedValue([{ id: 'a-1', value: 'example.com', isPrimary: true }]);
+
+        const jobs = await service.createNewJob({
+          tool: nmap,
+          workspaceId: 'ws-1',
+          workflow: { id: 'wf-1' } as any,
+        });
+
+        expect(jobs.map((j) => j.category)).toEqual([ToolCategory.PORTS_SCANNER]);
+        expect(mockAssetQB.andWhere).toHaveBeenCalledWith('target.type IN (:...targetTypes)', {
+          targetTypes: [TargetType.DOMAIN, TargetType.IP],
+        });
+      });
+
+      it('uses the requested category for asset source and target types', async () => {
+        mockAssetServiceQB.getMany.mockResolvedValue([makeService('as-1')]);
+
+        const jobs = await service.createNewJob({
+          tool: nmap,
+          category: ToolCategory.HTTP_PROBE,
+          workspaceId: 'ws-1',
+          workflow: { id: 'wf-1' } as any,
+        });
+
+        expect(jobs.map((j) => j.category)).toEqual([ToolCategory.HTTP_PROBE]);
+        expect(mockAssetServiceQB.andWhere).toHaveBeenCalledWith('target.type IN (:...targetTypes)', {
+          targetTypes: [TargetType.DOMAIN],
+        });
+        expect(mockAssetQB.getMany).not.toHaveBeenCalled();
+      });
+
+      it('rejects a category the tool does not declare', async () => {
+        await expect(
+          service.createNewJob({
+            tool: nmap,
+            category: ToolCategory.SCREENSHOT,
+            workspaceId: 'ws-1',
+            workflow: { id: 'wf-1' } as any,
+          }),
+        ).rejects.toThrow('Tool "nmap" has no category "screenshot"');
+      });
+    });
+
     describe('target type filter', () => {
       it('restricts assets to the target types the tool declares', async () => {
         await service.createNewJob({
-          tool: { ...subdomainsTool, targetTypes: [TargetType.DOMAIN] },
+          tool: { ...subdomainsTool, categories: [{ name: ToolCategory.SUBDOMAINS, targetTypes: [TargetType.DOMAIN] }] },
           workspaceId: 'ws-1',
           workflow: { id: 'wf-1' } as any,
         });
@@ -2102,9 +2159,9 @@ describe('JobsRegistryService', () => {
         );
       });
 
-      it('treats a tool without declared target types as a host scanner', async () => {
+      it('treats a category without declared target types as a host scanner', async () => {
         await service.createNewJob({
-          tool: portsScannerTool,
+          tool: { ...portsScannerTool, categories: [{ name: ToolCategory.PORTS_SCANNER, targetTypes: [] }] },
           workspaceId: 'ws-1',
           workflow: { id: 'wf-1' } as any,
         });
@@ -2119,7 +2176,7 @@ describe('JobsRegistryService', () => {
 
       it('restricts asset services the same way', async () => {
         await service.createNewJob({
-          tool: { ...httpProbeTool, targetTypes: [TargetType.IP] },
+          tool: { ...httpProbeTool, categories: [{ name: ToolCategory.HTTP_PROBE, targetTypes: [TargetType.IP] }] },
           workspaceId: 'ws-1',
           workflow: { id: 'wf-1' } as any,
         });
@@ -2138,7 +2195,7 @@ describe('JobsRegistryService', () => {
         mockAssetQB.getMany.mockResolvedValue([]);
 
         const result = await service.createNewJob({
-          tool: { ...subdomainsTool, targetTypes: [TargetType.DOMAIN] },
+          tool: { ...subdomainsTool, categories: [{ name: ToolCategory.SUBDOMAINS, targetTypes: [TargetType.DOMAIN] }] },
           targetIds: ['ip-target'],
           workspaceId: 'ws-1',
           workflow: { id: 'wf-1' } as any,

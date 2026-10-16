@@ -55,8 +55,9 @@ describe('JobResultProcessor', () => {
     tool: {
       name: 'http-probe',
       type: WorkerType.PROVIDER,
-      category: 'http_probe',
+      categories: [{ name: 'http_probe', targetTypes: [] }],
     },
+    category: 'http_probe',
     isSaveData: true,
     isPublishEvent: false,
     jobHistory: { id: 'history-1' },
@@ -239,6 +240,26 @@ describe('JobResultProcessor', () => {
     });
   });
 
+  describe('when the result was posted for another category', () => {
+    it('fails the job without syncing the payload through the wrong handler', async () => {
+      mockJobsRegistryService.findJobForUpdate.mockResolvedValue(baseJob);
+      mockStorageService.readJsonFile.mockResolvedValue({ payload: [{ name: 'x' }] });
+      const misrouted = {
+        ...baseBullJob,
+        data: { ...baseBullJob.data, category: ToolCategory.VULNERABILITIES },
+        attemptsMade: 2,
+      } as unknown as Parameters<JobResultProcessor['process']>[0];
+
+      await expect(processor.process(misrouted)).rejects.toThrow(
+        'Result posted as "vulnerabilities" but job job-1 runs "http_probe"',
+      );
+
+      expect(mockDataAdapterService.syncData).not.toHaveBeenCalled();
+      expect(mockJobsRegistryService.handleJobError).toHaveBeenCalled();
+      expect(mockJobRepository.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe('when a built-in tool finds nothing to scan', () => {
     const naabuJob = () =>
       ({
@@ -246,8 +267,9 @@ describe('JobResultProcessor', () => {
         tool: {
           name: 'naabu',
           type: WorkerType.BUILT_IN,
-          category: ToolCategory.PORTS_SCANNER,
+          categories: [{ name: ToolCategory.PORTS_SCANNER, targetTypes: [] }],
         },
+        category: ToolCategory.PORTS_SCANNER,
       }) as unknown as Job;
 
     // naabu exits non-zero when the host does not resolve. That is the target's
@@ -337,8 +359,9 @@ describe('JobResultProcessor', () => {
         tool: {
           name: 'naabu',
           type: WorkerType.BUILT_IN,
-          category: ToolCategory.PORTS_SCANNER,
+          categories: [{ name: ToolCategory.PORTS_SCANNER, targetTypes: [] }],
         },
+        category: ToolCategory.PORTS_SCANNER,
       } as unknown as Job;
       mockJobsRegistryService.findJobForUpdate.mockResolvedValue(naabuJob);
       mockStorageService.readJsonFile.mockResolvedValue({
