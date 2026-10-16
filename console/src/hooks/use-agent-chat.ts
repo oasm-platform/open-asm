@@ -4,7 +4,9 @@ import type { UIMessage } from 'ai';
 import type { AgentTodoItem } from '@/pages/agents/components/agent-todo-panel';
 import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import {
+  agentsControllerStopConversation,
   useAgentsControllerGetMessagesInfinite,
+  type ConversationMetadataDto,
   type ConversationResponseDto,
 } from '@/services/apis/gen/queries';
 import { orvalClient } from '@/services/apis/axios-client';
@@ -140,6 +142,8 @@ interface UseAgentChatReturn {
   title: string | null;
   createdAt: string | null;
   todos: AgentTodoItem[];
+  /** Model, context usage and token/cost stats of the conversation */
+  conversationMeta: ConversationMetadataDto | null;
   selectedModel: SelectedModel | null;
   agentMode: string;
   selectedWorkerId: string | null;
@@ -174,6 +178,39 @@ interface UseAgentChatReturn {
  * Otherwise falls back to reconstructing parts from content/messageType/toolCalls
  * (legacy format for old messages).
  */
+/** Poll interval while the server is still producing the last answer. */
+const SERVER_STREAM_POLL_MS = 1_500;
+
+/**
+ * True when the newest message persisted on the server is an assistant turn
+ * still being generated. A run outlives the request that started it, so a
+ * client that reloads or returns to the conversation sees this and polls until
+ * the answer is complete.
+ */
+function isServerStreaming(
+  pages: Array<{ data?: unknown[] } | unknown[]> | undefined,
+): boolean {
+  if (!pages) return false;
+  // Page 1 is newest-first (sortOrder DESC), so the first item is the latest
+  const first = pages[0];
+  const list = Array.isArray(first)
+    ? first
+    : ((first as { data?: unknown[] })?.data ?? []);
+  const latest = list[0] as Record<string, unknown> | undefined;
+  if (!latest || String(latest.role).toLowerCase() !== 'assistant') return false;
+  const status = (latest.metadata as { status?: string } | undefined)?.status;
+  return status === 'streaming';
+}
+
+/**
+ * Cheap identity of a message list: id + part count per message. Changes when
+ * a message is added or a streaming message gains parts, so the history sync
+ * updates then but not on every equal refetch.
+ */
+function messagesSignature(messages: UIMessage[]): string {
+  return messages.map((m) => `${m.id}:${m.parts?.length ?? 0}`).join('|');
+}
+
 function mapDbMessagesToUI(
   pages: Array<{ data?: unknown[]; items?: unknown[]; messages?: unknown[] } | unknown[]>,
 ): UIMessage[] {
@@ -284,6 +321,8 @@ export function useAgentChat({
   const [todos, setTodos] = useState<AgentTodoItem[]>([]);
   const [title, setTitle] = useState<string | null>(null);
   const [createdAt, setCreatedAt] = useState<string | null>(null);
+  const [conversationMeta, setConversationMeta] =
+    useState<ConversationMetadataDto | null>(null);
   const { appendEvent, eventsMap } = useRemoteExecuteStream();
   // Parallel tool calls can each need approval, so keep a queue
   const [approvalQueue, setApprovalQueue] = useState<PendingApproval[]>([]);
@@ -350,6 +389,13 @@ export function useAgentChat({
         queryKey: ['/api/agents/conversations', conversationId, 'messages'],
         enabled:
           !!conversationId && !isNewConversation && !isStreamingRef.current,
+        // Keep refreshing while a run started elsewhere (another tab, or
+        // before we navigated away) is still producing the answer, so the
+        // completed response appears without a manual reload.
+        refetchInterval: (query) =>
+          !isStreamingRef.current && isServerStreaming(query.state.data?.pages)
+            ? SERVER_STREAM_POLL_MS
+            : false,
         getNextPageParam: (lastPage) => {
           const page = lastPage.page ?? 1;
           const limit = lastPage.limit ?? 10;
@@ -466,6 +512,13 @@ export function useAgentChat({
         const mode = (data.data as { mode?: unknown } | undefined)?.mode;
         if (isApprovalMode(mode)) syncApprovalMode(mode);
       }
+      if (data.type === 'data-conversation-stats') {
+        // Sent once a turn ends: model, context usage and turn stats
+        const payload = data.data as
+          | { metadata?: ConversationMetadataDto }
+          | undefined;
+        if (payload?.metadata) setConversationMeta(payload.metadata);
+      }
       if (data.type === 'data-remote-execute-output') {
         const event = data.data as import('@/hooks/use-remote-execute-stream').RemoteExecuteStreamEvent;
         appendEvent(event);
@@ -544,12 +597,13 @@ export function useAgentChat({
   useEffect(() => {
     if (!conversationId || isLoadingHistory || isStreamingRef.current) return;
     if (savedMessages.length > 0) {
-      // Use functional update to compare and avoid unnecessary re-renders
+      // Use functional update to compare and avoid unnecessary re-renders.
+      // Compare a lightweight signature (id + part count) rather than only ids:
+      // a polled run keeps the same id while its parts grow, and skipping on
+      // id alone would freeze the UI on the stale streaming placeholder.
       setMessagesRef.current((prev) => {
-        // Skip if messages are the same length and have same IDs
-        if (prev.length === savedMessages.length) {
-          const sameIds = prev.every((m, i) => m.id === savedMessages[i]?.id);
-          if (sameIds) return prev;
+        if (messagesSignature(prev) === messagesSignature(savedMessages)) {
+          return prev;
         }
         return savedMessages;
       });
@@ -605,8 +659,15 @@ export function useAgentChat({
 
   const handleStop = useCallback(() => {
     isUserStoppedRef.current = true;
+    // Dropping the stream no longer aborts the run (so navigating away keeps
+    // it going); an explicit stop must tell the server to abort it.
+    if (conversationId) {
+      void agentsControllerStopConversation(conversationId).catch(() => {
+        // best-effort: the local stop below still ends this client's stream
+      });
+    }
     stop();
-  }, [stop]);
+  }, [stop, conversationId]);
 
   const onRetryAction = useMemo(() => {
     return lastAssistantIdx !== -1 && !isStreaming ? handleRetry : undefined;
@@ -695,6 +756,7 @@ export function useAgentChat({
   useEffect(() => {
     if (!conversationId) {
       setTodos([]);
+      setConversationMeta(null);
       restoreApprovalMode();
       return;
     }
@@ -725,6 +787,9 @@ export function useAgentChat({
         }
         if (!cancelled && data.createdAt) {
           setCreatedAt(data.createdAt as string);
+        }
+        if (!cancelled) {
+          setConversationMeta(data.metadata ?? null);
         }
         const savedApprovalMode = (data as { approvalMode?: string })
           .approvalMode;
@@ -795,6 +860,7 @@ export function useAgentChat({
     isRetrying,
     retryAttempt: retryCount,
     todos,
+    conversationMeta,
     title,
     createdAt,
     selectedModel,

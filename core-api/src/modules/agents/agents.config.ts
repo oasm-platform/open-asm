@@ -2,6 +2,7 @@ import { decryptWithDEK } from '@/common/utils/workspace-encryption.util';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import type { LanguageModel } from 'ai';
 import { In, Repository } from 'typeorm';
 import {
   AgentConfigResponseDto,
@@ -15,7 +16,8 @@ import {
   AgentSearchProviderConfig,
 } from './entities/agent-config.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
-import { SearchProvider } from './enums/agent.enums';
+import { LLMProvider, SearchProvider } from './enums/agent.enums';
+import { getLLMProviderConfig } from './llm-provider-supported';
 
 export function maskApiKey(apiKey: string): string {
   if (apiKey.length <= 4) return '****';
@@ -142,6 +144,58 @@ export class AgentsConfigService {
       userId,
       agentConfig,
     );
+  }
+
+  /** Builds the AI SDK model of a connection (decrypting its API key). */
+  async createLanguageModel(
+    config: AgentLLMConfig,
+    workspaceId: string,
+  ): Promise<LanguageModel> {
+    let apiKey = '';
+    if (config.apiKey) {
+      apiKey = await this.workspaceEncryption.decrypt(
+        workspaceId,
+        config.apiKey,
+      );
+    }
+    const providerConfig = getLLMProviderConfig(config.provider);
+
+    if (!providerConfig) {
+      throw new BadRequestException(
+        `Unsupported LLM provider: ${String(config.provider)}`,
+      );
+    }
+
+    const baseURL =
+      config.provider === LLMProvider.CUSTOM ? config.apiUrl : undefined;
+
+    return providerConfig.handler(apiKey, config.model, baseURL);
+  }
+
+  /**
+   * The model background subagents run with: the first `modelsConfig.subagents`
+   * ref, else the conversation's own connection, else the user's default.
+   */
+  async resolveSubagentLLMConfig(
+    workspaceId: string,
+    userId: string,
+    fallbackLlmConfigId: string,
+    /** The subagent's own model, tried first */
+    override?: { llmConfigId: string; model: string },
+  ): Promise<ResolvedLLMConfig | null> {
+    const agentConfig = await this.find(workspaceId, userId);
+    const ref = override ?? agentConfig?.modelsConfig.subagents?.[0];
+    if (ref) {
+      const llmConfig = await this.llmConfigRepository.findOne({
+        where: { id: ref.llmConfigId, workspaceId, userId },
+      });
+      if (llmConfig) return withAgentConfig(llmConfig, agentConfig, ref.model);
+    }
+    const fallback = await this.llmConfigRepository.findOne({
+      where: { id: fallbackLlmConfigId, workspaceId, userId },
+    });
+    if (fallback) return withAgentConfig(fallback, agentConfig);
+    return this.getDefaultLLMConfig(workspaceId, userId, agentConfig);
   }
 
   async get(

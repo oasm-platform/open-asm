@@ -32,6 +32,7 @@ import type { Response } from 'express';
 import { AgentsCompletionsService } from './agents.completions';
 import { AgentsApprovalsService } from './agents.approvals';
 import { AgentsConfigService } from './agents.config';
+import { AgentsDefinitionsService } from './agents.definitions';
 import { AgentsService } from './agents.service';
 import {
   AgentConfigResponseDto,
@@ -46,6 +47,7 @@ import {
 } from './dto/command-approval.dto';
 import { AgentsSkillsService } from './agents.skills';
 import { GetAgentModesResponseDto } from './dto/agent-mode.dto';
+import { SubagentResponseDto } from './dto/conversation-stats.dto';
 import {
   ConversationResponseDto,
   UpdateConversationDto,
@@ -73,6 +75,11 @@ import {
   UpdateSkillDto,
 } from './dto/skill.dto';
 import { WorkspaceMemoryResponseDto } from './dto/workspace-memory.dto';
+import {
+  AgentDefinitionResponseDto,
+  CreateAgentDefinitionDto,
+  UpdateAgentDefinitionDto,
+} from './dto/agent-definition.dto';
 
 @ApiTags('Agents')
 @Controller('agents')
@@ -84,6 +91,7 @@ export class AgentsController {
     private readonly agentsSkillsService: AgentsSkillsService,
     private readonly agentsApprovalsService: AgentsApprovalsService,
     private readonly agentsConfigService: AgentsConfigService,
+    private readonly agentsDefinitionsService: AgentsDefinitionsService,
   ) {}
 
   @WorkspaceAccess('agent.read')
@@ -342,6 +350,30 @@ export class AgentsController {
   }
 
   @WorkspaceAccess('agent.read')
+  @Get('conversations/:id/subagents')
+  @Doc({
+    summary: 'List conversation subagents',
+    description:
+      'Background subagent tasks dispatched in this conversation, with status and result',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Conversation ID' }],
+    },
+    response: { serialization: SubagentResponseDto, isArray: true },
+  })
+  async getConversationSubagents(
+    @Param() { id }: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<SubagentResponseDto[]> {
+    return this.agentsService.getConversationSubagents(
+      id,
+      workspaceId,
+      userId,
+    );
+  }
+
+  @WorkspaceAccess('agent.read')
   @Get('conversations')
   @Doc({
     summary: 'List conversations',
@@ -454,19 +486,22 @@ export class AgentsController {
     @UserId() userId: string,
     @Res() res: Response,
   ): Promise<void> {
-    // Create an AbortController that will be triggered when client disconnects
+    // The run outlives this HTTP request. A client disconnect (navigating to
+    // another conversation/tab) must NOT kill it: we keep draining the stream
+    // server-side so it finishes and persists, and the user sees the result on
+    // return. Only an explicit stop (POST .../stop) aborts the run.
     const abortController = new AbortController();
+    let clientGone = false;
+    const canWrite = () => !clientGone && !res.writableEnded;
 
-    // Detect client disconnect. Listen on the response: the request has
-    // already emitted 'close' once the body parser consumed it, so a listener
-    // on req would never fire and a stopped/closed chat would never abort.
+    // Listen on the response: the request already emitted 'close' once the
+    // body parser consumed it, so a listener on req would never fire.
     const onClientDisconnect = () => {
-      if (!res.writableEnded) {
-        abortController.abort();
-      }
+      clientGone = true;
     };
     res.on('close', onClientDisconnect);
 
+    let activeConversationId: string | undefined;
     try {
       const { stream, conversationId } =
         await this.agentsCompletionsService.streamMessage(
@@ -475,24 +510,33 @@ export class AgentsController {
           userId,
           abortController.signal,
         );
+      activeConversationId = conversationId;
+      if (conversationId) {
+        this.agentsCompletionsService.registerActiveRun(
+          conversationId,
+          abortController,
+        );
+      }
 
-      res.socket?.setNoDelay(true);
-      res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-      res.setHeader('Cache-Control', 'no-cache, no-transform');
-      res.setHeader('Content-Encoding', 'identity');
-      res.setHeader('Connection', 'keep-alive');
-      res.setHeader(
-        'X-Conversation-Id',
-        conversationId || dto.conversationId || '',
-      );
-      res.flushHeaders();
+      if (canWrite()) {
+        res.socket?.setNoDelay(true);
+        res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-cache, no-transform');
+        res.setHeader('Content-Encoding', 'identity');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader(
+          'X-Conversation-Id',
+          conversationId || dto.conversationId || '',
+        );
+        res.flushHeaders();
+      }
 
       // Headers are now committed — from this point on we can only write SSE events
 
       // SSE keepalive heartbeat: emit comment every 15s to prevent
       // proxy/load-balancer timeouts on long-running streams.
       const keepaliveInterval = setInterval(() => {
-        if (!res.writableEnded) {
+        if (canWrite()) {
           res.write(':keepalive\n\n');
         }
       }, 15_000);
@@ -500,6 +544,7 @@ export class AgentsController {
       try {
         const reader = stream.getReader();
         while (true) {
+          // An explicit stop cancels the run; a mere disconnect does not
           if (abortController.signal.aborted) {
             await reader.cancel();
             break;
@@ -507,15 +552,19 @@ export class AgentsController {
 
           const { done, value } = await reader.read();
           if (done) break;
-          res.write(`data: ${JSON.stringify(value)}\n\n`);
+          // Keep reading even after the client left, so the run reaches its
+          // end and persists; just stop writing to the dead socket.
+          if (canWrite()) {
+            res.write(`data: ${JSON.stringify(value)}\n\n`);
+          }
         }
         // Send [DONE] marker to properly terminate the SSE stream
-        if (!res.writableEnded) {
+        if (canWrite()) {
           res.write('data: [DONE]\n\n');
           res.end();
         }
       } catch (streamError) {
-        if (abortController.signal.aborted) {
+        if (abortController.signal.aborted || clientGone) {
           if (!res.writableEnded) {
             res.end();
           }
@@ -527,7 +576,7 @@ export class AgentsController {
             : typeof streamError === 'string'
               ? streamError
               : 'Stream error';
-        if (!res.writableEnded) {
+        if (canWrite()) {
           res.write(
             `data: ${JSON.stringify({ type: 'error', error: { message } })}\n\n`,
           );
@@ -537,12 +586,7 @@ export class AgentsController {
         clearInterval(keepaliveInterval);
       }
     } catch (error) {
-      if (abortController.signal.aborted) {
-        if (!res.writableEnded) {
-          res.end();
-        }
-        return;
-      }
+      if (clientGone) return;
       if (error instanceof BadRequestException) {
         res.status(400).json({
           message: error.message,
@@ -559,7 +603,38 @@ export class AgentsController {
       }
     } finally {
       res.off('close', onClientDisconnect);
+      if (activeConversationId) {
+        this.agentsCompletionsService.clearActiveRun(
+          activeConversationId,
+          abortController,
+        );
+      }
     }
+  }
+
+  @WorkspaceAccess('agent.write')
+  @Post('conversations/:id/stop')
+  @HttpCode(HttpStatus.OK)
+  @Doc({
+    summary: 'Stop the active response',
+    description:
+      'Aborts the in-progress agent run of a conversation. Use this instead of ' +
+      'dropping the stream connection, which now lets the run finish in the background.',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Conversation ID' }],
+    },
+    response: { serialization: DefaultMessageResponseDto },
+  })
+  async stopConversation(
+    @Param('id') id: string,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    // Ownership check (throws NotFound if the conversation is not the user's)
+    await this.agentsService.getConversation(id, workspaceId, userId);
+    const stopped = this.agentsCompletionsService.stopRun(id);
+    return { message: stopped ? 'Response stopped' : 'No active response' };
   }
 
   @WorkspaceAccess('agent.write')
@@ -756,6 +831,83 @@ export class AgentsController {
   ): Promise<DefaultMessageResponseDto> {
     await this.agentsService.deleteWorkspaceMemory(id, workspaceId, userId);
     return { message: 'Memory deleted successfully' };
+  }
+
+  // ==========================================
+  // Agent Definitions Endpoints
+  // ==========================================
+
+  @WorkspaceAccess('agent.read')
+  @Get('definitions')
+  @Doc({
+    summary: 'List agent definitions',
+    description:
+      "Built-in agents, the workspace's shared agents and the current user's personal agents",
+    request: { getWorkspaceId: true },
+    response: { serialization: AgentDefinitionResponseDto, isArray: true },
+  })
+  getAgentDefinitions(
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<AgentDefinitionResponseDto[]> {
+    return this.agentsDefinitionsService.list(workspaceId, userId);
+  }
+
+  @WorkspaceAccess('agent.write')
+  @Post('definitions')
+  @Doc({
+    summary: 'Create agent definition',
+    description:
+      'Create a personal (scope user) or workspace-shared agent. The name is a slug mentioned as @name',
+    request: { getWorkspaceId: true },
+    response: { serialization: AgentDefinitionResponseDto },
+  })
+  createAgentDefinition(
+    @Body() dto: CreateAgentDefinitionDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<AgentDefinitionResponseDto> {
+    return this.agentsDefinitionsService.create(workspaceId, userId, dto);
+  }
+
+  @WorkspaceAccess('agent.write')
+  @Patch('definitions/:id')
+  @Doc({
+    summary: 'Update agent definition',
+    description: 'Update a custom agent you created',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Agent definition ID' }],
+    },
+    response: { serialization: AgentDefinitionResponseDto },
+  })
+  updateAgentDefinition(
+    @Param('id') id: string,
+    @Body() dto: UpdateAgentDefinitionDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<AgentDefinitionResponseDto> {
+    return this.agentsDefinitionsService.update(workspaceId, userId, id, dto);
+  }
+
+  @WorkspaceAccess('agent.write')
+  @Delete('definitions/:id')
+  @Doc({
+    summary: 'Delete agent definition',
+    description: 'Delete a custom agent you created',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Agent definition ID' }],
+    },
+    response: { serialization: DefaultMessageResponseDto },
+  })
+  async deleteAgentDefinition(
+    @Param('id') id: string,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    await this.agentsDefinitionsService.delete(workspaceId, userId, id);
+    return { message: 'Agent deleted successfully' };
   }
 
   // ==========================================

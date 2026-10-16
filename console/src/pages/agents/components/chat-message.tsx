@@ -11,12 +11,20 @@ import {
 import { Markdown } from '@/components/common/markdown';
 import {
   ToolCallDisplay,
+  ToolCallLabel,
   type ToolCallState,
 } from '@/components/common/tool-call-display';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
 import type { RemoteExecuteStreamEvent } from '@/hooks/use-remote-execute-stream';
 import type { UIMessage } from 'ai';
 import { motion } from 'framer-motion';
-import { memo, useMemo } from 'react';
+import { ChevronRightIcon } from 'lucide-react';
+import { memo, useMemo, useState } from 'react';
 import {
   CopyButton,
   getTextContent,
@@ -35,21 +43,127 @@ interface ChatMessageProps {
   messagesLength: number;
   isStreaming: boolean;
   remoteExecuteEvents?: Map<string, RemoteExecuteStreamEvent[]>;
+  /** Tool call picked in the sidebar; its group expands so it can be scrolled to */
+  selectedToolCallId?: string | null;
+}
+
+interface ToolItem {
+  kind: 'tool';
+  toolCallId: string;
+  toolName: string;
+  state: string;
+  input?: unknown;
+  output?: unknown;
 }
 
 type RenderItem =
   | { kind: 'reasoning'; text: string; isStreaming: boolean }
-  | {
-      kind: 'tool';
-      toolCallId: string;
-      toolName: string;
-      state: string;
-      input?: unknown;
-      output?: unknown;
-    }
+  | ToolItem
+  | { kind: 'tool-group'; tools: ToolItem[] }
   | { kind: 'text'; text: string }
   | { kind: 'generating' }
   | { kind: 'initial-thinking' };
+
+/** Plans stay visible on their own rather than folded into a group */
+const UNGROUPED_TOOLS = new Set(['formulate_plan']);
+
+/** Fold runs of two or more adjacent tool calls into one group */
+function groupToolCalls(items: RenderItem[]): RenderItem[] {
+  const result: RenderItem[] = [];
+  let run: ToolItem[] = [];
+  const flush = () => {
+    if (run.length > 1) result.push({ kind: 'tool-group', tools: run });
+    else result.push(...run);
+    run = [];
+  };
+  for (const item of items) {
+    if (item.kind === 'tool' && !UNGROUPED_TOOLS.has(item.toolName)) {
+      run.push(item);
+    } else {
+      flush();
+      result.push(item);
+    }
+  }
+  flush();
+  return result;
+}
+
+function toToolCallState(item: ToolItem): ToolCallState {
+  return {
+    toolCallId: item.toolCallId,
+    toolName: item.toolName,
+    status: item.state as ToolCallState['status'],
+    input: item.input as Record<string, unknown> | undefined,
+    output: item.output,
+  };
+}
+
+function ToolCallItem({
+  item,
+  remoteExecuteEvents,
+}: {
+  item: ToolItem;
+  remoteExecuteEvents?: Map<string, RemoteExecuteStreamEvent[]>;
+}) {
+  return (
+    <div id={`tool-call-${item.toolCallId}`}>
+      <ToolCallDisplay
+        toolCall={toToolCallState(item)}
+        streamEvents={remoteExecuteEvents?.get(item.toolCallId)}
+      />
+    </div>
+  );
+}
+
+/** Adjacent tool calls collapsed to the latest one's label */
+function ToolCallGroup({
+  tools,
+  remoteExecuteEvents,
+  selectedToolCallId,
+}: {
+  tools: ToolItem[];
+  remoteExecuteEvents?: Map<string, RemoteExecuteStreamEvent[]>;
+  selectedToolCallId?: string | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const [revealed, setRevealed] = useState<string | null>(null);
+  // Expand during render (not in an effect) so the selected call is already
+  // in the DOM when the conversation scrolls to it
+  if (
+    selectedToolCallId &&
+    selectedToolCallId !== revealed &&
+    tools.some((t) => t.toolCallId === selectedToolCallId)
+  ) {
+    setRevealed(selectedToolCallId);
+    setOpen(true);
+  }
+
+  const latest = tools[tools.length - 1];
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger className="flex w-full min-w-0 items-center gap-2 text-left text-muted-foreground hover:text-foreground">
+        <ToolCallLabel toolCall={toToolCallState(latest)} />
+        <span className="shrink-0 text-xs">{tools.length} tool calls</span>
+        <ChevronRightIcon
+          className={cn(
+            'size-3.5 shrink-0 transition-transform',
+            open && 'rotate-90',
+          )}
+        />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-1.5 flex flex-col gap-1.5 border-l pl-3">
+        {tools.map((item) => (
+          <ToolCallItem
+            key={item.toolCallId}
+            item={item}
+            remoteExecuteEvents={remoteExecuteEvents}
+          />
+        ))}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // ChatMessage
@@ -61,6 +175,7 @@ export const ChatMessage = memo(function ChatMessage({
   messagesLength,
   isStreaming,
   remoteExecuteEvents,
+  selectedToolCallId,
 }: ChatMessageProps) {
   const textContent = getTextContent(message);
   const hasContent = textContent.length > 0;
@@ -155,7 +270,7 @@ export const ChatMessage = memo(function ChatMessage({
       items.push({ kind: 'generating' });
     }
 
-    return items;
+    return groupToolCalls(items);
   }, [parts, isReasoningStreaming, showGenerating, showInitialThinking]);
 
   return (
@@ -181,23 +296,20 @@ export const ChatMessage = memo(function ChatMessage({
                 );
               case 'tool':
                 return (
-                  <div
+                  <ToolCallItem
                     key={item.toolCallId}
-                    id={`tool-call-${item.toolCallId}`}
-                  >
-                    <ToolCallDisplay
-                      toolCall={{
-                        toolCallId: item.toolCallId,
-                        toolName: item.toolName,
-                        status: item.state as ToolCallState['status'],
-                        input: item.input as
-                          | Record<string, unknown>
-                          | undefined,
-                        output: item.output,
-                      }}
-                      streamEvents={remoteExecuteEvents?.get(item.toolCallId)}
-                    />
-                  </div>
+                    item={item}
+                    remoteExecuteEvents={remoteExecuteEvents}
+                  />
+                );
+              case 'tool-group':
+                return (
+                  <ToolCallGroup
+                    key={`tool-group-${item.tools[0].toolCallId}`}
+                    tools={item.tools}
+                    remoteExecuteEvents={remoteExecuteEvents}
+                    selectedToolCallId={selectedToolCallId}
+                  />
                 );
               case 'text':
                 return (

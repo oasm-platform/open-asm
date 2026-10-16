@@ -12,6 +12,9 @@ vi.mock('@/pages/agents/components/llm-connect', () => ({
 vi.mock('@/components/models-manager', () => ({
   ModelsManager: () => <div>models content</div>,
 }));
+vi.mock('@/components/agents-manager', () => ({
+  AgentsManager: () => <div>agents content</div>,
+}));
 vi.mock('@/components/skills-manager', () => ({
   SkillsManager: () => <div>skills content</div>,
 }));

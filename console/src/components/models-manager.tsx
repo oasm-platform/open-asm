@@ -87,7 +87,7 @@ function connectionLabel(connection: LLMConfigWithProviderDto): string {
 const filterByKeywords = (_value: string, search: string, keywords?: string[]) =>
   defaultFilter(keywords?.join(' ') ?? '', search);
 
-function ModelPicker({
+export function ModelPicker({
   label,
   value,
   connections,

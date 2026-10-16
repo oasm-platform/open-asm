@@ -3,6 +3,7 @@ import createState from './createState';
 export type AgentSettingsTab =
   | 'provider'
   | 'models'
+  | 'agents'
   | 'web-search'
   | 'instruction'
   | 'skills'
