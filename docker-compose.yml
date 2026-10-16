@@ -88,6 +88,11 @@ services:
       # container recreation mints a fresh identity and startup orphan
       # reconcile can no longer recognize the previous run's containers.
       - WORKER_TOKEN_FILE=/app/state/.worker-token
+      # Run agent shell commands in a per-session locked-down container (no
+      # worker env, no docker.sock, tools read-only) instead of on this
+      # worker. Required for a global worker to serve agents of every
+      # workspace; fails closed (commands error) if Docker is unreachable.
+      - WORKER_AGENT_SANDBOX=true
       # WORKER_CONNECTOR_ADDR: optional override for the address connector
       # containers dial back on (auto-derived when unset — host.docker.internal
       # on any OS via a host-gateway ExtraHosts mapping the worker adds on
@@ -154,8 +159,10 @@ services:
         max-file: '3'
     volumes:
       - pgdata:/var/lib/postgresql/data:rw
+    # Loopback only: agent sandboxes on a shared worker must not reach the
+    # database (trust auth) through the Docker bridge gateway.
     ports:
-      - '${POSTGRES_PORT:-5432}:5432'
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
     networks:
       - oasm
     healthcheck:
@@ -168,8 +175,9 @@ services:
     container_name: oasm-redis
     image: redis:alpine
     restart: always
+    # Loopback only: it carries every workspace's remote-execute results.
     ports:
-      - '6379:6379'
+      - '127.0.0.1:6379:6379'
     networks:
       - oasm
     logging:
@@ -201,7 +209,7 @@ services:
     networks:
       - oasm
     ports:
-      - '4360:4360'
+      - '127.0.0.1:4360:4360'
     restart: 'always'
     volumes:
       - geoip-data:/app/data:rw
@@ -212,8 +220,8 @@ services:
     networks:
       - oasm
     ports:
-      - '9000:9000'
-      - '9001:9001'
+      - '127.0.0.1:9000:9000'
+      - '127.0.0.1:9001:9001'
     environment:
       - RUSTFS_ACCESS_KEY=rustfsadmin
       - RUSTFS_SECRET_KEY=rustfssecret

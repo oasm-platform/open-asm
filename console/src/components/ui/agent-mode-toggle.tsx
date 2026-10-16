@@ -8,8 +8,10 @@ import {
 import {
   SendMessageDtoAgentMode,
   useAgentsControllerGetAgentModes,
+  WorkerInstanceScope,
 } from '@/services/apis/gen/queries';
 import { ApprovalModeSelect } from '@/components/ui/approval-mode-select';
+import { Badge } from '@/components/ui/badge';
 import { useConnectWorkerState } from '@/hooks/useConnectWorkerState';
 import { CheckIcon, InfinityIcon, MonitorIcon } from 'lucide-react';
 import { memo } from 'react';
@@ -135,6 +137,12 @@ export const AgentModeSelect = memo(function AgentModeSelect({
                       <span className="flex-1">
                         {worker.name ?? worker.id.slice(0, 8)}
                       </span>
+                      {/* Shared by every workspace */}
+                      {worker.scope === WorkerInstanceScope.cloud && (
+                        <Badge variant="outline" className="text-[10px]">
+                          Global
+                        </Badge>
+                      )}
                       <span className="relative flex h-2 w-2 shrink-0">
                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75" />
                         <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />

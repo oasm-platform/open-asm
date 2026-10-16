@@ -642,19 +642,26 @@ export class AgentTool {
         inputSchema: listWorkersSchema,
         execute: async (params: z.infer<typeof listWorkersSchema>) => {
           const { page, limit, q } = params;
-          const response = await this.workersService.getWorkers({
-            limit: limit ?? 100,
-            page: page ?? 1,
-            sortBy: 'createdAt',
-            sortOrder: SortOrder.DESC,
-            search: q,
-            workspaceId,
-            scope: WorkerScope.WORKSPACE,
-            enabledAgentMode: true,
-          });
+          // This workspace's own workers and the global ones
+          const response = await this.workersService.getWorkers(
+            {
+              limit: limit ?? 100,
+              page: page ?? 1,
+              sortBy: 'createdAt',
+              sortOrder: SortOrder.DESC,
+              search: q,
+              enabledAgentMode: true,
+            },
+            { agentWorkspaceId: workspaceId },
+          );
           return {
             ...response,
-            data: response.data.map((i) => ({ id: i.id, name: i.name })),
+            data: response.data.map((i) => ({
+              id: i.id,
+              name: i.name,
+              scope:
+                i.scope === WorkerScope.CLOUD ? 'global' : 'workspace',
+            })),
           };
         },
       };

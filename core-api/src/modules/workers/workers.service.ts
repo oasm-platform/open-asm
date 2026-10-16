@@ -195,13 +195,25 @@ export class WorkersService {
     return null;
   }
 
-  /** Agents may only use workspace-scoped workers of their own workspace (never cloud). */
+  /**
+   * Agents may use the workspace-scoped workers of their own workspace and
+   * any global worker (cloud + built-in) with agent mode on — set only while
+   * it sandboxes agent commands. Cloud PROVIDER workers are never global.
+   */
   public async isAgentWorkerForWorkspace(
     workerId: string,
     workspaceId: string,
   ): Promise<boolean> {
     return this.repo.exists({
-      where: { id: workerId, workspaceId, scope: WorkerScope.WORKSPACE },
+      where: [
+        { id: workerId, workspaceId, scope: WorkerScope.WORKSPACE },
+        {
+          id: workerId,
+          scope: WorkerScope.CLOUD,
+          type: WorkerType.BUILT_IN,
+          enabledAgentMode: true,
+        },
+      ],
     });
   }
 
@@ -215,6 +227,14 @@ export class WorkersService {
    */
   public async getWorkers(
     query: GetManyWorkersDto,
+    options?: {
+      /**
+       * Only the workers agents of this workspace may use: its own
+       * workspace-scoped ones and the global (cloud + built-in) ones.
+       * Server-side only, so it is not part of the query DTO.
+       */
+      agentWorkspaceId?: string;
+    },
   ): Promise<GetManyBaseResponseDto<WorkerInstance>> {
     const {
       page,
@@ -245,6 +265,18 @@ export class WorkersService {
       queryBuilder.andWhere('w."enabledAgentMode" = :enabledAgentMode', {
         enabledAgentMode,
       });
+    }
+
+    if (options?.agentWorkspaceId) {
+      queryBuilder.andWhere(
+        '((w."scope" = :agentWorkspaceScope AND w."workspaceId" = :agentWorkspaceId) OR (w."scope" = :agentCloudScope AND w."type" = :agentGlobalType))',
+        {
+          agentWorkspaceScope: WorkerScope.WORKSPACE,
+          agentWorkspaceId: options.agentWorkspaceId,
+          agentCloudScope: WorkerScope.CLOUD,
+          agentGlobalType: WorkerType.BUILT_IN,
+        },
+      );
     }
 
     // Add explicit scope filter if provided
@@ -873,7 +905,14 @@ export class WorkersService {
   }
 
   public async enableAgentMode(workerId: string): Promise<void> {
-    await this.repo.update(workerId, { enabledAgentMode: true });
+    await this.setAgentMode(workerId, true);
+  }
+
+  public async setAgentMode(
+    workerId: string,
+    enabledAgentMode: boolean,
+  ): Promise<void> {
+    await this.repo.update(workerId, { enabledAgentMode });
   }
 
   public async handleRemoteExecuteResult(result: {

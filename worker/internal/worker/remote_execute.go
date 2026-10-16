@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -13,22 +14,75 @@ import (
 	pb "oasm-worker/internal/gen/workers"
 
 	"oasm-worker/internal/grpcclient"
+	"oasm-worker/internal/runtime"
 )
 
-type sessionSandbox struct {
-	rootPath string
-	mu       sync.Mutex
+// agentCommandSandbox runs agent shell commands in an isolated per-session
+// container (runtime.AgentSandbox). nil means the legacy host `sh -c` path.
+type agentCommandSandbox interface {
+	Exec(ctx context.Context, sessionID, command string, out func([]byte) error) (int, error)
+	Close(ctx context.Context, sessionID string) error
 }
 
-func newSessionSandbox(workspaceRoot, sessionID string) (*sessionSandbox, error) {
+// unavailableSandbox is the fail-closed stand-in used when the sandbox was
+// requested but cannot run: every command errors instead of silently
+// falling back to the host, where it could read the worker's secrets.
+type unavailableSandbox struct{ err error }
+
+func (u unavailableSandbox) Exec(context.Context, string, string, func([]byte) error) (int, error) {
+	return -1, u.err
+}
+
+func (u unavailableSandbox) Close(context.Context, string) error { return nil }
+
+// selectCommandSandbox picks how agent commands run: host exec when the
+// sandbox is disabled, the sandbox when it initialized, else fail closed.
+// Returns an untyped nil for the host path so callers can test against nil.
+func selectCommandSandbox(enabled bool, sb *runtime.AgentSandbox, initErr error) agentCommandSandbox {
+	if !enabled {
+		return nil
+	}
+	if sb == nil {
+		if initErr == nil {
+			initErr = errors.New("docker runtime unavailable")
+		}
+		return unavailableSandbox{err: fmt.Errorf("agent sandbox unavailable: %w", initErr)}
+	}
+	return sb
+}
+
+// remoteResultSender is the subset of RemoteExecuteHandler a command uses to
+// report its result.
+type remoteResultSender interface {
+	SendStdout(ctx context.Context, data []byte) error
+	SendExit(ctx context.Context, exitCode int32) error
+	SendError(ctx context.Context, errMsg string) error
+}
+
+type sessionSandbox struct {
+	sessionID string
+	rootPath  string              // host session dir; empty when containerized
+	container agentCommandSandbox // non-nil: commands run in a sandbox container
+	mu        sync.Mutex
+}
+
+func newSessionSandbox(workspaceRoot, sessionID string, container agentCommandSandbox) (*sessionSandbox, error) {
+	if container != nil {
+		// The container is created lazily on the first command; no host dir,
+		// so nothing of the session ever lands on the worker's filesystem.
+		return &sessionSandbox{sessionID: sessionID, container: container}, nil
+	}
+
 	sessionDir := filepath.Join(workspaceRoot, sessionID)
 
-	if err := os.MkdirAll(sessionDir, 0o755); err != nil {
+	// 0700: other sessions' commands run as the same OS user on this path.
+	if err := os.MkdirAll(sessionDir, 0o700); err != nil {
 		return nil, fmt.Errorf("failed to create session directory: %w", err)
 	}
 
 	return &sessionSandbox{
-		rootPath: sessionDir,
+		sessionID: sessionID,
+		rootPath:  sessionDir,
 	}, nil
 }
 
@@ -66,12 +120,39 @@ func (s *sessionSandbox) resolvePath(path string) (string, error) {
 func (s *sessionSandbox) close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.container != nil {
+		// Detached: the stream ctx is usually already cancelled here, and a
+		// leaked sandbox would keep the session's files and processes alive.
+		cctx, cancel := newDetachedCleanupContext()
+		defer cancel()
+		return s.container.Close(cctx, s.sessionID)
+	}
 	return os.RemoveAll(s.rootPath)
 }
 
-func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Client, workspaceRoot string, toolPath string, events chan<- TuiEvent, runTool func(sessionID string, run *pb.ToolRun, send toolResultSender), cancelTool func(sessionID string) bool) {
+// startRemoteExecuteHandler serves the remote execute stream. cmdSandbox nil
+// runs agent commands on the host; non-nil runs them through it (see
+// selectCommandSandbox).
+func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Client, workspaceRoot string, toolPath string, cmdSandbox agentCommandSandbox, events chan<- TuiEvent, runTool func(sessionID string, run *pb.ToolRun, send toolResultSender), cancelTool func(sessionID string) bool) {
 	log := NewTuiLogger(events, "RemoteExec")
 	remoteSem := make(chan struct{}, 16)
+
+	// Sandboxed sessions live across stream reconnects and end on idle (see
+	// sandboxSessions); host sessions stay per stream, as before.
+	var sbSessions *sandboxSessions
+	if cmdSandbox != nil {
+		sbSessions = newSandboxSessions(sandboxIdleTTL, maxLiveSandboxes, func(sessionID string) {
+			cctx, cancel := newDetachedCleanupContext()
+			defer cancel()
+			if err := cmdSandbox.Close(cctx, sessionID); err != nil {
+				log.ErrorE("Failed to remove session sandbox", err)
+			} else {
+				log.Info("Cleaned up session sandbox: %s", sessionID)
+			}
+			Emit(events, TuiEvent{Type: EventSessionClosed, SessionID: sessionID})
+		})
+		defer sbSessions.closeAll()
+	}
 
 	for {
 		select {
@@ -110,13 +191,17 @@ func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Clien
 				return sb, nil
 			}
 
-			sb, err := newSessionSandbox(workspaceRoot, sessionID)
+			sb, err := newSessionSandbox(workspaceRoot, sessionID, cmdSandbox)
 			if err != nil {
 				return nil, err
 			}
 
 			activeSessions[sessionID] = sb
-			log.Info("Session sandbox: %s -> %s", sessionID, sb.rootPath)
+			if sb.container != nil {
+				log.Info("Session sandbox: %s -> isolated container", sessionID)
+			} else {
+				log.Info("Session sandbox: %s -> %s", sessionID, sb.rootPath)
+			}
 
 			Emit(events, TuiEvent{
 				Type:          EventSessionCreated,
@@ -153,6 +238,11 @@ func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Clien
 				if sessionID == "" || command == "" {
 					log.Warning("Empty session or command field")
 					_ = handler.SendError(ctx, "empty session or command")
+					continue
+				}
+
+				if sbSessions != nil {
+					startSandboxedCommand(ctx, handler, resp, sbSessions, cmdSandbox, remoteSem, events, toolPath)
 					continue
 				}
 
@@ -231,11 +321,51 @@ func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Clien
 	}
 }
 
-func executeRemoteCommand(ctx context.Context, handler *grpcclient.RemoteExecuteHandler, sessionID, cmdID, workerID, command string, sandbox *sessionSandbox, events chan<- TuiEvent, toolPath string) {
+// startSandboxedCommand runs one COMMAND event in its session's sandbox,
+// tracked by sbSessions so the container is removed once the session idles.
+func startSandboxedCommand(ctx context.Context, handler *grpcclient.RemoteExecuteHandler, resp *pb.RemoteExecuteSubscribeResponse, sbSessions *sandboxSessions, cmdSandbox agentCommandSandbox, remoteSem chan struct{}, events chan<- TuiEvent, toolPath string) {
+	log := NewTuiLogger(events, "RemoteExec")
+	sessionID, command := resp.SessionId, resp.Command
+	// Captured now: Next() overwrites handler ids before the goroutine sends
+	cmdID, cmdWorkerID := resp.Id, resp.WorkerId
+
+	ok, isNew := sbSessions.begin(sessionID)
+	if !ok {
+		log.Warning("agent sandbox limit reached (%d live)", maxLiveSandboxes)
+		_ = handler.SendErrorFor(ctx, sessionID, cmdID, cmdWorkerID, "too many active agent sandboxes on this worker, try again shortly")
+		return
+	}
+	if isNew {
+		log.Info("Session sandbox: %s -> isolated container", sessionID)
+		Emit(events, TuiEvent{Type: EventSessionCreated, SessionID: sessionID, SessionActive: true})
+	}
+	Emit(events, TuiEvent{Type: EventSessionCommand, SessionID: sessionID, SessionCommand: command})
+
+	sb := &sessionSandbox{sessionID: sessionID, container: cmdSandbox}
+	select {
+	case remoteSem <- struct{}{}:
+		go func() {
+			defer func() { <-remoteSem }()
+			defer sbSessions.end(sessionID)
+			executeRemoteCommand(ctx, handler, sessionID, cmdID, cmdWorkerID, command, sb, events, toolPath)
+		}()
+	default:
+		sbSessions.end(sessionID)
+		log.Warning("remote exec concurrency limit reached")
+		_ = handler.SendErrorFor(ctx, sessionID, cmdID, cmdWorkerID, "server busy")
+	}
+}
+
+func executeRemoteCommand(ctx context.Context, handler remoteResultSender, sessionID, cmdID, workerID, command string, sandbox *sessionSandbox, events chan<- TuiEvent, toolPath string) {
 	log := NewTuiLogger(events, "RemoteExec")
 	log.Info("Executing in session %s: %s", sessionID, command)
 	_ = cmdID
 	_ = workerID
+
+	if sandbox.container != nil {
+		executeSandboxedCommand(ctx, handler, sessionID, command, sandbox.container, events)
+		return
+	}
 
 	wrappedCmd := fmt.Sprintf("(%s) 2>&1", command)
 	cmd := exec.CommandContext(ctx, "sh", "-c", wrappedCmd)
@@ -298,4 +428,45 @@ func executeRemoteCommand(ctx context.Context, handler *grpcclient.RemoteExecute
 	}
 
 	_ = handler.SendExit(ctx, exitCode)
+}
+
+// executeSandboxedCommand runs one agent command in the session's sandbox
+// container and reports it through the same result path as the host exec:
+// stdout chunks, then EXIT with the real exit code. Any sandbox failure
+// (engine down, create/exec error, cancellation) is an ERROR result — never a
+// retry on the host.
+func executeSandboxedCommand(ctx context.Context, handler remoteResultSender, sessionID, command string, sb agentCommandSandbox, events chan<- TuiEvent) {
+	log := NewTuiLogger(events, "RemoteExec")
+
+	// On timeout the sandbox removes the session container, which stops the
+	// command; the session's next command gets a fresh one
+	cmdCtx, cancel := context.WithTimeout(ctx, sandboxCommandTimeout)
+	defer cancel()
+	exitCode, err := sb.Exec(cmdCtx, sessionID, command, func(chunk []byte) error {
+		if sendErr := handler.SendStdout(ctx, chunk); sendErr != nil {
+			return fmt.Errorf("stream output: %w", sendErr)
+		}
+		Emit(events, TuiEvent{
+			Type:          EventSessionOutput,
+			SessionID:     sessionID,
+			SessionOutput: string(chunk),
+			SessionStream: "stdout",
+		})
+		return nil
+	})
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil {
+			err = fmt.Errorf("timed out after %s", sandboxCommandTimeout)
+		}
+		log.ErrorE(fmt.Sprintf("Sandboxed command failed: %s", command), err)
+		_ = handler.SendError(ctx, fmt.Sprintf("sandboxed command failed: %v", err))
+		return
+	}
+
+	if exitCode != 0 {
+		log.Warning("Command failed (code %d): %s", exitCode, command)
+	} else {
+		log.Success("Command completed: %s", command)
+	}
+	_ = handler.SendExit(ctx, int32(exitCode))
 }
