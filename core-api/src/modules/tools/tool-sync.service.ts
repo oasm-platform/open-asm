@@ -202,10 +202,15 @@ export class ToolSyncService implements OnModuleInit {
     >;
 
     const connectorEntries: Array<{ insert: ToolInsert; logoBase64?: string }> = [];
+    // Every slug in the manifest, including connectors skipped below: a
+    // connector this platform cannot read is not removed, and orphan cleanup
+    // must not delete it (that cascades to its config profiles and jobs).
+    const manifestSlugs: string[] = [];
 
     for (const rawEntry of connectors) {
       const slug = String((rawEntry['slug'] as string) ?? (rawEntry['name'] as string) ?? '').toLowerCase();
       if (!slug) continue;
+      manifestSlugs.push(slug);
       const name = slug;
       const description =
         (rawEntry['description'] as string) ??
@@ -385,10 +390,10 @@ export class ToolSyncService implements OnModuleInit {
     if (toUpsert.length === 0) {
       // Still cleanup orphans (use original manifest names to avoid false orphans after takeover splice)
       await this.redisLockService.withLock('connector-tools-sync', 10_000, () =>
-        this.removeOrphanConnectorTools(allConnectorNames),
+        this.removeOrphanConnectorTools(manifestSlugs),
       );
       await this.redisLockService.withLock('provider-tools-sync', 10_000, () =>
-        this.removeOrphanProviderTools(allConnectorNames),
+        this.removeOrphanProviderTools(manifestSlugs),
       );
       return [];
     }
@@ -432,12 +437,12 @@ export class ToolSyncService implements OnModuleInit {
 
     // Cleanup connector orphans after successful sync (use original manifest names)
     await this.redisLockService.withLock('connector-tools-sync', 10_000, () =>
-      this.removeOrphanConnectorTools(allConnectorNames),
+      this.removeOrphanConnectorTools(manifestSlugs),
     );
 
     // Cleanup legacy PROVIDER official-support tools no longer in manifest
     await this.redisLockService.withLock('provider-tools-sync', 10_000, () =>
-      this.removeOrphanProviderTools(allConnectorNames),
+      this.removeOrphanProviderTools(manifestSlugs),
     );
 
     return committedTools;

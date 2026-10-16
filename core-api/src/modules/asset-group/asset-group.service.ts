@@ -18,6 +18,7 @@ import {
   encryptInlineConfig,
   getSensitiveFields,
 } from '../tools/validators/tool-config-profiles.crypto';
+import { resolveToolCategory } from '../tools/tool-categories';
 import { ToolsService } from '../tools/tools.service';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { Workflow } from '../workflows/entities/workflow.entity';
@@ -404,6 +405,17 @@ export class AssetGroupService {
             `Tool "${tool.name}" requires a configuration profile or inline config.`,
           );
         }
+      }
+    }
+
+    // A category the tool does not declare would fail every scheduled run.
+    for (const tool of tools) {
+      const category = inputByToolId.get(tool.id!)?.category;
+      if (!category) continue;
+      try {
+        resolveToolCategory(tool, category);
+      } catch (error) {
+        throw new BadRequestException((error as Error).message);
       }
     }
 

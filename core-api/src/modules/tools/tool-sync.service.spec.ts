@@ -326,6 +326,25 @@ describe('ToolSyncService categories synchronization', () => {
     ]);
   });
 
+  // A connector this platform cannot read (e.g. a newer manifest) is skipped,
+  // not treated as removed: deleting it would cascade to its config profiles
+  // (credentials) and jobs.
+  it('keeps an existing connector that a later manifest makes unusable', async () => {
+    const h = createHarness();
+    h.setManifest([connector({ slug: 'katana' })]);
+    await runConnectorSync(h.service);
+    expect(h.rowByName('katana')).toBeDefined();
+
+    h.setManifest([
+      connector({ slug: 'katana', capabilities: [{ name: 'quantum', targetTypes: ['ip'] }] }),
+      connector({ slug: 'gau' }),
+    ]);
+    await runConnectorSync(h.service);
+
+    expect(h.rowByName('katana')).toBeDefined();
+    expect(h.rowByName('gau')).toBeDefined();
+  });
+
   it('upserts built-in tools with their declared categories', async () => {
     const h = createHarness();
 
