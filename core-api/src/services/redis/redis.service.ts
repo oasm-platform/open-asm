@@ -504,6 +504,54 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Sets a key's time-to-live in seconds (`EXPIRE key seconds`).
+   *
+   * @returns true when the TTL was set, false when the key does not exist.
+   */
+  public async expire(key: string, seconds: number): Promise<boolean> {
+    return (await this.client.expire(key, seconds)) === 1;
+  }
+
+  /**
+   * Whether a key currently exists.
+   *
+   * Uses `cacheClient` (never the `subscriber`, which rejects non-subscribe
+   * commands) so a resume handler can probe for a stream buffer without
+   * disturbing the pub/sub connection.
+   */
+  public async exists(key: string): Promise<boolean> {
+    return (await this.cacheClient.exists(key)) === 1;
+  }
+
+  /**
+   * Reads a range of stream entries, oldest first (`XRANGE key start end`).
+   *
+   * `-`/`+` are the min/max id sentinels, so the default reads the whole
+   * stream. Unlike {@link xreadgroup} this is a plain, non-blocking read with
+   * no consumer-group bookkeeping: it is the replay-from-start a reconnecting
+   * reader needs before it tails live entries.
+   */
+  public async xrange(
+    stream: string,
+    start = '-',
+    end = '+',
+  ): Promise<StreamEntry[]> {
+    const response = (await this.client.xrange(
+      stream,
+      start,
+      end,
+    )) as [string, string[]][];
+
+    return response.map(([entryId, values]) => {
+      const fields: Record<string, string> = {};
+      for (let i = 0; i < values.length; i += 2) {
+        fields[values[i]] = values[i + 1];
+      }
+      return { id: entryId, fields };
+    });
+  }
+
+  /**
    * Creates a consumer group, ignoring the error when it already exists.
    *
    * BUSYGROUP is the normal path on every boot after the first (the group is

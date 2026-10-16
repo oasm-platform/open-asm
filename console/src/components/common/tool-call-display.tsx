@@ -163,6 +163,16 @@ const labelTextClass: Record<ToolCallState['status'], string | undefined> = {
   'needs-plan': 'text-amber-500',
 };
 
+/** Connector slug and target of a run_tool_connector call, e.g. "nuclei example.com" */
+function connectorRunDetail(toolCall: ToolCallState): string | null {
+  if (toolCall.toolName !== 'run_tool_connector') return null;
+  const { tool, target } = toolCall.input ?? {};
+  const detail = [tool, target]
+    .filter((value) => typeof value === 'string' && value)
+    .join(' ');
+  return detail || null;
+}
+
 /** One-line label of a tool call: the name, colored by its status. */
 export function ToolCallLabel({
   toolCall,
@@ -172,6 +182,7 @@ export function ToolCallLabel({
   className?: string;
 }) {
   const config = statusConfig[toolCall.status];
+  const detail = connectorRunDetail(toolCall);
 
   return (
     <div
@@ -179,10 +190,22 @@ export function ToolCallLabel({
       title={config.label}
     >
       <span
-        className={cn('font-medium truncate', labelTextClass[toolCall.status])}
+        className={cn(
+          'font-medium truncate',
+          detail && 'shrink-0',
+          labelTextClass[toolCall.status],
+        )}
       >
         {formatToolName(toolCall.toolName)}
       </span>
+      {detail && (
+        <span
+          className="ml-1.5 truncate text-xs text-muted-foreground"
+          title={detail}
+        >
+          {detail}
+        </span>
+      )}
       <span className="sr-only"> ({config.label})</span>
     </div>
   );

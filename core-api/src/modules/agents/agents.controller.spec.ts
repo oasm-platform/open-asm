@@ -18,6 +18,7 @@ describe('AgentsController workspace permission guards', () => {
     ['getConversationSubagents', 'GET /conversations/:id/subagents'],
     ['getConversations', 'GET /conversations'],
     ['getMessages', 'GET /conversations/:id/messages'],
+    ['resumeStream', 'GET /conversations/:id/stream'],
     ['getMCPConfig', 'GET /mcp-configs'],
     ['pingMCPServer', 'GET /mcp-configs/:name/ping'],
     ['getWorkspaceMemory', 'GET /workspace-memory'],

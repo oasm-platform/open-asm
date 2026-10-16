@@ -6,7 +6,6 @@ import {
 import { cn } from '@/lib/utils';
 import {
   SubagentResponseDtoStatus,
-  useAgentsControllerGetConversationSubagents,
   type SubagentResponseDto,
 } from '@/services/apis/gen/queries';
 import {
@@ -20,9 +19,10 @@ import {
 import { memo, useEffect, useState } from 'react';
 import { formatDuration, formatTokens } from './turn-stats-panel';
 
-export const SUBAGENTS_POLL_MS = 1_000;
+/** How often the run time of running subagents ticks (local clock only). */
+export const SUBAGENTS_TICK_MS = 1_000;
 
-const isActive = (s: SubagentResponseDto) =>
+export const isSubagentActive = (s: SubagentResponseDto) =>
   s.status === SubagentResponseDtoStatus.pending ||
   s.status === SubagentResponseDtoStatus.in_progress;
 
@@ -109,41 +109,22 @@ function SubagentRow({
 }
 
 interface SubagentsPanelProps {
-  conversationId: string | undefined;
-  /** The main agent is answering: it may dispatch at any moment */
-  isStreaming: boolean;
+  /** From the conversation detail, kept current by the chat stream */
+  subagents: SubagentResponseDto[];
 }
 
-/**
- * Background subagents of the conversation. Polls every second while the
- * main agent streams or a subagent is still queued/running, then stops.
- */
+/** Background subagents of the conversation. */
 export const SubagentsPanel = memo(function SubagentsPanel({
-  conversationId,
-  isStreaming,
+  subagents,
 }: SubagentsPanelProps) {
   const [open, setOpen] = useState(true);
   const [now, setNow] = useState(() => Date.now());
+  const running = subagents.filter(isSubagentActive).length;
 
-  const { data } = useAgentsControllerGetConversationSubagents(
-    conversationId ?? '',
-    {
-      query: {
-        enabled: !!conversationId,
-        refetchInterval: (query) =>
-          isStreaming || query.state.data?.some(isActive)
-            ? SUBAGENTS_POLL_MS
-            : false,
-      },
-    },
-  );
-  const subagents = data ?? [];
-  const running = subagents.filter(isActive).length;
-
-  // Ticks the elapsed time of running subagents between fetches
+  // Ticks the elapsed time of running subagents
   useEffect(() => {
     if (running === 0) return;
-    const timer = setInterval(() => setNow(Date.now()), SUBAGENTS_POLL_MS);
+    const timer = setInterval(() => setNow(Date.now()), SUBAGENTS_TICK_MS);
     return () => clearInterval(timer);
   }, [running]);
 

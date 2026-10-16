@@ -352,7 +352,6 @@ describe('AgentTool plan tools', () => {
         AgentMode.AGENT,
         emitter,
         'c1',
-        false,
         { ...settings(AgentApprovalMode.PLAN), planFirst: true },
       ) as unknown as Record<string, { execute: ToolLike['execute'] }>;
 
@@ -377,7 +376,6 @@ describe('AgentTool plan tools', () => {
         AgentMode.AGENT,
         emitter,
         'c1',
-        false,
         approval,
       ) as unknown as Record<string, ToolLike>;
       await formulate(approval, ['a']);

@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import type { UIMessage } from 'ai';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useAgentChat } from './use-agent-chat';
+import { seedFromSaved, useAgentChat } from './use-agent-chat';
 
 const mocks = vi.hoisted(() => ({
   onData: undefined as
@@ -64,6 +64,12 @@ vi.mock('@/hooks/useWorkspaceSelector', () => ({
 }));
 
 vi.mock('@/services/apis/gen/queries', () => ({
+  SubagentResponseDtoStatus: {
+    pending: 'pending',
+    in_progress: 'in_progress',
+    completed: 'completed',
+    failed: 'failed',
+  },
   useAgentsControllerGetMessagesInfinite: () => ({
     data: mocks.messagesData,
     isLoading: false,
@@ -357,5 +363,99 @@ describe('useAgentChat conversation stats', () => {
       mocks.onData?.({ type: 'data-conversation-stats', data: { metadata: after } });
     });
     expect(result.current.conversationMeta).toEqual(after);
+  });
+});
+
+describe('useAgentChat subagents', () => {
+  const subagent = (status: string) => ({ id: 's1', name: 'worker', status });
+
+  beforeEach(() => {
+    mocks.onData = undefined;
+    mocks.messagesData = undefined;
+    mocks.status = 'streaming';
+    mocks.orvalClient.mockReset();
+  });
+
+  afterEach(() => {
+    mocks.status = 'streaming';
+  });
+
+  const flush = () =>
+    act(async () => {
+      await Promise.resolve();
+    });
+
+  it('loads them with the conversation and follows stream updates without refetching', async () => {
+    mocks.orvalClient.mockResolvedValueOnce({
+      id: 'c1',
+      subagents: [subagent('pending')],
+    });
+    const { result } = renderHook(() => useAgentChat({ conversationId: 'c1' }));
+    await flush();
+    expect(result.current.subagents).toEqual([subagent('pending')]);
+
+    act(() => {
+      mocks.onData?.({
+        type: 'data-subagents-updated',
+        data: { subagents: [subagent('completed')] },
+      });
+    });
+    expect(result.current.subagents).toEqual([subagent('completed')]);
+    expect(mocks.orvalClient).toHaveBeenCalledTimes(1);
+  });
+
+  it('reloads the detail once when the run ends with a subagent still active', async () => {
+    mocks.orvalClient
+      .mockResolvedValueOnce({ id: 'c1', subagents: [subagent('in_progress')] })
+      .mockResolvedValueOnce({ id: 'c1', subagents: [subagent('completed')] });
+    const { result, rerender } = renderHook(() =>
+      useAgentChat({ conversationId: 'c1' }),
+    );
+    await flush();
+
+    mocks.status = 'ready';
+    rerender();
+    await flush();
+
+    expect(mocks.orvalClient).toHaveBeenCalledTimes(2);
+    expect(result.current.subagents).toEqual([subagent('completed')]);
+  });
+
+  it('does not reload when no subagent is active at the end of the run', async () => {
+    mocks.orvalClient.mockResolvedValueOnce({
+      id: 'c1',
+      subagents: [subagent('completed')],
+    });
+    const { rerender } = renderHook(() => useAgentChat({ conversationId: 'c1' }));
+    await flush();
+
+    mocks.status = 'ready';
+    rerender();
+    await flush();
+
+    expect(mocks.orvalClient).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('seedFromSaved', () => {
+  const msg = (id: string, role: 'user' | 'assistant'): UIMessage =>
+    ({ id, role, parts: [] }) as UIMessage;
+  const pages = (status: string) => [
+    { data: [{ role: 'assistant', metadata: { status } }] },
+  ];
+
+  it('drops the trailing assistant while the server is still producing it', () => {
+    const saved = [msg('u1', 'user'), msg('a1', 'assistant')];
+    expect(seedFromSaved(saved, pages('streaming'))).toEqual([saved[0]]);
+  });
+
+  it('keeps every message once the last answer is finished', () => {
+    const saved = [msg('u1', 'user'), msg('a1', 'assistant')];
+    expect(seedFromSaved(saved, pages('completed'))).toBe(saved);
+  });
+
+  it('keeps a trailing user message even mid-stream', () => {
+    const saved = [msg('a1', 'assistant'), msg('u2', 'user')];
+    expect(seedFromSaved(saved, pages('streaming'))).toBe(saved);
   });
 });
