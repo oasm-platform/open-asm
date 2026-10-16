@@ -5,7 +5,6 @@ import {
   parseManifestCategories,
   resolveToolCategory,
   sameCategories,
-  toolHasCategory,
 } from './tool-categories';
 
 const HOST = [TargetType.DOMAIN, TargetType.IP, TargetType.CIDR];
@@ -136,11 +135,6 @@ describe('resolveToolCategory', () => {
     expect(() => resolveToolCategory({ name: 'x', categories: [] })).toThrow(
       'declares no category',
     );
-  });
-
-  it('toolHasCategory', () => {
-    expect(toolHasCategory(tool, 'vulnerabilities')).toBe(true);
-    expect(toolHasCategory(tool, 'screenshot')).toBe(false);
   });
 });
 

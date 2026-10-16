@@ -75,12 +75,9 @@ function parseCapabilities(capabilities: unknown): {
       skipped.push(`${capName} (unknown capability)`);
       continue;
     }
-    // No fallback to host targets: a repository scanner without target types
-    // must not start receiving IPs.
-    const declared = Array.isArray(raw.targetTypes) ? raw.targetTypes : [];
-    const { targetTypes, unknown } = parseManifestTargetTypes(declared);
+    const { targetTypes, unknown } = parseManifestTargetTypes(raw.targetTypes);
     unknown.forEach((t) => unknownTargetTypes.add(t));
-    if (unknown.length === declared.length) {
+    if (targetTypes.length === 0) {
       skipped.push(`${capName} (no targetTypes)`);
       continue;
     }
@@ -149,13 +146,6 @@ export function resolveToolCategory(
     );
   }
   return found;
-}
-
-export function toolHasCategory(
-  tool: HasCategories,
-  category: string,
-): boolean {
-  return (tool.categories ?? []).some((c) => (c.name as string) === category);
 }
 
 /** Order-sensitive on categories (order decides the default), not on target types. */
