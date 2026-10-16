@@ -13,7 +13,7 @@ vi.mock('framer-motion', async (importOriginal) => ({
   useReducedMotion: () => true,
 }));
 
-const certificates = ASK_PROMPT_GROUPS.find((g) => g.id === 'certificates')!;
+const vulnerabilities = ASK_PROMPT_GROUPS.find((g) => g.id === 'vulnerabilities')!;
 
 describe('PromptGroups', () => {
   it('shows one chip per group', () => {
@@ -29,19 +29,19 @@ describe('PromptGroups', () => {
     const onSelect = vi.fn();
     render(<PromptGroups groups={ASK_PROMPT_GROUPS} onSelect={onSelect} />);
 
-    await user.click(screen.getByRole('button', { name: 'Certificates' }));
+    await user.click(screen.getByRole('button', { name: 'Vulnerabilities' }));
 
-    const list = screen.getByRole('list', { name: 'Certificates prompts' });
+    const list = screen.getByRole('list', { name: 'Vulnerabilities prompts' });
     expect(within(list).getAllByRole('button')).toHaveLength(
-      certificates.prompts.length,
+      vulnerabilities.prompts.length,
     );
     // The panel replaces the chips.
     expect(screen.queryByRole('button', { name: 'Overview' })).toBeNull();
 
     await user.click(
-      within(list).getByRole('button', { name: certificates.prompts[0] }),
+      within(list).getByRole('button', { name: vulnerabilities.prompts[0] }),
     );
-    expect(onSelect).toHaveBeenCalledWith(certificates.prompts[0]);
+    expect(onSelect).toHaveBeenCalledWith(vulnerabilities.prompts[0]);
     // Picking a prompt closes the panel.
     expect(screen.getByRole('button', { name: 'Overview' })).toBeTruthy();
   });
@@ -70,9 +70,9 @@ describe('PromptGroups', () => {
 
     await user.click(screen.getByRole('button', { name: 'Overview' }));
     await user.click(screen.getByRole('button', { name: 'Close' }));
-    expect(screen.getByRole('button', { name: 'Certificates' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Vulnerabilities' })).toBeTruthy();
 
-    await user.click(screen.getByRole('button', { name: 'Certificates' }));
+    await user.click(screen.getByRole('button', { name: 'Vulnerabilities' }));
     await user.keyboard('{Escape}');
     expect(screen.getByRole('button', { name: 'Overview' })).toBeTruthy();
   });
@@ -88,19 +88,19 @@ describe('PromptGroups', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Certificates' }));
-    const list = screen.getByRole('list', { name: 'Certificates prompts' });
+    await user.click(screen.getByRole('button', { name: 'Vulnerabilities' }));
+    const list = screen.getByRole('list', { name: 'Vulnerabilities prompts' });
 
     await user.hover(
-      within(list).getByRole('button', { name: certificates.prompts[1] }),
+      within(list).getByRole('button', { name: vulnerabilities.prompts[1] }),
     );
-    expect(onPreview).toHaveBeenLastCalledWith(certificates.prompts[1]);
+    expect(onPreview).toHaveBeenLastCalledWith(vulnerabilities.prompts[1]);
 
     await user.unhover(list);
     expect(onPreview).toHaveBeenLastCalledWith(null);
 
     await user.hover(
-      within(list).getByRole('button', { name: certificates.prompts[2] }),
+      within(list).getByRole('button', { name: vulnerabilities.prompts[2] }),
     );
     await user.keyboard('{Escape}');
     expect(onPreview).toHaveBeenLastCalledWith(null);

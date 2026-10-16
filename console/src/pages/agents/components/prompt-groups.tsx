@@ -133,17 +133,17 @@ export function PromptGroups({
           <motion.div
             key="chips"
             {...fade}
-            className="flex flex-wrap justify-center gap-2"
+            className="grid grid-cols-3 gap-2"
           >
             {groups.map((group) => (
               <button
                 key={group.id}
                 type="button"
                 onClick={() => setActiveId(group.id)}
-                className="inline-flex items-center gap-1.5 rounded-lg border bg-muted px-3 py-1.5 text-sm font-medium text-foreground/90 transition-colors hover:bg-accent hover:text-foreground cursor-pointer"
+                className="inline-flex min-w-0 items-center justify-center gap-1.5 rounded-lg border bg-muted px-3 py-1.5 text-sm font-medium text-foreground/90 transition-colors hover:bg-accent hover:text-foreground cursor-pointer"
               >
-                <group.icon className="size-4 text-muted-foreground" />
-                {group.label}
+                <group.icon className="size-4 shrink-0 text-muted-foreground" />
+                <span className="truncate">{group.label}</span>
               </button>
             ))}
           </motion.div>

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 
+	"google.golang.org/grpc/metadata"
+
 	workers "oasm-worker/internal/gen/workers"
 )
 
@@ -19,8 +21,21 @@ type RemoteExecuteHandler struct {
 	workerID  string
 }
 
+// AgentSandboxHeader is the RemoteExecuteSubscribe metadata key telling
+// core-api this worker runs agent shell commands inside a sandbox container.
+// Core only lets a shared (global) worker serve agents when it is present.
+const AgentSandboxHeader = "x-agent-sandbox"
+
+// SetAgentSandbox records whether agent commands run sandboxed. Set it only
+// once the sandbox is actually usable: the header is a security claim core
+// relies on to route other workspaces' agents here.
+func (c *Client) SetAgentSandbox(enabled bool) { c.agentSandbox.Store(enabled) }
+
 // RemoteExecuteSubscribe opens the remote-execute event stream to core-api.
 func (c *Client) RemoteExecuteSubscribe(ctx context.Context) (*RemoteExecuteHandler, error) {
+	if c.agentSandbox.Load() {
+		ctx = metadata.AppendToOutgoingContext(ctx, AgentSandboxHeader, "1")
+	}
 	stream, err := c.workers.RemoteExecuteSubscribe(ctx, &workers.RemoteExecuteSubscribeRequest{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to subscribe to remote execute: %w", err)

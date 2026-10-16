@@ -6,6 +6,7 @@ import { MemoryManager } from '@/components/memory-manager';
 import { ModelsManager } from '@/components/models-manager';
 import { SkillsManager } from '@/components/skills-manager';
 import { WebSearchManager } from '@/components/web-search-manager';
+import { SettingsHeaderActionsContext } from '@/components/settings-header-actions';
 import {
   Dialog,
   DialogClose,
@@ -33,7 +34,7 @@ import {
   ScrollText,
   X,
 } from 'lucide-react';
-import { type ComponentType, type SVGProps } from 'react';
+import { useState, type ComponentType, type SVGProps } from 'react';
 import {
   useAgentSettingsDialog,
   type AgentSettingsTab,
@@ -120,11 +121,12 @@ export function AgentSettingsDialog() {
   } = useAgentSettingsDialog();
   const active = tabs.find((tab) => tab.value === activeTab) ?? tabs[0];
   const ActiveIcon = active.icon;
+  const [actionsSlot, setActionsSlot] = useState<HTMLDivElement | null>(null);
   return (
     <Dialog open={isOpen} onOpenChange={(next) => (next ? open(activeTab) : close())}>
       <DialogContent
         showCloseButton={false}
-        className="w-[calc(100%-2rem)] max-w-6xl h-[calc(100dvh-4rem)] sm:h-[85vh] rounded-xl flex flex-col gap-0 p-0 sm:p-0 overflow-hidden"
+        className="w-full max-w-none h-dvh rounded-none sm:rounded-none border-0 md:w-[calc(100%-2rem)] md:max-w-6xl md:h-[85vh] md:rounded-xl md:border flex flex-col gap-0 p-0 sm:p-0 overflow-hidden"
       >
         <DialogTitle className="sr-only">Agent Settings</DialogTitle>
 
@@ -158,7 +160,7 @@ export function AgentSettingsDialog() {
 
           <div className="flex flex-col flex-1 min-h-0 min-w-0">
             <div className="flex shrink-0 items-center justify-between gap-4 border-b px-4 py-3 md:px-6 md:py-4">
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <h2 className="text-lg font-semibold tracking-tight">
                   {active.label}
                 </h2>
@@ -166,6 +168,10 @@ export function AgentSettingsDialog() {
                   {active.description}
                 </p>
               </div>
+              <div
+                ref={setActionsSlot}
+                className="flex shrink-0 items-center gap-2 empty:hidden"
+              />
               <DialogClose className="shrink-0 rounded-xs opacity-70 transition-opacity hover:opacity-100 hover:cursor-pointer focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden">
                 <X className="size-4" />
                 <span className="sr-only">Close</span>
@@ -200,18 +206,20 @@ export function AgentSettingsDialog() {
               </Select>
             </div>
 
-            {tabs.map((tab) => {
-              const Component = tab.component;
-              return (
-                <TabsContent
-                  key={tab.value}
-                  value={tab.value}
-                  className="flex-1 min-h-0 overflow-y-auto mt-0 px-4 py-4 md:px-6 md:py-5"
-                >
-                  <Component />
-                </TabsContent>
-              );
-            })}
+            <SettingsHeaderActionsContext.Provider value={actionsSlot}>
+              {tabs.map((tab) => {
+                const Component = tab.component;
+                return (
+                  <TabsContent
+                    key={tab.value}
+                    value={tab.value}
+                    className="flex-1 min-h-0 overflow-y-auto mt-0 px-4 py-4 md:px-6 md:py-5"
+                  >
+                    <Component />
+                  </TabsContent>
+                );
+              })}
+            </SettingsHeaderActionsContext.Provider>
           </div>
         </Tabs>
       </DialogContent>

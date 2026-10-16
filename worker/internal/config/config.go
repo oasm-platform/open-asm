@@ -56,6 +56,20 @@ type Config struct {
 	// run. Fixed at 1 in Phase 2 (a container is Busy while an execution is
 	// in flight; reuse happens only when Idle).
 	MaxJobsPerContainer int `mapstructure:"max_jobs_per_container"`
+
+	// AgentSandbox runs agent shell commands (remote execute COMMAND) inside a
+	// per-session locked-down container instead of `sh -c` on the worker host,
+	// and advertises that to core-api (x-agent-sandbox metadata) so a shared
+	// global worker may serve agents of every workspace. Fail closed: when the
+	// Docker engine is unavailable commands error out, never fall back to host.
+	AgentSandbox bool `mapstructure:"agent_sandbox"`
+	// AgentSandboxImage is the sandbox image. Empty = auto: the worker's own
+	// container image when containerized, else oasm/oasm-worker:latest.
+	AgentSandboxImage string `mapstructure:"agent_sandbox_image"`
+	// AgentSandboxToolsSource overrides what is mounted read-only at the tool
+	// path inside the sandbox (volume name or absolute host path). Empty =
+	// auto-detect from the worker's own tool-path mount.
+	AgentSandboxToolsSource string `mapstructure:"agent_sandbox_tools_source"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -81,6 +95,9 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("connector_idle_timeout", 60)
 	viper.SetDefault("max_replicas_per_image", 1)
 	viper.SetDefault("max_jobs_per_container", 1)
+	viper.SetDefault("agent_sandbox", false)
+	viper.SetDefault("agent_sandbox_image", "")
+	viper.SetDefault("agent_sandbox_tools_source", "")
 
 	var cfg Config
 	if err := viper.Unmarshal(&cfg); err != nil {

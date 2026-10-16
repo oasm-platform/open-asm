@@ -1,4 +1,4 @@
-import { WorkerScope } from '@/common/enums/enum';
+import { WorkerScope, WorkerType } from '@/common/enums/enum';
 import type { WrapperType } from '@/common/types/app.types';
 import { AgentConversation } from '@/modules/agents/entities/agent-conversation.entity';
 import { RedisService } from '@/services/redis/redis.service';
@@ -44,6 +44,46 @@ export interface ConversationWorkerPick {
   pin: boolean;
 }
 
+export interface RegisterWorkerOptions {
+  /**
+   * The worker runs agent shell commands in a per-session sandbox container
+   * (it subscribed with AGENT_SANDBOX_HEADER).
+   */
+  sandboxed?: boolean;
+}
+
+/** What the subscribe service knows about a connected worker. */
+interface ConnectedWorker {
+  workspaceId: string | null;
+  scope: WorkerScope;
+  type: WorkerType;
+  sandboxed: boolean;
+}
+
+/**
+ * Global = cloud scope AND built-in, as createCloudWorker makes them. PROVIDER
+ * workers (tool API keys) are cloud-scoped too but never global.
+ */
+export function isGlobalWorker(worker: {
+  scope: WorkerScope;
+  type: WorkerType;
+}): boolean {
+  return (
+    worker.scope === WorkerScope.CLOUD && worker.type === WorkerType.BUILT_IN
+  );
+}
+
+/**
+ * A workspace worker serves its own workspace's agents; a global worker
+ * serves every workspace, but only when it sandboxes agent commands — a
+ * shared host must never run one tenant's shell next to another's.
+ */
+function servesAgents(worker: ConnectedWorker): boolean {
+  if (worker.type === WorkerType.PROVIDER) return false;
+  if (worker.scope === WorkerScope.WORKSPACE) return true;
+  return isGlobalWorker(worker) && worker.sandboxed;
+}
+
 export interface WorkerRegistration {
   subject: ReplaySubject<RemoteExecuteCommand>;
   observable: ReturnType<ReplaySubject<RemoteExecuteCommand>['asObservable']>;
@@ -63,11 +103,17 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
   /** In-flight tool runs (session id → worker), failed fast on disconnect. */
   private readonly toolRunWorkerMap = new Map<string, string>();
 
-  /** Who each connected worker may serve. Cloud workers never serve agents. */
-  private readonly workerScope = new Map<
-    string,
-    { workspaceId: string | null; scope: WorkerScope }
-  >();
+  /**
+   * The worker each session's last push went to (every push path). Results
+   * for the session are accepted only from it.
+   */
+  private readonly resultWorkerMap = new Map<string, string>();
+
+  /**
+   * Who each connected worker may serve: a workspace worker its own
+   * workspace, a sandboxed global worker every workspace (see servesAgents).
+   */
+  private readonly workerScope = new Map<string, ConnectedWorker>();
 
   constructor(
     @Inject(forwardRef(() => WorkersService))
@@ -77,16 +123,34 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
     private readonly redisService: RedisService,
   ) {}
 
-  registerWorker(worker: WorkerInstance): WorkerRegistration {
-    // Cloud workers never serve agents (cloud ToS): they keep the stream for
-    // protocol compatibility but are never marked agent-capable.
-    if (worker.scope !== WorkerScope.CLOUD) {
-      void this.workersService.enableAgentMode(worker.id);
-    }
-    this.workerScope.set(worker.id, {
+  registerWorker(
+    worker: WorkerInstance,
+    options: RegisterWorkerOptions = {},
+  ): WorkerRegistration {
+    const connected: ConnectedWorker = {
       workspaceId: worker.workspaceId ?? worker.workspace?.id ?? null,
       scope: worker.scope,
-    });
+      type: worker.type,
+      sandboxed: options.sandboxed === true,
+    };
+    const logFlagError = (err: unknown) =>
+      this.logger.warn(
+        `Failed to update agent mode of worker ${worker.id}: ${String(err)}`,
+      );
+    if (servesAgents(connected)) {
+      void this.workersService.enableAgentMode(worker.id).catch(logFlagError);
+    } else {
+      // A stale flag would still list it to agents and admit it as a pin
+      void this.workersService
+        .setAgentMode(worker.id, false)
+        .catch(logFlagError);
+      if (isGlobalWorker(connected)) {
+        this.logger.warn(
+          `Global worker ${worker.id} subscribed without an agent sandbox — it serves no agents`,
+        );
+      }
+    }
+    this.workerScope.set(worker.id, connected);
 
     const subject = new ReplaySubject<RemoteExecuteCommand>(1);
     this.workers.set(worker.id, subject);
@@ -177,23 +241,26 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
     }
   }
 
-  /** A connected workspace worker of this workspace — never cloud. */
+  /** A connected worker of this workspace, or a connected sandboxed global one. */
   private canServe(workerId: string, workspaceId: string): boolean {
-    const scope = this.workerScope.get(workerId);
-    return (
-      this.isWorkerAlive(workerId) &&
-      scope?.scope === WorkerScope.WORKSPACE &&
-      scope.workspaceId === workspaceId
-    );
+    const connected = this.workerScope.get(workerId);
+    if (!connected || !this.isWorkerAlive(workerId)) return false;
+    if (!servesAgents(connected)) return false;
+    return isGlobalWorker(connected) || connected.workspaceId === workspaceId;
   }
 
+  /** Prefers the workspace's own workers; falls back to a global one. */
   private getNextAvailableWorker(workspaceId: string): string | null {
+    let globalWorkerId: string | null = null;
     for (const workerId of this.workers.keys()) {
-      if (this.canServe(workerId, workspaceId)) {
+      if (!this.canServe(workerId, workspaceId)) continue;
+      const connected = this.workerScope.get(workerId);
+      if (connected && !isGlobalWorker(connected)) {
         return workerId;
       }
+      globalWorkerId ??= workerId;
     }
-    return null;
+    return globalWorkerId;
   }
 
   getOrAssignWorker(sessionId: string, workspaceId: string): string | null {
@@ -229,6 +296,7 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
       command,
     };
 
+    this.resultWorkerMap.set(sessionId, workerId);
     subject.next(payload);
     return payload;
   }
@@ -251,6 +319,7 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
       command: '',
       toolRun,
     };
+    this.resultWorkerMap.set(sessionId, workerId);
     subject.next(payload);
     this.toolRunWorkerMap.set(sessionId, workerId);
     return payload;
@@ -298,10 +367,10 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
 
   /**
    * The worker to serve a conversation's next push: Redis pin → Postgres pin
-   * → any connected worker of the workspace. Nothing new is persisted here:
+   * → a connected worker of the workspace, else a global one. Nothing new is persisted here:
    * when `pin` is set the caller pins the fallback with pinConversationWorker
    * once its push succeeded, so a failed push never pins a dead worker.
-   * A pin that fails the scope rule (other workspace, cloud) is cleared; an
+   * A pin that fails the scope rule (another workspace's worker) is cleared; an
    * in-scope pin whose worker is merely offline is kept — a fallback serves
    * this push only.
    */
@@ -371,6 +440,17 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
   removeSession(sessionId: string): void {
     this.sessionWorkerMap.delete(sessionId);
     this.toolRunWorkerMap.delete(sessionId);
+    this.resultWorkerMap.delete(sessionId);
+  }
+
+  /**
+   * Whether a result for this session may come from this worker: only the
+   * worker its last push went to. A session with no recorded push (already
+   * finished, or pushed before a restart) is accepted as before.
+   */
+  isResultFromAssignedWorker(sessionId: string, workerId: string): boolean {
+    const assigned = this.resultWorkerMap.get(sessionId);
+    return assigned === undefined || assigned === workerId;
   }
 
   getSessionWorkerId(sessionId: string): string | undefined {
@@ -391,6 +471,10 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
       this.logger.warn(
         `Session ${sessionId} lost its worker ${workerId} due to disconnection`,
       );
+    }
+
+    for (const [sessionId, wId] of this.resultWorkerMap) {
+      if (wId === workerId) this.resultWorkerMap.delete(sessionId);
     }
 
     // A tool run's waiter would otherwise block until its timeout: end it now
@@ -425,5 +509,6 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
     this.workerScope.clear();
     this.sessionWorkerMap.clear();
     this.toolRunWorkerMap.clear();
+    this.resultWorkerMap.clear();
   }
 }

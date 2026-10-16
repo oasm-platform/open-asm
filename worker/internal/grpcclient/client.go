@@ -57,6 +57,10 @@ type Client struct {
 	// stream is still opened but cancels are ignored.
 	streamCancelMu sync.RWMutex
 	streamCancel   StreamCancelFunc
+
+	// agentSandbox is advertised on RemoteExecuteSubscribe (x-agent-sandbox)
+	// when agent shell commands run in a per-session sandbox container.
+	agentSandbox atomic.Bool
 }
 
 // NewClient validates the required configuration and creates a lazily-dialing

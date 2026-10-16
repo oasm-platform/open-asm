@@ -1,4 +1,7 @@
-import { WORKER_TOKEN_HEADER } from '@/common/constants/app.constants';
+import {
+  AGENT_SANDBOX_HEADER,
+  WORKER_TOKEN_HEADER,
+} from '@/common/constants/app.constants';
 import { Public } from '@/common/decorators/app.decorator';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
@@ -319,16 +322,13 @@ export class WorkersController {
     _request: Record<string, never>,
     metadata: Metadata,
   ): Observable<RemoteExecuteCommand> {
-    const tokenValues = metadata.get(WORKER_TOKEN_HEADER);
-    const workerToken = tokenValues?.[0] as string | undefined;
-    const worker = this.grpcWorkerContext.getWorker(workerToken!);
-
-    if (!worker) {
-      throw new RpcException('Worker not found in context');
-    }
+    const worker = this.getGrpcWorker(metadata);
+    // "1" = the worker runs agent shell commands in a per-session sandbox
+    const sandboxed =
+      String(metadata.get(AGENT_SANDBOX_HEADER)?.[0] ?? '') === '1';
 
     const { subject, observable } =
-      this.remoteExecuteSubscribeService.registerWorker(worker);
+      this.remoteExecuteSubscribeService.registerWorker(worker, { sandboxed });
 
     subject.next({
       id: '',
@@ -343,17 +343,49 @@ export class WorkersController {
 
   @UseGuards(GrpcWorkerTokenGuard)
   @GrpcMethod('WorkersService', 'RemoteExecuteResult')
-  async grpcRemoteExecuteResult(request: {
-    id: string;
-    sessionId: string;
-    type: number;
-    data: Uint8Array;
-    exitCode: number;
-  }): Promise<{ success: boolean; message: string }> {
+  async grpcRemoteExecuteResult(
+    request: {
+      id: string;
+      sessionId: string;
+      type: number;
+      data: Uint8Array;
+      exitCode: number;
+    },
+    metadata: Metadata,
+  ): Promise<{ success: boolean; message: string }> {
+    const worker = this.getGrpcWorker(metadata);
     this.logger.log(
-      `[grpcRemoteExecuteResult] Received: sessionId=${request.sessionId}, type=${request.type}, exitCode=${request.exitCode}`,
+      `[grpcRemoteExecuteResult] Received: sessionId=${request.sessionId}, type=${request.type}, exitCode=${request.exitCode}, worker=${worker.id}`,
     );
+    // Only the worker the session was pushed to may answer for it
+    if (
+      !this.remoteExecuteSubscribeService.isResultFromAssignedWorker(
+        request.sessionId,
+        worker.id,
+      )
+    ) {
+      this.logger.warn(
+        `[grpcRemoteExecuteResult] Dropped a result for session ${request.sessionId} from worker ${worker.id}: the session is assigned to another worker`,
+      );
+      return {
+        success: false,
+        message: 'Session is not assigned to this worker',
+      };
+    }
     await this.workersService.handleRemoteExecuteResult(request);
     return { success: true, message: 'Result acknowledged' };
+  }
+
+  /** The worker GrpcWorkerTokenGuard resolved from the call's token. */
+  private getGrpcWorker(metadata: Metadata): WorkerInstance {
+    const workerToken = metadata.get(WORKER_TOKEN_HEADER)?.[0] as
+      string | undefined;
+    const worker = workerToken
+      ? this.grpcWorkerContext.getWorker(workerToken)
+      : undefined;
+    if (!worker) {
+      throw new RpcException('Worker not found in context');
+    }
+    return worker;
   }
 }

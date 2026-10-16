@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { SettingsHeaderActions } from '@/components/settings-header-actions';
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
@@ -188,22 +189,27 @@ export function WebSearchManager() {
         </div>
       )}
 
-      <div className="flex justify-end gap-2">
+      <SettingsHeaderActions>
         {dirty && (
           <Button
             size="sm"
-            variant="ghost"
+            variant="outline"
             disabled={upsert.isPending}
             onClick={reset}
           >
             Discard
           </Button>
         )}
-        <Button size="sm" disabled={!canSave} onClick={save}>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!canSave}
+          onClick={save}
+        >
           {upsert.isPending && <Loader2 className="animate-spin" />}
           Save
         </Button>
-      </div>
+      </SettingsHeaderActions>
     </div>
   );
 }
