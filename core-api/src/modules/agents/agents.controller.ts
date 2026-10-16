@@ -81,6 +81,18 @@ import {
   UpdateAgentDefinitionDto,
 } from './dto/agent-definition.dto';
 
+/** Longest a stopped run is still reported as running while it saves */
+const STOP_SETTLE_TIMEOUT_MS = 30_000;
+
+/** Resolves `ms` after the signal aborts; never resolves while it does not */
+function afterAbort(signal: AbortSignal, ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const start = () => setTimeout(resolve, ms).unref();
+    if (signal.aborted) start();
+    else signal.addEventListener('abort', start, { once: true });
+  });
+}
+
 @ApiTags('Agents')
 @Controller('agents')
 @UseGuards(AuthGuard)
@@ -466,8 +478,21 @@ export class AgentsController {
     @Query() query: GetManyBaseQueryParams,
     @WorkspaceId() workspaceId: string,
     @UserId() userId: string,
-  ): Promise<GetManyBaseResponseDto<MessageResponseDto>> {
-    return this.agentsService.getMessages(id, workspaceId, userId, query);
+  ): Promise<
+    GetManyBaseResponseDto<MessageResponseDto> & { running: boolean }
+  > {
+    // Lets a client that lost the stream keep polling until the whole run
+    // ends, including the gaps between continuation iterations. Read before
+    // the messages: `running: false` then means they were read after the
+    // run saved its final state.
+    const running = this.agentsCompletionsService.isRunActive(id);
+    const result = await this.agentsService.getMessages(
+      id,
+      workspaceId,
+      userId,
+      query,
+    );
+    return { ...result, running };
   }
 
   @WorkspaceAccess('agent.read')
@@ -502,8 +527,9 @@ export class AgentsController {
     res.on('close', onClientDisconnect);
 
     let activeConversationId: string | undefined;
+    let runSettled: Promise<void> | undefined;
     try {
-      const { stream, conversationId } =
+      const { stream, conversationId, settled } =
         await this.agentsCompletionsService.streamMessage(
           dto,
           workspaceId,
@@ -511,6 +537,7 @@ export class AgentsController {
           abortController.signal,
         );
       activeConversationId = conversationId;
+      runSettled = settled;
       if (conversationId) {
         this.agentsCompletionsService.registerActiveRun(
           conversationId,
@@ -604,10 +631,23 @@ export class AgentsController {
     } finally {
       res.off('close', onClientDisconnect);
       if (activeConversationId) {
-        this.agentsCompletionsService.clearActiveRun(
-          activeConversationId,
-          abortController,
-        );
+        const conversationId = activeConversationId;
+        const clear = () =>
+          this.agentsCompletionsService.clearActiveRun(
+            conversationId,
+            abortController,
+          );
+        // After a stop this request ends before the run has saved its stopped
+        // state; keep reporting it as running until then, but not forever
+        // (a tool may ignore the abort)
+        if (runSettled) {
+          void Promise.race([
+            runSettled,
+            afterAbort(abortController.signal, STOP_SETTLE_TIMEOUT_MS),
+          ]).finally(clear);
+        } else {
+          clear();
+        }
       }
     }
   }
