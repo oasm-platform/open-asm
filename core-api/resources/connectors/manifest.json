@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-13T09:17:11.9248168Z",
+  "generatedAt": "2026-10-16T03:02:30.789400436Z",
   "connectors": [
     {
       "name": "Acunetix",
@@ -16,32 +16,34 @@
       "shortDescription": "Acunetix web vulnerability scanner",
       "description": "Connects to an Acunetix instance, runs a scan against a target, and streams the discovered vulnerabilities back to the Worker.",
       "capabilities": [
-        "vulnerabilities"
-      ],
-      "targetTypes": [
-        "domain",
-        "ip",
-        "cidr"
-      ],
-      "inputsSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "target": {
-            "description": "Target URL or hostname to scan.",
-            "examples": [
-              "https://example.com"
+        {
+          "name": "vulnerabilities",
+          "targetTypes": [
+            "domain",
+            "ip",
+            "cidr"
+          ],
+          "inputsSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "target": {
+                "description": "Target URL or hostname to scan.",
+                "examples": [
+                  "https://example.com"
+                ],
+                "format": "uri",
+                "title": "Scan target",
+                "type": "string",
+                "ui:placeholder": "https://example.com"
+              }
+            },
+            "required": [
+              "target"
             ],
-            "format": "uri",
-            "title": "Scan target",
-            "type": "string",
-            "ui:placeholder": "https://example.com"
+            "type": "object"
           }
-        },
-        "required": [
-          "target"
-        ],
-        "type": "object"
-      },
+        }
+      ],
       "configSchema": {
         "additionalProperties": false,
         "properties": {
@@ -128,33 +130,35 @@
       "shortDescription": "HTTP parameter discovery",
       "description": "Discovers hidden HTTP parameters for a URL using Arjun, probing a wordlist of parameter names against the target and reporting every parameter the endpoint responds to.",
       "capabilities": [
-        "url_discovery"
-      ],
-      "targetTypes": [
-        "domain",
-        "ip",
-        "cidr"
+        {
+          "name": "url_discovery",
+          "targetTypes": [
+            "domain",
+            "ip",
+            "cidr"
+          ],
+          "inputsSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "target": {
+                "description": "URL to discover parameters for. Each discovered parameter is emitted as <url>?<param>=.",
+                "examples": [
+                  "https://example.com/search"
+                ],
+                "format": "uri",
+                "title": "Target URL",
+                "type": "string",
+                "ui:placeholder": "https://example.com/search"
+              }
+            },
+            "required": [
+              "target"
+            ],
+            "type": "object"
+          }
+        }
       ],
       "agentTool": true,
-      "inputsSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "target": {
-            "description": "URL to discover parameters for. Each discovered parameter is emitted as <url>?<param>=.",
-            "examples": [
-              "https://example.com/search"
-            ],
-            "format": "uri",
-            "title": "Target URL",
-            "type": "string",
-            "ui:placeholder": "https://example.com/search"
-          }
-        },
-        "required": [
-          "target"
-        ],
-        "type": "object"
-      },
       "configSchema": {
         "additionalProperties": false,
         "properties": {
@@ -274,31 +278,33 @@
       "shortDescription": "Historical URL discovery via public archives",
       "description": "Discovers historical/archived URLs for a domain using Gau (GetAllUrls) across Wayback Machine, Common Crawl, AlienVault OTX and urlscan.io.",
       "capabilities": [
-        "url_discovery"
-      ],
-      "targetTypes": [
-        "domain"
+        {
+          "name": "url_discovery",
+          "targetTypes": [
+            "domain"
+          ],
+          "inputsSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "target": {
+                "description": "Domain (or URL) to discover historical URLs for. Scheme/path stripped to the host.",
+                "examples": [
+                  "example.com"
+                ],
+                "format": "uri",
+                "title": "Target domain",
+                "type": "string",
+                "ui:placeholder": "example.com"
+              }
+            },
+            "required": [
+              "target"
+            ],
+            "type": "object"
+          }
+        }
       ],
       "agentTool": true,
-      "inputsSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "target": {
-            "description": "Domain (or URL) to discover historical URLs for. Scheme/path stripped to the host.",
-            "examples": [
-              "example.com"
-            ],
-            "format": "uri",
-            "title": "Target domain",
-            "type": "string",
-            "ui:placeholder": "example.com"
-          }
-        },
-        "required": [
-          "target"
-        ],
-        "type": "object"
-      },
       "configSchema": {
         "additionalProperties": false,
         "properties": {
@@ -385,46 +391,48 @@
       "shortDescription": "Finds secrets committed to Git repositories",
       "description": "Scans the repositories of a Git organization for committed credentials — API keys, tokens, private keys, passwords — with Gitleaks rules. Secret values are redacted at the source: findings name the rule, file, line and commit, never the secret itself. Optionally scans recent history, where deleted secrets remain exposed.",
       "capabilities": [
-        "secrets"
-      ],
-      "targetTypes": [
-        "git_org"
+        {
+          "name": "secrets",
+          "targetTypes": [
+            "git_org"
+          ],
+          "inputsSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "ref": {
+                "description": "Branch, tag or commit to scan. Empty scans the default branch.",
+                "title": "Ref",
+                "type": "string"
+              },
+              "repository": {
+                "description": "https clone URL of the repository to scan.",
+                "examples": [
+                  "https://github.com/acme/web"
+                ],
+                "format": "uri",
+                "title": "Repository",
+                "type": "string"
+              },
+              "token": {
+                "description": "Access token for private repositories.",
+                "title": "Token",
+                "type": "string",
+                "ui:widget": "password"
+              },
+              "username": {
+                "description": "HTTP user for private repositories.",
+                "title": "Username",
+                "type": "string"
+              }
+            },
+            "required": [
+              "repository"
+            ],
+            "type": "object"
+          }
+        }
       ],
       "agentTool": true,
-      "inputsSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "ref": {
-            "description": "Branch, tag or commit to scan. Empty scans the default branch.",
-            "title": "Ref",
-            "type": "string"
-          },
-          "repository": {
-            "description": "https clone URL of the repository to scan.",
-            "examples": [
-              "https://github.com/acme/web"
-            ],
-            "format": "uri",
-            "title": "Repository",
-            "type": "string"
-          },
-          "token": {
-            "description": "Access token for private repositories.",
-            "title": "Token",
-            "type": "string",
-            "ui:widget": "password"
-          },
-          "username": {
-            "description": "HTTP user for private repositories.",
-            "title": "Username",
-            "type": "string"
-          }
-        },
-        "required": [
-          "repository"
-        ],
-        "type": "object"
-      },
       "configSchema": {
         "additionalProperties": false,
         "properties": {
@@ -467,31 +475,33 @@
       "shortDescription": "Web crawler and endpoint discovery",
       "description": "Crawls a target website with Katana (ProjectDiscovery) up to a configurable depth and streams every discovered HTTP/HTTPS URL as a finding for URL discovery.",
       "capabilities": [
-        "url_discovery"
-      ],
-      "targetTypes": [
-        "domain"
+        {
+          "name": "url_discovery",
+          "targetTypes": [
+            "domain"
+          ],
+          "inputsSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "target": {
+                "description": "Domain (or URL) to crawl. Scheme/path stripped to the host.",
+                "examples": [
+                  "example.com"
+                ],
+                "format": "uri",
+                "title": "Target domain",
+                "type": "string",
+                "ui:placeholder": "example.com"
+              }
+            },
+            "required": [
+              "target"
+            ],
+            "type": "object"
+          }
+        }
       ],
       "agentTool": true,
-      "inputsSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "target": {
-            "description": "Domain (or URL) to crawl. Scheme/path stripped to the host.",
-            "examples": [
-              "example.com"
-            ],
-            "format": "uri",
-            "title": "Target domain",
-            "type": "string",
-            "ui:placeholder": "example.com"
-          }
-        },
-        "required": [
-          "target"
-        ],
-        "type": "object"
-      },
       "configSchema": {
         "additionalProperties": false,
         "properties": {
@@ -644,32 +654,34 @@
       "shortDescription": "Tenable Nessus vulnerability scanner",
       "description": "Connects to a Tenable Nessus instance, creates and runs a scan against a target, and streams the discovered vulnerabilities back to the Worker as JSONL findings.",
       "capabilities": [
-        "vulnerabilities"
-      ],
-      "targetTypes": [
-        "domain",
-        "ip",
-        "cidr"
-      ],
-      "inputsSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "target": {
-            "description": "Target URL or hostname to scan.",
-            "examples": [
-              "https://example.com"
+        {
+          "name": "vulnerabilities",
+          "targetTypes": [
+            "domain",
+            "ip",
+            "cidr"
+          ],
+          "inputsSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "target": {
+                "description": "Target URL or hostname to scan.",
+                "examples": [
+                  "https://example.com"
+                ],
+                "format": "uri",
+                "title": "Scan target",
+                "type": "string",
+                "ui:placeholder": "https://example.com"
+              }
+            },
+            "required": [
+              "target"
             ],
-            "format": "uri",
-            "title": "Scan target",
-            "type": "string",
-            "ui:placeholder": "https://example.com"
+            "type": "object"
           }
-        },
-        "required": [
-          "target"
-        ],
-        "type": "object"
-      },
+        }
+      ],
       "configSchema": {
         "additionalProperties": false,
         "properties": {
@@ -744,33 +756,35 @@
       "shortDescription": "Signature-based web server and CGI scanner",
       "description": "Scans a web server for 7,000+ known issues: dangerous files and CGIs, outdated server software, missing security headers, and version-specific flaws. Each finding is classified from Nikto's own test database and correlated with CVE references.",
       "capabilities": [
-        "vulnerabilities"
-      ],
-      "targetTypes": [
-        "domain",
-        "ip",
-        "cidr"
+        {
+          "name": "vulnerabilities",
+          "targetTypes": [
+            "domain",
+            "ip",
+            "cidr"
+          ],
+          "inputsSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "target": {
+                "description": "Target URL or hostname. A bare host is prefixed with https://; an explicit port is preserved (example.com:8443).",
+                "examples": [
+                  "https://example.com"
+                ],
+                "format": "uri",
+                "title": "Scan target",
+                "type": "string",
+                "ui:placeholder": "https://example.com"
+              }
+            },
+            "required": [
+              "target"
+            ],
+            "type": "object"
+          }
+        }
       ],
       "agentTool": true,
-      "inputsSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "target": {
-            "description": "Target URL or hostname. A bare host is prefixed with https://; an explicit port is preserved (example.com:8443).",
-            "examples": [
-              "https://example.com"
-            ],
-            "format": "uri",
-            "title": "Scan target",
-            "type": "string",
-            "ui:placeholder": "https://example.com"
-          }
-        },
-        "required": [
-          "target"
-        ],
-        "type": "object"
-      },
       "configSchema": {
         "additionalProperties": false,
         "properties": {
@@ -912,34 +926,36 @@
       "shortDescription": "TCP/UDP port scanner",
       "description": "Scans a single host with Nmap (Nmap Security Scanner) and streams every open port as a finding for port scanning: one finding per protocol/port with its Nmap service name, product and version. Unprivileged TCP connect scan; requires no raw sockets.",
       "capabilities": [
-        "ports_scanner"
-      ],
-      "targetTypes": [
-        "domain",
-        "ip",
-        "cidr"
+        {
+          "name": "ports_scanner",
+          "targetTypes": [
+            "domain",
+            "ip",
+            "cidr"
+          ],
+          "inputsSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "target": {
+                "description": "Host to scan: a hostname, an IPv4 literal, or a bracketed IPv6 literal. Scheme and path are stripped; CIDR ranges, lists and wildcards are rejected.",
+                "examples": [
+                  "example.com",
+                  "203.0.113.10"
+                ],
+                "format": "uri",
+                "title": "Target host",
+                "type": "string",
+                "ui:placeholder": "example.com"
+              }
+            },
+            "required": [
+              "target"
+            ],
+            "type": "object"
+          }
+        }
       ],
       "agentTool": true,
-      "inputsSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "target": {
-            "description": "Host to scan: a hostname, an IPv4 literal, or a bracketed IPv6 literal. Scheme and path are stripped; CIDR ranges, lists and wildcards are rejected.",
-            "examples": [
-              "example.com",
-              "203.0.113.10"
-            ],
-            "format": "uri",
-            "title": "Target host",
-            "type": "string",
-            "ui:placeholder": "example.com"
-          }
-        },
-        "required": [
-          "target"
-        ],
-        "type": "object"
-      },
       "configSchema": {
         "additionalProperties": false,
         "properties": {
@@ -1003,33 +1019,35 @@
       "shortDescription": "Fast template-based vulnerability scanner",
       "description": "Runs ProjectDiscovery Nuclei template-based scans against a target URL to detect known vulnerabilities, misconfigurations, and exposed secrets.",
       "capabilities": [
-        "vulnerabilities"
-      ],
-      "targetTypes": [
-        "domain",
-        "ip",
-        "cidr"
+        {
+          "name": "vulnerabilities",
+          "targetTypes": [
+            "domain",
+            "ip",
+            "cidr"
+          ],
+          "inputsSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "target": {
+                "description": "Target URL or hostname to scan.",
+                "examples": [
+                  "https://example.com"
+                ],
+                "format": "uri",
+                "title": "Scan target",
+                "type": "string",
+                "ui:placeholder": "https://example.com"
+              }
+            },
+            "required": [
+              "target"
+            ],
+            "type": "object"
+          }
+        }
       ],
       "agentTool": true,
-      "inputsSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "target": {
-            "description": "Target URL or hostname to scan.",
-            "examples": [
-              "https://example.com"
-            ],
-            "format": "uri",
-            "title": "Scan target",
-            "type": "string",
-            "ui:placeholder": "https://example.com"
-          }
-        },
-        "required": [
-          "target"
-        ],
-        "type": "object"
-      },
       "configSchema": {
         "additionalProperties": false,
         "properties": {
@@ -1148,33 +1166,35 @@
       "shortDescription": "OWASP ZAP dynamic web application scanner",
       "description": "Runs OWASP ZAP (Zed Attack Proxy) against a target web application using the Automation Framework, then streams the discovered alerts back to the Worker as normalized findings.",
       "capabilities": [
-        "vulnerabilities"
-      ],
-      "targetTypes": [
-        "domain",
-        "ip",
-        "cidr"
+        {
+          "name": "vulnerabilities",
+          "targetTypes": [
+            "domain",
+            "ip",
+            "cidr"
+          ],
+          "inputsSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "target": {
+                "description": "Target URL to scan. A bare host is prefixed with https://.",
+                "examples": [
+                  "https://example.com"
+                ],
+                "format": "uri",
+                "title": "Scan target",
+                "type": "string",
+                "ui:placeholder": "https://example.com"
+              }
+            },
+            "required": [
+              "target"
+            ],
+            "type": "object"
+          }
+        }
       ],
       "agentTool": true,
-      "inputsSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "target": {
-            "description": "Target URL to scan. A bare host is prefixed with https://.",
-            "examples": [
-              "https://example.com"
-            ],
-            "format": "uri",
-            "title": "Scan target",
-            "type": "string",
-            "ui:placeholder": "https://example.com"
-          }
-        },
-        "required": [
-          "target"
-        ],
-        "type": "object"
-      },
       "configSchema": {
         "additionalProperties": false,
         "properties": {
@@ -1261,34 +1281,36 @@
       "shortDescription": "Fast async TCP/UDP port scanner",
       "description": "Scans a single host with RustScan in greppable mode and streams every open port as a finding for port scanning: one finding per protocol/port. Async TCP connect scan; needs no raw sockets, no privileges and no nmap, so findings carry no service or version — run the Nmap connector alongside it for service detection.",
       "capabilities": [
-        "ports_scanner"
-      ],
-      "targetTypes": [
-        "domain",
-        "ip",
-        "cidr"
+        {
+          "name": "ports_scanner",
+          "targetTypes": [
+            "domain",
+            "ip",
+            "cidr"
+          ],
+          "inputsSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "target": {
+                "description": "Host to scan: a hostname, an IPv4 literal, or a bracketed IPv6 literal. Scheme and path are stripped; CIDR ranges, lists and wildcards are rejected.",
+                "examples": [
+                  "example.com",
+                  "203.0.113.10"
+                ],
+                "format": "uri",
+                "title": "Target host",
+                "type": "string",
+                "ui:placeholder": "example.com"
+              }
+            },
+            "required": [
+              "target"
+            ],
+            "type": "object"
+          }
+        }
       ],
       "agentTool": true,
-      "inputsSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "target": {
-            "description": "Host to scan: a hostname, an IPv4 literal, or a bracketed IPv6 literal. Scheme and path are stripped; CIDR ranges, lists and wildcards are rejected.",
-            "examples": [
-              "example.com",
-              "203.0.113.10"
-            ],
-            "format": "uri",
-            "title": "Target host",
-            "type": "string",
-            "ui:placeholder": "example.com"
-          }
-        },
-        "required": [
-          "target"
-        ],
-        "type": "object"
-      },
       "configSchema": {
         "additionalProperties": false,
         "properties": {
@@ -1359,46 +1381,48 @@
       "shortDescription": "Finds vulnerable dependencies and IaC misconfigurations in Git repositories",
       "description": "Scans the repositories of a Git organization with Aqua Security Trivy. Reports known vulnerabilities (CVE, GHSA) in the dependencies declared by lockfiles and manifests — npm, pip, Go, Maven, Cargo, Composer, NuGet, RubyGems and more — with the installed and fixed versions, and misconfigurations in Dockerfiles, Kubernetes manifests, Helm charts and Terraform. Secret scanning can be turned on in the profile; secret values are never reported.",
       "capabilities": [
-        "vulnerabilities"
-      ],
-      "targetTypes": [
-        "git_org"
+        {
+          "name": "vulnerabilities",
+          "targetTypes": [
+            "git_org"
+          ],
+          "inputsSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "ref": {
+                "description": "Branch, tag or commit to scan. Empty scans the default branch.",
+                "title": "Ref",
+                "type": "string"
+              },
+              "repository": {
+                "description": "https clone URL of the repository to scan.",
+                "examples": [
+                  "https://github.com/acme/web"
+                ],
+                "format": "uri",
+                "title": "Repository",
+                "type": "string"
+              },
+              "token": {
+                "description": "Access token for private repositories.",
+                "title": "Token",
+                "type": "string",
+                "ui:widget": "password"
+              },
+              "username": {
+                "description": "HTTP user for private repositories.",
+                "title": "Username",
+                "type": "string"
+              }
+            },
+            "required": [
+              "repository"
+            ],
+            "type": "object"
+          }
+        }
       ],
       "agentTool": true,
-      "inputsSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "ref": {
-            "description": "Branch, tag or commit to scan. Empty scans the default branch.",
-            "title": "Ref",
-            "type": "string"
-          },
-          "repository": {
-            "description": "https clone URL of the repository to scan.",
-            "examples": [
-              "https://github.com/acme/web"
-            ],
-            "format": "uri",
-            "title": "Repository",
-            "type": "string"
-          },
-          "token": {
-            "description": "Access token for private repositories.",
-            "title": "Token",
-            "type": "string",
-            "ui:widget": "password"
-          },
-          "username": {
-            "description": "HTTP user for private repositories.",
-            "title": "Username",
-            "type": "string"
-          }
-        },
-        "required": [
-          "repository"
-        ],
-        "type": "object"
-      },
       "configSchema": {
         "additionalProperties": false,
         "properties": {
@@ -1482,33 +1506,35 @@
       "shortDescription": "WordPress vulnerability scanner",
       "description": "Scans WordPress sites using WPScan to enumerate vulnerable plugins and themes, detect known CVEs, misconfigurations, and weak credentials.",
       "capabilities": [
-        "vulnerabilities"
-      ],
-      "targetTypes": [
-        "domain",
-        "ip",
-        "cidr"
+        {
+          "name": "vulnerabilities",
+          "targetTypes": [
+            "domain",
+            "ip",
+            "cidr"
+          ],
+          "inputsSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "target": {
+                "description": "Target URL or hostname to scan.",
+                "examples": [
+                  "https://example.com"
+                ],
+                "format": "uri",
+                "title": "Scan target",
+                "type": "string",
+                "ui:placeholder": "https://example.com"
+              }
+            },
+            "required": [
+              "target"
+            ],
+            "type": "object"
+          }
+        }
       ],
       "agentTool": true,
-      "inputsSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "target": {
-            "description": "Target URL or hostname to scan.",
-            "examples": [
-              "https://example.com"
-            ],
-            "format": "uri",
-            "title": "Scan target",
-            "type": "string",
-            "ui:placeholder": "https://example.com"
-          }
-        },
-        "required": [
-          "target"
-        ],
-        "type": "object"
-      },
       "configSchema": {
         "additionalProperties": false,
         "properties": {
@@ -1750,33 +1776,35 @@
       "shortDescription": "Brute-force web path and file discovery",
       "description": "Discovers hidden files, directories and endpoints on a web target by brute-forcing paths from a wordlist with dirsearch, filtering by status code and file extension.",
       "capabilities": [
-        "url_discovery"
-      ],
-      "targetTypes": [
-        "domain",
-        "ip",
-        "cidr"
+        {
+          "name": "url_discovery",
+          "targetTypes": [
+            "domain",
+            "ip",
+            "cidr"
+          ],
+          "inputsSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "target": {
+                "description": "Base URL to scan. Scheme/path preserved; dirsearch is run with -u <target>.",
+                "examples": [
+                  "https://example.com"
+                ],
+                "format": "uri",
+                "title": "Target URL",
+                "type": "string",
+                "ui:placeholder": "https://example.com"
+              }
+            },
+            "required": [
+              "target"
+            ],
+            "type": "object"
+          }
+        }
       ],
       "agentTool": true,
-      "inputsSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "target": {
-            "description": "Base URL to scan. Scheme/path preserved; dirsearch is run with -u <target>.",
-            "examples": [
-              "https://example.com"
-            ],
-            "format": "uri",
-            "title": "Target URL",
-            "type": "string",
-            "ui:placeholder": "https://example.com"
-          }
-        },
-        "required": [
-          "target"
-        ],
-        "type": "object"
-      },
       "configSchema": {
         "additionalProperties": false,
         "properties": {
@@ -1918,33 +1946,35 @@
       "shortDescription": "Directory and file discovery via web fuzzing",
       "description": "Fuzzes a target path base with ffuf wordlists to discover directories, files and endpoints, streaming every match as a finding for URL discovery.",
       "capabilities": [
-        "url_discovery"
-      ],
-      "targetTypes": [
-        "domain",
-        "ip",
-        "cidr"
+        {
+          "name": "url_discovery",
+          "targetTypes": [
+            "domain",
+            "ip",
+            "cidr"
+          ],
+          "inputsSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "target": {
+                "description": "Base URL to fuzz under. A missing scheme defaults to https://. The path (if any) is the fuzz base, i.e. FUZZ is appended to it.",
+                "examples": [
+                  "example.com"
+                ],
+                "format": "uri",
+                "title": "Target URL",
+                "type": "string",
+                "ui:placeholder": "example.com"
+              }
+            },
+            "required": [
+              "target"
+            ],
+            "type": "object"
+          }
+        }
       ],
       "agentTool": true,
-      "inputsSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "target": {
-            "description": "Base URL to fuzz under. A missing scheme defaults to https://. The path (if any) is the fuzz base, i.e. FUZZ is appended to it.",
-            "examples": [
-              "example.com"
-            ],
-            "format": "uri",
-            "title": "Target URL",
-            "type": "string",
-            "ui:placeholder": "example.com"
-          }
-        },
-        "required": [
-          "target"
-        ],
-        "type": "object"
-      },
       "configSchema": {
         "additionalProperties": false,
         "properties": {

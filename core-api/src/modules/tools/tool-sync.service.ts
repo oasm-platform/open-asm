@@ -5,13 +5,13 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { In, Repository } from 'typeorm';
 import { RedisLockService } from '@/services/redis/distributed-lock.service';
-import { ToolCategory, WorkerType } from '@/common/enums/enum';
+import { WorkerType } from '@/common/enums/enum';
 import { JobPriority } from '@/common/enums/enum';
 import { Tool } from './entities/tools.entity';
 import { WorkspaceTool } from './entities/workspace_tools.entity';
 import { StorageService } from '../storage/storage.service';
 import { DataSource } from 'typeorm';
-import { parseManifestTargetTypes, sameTargetTypes } from './tool-target-types';
+import { parseManifestCategories, sameCategories } from './tool-categories';
 import { builtInTools } from './tools-provider/built-in-tools';
 
 /**
@@ -100,8 +100,7 @@ export class ToolSyncService implements OnModuleInit {
         existing.logoUrl !== tool.logoUrl ||
         existing.version !== tool.version ||
         existing.priority !== tool.priority ||
-        existing.category !== tool.category ||
-        !sameTargetTypes(existing.targetTypes, tool.targetTypes);
+        !sameCategories(existing.categories, tool.categories);
       if (needsUpdate) {
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
         builtInToUpsert.push({ ...tool, id: existing.id! } as ToolInsert);
@@ -113,7 +112,7 @@ export class ToolSyncService implements OnModuleInit {
         .insert()
         .orUpdate({
           conflict_target: ['name'],
-          overwrite: ['description', 'logoUrl', 'version', 'priority', 'category', 'targetTypes', 'type', 'isBuiltIn', 'isOfficialSupport'],
+          overwrite: ['description', 'logoUrl', 'version', 'priority', 'categories', 'type', 'isBuiltIn', 'isOfficialSupport'],
         })
         .values(builtInToUpsert)
         .execute();
@@ -131,37 +130,6 @@ export class ToolSyncService implements OnModuleInit {
     // This also handles legacy PROVIDER → CONNECTOR takeover and orphan cleanup.
     // With unique(name), connector data overrides any existing tool with same slug.
     await this.syncConnectorTools();
-  }
-
-  public static mapConnectorCapabilityToCategory(capabilities: string[] | undefined): ToolCategory | undefined {
-    if (!capabilities || capabilities.length === 0) return ToolCategory.VULNERABILITIES;
-    const cap = capabilities[0]?.toLowerCase();
-    switch (cap) {
-      case 'subdomains':
-        return ToolCategory.SUBDOMAINS;
-      case 'http_probe':
-        return ToolCategory.HTTP_PROBE;
-      case 'ports_scanner':
-      case 'port_scanner':
-        return ToolCategory.PORTS_SCANNER;
-      // Repository scanners (secrets/sca/sast) report findings too: they share
-      // the vulnerabilities result path, and their `targetTypes` (git_org) is
-      // what keeps them apart from host scanners.
-      case 'vulnerabilities':
-      case 'secrets':
-      case 'sca':
-      case 'sast':
-        return ToolCategory.VULNERABILITIES;
-      case 'screenshot':
-        return ToolCategory.SCREENSHOT;
-      case 'url_discovery':
-        return ToolCategory.URL_DISCOVERY;
-      default:
-        // Unknown capability: the connector is not synced rather than being
-        // silently treated as a vulnerability scanner (the manifest builder
-        // rejects unknown capabilities, so this means a newer manifest).
-        return undefined;
-    }
   }
 
   /**
@@ -245,23 +213,20 @@ export class ToolSyncService implements OnModuleInit {
         '';
       const version = (rawEntry['version'] as string) ?? '';
       const logoBase64 = rawEntry['logo'] as string | undefined;
-      const capabilities = rawEntry['capabilities'] as string[] | undefined;
-      const category = ToolSyncService.mapConnectorCapabilityToCategory(capabilities);
-      if (!category) {
-        this.logger.warn(
-          `Connector "${slug}" skipped: unknown capability ${JSON.stringify(capabilities)}`,
-        );
-        continue;
-      }
-      // Manifests predating `targetTypes` (or a platform that does not know a
-      // newer type yet) fall back to the host default — the old behaviour.
-      const { targetTypes, unknown: unknownTargetTypes } = parseManifestTargetTypes(
-        rawEntry['targetTypes'],
+      const { categories, skipped, unknownTargetTypes } = parseManifestCategories(
+        rawEntry['capabilities'],
       );
+      if (skipped.length > 0) {
+        this.logger.warn(`Connector "${slug}": skipped capabilities ${skipped.join(', ')}`);
+      }
       if (unknownTargetTypes.length > 0) {
         this.logger.warn(
           `Connector "${slug}" declares target types this platform does not support yet: ${unknownTargetTypes.join(', ')}`,
         );
+      }
+      if (categories.length === 0) {
+        this.logger.warn(`Connector "${slug}" skipped: no supported capability`);
+        continue;
       }
       const author = String((rawEntry['author'] as string) ?? '').trim().toLowerCase();
       const isOfficialSupport = author === 'oasm';
@@ -277,8 +242,7 @@ export class ToolSyncService implements OnModuleInit {
         id: randomUUID(),
         name,
         description,
-        category,
-        targetTypes,
+        categories,
         version,
         logoUrl,
         isBuiltIn: false,
@@ -367,8 +331,7 @@ export class ToolSyncService implements OnModuleInit {
           existing.isBuiltIn !== false ||
           existing.isOfficialSupport !== entry.insert.isOfficialSupport ||
           existing.description !== entry.insert.description ||
-          existing.category !== entry.insert.category ||
-          !sameTargetTypes(existing.targetTypes, entry.insert.targetTypes) ||
+          !sameCategories(existing.categories, entry.insert.categories) ||
           existing.version !== entry.insert.version ||
           existing.logoUrl !== entry.insert.logoUrl ||
           existing.priority !== entry.insert.priority;
@@ -382,8 +345,7 @@ export class ToolSyncService implements OnModuleInit {
         existing.isBuiltIn = false;
         existing.isOfficialSupport = entry.insert.isOfficialSupport;
         existing.description = entry.insert.description;
-        existing.category = entry.insert.category;
-        existing.targetTypes = entry.insert.targetTypes;
+        existing.categories = entry.insert.categories;
         existing.version = entry.insert.version;
         const staleLogoUrl = existing.logoUrl;
         existing.logoUrl = entry.insert.logoUrl;
@@ -437,7 +399,7 @@ export class ToolSyncService implements OnModuleInit {
       .insert()
       .orUpdate({
         conflict_target: ['name'],
-        overwrite: ['description', 'logoUrl', 'version', 'priority', 'category', 'targetTypes', 'type', 'isBuiltIn', 'isOfficialSupport'],
+        overwrite: ['description', 'logoUrl', 'version', 'priority', 'categories', 'type', 'isBuiltIn', 'isOfficialSupport'],
       })
       .values(toUpsert)
       .execute();

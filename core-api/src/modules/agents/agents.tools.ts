@@ -599,7 +599,7 @@ export class AgentTool {
       const toolConfig: any = {
         description: [
           'List security tools/scanners with their state in this workspace.',
-          'Each item: id, name, type (built_in or connector), category, description, agentTool, isInstalled, isReady.',
+          'Each item: id, name, type (built_in or connector), categories (modes it can run in), description, agentTool, isInstalled, isReady.',
           'agentTool=true means the agent can use the tool; a connector runs with run_tool only when agentTool, isInstalled and isReady are all true.',
           'Params: page, limit, q (search by name or description), agentTool (true → only agent tools, false → only the others, omit → all).',
         ].join('\n'),
@@ -621,7 +621,7 @@ export class AgentTool {
               id: i.id,
               name: i.name,
               type: i.type,
-              category: i.category,
+              categories: (i.categories ?? []).map((c) => c.name),
               description: i.description,
               agentTool: i.agentTool ?? false,
               isInstalled: i.isInstalled ?? false,

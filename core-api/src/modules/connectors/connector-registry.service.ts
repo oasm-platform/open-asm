@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import type { ManifestCapability } from '../tools/tool-categories';
 
 export interface ConnectorManifestEntry {
   name: string;
@@ -14,10 +15,10 @@ export interface ConnectorManifestEntry {
   homepage?: string;
   repositoryUrl?: string;
   supportUrl?: string;
-  capabilities: string[];
+  /** Ordered modes; each declares its own target types and inputs schema. */
+  capabilities: ManifestCapability[];
   /** When true the AI agent exposes this connector as its own callable tool. */
   agentTool?: boolean;
-  inputsSchema?: Record<string, unknown>;
   configSchema?: Record<string, unknown>;
   [key: string]: unknown;
 }
@@ -161,26 +162,25 @@ export class ConnectorRegistryService implements OnModuleInit {
   }
 
   /**
-   * Returns configSchema when present, otherwise falls back to inputsSchema.
+   * Returns the connector configSchema.
    * Returns null when the connector is unknown or has neither schema.
    */
   getConnectorSchema(slug: string): Record<string, unknown> | null {
     const entry = this.getConnector(slug);
     if (!entry) return null;
-    return entry.configSchema ?? entry.inputsSchema ?? null;
+    return entry.configSchema ?? null;
   }
 
   /**
    * Returns the effective schema plus its source for the given connector.
-   * source is 'configSchema' | 'inputsSchema' | null.
+   * source is 'configSchema' | null.
    */
   getEffectiveSchema(
     slug: string,
-  ): { schema: Record<string, unknown> | null; source: 'configSchema' | 'inputsSchema' | null } {
+  ): { schema: Record<string, unknown> | null; source: 'configSchema' | null } {
     const entry = this.getConnector(slug);
     if (!entry) return { schema: null, source: null };
     if (entry.configSchema) return { schema: entry.configSchema, source: 'configSchema' };
-    if (entry.inputsSchema) return { schema: entry.inputsSchema, source: 'inputsSchema' };
     return { schema: null, source: null };
   }
 }

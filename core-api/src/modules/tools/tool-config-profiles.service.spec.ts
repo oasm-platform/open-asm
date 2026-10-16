@@ -164,63 +164,41 @@ describe('ToolConfigProfilesService', () => {
     ).rejects.toThrow(/unknown tool/i);
   });
 
-  // ── Fallback: configSchema absent → inputsSchema used ────────────
-  it('create — uses inputsSchema fallback when configSchema absent', async () => {
-    const inputsSchema = {
+  // ── No configSchema: inputs schemas never stand in for config ─────
+  const capabilityWithInputs = {
+    name: 'vulnerabilities',
+    targetTypes: ['domain'],
+    inputsSchema: {
       type: 'object',
-      properties: { target: { type: 'string', format: 'uri' } },
+      properties: {
+        apiKey: { type: 'string', 'ui:widget': 'password' },
+        target: { type: 'string', format: 'uri' },
+      },
       required: ['target'],
-    };
+    },
+  };
+
+  it('create — stores config unvalidated when the connector has no configSchema', async () => {
     (connectorRegistry.getConnector as jest.Mock).mockReturnValue({
       name: 'wpscan', slug: 'wpscan',
-      // no configSchema — should fall back to inputsSchema
-      inputsSchema,
+      capabilities: [capabilityWithInputs],
     });
     toolsRepo.findOne.mockResolvedValue({ id: toolId, name: 'wpscan' });
     profilesRepo.findOne.mockResolvedValue(null);
     profilesRepo.save.mockImplementation((p) => p);
     profilesRepo.create.mockImplementation((p) => p);
 
-    const result = await service.create(wsId, toolId, {
-      name: 'default',
-      config: { target: 'https://example.com' },
-    });
+    // Would fail the capability inputsSchema (no target) — it must not be used.
+    const result = await service.create(wsId, toolId, { name: 'default', config: {} });
+
     expect(result).toBeDefined();
     expect(profilesRepo.save).toHaveBeenCalledTimes(1);
   });
 
-  it('create — rejects invalid config against inputsSchema fallback', async () => {
-    const inputsSchema = {
-      type: 'object',
-      properties: { target: { type: 'string', format: 'uri' } },
-      required: ['target'],
-    };
+  it('list — does not mask from a capability inputsSchema', async () => {
     (connectorRegistry.getConnector as jest.Mock).mockReturnValue({
       name: 'wpscan', slug: 'wpscan',
-      inputsSchema,
-    });
-    toolsRepo.findOne.mockResolvedValue({ id: toolId, name: 'wpscan' });
-    profilesRepo.findOne.mockResolvedValue(null);
-
-    // Missing required 'target' field — should fail validation
-    await expect(
-      service.create(wsId, toolId, { name: 'bad', config: {} }),
-    ).rejects.toThrow(BadRequestException);
-  });
-
-  // ── maskConfig uses fallback schema ────────────────────────────────
-  it('list — masks sensitive fields from inputsSchema fallback', async () => {
-    const inputsSchemaWithPassword = {
-      type: 'object',
-      properties: {
-        apiKey: { type: 'string', 'ui:widget': 'password' },
-        target: { type: 'string' },
-      },
-    };
-    (connectorRegistry.getConnector as jest.Mock).mockReturnValue({
-      name: 'wpscan', slug: 'wpscan',
-      inputsSchema: inputsSchemaWithPassword,
-      // no configSchema
+      capabilities: [capabilityWithInputs],
     });
     const profile = mockProfile({
       config: { apiKey: 'secretvalue123', target: 'example.com' },
@@ -229,10 +207,7 @@ describe('ToolConfigProfilesService', () => {
 
     const result = await service.list(wsId, toolId);
 
-    expect(result).toHaveLength(1);
-    const cfg = result[0].config;
-    expect(cfg.apiKey).toMatch(/^\*\*\*\*/);
-    expect(cfg.target).toBe('example.com');
+    expect(result[0].config).toEqual({ apiKey: 'secretvalue123', target: 'example.com' });
   });
 
   it('create — isDefault defaults to false', async () => {

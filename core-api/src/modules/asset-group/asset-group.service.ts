@@ -423,7 +423,7 @@ export class AssetGroupService {
             let config = input?.config;
             if (config && tool.type === WorkerType.CONNECTOR) {
               const entry = this.connectorRegistry.getConnector(tool.name);
-              const schema = entry?.configSchema ?? entry?.inputsSchema;
+              const schema = entry?.configSchema;
               const sensitiveFields = getSensitiveFields(schema);
               config = encryptInlineConfig(config, sensitiveFields, dek);
             }

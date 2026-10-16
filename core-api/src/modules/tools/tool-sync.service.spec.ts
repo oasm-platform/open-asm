@@ -12,8 +12,6 @@ import { ToolSyncService } from './tool-sync.service';
 // captures the real module. We instead spy on the shared module object.
 const readFileSpy = jest.spyOn(fs, 'readFile');
 
-const map = ToolSyncService.mapConnectorCapabilityToCategory;
-
 const PNG_B64 = Buffer.from('fake-png-bytes').toString('base64');
 
 /** Minimal connector manifest entry with sensible defaults. */
@@ -22,7 +20,7 @@ const connector = (over: Record<string, unknown>): Record<string, unknown> => ({
   description: 'desc',
   version: '1.0.0',
   author: 'oasm',
-  capabilities: ['vulnerabilities'],
+  capabilities: [{ name: 'vulnerabilities', targetTypes: ['domain', 'ip', 'cidr'] }],
   ...over,
 });
 
@@ -167,87 +165,6 @@ const createHarness = (): Harness => {
 const runConnectorSync = (service: ToolSyncService): Promise<Tool[]> =>
   (service as unknown as { syncConnectorTools: () => Promise<Tool[]> }).syncConnectorTools();
 
-describe('ToolSyncService.mapConnectorCapabilityToCategory', () => {
-  describe('url_discovery (happy path)', () => {
-    it('maps ["url_discovery"] to URL_DISCOVERY', () => {
-      // Arrange
-      const capabilities: string[] = ['url_discovery'];
-
-      // Act
-      const category: ToolCategory | undefined = map(capabilities);
-
-      // Assert
-      expect(category).toBe(ToolCategory.URL_DISCOVERY);
-    });
-
-    it('maps the capability case-insensitively (["URL_DISCOVERY"])', () => {
-      // Arrange
-      const capabilities: string[] = ['URL_DISCOVERY'];
-
-      // Act
-      const category: ToolCategory | undefined = map(capabilities);
-
-      // Assert
-      expect(category).toBe(ToolCategory.URL_DISCOVERY);
-    });
-  });
-
-  describe('edge cases', () => {
-    it('maps undefined capabilities to VULNERABILITIES', () => {
-      // Arrange
-      const capabilities: string[] | undefined = undefined;
-
-      // Act
-      const category: ToolCategory | undefined = map(capabilities);
-
-      // Assert
-      expect(category).toBe(ToolCategory.VULNERABILITIES);
-    });
-
-    it('maps an empty capability list to VULNERABILITIES', () => {
-      // Arrange
-      const capabilities: string[] = [];
-
-      // Act
-      const category: ToolCategory | undefined = map(capabilities);
-
-      // Assert
-      expect(category).toBe(ToolCategory.VULNERABILITIES);
-    });
-
-    it('maps an unknown capability to undefined (connector skipped)', () => {
-      expect(map(['unknown_cap'])).toBeUndefined();
-    });
-
-    it.each(['secrets', 'sca', 'sast'])(
-      'maps the repository-scanner capability %s to VULNERABILITIES',
-      (capability) => {
-        expect(map([capability])).toBe(ToolCategory.VULNERABILITIES);
-      },
-    );
-  });
-
-  describe('regression: existing capability mapping is unchanged', () => {
-    it.each<[string, ToolCategory]>([
-      ['subdomains', ToolCategory.SUBDOMAINS],
-      ['http_probe', ToolCategory.HTTP_PROBE],
-      ['ports_scanner', ToolCategory.PORTS_SCANNER],
-      ['port_scanner', ToolCategory.PORTS_SCANNER],
-      ['vulnerabilities', ToolCategory.VULNERABILITIES],
-      ['screenshot', ToolCategory.SCREENSHOT],
-    ])('maps "%s" to "%s"', (capability, expected) => {
-      // Arrange
-      const capabilities: string[] = [capability];
-
-      // Act
-      const category: ToolCategory | undefined = map(capabilities);
-
-      // Assert
-      expect(category).toBe(expected);
-    });
-  });
-});
-
 describe('ToolSyncService connector logo synchronization', () => {
   beforeEach(() => {
     // Re-arm the module-level fs spy (never restoreAllMocks — that would also
@@ -342,54 +259,83 @@ describe('ToolSyncService connector logo synchronization', () => {
   });
 });
 
-describe('ToolSyncService connector targetTypes synchronization', () => {
+describe('ToolSyncService categories synchronization', () => {
   beforeEach(() => {
     readFileSpy.mockReset();
   });
 
-  it('stores the manifest targetTypes as TargetType values', async () => {
+  it('syncs every capability of a connector as an ordered category list', async () => {
     const h = createHarness();
-    h.setManifest([connector({ slug: 'gau', targetTypes: ['domain'] })]);
+    h.setManifest([
+      connector({
+        slug: 'nmap',
+        capabilities: [
+          { name: 'ports_scanner', targetTypes: ['domain', 'ip', 'cidr'] },
+          { name: 'vulnerabilities', targetTypes: ['domain'] },
+        ],
+      }),
+    ]);
 
     await runConnectorSync(h.service);
 
-    expect(h.rowByName('gau')!.targetTypes).toEqual([TargetType.DOMAIN]);
+    expect(h.rowByName('nmap')!.categories).toEqual([
+      {
+        name: ToolCategory.PORTS_SCANNER,
+        targetTypes: [TargetType.DOMAIN, TargetType.IP, TargetType.CIDR],
+      },
+      { name: ToolCategory.VULNERABILITIES, targetTypes: [TargetType.DOMAIN] },
+    ]);
   });
 
-  it('falls back to the host default when the manifest predates targetTypes', async () => {
+  it('skips a connector whose capabilities declare no target types (old manifest shape)', async () => {
     const h = createHarness();
-    h.setManifest([connector({ slug: 'nessus' })]);
+    h.setManifest([connector({ slug: 'old', capabilities: ['vulnerabilities'] })]);
 
     await runConnectorSync(h.service);
 
-    expect(h.rowByName('nessus')!.targetTypes).toEqual([
-      TargetType.DOMAIN,
-      TargetType.IP,
-      TargetType.CIDR,
-    ]);
+    expect(h.rowByName('old')).toBeUndefined();
   });
 
   it('skips a connector whose capability this platform does not know', async () => {
     const h = createHarness();
     h.setManifest([
-      connector({ slug: 'future', capabilities: ['quantum'] }),
-      connector({ slug: 'gitleaks', capabilities: ['secrets'], targetTypes: ['git_org'] }),
+      connector({ slug: 'future', capabilities: [{ name: 'quantum', targetTypes: ['ip'] }] }),
+      connector({ slug: 'gitleaks', capabilities: [{ name: 'secrets', targetTypes: ['git_org'] }] }),
     ]);
 
     await runConnectorSync(h.service);
 
     expect(h.rowByName('future')).toBeUndefined();
-    expect(h.rowByName('gitleaks')).toMatchObject({ category: ToolCategory.VULNERABILITIES });
+    expect(h.rowByName('gitleaks')!.categories).toEqual([
+      { name: ToolCategory.VULNERABILITIES, targetTypes: [TargetType.GIT_ORG] },
+    ]);
   });
 
-  it('updates an existing row when the manifest narrows its targetTypes', async () => {
+  it('updates an existing row when the manifest narrows a category target types', async () => {
     const h = createHarness();
     h.setManifest([connector({ slug: 'katana' })]);
     await runConnectorSync(h.service);
 
-    h.setManifest([connector({ slug: 'katana', targetTypes: ['domain'] })]);
+    h.setManifest([
+      connector({ slug: 'katana', capabilities: [{ name: 'vulnerabilities', targetTypes: ['domain'] }] }),
+    ]);
     await runConnectorSync(h.service);
 
-    expect(h.rowByName('katana')!.targetTypes).toEqual([TargetType.DOMAIN]);
+    expect(h.rowByName('katana')!.categories).toEqual([
+      { name: ToolCategory.VULNERABILITIES, targetTypes: [TargetType.DOMAIN] },
+    ]);
+  });
+
+  it('upserts built-in tools with their declared categories', async () => {
+    const h = createHarness();
+
+    await h.service.onModuleInit();
+
+    const builtIns = h.insertCalls.find((c) => c.values.some((v) => v.type === WorkerType.BUILT_IN))!;
+    expect(builtIns.overwrite).toContain('categories');
+    expect(builtIns.overwrite).not.toContain('category');
+    expect(builtIns.values.find((v) => v.name === 'subfinder')!.categories).toEqual([
+      { name: ToolCategory.SUBDOMAINS, targetTypes: [TargetType.DOMAIN] },
+    ]);
   });
 });

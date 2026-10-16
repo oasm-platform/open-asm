@@ -112,20 +112,25 @@ describe('ToolsController.getConnectorBySlug', () => {
     );
   });
 
-  it('exposes the manifest inputsSchema', () => {
+  it('exposes each category with its inputsSchema, not a top-level one', () => {
     mockConnectorRegistryService.getConnector.mockReturnValue({
       name: 'Nuclei',
       slug: 'nuclei',
       version: '1.0.0',
       image: 'ghcr.io/oasm-platform/connector-nuclei:1.0.0',
-      capabilities: ['vulnerabilities'],
-      inputsSchema,
+      capabilities: [
+        { name: 'vulnerabilities', targetTypes: ['domain', 'ip'], inputsSchema },
+      ],
       configSchema: { type: 'object' },
     });
 
     const result = controller.getConnectorBySlug({ slug: 'nuclei' });
 
-    expect(result.inputsSchema).toEqual(inputsSchema);
+    expect(result.capabilities).toEqual(['vulnerabilities']);
+    expect(result.categories).toEqual([
+      { name: 'vulnerabilities', targetTypes: ['DOMAIN', 'IP'], inputsSchema },
+    ]);
+    expect(result).not.toHaveProperty('inputsSchema');
     expect(result).not.toHaveProperty('configSchema');
   });
 

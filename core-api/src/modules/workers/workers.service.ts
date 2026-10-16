@@ -394,7 +394,7 @@ export class WorkersService {
       id: tool.id!,
       name: tool.name,
       logoUrl: tool.logoUrl,
-      category: tool.category,
+      categories: (tool.categories ?? []).map((c) => c.name),
       type: 'builtin',
       // Filled in below from the single running-jobs query.
       currentJobs: [],
