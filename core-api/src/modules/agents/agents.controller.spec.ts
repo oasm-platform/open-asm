@@ -15,6 +15,7 @@ describe('AgentsController workspace permission guards', () => {
     ['getConnectedProviders', 'GET /providers/connected'],
     ['getProviderModels', 'GET /llm-configs/:id/models'],
     ['getConversation', 'GET /conversations/:id'],
+    ['getConversationSubagents', 'GET /conversations/:id/subagents'],
     ['getConversations', 'GET /conversations'],
     ['getMessages', 'GET /conversations/:id/messages'],
     ['getMCPConfig', 'GET /mcp-configs'],
@@ -22,6 +23,7 @@ describe('AgentsController workspace permission guards', () => {
     ['getWorkspaceMemory', 'GET /workspace-memory'],
     ['getSkills', 'GET /skills'],
     ['getAgentConfig', 'GET /config'],
+    ['getAgentDefinitions', 'GET /definitions'],
   ];
 
   const write: Array<[string, string]> = [
@@ -37,6 +39,10 @@ describe('AgentsController workspace permission guards', () => {
     ['deleteMCPServer', 'DELETE /mcp-configs/:name'],
     ['toggleMCPServer', 'PATCH /mcp-configs/:name/toggle'],
     ['deleteWorkspaceMemory', 'DELETE /workspace-memory/:id'],
+    ['stopConversation', 'POST /conversations/:id/stop'],
+    ['createAgentDefinition', 'POST /definitions'],
+    ['updateAgentDefinition', 'PATCH /definitions/:id'],
+    ['deleteAgentDefinition', 'DELETE /definitions/:id'],
     ['createSkill', 'POST /skills'],
     ['updateSkill', 'PATCH /skills/:id'],
     ['deleteSkill', 'DELETE /skills/:id'],

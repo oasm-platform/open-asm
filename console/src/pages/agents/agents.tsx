@@ -7,6 +7,8 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { useCallback, useState } from 'react';
 import { ChatConversation } from './components/chat-conversation';
 import { ToolCallHistoryPanel } from './components/tool-call-history-panel';
+import { SubagentsPanel } from './components/subagents-panel';
+import { TurnStatsPanel } from './components/turn-stats-panel';
 import { useMediaQuery } from './components/use-media-query';
 
 dayjs.extend(relativeTime);
@@ -27,6 +29,7 @@ export default function AgentsChatPage() {
     isRetrying,
     retryAttempt,
     todos,
+    conversationMeta,
     title,
     createdAt,
     selectedModel,
@@ -127,12 +130,19 @@ export default function AgentsChatPage() {
         />
       </div>
 
-      {/* Right sidebar: Tool call history — large screens only */}
-      <div className="hidden lg:flex lg:w-80 shrink-0 flex-col overflow-y-auto">
-        <ToolCallHistoryPanel
-          messages={messages}
-          onSelectToolCall={handleSelectToolCall}
+      {/* Right sidebar: Context/turn stats + tool call history — large screens only */}
+      <div className="hidden lg:flex lg:w-80 shrink-0 flex-col overflow-hidden">
+        <TurnStatsPanel metadata={conversationMeta} />
+        <SubagentsPanel
+          conversationId={conversationId}
+          isStreaming={isStreaming}
         />
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <ToolCallHistoryPanel
+            messages={messages}
+            onSelectToolCall={handleSelectToolCall}
+          />
+        </div>
       </div>
     </div>
   );

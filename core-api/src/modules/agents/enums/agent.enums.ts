@@ -33,3 +33,24 @@ export enum SearchProvider {
   FIRECRAWL = 'firecrawl',
   TINYFISH = 'tinyfish',
 }
+
+export enum SubagentStatus {
+  PENDING = 'pending',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+}
+
+/** When an agent definition can run: as the main agent, as a subagent or both. */
+export enum AgentDefinitionMode {
+  PRIMARY = 'primary',
+  SUBAGENT = 'subagent',
+  ALL = 'all',
+}
+
+/** Who sees an agent definition. Built-in ones come from `builtin-agents/`. */
+export enum AgentDefinitionScope {
+  BUILTIN = 'builtin',
+  USER = 'user',
+  WORKSPACE = 'workspace',
+}

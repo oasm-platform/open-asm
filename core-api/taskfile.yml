@@ -87,3 +87,8 @@ tasks:
   migration:revert:
     cmds:
       - pnpm exec ts-node --project tsconfig.json -r tsconfig-paths/register -- node_modules/typeorm/cli.js migration:revert -d src/database/database-config.ts
+  # Refresh the bundled models.dev snapshot (resources/models-dev/catalog.json)
+  # Fallback for context-window limits when models.dev is unreachable at runtime.
+  models:snapshot:
+    cmds:
+      - pnpm exec ts-node --project tsconfig.json -r tsconfig-paths/register -- scripts/update-models-snapshot.ts

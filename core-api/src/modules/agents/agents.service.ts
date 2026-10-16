@@ -25,8 +25,18 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { firstValueFrom } from 'rxjs';
 import { In, Repository } from 'typeorm';
 import { AgentsApprovalsService } from './agents.approvals';
-import { AgentsConfigService, maskApiKey } from './agents.config';
+import {
+  AgentsConfigService,
+  maskApiKey,
+  withAgentConfig,
+} from './agents.config';
 import { AgentsMemoriesService } from './agents.memories';
+import { AgentsModelsCatalogService } from './agents.models-catalog';
+import { AgentsSubagentsService } from './agents.subagents';
+import type {
+  ConversationMetadataDto,
+  SubagentResponseDto,
+} from './dto/conversation-stats.dto';
 import { AgentModeDto, GetAgentModesResponseDto } from './dto/agent-mode.dto';
 import {
   ConversationResponseDto,
@@ -84,6 +94,8 @@ export class AgentsService {
     private readonly workersService: WorkersService,
     private readonly approvals: AgentsApprovalsService,
     private readonly agentsConfig: AgentsConfigService,
+    private readonly modelsCatalog: AgentsModelsCatalogService,
+    private readonly subagents: AgentsSubagentsService,
   ) {}
 
   private async getDefaultLLMConfigId(
@@ -463,7 +475,60 @@ export class AgentsService {
       todos,
       summary: conversation.summary,
       workerId: conversation.workerId,
+      metadata: await this.conversationMetadata(conversation),
     };
+  }
+
+  /**
+   * Stored metadata of the conversation; before its first turn finished (or
+   * for older conversations) the model and window come from its connection.
+   */
+  private async conversationMetadata(
+    conversation: AgentConversation,
+  ): Promise<ConversationMetadataDto | null> {
+    const stored = conversation.metadata ?? null;
+    if (stored?.model) return stored;
+
+    const llmConfig = await this.llmConfigRepository.findOne({
+      where: {
+        id: conversation.llmConfigId,
+        workspaceId: conversation.workspaceId,
+        userId: conversation.createdBy,
+      },
+    });
+    if (!llmConfig) return stored;
+    const resolved = withAgentConfig(
+      llmConfig,
+      await this.agentsConfig.find(
+        conversation.workspaceId,
+        conversation.createdBy,
+      ),
+    );
+    const window = this.modelsCatalog.resolveWindow(resolved);
+    return {
+      ...(stored ?? {}),
+      model: resolved.model,
+      provider: resolved.provider,
+      llmConfigId: resolved.id,
+      contextWindow: window.tokens,
+      contextWindowSource: window.source,
+      catalogEstimated: window.estimated,
+    };
+  }
+
+  async getConversationSubagents(
+    id: string,
+    workspaceId: string,
+    userId: string,
+  ): Promise<SubagentResponseDto[]> {
+    const conversation = await this.conversationRepository.findOne({
+      where: { id, workspaceId, createdBy: userId },
+      select: ['id'],
+    });
+    if (!conversation) {
+      throw new NotFoundException('Conversation not found');
+    }
+    return this.subagents.listForConversation(id);
   }
 
   async getConversations(

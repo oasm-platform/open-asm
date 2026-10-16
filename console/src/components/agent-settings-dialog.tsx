@@ -1,4 +1,5 @@
 import LlmConnect from '@/pages/agents/components/llm-connect';
+import { AgentsManager } from '@/components/agents-manager';
 import { ConnectorsManager } from '@/components/connectors-manager';
 import { InstructionManager } from '@/components/instruction-manager';
 import { MemoryManager } from '@/components/memory-manager';
@@ -23,6 +24,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   BookOpen,
+  Bot,
   Brain,
   Cpu,
   Globe,
@@ -59,6 +61,14 @@ const tabs: TabConfig[] = [
     description: 'Choose the models the agent uses',
     icon: Cpu,
     component: ModelsManager,
+  },
+  {
+    value: 'agents',
+    label: 'Agents',
+    description:
+      'Built-in agents and custom agents you can mention with @name',
+    icon: Bot,
+    component: AgentsManager,
   },
   {
     value: 'web-search',
