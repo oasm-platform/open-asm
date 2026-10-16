@@ -38,7 +38,6 @@ import dayjs from 'dayjs';
 import {
   BadgeCheck,
   Box,
-  Crosshair,
   Plus,
   Settings,
   Tag,
@@ -50,6 +49,7 @@ import {
   ConfigProfilesSkeleton,
   ToolDetailSkeleton,
 } from './tool-detail-skeleton';
+import { formatCategory } from './format-category';
 import ToolInstallButton from './tool-install-button';
 
 /** Extended profile shape returned by the API (orval type is incomplete). */
@@ -187,15 +187,6 @@ export default function ToolDetail() {
     // their own visibility condition — they render nothing until data exists.
   ].filter((tab) => tab.visible);
 
-  // Format category name for display
-  const formatCategory = (category: string | undefined) => {
-    if (!category) return 'N/A';
-    return category
-      .split('_')
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  };
-
   // Format type for display
   const formatType = (type: string) => {
     switch (type) {
@@ -238,26 +229,26 @@ export default function ToolDetail() {
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    {tool.category && (
-                      <Badge variant="secondary" className="gap-1">
+                    {tool.categories?.map((c) => (
+                      <Badge
+                        key={c.name}
+                        variant="secondary"
+                        className="gap-1"
+                        title="Target types this category can scan"
+                      >
                         <Tag />
-                        {formatCategory(tool.category)}
+                        {formatCategory(c.name)}
+                        {c.targetTypes.length > 0 && (
+                          <span className="text-muted-foreground">
+                            · {c.targetTypes.map(formatTargetType).join(', ')}
+                          </span>
+                        )}
                       </Badge>
-                    )}
+                    ))}
                     {tool.type && (
                       <Badge variant="secondary" className="gap-1">
                         <Box />
                         {formatType(tool.type)}
-                      </Badge>
-                    )}
-                    {tool.targetTypes?.length > 0 && (
-                      <Badge
-                        variant="secondary"
-                        className="gap-1"
-                        title="Target types this tool can scan"
-                      >
-                        <Crosshair />
-                        {tool.targetTypes.map(formatTargetType).join(', ')}
                       </Badge>
                     )}
                   </div>

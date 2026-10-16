@@ -1309,6 +1309,11 @@ export const ToolCategory = {
   url_discovery: 'url_discovery',
 } as const;
 
+export type ToolCategorySpec = {
+  name: ToolCategory;
+  targetTypes: TargetType[];
+};
+
 export type ToolType = (typeof ToolType)[keyof typeof ToolType];
 
 export const ToolType = {
@@ -1326,9 +1331,7 @@ export type Tool = {
   name: string;
   description: string;
   command: string;
-  category: ToolCategory;
-  /** Target types whose assets this tool can scan */
-  targetTypes: TargetType[];
+  categories: ToolCategorySpec[];
   version: string;
   /** @nullable */
   logoUrl?: string | null;
@@ -1595,6 +1598,8 @@ export type WorkflowStepStatusDto = {
   /** Display label (the job id when no name is set) */
   name: string;
   run: string;
+  /** Category the step runs its tool in */
+  category?: string;
   /** Ids of the jobs this one waits for */
   needs: string[];
   status: WorkflowStepStatusDtoStatus;
@@ -2207,7 +2212,7 @@ export type WorkerToolDto = {
   name: string;
   /** @nullable */
   logoUrl?: string | null;
-  category?: string;
+  categories?: string[];
   type: WorkerToolDtoType;
   /** Jobs this worker is currently running with this tool. Capped server-side; may be shorter than the worker-level `currentJobsCount`. */
   currentJobs: WorkerToolJobDto[];
@@ -2278,25 +2283,13 @@ export type GetWorkerResponseDto = {
   tools: WorkerToolDto[];
 };
 
-export type CreateToolDtoCategory =
-  (typeof CreateToolDtoCategory)[keyof typeof CreateToolDtoCategory];
-
-export const CreateToolDtoCategory = {
-  subdomains: 'subdomains',
-  http_probe: 'http_probe',
-  ports_scanner: 'ports_scanner',
-  vulnerabilities: 'vulnerabilities',
-  screenshot: 'screenshot',
-  url_discovery: 'url_discovery',
-} as const;
-
 export type CreateToolDto = {
   name: string;
   description: string;
-  category: CreateToolDtoCategory;
   version: string;
   /** @nullable */
   logoUrl?: string | null;
+  categories: ToolCategory[];
   /** The ID of the provider */
   providerId: string;
 };
@@ -2327,9 +2320,16 @@ export type GetManyToolDto = {
 };
 
 /**
- * JSON Schema of the inputs OASM passes to the connector on each run.
+ * JSON Schema of the inputs OASM passes to the connector for this category.
  */
-export type ConnectorDtoInputsSchema = { [key: string]: unknown };
+export type ConnectorCategoryDtoInputsSchema = { [key: string]: unknown };
+
+export type ConnectorCategoryDto = {
+  name: ToolCategory;
+  targetTypes: TargetType[];
+  /** JSON Schema of the inputs OASM passes to the connector for this category. */
+  inputsSchema?: ConnectorCategoryDtoInputsSchema;
+};
 
 export type ConnectorDto = {
   name: string;
@@ -2345,8 +2345,7 @@ export type ConnectorDto = {
   supportUrl?: string;
   capabilities: string[];
   agentTool?: boolean;
-  /** JSON Schema of the inputs OASM passes to the connector on each run. */
-  inputsSchema?: ConnectorDtoInputsSchema;
+  categories: ConnectorCategoryDto[];
 };
 
 export type ToolConfigProfile = {
@@ -3862,6 +3861,8 @@ export type AssetGroupToolInput = {
   config?: AssetGroupToolInputConfig;
   /** Reference to a saved config profile */
   configProfileId?: string;
+  /** Category to run the tool in (default: its first) */
+  category?: ToolCategory;
 };
 
 export type CreateAssetGroupDto = {
@@ -25094,7 +25095,7 @@ export function useToolsControllerGetInstalledTools<
 }
 
 /**
- * Fetches connector metadata (name, version, image, author, pricingTier, descriptions, capabilities, links, inputsSchema) from the connector manifest.
+ * Fetches connector metadata (name, version, image, author, pricingTier, descriptions, capabilities, categories with their target types and inputs schema, links) from the connector manifest.
  * @summary Get connector metadata by slug
  */
 export const toolsControllerGetConnectorBySlug = (
@@ -25433,7 +25434,7 @@ export function useToolsControllerGetToolById<
 }
 
 /**
- * Returns the effective JSON Schema for a tool's configuration. Uses configSchema when present, falls back to inputsSchema.
+ * Returns the JSON Schema of a tool's configuration (the connector configSchema).
  * @summary Get tool config schema
  */
 export const toolsControllerGetToolSchema = (

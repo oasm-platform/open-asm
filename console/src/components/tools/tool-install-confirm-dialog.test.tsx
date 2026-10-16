@@ -36,25 +36,33 @@ const connectorTool = {
   type: 'connector',
 } as unknown as Tool;
 
+const repositoryInputs = {
+  type: 'object',
+  properties: {
+    ref: {
+      title: 'Ref',
+      type: 'string',
+      description: 'Branch, tag or commit to scan.',
+    },
+    repository: {
+      title: 'Repository',
+      type: 'string',
+      format: 'uri',
+      description: 'https clone URL of the repository to scan.',
+    },
+  },
+  required: ['repository'],
+};
+
 const gitleaks = {
   description: 'Scans a git repository for leaked secrets.',
-  inputsSchema: {
-    type: 'object',
-    properties: {
-      ref: {
-        title: 'Ref',
-        type: 'string',
-        description: 'Branch, tag or commit to scan.',
-      },
-      repository: {
-        title: 'Repository',
-        type: 'string',
-        format: 'uri',
-        description: 'https clone URL of the repository to scan.',
-      },
+  categories: [
+    {
+      name: 'vulnerabilities',
+      targetTypes: ['GIT_ORG'],
+      inputsSchema: repositoryInputs,
     },
-    required: ['repository'],
-  },
+  ],
 };
 
 async function openDialog(tool = connectorTool, onConfirm = vi.fn()) {
@@ -111,6 +119,34 @@ describe('ToolInstallConfirmDialog', () => {
     expect(
       screen.getByText('Scans a git repository for leaked secrets.'),
     ).toBeTruthy();
+  });
+
+  it('groups inputs by category when the connector runs in several', async () => {
+    mocks.connector = {
+      description: 'Port and vulnerability scanner.',
+      categories: [
+        {
+          name: 'ports_scanner',
+          targetTypes: ['IP'],
+          inputsSchema: {
+            type: 'object',
+            properties: { target: { title: 'Target host', type: 'string' } },
+          },
+        },
+        {
+          name: 'vulnerabilities',
+          targetTypes: ['DOMAIN'],
+          inputsSchema: repositoryInputs,
+        },
+      ],
+    };
+    await openDialog();
+
+    expect(screen.getByText('Ports Scanner')).toBeTruthy();
+    expect(screen.getByText('Vulnerabilities')).toBeTruthy();
+    const items = screen.getAllByRole('listitem').map((li) => li.textContent);
+    expect(items[0]).toContain('Target host');
+    expect(items[1]).toContain('Repository');
   });
 
   it('only fetches connector metadata for connector tools', async () => {

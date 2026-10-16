@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import LogoFrame from '@/components/ui/logo-frame';
 import ToolLogo from '@/components/ui/tool-logo';
 import { type Tool } from '@/services/apis/gen/queries';
+import { formatCategory } from './format-category';
 import { useNavigate } from '@tanstack/react-router';
 import { BadgeCheck, Bot } from 'lucide-react';
 
@@ -9,13 +10,6 @@ interface ToolCardProps {
   tool: Tool;
   /** Runs before going to the tool detail page, e.g. to close a dialog. */
   onNavigate?: () => void;
-}
-
-function formatCategory(category: string): string {
-  return category
-    .split('_')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
 }
 
 const ToolCard = ({ tool, onNavigate }: ToolCardProps) => {
@@ -40,7 +34,11 @@ const ToolCard = ({ tool, onNavigate }: ToolCardProps) => {
             <BadgeCheck className="size-4 text-blue-500" />
           </span>
         )}
-        <Badge variant="secondary">{formatCategory(tool.category)}</Badge>
+        {tool.categories?.map((c) => (
+          <Badge key={c.name} variant="secondary">
+            {formatCategory(c.name)}
+          </Badge>
+        ))}
         {tool.agentTool && (
           <span title="AI agent tool" className="inline-flex shrink-0">
             <Bot className="size-4 text-muted-foreground" />
