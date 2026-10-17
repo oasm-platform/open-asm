@@ -94,6 +94,7 @@ type capturedResult struct {
 	isError bool
 	vulns   []*pb.Vulnerability
 	urls    []*pb.DiscoveredUrl
+	ports   []int32
 }
 
 func (s *testJobsServer) Next(_ context.Context, _ *pb.Worker) (*pb.Job, error) {
@@ -145,7 +146,7 @@ func (s *testJobsServer) ResultPorts(_ context.Context, req *pb.PortsResultReque
 	if req.Raw != nil {
 		raw = *req.Raw
 	}
-	s.results = append(s.results, capturedResult{jobID: req.JobId, raw: raw, isError: req.Error})
+	s.results = append(s.results, capturedResult{jobID: req.JobId, raw: raw, isError: req.Error, ports: req.GetNumbers().GetValues()})
 	return &pb.JobResponse{Success: true}, nil
 }
 

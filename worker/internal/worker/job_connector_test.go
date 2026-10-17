@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -576,6 +577,54 @@ func TestHandleConnectorResultFailureCarriesContainerLogs(t *testing.T) {
 		if !strings.Contains(got.raw, want) {
 			t.Errorf("failure payload missing %q\n--- payload ---\n%s", want, got.raw)
 		}
+	}
+}
+
+// TestHandleConnectorResultAggregatesPorts: a ports_scanner connector's open
+// TCP ports reach Core in the structured port list, once, at drain end; UDP
+// and malformed entries are dropped.
+func TestHandleConnectorResultAggregatesPorts(t *testing.T) {
+	resetWorkerGlobals()
+
+	client, jobsSrv, _ := newWorkerTestSetup(t)
+	proxy := connector.NewProxy()
+	events := make(chan TuiEvent, 64)
+
+	execID := "exec-ports-1"
+	bridgeMu.Lock()
+	bridge[execID] = &bridgeEntry{jobID: "job-ports-1", category: "ports_scanner", release: func() {}}
+	bridgeMu.Unlock()
+	resultCh := make(chan connector.ResultMsg, 8)
+	proxy.Register(execID, resultCh)
+
+	done := make(chan struct{})
+	go func() {
+		handleConnectorResult(context.Background(), execID, client, events, proxy, resultCh, time.Now(), time.Minute, nil, nil)
+		close(done)
+	}()
+
+	proxy.ForwardResult(execID, nil, []*connectorpb.Finding{
+		{Name: "open tcp/22 (ssh)", Severity: "info", Ports: []string{"tcp/22"}},
+		{Name: "open udp/53 (domain)", Severity: "info", Ports: []string{"udp/53"}},
+	})
+	proxy.ForwardResult(execID, nil, []*connectorpb.Finding{
+		{Name: "open tcp/443", Severity: "info", Ports: []string{"tcp/443", "tcp/x"}},
+	})
+	proxy.MarkDone(execID)
+	proxy.OnConnectorDown(execID)
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for handleConnectorResult")
+	}
+
+	results := jobsSrv.getResults()
+	if len(results) != 1 {
+		t.Fatalf("expected exactly 1 ports submission, got %d", len(results))
+	}
+	if got := results[0]; got.isError || !slices.Equal(got.ports, []int32{22, 443}) {
+		t.Fatalf("got isError=%t ports=%v, want false [22 443]", got.isError, got.ports)
 	}
 }
 
