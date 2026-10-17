@@ -283,6 +283,35 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Pattern subscription (`PSUBSCRIBE`). One listener serves every channel the
+   * pattern matches, so a fan-out keyed by channel (one channel per user)
+   * stays at a single `pmessage` listener instead of one `message` listener
+   * per channel, each called for every message on the connection.
+   *
+   * @param pattern - Glob pattern, e.g. `notification:*`
+   * @param callback - Called with the concrete channel and the message
+   */
+  public async psubscribe(
+    pattern: string,
+    callback: MessageCallback,
+  ): Promise<void> {
+    const listener = (matched: string, channel: string, message: string) => {
+      if (matched === pattern) callback(channel, message);
+    };
+    this.subscriber.on('pmessage', listener);
+    try {
+      await this.subscriber.psubscribe(pattern);
+    } catch (error) {
+      this.subscriber.removeListener('pmessage', listener);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(
+        `Failed to subscribe to pattern ${pattern}: ${errorMessage}`,
+      );
+    }
+  }
+
+  /**
    * Unsubscribe from a Redis channel
    * Removes all registered callbacks for this channel to prevent memory leaks.
    *
@@ -606,6 +635,42 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     const client = this.client.duplicate();
     this.blockingClients.set(group, client);
     return client;
+  }
+
+  /**
+   * Tails a stream WITHOUT a consumer group: every caller sees every entry
+   * after `lastId`, nothing is acknowledged and nothing is replayed. That is
+   * the fan-out a live reader needs (each replica forwards to its own SSE
+   * clients), as opposed to a group, which hands each entry to one replica.
+   *
+   * `reader` names the dedicated blocking connection, like `group` does for
+   * {@link xreadgroup}.
+   */
+  public async xread(
+    stream: string,
+    reader: string,
+    lastId: string,
+    count: number,
+    blockMs: number,
+  ): Promise<StreamEntry[]> {
+    const response = (await this.blockingClientFor(reader).xread(
+      'COUNT',
+      count,
+      'BLOCK',
+      blockMs,
+      'STREAMS',
+      stream,
+      lastId,
+    )) as [string, [string, string[]][]][] | null;
+
+    const entries = response?.[0]?.[1] ?? [];
+    return entries.map(([entryId, values]) => {
+      const fields: Record<string, string> = {};
+      for (let i = 0; i < values.length; i += 2) {
+        fields[values[i]] = values[i + 1];
+      }
+      return { id: entryId, fields };
+    });
   }
 
   public async xreadgroup(

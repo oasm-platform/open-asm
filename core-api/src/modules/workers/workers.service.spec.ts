@@ -8,6 +8,8 @@ import type { Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
+import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
+import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { InternalNetwork } from '../internal-networks/entities/internal-network.entity';
 import { NetworkInterface } from '../internal-networks/entities/network-interface.entity';
@@ -34,6 +36,7 @@ describe('WorkersService', () => {
   let mockAliveStreamManager: Partial<AliveStreamManager>;
   let mockConnectorRegistryService: Partial<ConnectorRegistryService>;
   let mockWorkerTelemetryService: Partial<WorkerTelemetryService>;
+  let mockEventBridge: { publishSafely: jest.Mock };
 
   beforeEach(async () => {
     mockWorkerInstanceRepository = {
@@ -120,6 +123,8 @@ describe('WorkersService', () => {
       get: jest.fn().mockResolvedValue(null),
     };
 
+    mockEventBridge = { publishSafely: jest.fn().mockResolvedValue('1-0') };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         WorkersService,
@@ -175,6 +180,10 @@ describe('WorkersService', () => {
           provide: WorkerTelemetryService,
           useValue: mockWorkerTelemetryService,
         },
+        {
+          provide: EventBridgeService,
+          useValue: mockEventBridge,
+        },
       ],
     }).compile();
 
@@ -199,9 +208,9 @@ describe('WorkersService', () => {
 
       // Mock workerLeave dependencies
       (mockJobsRegistryService.repo as any).execute = jest.fn();
-      (mockWorkerInstanceRepository.delete as jest.Mock).mockResolvedValue(
-        undefined,
-      );
+      (mockWorkerInstanceRepository.delete as jest.Mock).mockResolvedValue({
+        affected: 1,
+      });
       // Mock resetStuckAndFailedJobs
       (mockWorkerInstanceRepository.manager as any) = {
         query: jest.fn().mockResolvedValue(undefined),
@@ -257,9 +266,9 @@ describe('WorkersService', () => {
 
       // Mock workerLeave dependencies
       (mockJobsRegistryService.repo as any).execute = jest.fn();
-      (mockWorkerInstanceRepository.delete as jest.Mock).mockResolvedValue(
-        undefined,
-      );
+      (mockWorkerInstanceRepository.delete as jest.Mock).mockResolvedValue({
+        affected: 1,
+      });
       // Mock resetStuckAndFailedJobs
       (mockWorkerInstanceRepository.manager as any) = {
         query: jest.fn().mockResolvedValue(undefined),
@@ -571,6 +580,99 @@ describe('WorkersService', () => {
       expect(mockWorkerInstanceRepository.update).not.toHaveBeenCalledWith(
         { id: 'w-existing' },
         expect.objectContaining({ runMode: expect.anything() }),
+      );
+    });
+  });
+
+  describe('worker lifecycle events', () => {
+    beforeEach(() => {
+      (mockWorkerInstanceRepository as any).manager = {
+        query: jest.fn().mockResolvedValue(undefined),
+      };
+    });
+
+    it('publishes worker.timed_out when a stale workspace worker is removed', async () => {
+      (mockWorkerInstanceRepository.find as jest.Mock).mockResolvedValue([
+        { id: 'worker-1', workspaceId: 'ws-1' } as WorkerInstance,
+      ]);
+      (mockWorkerInstanceRepository.delete as jest.Mock).mockResolvedValue({
+        affected: 1,
+      });
+
+      await service.autoCleanupWorkersAndJobs();
+
+      expect(mockEventBridge.publishSafely).toHaveBeenCalledWith(
+        EVENT_CATALOG.worker.timed_out,
+        expect.objectContaining({
+          workspaceId: 'ws-1',
+          resourceType: 'worker',
+          resourceId: 'worker-1',
+        }),
+        { subject: 'workspace:ws-1/worker:worker-1' },
+      );
+    });
+
+    it('does not publish worker.timed_out when another replica removed it first', async () => {
+      (mockWorkerInstanceRepository.find as jest.Mock).mockResolvedValue([
+        { id: 'worker-1', workspaceId: 'ws-1' } as WorkerInstance,
+      ]);
+      (mockWorkerInstanceRepository.delete as jest.Mock).mockResolvedValue({
+        affected: 0,
+      });
+
+      await service.autoCleanupWorkersAndJobs();
+
+      expect(mockEventBridge.publishSafely).not.toHaveBeenCalled();
+    });
+
+    it('publishes worker.disconnected when the alive stream drops', async () => {
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 'worker-1',
+        workspaceId: 'ws-1',
+      });
+
+      await service.workerDisconnected('worker-1');
+
+      expect((mockJobsRegistryService.repo as any).execute).toHaveBeenCalled();
+      expect(mockEventBridge.publishSafely).toHaveBeenCalledWith(
+        EVENT_CATALOG.worker.disconnected,
+        expect.objectContaining({ workspaceId: 'ws-1', resourceId: 'worker-1' }),
+        expect.anything(),
+      );
+    });
+
+    it('does not publish for cloud workers, which have no workspace', async () => {
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 'worker-1',
+        workspaceId: null,
+      });
+
+      await service.workerDisconnected('worker-1');
+
+      expect(mockEventBridge.publishSafely).not.toHaveBeenCalled();
+    });
+
+    it('publishes worker.rejoined on a token rejoin', async () => {
+      (mockConfigService.get as jest.Mock).mockReturnValue(undefined);
+      (
+        mockApiKeysService.apiKeysRepository!.findOne as jest.Mock
+      ).mockResolvedValue({ id: 'key-1', key: 'api-key-1' });
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 'w-existing',
+        token: 'tok-existing',
+        workspaceId: 'ws-1',
+      });
+
+      await service.join({
+        apiKey: 'api-key-1',
+        signature: '',
+        token: 'tok-existing',
+      });
+
+      expect(mockEventBridge.publishSafely).toHaveBeenCalledWith(
+        EVENT_CATALOG.worker.rejoined,
+        expect.objectContaining({ workspaceId: 'ws-1', resourceId: 'w-existing' }),
+        expect.anything(),
       );
     });
   });

@@ -8,7 +8,6 @@ import {
   Patch,
   Query,
   Req,
-  Sse,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
@@ -64,16 +63,6 @@ export class NotificationsController {
   // in-app notifications for arbitrary user ids — including administrators —
   // with attacker-controlled interpolation metadata, and the `notification`
   // permission resource has no `write` action to gate it with.
-
-  @Doc({
-    summary: 'Subscribe to notifications stream',
-    description:
-      'Subscribe to a Server-Sent Events (SSE) stream for real-time notifications',
-  })
-  @Sse('stream')
-  stream(@UserContext() user: UserContextPayload) {
-    return this.notificationsService.subscribeToStream(user.id);
-  }
 
   @Doc({
     summary: 'Get unread notifications count',

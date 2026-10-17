@@ -3,6 +3,7 @@ import { WORKER_TIMEOUT } from '@/common/constants/app.constants';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import {
   ApiKeyType,
+  AuditOutcome,
   JobStatus,
   WorkerScope,
   WorkerType,
@@ -27,6 +28,12 @@ import { LessThan, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
+import {
+  type CatalogEvent,
+  EVENT_CATALOG,
+} from '../event-bridge/contracts/event-catalog';
+import type { EventEnvelopeData } from '../event-bridge/contracts/event-envelope';
+import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
 import { InternalNetwork } from '../internal-networks/entities/internal-network.entity';
 import { NetworkInterface } from '../internal-networks/entities/network-interface.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
@@ -86,6 +93,8 @@ export class WorkersService {
     private readonly workerTelemetryService: WorkerTelemetryService,
 
     private readonly connectorRegistry: ConnectorRegistryService,
+
+    private readonly eventBridge: EventBridgeService,
   ) {}
 
   /**
@@ -138,7 +147,7 @@ export class WorkersService {
       this.logger.log(
         `[autoCleanup] Worker ${worker.id} has no active stream and lastSeenAt expired, removing`,
       );
-      await this.workerLeave(worker.id);
+      await this.workerLeave(worker);
     }
 
     // Update both in_progress jobs with missing workers and failed jobs
@@ -146,15 +155,50 @@ export class WorkersService {
   }
 
   /**
-   * Removes a worker from the repository using its unique identifier.
+   * Removes a timed-out worker, releasing its jobs first.
    *
-   * @param id - The unique identifier of the worker instance to be removed.
-   * @returns A promise that resolves when the worker is successfully deleted.
+   * @param worker - The worker instance to be removed.
    */
+  private async workerLeave(worker: WorkerInstance) {
+    await this.releaseWorkerJobs(worker.id);
+    const { affected } = await this.repo.delete(worker.id);
+    // Every replica runs this sweep; only the one that removed the row
+    // announces it.
+    if (affected) {
+      await this.publishWorkerEvent(EVENT_CATALOG.worker.timed_out, worker);
+    }
+  }
 
-  private async workerLeave(id: string) {
-    await this.releaseWorkerJobs(id);
-    return this.repo.delete(id);
+  /**
+   * Handles a dropped gRPC alive stream: frees the worker's jobs for other
+   * workers and announces the disconnect. The row stays until
+   * {@link autoCleanupWorkersAndJobs} times it out, so a reconnect is cheap.
+   */
+  public async workerDisconnected(workerId: string) {
+    await this.releaseWorkerJobs(workerId);
+    const worker = await this.repo.findOne({ where: { id: workerId } });
+    await this.publishWorkerEvent(EVENT_CATALOG.worker.disconnected, worker);
+  }
+
+  /**
+   * Announces a worker lifecycle change to its workspace. Cloud workers have
+   * no workspace and the bus carries no global events, so they are skipped.
+   */
+  private async publishWorkerEvent(
+    event: CatalogEvent,
+    worker: Pick<WorkerInstance, 'id' | 'workspaceId'> | null,
+  ): Promise<void> {
+    if (!worker?.workspaceId) return;
+    await this.eventBridge.publishSafely(
+      event,
+      {
+        workspaceId: worker.workspaceId,
+        outcome: AuditOutcome.Success,
+        resourceType: 'worker',
+        resourceId: worker.id,
+      } satisfies EventEnvelopeData,
+      { subject: `workspace:${worker.workspaceId}/worker:${worker.id}` },
+    );
   }
 
   /**
@@ -654,6 +698,10 @@ export class WorkersService {
         if (Object.keys(updates).length > 0) {
           await this.repo.update({ id: existingWorker.id }, updates);
         }
+        await this.publishWorkerEvent(
+          EVENT_CATALOG.worker.rejoined,
+          existingWorker,
+        );
         return this.repo.findOne({
           where: { id: existingWorker.id },
         }) as Promise<WorkerInstance>;
@@ -665,7 +713,14 @@ export class WorkersService {
       return this.createCloudWorker(metadata, ipAddress, runMode);
     }
 
-    return this.createRegularWorker(apiKey, metadata, ipAddress, runMode);
+    const worker = await this.createRegularWorker(
+      apiKey,
+      metadata,
+      ipAddress,
+      runMode,
+    );
+    await this.publishWorkerEvent(EVENT_CATALOG.worker.joined, worker);
+    return worker;
   }
 
   /**

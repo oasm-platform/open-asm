@@ -5,6 +5,7 @@ import { AssetsModule } from './assets/assets.module';
 import { AuthModule } from './auth/auth.module';
 import { ConnectorsModule } from './connectors/connectors.module';
 import { DataAdapterModule } from './data-adapter/data-adapter.module';
+import { EventsModule } from './events/events.module';
 import { InternalNetworksModule } from './internal-networks/internal-networks.module';
 import { IssuesModule } from './issues/issues.module';
 import { JobsRegistryModule } from './jobs-registry/jobs-registry.module';
@@ -58,6 +59,7 @@ import { ReportsModule } from './reports/reports.module';
     ReportsModule,
     IntegrationsModule,
     ConnectorsModule,
+    EventsModule,
   ],
 })
 export class CombineModule {}

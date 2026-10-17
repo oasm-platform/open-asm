@@ -4,7 +4,7 @@ import {
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
-import { useSse } from './use-sse';
+import { useLiveEvents } from './use-live-events';
 
 export function useNotificationStream() {
   const queryClient = useQueryClient();
@@ -21,5 +21,5 @@ export function useNotificationStream() {
     });
   }, [queryClient]);
 
-  useSse('/api/notifications/stream', handleMessage);
+  useLiveEvents('notification.*', handleMessage);
 }
