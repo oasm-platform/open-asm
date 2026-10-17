@@ -3,7 +3,11 @@ import * as yaml from 'js-yaml';
 import * as path from 'path';
 import { TargetType } from '@/common/enums/enum';
 import {
-  parseManifestTargetTypes,
+  parseManifestCategories,
+  resolveToolCategory,
+} from '../tools/tool-categories';
+import type { ToolCategorySpec } from '../tools/tool-categories';
+import {
   resolveToolTargetTypes,
   triggerTargetType,
 } from '../tools/tool-target-types';
@@ -29,32 +33,38 @@ const manifestPath = path.join(
 
 interface Template {
   on?: { target?: string[] };
-  jobs?: Record<string, { run: string }>;
+  jobs?: Record<string, { run: string; category?: string }>;
 }
 
-const toolTargetTypes = (): Map<string, TargetType[]> => {
-  const byName = new Map<string, TargetType[]>();
+type KnownTool = { name: string; categories: ToolCategorySpec[] };
+
+const knownTools = (): Map<string, KnownTool> => {
+  const byName = new Map<string, KnownTool>();
   for (const tool of builtInTools) {
-    byName.set(tool.name, resolveToolTargetTypes(tool));
+    byName.set(tool.name, { name: tool.name, categories: tool.categories ?? [] });
   }
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as {
-    connectors: Array<{ slug: string; targetTypes?: unknown }>;
+    connectors: Array<{ slug: string; capabilities?: unknown }>;
   };
   for (const connector of manifest.connectors) {
-    byName.set(
-      connector.slug,
-      parseManifestTargetTypes(connector.targetTypes).targetTypes,
-    );
+    byName.set(connector.slug, {
+      name: connector.slug,
+      categories: parseManifestCategories(connector.capabilities).categories,
+    });
   }
   return byName;
 };
+
+/** Target types a job of `tool` scans in `category` (default: its first). */
+const targetTypesOf = (tool: KnownTool, category?: string): TargetType[] =>
+  resolveToolTargetTypes(resolveToolCategory(tool, category));
 
 const templateFiles = fs
   .readdirSync(templatesDir)
   .filter((file) => /\.ya?ml$/.test(file));
 
 describe('default workflow templates', () => {
-  const tools = toolTargetTypes();
+  const tools = knownTools();
 
   it.each(templateFiles)('%s is a valid graph of known tools', (file) => {
     const content = yaml.load(
@@ -67,10 +77,11 @@ describe('default workflow templates', () => {
       .filter((type): type is TargetType => type !== undefined);
 
     for (const [, job] of jobEntries(content.jobs)) {
-      const supported = tools.get(job.run);
-      expect(supported).toBeDefined();
+      const tool = tools.get(job.run);
+      expect(tool).toBeDefined();
+      const supported = targetTypesOf(tool!, job.category);
       if (triggerTypes.length > 0) {
-        expect(triggerTypes.some((type) => supported!.includes(type))).toBe(
+        expect(triggerTypes.some((type) => supported.includes(type))).toBe(
           true,
         );
       }
@@ -82,7 +93,7 @@ describe('default workflow templates', () => {
       fs.readFileSync(path.join(templatesDir, 'repository_scan.yaml'), 'utf8'),
     ) as Template;
     expect(content.on?.target).toEqual(['git_org.synced']);
-    expect(tools.get('gitleaks')).toEqual([TargetType.GIT_ORG]);
+    expect(targetTypesOf(tools.get('gitleaks')!)).toEqual([TargetType.GIT_ORG]);
   });
 
   it('scans repositories for secrets and for vulnerable dependencies', () => {
@@ -91,6 +102,6 @@ describe('default workflow templates', () => {
     ) as Template;
     const runs = jobEntries(content.jobs).map(([, job]) => job.run);
     expect(runs).toEqual(expect.arrayContaining(['gitleaks', 'trivy']));
-    expect(tools.get('trivy')).toEqual([TargetType.GIT_ORG]);
+    expect(targetTypesOf(tools.get('trivy')!)).toEqual([TargetType.GIT_ORG]);
   });
 });

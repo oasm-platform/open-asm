@@ -108,8 +108,14 @@ export function CreateAssetGroup() {
     () =>
       (toolsQuery.data?.data ?? []).filter(
         (tool) =>
-          tool.category === ToolCategory.vulnerabilities ||
-          tool.category === ToolCategory.url_discovery,
+          tool.categories?.some((c) =>
+            (
+              [
+                ToolCategory.vulnerabilities,
+                ToolCategory.url_discovery,
+              ] as ToolCategory[]
+            ).includes(c.name),
+          ),
       ),
     [toolsQuery.data?.data],
   );
@@ -138,7 +144,12 @@ export function CreateAssetGroup() {
       tools: pipeline,
       schedule,
     } as CreateAssetGroupDto & {
-      tools: { toolId: string; config?: Record<string, unknown>; configProfileId?: string }[];
+      tools: {
+        toolId: string;
+        config?: Record<string, unknown>;
+        configProfileId?: string;
+        category?: ToolCategory;
+      }[];
     };
     createAssetGroup(
       { data: dto },

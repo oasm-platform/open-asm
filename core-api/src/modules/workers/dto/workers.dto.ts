@@ -143,8 +143,8 @@ export class WorkerToolDto {
   @ApiProperty({ required: false, nullable: true, type: String })
   logoUrl?: string | null;
 
-  @ApiProperty({ required: false })
-  category?: string;
+  @ApiProperty({ required: false, type: [String] })
+  categories?: string[];
 
   @ApiProperty({ enum: ['builtin', 'connector'] })
   type: 'builtin' | 'connector';

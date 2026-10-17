@@ -1,15 +1,15 @@
-import { JobPriority, ToolCategory, WorkerType } from '@/common/enums/enum';
+import { JobPriority, WorkerType } from '@/common/enums/enum';
 import { JobDataResultType } from '@/common/types/app.types';
 import { ApiKey } from '@/modules/apikeys/entities/apikey.entity';
 import { AssetTag } from '@/modules/assets/entities/asset-tags.entity';
 import { Job } from '@/modules/jobs-registry/entities/job.entity';
 import { ToolProvider } from '@/modules/providers/entities/provider.entity';
-import { TargetType } from '@/common/enums/enum';
 import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.entity';
 import { WorkerInstance } from '@/modules/workers/entities/worker.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 import {
+  Check,
   Column,
   Entity,
   Generated,
@@ -22,11 +22,15 @@ import {
   Unique,
   UpdateDateColumn,
 } from 'typeorm';
-import { DEFAULT_TOOL_TARGET_TYPES } from '../tool-target-types';
+import { ToolCategorySpec } from '../tool-categories';
 import { WorkspaceTool } from './workspace_tools.entity';
 
 @Entity('tools')
 @Unique(['name'])
+@Check(
+  'CHK_tools_categories_not_empty',
+  `jsonb_typeof("categories") = 'array' AND jsonb_array_length("categories") > 0`,
+)
 export class Tool {
   @ApiProperty()
   @PrimaryColumn({ type: 'uuid' })
@@ -61,28 +65,16 @@ export class Tool {
   @OneToMany(() => WorkspaceTool, (workspaceTool) => workspaceTool.tool)
   workspaceTools?: Relation<WorkspaceTool[]>;
 
-  @ApiProperty({ enum: ToolCategory })
-  @IsEnum(ToolCategory)
-  @Column({ type: 'varchar' })
-  category?: ToolCategory;
-
   /**
-   * Target types whose assets this tool may scan. Jobs are only ever created
-   * for assets of these target types, whichever workflow runs the tool.
-   * Connector tools take it from the manifest `targetTypes`; built-in tools
-   * declare it in built-in-tools.ts. Read through `resolveToolTargetTypes()`.
+   * Modes this tool runs in, in order; the first is the default for a workflow
+   * step that names none. Each carries the target types it may scan — jobs are
+   * only created for assets of the chosen category's target types.
+   * Built-ins declare them in built-in-tools.ts; connectors in manifest
+   * `capabilities`. Resolve through `resolveToolCategory()`.
    */
-  @ApiProperty({
-    enum: TargetType,
-    enumName: 'TargetType',
-    isArray: true,
-    description: 'Target types whose assets this tool can scan',
-  })
-  @Column('text', {
-    array: true,
-    default: () => `'{${DEFAULT_TOOL_TARGET_TYPES.join(',')}}'`,
-  })
-  targetTypes?: TargetType[];
+  @ApiProperty({ type: ToolCategorySpec, isArray: true })
+  @Column({ type: 'jsonb' })
+  categories?: ToolCategorySpec[];
 
   @ApiProperty()
   @IsOptional()

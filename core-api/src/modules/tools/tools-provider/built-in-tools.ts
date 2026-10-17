@@ -9,9 +9,8 @@ import { Tool } from '../entities/tools.entity';
 export const builtInTools: Tool[] = [
   {
     name: 'subfinder',
-    category: ToolCategory.SUBDOMAINS,
     // Subdomain enumeration only makes sense for a domain.
-    targetTypes: [TargetType.DOMAIN],
+    categories: [{ name: ToolCategory.SUBDOMAINS, targetTypes: [TargetType.DOMAIN] }],
     description:
       'Subfinder is a subdomain discovery tool that returns valid subdomains for websites, using passive online sources.',
     logoUrl: '/static/images/subfinder.png',
@@ -41,8 +40,7 @@ export const builtInTools: Tool[] = [
   },
   {
     name: 'httpx',
-    category: ToolCategory.HTTP_PROBE,
-    targetTypes: [TargetType.DOMAIN, TargetType.IP, TargetType.CIDR],
+    categories: [{ name: ToolCategory.HTTP_PROBE, targetTypes: [TargetType.DOMAIN, TargetType.IP, TargetType.CIDR] }],
     description:
       'Httpx is a fast and multi-purpose HTTP toolkit that allows running multiple probes using the retryable http library. It is designed to maintain result reliability with an increased number of threads.',
     logoUrl: '/static/images/httpx.png',
@@ -54,8 +52,7 @@ export const builtInTools: Tool[] = [
   },
   {
     name: 'screenshot',
-    category: ToolCategory.SCREENSHOT,
-    targetTypes: [TargetType.DOMAIN, TargetType.IP, TargetType.CIDR],
+    categories: [{ name: ToolCategory.SCREENSHOT, targetTypes: [TargetType.DOMAIN, TargetType.IP, TargetType.CIDR] }],
     description: 'Take a screenshot of a website.',
     logoUrl: '/static/images/screenshot.png',
     parser: JSON.parse,
@@ -65,8 +62,7 @@ export const builtInTools: Tool[] = [
   },
   {
     name: 'naabu',
-    category: ToolCategory.PORTS_SCANNER,
-    targetTypes: [TargetType.DOMAIN, TargetType.IP, TargetType.CIDR],
+    categories: [{ name: ToolCategory.PORTS_SCANNER, targetTypes: [TargetType.DOMAIN, TargetType.IP, TargetType.CIDR] }],
     description:
       'A fast port scanner written in go with a focus on reliability and simplicity. Designed to be used in combination with other tools for attack surface discovery in bug bounties and pentests.',
     logoUrl: '/static/images/naabu.png',

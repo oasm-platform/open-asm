@@ -1,5 +1,6 @@
 import type { WorkflowStepStatusDto } from '@/services/apis/gen/queries';
 import type { Edge, EdgeMarker, Node } from '@xyflow/react';
+import { formatCategory } from '@/pages/tools/components/format-category';
 
 /**
  * Layout of a workflow run as a DAG, in "waves".
@@ -22,6 +23,8 @@ export interface StepNodeData extends Record<string, unknown> {
   id: string;
   label: string;
   run: string;
+  /** Category the step runs its tool in. */
+  category?: string;
   status: string;
   needs: string[];
   jobs: number;
@@ -50,7 +53,7 @@ export interface WorkflowGraphLayout {
 export function describeStep(step: WorkflowStepStatusDto): string {
   const parts = [
     step.name || step.id || step.run,
-    step.run,
+    step.category ? `${step.run} (${formatCategory(step.category)})` : step.run,
     step.status,
     `${step.jobs} job${step.jobs === 1 ? '' : 's'}`,
   ];
@@ -133,6 +136,7 @@ export function buildWorkflowGraphLayout(
           id: step.id,
           label: step.name || step.id || step.run,
           run: step.run,
+          category: step.category,
           status: step.status,
           needs: step.needs,
           jobs: step.jobs,

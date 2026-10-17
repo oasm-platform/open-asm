@@ -16,6 +16,7 @@ import {
   useToolsControllerGetConnectorBySlug,
   type Tool,
 } from '@/services/apis/gen/queries';
+import { formatCategory } from '@/pages/tools/components/format-category';
 import { ChevronRight, Download } from 'lucide-react';
 import { useState, type JSX, type ReactNode } from 'react';
 
@@ -108,7 +109,14 @@ export function ToolInstallConfirmDialog({
   )?.name;
 
   const about = connector?.description ?? connector?.shortDescription;
-  const inputs = listSchemaInputs(connector?.inputsSchema);
+  // One inputs list per category the connector runs in; a heading only when
+  // there is more than one.
+  const inputGroups = (connector?.categories ?? [])
+    .map((category) => ({
+      category: category.name,
+      inputs: listSchemaInputs(category.inputsSchema),
+    }))
+    .filter((group) => group.inputs.length > 0);
 
   // Connector names are lowercase slugs (gitleaks); capitalize for display.
   const displayName = tool.name.charAt(0).toUpperCase() + tool.name.slice(1);
@@ -177,37 +185,46 @@ export function ToolInstallConfirmDialog({
             </Section>
           )}
 
-          {inputs.length > 0 && (
+          {inputGroups.length > 0 && (
             <Section title="Data shared with this tool">
               <p className="text-sm text-muted-foreground">
                 Each time it runs, {toolName} receives the following inputs
                 from OASM.
               </p>
-              <ul className="mt-3 space-y-3">
-                {inputs.map((input) => (
-                  <li key={input.key} className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-sm font-medium">
-                        {input.title ?? input.key}
-                      </span>
-                      {input.title && (
-                        <code className="rounded bg-background px-1.5 py-0.5 text-xs text-muted-foreground">
-                          {input.key}
-                        </code>
-                      )}
-                      <Badge variant="outline">{input.type}</Badge>
-                      {input.required && (
-                        <Badge variant="secondary">Required</Badge>
-                      )}
-                    </div>
-                    {input.description && (
-                      <p className="text-sm text-muted-foreground">
-                        {input.description}
-                      </p>
-                    )}
-                  </li>
-                ))}
-              </ul>
+              {inputGroups.map((group) => (
+                <div key={group.category} className="mt-3">
+                  {inputGroups.length > 1 && (
+                    <h4 className="text-sm font-medium">
+                      {formatCategory(group.category)}
+                    </h4>
+                  )}
+                  <ul className="mt-2 space-y-3">
+                    {group.inputs.map((input) => (
+                      <li key={input.key} className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-sm font-medium">
+                            {input.title ?? input.key}
+                          </span>
+                          {input.title && (
+                            <code className="rounded bg-background px-1.5 py-0.5 text-xs text-muted-foreground">
+                              {input.key}
+                            </code>
+                          )}
+                          <Badge variant="outline">{input.type}</Badge>
+                          {input.required && (
+                            <Badge variant="secondary">Required</Badge>
+                          )}
+                        </div>
+                        {input.description && (
+                          <p className="text-sm text-muted-foreground">
+                            {input.description}
+                          </p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </Section>
           )}
 

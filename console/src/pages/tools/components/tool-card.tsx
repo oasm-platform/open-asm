@@ -13,6 +13,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { BadgeCheck } from 'lucide-react';
 import { useState } from 'react';
+import { formatCategory } from './format-category';
 import ToolInstallButton from './tool-install-button';
 
 interface ToolCardProps {
@@ -25,13 +26,6 @@ interface ToolCardProps {
    * Default 'tools'.
    */
   openFrom?: 'tools' | 'agent-settings';
-}
-
-function formatCategory(category: string): string {
-  return category
-    .split('_')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
 }
 
 const ToolCard = ({ tool, onNavigate, openFrom = 'tools' }: ToolCardProps) => {
@@ -86,7 +80,6 @@ const ToolCard = ({ tool, onNavigate, openFrom = 'tools' }: ToolCardProps) => {
               <BadgeCheck className="size-4 text-blue-500" />
             </span>
           )}
-          <Badge variant="secondary">{formatCategory(tool.category)}</Badge>
         </div>
         <div className="relative z-10 shrink-0">
           <ToolInstallButton
@@ -99,9 +92,19 @@ const ToolCard = ({ tool, onNavigate, openFrom = 'tools' }: ToolCardProps) => {
           />
         </div>
       </div>
-      <p className="text-sm text-muted-foreground line-clamp-2">
+      <p className="text-sm text-muted-foreground line-clamp-3">
         {tool.description || 'No description available.'}
       </p>
+      {!!tool.categories?.length && (
+        // Pinned to the bottom so badges line up across cards of different heights
+        <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-1">
+          {tool.categories.map((c) => (
+            <Badge key={c.name} variant="secondary">
+              {formatCategory(c.name)}
+            </Badge>
+          ))}
+        </div>
+      )}
       {isConnector && (
         // Same create-profile sheet as the Configuration tab of the detail page
         <ToolConnectorConfigSheet

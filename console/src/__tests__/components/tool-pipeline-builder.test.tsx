@@ -83,3 +83,62 @@ describe('ToolPipelineBuilder — tool click opens its panel', () => {
     await expectPopoverAnchored();
   });
 });
+
+describe('ToolPipelineBuilder — category picker', () => {
+  const nmap = {
+    id: 'tool-nmap',
+    name: 'nmap',
+    type: 'connector',
+    logoUrl: '',
+    categories: [
+      { name: 'ports_scanner', targetTypes: [] },
+      { name: 'vulnerabilities', targetTypes: [] },
+    ],
+  } as unknown as Tool;
+
+  it('lets an entry of a multi-category tool pick its category', async () => {
+    const onChange = vi.fn();
+    const { user } = renderWithProviders(
+      <ToolPipelineBuilder
+        tools={[nmap]}
+        value={[{ toolId: 'tool-nmap' }]}
+        onChange={onChange}
+      />,
+    );
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Configure nmap' }),
+    );
+    await user.click(await screen.findByRole('combobox', { name: 'Category' }));
+    await user.click(
+      await screen.findByRole('option', { name: 'Vulnerabilities' }),
+    );
+
+    expect(onChange).toHaveBeenCalledWith([
+      { toolId: 'tool-nmap', category: 'vulnerabilities' },
+    ]);
+  });
+
+  it('shows no category picker for a single-category tool', async () => {
+    const naabu = {
+      ...nmap,
+      id: 'tool-naabu',
+      name: 'naabu',
+      categories: [{ name: 'ports_scanner', targetTypes: [] }],
+    } as unknown as Tool;
+    const { user } = renderWithProviders(
+      <ToolPipelineBuilder
+        tools={[naabu]}
+        value={[{ toolId: 'tool-naabu' }]}
+        onChange={vi.fn()}
+      />,
+    );
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Configure naabu' }),
+    );
+
+    expect(await screen.findByText('Inline config')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Category' })).toBeNull();
+  });
+});

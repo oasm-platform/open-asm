@@ -45,7 +45,7 @@ const makeTool = (overrides: Partial<Tool> & { name: string }): Tool => ({
   isOfficialSupport: false,
   type: WorkerType.CONNECTOR,
   priority: 'medium' as any,
-  category: 'vulnerabilities' as any,
+  categories: [{ name: 'vulnerabilities', targetTypes: ['DOMAIN', 'IP', 'CIDR'] }] as any,
   ...overrides,
 });
 
@@ -202,7 +202,7 @@ describe('ToolsService — readiness flags', () => {
     });
 
     it('should combine search with category filter', async () => {
-      const tool = makeTool({ id: 't1', name: 'nuclei', category: ToolCategory.VULNERABILITIES });
+      const tool = makeTool({ id: 't1', name: 'nuclei' });
       toolsRepo.findAndCount.mockResolvedValue([[tool], 1]);
       workspaceToolRepo.find.mockResolvedValue([]);
       mockWorkerCount();
@@ -215,6 +215,25 @@ describe('ToolsService — readiness flags', () => {
       expect(result.data).toHaveLength(1);
       const callArg = toolsRepo.findAndCount.mock.calls[0][0];
       expect(callArg.where).toBeDefined();
+    });
+
+    it('filters by category with a jsonb containment on categories', async () => {
+      toolsRepo.findAndCount.mockResolvedValue([[], 0]);
+      workspaceToolRepo.find.mockResolvedValue([]);
+      mockWorkerCount();
+
+      await service.getManyTools({
+        page: 1, limit: 10, category: ToolCategory.URL_DISCOVERY,
+        workspaceId: 'ws-001',
+      } as any);
+
+      const where = toolsRepo.findAndCount.mock.calls[0][0].where;
+      const branch = (Array.isArray(where) ? where[0] : where) as Record<string, any>;
+      expect(branch).not.toHaveProperty('category');
+      expect(branch.categories.getSql('"categories"')).toBe('"categories" @> :categoryFilter::jsonb');
+      expect(branch.categories.objectLiteralParameters).toEqual({
+        categoryFilter: JSON.stringify([{ name: 'url_discovery' }]),
+      });
     });
 
     it('should combine search with type filter', async () => {

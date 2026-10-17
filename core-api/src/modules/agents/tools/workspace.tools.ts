@@ -262,7 +262,7 @@ export function listToolsTool(
   return defineTool({
     description: [
       'List security tools/scanners with their state in this workspace.',
-      'Each item: id, name, type (built_in or connector), category, description, agentTool, isInstalled, isReady.',
+      'Each item: id, name, type (built_in or connector), categories (modes it can run in), description, agentTool, isInstalled, isReady.',
       'agentTool=true means the agent can use the tool; it runs only when agentTool, isInstalled and isReady are all true.',
       'type decides how it runs: built_in → execute_remote_command with the tool name as the command; connector → run_tool_connector.',
       'Params: page, limit, q (search by name or description), agentTool (true → only agent tools, false → only the others, omit → all).',
@@ -282,7 +282,7 @@ export function listToolsTool(
           id: i.id,
           name: i.name,
           type: i.type,
-          category: i.category,
+          categories: (i.categories ?? []).map((c) => c.name),
           description: i.description,
           agentTool: i.agentTool ?? false,
           isInstalled: i.isInstalled ?? false,

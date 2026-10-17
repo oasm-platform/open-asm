@@ -1,4 +1,5 @@
 import { BaseEntity } from '@/common/entities/base.entity';
+import { ToolCategory } from '@/common/enums/enum';
 import { AssetGroupWorkflow } from '@/modules/asset-group/entities/asset-groups-workflows.entity';
 import { User } from '@/modules/auth/entities/user.entity';
 import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity';
@@ -7,6 +8,7 @@ import { ApiExtraModels, ApiProperty, getSchemaPath } from '@nestjs/swagger';
 import {
   IsArray,
   IsBoolean,
+  IsEnum,
   IsNotEmpty,
   IsObject,
   IsOptional,
@@ -49,6 +51,15 @@ export class WorkflowJob {
   @IsString()
   @IsNotEmpty()
   run: string;
+
+  /**
+   * Category to run the tool in; omitted → the tool's first category. Required
+   * on every job of a tool that runs in more than one job of the workflow.
+   */
+  @ApiProperty({ required: false, enum: ToolCategory, enumName: 'ToolCategory' })
+  @IsOptional()
+  @IsEnum(ToolCategory)
+  category?: ToolCategory;
 
   /**
    * Ids of the jobs that must reach a terminal state before this one is

@@ -1,3 +1,4 @@
+import { ToolCategory } from '@/common/enums/enum';
 import { BullMQName, CronSchedule } from '@/common/enums/enum';
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { getQueueToken } from '@nestjs/bullmq';
@@ -283,6 +284,65 @@ describe('AssetGroupService', () => {
       );
     });
 
+    it('should carry a per-tool category into the group workflow job', async () => {
+      mockAssetGroupRepo.findOne.mockResolvedValueOnce(undefined);
+      mockManager.find.mockResolvedValue([
+        {
+          id: 'tool-1',
+          name: 'nmap',
+          categories: [
+            { name: ToolCategory.PORTS_SCANNER, targetTypes: [] },
+            { name: ToolCategory.VULNERABILITIES, targetTypes: [] },
+          ],
+        },
+      ]);
+      mockWorkflowRepo.create.mockImplementation((data) => data);
+      mockWorkflowRepo.save.mockResolvedValue({ id: 'workflow-1' });
+      mockWorkflowService.addManyWorkflows.mockResolvedValue({ message: 'ok' });
+
+      await service.create(
+        {
+          name: 'Web Servers',
+          tools: [{ toolId: 'tool-1', category: ToolCategory.VULNERABILITIES }],
+        },
+        workspaceId,
+      );
+
+      expect(mockWorkflowRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.objectContaining({
+            jobs: { nmap: { run: 'nmap', category: 'vulnerabilities' } },
+          }),
+        }),
+      );
+    });
+
+    it('should reject a per-tool category the tool does not declare', async () => {
+      mockAssetGroupRepo.findOne.mockResolvedValueOnce(undefined);
+      mockManager.find.mockResolvedValue([
+        {
+          id: 'tool-1',
+          name: 'subfinder',
+          categories: [{ name: ToolCategory.SUBDOMAINS, targetTypes: [] }],
+        },
+      ]);
+
+      await expect(
+        service.create(
+          {
+            name: 'Web Servers',
+            tools: [{ toolId: 'tool-1', category: ToolCategory.VULNERABILITIES }],
+          },
+          workspaceId,
+        ),
+      ).rejects.toThrow(
+        new BadRequestException(
+          'Tool "subfinder" has no category "vulnerabilities" (has: subdomains)',
+        ),
+      );
+      expect(mockWorkflowRepo.save).not.toHaveBeenCalled();
+    });
+
     it('should default the workflow schedule to EVERY_3_DAYS when only toolIds are passed', async () => {
       const tools = [{ id: 'tool-1', name: 'nmap' }];
       const dto = {
@@ -328,7 +388,16 @@ describe('AssetGroupService', () => {
       } as CreateAssetGroupDto;
 
       mockAssetGroupRepo.findOne.mockResolvedValueOnce(undefined); // name check
-      mockManager.find.mockResolvedValue([{ id: 'tool-1', name: 'nmap' }]);
+      mockManager.find.mockResolvedValue([
+        {
+          id: 'tool-1',
+          name: 'nmap',
+          categories: [
+            { name: ToolCategory.PORTS_SCANNER, targetTypes: [] },
+            { name: ToolCategory.VULNERABILITIES, targetTypes: [] },
+          ],
+        },
+      ]);
 
       await expect(service.create(dto, workspaceId)).rejects.toThrow(
         NotFoundException,

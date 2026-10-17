@@ -41,7 +41,7 @@ export class ToolConfigProfilesService {
 
   /**
    * Resolves the connector schema for a given tool row.
-   * Falls back to inputsSchema when configSchema is absent.
+   * The schema is the connector configSchema.
    * Tool.name IS the connector slug (e.g. "nuclei").
    */
   private async resolveConnectorSchema(toolId: string) {
@@ -55,10 +55,9 @@ export class ToolConfigProfilesService {
         `Unknown tool "${tool.name}" -- cannot validate config`,
       );
     }
-    // Fallback: configSchema ?? inputsSchema. A known connector with neither
-    // schema needs no config — profile creation stays allowed and validation
+    // A known connector without a configSchema needs no config — profile creation stays allowed and validation
     // is skipped (config stored as-is, no sensitive fields to encrypt).
-    const schema = entry.configSchema ?? entry.inputsSchema ?? null;
+    const schema = entry.configSchema ?? null;
     if (!schema) {
       return {
         tool,
@@ -104,8 +103,8 @@ export class ToolConfigProfilesService {
       (profile.tool).name,
     );
     if (!entry) return profile;
-    // Fallback: configSchema ?? inputsSchema for sensitive field detection
-    const schema = entry.configSchema ?? entry.inputsSchema;
+    // configSchema drives sensitive field detection
+    const schema = entry.configSchema;
     if (!schema) return profile;
     const sensitiveFields = getSensitiveFields(schema);
     if (sensitiveFields.length === 0) return profile;
@@ -433,8 +432,7 @@ export class ToolConfigProfilesService {
     if (!tool) return undefined;
 
     const entry = this.connectorRegistry.getConnector(tool.name);
-    // Fallback: configSchema ?? inputsSchema
-    const schema = entry?.configSchema ?? entry?.inputsSchema;
+    const schema = entry?.configSchema;
     if (!schema) return profile.config;
 
     const sensitiveFields = getSensitiveFields(schema);
@@ -470,7 +468,7 @@ export class ToolConfigProfilesService {
     if (!tool) return ref.config;
 
     const entry = this.connectorRegistry.getConnector(tool.name);
-    const schema = entry?.configSchema ?? entry?.inputsSchema;
+    const schema = entry?.configSchema;
     const sensitiveFields = getSensitiveFields(schema);
 
     let inlineConfig = ref.config;

@@ -1,4 +1,4 @@
-import { EventTriggerType, JobRunType, JobStatus, ToolCategory } from '@/common/enums/enum';
+import { EventTriggerType, JobRunType, JobStatus } from '@/common/enums/enum';
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource, type QueryRunner } from 'typeorm';
@@ -10,6 +10,7 @@ import {
   filterGraphByAssetsDiscovery,
   planAdvance,
   reconcileStepStates,
+  withResolvedCategories,
   withStepDispatched,
   withStepFailed,
   withStepSkipped,
@@ -17,6 +18,7 @@ import {
   type WorkflowGraph,
   type WorkflowRunScope,
 } from '../workflows/workflow-graph';
+import { resolveToolCategory } from '../tools/tool-categories';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
@@ -225,6 +227,7 @@ export class WorkflowRunnerService {
               tool,
               config: step.config,
               configProfileId: step.configProfileId,
+              category: step.category,
               // Every step of a run reuses the scope captured at start, so a
               // subdomain step's newly discovered assets are picked up by the
               // next step while an asset-group run stays inside its selection.
@@ -294,17 +297,17 @@ export class WorkflowRunnerService {
   }
 
   /**
-   * Resolves the run graph: parses the workflow, drops the SUBDOMAINS steps when
-   * the workspace has assets discovery disabled, and loads the tools so the
-   * caller can dispatch without another round trip.
+   * Resolves the run graph: parses the workflow, loads the tools so the caller
+   * can dispatch without another round trip, resolves each step's category and
+   * drops the SUBDOMAINS steps when the workspace has assets discovery disabled.
    */
   private async buildRunGraph(
     workflow: Workflow,
     workspaceId?: string,
   ): Promise<RunGraph> {
-    const fullGraph = buildWorkflowGraph(workflow.content);
+    const parsedGraph = buildWorkflowGraph(workflow.content);
 
-    const runNames = [...new Set(fullGraph.steps.map((step) => step.run))];
+    const runNames = [...new Set(parsedGraph.steps.map((step) => step.run))];
     const tools =
       runNames.length > 0
         ? await this.toolsService.getToolByNames({ names: runNames })
@@ -313,6 +316,15 @@ export class WorkflowRunnerService {
     for (const tool of tools) {
       if (tool.name) toolsByRun.set(tool.name, tool);
     }
+    const fullGraph = withResolvedCategories(parsedGraph, (step) => {
+      const tool = toolsByRun.get(step.run);
+      if (!tool) return undefined;
+      try {
+        return resolveToolCategory(tool, step.category).name;
+      } catch {
+        return undefined; // invalid category: dispatch fails the step with the reason
+      }
+    });
 
     let isAssetsDiscovery = true;
     if (workspaceId) {
@@ -324,12 +336,7 @@ export class WorkflowRunnerService {
       return { graph: fullGraph, toolsByRun, droppedSteps: [] };
     }
 
-    const categories = new Map<string, ToolCategory>();
-    for (const [name, tool] of toolsByRun) {
-      if (tool.category) categories.set(name, tool.category);
-    }
-
-    const graph = filterGraphByAssetsDiscovery(fullGraph, false, categories);
+    const graph = filterGraphByAssetsDiscovery(fullGraph, false);
     const kept = new Set(graph.steps.map((step) => step.id));
     return {
       graph,
@@ -350,7 +357,7 @@ export class WorkflowRunnerService {
     return scope;
   }
 
-  /** Per-tool job rollup of the run, used to reconcile each step's state. */
+  /** Per-step (tool + category) job rollup of the run, used to reconcile each step's state. */
   private async summarizeStepJobs(
     queryRunner: QueryRunner,
     jobHistoryId: string,
@@ -359,6 +366,7 @@ export class WorkflowRunnerService {
       .createQueryBuilder(Job, 'job')
       .innerJoin('job.tool', 'tool')
       .select('tool.name', 'tool')
+      .addSelect('job.category', 'category')
       .addSelect('COUNT(*)', 'total')
       .addSelect(
         `MAX(COALESCE(job."completedAt", job."updatedAt")) FILTER (WHERE job.status IN ('${JobStatus.COMPLETED}', '${JobStatus.FAILED}', '${JobStatus.CANCELLED}', '${JobStatus.SKIPPED}'))`,
@@ -386,12 +394,14 @@ export class WorkflowRunnerService {
       )
       .where('job."jobHistoryId" = :id', { id: jobHistoryId })
       .groupBy('tool.name')
+      .addGroupBy('job.category')
       .getRawMany<Record<string, string | Date>>();
 
     return rows.map((row) => {
       const lastTerminalAt = row['lastTerminalAt'];
       return {
         tool: String(row['tool']),
+        category: String(row['category']),
         total: Number(row['total'] ?? 0),
         pending: Number(row['pending'] ?? 0),
         inProgress: Number(row['inProgress'] ?? 0),

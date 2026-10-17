@@ -1146,15 +1146,15 @@ export class DataAdapterService {
       };
 
       // Get the appropriate sync function based on category
-      if (!job.tool.category) {
-        throw new Error('Tool category is undefined');
+      if (!job.category) {
+        throw new Error('Job category is undefined');
       }
 
-      const syncFunction = syncFunctions[job.tool.category];
+      const syncFunction = syncFunctions[job.category];
 
       // Check if we have a function for this category
       if (!syncFunction) {
-        throw new Error(`Unsupported tool category: ${job.tool.category}`);
+        throw new Error(`Unsupported tool category: ${job.category}`);
       }
 
       // Validate data before syncing
@@ -1165,7 +1165,7 @@ export class DataAdapterService {
         );
         if (!isValid) {
           throw new Error(
-            `Data validation failed for category: ${job.tool.category}`,
+            `Data validation failed for category: ${job.category}`,
           );
         }
       }
@@ -1177,7 +1177,7 @@ export class DataAdapterService {
       return;
     } catch (error) {
       this.logger.error(
-        `syncData failed for job ${job.id} (category: ${job.tool.category}):`,
+        `syncData failed for job ${job.id} (category: ${job.category}):`,
         error instanceof Error ? error.message : error,
       );
       throw error;

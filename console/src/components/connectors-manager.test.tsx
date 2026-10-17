@@ -47,7 +47,7 @@ vi.mock('@/services/apis/gen/queries', async (importOriginal) => {
 const tool = (name: string, isInstalled = false) => ({
   id: `id-${name}`,
   name,
-  category: 'vulnerabilities',
+  categories: [{ name: 'vulnerabilities', targetTypes: [] }],
   description: `${name} description`,
   logoUrl: null,
   agentTool: true,

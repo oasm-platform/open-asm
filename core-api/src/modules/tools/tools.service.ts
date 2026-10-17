@@ -15,7 +15,7 @@ import type {
   FindOperator,
   FindOptionsWhere,
 } from 'typeorm';
-import { And, ILike, In, Not, Repository } from 'typeorm';
+import { And, ILike, In, Not, Raw, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkersService } from '../workers/workers.service';
@@ -28,6 +28,13 @@ import { Tool } from './entities/tools.entity';
 import { ToolConfigProfile } from './entities/tool-config-profiles.entity';
 import { WorkspaceTool } from './entities/workspace_tools.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
+import { DEFAULT_TOOL_TARGET_TYPES } from './tool-target-types';
+
+/** WHERE fragment: the tool declares `category` among its categories. */
+const hasCategory = (category: ToolCategory) =>
+  Raw((alias) => `${alias} @> :categoryFilter::jsonb`, {
+    categoryFilter: JSON.stringify([{ name: category }]),
+  });
 
 // Search input is trimmed and capped to keep ILIKE patterns cheap and bounded.
 const MAX_SEARCH_LENGTH = 100;
@@ -128,20 +135,6 @@ export class ToolsService {
   }
 
   /**
-   * Get a built-in tool by category.
-   * @param {ToolCategory} category - The category of the tool.
-   * @returns {Tool | undefined} The built-in tool if found, otherwise undefined.
-   */
-  public async getBuiltInByCategory(
-    category: ToolCategory,
-  ): Promise<Tool | null> {
-    const tool = await this.toolsRepository.findOne({
-      where: { category, type: WorkerType.BUILT_IN },
-    });
-    return tool;
-  }
-
-  /**
    * Whether the tool counts as an AI agent tool. Built-in tools always do;
    * any other tool needs the `agentTool` flag on its connector manifest entry.
    */
@@ -228,7 +221,7 @@ export class ToolsService {
   async getToolSchema(
     toolId: string,
     workspaceId?: string,
-  ): Promise<{ schema: Record<string, unknown> | null; source: 'configSchema' | 'inputsSchema' | null }> {
+  ): Promise<{ schema: Record<string, unknown> | null; source: 'configSchema' | null }> {
     const tool = await this.getToolById(toolId, workspaceId);
     // Only an UNKNOWN connector slug (no registry entry at all) is an error.
     // A known connector that merely lacks a schema legitimately has no config.
@@ -368,7 +361,7 @@ export class ToolsService {
   ): FindOptionsWhere<Tool>[] | FindOptionsWhere<Tool> | undefined {
     const base: FindOptionsWhere<Tool> = {};
     if (query.type) base.type = query.type;
-    if (query.category) base.category = query.category;
+    if (query.category) base.categories = hasCategory(query.category);
     if (query.providerId) base.provider = { id: query.providerId };
 
     const searchTerm = (query.search ?? '').trim().slice(0, MAX_SEARCH_LENGTH);
@@ -555,14 +548,14 @@ export class ToolsService {
     const builtInTools = await this.toolsRepository.find({
       where: {
         type: WorkerType.BUILT_IN,
-        ...(dto.category && { category: dto.category }),
+        ...(dto.category && { categories: hasCategory(dto.category) }),
       },
     });
 
     const workspaceTools = await this.workspaceToolRepository.find({
       where: {
         workspace: { id: workspaceId },
-        ...(dto.category && { tool: { category: dto.category } }),
+        ...(dto.category && { tool: { categories: hasCategory(dto.category) } }),
       },
       relations: ['tool'],
     });
@@ -686,7 +679,10 @@ export class ToolsService {
     const tool = this.toolsRepository.create({
       name: dto.name,
       description: dto.description,
-      category: dto.category,
+      categories: dto.categories.map((name) => ({
+        name,
+        targetTypes: [...DEFAULT_TOOL_TARGET_TYPES],
+      })),
       // Set default values for other required fields
       type: WorkerType.PROVIDER, // or another appropriate default
       isOfficialSupport: false,

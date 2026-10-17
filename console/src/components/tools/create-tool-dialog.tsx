@@ -23,7 +23,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { CreateToolDtoCategory, useToolsControllerCreateTool } from '@/services/apis/gen/queries';
+import { ToolCategory, useToolsControllerCreateTool } from '@/services/apis/gen/queries';
 import { zodResolver } from '@hookform/resolvers/zod';
 import React from 'react';
 import { useForm } from 'react-hook-form';
@@ -33,7 +33,7 @@ import * as z from 'zod';
 const formSchema = z.object({
     name: z.string().min(1, 'Name is required'),
     description: z.string().min(1, 'Description is required'),
-    category: z.nativeEnum(CreateToolDtoCategory),
+    category: z.nativeEnum(ToolCategory),
     version: z.string().min(1, 'Version is required'),
 });
 
@@ -49,7 +49,7 @@ export function CreateToolDialog({ providerId, children }: CreateToolDialogProps
         defaultValues: {
             name: '',
             description: '',
-            category: CreateToolDtoCategory.subdomains,
+            category: ToolCategory.subdomains,
             version: '',
         },
     });
@@ -60,7 +60,11 @@ export function CreateToolDialog({ providerId, children }: CreateToolDialogProps
         createTool(
             {
                 data: {
-                    ...values,
+                    name: values.name,
+                    description: values.description,
+                    version: values.version,
+                    // Provider tools run in one category.
+                    categories: [values.category],
                     providerId
                 },
             },
@@ -128,7 +132,7 @@ export function CreateToolDialog({ providerId, children }: CreateToolDialogProps
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
-                                            {Object.values(CreateToolDtoCategory).map((category) => (
+                                            {Object.values(ToolCategory).map((category) => (
                                                 <SelectItem key={category} value={category}>
                                                     {category.replace('_', ' ').replace(/^(.)/, (_, c) => c.toUpperCase())}
                                                 </SelectItem>

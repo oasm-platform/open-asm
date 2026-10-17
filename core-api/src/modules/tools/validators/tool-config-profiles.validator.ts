@@ -20,7 +20,6 @@ export function _resetValidatorCache(): void {
 
 /**
  * Returns a compiled AJV validator for the given tool's effective schema.
- * Falls back to inputsSchema when configSchema is absent.
  * Cached after first compile — subsequent calls reuse the cached function.
  */
 function getValidatorFor(
@@ -37,8 +36,7 @@ function getValidatorFor(
     );
   }
 
-  // Fallback: configSchema ?? inputsSchema
-  const schema = entry.configSchema ?? entry.inputsSchema;
+  const schema = entry.configSchema;
   if (!schema) {
     throw new BadRequestException(
       `Tool "${toolName}" has no config schema or inputs schema -- cannot validate config`,

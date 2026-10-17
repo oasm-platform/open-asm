@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 
 interface ToolSchemaResponse {
   schema: Record<string, unknown>;
-  source: 'configSchema' | 'inputsSchema' | null;
+  source: 'configSchema' | null;
 }
 
 const TOOL_SCHEMA_KEY = 'tool-schema';

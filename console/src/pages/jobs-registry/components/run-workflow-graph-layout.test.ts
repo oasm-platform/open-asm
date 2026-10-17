@@ -263,3 +263,28 @@ describe('buildWorkflowGraphLayout', () => {
     expect(waves).toBe(0);
   });
 });
+
+describe('step category', () => {
+  const twoNmapSteps = [
+    step('ports', { name: 'Ports', run: 'nmap', category: 'ports_scanner' }),
+    step('vulns', {
+      name: 'Vulns',
+      run: 'nmap',
+      category: 'vulnerabilities',
+      needs: ['ports'],
+    }),
+  ];
+
+  it('carries each step category on its node so one tool twice stays distinguishable', () => {
+    const { nodes } = buildWorkflowGraphLayout(twoNmapSteps);
+
+    expect(nodes.map((node) => node.data.category)).toEqual([
+      'ports_scanner',
+      'vulnerabilities',
+    ]);
+  });
+
+  it('spells the category out for assistive technology', () => {
+    expect(describeStep(twoNmapSteps[1])).toContain('nmap (Vulnerabilities)');
+  });
+});

@@ -3,6 +3,7 @@ import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import {
   BullMQName,
   Severity,
+  ToolCategory,
   VulnerabilityAnalyzeStatus,
 } from '@/common/enums/enum';
 import { getManyResponse } from '@/utils/getManyResponse';
@@ -89,6 +90,7 @@ export class VulnerabilitiesService {
       workspaceId,
       config: job?.config,
       configProfileId: job?.configProfileId,
+      category: job?.category as ToolCategory | undefined,
     });
     return { message: `Scanning target ${targetId}...` };
   }

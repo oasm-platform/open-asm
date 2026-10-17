@@ -3,6 +3,8 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Tool } from '../tools/entities/tools.entity';
+import { resolveToolCategory } from '../tools/tool-categories';
+import type { ToolCategorySpec } from '../tools/tool-categories';
 import {
   resolveToolTargetTypes,
   triggerTargetType,
@@ -48,7 +50,7 @@ export class WorkflowsService {
     const workflow = new Workflow();
     workflow.name = name;
     workflow.content = this.normalizeContent(content);
-    await this.assertToolsCanRunOnTriggers(workflow.content);
+    await this.assertStepsCanRun(workflow.content);
     workflow.filePath =
       filePath || `${name.toLowerCase().replace(/\s+/g, '-')}.yaml`;
     workflow.createdBy = { id: createdBy.id } as User;
@@ -101,7 +103,7 @@ export class WorkflowsService {
     if (updateData.name) workflow.name = updateData.name;
     if (updateData.content) {
       workflow.content = this.normalizeContent(updateData.content);
-      await this.assertToolsCanRunOnTriggers(workflow.content);
+      await this.assertStepsCanRun(workflow.content);
     }
     if (updateData.filePath) workflow.filePath = updateData.filePath;
 
@@ -135,21 +137,20 @@ export class WorkflowsService {
   }
 
   /**
-   * Rejects a workflow in which a job's tool can scan NONE of the target types
-   * its triggers fire for (e.g. `subfinder` — domains only — in a workflow
-   * that only triggers on `ip.create`): that job could never produce work.
+   * Rejects a workflow in which a job names a category its tool does not
+   * declare, or in which a job's category can scan NONE of the target types its
+   * triggers fire for (e.g. `subfinder` — domains only — in a workflow that only
+   * triggers on `ip.create`): that job could never produce work.
    *
    * Partial overlap is allowed on purpose. A workflow triggered by both
    * `domain.create` and `ip.create` may still use `subfinder`; at run time
    * the job simply finds no eligible asset for an IP target and is skipped.
-   * Workflows without target triggers (schedules, asset groups) are not
-   * checked here — the same run-time filter covers them.
+   * Workflows without target triggers (schedules, asset groups) only get the
+   * category check — the same run-time filter covers their target types.
    *
-   * @throws BadRequestException naming every offending tool.
+   * @throws BadRequestException naming every offending job.
    */
-  private async assertToolsCanRunOnTriggers(
-    content: WorkflowContent,
-  ): Promise<void> {
+  private async assertStepsCanRun(content: WorkflowContent): Promise<void> {
     const triggerTypes = [
       ...new Set(
         (content.on?.target ?? [])
@@ -157,13 +158,11 @@ export class WorkflowsService {
           .filter((type) => type !== undefined),
       ),
     ];
-    if (triggerTypes.length === 0) return;
 
+    const jobs = jobEntries(content.jobs);
     const runs = [
       ...new Set(
-        jobEntries(content.jobs)
-          .map(([, job]) => job.run)
-          .filter((run): run is string => !!run),
+        jobs.map(([, job]) => job.run).filter((run): run is string => !!run),
       ),
     ];
     if (runs.length === 0) return;
@@ -171,15 +170,25 @@ export class WorkflowsService {
     // Unknown tools are not this check's concern: the run reports them.
     const tools = await this.toolRepository.find({
       where: { name: In(runs) },
-      select: { name: true, targetTypes: true },
+      select: { name: true, categories: true },
     });
+    const toolByName = new Map(tools.map((tool) => [tool.name, tool]));
 
-    const errors = tools.flatMap((tool) => {
-      const supported = resolveToolTargetTypes(tool);
-      return triggerTypes.some((type) => supported.includes(type))
+    const errors = jobs.flatMap(([, job]) => {
+      const tool = job.run ? toolByName.get(job.run) : undefined;
+      if (!tool) return [];
+      let spec: ToolCategorySpec;
+      try {
+        spec = resolveToolCategory(tool, job.category);
+      } catch (error) {
+        return [(error as Error).message];
+      }
+      const supported = resolveToolTargetTypes(spec);
+      return triggerTypes.length === 0 ||
+        triggerTypes.some((type) => supported.includes(type))
         ? []
         : [
-            `"${tool.name}" can only scan ${supported.join(', ')} targets but this workflow triggers on ${triggerTypes.join(', ')}`,
+            `"${tool.name}" (${spec.name}) can only scan ${supported.join(', ')} targets but this workflow triggers on ${triggerTypes.join(', ')}`,
           ];
     });
     if (errors.length > 0) {
