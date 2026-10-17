@@ -585,7 +585,8 @@ export function useAgentChat({
     id: conversationId || 'agent-new-chat',
     // Reconnect to an in-progress run on mount (reload, or returning to the
     // chat) and stream the rest, instead of polling the database for it.
-    resume: true,
+    // A chat just started here has no run to resume yet.
+    resume: !isNewConversation,
     experimental_throttle: 50,
     onError: (error) => {
       // Ignore errors from user-initiated stops — not a real error

@@ -18,6 +18,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  NotFoundException,
   Param,
   Patch,
   Post,
@@ -711,8 +712,16 @@ export class AgentsController {
     @UserId() userId: string,
     @Res() res: Response,
   ): Promise<void> {
-    // Ownership check (throws NotFound if the conversation is not the user's)
-    await this.agentsService.getConversation(id, workspaceId, userId);
+    // Ownership check. A chat started on the client has no row until its first
+    // message is saved, so a missing conversation has nothing to resume: 204,
+    // not 404, which the client would report as a stream error.
+    try {
+      await this.agentsService.getConversation(id, workspaceId, userId);
+    } catch (error) {
+      if (!(error instanceof NotFoundException)) throw error;
+      res.status(HttpStatus.NO_CONTENT).end();
+      return;
+    }
 
     const stream = await this.agentsStreamBuffer.createResumeStream(id, () =>
       this.agentsCompletionsService.isRunActive(id),

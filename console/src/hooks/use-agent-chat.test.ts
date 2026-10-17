@@ -14,13 +14,17 @@ const mocks = vi.hoisted(() => ({
   regenerate: vi.fn(),
   refetch: vi.fn(),
   chatMessages: [] as UIMessage[],
+  resume: undefined as boolean | undefined,
+  locationState: null as unknown,
 }));
 
 vi.mock('@ai-sdk/react', () => ({
   useChat: (options: {
     onData: (data: { type: string; data: unknown }) => void;
     onError: (error: Error) => void;
+    resume?: boolean;
   }) => {
+    mocks.resume = options.resume;
     mocks.onData = options.onData;
     mocks.onError = options.onError;
     return {
@@ -43,7 +47,10 @@ vi.mock('ai', async (importOriginal) => {
 });
 
 vi.mock('@tanstack/react-router', () => ({
-  useLocation: () => ({ state: null, pathname: '/aistudio/conversations/c1' }),
+  useLocation: () => ({
+    state: mocks.locationState,
+    pathname: '/aistudio/conversations/c1',
+  }),
   useNavigate: () => vi.fn(),
 }));
 
@@ -457,5 +464,28 @@ describe('seedFromSaved', () => {
   it('keeps a trailing user message even mid-stream', () => {
     const saved = [msg('a1', 'assistant'), msg('u2', 'user')];
     expect(seedFromSaved(saved, pages('streaming'))).toBe(saved);
+  });
+});
+
+describe('useAgentChat stream resume', () => {
+  beforeEach(() => {
+    mocks.orvalClient.mockReset();
+    mocks.orvalClient.mockResolvedValue({ id: 'c1' });
+  });
+
+  afterEach(() => {
+    mocks.locationState = null;
+  });
+
+  it('resumes the run of an existing conversation on mount', () => {
+    renderHook(() => useAgentChat({ conversationId: 'c1' }));
+    expect(mocks.resume).toBe(true);
+  });
+
+  it('does not resume a chat just started from the landing page', () => {
+    // It has no row on the server yet, so a resume request would 404.
+    mocks.locationState = { pendingMessage: 'scan example.com' };
+    renderHook(() => useAgentChat({ conversationId: 'c1' }));
+    expect(mocks.resume).toBe(false);
   });
 });
