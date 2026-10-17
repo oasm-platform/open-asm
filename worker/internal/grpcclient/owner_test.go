@@ -19,7 +19,6 @@ func TestOwnerIDFromTokenFile(t *testing.T) {
 		t.Fatalf("seed token file: %v", err)
 	}
 	t.Setenv("WORKER_TOKEN_FILE", path)
-	t.Setenv("WORKER_SIGNATURE", "")
 
 	srv := newTestServer(t)
 
@@ -38,50 +37,15 @@ func TestOwnerIDFromTokenFile(t *testing.T) {
 	}
 }
 
-// WORKER_SIGNATURE takes precedence over the token: operators pin identity
-// with a signature even when the join token rotates.
-func TestOwnerIDPrefersSignatureOverToken(t *testing.T) {
-	t.Setenv("WORKER_SIGNATURE", "sig-1")
-
-	dirA, dirB := t.TempDir(), t.TempDir()
-	pathA := filepath.Join(dirA, ".worker-token")
-	pathB := filepath.Join(dirB, ".worker-token")
-	if err := os.WriteFile(pathA, []byte("tok-A\n"), 0o600); err != nil {
-		t.Fatalf("seed token A: %v", err)
-	}
-	if err := os.WriteFile(pathB, []byte("tok-B\n"), 0o600); err != nil {
-		t.Fatalf("seed token B: %v", err)
-	}
-
-	t.Setenv("WORKER_TOKEN_FILE", pathA)
-	srvA := newTestServer(t)
-
-	t.Setenv("WORKER_TOKEN_FILE", pathB)
-	srvB := newTestServer(t)
-
-	if srvA.client.OwnerID() != srvB.client.OwnerID() {
-		t.Fatalf("same signature must yield same OwnerID regardless of token: %q vs %q",
-			srvA.client.OwnerID(), srvB.client.OwnerID())
-	}
-
-	t.Setenv("WORKER_SIGNATURE", "sig-2")
-	t.Setenv("WORKER_TOKEN_FILE", pathA)
-	srvC := newTestServer(t)
-	if srvC.client.OwnerID() == srvA.client.OwnerID() {
-		t.Fatal("different signatures must yield different OwnerIDs")
-	}
-}
-
-// First-ever run: no signature, no token file → empty OwnerID. Callers must
+// First-ever run: no token file → empty OwnerID. Callers must
 // then fall back to the safe reconcile tier (stopped containers only).
 func TestOwnerIDEmptyWithoutIdentity(t *testing.T) {
 	t.Setenv("WORKER_TOKEN_FILE", filepath.Join(t.TempDir(), "missing-token"))
-	t.Setenv("WORKER_SIGNATURE", "")
 
 	srv := newTestServer(t)
 
 	if got := srv.client.OwnerID(); got != "" {
-		t.Fatalf("OwnerID() = %q, want empty when neither signature nor token exists", got)
+		t.Fatalf("OwnerID() = %q, want empty when no token exists", got)
 	}
 }
 
@@ -89,7 +53,6 @@ func TestOwnerIDEmptyWithoutIdentity(t *testing.T) {
 // client resuming the persisted token) must derive the identical OwnerID —
 // that is what lets the next boot's reconcile recognize its own orphans.
 func TestOwnerIDRefreshedAfterJoin(t *testing.T) {
-	t.Setenv("WORKER_SIGNATURE", "")
 	tokenPath := filepath.Join(t.TempDir(), ".worker-token")
 	t.Setenv("WORKER_TOKEN_FILE", tokenPath)
 

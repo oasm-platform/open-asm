@@ -109,6 +109,46 @@ describe('EventsService', () => {
     ]);
   });
 
+  it('forwards joinKeyId from metadata, and nothing else of it', async () => {
+    redis.xread.mockResolvedValueOnce([
+      entry('e1', 'worker.joined', {
+        workspaceId: 'ws-1',
+        resourceType: 'worker',
+        resourceId: 'w-1',
+        metadata: { joinKeyId: 'jk-1', other: 'hidden' },
+      }),
+      entry('e2', 'worker.joined', {
+        workspaceId: 'ws-1',
+        resourceId: 'w-2',
+        metadata: { joinKeyId: 42 },
+      }),
+    ]);
+
+    const received: MessageEvent[] = [];
+    const subscription = service
+      .stream('ws-1', 'user-1')
+      .subscribe((event) => received.push(event));
+    await flush();
+    subscription.unsubscribe();
+
+    expect(received.map((event) => event.data)).toEqual([
+      {
+        id: 'e1',
+        type: 'worker.joined',
+        time: '2026-10-17T00:00:00.000Z',
+        resourceType: 'worker',
+        resourceId: 'w-1',
+        joinKeyId: 'jk-1',
+      },
+      {
+        id: 'e2',
+        type: 'worker.joined',
+        time: '2026-10-17T00:00:00.000Z',
+        resourceId: 'w-2',
+      },
+    ]);
+  });
+
   it('keeps reading when the first xlast fails', async () => {
     jest.useFakeTimers({ doNotFake: ['setImmediate'] });
     redis.xlast

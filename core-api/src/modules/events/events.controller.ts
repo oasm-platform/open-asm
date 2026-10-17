@@ -36,7 +36,8 @@ export class EventsController {
       'Server-Sent Events stream of the current user\'s notification pushes ' +
       'plus, when the X-Workspace-Id header is sent, the allowlisted events ' +
       'of that workspace. Each message is a JSON ClientEvent ' +
-      '`{ id, type, time, resourceType, resourceId }`; a `ping` event is ' +
+      '`{ id, type, time, resourceType, resourceId, joinKeyId? }` ' +
+      '(`joinKeyId` only on `worker.joined` from a one-time join key); a `ping` event is ' +
       'sent periodically as a heartbeat.',
     request: { getWorkspaceId: true },
   })

@@ -2051,10 +2051,20 @@ export type WorkerMetadataDto = {
 
 export type WorkerJoinDto = {
   apiKey: string;
-  signature?: string;
   token?: string;
   ipAddress?: string;
   metadata?: WorkerMetadataDto;
+};
+
+export type WorkerJoinKeyResponseDto = {
+  /** Public id of the join key. `worker.joined` live events carry it as `joinKeyId`. */
+  id: string;
+  /** One-time API key a worker joins with */
+  apiKey: string;
+  /** When the key expires (ISO 8601) */
+  expiresAt: string;
+  /** Seconds until the key expires, counted from this response. Prefer it over expiresAt to avoid client clock skew. */
+  expiresInSeconds: number;
 };
 
 export type WorkerListItemDto = {
@@ -23802,6 +23812,267 @@ export const useWorkersControllerJoin = <TError = unknown, TContext = unknown>(
 };
 
 /**
+ * Issues a one-time API key a worker joins this workspace with. It expires after a few minutes and is consumed by the first successful join; the `worker.joined` live event carries its id as `joinKeyId`.
+ * @summary Create a worker join key
+ */
+export const workersControllerCreateJoinKey = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<WorkerJoinKeyResponseDto>(
+    { url: `/api/workers/join-keys`, method: 'POST', signal },
+    options,
+  );
+};
+
+export const getWorkersControllerCreateJoinKeyMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workersControllerCreateJoinKey>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workersControllerCreateJoinKey>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ['workersControllerCreateJoinKey'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workersControllerCreateJoinKey>>,
+    void
+  > = () => {
+    return workersControllerCreateJoinKey(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkersControllerCreateJoinKeyMutationResult = NonNullable<
+  Awaited<ReturnType<typeof workersControllerCreateJoinKey>>
+>;
+
+export type WorkersControllerCreateJoinKeyMutationError = unknown;
+
+/**
+ * @summary Create a worker join key
+ */
+export const useWorkersControllerCreateJoinKey = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workersControllerCreateJoinKey>>,
+      TError,
+      void,
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workersControllerCreateJoinKey>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(
+    getWorkersControllerCreateJoinKeyMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Deletes the join key `id` and issues a new one. An already expired or used key is simply replaced.
+ * @summary Rotate a worker join key
+ */
+export const workersControllerRotateJoinKey = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<WorkerJoinKeyResponseDto>(
+    { url: `/api/workers/join-keys/${id}/rotate`, method: 'POST', signal },
+    options,
+  );
+};
+
+export const getWorkersControllerRotateJoinKeyMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workersControllerRotateJoinKey>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workersControllerRotateJoinKey>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['workersControllerRotateJoinKey'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workersControllerRotateJoinKey>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return workersControllerRotateJoinKey(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkersControllerRotateJoinKeyMutationResult = NonNullable<
+  Awaited<ReturnType<typeof workersControllerRotateJoinKey>>
+>;
+
+export type WorkersControllerRotateJoinKeyMutationError = unknown;
+
+/**
+ * @summary Rotate a worker join key
+ */
+export const useWorkersControllerRotateJoinKey = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workersControllerRotateJoinKey>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workersControllerRotateJoinKey>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getWorkersControllerRotateJoinKeyMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Deletes the join key `id` before it expires, e.g. when the connect dialog closes.
+ * @summary Revoke a worker join key
+ */
+export const workersControllerRevokeJoinKey = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/workers/join-keys/${id}`, method: 'DELETE', signal },
+    options,
+  );
+};
+
+export const getWorkersControllerRevokeJoinKeyMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workersControllerRevokeJoinKey>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workersControllerRevokeJoinKey>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['workersControllerRevokeJoinKey'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workersControllerRevokeJoinKey>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return workersControllerRevokeJoinKey(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkersControllerRevokeJoinKeyMutationResult = NonNullable<
+  Awaited<ReturnType<typeof workersControllerRevokeJoinKey>>
+>;
+
+export type WorkersControllerRevokeJoinKeyMutationError = unknown;
+
+/**
+ * @summary Revoke a worker join key
+ */
+export const useWorkersControllerRevokeJoinKey = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workersControllerRevokeJoinKey>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workersControllerRevokeJoinKey>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getWorkersControllerRevokeJoinKeyMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
  * Fetches a paginated list of all active security assessment workers in the cluster. Each row carries only list fields; use GET /workers/:id for tools and details.
  * @summary Get all workers with pagination and sorting.
  */
@@ -43798,7 +44069,7 @@ export const useReportsControllerDeleteReport = <
 };
 
 /**
- * Server-Sent Events stream of the current user's notification pushes plus, when the X-Workspace-Id header is sent, the allowlisted events of that workspace. Each message is a JSON ClientEvent `{ id, type, time, resourceType, resourceId }`; a `ping` event is sent periodically as a heartbeat.
+ * Server-Sent Events stream of the current user's notification pushes plus, when the X-Workspace-Id header is sent, the allowlisted events of that workspace. Each message is a JSON ClientEvent `{ id, type, time, resourceType, resourceId, joinKeyId? }` (`joinKeyId` only on `worker.joined` from a one-time join key); a `ping` event is sent periodically as a heartbeat.
  * @summary Subscribe to live events
  */
 export const eventsControllerStream = (

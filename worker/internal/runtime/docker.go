@@ -1051,7 +1051,7 @@ type ReconcileReport struct {
 //	        docker.sock this may be a sibling worker's live container (a
 //	        core-side owner referee lands separately).
 //
-// ownerID empty (first-ever run: no signature, no token) degrades to tier 1
+// ownerID empty (first-ever run: no token) degrades to tier 1
 // only — the fail-safe direction. Called once per boot from
 // reconcileStartupOrphans, before grpcClient.Connect: the fresh process owns
 // no containers yet, so tier-2 matches can only be dead predecessors'.

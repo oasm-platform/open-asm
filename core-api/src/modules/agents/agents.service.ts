@@ -10,6 +10,7 @@ import {
   encryptWithDEK,
 } from '@/common/utils/workspace-encryption.util';
 import { WorkerInstance } from '@/modules/workers/entities/worker.entity';
+import { RemoteExecuteSubscribeService } from '@/modules/workers/remote-execute-subscribe.service';
 import { WorkersService } from '@/modules/workers/workers.service';
 import { RedisService } from '@/services/redis/redis.service';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
@@ -92,6 +93,7 @@ export class AgentsService {
     private readonly agentsMemories: AgentsMemoriesService,
     private readonly httpService: HttpService,
     private readonly workersService: WorkersService,
+    private readonly remoteExecuteSubscribe: RemoteExecuteSubscribeService,
     private readonly approvals: AgentsApprovalsService,
     private readonly agentsConfig: AgentsConfigService,
     private readonly modelsCatalog: AgentsModelsCatalogService,
@@ -140,8 +142,11 @@ export class AgentsService {
       },
       { agentWorkspaceId: workspaceId },
     );
-    // The workspace's own workers first, as the auto pick prefers them
-    const workers = [...workersResponse.data].sort(
+    // Only workers that can run a command right now; the workspace's own
+    // first, as the auto pick prefers them
+    const workers = workersResponse.data
+      .filter((w) => this.remoteExecuteSubscribe.isAgentReady(w.id, workspaceId))
+      .sort(
       (a, b) =>
         Number(a.scope === WorkerScope.CLOUD) -
         Number(b.scope === WorkerScope.CLOUD),

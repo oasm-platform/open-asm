@@ -145,7 +145,6 @@ export enum JobPriority {
  * Enum representing API key types
  */
 export enum ApiKeyType {
-  TOOL = 'tool',
   WORKSPACE = 'workspace',
   MCP = 'mcp',
 }

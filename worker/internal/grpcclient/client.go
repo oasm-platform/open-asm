@@ -33,9 +33,7 @@ type Client struct {
 
 	// tokenFile is where the worker token is persisted across restarts so a
 	// rejoin can recover the same worker identity (core matches on the token).
-	// signature is sent with Join when WORKER_SIGNATURE is configured.
 	tokenFile string
-	signature string
 
 	workers workerPb.WorkersServiceClient
 	jobs    jobRegistryPb.JobsRegistryServiceClient
@@ -110,7 +108,6 @@ func NewClient(apiKey, grpcHost, toolPath string, logger Logger, dialOpts ...grp
 	}
 
 	c.tokenFile = resolveTokenFilePath()
-	c.signature = os.Getenv("WORKER_SIGNATURE")
 	if tok := readTokenFile(c.tokenFile); tok != "" {
 		auth.setToken(tok)
 		logger.Verbose("resumed worker token from %s", c.tokenFile)

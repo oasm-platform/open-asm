@@ -170,7 +170,7 @@ func TestReconcileKeepsForeignRunning(t *testing.T) {
 	}
 }
 
-// Empty owner (first-ever boot: no signature, no token) degrades to tier 1
+// Empty owner (first-ever boot: no token) degrades to tier 1
 // only — without ownership proof, nothing running may be deleted.
 func TestReconcileEmptyOwnerOnlyRemovesStopped(t *testing.T) {
 	engine := newFakeDockerEngine()

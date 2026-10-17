@@ -188,12 +188,14 @@ export class EventsService implements OnModuleDestroy {
     const data = parseData(entry.fields.data);
     if (!data) return;
 
+    const joinKeyId = data.metadata?.joinKeyId;
     this.emit(this.workspaces.get(data.workspaceId), {
       id,
       type,
       time,
       resourceType: data.resourceType,
       resourceId: data.resourceId,
+      ...(typeof joinKeyId === 'string' && { joinKeyId }),
     });
   }
 
