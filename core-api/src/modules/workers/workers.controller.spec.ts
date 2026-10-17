@@ -1,7 +1,12 @@
-import { WORKER_TOKEN_HEADER } from '@/common/constants/app.constants';
+import {
+  AGENT_SANDBOX_HEADER,
+  WORKER_TOKEN_HEADER,
+} from '@/common/constants/app.constants';
 import { WorkspacePermissions } from '@/common/decorators/workspace-permissions.decorator';
+import { WorkerScope, WorkerType } from '@/common/enums/enum';
 import { Metadata } from '@grpc/grpc-js';
 import { Reflector } from '@nestjs/core';
+import { RemoteExecuteSubscribeService } from './remote-execute-subscribe.service';
 import { WorkersController } from './workers.controller';
 
 describe('WorkersController workspace permission guards', () => {
@@ -77,5 +82,121 @@ describe('WorkersController.grpcWorkerTelemetry', () => {
     });
     expect(workerContext.getWorker).toHaveBeenCalledWith(worker.token);
     expect(telemetryService.record).toHaveBeenCalledWith(worker, request);
+  });
+});
+
+describe('WorkersController remote execute', () => {
+  const ownWorker = {
+    id: 'w-own',
+    token: 'token-own',
+    workspaceId: 'ws-1',
+    scope: WorkerScope.WORKSPACE,
+    type: WorkerType.BUILT_IN,
+  };
+  const otherWorker = {
+    id: 'w-other',
+    token: 'token-other',
+    workspaceId: 'ws-2',
+    scope: WorkerScope.WORKSPACE,
+    type: WorkerType.BUILT_IN,
+  };
+  const workers: Record<string, unknown> = {
+    [ownWorker.token]: ownWorker,
+    [otherWorker.token]: otherWorker,
+  };
+
+  const metadataFor = (token: string, extra: Record<string, string> = {}) => {
+    const metadata = new Metadata();
+    metadata.set(WORKER_TOKEN_HEADER, token);
+    for (const [key, value] of Object.entries(extra)) metadata.set(key, value);
+    return metadata;
+  };
+
+  const build = () => {
+    const workersService = {
+      enableAgentMode: jest.fn().mockResolvedValue(undefined),
+      setAgentMode: jest.fn().mockResolvedValue(undefined),
+      handleRemoteExecuteResult: jest.fn().mockResolvedValue(undefined),
+    };
+    const subscribeService = new RemoteExecuteSubscribeService(
+      workersService as never,
+      {} as never,
+      { publish: jest.fn().mockResolvedValue(1) } as never,
+    );
+    const workerContext = {
+      getWorker: jest.fn((token: string) => workers[token]),
+    };
+    const controller = new WorkersController(
+      workersService as never,
+      subscribeService,
+      workerContext as never,
+      {} as never,
+      {} as never,
+    );
+    return { controller, subscribeService, workersService };
+  };
+
+  const result = (sessionId: string) => ({
+    id: 'r1',
+    sessionId,
+    type: 1,
+    data: Buffer.from('out'),
+    exitCode: 0,
+  });
+
+  it('registers the subscribing worker with its agent sandbox header', () => {
+    const { controller, subscribeService } = build();
+    const register = jest.spyOn(subscribeService, 'registerWorker');
+
+    controller
+      .grpcRemoteExecuteSubscribe(
+        {},
+        metadataFor(ownWorker.token, { [AGENT_SANDBOX_HEADER]: '1' }),
+      )
+      .subscribe();
+    controller
+      .grpcRemoteExecuteSubscribe({}, metadataFor(otherWorker.token))
+      .subscribe();
+
+    expect(register).toHaveBeenNthCalledWith(1, ownWorker, { sandboxed: true });
+    expect(register).toHaveBeenNthCalledWith(2, otherWorker, {
+      sandboxed: false,
+    });
+  });
+
+  it('drops a result from a worker the session was not assigned to', async () => {
+    const { controller, subscribeService, workersService } = build();
+    controller
+      .grpcRemoteExecuteSubscribe({}, metadataFor(ownWorker.token))
+      .subscribe();
+    subscribeService.pushCommand(ownWorker.id, 's1', 'id');
+
+    await expect(
+      controller.grpcRemoteExecuteResult(
+        result('s1'),
+        metadataFor(otherWorker.token),
+      ),
+    ).resolves.toMatchObject({ success: false });
+    expect(workersService.handleRemoteExecuteResult).not.toHaveBeenCalled();
+
+    await expect(
+      controller.grpcRemoteExecuteResult(
+        result('s1'),
+        metadataFor(ownWorker.token),
+      ),
+    ).resolves.toMatchObject({ success: true });
+    expect(workersService.handleRemoteExecuteResult).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts a result for a session with no recorded push', async () => {
+    const { controller, workersService } = build();
+
+    await expect(
+      controller.grpcRemoteExecuteResult(
+        result('s-unknown'),
+        metadataFor(otherWorker.token),
+      ),
+    ).resolves.toMatchObject({ success: true });
+    expect(workersService.handleRemoteExecuteResult).toHaveBeenCalledTimes(1);
   });
 });

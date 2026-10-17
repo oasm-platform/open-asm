@@ -1008,7 +1008,7 @@ describe('WorkersService', () => {
   });
 
   describe('isAgentWorkerForWorkspace', () => {
-    it('accepts only a workspace-scoped worker of the same workspace', async () => {
+    it('accepts a worker of the same workspace or a global agent worker', async () => {
       (mockWorkerInstanceRepository.exists as jest.Mock).mockResolvedValue(
         true,
       );
@@ -1017,7 +1017,71 @@ describe('WorkersService', () => {
         service.isAgentWorkerForWorkspace('w1', 'ws-1'),
       ).resolves.toBe(true);
       expect(mockWorkerInstanceRepository.exists).toHaveBeenCalledWith({
-        where: { id: 'w1', workspaceId: 'ws-1', scope: WorkerScope.WORKSPACE },
+        where: [
+          { id: 'w1', workspaceId: 'ws-1', scope: WorkerScope.WORKSPACE },
+          {
+            id: 'w1',
+            scope: WorkerScope.CLOUD,
+            type: WorkerType.BUILT_IN,
+            enabledAgentMode: true,
+          },
+        ],
+      });
+    });
+  });
+
+  describe('setAgentMode', () => {
+    it('writes the agent mode flag of the worker', async () => {
+      await service.setAgentMode('w1', false);
+      expect(mockWorkerInstanceRepository.update).toHaveBeenCalledWith('w1', {
+        enabledAgentMode: false,
+      });
+
+      await service.enableAgentMode('w2');
+      expect(mockWorkerInstanceRepository.update).toHaveBeenCalledWith('w2', {
+        enabledAgentMode: true,
+      });
+    });
+  });
+
+  describe('getWorkers - agentWorkspaceId filter', () => {
+    it("limits to the workspace's own workers and global (cloud + built-in) ones", async () => {
+      const qb = {
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      (
+        mockWorkerInstanceRepository.createQueryBuilder as jest.Mock
+      ).mockReturnValue(qb);
+      (mockToolsService.getBuiltInTools as jest.Mock).mockResolvedValue({
+        data: [],
+      });
+
+      await service.getWorkers(
+        { page: 1, limit: 10, enabledAgentMode: true } as any,
+        { agentWorkspaceId: 'ws-1' },
+      );
+
+      const call = (qb.andWhere.mock.calls as [string, unknown][]).find(
+        ([sql]) => sql.includes(':agentWorkspaceId'),
+      );
+      expect(call).toBeDefined();
+      const [sql, params] = call!;
+      expect(sql).toContain(
+        '(w."scope" = :agentCloudScope AND w."type" = :agentGlobalType)',
+      );
+      expect(params).toEqual({
+        agentWorkspaceScope: WorkerScope.WORKSPACE,
+        agentWorkspaceId: 'ws-1',
+        agentCloudScope: WorkerScope.CLOUD,
+        agentGlobalType: WorkerType.BUILT_IN,
       });
     });
   });

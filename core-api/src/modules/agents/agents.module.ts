@@ -17,6 +17,7 @@ import { AgentConfig } from './entities/agent-config.entity';
 import { AgentCommandApproval } from './entities/agent-command-approval.entity';
 import { AgentsMemoriesService } from './agents.memories';
 import { AgentsModelsCatalogService } from './agents.models-catalog';
+import { AgentsStreamBufferService } from './agents.stream-buffer';
 import { AgentsSubagentsService } from './agents.subagents';
 import { AgentsService } from './agents.service';
 import { AgentTool } from './agents.tools';
@@ -72,6 +73,7 @@ import { HttpModule } from '@nestjs/axios';
     AgentsModelsCatalogService,
     AgentsSubagentsService,
     AgentsDefinitionsService,
+    AgentsStreamBufferService,
   ],
   exports: [
     AgentsService,

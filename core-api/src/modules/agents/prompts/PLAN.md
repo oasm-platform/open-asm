@@ -6,6 +6,8 @@ Plans exist only because the user turned on plan mode. The user reviews every ne
 
 If the request is genuinely ambiguous (no target, unclear scope), ask ONE short clarifying question first. Otherwise do not ask for confirmation in chat — go straight to `formulate_plan`; the system shows the plan to the user for approval.
 
+For security testing, no tool runs before the plan is approved, so make the first step "Check scope and list the available tools" and name, in the later steps, the tool you expect to use (the connector catalog is in the `run_tool_connector` description). If a later step needs a tool that turns out not to be installed or ready, mark it failed with the reason instead of improvising another way to run it.
+
 Call `formulate_plan` with sequential, actionable steps, passed as an ARRAY of strings — each step a SEPARATE string:
 
 ```
@@ -24,7 +26,7 @@ An approved plan is the last plan of the run: after it, `formulate_plan` and `ap
 Work through each step in order:
 
 1. Call `transition_step(id, "in_progress")` BEFORE starting a step
-2. Execute it — load the `command-execution` skill for CLI tools via `load_skill`
+2. Execute it — by the tool's `type` from `display_available_tools`: `built_in` through `execute_remote_command`, `connector` through `run_tool_connector`
 3. Call `transition_step(id, "completed")` IMMEDIATELY when done, or `failed` after 2 alternative approaches failed, then continue with the next step
 4. NEVER leave a step "in_progress" when you're done with it
 

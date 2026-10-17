@@ -4,10 +4,11 @@ import {
   AgentApprovalMode,
   AgentMode,
   WorkerScope,
+  WorkerType,
 } from '@/common/enums/enum';
 import { AgentsCompletionsService } from './agents.completions';
 import { AgentsService } from './agents.service';
-import { AgentTool } from './agents.tools';
+import { listWorkersTool } from './tools/workspace.tools';
 import type { SendMessageDto } from './dto/message.dto';
 
 const dto = {
@@ -84,39 +85,60 @@ describe('worker scope enforcement', () => {
   });
 
   describe('worker listings', () => {
-    it('getAgentModesWithWorkers lists only workspace-scoped workers', async () => {
-      const getWorkers = jest.fn().mockResolvedValue({ data: [] });
+    it('getAgentModesWithWorkers lists the workspace and global agent workers, own first', async () => {
+      const getWorkers = jest.fn().mockResolvedValue({
+        data: [
+          {
+            id: 'g1',
+            name: 'global',
+            scope: WorkerScope.CLOUD,
+            type: WorkerType.BUILT_IN,
+          },
+          { id: 'w1', name: 'own', scope: WorkerScope.WORKSPACE },
+        ],
+      });
       const service = Object.assign(Object.create(AgentsService.prototype), {
         workersService: { getWorkers },
       }) as AgentsService;
 
-      await service.getAgentModesWithWorkers('ws-1');
+      const result = await service.getAgentModesWithWorkers('ws-1');
 
       expect(getWorkers).toHaveBeenCalledWith(
-        expect.objectContaining({
-          scope: WorkerScope.WORKSPACE,
-          workspaceId: 'ws-1',
-        }),
+        expect.objectContaining({ enabledAgentMode: true }),
+        { agentWorkspaceId: 'ws-1' },
       );
+      expect(getWorkers.mock.calls[0][0]).not.toHaveProperty('scope');
+      expect(result.workers.map((w) => w.id)).toEqual(['w1', 'g1']);
     });
 
-    it('list_workers tool lists only workspace-scoped workers', async () => {
-      const getWorkers = jest.fn().mockResolvedValue({ data: [] });
-      const agentTool = Object.assign(Object.create(AgentTool.prototype), {
-        workersService: { getWorkers },
-      }) as AgentTool;
-
-      const tool = agentTool.listWorkersTool('ws-1') as unknown as {
+    it('list_workers tool lists the workspace and global agent workers', async () => {
+      const getWorkers = jest.fn().mockResolvedValue({
+        data: [
+          {
+            id: 'g1',
+            name: 'global',
+            scope: WorkerScope.CLOUD,
+            type: WorkerType.BUILT_IN,
+          },
+        ],
+      });
+      const tool = listWorkersTool(
+        { workersService: { getWorkers } } as never,
+        'ws-1',
+      ) as unknown as {
         execute: (params: unknown, options: unknown) => Promise<unknown>;
       };
-      await tool.execute({}, {});
+      const result = (await tool.execute({}, {})) as {
+        data: Array<{ id: string; scope: string }>;
+      };
 
       expect(getWorkers).toHaveBeenCalledWith(
-        expect.objectContaining({
-          scope: WorkerScope.WORKSPACE,
-          workspaceId: 'ws-1',
-        }),
+        expect.objectContaining({ enabledAgentMode: true }),
+        { agentWorkspaceId: 'ws-1' },
       );
+      expect(result.data).toEqual([
+        { id: 'g1', name: 'global', scope: 'global' },
+      ]);
     });
   });
 });

@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { SettingsHeaderActions } from '@/components/settings-header-actions';
 import { Textarea } from '@/components/ui/textarea';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import {
@@ -91,28 +92,31 @@ export function InstructionManager() {
         }
         className="min-h-64 max-h-[60vh] font-mono"
       />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">
-          Added to the agent&apos;s system prompt in every conversation ·{' '}
-          {value.length.toLocaleString()} / {MAX_LENGTH.toLocaleString()}
-        </p>
-        <div className="flex gap-2">
-          {dirty && (
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={upsert.isPending}
-              onClick={() => setDraft(null)}
-            >
-              Discard
-            </Button>
-          )}
-          <Button size="sm" disabled={!dirty || upsert.isPending} onClick={save}>
-            {upsert.isPending && <Loader2 className="animate-spin" />}
-            Save
+      <p className="text-xs text-muted-foreground">
+        Added to the agent&apos;s system prompt in every conversation ·{' '}
+        {value.length.toLocaleString()} / {MAX_LENGTH.toLocaleString()}
+      </p>
+      <SettingsHeaderActions>
+        {dirty && (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={upsert.isPending}
+            onClick={() => setDraft(null)}
+          >
+            Discard
           </Button>
-        </div>
-      </div>
+        )}
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!dirty || upsert.isPending}
+          onClick={save}
+        >
+          {upsert.isPending && <Loader2 className="animate-spin" />}
+          Save
+        </Button>
+      </SettingsHeaderActions>
     </div>
   );
 }

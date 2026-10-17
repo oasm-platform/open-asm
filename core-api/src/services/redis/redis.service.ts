@@ -504,6 +504,66 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Sets a key's time-to-live in seconds (`EXPIRE key seconds`).
+   *
+   * @returns true when the TTL was set, false when the key does not exist.
+   */
+  public async expire(key: string, seconds: number): Promise<boolean> {
+    return (await this.client.expire(key, seconds)) === 1;
+  }
+
+  /**
+   * Reads a range of stream entries, oldest first (`XRANGE key start end`).
+   *
+   * `-`/`+` are the min/max id sentinels, so the default reads the whole
+   * stream. Unlike {@link xreadgroup} this is a plain, non-blocking read with
+   * no consumer-group bookkeeping: it is the replay-from-start a reconnecting
+   * reader needs before it tails live entries.
+   */
+  public async xrange(
+    stream: string,
+    start = '-',
+    end = '+',
+  ): Promise<StreamEntry[]> {
+    const response = (await this.client.xrange(
+      stream,
+      start,
+      end,
+    )) as [string, string[]][];
+
+    return response.map(([entryId, values]) => {
+      const fields: Record<string, string> = {};
+      for (let i = 0; i < values.length; i += 2) {
+        fields[values[i]] = values[i + 1];
+      }
+      return { id: entryId, fields };
+    });
+  }
+
+  /**
+   * The newest entry of a stream (`XREVRANGE key + - COUNT 1`), or null when
+   * the stream is empty or missing.
+   */
+  public async xlast(stream: string): Promise<StreamEntry | null> {
+    const response = (await this.client.xrevrange(
+      stream,
+      '+',
+      '-',
+      'COUNT',
+      1,
+    )) as [string, string[]][];
+    const [entry] = response;
+    if (!entry) return null;
+
+    const [entryId, values] = entry;
+    const fields: Record<string, string> = {};
+    for (let i = 0; i < values.length; i += 2) {
+      fields[values[i]] = values[i + 1];
+    }
+    return { id: entryId, fields };
+  }
+
+  /**
    * Creates a consumer group, ignoring the error when it already exists.
    *
    * BUSYGROUP is the normal path on every boot after the first (the group is

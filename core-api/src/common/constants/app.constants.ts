@@ -17,6 +17,12 @@ export const MCP_API_KEY_HEADER = 'x-oasm-api-key';
 export const MCP_AUTH_PATH = 'mcp';
 export const WORKER_TOKEN_HEADER = 'worker-token';
 /**
+ * gRPC metadata a worker sends on RemoteExecuteSubscribe ("1") when it runs
+ * agent shell commands inside a per-session sandbox container. A global
+ * worker serves agents only with it.
+ */
+export const AGENT_SANDBOX_HEADER = 'x-agent-sandbox';
+/**
  * Controller paths (under API_GLOBAL_PREFIX) that authenticate with
  * MCP_API_KEY_HEADER via McpGuard instead of a browser session.
  *

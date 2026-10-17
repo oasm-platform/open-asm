@@ -1,16 +1,10 @@
 import {
-  Activity,
   Bug,
-  FileCode,
   Gauge,
-  ListChecks,
-  LockKeyhole,
   Network,
   Radar,
-  ScanSearch,
   ShieldAlert,
   Telescope,
-  Terminal,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -83,42 +77,6 @@ export const ASK_PROMPT_GROUPS: PromptGroup[] = [
       'Group vulnerabilities by asset so I can assign owners',
     ],
   },
-  {
-    id: 'certificates',
-    label: 'Certificates',
-    icon: LockKeyhole,
-    prompts: [
-      'Which TLS certificates expire in the next 30 days?',
-      'Are any of my certificates already expired?',
-      "Find self-signed certificates or certificates that don't match their host",
-      'Which certificate authorities issue my certificates?',
-      'Check that my main domains serve valid, trusted certificates',
-    ],
-  },
-  {
-    id: 'remediation',
-    label: 'Remediation',
-    icon: ListChecks,
-    prompts: [
-      'Which security issues are still open?',
-      'Summarize the issues in progress and what is left to do',
-      'Which open issues have been waiting the longest?',
-      'Draft remediation tickets for my open critical issues',
-      'Which resolved issues should be re-tested?',
-    ],
-  },
-  {
-    id: 'scans',
-    label: 'Scans & workers',
-    icon: Activity,
-    prompts: [
-      'Which scan jobs failed recently, and why?',
-      'What scans are running right now?',
-      'Summarize the results of the last completed scans',
-      'Are my workers online and ready to scan?',
-      'Which security tools can you use in this workspace?',
-    ],
-  },
 ];
 
 /**
@@ -163,40 +121,6 @@ export const AGENT_PROMPT_GROUPS: PromptGroup[] = [
       'Check my WordPress sites for known issues',
       'Run a baseline web app scan on my in-scope sites',
       'Scan my web servers for misconfigurations',
-    ],
-  },
-  {
-    id: 'code',
-    label: 'Code & dependencies',
-    icon: FileCode,
-    prompts: [
-      'Scan my connected repositories for leaked secrets',
-      'Check my repositories for vulnerable dependencies',
-      'Find exposed API keys or credentials in my code',
-      'Scan a container image for known CVEs',
-    ],
-  },
-  {
-    id: 'verify',
-    label: 'Verify & triage',
-    icon: ScanSearch,
-    prompts: [
-      'Verify whether my top vulnerability is really exploitable',
-      'Re-scan an asset to confirm a fix worked',
-      'Validate my critical findings and drop the false positives',
-      'Investigate a suspicious host and report what you find',
-    ],
-  },
-  {
-    id: 'operate',
-    label: 'Run & operate',
-    icon: Terminal,
-    prompts: [
-      'Run a full discovery-to-scan pipeline on one of my targets',
-      'Run a specific security tool against one of my assets',
-      'Queue scans for all my high-value targets',
-      'Check which workers are online and ready to run scans',
-      'Show what each connected security tool can do',
     ],
   },
 ];

@@ -157,6 +157,36 @@
   }
 }
 
+/* ── Landing prompt suggestions ────────────────────────────────────────
+ * Fades the suggestion chips in from left to right when the landing page
+ * opens: a soft-edged mask sweeps across them. The mask only lives in the
+ * keyframes (fill-mode backwards), so it is gone once the sweep ends.
+ */
+.prompt-groups-reveal {
+  animation: prompt-groups-reveal 900ms ease-out 200ms backwards;
+}
+
+@keyframes prompt-groups-reveal {
+  from {
+    mask-image: linear-gradient(to right, #000 40%, transparent 60%);
+    mask-size: 250% 100%;
+    mask-repeat: no-repeat;
+    mask-position: 100% 0;
+  }
+  to {
+    mask-image: linear-gradient(to right, #000 40%, transparent 60%);
+    mask-size: 250% 100%;
+    mask-repeat: no-repeat;
+    mask-position: 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prompt-groups-reveal {
+    animation: none;
+  }
+}
+
 /* ── Asset graph animations ─────────────────────────────────────────────
  * `graph-dash` drives the dashed `returns` edges (animated alert links);
  * `graph-glow-pulse` is the critical-service glow. Both are disabled for
@@ -248,4 +278,41 @@
 }
 [data-sidebar='content']:hover::-webkit-scrollbar-thumb {
   background: var(--sidebar-border);
+}
+
+/* ── Tool call shimmer ──────────────────────────────────────────────────
+ * Running tool call name in the chat: a highlight sweeps across the text
+ * left -> right, then back. Static muted text under reduced motion.
+ */
+.tool-call-running {
+  background-image: linear-gradient(
+    90deg,
+    var(--muted-foreground) 0%,
+    var(--muted-foreground) 35%,
+    var(--foreground) 50%,
+    var(--muted-foreground) 65%,
+    var(--muted-foreground) 100%
+  );
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: tool-call-shimmer 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes tool-call-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tool-call-running {
+    animation: none;
+    background-image: none;
+    color: var(--muted-foreground);
+  }
 }

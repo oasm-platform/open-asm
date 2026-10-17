@@ -18,6 +18,7 @@ import {
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { LLMProvider, SearchProvider } from './enums/agent.enums';
 import { getLLMProviderConfig } from './llm-provider-supported';
+import { currentToolName } from './tools/helpers';
 
 export function maskApiKey(apiKey: string): string {
   if (apiKey.length <= 4) return '****';
@@ -49,7 +50,7 @@ export function withoutDisabledTools<T extends Record<string, unknown>>(
   tools: T,
   config: AgentConfig | null,
 ): T {
-  const disabled = new Set(config?.disabledTools ?? []);
+  const disabled = new Set((config?.disabledTools ?? []).map(currentToolName));
   if (disabled.size === 0) return tools;
   return Object.fromEntries(
     Object.entries(tools).filter(([name]) => !disabled.has(name)),
@@ -243,7 +244,9 @@ export class AgentsConfigService {
       config.defaultApprovalMode = dto.defaultApprovalMode;
     }
     if (dto.disabledTools !== undefined) {
-      config.disabledTools = [...new Set(dto.disabledTools)];
+      config.disabledTools = [
+        ...new Set(dto.disabledTools.map(currentToolName)),
+      ];
     }
     if (dto.responseLanguage !== undefined) {
       config.responseLanguage = dto.responseLanguage || null;
@@ -401,7 +404,7 @@ export class AgentsConfigService {
       maxSteps: config?.maxSteps ?? null,
       defaultAgentMode: config?.defaultAgentMode ?? null,
       defaultApprovalMode: config?.defaultApprovalMode ?? null,
-      disabledTools: config?.disabledTools ?? [],
+      disabledTools: (config?.disabledTools ?? []).map(currentToolName),
       responseLanguage: config?.responseLanguage ?? null,
     };
   }

@@ -10,14 +10,13 @@ import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { cn } from '@/lib/utils';
 import { SendMessageDtoAgentMode } from '@/services/apis/gen/queries';
-import { getRouteApi, useNavigate } from '@tanstack/react-router';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Plus, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { v7 as uuidv7 } from 'uuid';
 // import AgentIcon from './components/agent-icon';
 
-import { AgentToolsTray } from './components/agent-tools-tray';
 import {
   AGENT_PROMPT_GROUPS,
   ASK_PROMPT_GROUPS,
@@ -25,19 +24,25 @@ import {
 } from './components/landing-constants';
 import { PromptGroups } from './components/prompt-groups';
 
-const routeApi = getRouteApi('/_authed/aistudio/');
+interface AgentsLandingPageProps {
+  /** Mode the page runs in; each mode has its own route. */
+  initialAgentMode?: string;
+}
 
-export default function AgentsLandingPage() {
+export default function AgentsLandingPage({
+  initialAgentMode = SendMessageDtoAgentMode.ask,
+}: AgentsLandingPageProps) {
   const navigate = useNavigate();
   const { open: openSettings } = useAgentSettingsDialog();
-  const { text: queryText } = routeApi.useSearch();
+  // Shared by the /aistudio and /aistudio/agents routes, which both take ?text=
+  const { text: queryText } = useSearch({ strict: false });
   const [isSending, setIsSending] = useState(false);
   const [selectedModel, setSelectedModel] = useState<{
     provider: string;
     model: string;
     configId: string;
   } | null>(null);
-  const [agentMode, setAgentMode] = useState('ask');
+  const [agentMode, setAgentMode] = useState<string>(initialAgentMode);
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
   // Starter prompt under the pointer, previewed as the input placeholder
   const [previewPrompt, setPreviewPrompt] = useState<string | null>(null);
@@ -120,7 +125,7 @@ export default function AgentsLandingPage() {
         className="w-full md:w-2/3 lg:w-1/2 mx-auto"
         permission="agent.read"
       >
-        <div className="flex h-[calc(100vh-8rem)] flex-col items-center justify-center gap-8">
+        <div className="flex h-full flex-col items-center justify-center gap-8">
           <div className="flex flex-col items-center gap-4 text-center">
             <div className="rounded-full bg-muted p-4 ring-1 ring-border">
               <Sparkles className="h-8 w-8 text-muted-foreground" />
@@ -145,98 +150,94 @@ export default function AgentsLandingPage() {
   }
 
   return (
-    // Full width so the halo can spread across the content area; the column
-    // width lives on the input wrapper instead.
-    <Page className="w-full" permission="agent.read">
-      {/* The prompt input and its tools tray are the only in-flow elements,
-          so they sit at the vertical centre (nudged up by the bottom padding);
-          the hero and the suggestions hang off them without shifting them.
-          `isolate` keeps the halo's -z-10 above the page background. */}
-      <div className="relative isolate flex h-[calc(100vh-8rem)] flex-col items-center justify-center pb-24">
-        {/* Soft blue halo around the input, fading in once the border beam
-            has finished its lap. Fully faded before the edges. */}
-        {haloVisible && (
-          <motion.div
-            aria-hidden="true"
-            data-testid="landing-halo"
-            data-mode={isAgentMode ? 'agent' : 'ask'}
-            initial={reduceMotion ? false : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 1.2, ease: 'easeOut' }}
-            className="pointer-events-none absolute inset-0 -z-10"
-          >
-            {/* Blue in ask mode, light orange in agent mode (it can run
-                commands on workers). Gradients can't transition, so the two
-                layers cross-fade. */}
-            <div
-              className={cn(
-                'absolute inset-0 bg-[radial-gradient(50%_50%_at_50%_45%,rgba(59,130,246,0.14),transparent)] transition-opacity duration-700 dark:bg-[radial-gradient(50%_50%_at_50%_45%,rgba(37,99,235,0.3),transparent)]',
-                isAgentMode && 'opacity-0',
-              )}
-            />
-            <div
-              className={cn(
-                'absolute inset-0 bg-[radial-gradient(50%_50%_at_50%_45%,rgba(251,146,60,0.16),transparent)] transition-opacity duration-700 dark:bg-[radial-gradient(50%_50%_at_50%_45%,rgba(251,146,60,0.22),transparent)]',
-                !isAgentMode && 'opacity-0',
-              )}
-            />
-          </motion.div>
-        )}
-        <div className="relative w-full max-w-2xl md:w-2/3 lg:w-1/2">
-          {/* Hero */}
-          <div className="absolute inset-x-0 bottom-full mb-8 flex flex-col items-center gap-3 text-center">
-            <div className="rounded-full bg-muted p-3 ring-1 ring-border">
-              <Sparkles className="h-6 w-6 text-foreground" />
+    // Fills the layout's main area edge to edge (the negative margins undo its
+    // padding) so the halo spreads across all of it. `isolate` keeps the
+    // halo's -z-10 above the page background.
+    <div className="relative isolate -m-4 md:-m-6 flex min-h-0 flex-1 flex-col">
+      {/* Soft blue halo around the input, fading in once the border beam
+          has finished its lap. Fully faded before the edges. */}
+      {haloVisible && (
+        <motion.div
+          aria-hidden="true"
+          data-testid="landing-halo"
+          data-mode={isAgentMode ? 'agent' : 'ask'}
+          initial={reduceMotion ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 1.2, ease: 'easeOut' }}
+          className="pointer-events-none absolute inset-0 -z-10"
+        >
+          {/* Blue in ask mode, light orange in agent mode (it can run
+              commands on workers). Gradients can't transition, so the two
+              layers cross-fade. */}
+          <div
+            className={cn(
+              'absolute inset-0 bg-[radial-gradient(50%_50%_at_50%_45%,rgba(59,130,246,0.14),transparent)] transition-opacity duration-700 dark:bg-[radial-gradient(50%_50%_at_50%_45%,rgba(37,99,235,0.3),transparent)]',
+              isAgentMode && 'opacity-0',
+            )}
+          />
+          <div
+            className={cn(
+              'absolute inset-0 bg-[radial-gradient(50%_50%_at_50%_45%,rgba(251,146,60,0.16),transparent)] transition-opacity duration-700 dark:bg-[radial-gradient(50%_50%_at_50%_45%,rgba(251,146,60,0.22),transparent)]',
+              !isAgentMode && 'opacity-0',
+            )}
+          />
+        </motion.div>
+      )}
+      {/* Full width so the halo spreads behind it; the column width lives on
+          the input wrapper instead. */}
+      <Page className="w-full min-h-0 flex-1 p-4 md:p-6" permission="agent.read">
+        {/* The prompt input is the only in-flow element, so it sits at the
+            vertical centre (nudged up by the bottom padding); the hero and the
+            suggestions hang off it without shifting it. */}
+        <div className="flex h-full flex-col items-center justify-center pb-24">
+          <div className="relative w-full max-w-2xl md:w-2/3 lg:w-1/2">
+            {/* Hero */}
+            <div className="absolute inset-x-0 bottom-full mb-8 flex flex-col items-center gap-3 text-center">
+              <TypewriterText
+                texts={CONVERSATION_STARTERS}
+                className="hidden sm:inline text-xl font-medium text-foreground max-w-lg"
+              />
             </div>
-            <TypewriterText
-              texts={CONVERSATION_STARTERS}
-              className="hidden sm:inline text-xl font-medium text-foreground max-w-lg"
+
+            {/* Input area: rounder box and a round send button. A gradient beam
+                runs once around the box when it first appears. */}
+            <div ref={inputWrapperRef} className="relative rounded-2xl">
+              <AgentPromptInput
+                onSubmit={handleSendMessage}
+                isSending={isSending}
+                selectedModel={selectedModel}
+                onSelectModel={(provider, model, configId) => {
+                  setSelectedModel({ provider, model, configId });
+                }}
+                agentMode={agentMode}
+                onAgentModeChange={setAgentMode}
+                selectedWorkerId={selectedWorkerId}
+                onWorkerSelect={setSelectedWorkerId}
+                // The mode comes from the route (/aistudio or /aistudio/agents).
+                showAgentModeToggle={false}
+                showSettingsButton={false}
+                placeholder={previewPrompt ?? undefined}
+                value={inputText}
+                onValueChange={setInputText}
+                className="[&_[data-slot=input-group]]:rounded-2xl [&_[data-slot=input-group]]:bg-card [&_[data-slot=input-group]]:dark:bg-card [&_button[type=submit]]:rounded-full"
+              />
+              <BorderBeam playKey={1} onComplete={showHalo} />
+            </div>
+
+            {/* Starter prompts, grouped by topic. Agent mode offers prompts
+                that run scans and tools; Ask mode offers read-only ones. */}
+            <PromptGroups
+              groups={isAgentMode ? AGENT_PROMPT_GROUPS : ASK_PROMPT_GROUPS}
+              onSelect={handleSuggestionClick}
+              onPreview={setPreviewPrompt}
+              // Agent mode fills the input instead of sending, so keep the panel
+              // open for picking another prompt or adding a target.
+              closeOnSelect={!isAgentMode}
+              className="absolute inset-x-0 top-full mt-4"
             />
           </div>
-
-          {/* Input area: rounder box and a round send button, with the
-              Agent toggle moved down into the tools tray. A gradient beam
-              runs once around the box when it first appears. */}
-          <div ref={inputWrapperRef} className="relative rounded-2xl">
-            <AgentPromptInput
-              onSubmit={handleSendMessage}
-              isSending={isSending}
-              selectedModel={selectedModel}
-              onSelectModel={(provider, model, configId) => {
-                setSelectedModel({ provider, model, configId });
-              }}
-              agentMode={agentMode}
-              onAgentModeChange={setAgentMode}
-              selectedWorkerId={selectedWorkerId}
-              onWorkerSelect={setSelectedWorkerId}
-              showAgentModeToggle={false}
-              showSettingsButton={false}
-              placeholder={previewPrompt ?? undefined}
-              value={inputText}
-              onValueChange={setInputText}
-              className="[&_[data-slot=input-group]]:rounded-2xl [&_[data-slot=input-group]]:bg-card [&_[data-slot=input-group]]:dark:bg-card [&_button[type=submit]]:rounded-full"
-            />
-            <BorderBeam playKey={1} onComplete={showHalo} />
-          </div>
-          <AgentToolsTray
-            agentMode={agentMode}
-            onAgentModeChange={setAgentMode}
-            onWorkerChange={setSelectedWorkerId}
-          />
-
-          {/* Starter prompts, grouped by topic. Agent mode offers prompts
-              that run scans and tools; Ask mode offers read-only ones. */}
-          <PromptGroups
-            groups={isAgentMode ? AGENT_PROMPT_GROUPS : ASK_PROMPT_GROUPS}
-            onSelect={handleSuggestionClick}
-            onPreview={setPreviewPrompt}
-            // Agent mode fills the input instead of sending, so keep the panel
-            // open for picking another prompt or adding a target.
-            closeOnSelect={!isAgentMode}
-            className="absolute inset-x-0 top-full mt-4"
-          />
         </div>
-      </div>
-    </Page>
+      </Page>
+    </div>
   );
 }

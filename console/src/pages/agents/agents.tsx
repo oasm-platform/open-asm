@@ -30,6 +30,7 @@ export default function AgentsChatPage() {
     retryAttempt,
     todos,
     conversationMeta,
+    subagents,
     title,
     createdAt,
     selectedModel,
@@ -63,10 +64,9 @@ export default function AgentsChatPage() {
   }, []);
 
   return (
-    <div
-      className="-m-4 md:-m-6 flex flex-col lg:flex-row overflow-hidden"
-      style={{ height: 'calc(100vh - 4rem)' }}
-    >
+    // Fills the layout's main area edge to edge (the negative margins undo
+    // its padding)
+    <div className="-m-4 md:-m-6 flex min-h-0 flex-1 flex-col lg:flex-row overflow-hidden">
       {/* Left sidebar: Todo — large screens only */}
       <div className="hidden lg:flex lg:w-72 shrink-0 flex-col overflow-y-auto p-3">
         {todos && todos.length > 0 && (
@@ -133,10 +133,7 @@ export default function AgentsChatPage() {
       {/* Right sidebar: Context/turn stats + tool call history — large screens only */}
       <div className="hidden lg:flex lg:w-80 shrink-0 flex-col overflow-hidden">
         <TurnStatsPanel metadata={conversationMeta} />
-        <SubagentsPanel
-          conversationId={conversationId}
-          isStreaming={isStreaming}
-        />
+        <SubagentsPanel subagents={subagents} />
         <div className="flex-1 min-h-0 overflow-y-auto">
           <ToolCallHistoryPanel
             messages={messages}

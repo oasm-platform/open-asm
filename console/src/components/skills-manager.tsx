@@ -4,6 +4,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { SettingsHeaderActions } from '@/components/settings-header-actions';
 import {
   Dialog,
   DialogContent,
@@ -343,12 +344,7 @@ export function SkillsManager() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {skills.length === 0
-            ? 'No skills configured'
-            : `${skills.length} skill${skills.length !== 1 ? 's' : ''}`}
-        </p>
+      <SettingsHeaderActions>
         <Button
           size="sm"
           variant="outline"
@@ -358,7 +354,12 @@ export function SkillsManager() {
           <Plus className="size-3.5" />
           Add Skill
         </Button>
-      </div>
+      </SettingsHeaderActions>
+      <p className="text-sm text-muted-foreground">
+        {skills.length === 0
+          ? 'No skills configured'
+          : `${skills.length} skill${skills.length !== 1 ? 's' : ''}`}
+      </p>
 
       <SkillFormDialog
         open={showForm}

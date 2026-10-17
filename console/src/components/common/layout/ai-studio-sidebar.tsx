@@ -1,10 +1,12 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import {
+  Bot,
   Loader2,
   MessageSquare,
   MoreHorizontal,
   Pencil,
+  Plug,
   Settings,
   SquarePen,
   Trash2,
@@ -43,7 +45,7 @@ const CONVERSATION_PATH_PREFIX = '/aistudio/conversations/';
 const UNTITLED = 'New conversation';
 
 const itemClassName =
-  'h-9 rounded-lg text-[13px] font-medium hover:cursor-pointer data-[active=true]:bg-muted data-[active=true]:text-foreground data-[active=true]:font-semibold';
+  'h-8 rounded-lg text-[13px] font-medium hover:cursor-pointer data-[active=true]:bg-muted data-[active=true]:text-foreground data-[active=true]:font-semibold';
 
 interface ConversationItemProps {
   conversation: { id: string; title?: string | null };
@@ -86,7 +88,7 @@ function ConversationItem({
   if (editing) {
     return (
       <SidebarMenuItem>
-        <div className="flex h-9 items-center gap-2 px-2">
+        <div className="flex h-8 items-center gap-2 px-2">
           <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
           <SidebarInput
             ref={inputRef}
@@ -250,7 +252,7 @@ export function AiStudioSidebar() {
     >
       <SidebarGroup className="p-0">
         <SidebarGroupContent>
-          <SidebarMenu className="gap-0.5">
+          <SidebarMenu className="gap-px">
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
@@ -262,6 +264,32 @@ export function AiStudioSidebar() {
                   <SquarePen />
                   <span className="truncate">New Chat</span>
                 </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={pathname === '/aistudio/agents'}
+                tooltip="Agents"
+                className={itemClassName}
+              >
+                <Link to="/aistudio/agents" onClick={() => setOpenMobile(false)}>
+                  <Bot />
+                  <span className="truncate">Agents</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                tooltip="Connectors"
+                className={itemClassName}
+                onClick={() => {
+                  setOpenMobile(false);
+                  openSettings('connectors');
+                }}
+              >
+                <Plug />
+                <span className="truncate">Connectors</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
@@ -284,7 +312,7 @@ export function AiStudioSidebar() {
       <SidebarGroup className="p-0 group-data-[collapsible=icon]:hidden">
         <SidebarGroupContent>
           <div className="flex items-center justify-between pr-1">
-            <SidebarGroupLabel className="px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
+            <SidebarGroupLabel className="h-6 px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
               Chats
             </SidebarGroupLabel>
             {conversations.length > 0 && (
@@ -316,7 +344,7 @@ export function AiStudioSidebar() {
               </DropdownMenu>
             )}
           </div>
-          <SidebarMenu className="mt-1 gap-0.5">
+          <SidebarMenu className="gap-px">
             {isLoading && (
               <div className="flex justify-center py-3">
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />

@@ -2,12 +2,14 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import type { UIMessage } from 'ai';
 import type { AgentTodoItem } from '@/pages/agents/components/agent-todo-panel';
+import { isSubagentActive } from '@/pages/agents/components/subagents-panel';
 import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import {
   agentsControllerStopConversation,
   useAgentsControllerGetMessagesInfinite,
   type ConversationMetadataDto,
   type ConversationResponseDto,
+  type SubagentResponseDto,
 } from '@/services/apis/gen/queries';
 import { orvalClient } from '@/services/apis/axios-client';
 import {
@@ -18,6 +20,7 @@ import {
   syncApprovalMode,
 } from '@/hooks/use-approval-mode';
 import { useRemoteExecuteStream } from '@/hooks/use-remote-execute-stream';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 // ---------------------------------------------------------------------------
@@ -144,6 +147,8 @@ interface UseAgentChatReturn {
   todos: AgentTodoItem[];
   /** Model, context usage and token/cost stats of the conversation */
   conversationMeta: ConversationMetadataDto | null;
+  /** Background subagents: from the detail, then from stream updates */
+  subagents: SubagentResponseDto[];
   selectedModel: SelectedModel | null;
   agentMode: string;
   selectedWorkerId: string | null;
@@ -203,12 +208,89 @@ function isServerStreaming(
 }
 
 /**
- * Cheap identity of a message list: id + part count per message. Changes when
- * a message is added or a streaming message gains parts, so the history sync
- * updates then but not on every equal refetch.
+ * True while the server still runs this conversation. The server's `running`
+ * flag decides: it also covers the gaps between continuation iterations, and
+ * a message left 'streaming' by a crash must not lock the conversation. The
+ * newest message's status is only the fallback for a server without it.
+ */
+function isServerRunning(
+  pages: Array<{ data?: unknown[] } | unknown[]> | undefined,
+): boolean {
+  const running = (pages?.[0] as { running?: unknown } | undefined)?.running;
+  return typeof running === 'boolean' ? running : isServerStreaming(pages);
+}
+
+/** Text of the newest user message */
+function lastUserText(messages: UIMessage[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.role !== 'user') continue;
+    return m.parts
+      .filter((p) => p.type === 'text')
+      .map((p) => ('text' in p ? p.text : ''))
+      .join('');
+  }
+  return '';
+}
+
+/**
+ * True when the server holds an answer to `question`: the newest message is
+ * an assistant answer that did not fail or stop, after a user message with
+ * that text. A request that never reached the server leaves the previous
+ * turn newest instead, which does not match.
+ */
+function isAnsweredOnServer(
+  pages: Array<{ data?: unknown[] } | unknown[]> | undefined,
+  question: string,
+): boolean {
+  const first = pages?.[0];
+  const list = (
+    Array.isArray(first) ? first : ((first as { data?: unknown[] })?.data ?? [])
+  ) as Array<Record<string, unknown>>;
+  const [latest] = list;
+  if (!latest || String(latest.role).toLowerCase() !== 'assistant') {
+    return false;
+  }
+  const status = (latest.metadata as { status?: string } | undefined)?.status;
+  if (status === 'error' || status === 'aborted' || status === 'streaming') {
+    return false;
+  }
+  const user = list.find((m) => String(m.role).toLowerCase() === 'user');
+  return !!question && String(user?.content ?? '') === question;
+}
+
+function partSignature(part: UIMessage['parts'][number]): string {
+  const p = part as { type: string; state?: string; text?: unknown };
+  const state = p.state ? `/${p.state}` : '';
+  const length = typeof p.text === 'string' ? `#${p.text.length}` : '';
+  return `${p.type}${state}${length}`;
+}
+
+/**
+ * Cheap identity of a message list: id + type/state/text length of each part.
+ * Changes when a message is added or a running message grows (more parts,
+ * longer text, a tool finishing), so the history sync updates then but not
+ * on every equal refetch.
  */
 function messagesSignature(messages: UIMessage[]): string {
-  return messages.map((m) => `${m.id}:${m.parts?.length ?? 0}`).join('|');
+  return messages
+    .map((m) => `${m.id}:${(m.parts ?? []).map(partSignature).join(',')}`)
+    .join('|');
+}
+
+/**
+ * What to seed useChat with: the saved messages, minus a trailing assistant
+ * that the server is still producing. Resuming replays that message from the
+ * start, so seeding the database copy would show it twice.
+ */
+export function seedFromSaved(
+  savedMessages: UIMessage[],
+  pages: Array<{ data?: unknown[] } | unknown[]> | undefined,
+): UIMessage[] {
+  const trailingInProgress =
+    isServerStreaming(pages) &&
+    savedMessages.at(-1)?.role === 'assistant';
+  return trailingInProgress ? savedMessages.slice(0, -1) : savedMessages;
 }
 
 function mapDbMessagesToUI(
@@ -309,6 +391,7 @@ export function useAgentChat({
 }: UseAgentChatOptions): UseAgentChatReturn {
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const hasAutoSentRef = useRef(false);
   const chatMessagesRef = useRef<UIMessage[]>([]);
   const isStreamingRef = useRef(false);
@@ -323,6 +406,11 @@ export function useAgentChat({
   const [createdAt, setCreatedAt] = useState<string | null>(null);
   const [conversationMeta, setConversationMeta] =
     useState<ConversationMetadataDto | null>(null);
+  const [subagents, setSubagents] = useState<SubagentResponseDto[]>([]);
+  const subagentsRef = useRef(subagents);
+  useEffect(() => {
+    subagentsRef.current = subagents;
+  }, [subagents]);
   const { appendEvent, eventsMap } = useRemoteExecuteStream();
   // Parallel tool calls can each need approval, so keep a queue
   const [approvalQueue, setApprovalQueue] = useState<PendingApproval[]>([]);
@@ -366,13 +454,28 @@ export function useAgentChat({
   // A chat started from the landing page gets its id on the client and only
   // exists on the server once its first message streams. It has no history
   // to load, and fetching it early just 404s (and retries), so skip that.
-  const [createdHereId] = useState(() =>
+  const [createdHereId, setCreatedHereId] = useState(() =>
     (location.state as { pendingMessage?: string } | null)?.pendingMessage
       ? conversationId
       : undefined,
   );
+  // Kept after createdHereId is cleared: the chat was still started here
+  const startedHereIdRef = useRef(createdHereId);
+  // Once the user switches to another conversation the new one exists on the
+  // server, so coming back to it must load its history like any other
+  useEffect(() => {
+    if (createdHereId && conversationId !== createdHereId) {
+      setCreatedHereId(undefined);
+    }
+    // Once left, it is loaded like any other: the modes on screen belong to
+    // the conversation switched to
+    if (startedHereIdRef.current && conversationId !== startedHereIdRef.current) {
+      startedHereIdRef.current = undefined;
+    }
+  }, [conversationId, createdHereId]);
   const isNewConversation =
     !!conversationId && conversationId === createdHereId;
+  const [resumeOnMount] = useState(() => !isNewConversation);
 
   // Fetch messages with infinite scroll
   const {
@@ -381,6 +484,7 @@ export function useAgentChat({
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    refetch: refetchMessages,
   } = useAgentsControllerGetMessagesInfinite(
     conversationId!,
     { page: 1, limit: 10, sortOrder: 'DESC' },
@@ -393,7 +497,7 @@ export function useAgentChat({
         // before we navigated away) is still producing the answer, so the
         // completed response appears without a manual reload.
         refetchInterval: (query) =>
-          !isStreamingRef.current && isServerStreaming(query.state.data?.pages)
+          !isStreamingRef.current && isServerRunning(query.state.data?.pages)
             ? SERVER_STREAM_POLL_MS
             : false,
         getNextPageParam: (lastPage) => {
@@ -408,12 +512,25 @@ export function useAgentChat({
     },
   );
 
+  // In a ref so the auto-retry timer reads the latest without re-running
+  const refetchMessagesRef = useRef(refetchMessages);
+  useEffect(() => {
+    refetchMessagesRef.current = refetchMessages;
+  }, [refetchMessages]);
+
   // Convert history messages to UIMessage format
   const savedMessages: UIMessage[] = useMemo(() => {
     const pages = messagesData?.pages;
     if (!pages || !Array.isArray(pages)) return [];
     return mapDbMessagesToUI(pages);
   }, [messagesData]);
+
+  // What seeds useChat. `savedMessages` itself stays whole, so the view (and
+  // the polling fallback) still shows the partial until resume takes over.
+  const seedMessages: UIMessage[] = useMemo(
+    () => seedFromSaved(savedMessages, messagesData?.pages),
+    [savedMessages, messagesData],
+  );
 
   const transport = useMemo(
     () =>
@@ -422,6 +539,12 @@ export function useAgentChat({
         headers: selectedWorkspaceId
           ? { 'x-workspace-id': selectedWorkspaceId }
           : {},
+        // On mount (resume), reconnect to a run still producing the answer.
+        // A plain GET; the server replays from the start and 204s when there
+        // is nothing to resume. The transport headers (workspace id) carry over.
+        prepareReconnectToStreamRequest: ({ id }) => ({
+          api: `/api/agents/conversations/${id}/stream`,
+        }),
         prepareSendMessagesRequest: ({ messages }) => {
           const lastMessage = messages[messages.length - 1];
           const textContent =
@@ -458,9 +581,13 @@ export function useAgentChat({
     setMessages,
     regenerate,
     stop,
+    resumeStream,
   } = useChat({
     transport,
     id: conversationId || 'agent-new-chat',
+    // No `resume` option: it resumes from an effect, which StrictMode runs
+    // twice, and two resumes of one run interleave into duplicate messages.
+    // The effect below resumes once instead.
     experimental_throttle: 50,
     onError: (error) => {
       // Ignore errors from user-initiated stops — not a real error
@@ -519,12 +646,30 @@ export function useAgentChat({
           | undefined;
         if (payload?.metadata) setConversationMeta(payload.metadata);
       }
+      if (data.type === 'data-subagents-updated') {
+        // Sent on every subagent status change, with the whole list
+        const payload = data.data as
+          | { subagents?: SubagentResponseDto[] }
+          | undefined;
+        if (payload?.subagents) setSubagents(payload.subagents);
+      }
       if (data.type === 'data-remote-execute-output') {
         const event = data.data as import('@/hooks/use-remote-execute-stream').RemoteExecuteStreamEvent;
         appendEvent(event);
       }
     },
   });
+
+  // Reconnect to an in-progress run on mount (reload, or returning to the
+  // chat) and stream the rest, instead of polling the database for it.
+  // Decided once at mount: a chat just started here has no run to resume.
+  // The ref keeps it to one request, even when StrictMode re-runs the effect.
+  const resumeAttemptedRef = useRef(false);
+  useEffect(() => {
+    if (!resumeOnMount || !conversationId || resumeAttemptedRef.current) return;
+    resumeAttemptedRef.current = true;
+    void resumeStream();
+  }, [resumeOnMount, conversationId, resumeStream]);
 
   // Keep ref in sync
   useEffect(() => {
@@ -533,6 +678,48 @@ export function useAgentChat({
   }, [chatMessages, status]);
 
   const isStreaming = status === 'submitted' || status === 'streaming';
+  // A run that outlived this page's stream (left and came back, reloaded,
+  // another tab) is still busy: show it as streaming and keep Stop available,
+  // so a new message does not silently cancel it
+  const isServerBusy = !isStreaming && isServerRunning(messagesData?.pages);
+  const isBusy = isStreaming || isServerBusy;
+
+  // Once the first stream of a chat created here ends (done, or dropped while
+  // the run goes on), the conversation exists on the server: load and poll
+  // it like any other
+  const hasStreamedRef = useRef(false);
+  useEffect(() => {
+    if (isStreaming) {
+      hasStreamedRef.current = true;
+    } else if (hasStreamedRef.current && createdHereId) {
+      setCreatedHereId(undefined);
+    }
+  }, [isStreaming, createdHereId]);
+
+  // Subagent updates only arrive on this page's stream. When the run ends
+  // (or the run polled after a reload does) with one still queued/running,
+  // reload the detail once to catch changes the stream did not carry.
+  const wasBusyRef = useRef(isBusy);
+  useEffect(() => {
+    const ended = wasBusyRef.current && !isBusy;
+    wasBusyRef.current = isBusy;
+    if (!ended || !conversationId) return;
+    if (!subagentsRef.current.some(isSubagentActive)) return;
+    let cancelled = false;
+    orvalClient<ConversationResponseDto>({
+      url: `/api/agents/conversations/${conversationId}`,
+      method: 'GET',
+    })
+      .then((data) => {
+        if (!cancelled) setSubagents(data.subagents ?? []);
+      })
+      .catch(() => {
+        // Keeps the last known list
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isBusy, conversationId]);
 
   // A pending approval can never outlive its stream
   useEffect(() => {
@@ -593,22 +780,24 @@ export function useAgentChat({
     setMessagesRef.current = setMessages;
   }, [setMessages]);
 
-  // Sync history whenever savedMessages changes but not while streaming
+  // Sync history whenever savedMessages changes but not while streaming.
+  // Seeds the stripped copy (seedMessages), so a message a resume will replay
+  // is not seeded here and then duplicated by the replay.
   useEffect(() => {
     if (!conversationId || isLoadingHistory || isStreamingRef.current) return;
-    if (savedMessages.length > 0) {
+    if (seedMessages.length > 0) {
       // Use functional update to compare and avoid unnecessary re-renders.
       // Compare a lightweight signature (id + part count) rather than only ids:
       // a polled run keeps the same id while its parts grow, and skipping on
       // id alone would freeze the UI on the stale streaming placeholder.
       setMessagesRef.current((prev) => {
-        if (messagesSignature(prev) === messagesSignature(savedMessages)) {
+        if (messagesSignature(prev) === messagesSignature(seedMessages)) {
           return prev;
         }
-        return savedMessages;
+        return seedMessages;
       });
     }
-  }, [conversationId, isLoadingHistory, savedMessages]);
+  }, [conversationId, isLoadingHistory, seedMessages]);
 
   // Display chatMessages when available, otherwise fall back to savedMessages
   const messages: UIMessage[] =
@@ -659,19 +848,32 @@ export function useAgentChat({
 
   const handleStop = useCallback(() => {
     isUserStoppedRef.current = true;
+    // A stopped run must not be restarted by a pending auto-retry
+    abortRetryRef.current?.abort();
+    setStreamError(null);
+    retryCountRef.current = 0;
+    setRetryCount(0);
+    setIsRetrying(false);
     // Dropping the stream no longer aborts the run (so navigating away keeps
     // it going); an explicit stop must tell the server to abort it.
     if (conversationId) {
-      void agentsControllerStopConversation(conversationId).catch(() => {
-        // best-effort: the local stop below still ends this client's stream
-      });
+      void agentsControllerStopConversation(conversationId)
+        // Leave the busy state of a server-side run now, not on the next poll
+        .then(() =>
+          queryClient.invalidateQueries({
+            queryKey: ['/api/agents/conversations', conversationId, 'messages'],
+          }),
+        )
+        .catch(() => {
+          // best-effort: the local stop below still ends this client's stream
+        });
     }
     stop();
-  }, [stop, conversationId]);
+  }, [stop, conversationId, queryClient]);
 
   const onRetryAction = useMemo(() => {
-    return lastAssistantIdx !== -1 && !isStreaming ? handleRetry : undefined;
-  }, [lastAssistantIdx, isStreaming, handleRetry]);
+    return lastAssistantIdx !== -1 && !isBusy ? handleRetry : undefined;
+  }, [lastAssistantIdx, isBusy, handleRetry]);
 
   const hasSentFirstMessage = useMemo(() => {
     return isStreaming || chatMessages.length > 0;
@@ -694,8 +896,15 @@ export function useAgentChat({
   useEffect(() => {
     if (!streamError) return;
     if (isStreaming) return;
+    // Only the stream dropped: the run goes on, and polling shows it. A
+    // retry would start a new run that cancels this one
+    if (isServerBusy) return;
     if (lastAssistantIdx === -1) return;
-    if (retryCount >= MAX_AUTO_RETRIES) return;
+    if (retryCount >= MAX_AUTO_RETRIES) {
+      // Out of retries: show the error with its manual Retry, not a spinner
+      setIsRetrying(false);
+      return;
+    }
 
     // Check if this error is transient — only auto-retry those
     const testError = new Error(streamError);
@@ -710,6 +919,37 @@ export function useAgentChat({
 
     const timer = setTimeout(async () => {
       if (controller.signal.aborted) return;
+      // Decide on fresh data: the messages cached before the send say nothing
+      // about whether the run outlived the dropped stream, and a retry would
+      // cancel a run that did
+      const fresh = await refetchMessagesRef.current().catch(() => undefined);
+      if (controller.signal.aborted) return;
+      const notFound =
+        (fresh?.error as { response?: { status?: number } } | null)?.response
+          ?.status === 404;
+      if (!fresh || (fresh.isError && !notFound)) {
+        // Cannot tell: try again after the next backoff
+        retryCountRef.current = retryCount + 1;
+        setRetryCount((c) => c + 1);
+        return;
+      }
+      // Still running: the effect below ends the error, polling shows the rest
+      if (!notFound && isServerRunning(fresh.data?.pages)) return;
+      // The run finished while the stream was down: nothing to retry, and a
+      // retry would ask the same question again
+      if (
+        !notFound &&
+        isAnsweredOnServer(
+          fresh.data?.pages,
+          lastUserText(chatMessagesRef.current),
+        )
+      ) {
+        setStreamError(null);
+        retryCountRef.current = 0;
+        setRetryCount(0);
+        setIsRetrying(false);
+        return;
+      }
       console.log(
         `[Chat] Auto-retry ${retryCount + 1}/${MAX_AUTO_RETRIES} after ${Math.round(backoffMs)}ms`,
       );
@@ -737,10 +977,22 @@ export function useAgentChat({
   }, [
     streamError,
     isStreaming,
+    isServerBusy,
     lastAssistantIdx,
     retryCount,
     regenerate,
   ]);
+
+  // The run outlived the dropped stream, so the error is over: polling shows
+  // the answer, and no retry may follow once the run ends
+  useEffect(() => {
+    if (!isServerBusy || !streamError) return;
+    abortRetryRef.current?.abort();
+    setStreamError(null);
+    retryCountRef.current = 0;
+    setRetryCount(0);
+    setIsRetrying(false);
+  }, [isServerBusy, streamError]);
 
   // Reset retry count when stream starts successfully (only if NOT in auto-retry).
   // During auto-retry, isRetrying is true so this won't interfere.
@@ -754,6 +1006,8 @@ export function useAgentChat({
 
   // Fetch initial todos and agentMode for existing conversations
   useEffect(() => {
+    // Subagents belong to one conversation: never show the previous one's
+    setSubagents([]);
     if (!conversationId) {
       setTodos([]);
       setConversationMeta(null);
@@ -767,6 +1021,10 @@ export function useAgentChat({
     // Use a flag to prevent setting state after unmount
     let cancelled = false;
     const approvalVersionAtStart = getApprovalModeVersion();
+    const agentModeAtStart = agentModeRef.current;
+    // A chat started on this page already holds the modes the user picked
+    // (maybe changed since its first message): the server's are older
+    const startedHere = startedHereIdRef.current === conversationId;
 
     orvalClient<ConversationResponseDto>({
       url: `/api/agents/conversations/${conversationId}`,
@@ -790,18 +1048,25 @@ export function useAgentChat({
         }
         if (!cancelled) {
           setConversationMeta(data.metadata ?? null);
+          setSubagents(data.subagents ?? []);
         }
         const savedApprovalMode = (data as { approvalMode?: string })
           .approvalMode;
         // Never clobber a mode the user picked while this request was pending
         if (
           !cancelled &&
+          !startedHere &&
           isApprovalMode(savedApprovalMode) &&
           getApprovalModeVersion() === approvalVersionAtStart
         ) {
           syncApprovalMode(savedApprovalMode);
         }
-        if (!cancelled && data.agentMode) {
+        if (
+          !cancelled &&
+          !startedHere &&
+          data.agentMode &&
+          agentModeRef.current === agentModeAtStart
+        ) {
           setAgentMode(data.agentMode);
           agentModeRef.current = data.agentMode;
         }
@@ -854,13 +1119,14 @@ export function useAgentChat({
 
   return {
     messages,
-    isStreaming,
+    isStreaming: isBusy,
     isLoadingHistory,
     streamError,
     isRetrying,
     retryAttempt: retryCount,
     todos,
     conversationMeta,
+    subagents,
     title,
     createdAt,
     selectedModel,

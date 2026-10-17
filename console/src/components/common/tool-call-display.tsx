@@ -6,7 +6,6 @@ import {
   CircleIcon,
   ClockIcon,
   ListChecksIcon,
-  WrenchIcon,
   XCircleIcon,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -154,7 +153,27 @@ export function ToolCallDisplay({
   );
 }
 
-/** One-line label of a tool call: name plus status badge. */
+/** Name color per status; completed keeps the surrounding text color */
+const labelTextClass: Record<ToolCallState['status'], string | undefined> = {
+  pending: 'tool-call-running',
+  executing: 'tool-call-running',
+  completed: undefined,
+  error: 'text-red-500',
+  rejected: 'text-amber-500',
+  'needs-plan': 'text-amber-500',
+};
+
+/** Connector slug and target of a run_tool_connector call, e.g. "nuclei example.com" */
+function connectorRunDetail(toolCall: ToolCallState): string | null {
+  if (toolCall.toolName !== 'run_tool_connector') return null;
+  const { tool, target } = toolCall.input ?? {};
+  const detail = [tool, target]
+    .filter((value) => typeof value === 'string' && value)
+    .join(' ');
+  return detail || null;
+}
+
+/** One-line label of a tool call: the name, colored by its status. */
 export function ToolCallLabel({
   toolCall,
   className,
@@ -163,24 +182,31 @@ export function ToolCallLabel({
   className?: string;
 }) {
   const config = statusConfig[toolCall.status];
-  const StatusIcon = config.icon;
+  const detail = connectorRunDetail(toolCall);
 
   return (
-    <div className={cn('flex min-w-0 items-center gap-2 text-sm', className)}>
-      <WrenchIcon className="size-3.5 text-muted-foreground shrink-0" />
-      <span className="font-medium truncate">
-        {formatToolName(toolCall.toolName)}
-      </span>
-      <Badge
-        variant="secondary"
+    <div
+      className={cn('flex min-w-0 items-center text-sm', className)}
+      title={config.label}
+    >
+      <span
         className={cn(
-          'gap-1 rounded-full text-xs shrink-0',
-          toolCall.status === 'executing' && 'animate-pulse',
+          'font-medium truncate',
+          detail && 'shrink-0',
+          labelTextClass[toolCall.status],
         )}
       >
-        <StatusIcon className={cn('size-3', config.color)} />
-        {config.label}
-      </Badge>
+        {formatToolName(toolCall.toolName)}
+      </span>
+      {detail && (
+        <span
+          className="ml-1.5 truncate text-xs text-muted-foreground"
+          title={detail}
+        >
+          {detail}
+        </span>
+      )}
+      <span className="sr-only"> ({config.label})</span>
     </div>
   );
 }

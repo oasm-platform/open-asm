@@ -129,18 +129,26 @@ export class AgentsService {
     workspaceId: string,
   ): Promise<GetAgentModesResponseDto> {
     const modes = this.getAgentModes();
-    const workersResponse = await this.workersService.getWorkers({
-      page: 1,
-      limit: 1000,
-      sortBy: '"createdAt"',
-      sortOrder: SortOrder.DESC,
-      workspaceId,
-      scope: WorkerScope.WORKSPACE,
-      enabledAgentMode: true,
-    });
+    // This workspace's own workers and the global ones
+    const workersResponse = await this.workersService.getWorkers(
+      {
+        page: 1,
+        limit: 1000,
+        sortBy: '"createdAt"',
+        sortOrder: SortOrder.DESC,
+        enabledAgentMode: true,
+      },
+      { agentWorkspaceId: workspaceId },
+    );
+    // The workspace's own workers first, as the auto pick prefers them
+    const workers = [...workersResponse.data].sort(
+      (a, b) =>
+        Number(a.scope === WorkerScope.CLOUD) -
+        Number(b.scope === WorkerScope.CLOUD),
+    );
     return {
       modes,
-      workers: workersResponse.data.map((w) => ({
+      workers: workers.map((w) => ({
         id: w.id,
         name: w.name,
         scope: w.scope,
@@ -476,6 +484,7 @@ export class AgentsService {
       summary: conversation.summary,
       workerId: conversation.workerId,
       metadata: await this.conversationMetadata(conversation),
+      subagents: await this.subagents.listForConversation(id),
     };
   }
 

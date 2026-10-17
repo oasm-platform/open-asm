@@ -3096,6 +3096,48 @@ export type ConversationMetadataDto = {
   updatedAt?: string;
 };
 
+export type SubagentResponseDtoStatus =
+  (typeof SubagentResponseDtoStatus)[keyof typeof SubagentResponseDtoStatus];
+
+export const SubagentResponseDtoStatus = {
+  pending: 'pending',
+  in_progress: 'in_progress',
+  completed: 'completed',
+  failed: 'failed',
+} as const;
+
+export type SubagentResponseDto = {
+  id: string;
+  /** Subagent key */
+  name: string;
+  status: SubagentResponseDtoStatus;
+  /** Task dispatched by the main agent */
+  task: string;
+  /**
+   * Final summary of the subagent
+   * @nullable
+   */
+  result: string | null;
+  /**
+   * Failure reason
+   * @nullable
+   */
+  error: string | null;
+  createdAt: string;
+  /** @nullable */
+  startedAt: string | null;
+  /** @nullable */
+  completedAt: string | null;
+  /**
+   * When the main agent received the result
+   * @nullable
+   */
+  deliveredAt: string | null;
+  sortOrder: number;
+  /** @nullable */
+  stats: TurnStatsDto | null;
+};
+
 /**
  * Interaction mode used by the conversation
  */
@@ -3149,48 +3191,8 @@ export type ConversationResponseDto = {
    * @nullable
    */
   metadata?: ConversationMetadataDto | null;
-};
-
-export type SubagentResponseDtoStatus =
-  (typeof SubagentResponseDtoStatus)[keyof typeof SubagentResponseDtoStatus];
-
-export const SubagentResponseDtoStatus = {
-  pending: 'pending',
-  in_progress: 'in_progress',
-  completed: 'completed',
-  failed: 'failed',
-} as const;
-
-export type SubagentResponseDto = {
-  id: string;
-  /** Subagent key */
-  name: string;
-  status: SubagentResponseDtoStatus;
-  /** Task dispatched by the main agent */
-  task: string;
-  /**
-   * Final summary of the subagent
-   * @nullable
-   */
-  result: string | null;
-  /**
-   * Failure reason
-   * @nullable
-   */
-  error: string | null;
-  createdAt: string;
-  /** @nullable */
-  startedAt: string | null;
-  /** @nullable */
-  completedAt: string | null;
-  /**
-   * When the main agent received the result
-   * @nullable
-   */
-  deliveredAt: string | null;
-  sortOrder: number;
-  /** @nullable */
-  stats: TurnStatsDto | null;
+  /** Background subagent tasks dispatched in this conversation (detail only) */
+  subagents?: SubagentResponseDto[];
 };
 
 export type GetManyConversationResponseDtoDto = {
@@ -33564,6 +33566,173 @@ export const useAgentsControllerStopConversation = <
     queryClient,
   );
 };
+
+/**
+ * Reconnects to a run still producing the conversation's answer and streams the rest via SSE, replaying what was produced before the reconnect. Returns 204 when there is nothing to resume.
+ * @summary Resume the active response stream
+ */
+export const agentsControllerResumeStream = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/agents/conversations/${id}/stream`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerResumeStreamQueryKey = (id: string) => {
+  return [`/api/agents/conversations/${id}/stream`] as const;
+};
+
+export const getAgentsControllerResumeStreamQueryOptions = <
+  TData = Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAgentsControllerResumeStreamQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerResumeStream>>
+  > = ({ signal }) => agentsControllerResumeStream(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerResumeStreamQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerResumeStream>>
+>;
+export type AgentsControllerResumeStreamQueryError = unknown;
+
+export function useAgentsControllerResumeStream<
+  TData = Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerResumeStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerResumeStream<
+  TData = Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerResumeStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerResumeStream<
+  TData = Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Resume the active response stream
+ */
+
+export function useAgentsControllerResumeStream<
+  TData = Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAgentsControllerResumeStreamQueryOptions(id, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
 
 /**
  * Delete a specific message in a conversation

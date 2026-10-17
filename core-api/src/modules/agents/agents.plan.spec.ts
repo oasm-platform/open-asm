@@ -352,7 +352,6 @@ describe('AgentTool plan tools', () => {
         AgentMode.AGENT,
         emitter,
         'c1',
-        false,
         { ...settings(AgentApprovalMode.PLAN), planFirst: true },
       ) as unknown as Record<string, { execute: ToolLike['execute'] }>;
 
@@ -377,7 +376,6 @@ describe('AgentTool plan tools', () => {
         AgentMode.AGENT,
         emitter,
         'c1',
-        false,
         approval,
       ) as unknown as Record<string, ToolLike>;
       await formulate(approval, ['a']);
@@ -475,6 +473,8 @@ describe('AgentsCompletionsService plan execution', () => {
       return {
         aiStream: new ReadableStream({ start: (c) => c.close() }),
         finishPromise: Promise.resolve(),
+
+        settle: jest.fn(() => Promise.resolve('answer')),
       };
     });
   });
@@ -554,6 +554,38 @@ describe('AgentsCompletionsService plan execution', () => {
     await run();
 
     expect(service.executeStreamText).toHaveBeenCalledTimes(3);
+  });
+
+  it('settles and retries an iteration the provider ended without an answer', async () => {
+    const settle = jest.fn(() => Promise.resolve('none'));
+    service.executeStreamText.mockImplementation(() => ({
+      aiStream: new ReadableStream({ start: (c) => c.close() }),
+      finishPromise: Promise.resolve(),
+      settle,
+    }));
+
+    await run(AgentMode.ASK, AgentApprovalMode.MANUAL);
+
+    expect(service.executeStreamText).toHaveBeenCalledTimes(3);
+    expect(settle).toHaveBeenCalledWith('error');
+  });
+
+  it('keeps a partial answer instead of re-running the tools it already ran', async () => {
+    repo.rows = [row('a', 'pending', 0)];
+    const settle = jest.fn(() => Promise.resolve('partial'));
+    service.executeStreamText.mockImplementation(() => ({
+      aiStream: new ReadableStream({
+        // Fails after some steps streamed
+        pull: (c) => c.error(new Error('connection reset')),
+      }),
+      finishPromise: Promise.resolve(),
+      settle,
+    }));
+
+    await run();
+
+    expect(service.executeStreamText).toHaveBeenCalledTimes(1);
+    expect(settle).toHaveBeenCalledWith('error');
   });
 
   it('does not mark unfinished steps as done when the run stops early', async () => {
@@ -659,6 +691,8 @@ describe('AgentsCompletionsService plan execution', () => {
         return {
           aiStream: new ReadableStream({ start: (c) => c.close() }),
           finishPromise: Promise.resolve(),
+
+          settle: jest.fn(() => Promise.resolve('answer')),
         };
       });
 
@@ -738,6 +772,8 @@ describe('AgentsCompletionsService plan execution', () => {
           return {
             aiStream: new ReadableStream({ start: (c) => c.close() }),
             finishPromise: Promise.resolve(),
+
+            settle: jest.fn(() => Promise.resolve('answer')),
           };
         },
       );
