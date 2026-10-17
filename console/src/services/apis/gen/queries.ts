@@ -36457,160 +36457,6 @@ export function useNotificationsControllerGetNotifications<
 }
 
 /**
- * Subscribe to a Server-Sent Events (SSE) stream for real-time notifications
- * @summary Subscribe to notifications stream
- */
-export const notificationsControllerStream = (
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<AppResponseSerialization>(
-    { url: `/api/notifications/stream`, method: 'GET', signal },
-    options,
-  );
-};
-
-export const getNotificationsControllerStreamQueryKey = () => {
-  return [`/api/notifications/stream`] as const;
-};
-
-export const getNotificationsControllerStreamQueryOptions = <
-  TData = Awaited<ReturnType<typeof notificationsControllerStream>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof notificationsControllerStream>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getNotificationsControllerStreamQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof notificationsControllerStream>>
-  > = ({ signal }) => notificationsControllerStream(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof notificationsControllerStream>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type NotificationsControllerStreamQueryResult = NonNullable<
-  Awaited<ReturnType<typeof notificationsControllerStream>>
->;
-export type NotificationsControllerStreamQueryError = unknown;
-
-export function useNotificationsControllerStream<
-  TData = Awaited<ReturnType<typeof notificationsControllerStream>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerStream>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof notificationsControllerStream>>,
-          TError,
-          Awaited<ReturnType<typeof notificationsControllerStream>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useNotificationsControllerStream<
-  TData = Awaited<ReturnType<typeof notificationsControllerStream>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerStream>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof notificationsControllerStream>>,
-          TError,
-          Awaited<ReturnType<typeof notificationsControllerStream>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useNotificationsControllerStream<
-  TData = Awaited<ReturnType<typeof notificationsControllerStream>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerStream>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Subscribe to notifications stream
- */
-
-export function useNotificationsControllerStream<
-  TData = Awaited<ReturnType<typeof notificationsControllerStream>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerStream>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getNotificationsControllerStreamQueryOptions(options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-/**
  * Get the total count of unread notifications for the current user
  * @summary Get unread notifications count
  */
@@ -43939,6 +43785,160 @@ export const useReportsControllerDeleteReport = <
     queryClient,
   );
 };
+
+/**
+ * Server-Sent Events stream of the current user's notification pushes plus, when the X-Workspace-Id header is sent, the allowlisted events of that workspace. Each message is a JSON ClientEvent `{ id, type, time, resourceType, resourceId }`; a `ping` event is sent periodically as a heartbeat.
+ * @summary Subscribe to live events
+ */
+export const eventsControllerStream = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/events/stream`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getEventsControllerStreamQueryKey = () => {
+  return [`/api/events/stream`] as const;
+};
+
+export const getEventsControllerStreamQueryOptions = <
+  TData = Awaited<ReturnType<typeof eventsControllerStream>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof eventsControllerStream>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getEventsControllerStreamQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof eventsControllerStream>>
+  > = ({ signal }) => eventsControllerStream(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof eventsControllerStream>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type EventsControllerStreamQueryResult = NonNullable<
+  Awaited<ReturnType<typeof eventsControllerStream>>
+>;
+export type EventsControllerStreamQueryError = unknown;
+
+export function useEventsControllerStream<
+  TData = Awaited<ReturnType<typeof eventsControllerStream>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof eventsControllerStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof eventsControllerStream>>,
+          TError,
+          Awaited<ReturnType<typeof eventsControllerStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useEventsControllerStream<
+  TData = Awaited<ReturnType<typeof eventsControllerStream>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof eventsControllerStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof eventsControllerStream>>,
+          TError,
+          Awaited<ReturnType<typeof eventsControllerStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useEventsControllerStream<
+  TData = Awaited<ReturnType<typeof eventsControllerStream>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof eventsControllerStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Subscribe to live events
+ */
+
+export function useEventsControllerStream<
+  TData = Awaited<ReturnType<typeof eventsControllerStream>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof eventsControllerStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getEventsControllerStreamQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
 
 /**
  * @summary Create a presigned URL for direct app-logo upload

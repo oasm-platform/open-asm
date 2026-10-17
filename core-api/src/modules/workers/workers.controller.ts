@@ -253,7 +253,16 @@ export class WorkersController {
           this.logger.log(
             `[grpcAlive] Worker ${registeredWorkerId} stream disconnected, releasing jobs`,
           );
-          void this.workersService.releaseWorkerJobs(registeredWorkerId);
+          const workerId = registeredWorkerId;
+          this.workersService
+            .workerDisconnected(workerId)
+            .catch((error: unknown) =>
+              this.logger.error(
+                `[grpcAlive] Worker ${workerId} disconnect handling failed: ${
+                  error instanceof Error ? error.message : 'unknown error'
+                }`,
+              ),
+            );
         }
       };
     });

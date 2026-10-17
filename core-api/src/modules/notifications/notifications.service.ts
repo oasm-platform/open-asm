@@ -7,7 +7,6 @@ import { Notification } from './entities/notification.entity';
 
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { NotificationsSink } from '../event-bridge/sinks/notifications/notifications.sink';
-import { RedisService } from '@/services/redis/redis.service';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { I18nService } from 'nestjs-i18n';
 import { CreateNotificationDto } from './dto/create-notification.dto';
@@ -21,7 +20,6 @@ export class NotificationsService {
     @InjectRepository(Notification)
     private notificationRepo: Repository<Notification>,
     private readonly i18n: I18nService,
-    private readonly redisService: RedisService,
     private readonly sink: NotificationsSink,
   ) {}
 
@@ -51,10 +49,6 @@ export class NotificationsService {
       body.metadata ?? {},
       body.ref && body.refId ? { name: body.ref, id: body.refId } : undefined,
     );
-  }
-
-  subscribeToStream(userId: string) {
-    return this.redisService.subscriber.subscribe(`notification:${userId}`);
   }
 
   async getNotifications(
