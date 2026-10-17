@@ -24,7 +24,7 @@ import { RpcException } from '@nestjs/microservices';
 import { Interval } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
-import { LessThan, Repository } from 'typeorm';
+import { LessThan, Repository, SelectQueryBuilder } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
@@ -52,6 +52,7 @@ import {
   GetWorkerResponseDto,
   WorkerAliveDto,
   WorkerJoinDto,
+  WorkerListItemDto,
   WorkerToolDto,
   WorkerToolJobDto,
 } from './dto/workers.dto';
@@ -280,15 +281,7 @@ export class WorkersService {
       agentWorkspaceId?: string;
     },
   ): Promise<GetManyBaseResponseDto<WorkerInstance>> {
-    const {
-      page,
-      limit,
-      sortOrder,
-      workspaceId,
-      enabledAgentMode,
-      scope,
-      runMode,
-    } = query;
+    const { page, limit, sortOrder } = query;
     let { sortBy } = query;
     if (!sortBy) {
       sortBy = '"createdAt"';
@@ -303,6 +296,126 @@ export class WorkersService {
       )
       .leftJoinAndSelect('w.tool', 't')
       .where('1=1');
+    this.applyWorkerFilters(queryBuilder, query, options);
+
+    const [workers, total] = await queryBuilder
+      .orderBy(`w.${sortBy.replace(/[^a-zA-Z0-9_]/g, '')}`, sortOrder)
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    // Only tool counts are returned to clients (the full Tool[] payload was
+    // removed from GET /workers). Hoisted above the per-worker map: one query
+    // for built-in tools and one manifest read total, shared by every worker in
+    // the page (findings #3).
+    const [builtInTools, connectorList] = await Promise.all([
+      this.toolsService.getBuiltInTools(),
+      Promise.resolve(this.connectorRegistry.getAllConnectors()),
+    ]);
+
+    const builtInToolsCount = builtInTools.data.length;
+
+    const workersWithJobCount = await Promise.all(
+      workers.map(async (worker) => {
+        const count = await this.jobsRegistryService['repo'].count({
+          where: {
+            workerId: worker.id,
+            status: JobStatus.IN_PROGRESS,
+          },
+        });
+
+        // Only node-mode workers run Docker connectors; CLI/legacy workers may
+        // not have Docker installed, so they count built-in tools only.
+        const toolsCount =
+          worker.runMode === 'node'
+            ? builtInToolsCount + connectorList.length
+            : builtInToolsCount;
+
+        return {
+          ...worker,
+          currentJobsCount: count,
+          toolsCount,
+          isOnline: this.aliveStreamManager.isActive(worker.id),
+        };
+      }),
+    );
+
+    return getManyResponse<WorkerInstance>({
+      query,
+      data: workersWithJobCount,
+      total,
+      ignoreFields: ['token', 'tool'],
+    });
+  }
+
+  /**
+   * The page behind `GET /workers`: same filters as {@link getWorkers}, but
+   * only the columns the list card shows — no tool join, no tool counts — and
+   * the active jobs of the whole page counted in one grouped query.
+   */
+  public async getWorkerList(
+    query: GetManyWorkersDto,
+  ): Promise<GetManyBaseResponseDto<WorkerListItemDto>> {
+    const { page, limit, sortOrder } = query;
+    const sortBy = (query.sortBy || 'createdAt').replace(/[^a-zA-Z0-9_]/g, '');
+
+    const queryBuilder = this.repo
+      .createQueryBuilder('w')
+      .select([
+        'w.id',
+        'w.name',
+        'w.os',
+        'w.lastSeenAt',
+        'w.createdAt',
+        'w.internalNetworkId',
+      ])
+      .where('1=1');
+    this.applyWorkerFilters(queryBuilder, query);
+
+    const [workers, total] = await queryBuilder
+      .orderBy(`w.${sortBy}`, sortOrder)
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    const jobCounts = new Map<string, number>();
+    if (workers.length > 0) {
+      const rows = await this.jobsRegistryService['repo']
+        .createQueryBuilder('j')
+        .select('j.workerId', 'workerId')
+        .addSelect('COUNT(*)', 'count')
+        .where('j.workerId IN (:...workerIds)', {
+          workerIds: workers.map((worker) => worker.id),
+        })
+        .andWhere('j.status = :status', { status: JobStatus.IN_PROGRESS })
+        .groupBy('j.workerId')
+        .getRawMany<{ workerId: string; count: string }>();
+      for (const row of rows) jobCounts.set(row.workerId, Number(row.count));
+    }
+
+    return getManyResponse<WorkerListItemDto>({
+      query,
+      data: workers.map((worker) => ({
+        id: worker.id,
+        name: worker.name,
+        os: worker.os,
+        isOnline: this.aliveStreamManager.isActive(worker.id),
+        lastSeenAt: worker.lastSeenAt,
+        createdAt: worker.createdAt,
+        internalNetworkId: worker.internalNetworkId,
+        currentJobsCount: jobCounts.get(worker.id) ?? 0,
+      })),
+      total,
+    });
+  }
+
+  /** The `WHERE` of {@link getWorkers} and {@link getWorkerList}. */
+  private applyWorkerFilters(
+    queryBuilder: SelectQueryBuilder<WorkerInstance>,
+    query: GetManyWorkersDto,
+    options?: { agentWorkspaceId?: string },
+  ): void {
+    const { workspaceId, enabledAgentMode, scope, runMode } = query;
 
     // Add enabledAgentMode filter if provided
     if (enabledAgentMode !== undefined) {
@@ -379,55 +492,6 @@ export class WorkersService {
         runModeFilter: runMode,
       });
     }
-
-    const [workers, total] = await queryBuilder
-      .orderBy(`w.${sortBy.replace(/[^a-zA-Z0-9_]/g, '')}`, sortOrder)
-      .skip((page - 1) * limit)
-      .take(limit)
-      .getManyAndCount();
-
-    // Only tool counts are returned to clients (the full Tool[] payload was
-    // removed from GET /workers). Hoisted above the per-worker map: one query
-    // for built-in tools and one manifest read total, shared by every worker in
-    // the page (findings #3).
-    const [builtInTools, connectorList] = await Promise.all([
-      this.toolsService.getBuiltInTools(),
-      Promise.resolve(this.connectorRegistry.getAllConnectors()),
-    ]);
-
-    const builtInToolsCount = builtInTools.data.length;
-
-    const workersWithJobCount = await Promise.all(
-      workers.map(async (worker) => {
-        const count = await this.jobsRegistryService['repo'].count({
-          where: {
-            workerId: worker.id,
-            status: JobStatus.IN_PROGRESS,
-          },
-        });
-
-        // Only node-mode workers run Docker connectors; CLI/legacy workers may
-        // not have Docker installed, so they count built-in tools only.
-        const toolsCount =
-          worker.runMode === 'node'
-            ? builtInToolsCount + connectorList.length
-            : builtInToolsCount;
-
-        return {
-          ...worker,
-          currentJobsCount: count,
-          toolsCount,
-          isOnline: this.aliveStreamManager.isActive(worker.id),
-        };
-      }),
-    );
-
-    return getManyResponse<WorkerInstance>({
-      query,
-      data: workersWithJobCount,
-      total,
-      ignoreFields: ['token', 'tool'],
-    });
   }
 
   /**

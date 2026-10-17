@@ -1,8 +1,8 @@
 import Page from '@/components/common/page';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardTitle } from '@/components/ui/card';
 import { ConnectWorkerTrigger } from '@/components/ui/connect-worker-trigger';
 import { Input } from '@/components/ui/input';
+import LogoFrame from '@/components/ui/logo-frame';
 import {
   Select,
   SelectContent,
@@ -10,13 +10,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger, useQueryTab } from '@/components/ui/tabs';
+import { useLiveEvents } from '@/hooks/use-live-events';
 import { useNavigateWithParams } from '@/hooks/useNavigateWithParams';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useWorkersControllerGetWorkers } from '@/services/apis/gen/queries';
 import type {
-  WorkerInstance,
+  WorkerListItemDto,
   WorkersControllerGetWorkersParams,
 } from '@/services/apis/gen/queries';
 import { useNavigate } from '@tanstack/react-router';
@@ -37,11 +37,11 @@ const COMMON_PARAMS = {
   sortOrder: 'DESC',
 } as const;
 
-const QueryOptions = {
-  query: { refetchInterval: 1000 },
-} as const;
-
 const VALID_TABS = ['workspace', 'global'] as const;
+
+// Same grid as the tools and integrations pages
+const GRID_CLASS =
+  'grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4';
 
 type WorkerSurface = 'ALL' | 'INTERNAL' | 'EXTERNAL';
 
@@ -59,29 +59,39 @@ const ListWorkers = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [surface, setSurface] = useState<WorkerSurface>('ALL');
 
+  // Each tab fetches only while it is open; switching back re-uses the cache
+  // and refetches it when stale.
+  const isWorkspaceTab = activeTab === 'workspace';
+
   const { data: globalData, isLoading: isGlobalLoading } =
     useWorkersControllerGetWorkers(
       {
         ...COMMON_PARAMS,
         scope: 'cloud',
       } as WorkersControllerGetWorkersParams,
-      QueryOptions,
+      { query: { enabled: activeTab === 'global' } },
     );
 
-  const { data: workspaceData, isLoading: isWorkspaceLoading } =
-    useWorkersControllerGetWorkers(
-      {
-        ...COMMON_PARAMS,
-        scope: 'workspace',
-        workspaceId: selectedWorkspaceId,
-      } as WorkersControllerGetWorkersParams,
-      {
-        query: {
-          ...QueryOptions.query,
-          enabled: !!selectedWorkspaceId,
-        },
-      },
-    );
+  const {
+    data: workspaceData,
+    isLoading: isWorkspaceLoading,
+    refetch: refetchWorkspace,
+  } = useWorkersControllerGetWorkers(
+    {
+      ...COMMON_PARAMS,
+      scope: 'workspace',
+      workspaceId: selectedWorkspaceId,
+    } as WorkersControllerGetWorkersParams,
+    { query: { enabled: isWorkspaceTab && !!selectedWorkspaceId } },
+  );
+
+  // No polling: refetch only when the server pushes a worker event. Those are
+  // workspace-scoped (cloud workers have no workspace and emit none), so only
+  // the workspace list follows them — and only while its tab is open; the
+  // cache goes stale meanwhile and is refetched when the tab is opened.
+  useLiveEvents('worker.*', () => {
+    if (isWorkspaceTab) void refetchWorkspace();
+  });
 
   const data = activeTab === 'global' ? globalData : workspaceData;
   const isLoading = activeTab === 'global' ? isGlobalLoading : isWorkspaceLoading;
@@ -103,22 +113,26 @@ const ListWorkers = () => {
     });
   }, [data, searchQuery, surface]);
 
+  // Same shape as ToolCardSkeleton
   const renderSkeleton = () => (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {[...Array(3)].map((_, i) => (
-        <Card key={i}>
-          <CardContent className="p-3 space-y-4">
-            <div className="flex justify-between items-start">
-              <Skeleton className="h-4 w-20" />
-              <Skeleton className="h-6 w-16" />
+    <div className={GRID_CLASS}>
+      {[...Array(4)].map((_, i) => (
+        <div
+          key={i}
+          className="flex flex-col items-start gap-2 rounded-lg border p-5 animate-pulse"
+        >
+          <div className="flex w-full items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="size-6 rounded bg-muted" />
+              <div className="h-4 w-24 rounded-md bg-muted" />
             </div>
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-4 w-2/3" />
-            </div>
-          </CardContent>
-        </Card>
+            <div className="h-4 w-14 rounded-md bg-muted" />
+          </div>
+          <div className="flex w-full items-center justify-between gap-2">
+            <div className="h-3 w-24 rounded-md bg-muted" />
+            <div className="h-3 w-28 rounded-md bg-muted" />
+          </div>
+        </div>
       ))}
     </div>
   );
@@ -167,85 +181,78 @@ const ListWorkers = () => {
     </div>
   );
 
-  const renderWorkerGrid = (workers: WorkerInstance[]) => (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
+  const renderWorkerGrid = (workers: WorkerListItemDto[]) => (
+    <div className={GRID_CLASS}>
       {workers.map((worker) => (
-        <Card
+        // Same layout as ToolCard: the detail link is a full-card overlay, so
+        // the internal-network badge can sit beside it instead of nested inside
+        <div
           key={worker.id}
-          role="button"
-          tabIndex={0}
-          onClick={() =>
-            navigate({ to: '/workers/$id', params: { id: worker.id } })
-          }
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              navigate({ to: '/workers/$id', params: { id: worker.id } });
-            }
-          }}
-          className={`cursor-pointer p-1 transition-opacity hover:border-primary ${isWorkerOnline(worker) ? '' : 'opacity-50'}`}
+          className={`relative flex h-full flex-col items-start gap-2 rounded-lg border p-5 text-left transition-colors hover:border-primary hover:bg-accent/50 ${isWorkerOnline(worker) ? '' : 'opacity-50'}`}
         >
-          <CardContent className="p-3 space-y-4">
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-1 bg-muted rounded-lg">
-                  {worker.os ? (
-                    <img
-                      className="dark:brightness-0 dark:invert"
-                      width={30}
-                      height={30}
-                      src={`/${worker.os}.svg`}
-                      alt={worker.os}
-                    />
-                  ) : (
-                    <Server />
-                  )}
-                </div>
-                <div>
-                  <span className="text-sm">{worker.name}</span>
-                  <div className="flex items-center space-x-2">
-                    <WorkerStatus worker={worker} />
-                  </div>
-                </div>
-              </div>
+          <button
+            type="button"
+            aria-label={worker.name}
+            onClick={() =>
+              navigate({ to: '/workers/$id', params: { id: worker.id } })
+            }
+            className="absolute inset-0 rounded-lg cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+          <div className="flex w-full items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <LogoFrame className="shrink-0 overflow-hidden">
+                {worker.os ? (
+                  <img
+                    width={24}
+                    height={24}
+                    src={`/${worker.os}.svg`}
+                    alt={worker.os}
+                  />
+                ) : (
+                  <Server className="size-6 dark:text-black" />
+                )}
+              </LogoFrame>
+              <h3 className="truncate text-base font-semibold">
+                {worker.name}
+              </h3>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <WorkerStatus worker={worker} />
+            </div>
+          </div>
+          <div className="flex w-full items-center justify-between gap-2 text-sm text-muted-foreground">
+            {worker.currentJobsCount > 0 ? (
+              <span className="text-green-600">
+                {worker.currentJobsCount} active job
+                {worker.currentJobsCount > 1 ? 's' : ''}
+              </span>
+            ) : (
+              <span>No active jobs</span>
+            )}
+            <span>Created {dayjs(worker.createdAt).fromNow()}</span>
+          </div>
+          {worker.internalNetworkId && (
+            // Pinned to the bottom so badges line up across cards
+            <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-1">
               <Badge
+                asChild
                 variant="secondary"
-                className={`${worker.internalNetworkId ? 'cursor-pointer hover:bg-secondary/80' : ''}`}
-                onClick={(e) => {
-                  if (worker.internalNetworkId) {
-                    e.stopPropagation();
+                className="relative z-10 cursor-pointer hover:bg-secondary/80"
+              >
+                <button
+                  type="button"
+                  onClick={() =>
                     navigateWithParams(
                       `/internal-networks/${worker.internalNetworkId}`,
-                    );
+                    )
                   }
-                }}
-              >
-                {worker.internalNetworkId ? 'Internal network' : 'External'}
+                >
+                  Internal network
+                </button>
               </Badge>
-            </CardTitle>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">
-                {worker.toolsCount ?? 0} tool
-                {(worker.toolsCount ?? 0) === 1 ? '' : 's'} connected
-              </span>
-              <div className="flex justify-between">
-                {worker.currentJobsCount > 0 ? (
-                  <span className="text-sm text-green-600">
-                    {worker.currentJobsCount} active job
-                    {worker.currentJobsCount > 1 ? 's' : ''}
-                  </span>
-                ) : (
-                  <span className="text-sm text-muted-foreground">
-                    No active jobs
-                  </span>
-                )}
-              </div>
             </div>
-            <div className="text-sm text-muted-foreground text-right">
-              Created {dayjs(worker.createdAt).fromNow()}
-            </div>
-          </CardContent>
-        </Card>
+          )}
+        </div>
       ))}
     </div>
   );
@@ -265,39 +272,44 @@ const ListWorkers = () => {
       permission="worker.read"
       description="Workers connect your infrastructure to run scans."
     >
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="flex items-center justify-between mb-4">
-          <TabsList>
-            <TabsTrigger value="workspace">Workspace</TabsTrigger>
-            <TabsTrigger value="global">Global</TabsTrigger>
-          </TabsList>
+      {/* gap-4 = the 16px rhythm of the tools and integrations pages */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full gap-4">
+        <TabsList>
+          <TabsTrigger value="workspace">Workspace</TabsTrigger>
+          <TabsTrigger value="global">Global</TabsTrigger>
+        </TabsList>
+        {/* Same toolbar as DataTable (targets page): search and filters on
+            the left, actions on the right from md up; stacked below md */}
+        <div className="flex flex-col gap-2 md:flex-row-reverse md:items-center md:justify-between">
           {activeTab === 'workspace' && hasWorkspaceWorkers && (
-            <ConnectWorkerTrigger />
+            <div className="flex items-center gap-2 md:justify-end">
+              <ConnectWorkerTrigger />
+            </div>
           )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2 mb-4">
-          <div className="relative w-56 max-w-xs">
-            <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search workers..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9 pl-8 text-xs"
-            />
+          <div className="flex flex-wrap items-center gap-2 md:min-w-0 md:flex-1">
+            <div className="relative w-full md:min-w-48 md:flex-1 md:max-w-xs xl:max-w-sm">
+              <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search workers..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-9 pl-8 text-xs"
+              />
+            </div>
+            <Select
+              value={surface}
+              onValueChange={(value) => setSurface(value as WorkerSurface)}
+            >
+              <SelectTrigger className="w-[150px] border-dashed py-0 text-xs focus:outline-none focus:ring-0 focus:ring-offset-0">
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All types</SelectItem>
+                <SelectItem value="EXTERNAL">External</SelectItem>
+                <SelectItem value="INTERNAL">Internal</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <Select
-            value={surface}
-            onValueChange={(value) => setSurface(value as WorkerSurface)}
-          >
-            <SelectTrigger className="w-[130px] border-dashed py-0 text-xs focus:outline-none focus:ring-0 focus:ring-offset-0">
-              <SelectValue placeholder="Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All types</SelectItem>
-              <SelectItem value="EXTERNAL">External</SelectItem>
-              <SelectItem value="INTERNAL">Internal</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
         <TabsContent value="workspace">{renderTabContent()}</TabsContent>
         <TabsContent value="global">{renderTabContent()}</TabsContent>

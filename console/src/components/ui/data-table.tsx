@@ -219,11 +219,13 @@ export function DataTable<TData, TValue>({
               <div key={i}>{c}</div>
             ))}
           </div>
-          <div className="flex items-center gap-4">
+          {/* Filters sit beside the search and wrap under it when narrow;
+              toolbarComponents (the actions) keep the right side */}
+          <div className="flex flex-wrap items-center gap-2 md:min-w-0 md:flex-1">
             {filterColumnKey && (
               <Input
                 placeholder={filterPlaceholder}
-                className="w-full max-w-xs xl:max-w-sm"
+                className="w-full md:min-w-48 md:flex-1 md:max-w-xs xl:max-w-sm"
                 value={searchValue}
                 onChange={(e) => {
                   setSearchValue(e.target.value);

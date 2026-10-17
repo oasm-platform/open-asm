@@ -278,7 +278,7 @@ export function ListTargets() {
       filterColumnKey="value"
       filterValue={filter}
       onFilterChange={setFilter}
-      toolbarComponents={[
+      filterComponents={[
         <TargetTypeFilter
           key="type-filter"
           value={typeFilter}
@@ -294,8 +294,8 @@ export function ListTargets() {
           value={scopeFilter}
           onValueChange={handleScopeFilterChange}
         />,
-        <StartDiscoveryButton />,
       ]}
+      toolbarComponents={[<StartDiscoveryButton key="start-discovery" />]}
       totalItems={total}
       onRowClick={handleRowClick}
       rowClassName="cursor-pointer hover:bg-muted/50 transition-colors"

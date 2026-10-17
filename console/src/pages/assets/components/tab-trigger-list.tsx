@@ -11,7 +11,7 @@ type Prop = {
 export default function TriggerList({ tabTriggerList }: Prop) {
   return (
     <div className="w-full overflow-x-auto scrollbar-hide">
-      <TabsList className="rounded-none bg-transparent p-0 flex gap-2 w-max flex-nowrap">
+      <TabsList className="rounded-none bg-transparent p-0 flex w-max flex-nowrap">
         {tabTriggerList.map((e) => (
           <TabsTrigger
             key={e.value}
