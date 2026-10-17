@@ -17,7 +17,11 @@ const dto = {
   agentMode: AgentMode.ASK,
 } as unknown as SendMessageDto;
 
-function buildCompletions(allowed: boolean, agentConfig: unknown = null) {
+function buildCompletions(
+  allowed: boolean,
+  agentConfig: unknown = null,
+  online = true,
+) {
   const conversationRepository = {
     findOne: jest.fn(),
     create: jest.fn((v) => v),
@@ -37,6 +41,9 @@ function buildCompletions(allowed: boolean, agentConfig: unknown = null) {
       workersService: {
         isAgentWorkerForWorkspace: jest.fn().mockResolvedValue(allowed),
       },
+      remoteExecuteSubscribe: {
+        isAgentReady: jest.fn().mockReturnValue(online),
+      },
     },
   );
   return { service, conversationRepository };
@@ -52,6 +59,22 @@ describe('worker scope enforcement', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(
         service.workersService.isAgentWorkerForWorkspace,
+      ).toHaveBeenCalledWith('worker-1', 'ws-1');
+      expect(conversationRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects an allowed worker that is offline', async () => {
+      const { service, conversationRepository } = buildCompletions(
+        true,
+        null,
+        false,
+      );
+
+      await expect(
+        service.getOrCreateConversation(dto, 'ws-1', 'user-1'),
+      ).rejects.toThrow('Worker is offline');
+      expect(
+        service.remoteExecuteSubscribe.isAgentReady,
       ).toHaveBeenCalledWith('worker-1', 'ws-1');
       expect(conversationRepository.save).not.toHaveBeenCalled();
     });
@@ -99,6 +122,7 @@ describe('worker scope enforcement', () => {
       });
       const service = Object.assign(Object.create(AgentsService.prototype), {
         workersService: { getWorkers },
+        remoteExecuteSubscribe: { isAgentReady: () => true },
       }) as AgentsService;
 
       const result = await service.getAgentModesWithWorkers('ws-1');
@@ -109,6 +133,25 @@ describe('worker scope enforcement', () => {
       );
       expect(getWorkers.mock.calls[0][0]).not.toHaveProperty('scope');
       expect(result.workers.map((w) => w.id)).toEqual(['w1', 'g1']);
+    });
+
+    it('getAgentModesWithWorkers leaves out offline workers', async () => {
+      const getWorkers = jest.fn().mockResolvedValue({
+        data: [
+          { id: 'w-online', name: 'up', scope: WorkerScope.WORKSPACE },
+          { id: 'w-offline', name: 'down', scope: WorkerScope.WORKSPACE },
+        ],
+      });
+      const isAgentReady = jest.fn((id: string) => id === 'w-online');
+      const service = Object.assign(Object.create(AgentsService.prototype), {
+        workersService: { getWorkers },
+        remoteExecuteSubscribe: { isAgentReady },
+      }) as AgentsService;
+
+      const result = await service.getAgentModesWithWorkers('ws-1');
+
+      expect(result.workers.map((w) => w.id)).toEqual(['w-online']);
+      expect(isAgentReady).toHaveBeenCalledWith('w-offline', 'ws-1');
     });
 
     it('list_workers tool lists the workspace and global agent workers', async () => {

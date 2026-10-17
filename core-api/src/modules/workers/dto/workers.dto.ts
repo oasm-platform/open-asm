@@ -49,10 +49,6 @@ export class WorkerJoinDto {
 
   @ApiProperty({ required: false })
   @IsString()
-  signature: string;
-
-  @ApiProperty({ required: false })
-  @IsString()
   @IsOptional()
   token?: string;
 
@@ -73,6 +69,26 @@ export class WorkerAliveDto {
   @ApiProperty()
   @IsString()
   token: string;
+}
+
+export class WorkerJoinKeyResponseDto {
+  @ApiProperty({
+    description:
+      'Public id of the join key. `worker.joined` live events carry it as `joinKeyId`.',
+  })
+  id: string;
+
+  @ApiProperty({ description: 'One-time API key a worker joins with' })
+  apiKey: string;
+
+  @ApiProperty({ description: 'When the key expires (ISO 8601)' })
+  expiresAt: string;
+
+  @ApiProperty({
+    description:
+      'Seconds until the key expires, counted from this response. Prefer it over expiresAt to avoid client clock skew.',
+  })
+  expiresInSeconds: number;
 }
 
 export class GetManyWorkersDto extends GetManyBaseQueryParams {

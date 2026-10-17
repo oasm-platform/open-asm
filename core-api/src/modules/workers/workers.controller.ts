@@ -2,18 +2,20 @@ import {
   AGENT_SANDBOX_HEADER,
   WORKER_TOKEN_HEADER,
 } from '@/common/constants/app.constants';
-import { Public } from '@/common/decorators/app.decorator';
+import { Public, UserContext } from '@/common/decorators/app.decorator';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
 import { GrpcWorkerTokenGuard } from '@/common/guards/grpc-worker-token.guard';
+import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Metadata } from '@grpc/grpc-js';
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Logger,
   Param,
@@ -33,6 +35,7 @@ import {
   GetWorkerResponseDto,
   WorkerAliveDto,
   WorkerJoinDto,
+  WorkerJoinKeyResponseDto,
   WorkerListItemDto,
 } from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
@@ -42,6 +45,7 @@ import {
   RemoteExecuteSubscribeService,
 } from './remote-execute-subscribe.service';
 import { WorkersService } from './workers.service';
+import { WorkerJoinKeyService } from './worker-join-key.service';
 import { WorkerTelemetryService } from './worker-telemetry.service';
 import type {
   WorkerTelemetryAck,
@@ -80,6 +84,7 @@ export class WorkersController {
     private readonly grpcWorkerContext: GrpcWorkerContext,
     private readonly aliveStreamManager: AliveStreamManager,
     private readonly workerTelemetryService: WorkerTelemetryService,
+    private readonly workerJoinKeyService: WorkerJoinKeyService,
   ) {}
 
   @Doc({
@@ -108,6 +113,68 @@ export class WorkersController {
   @Post('join')
   join(@Body() dto: WorkerJoinDto) {
     return this.workersService.join(dto);
+  }
+
+  @Doc({
+    summary: 'Create a worker join key',
+    description:
+      'Issues a one-time API key a worker joins this workspace with. It expires after a few minutes and is consumed by the first successful join; the `worker.joined` live event carries its id as `joinKeyId`.',
+    response: {
+      serialization: WorkerJoinKeyResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('workspace.apikey')
+  @Post('join-keys')
+  createJoinKey(
+    @WorkspaceId() workspaceId: string,
+    @UserContext() user: UserContextPayload,
+  ): Promise<WorkerJoinKeyResponseDto> {
+    return this.workerJoinKeyService.create(workspaceId, user.id);
+  }
+
+  @Doc({
+    summary: 'Rotate a worker join key',
+    description:
+      'Deletes the join key `id` and issues a new one. An already expired or used key is simply replaced.',
+    response: {
+      serialization: WorkerJoinKeyResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('workspace.apikey')
+  @Post('join-keys/:id/rotate')
+  rotateJoinKey(
+    @Param('id', ParseUUIDPipe) id: string,
+    @WorkspaceId() workspaceId: string,
+    @UserContext() user: UserContextPayload,
+  ): Promise<WorkerJoinKeyResponseDto> {
+    return this.workerJoinKeyService.rotate(workspaceId, user.id, id);
+  }
+
+  @Doc({
+    summary: 'Revoke a worker join key',
+    description:
+      'Deletes the join key `id` before it expires, e.g. when the connect dialog closes.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('workspace.apikey')
+  @Delete('join-keys/:id')
+  async revokeJoinKey(
+    @Param('id', ParseUUIDPipe) id: string,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    await this.workerJoinKeyService.revoke(workspaceId, id);
+    return { message: 'Join key revoked' };
   }
 
   @Doc({
@@ -181,7 +248,6 @@ export class WorkersController {
   async grpcJoin(
     requests: {
       apiKey: string;
-      signature: string;
       token?: string;
       metadata?: { name?: string; os?: string; mode?: number | string };
     },
@@ -192,7 +258,6 @@ export class WorkersController {
 
     const worker = await this.workersService.join({
       apiKey: requests.apiKey,
-      signature: requests.signature,
       token: requests.token,
       metadata: requests.metadata,
       ipAddress,

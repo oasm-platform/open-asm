@@ -22,7 +22,6 @@ func TestProcessConnectorJobStampsOwnerWorkerID(t *testing.T) {
 	bridge = make(map[string]*bridgeEntry)
 	bridgeMu.Unlock()
 
-	t.Setenv("WORKER_SIGNATURE", "sig-owner-test")
 	t.Setenv("WORKER_TOKEN_FILE", filepath.Join(t.TempDir(), ".worker-token"))
 
 	client, jobsSrv, fakeRT := newWorkerTestSetup(t)
@@ -51,10 +50,11 @@ func TestProcessConnectorJobStampsOwnerWorkerID(t *testing.T) {
 		t.Fatalf("expected 1 Create call, got %d", len(fakeRT.CreateSpecs))
 	}
 
-	// Contract: hash("sig:" + WORKER_SIGNATURE), first 8 bytes hex-encoded.
-	// Duplicated here on purpose — the label format must not drift silently
-	// between grpcclient and its consumers.
-	sum := sha256.Sum256([]byte("sig:sig-owner-test"))
+	// Contract: hash("tok:" + <join token>), first 8 bytes hex-encoded. The
+	// test setup's fake Join issues token "tok". Duplicated here on purpose —
+	// the label format must not drift silently between grpcclient and its
+	// consumers.
+	sum := sha256.Sum256([]byte("tok:tok"))
 	want := hex.EncodeToString(sum[:8])
 
 	got := fakeRT.CreateSpecs[0].WorkerID

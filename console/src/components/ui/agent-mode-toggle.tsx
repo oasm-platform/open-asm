@@ -6,6 +6,7 @@ import {
   PromptInputButton,
 } from '@/components/ai-elements/prompt-input';
 import {
+  getAgentsControllerGetAgentModesQueryKey,
   SendMessageDtoAgentMode,
   useAgentsControllerGetAgentModes,
   WorkerInstanceScope,
@@ -13,9 +14,28 @@ import {
 import { ApprovalModeSelect } from '@/components/ui/approval-mode-select';
 import { Badge } from '@/components/ui/badge';
 import { useConnectWorkerState } from '@/hooks/useConnectWorkerState';
+import { useLiveEvents } from '@/hooks/use-live-events';
+import { useQueryClient } from '@tanstack/react-query';
 import { CheckIcon, InfinityIcon, MonitorIcon } from 'lucide-react';
-import { memo } from 'react';
+import { memo, useEffect } from 'react';
 import { toast } from 'sonner';
+
+/**
+ * The workers agents can use right now. The server lists only online ones;
+ * worker lifecycle events refresh the list so it never shows a stale worker.
+ */
+function useAgentWorkers() {
+  const queryClient = useQueryClient();
+  const query = useAgentsControllerGetAgentModes();
+
+  useLiveEvents('worker.*', () => {
+    void queryClient.invalidateQueries({
+      queryKey: getAgentsControllerGetAgentModesQueryKey(),
+    });
+  });
+
+  return { ...query, workers: query.data?.workers ?? [] };
+}
 
 interface AgentModeToggleProps {
   value: string;
@@ -30,8 +50,7 @@ export const AgentModeToggle = memo(function AgentModeToggle({
   onWorkerChange,
 }: AgentModeToggleProps) {
   const isAgent = value === SendMessageDtoAgentMode.agent;
-  const { data } = useAgentsControllerGetAgentModes();
-  const workers = data?.workers ?? [];
+  const { workers } = useAgentWorkers();
   const { openDialog } = useConnectWorkerState();
 
   const handleToggle = () => {
@@ -83,9 +102,20 @@ export const AgentModeSelect = memo(function AgentModeSelect({
   showToggle = true,
 }: AgentModeSelectProps) {
   const isAgent = value === SendMessageDtoAgentMode.agent;
-  const { data } = useAgentsControllerGetAgentModes();
+  const { workers, isSuccess, isFetching, refetch } = useAgentWorkers();
 
-  const workers = data?.workers ?? [];
+  // A chosen worker that went offline drops out of the list; fall back to
+  // Auto rather than send a pick the server would reject.
+  const selectedIsOffline =
+    !!selectedWorkerId &&
+    isSuccess &&
+    !isFetching &&
+    !workers.some((worker) => worker.id === selectedWorkerId);
+  useEffect(() => {
+    if (!selectedIsOffline) return;
+    onWorkerChange?.(null);
+    toast.info('The selected worker went offline, switched to Auto');
+  }, [selectedIsOffline, onWorkerChange]);
 
   const handleWorkerSelect = (workerId: string) => {
     // Toggle selection: deselect if same worker is clicked again
@@ -98,8 +128,14 @@ export const AgentModeSelect = memo(function AgentModeSelect({
       <ApprovalModeSelect />
 
       {isAgent && (
-        <PromptInputActionMenu>
-          <PromptInputActionMenuTrigger tooltip="Connected workers">
+        <PromptInputActionMenu
+          // Re-check on open: a worker can come online without an event
+          // reaching this list (its RemoteExecute stream opens after join).
+          onOpenChange={(open) => {
+            if (open) void refetch();
+          }}
+        >
+          <PromptInputActionMenuTrigger tooltip="Online workers">
             <MonitorIcon
               size={16}
               className={
@@ -156,7 +192,7 @@ export const AgentModeSelect = memo(function AgentModeSelect({
               </>
             ) : (
               <PromptInputActionMenuItem disabled>
-                No workers connected
+                No online workers
               </PromptInputActionMenuItem>
             )}
           </PromptInputActionMenuContent>

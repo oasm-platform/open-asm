@@ -12,6 +12,8 @@ export interface LiveEvent {
   time?: string;
   resourceType?: string;
   resourceId?: string;
+  /** Id of the one-time join key a new worker used (`worker.joined` only). */
+  joinKeyId?: string;
 }
 
 /** An exact name (`worker.joined`) or a whole domain (`worker.*`). */

@@ -10,6 +10,15 @@ export const API_GLOBAL_PREFIX = 'api';
 export const APP_NAME = 'Open Attack Surface Management';
 export const DEFAULT_ADMIN_ID = '00bd7b24-2f88-4e2f-84e0-835bf28e7905';
 export const WORKER_TIMEOUT = 60000; // milliseconds
+/**
+ * Lifetime of a one-time worker join key, in seconds. A key is consumed by the
+ * first successful join; rotating replaces it with a fresh one.
+ */
+export const WORKER_JOIN_KEY_TTL_SECONDS = 300;
+/** Redis key holding a join key's record: `workers:api:<apiKey>`. */
+export const WORKER_JOIN_KEY_PREFIX = 'workers:api:';
+/** Redis alias from a join key's public id to the key: `workers:api-id:<id>`. */
+export const WORKER_JOIN_KEY_ID_PREFIX = 'workers:api-id:';
 export const LIMIT_WORKSPACE_CREATE = 5;
 export const API_KEY_LENGTH = 36;
 export const MCP_API_KEY_HEADER = 'x-oasm-api-key';

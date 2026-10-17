@@ -36,6 +36,12 @@ export interface ClientEvent {
   time?: string;
   resourceType?: string;
   resourceId?: string;
+  /**
+   * Public id of the one-time join key a new worker used (`worker.joined`
+   * only). An opaque alias — never the key itself — so the console dialog
+   * that issued the key can recognize its own worker.
+   */
+  joinKeyId?: string;
 }
 
 /** True when `name` matches an entry of {@link CLIENT_EVENTS}. */

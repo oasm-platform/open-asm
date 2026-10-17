@@ -5,7 +5,6 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
-import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
@@ -19,6 +18,7 @@ import { RedisService } from '@/services/redis/redis.service';
 import { AliveStreamManager } from './alive-stream-manager.service';
 import { WorkerInstance } from './entities/worker.entity';
 import { WorkersService } from './workers.service';
+import { WorkerJoinKeyService } from './worker-join-key.service';
 import { WorkerTelemetryService } from './worker-telemetry.service';
 
 describe('WorkersService', () => {
@@ -29,7 +29,7 @@ describe('WorkersService', () => {
   let mockInternalNetworkRepository: Partial<Repository<any>>;
   let mockNetworkInterfaceRepository: Partial<Repository<any>>;
   let mockJobsRegistryService: Partial<JobsRegistryService>;
-  let mockApiKeysService: Partial<ApiKeysService>;
+  let mockJoinKeyService: { consume: jest.Mock };
   let mockConfigService: Partial<ConfigService>;
   let mockToolsService: Partial<ToolsService>;
   let mockRedisService: Partial<RedisService>;
@@ -87,11 +87,7 @@ describe('WorkersService', () => {
       },
     } as any;
 
-    mockApiKeysService = {
-      apiKeysRepository: {
-        findOne: jest.fn(),
-      },
-    } as any;
+    mockJoinKeyService = { consume: jest.fn().mockResolvedValue(null) };
 
     mockConfigService = {
       get: jest.fn(),
@@ -153,8 +149,8 @@ describe('WorkersService', () => {
           useValue: mockJobsRegistryService,
         },
         {
-          provide: ApiKeysService,
-          useValue: mockApiKeysService,
+          provide: WorkerJoinKeyService,
+          useValue: mockJoinKeyService,
         },
         {
           provide: ConfigService,
@@ -342,25 +338,20 @@ describe('WorkersService', () => {
   });
 
   describe('join - runMode', () => {
-    const WORKER_SIG = 'test-sig';
-
     beforeEach(() => {
-      // Default config: empty signature (matches empty from worker), no cloud key
+      // Default config: no cloud key
       (mockConfigService.get as jest.Mock).mockImplementation((key: string) => {
-        if (key === 'WORKER_SIGNATURE') return WORKER_SIG;
         if (key === 'OASM_CLOUD_APIKEY') return '';
         return undefined;
       });
     });
 
     it('should save runMode "node" when join with numeric mode=2', async () => {
-      (
-        mockApiKeysService.apiKeysRepository.findOne as jest.Mock
-      ).mockResolvedValue({
-        id: 'key-1',
-        type: 'WORKSPACE',
-        ref: 'ws-1',
-        key: 'api-key-1',
+      mockJoinKeyService.consume.mockResolvedValue({
+        id: 'jk-1',
+        workspaceId: 'ws-1',
+        createdBy: 'u-1',
+        createdAt: '2026-10-17T00:00:00.000Z',
       });
       (mockWorkerInstanceRepository.save as jest.Mock).mockImplementation(
         (data: Record<string, unknown>) => data,
@@ -378,7 +369,6 @@ describe('WorkersService', () => {
 
       const result = await service.join({
         apiKey: 'api-key-1',
-        signature: WORKER_SIG,
         metadata: { name: 'test', os: 'linux', mode: 2 },
       });
 
@@ -389,13 +379,11 @@ describe('WorkersService', () => {
     });
 
     it('should save runMode "node" when join with enum-string mode (grpc enums:String)', async () => {
-      (
-        mockApiKeysService.apiKeysRepository.findOne as jest.Mock
-      ).mockResolvedValue({
-        id: 'key-1',
-        type: 'WORKSPACE',
-        ref: 'ws-1',
-        key: 'api-key-1',
+      mockJoinKeyService.consume.mockResolvedValue({
+        id: 'jk-1',
+        workspaceId: 'ws-1',
+        createdBy: 'u-1',
+        createdAt: '2026-10-17T00:00:00.000Z',
       });
       (mockWorkerInstanceRepository.save as jest.Mock).mockImplementation(
         (data: Record<string, unknown>) => data,
@@ -413,7 +401,6 @@ describe('WorkersService', () => {
 
       const result = await service.join({
         apiKey: 'api-key-1',
-        signature: WORKER_SIG,
         metadata: { name: 'test', os: 'linux', mode: 'WORKER_RUN_MODE_NODE' },
       });
 
@@ -424,13 +411,11 @@ describe('WorkersService', () => {
     });
 
     it('should save runMode "cli" when join with numeric mode=1', async () => {
-      (
-        mockApiKeysService.apiKeysRepository.findOne as jest.Mock
-      ).mockResolvedValue({
-        id: 'key-1',
-        type: 'WORKSPACE',
-        ref: 'ws-1',
-        key: 'api-key-1',
+      mockJoinKeyService.consume.mockResolvedValue({
+        id: 'jk-1',
+        workspaceId: 'ws-1',
+        createdBy: 'u-1',
+        createdAt: '2026-10-17T00:00:00.000Z',
       });
       (mockWorkerInstanceRepository.save as jest.Mock).mockImplementation(
         (data: Record<string, unknown>) => data,
@@ -448,7 +433,6 @@ describe('WorkersService', () => {
 
       const result = await service.join({
         apiKey: 'api-key-1',
-        signature: WORKER_SIG,
         metadata: { name: 'test', os: 'linux', mode: 1 },
       });
 
@@ -459,13 +443,11 @@ describe('WorkersService', () => {
     });
 
     it('should save runMode null when join with no mode (legacy worker)', async () => {
-      (
-        mockApiKeysService.apiKeysRepository.findOne as jest.Mock
-      ).mockResolvedValue({
-        id: 'key-1',
-        type: 'WORKSPACE',
-        ref: 'ws-1',
-        key: 'api-key-1',
+      mockJoinKeyService.consume.mockResolvedValue({
+        id: 'jk-1',
+        workspaceId: 'ws-1',
+        createdBy: 'u-1',
+        createdAt: '2026-10-17T00:00:00.000Z',
       });
       (mockWorkerInstanceRepository.save as jest.Mock).mockImplementation(
         (data: Record<string, unknown>) => data,
@@ -483,7 +465,6 @@ describe('WorkersService', () => {
 
       const result = await service.join({
         apiKey: 'api-key-1',
-        signature: WORKER_SIG,
         metadata: { name: 'test', os: 'linux' },
         // mode is undefined — legacy worker
       });
@@ -504,15 +485,7 @@ describe('WorkersService', () => {
         ...existingWorker,
         runMode: 'node',
       };
-      // API key must be valid for the join to pass validation
-      (
-        mockApiKeysService.apiKeysRepository.findOne as jest.Mock
-      ).mockResolvedValue({
-        id: 'key-1',
-        type: 'WORKSPACE',
-        ref: 'ws-1',
-        key: 'api-key-1',
-      });
+      // The join key was consumed on the first join; the token alone resumes.
       (mockWorkerInstanceRepository.findOne as jest.Mock).mockImplementation(
         (opts: Record<string, unknown>) => {
           const where = opts.where as Record<string, unknown> | undefined;
@@ -530,7 +503,6 @@ describe('WorkersService', () => {
 
       const result = await service.join({
         apiKey: 'api-key-1',
-        signature: WORKER_SIG,
         token: 'tok-existing',
         metadata: { name: 'test', os: 'linux', mode: 2 },
       });
@@ -548,14 +520,6 @@ describe('WorkersService', () => {
         token: 'tok-existing',
         runMode: 'node',
       };
-      (
-        mockApiKeysService.apiKeysRepository.findOne as jest.Mock
-      ).mockResolvedValue({
-        id: 'key-1',
-        type: 'WORKSPACE',
-        ref: 'ws-1',
-        key: 'api-key-1',
-      });
       (mockWorkerInstanceRepository.findOne as jest.Mock).mockImplementation(
         (opts: Record<string, unknown>) => {
           const where = opts.where as Record<string, unknown> | undefined;
@@ -572,7 +536,6 @@ describe('WorkersService', () => {
 
       await service.join({
         apiKey: 'api-key-1',
-        signature: WORKER_SIG,
         token: 'tok-existing',
         metadata: { name: 'test', os: 'linux', mode: 2 },
       });
@@ -581,6 +544,172 @@ describe('WorkersService', () => {
         { id: 'w-existing' },
         expect.objectContaining({ runMode: expect.anything() }),
       );
+    });
+  });
+
+  describe('join - one-time join keys', () => {
+    beforeEach(() => {
+      (mockConfigService.get as jest.Mock).mockImplementation((key: string) =>
+        key === 'OASM_CLOUD_APIKEY' ? 'cloud-key' : undefined,
+      );
+      (mockWorkerInstanceRepository.save as jest.Mock).mockImplementation(
+        (data: Record<string, unknown>) => data,
+      );
+      (mockWorkerInstanceRepository as any).manager = {
+        query: jest.fn().mockResolvedValue(undefined),
+      };
+    });
+
+    it('creates a workspace worker for the key and announces it with joinKeyId', async () => {
+      mockJoinKeyService.consume.mockResolvedValue({
+        id: 'jk-1',
+        workspaceId: 'ws-1',
+        createdBy: 'u-1',
+        createdAt: '2026-10-17T00:00:00.000Z',
+      });
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 'w-1',
+        workspaceId: 'ws-1',
+      });
+
+      await service.join({ apiKey: 'join-key-1' });
+
+      expect(mockJoinKeyService.consume).toHaveBeenCalledWith('join-key-1');
+      const saved = (mockWorkerInstanceRepository.save as jest.Mock).mock
+        .calls[0][0];
+      expect(saved).toMatchObject({
+        type: WorkerType.BUILT_IN,
+        scope: WorkerScope.WORKSPACE,
+        workspace: { id: 'ws-1' },
+      });
+      expect(mockEventBridge.publishSafely).toHaveBeenCalledWith(
+        EVENT_CATALOG.worker.joined,
+        expect.objectContaining({
+          workspaceId: 'ws-1',
+          resourceId: 'w-1',
+          metadata: { joinKeyId: 'jk-1' },
+        }),
+        expect.anything(),
+      );
+    });
+
+    it('rejects a key that is unknown, expired, already used or a legacy DB key', async () => {
+      mockJoinKeyService.consume.mockResolvedValue(null);
+
+      await expect(service.join({ apiKey: 'used-key' })).rejects.toThrow(
+        'Join key is invalid, expired or already used',
+      );
+      expect(mockWorkerInstanceRepository.save).not.toHaveBeenCalled();
+      expect(mockEventBridge.publishSafely).not.toHaveBeenCalled();
+    });
+
+    it('joins cloud workers with OASM_CLOUD_APIKEY without touching join keys', async () => {
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 'w-cloud',
+        workspaceId: null,
+      });
+
+      await service.join({ apiKey: 'cloud-key' });
+
+      expect(mockJoinKeyService.consume).not.toHaveBeenCalled();
+      const saved = (mockWorkerInstanceRepository.save as jest.Mock).mock
+        .calls[0][0];
+      expect(saved.scope).toBe(WorkerScope.CLOUD);
+    });
+
+    it('resumes a known token when its join key is long gone (restart)', async () => {
+      mockJoinKeyService.consume.mockResolvedValue(null);
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 'w-existing',
+        token: 'tok-existing',
+        workspaceId: 'ws-1',
+        scope: WorkerScope.WORKSPACE,
+        runMode: null,
+      });
+
+      await service.join({ apiKey: 'used-key', token: 'tok-existing' });
+
+      expect(mockWorkerInstanceRepository.save).not.toHaveBeenCalled();
+      expect(mockEventBridge.publishSafely).toHaveBeenCalledWith(
+        EVENT_CATALOG.worker.rejoined,
+        expect.not.objectContaining({ metadata: expect.anything() }),
+        expect.anything(),
+      );
+    });
+
+    it('consumes a live key sent with a token of the same workspace and announces the rejoin with joinKeyId', async () => {
+      mockJoinKeyService.consume.mockResolvedValue({
+        id: 'jk-1',
+        workspaceId: 'ws-1',
+        createdBy: 'u-1',
+        createdAt: '2026-10-17T00:00:00.000Z',
+      });
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 'w-existing',
+        token: 'tok-existing',
+        workspaceId: 'ws-1',
+        scope: WorkerScope.WORKSPACE,
+        runMode: null,
+      });
+
+      await service.join({ apiKey: 'fresh-key', token: 'tok-existing' });
+
+      expect(mockJoinKeyService.consume).toHaveBeenCalledWith('fresh-key');
+      expect(mockWorkerInstanceRepository.save).not.toHaveBeenCalled();
+      expect(mockEventBridge.publishSafely).toHaveBeenCalledWith(
+        EVENT_CATALOG.worker.rejoined,
+        expect.objectContaining({
+          resourceId: 'w-existing',
+          metadata: { joinKeyId: 'jk-1' },
+        }),
+        expect.anything(),
+      );
+    });
+
+    it('creates a new worker when the token belongs to another workspace', async () => {
+      mockJoinKeyService.consume.mockResolvedValue({
+        id: 'jk-2',
+        workspaceId: 'ws-2',
+        createdBy: 'u-1',
+        createdAt: '2026-10-17T00:00:00.000Z',
+      });
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockImplementation(
+        (opts: { where: Record<string, unknown> }) =>
+          opts.where.token
+            ? {
+                id: 'w-old',
+                token: 'tok-old',
+                workspaceId: 'ws-1',
+                scope: WorkerScope.WORKSPACE,
+              }
+            : { id: 'w-new', workspaceId: 'ws-2' },
+      );
+
+      await service.join({ apiKey: 'fresh-key', token: 'tok-old' });
+
+      const saved = (mockWorkerInstanceRepository.save as jest.Mock).mock
+        .calls[0][0];
+      expect(saved).toMatchObject({ workspace: { id: 'ws-2' } });
+      expect(saved.token).not.toBe('tok-old');
+      expect(mockEventBridge.publishSafely).toHaveBeenCalledWith(
+        EVENT_CATALOG.worker.joined,
+        expect.objectContaining({
+          workspaceId: 'ws-2',
+          metadata: { joinKeyId: 'jk-2' },
+        }),
+        expect.anything(),
+      );
+    });
+
+    it('rejects an unknown token with no live key', async () => {
+      mockJoinKeyService.consume.mockResolvedValue(null);
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue(
+        null,
+      );
+
+      await expect(
+        service.join({ apiKey: 'used-key', token: 'tok-gone' }),
+      ).rejects.toThrow('Join key is invalid, expired or already used');
     });
   });
 
@@ -654,9 +783,6 @@ describe('WorkersService', () => {
 
     it('publishes worker.rejoined on a token rejoin', async () => {
       (mockConfigService.get as jest.Mock).mockReturnValue(undefined);
-      (
-        mockApiKeysService.apiKeysRepository!.findOne as jest.Mock
-      ).mockResolvedValue({ id: 'key-1', key: 'api-key-1' });
       (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue({
         id: 'w-existing',
         token: 'tok-existing',
@@ -665,7 +791,6 @@ describe('WorkersService', () => {
 
       await service.join({
         apiKey: 'api-key-1',
-        signature: '',
         token: 'tok-existing',
       });
 

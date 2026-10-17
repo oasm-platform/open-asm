@@ -224,6 +224,20 @@ describe('RemoteExecuteSubscribeService — agent worker scoping', () => {
     expect(seen.at(-1)).toMatchObject({ type: 4, sessionId: 'call-1' });
   });
 
+  it('isAgentReady is true only while an in-scope worker is connected', () => {
+    expect(service.isAgentReady('w-own', 'ws-1')).toBe(false);
+
+    const reg = service.registerWorker(
+      worker('w-own', 'ws-1', WorkerScope.WORKSPACE),
+    );
+    const sub = reg.observable.subscribe();
+    expect(service.isAgentReady('w-own', 'ws-1')).toBe(true);
+    expect(service.isAgentReady('w-own', 'ws-2')).toBe(false);
+
+    sub.unsubscribe();
+    expect(service.isAgentReady('w-own', 'ws-1')).toBe(false);
+  });
+
   it('fails an in-flight tool run at once when its worker disconnects', () => {
     const reg = service.registerWorker(
       worker('w-own', 'ws-1', WorkerScope.WORKSPACE),

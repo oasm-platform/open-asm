@@ -75,11 +75,10 @@ func (c *Client) RunWorkerStream(ctx context.Context, onCancel StreamCancelFunc)
 	if err := session.Send(&workers.WorkerToCore{
 		Payload: &workers.WorkerToCore_Register{
 			Register: &workers.RegisterRequest{
-				ApiKey:    c.apiKey,
-				Signature: c.signature,
-				Token:     &token,
-				Metadata:  &workers.WorkerMetadata{Name: &hostname, Os: &osName, Mode: &mode},
-				Version:   &version,
+				ApiKey:   c.apiKey,
+				Token:    &token,
+				Metadata: &workers.WorkerMetadata{Name: &hostname, Os: &osName, Mode: &mode},
+				Version:  &version,
 			},
 		},
 	}); err != nil {

@@ -241,6 +241,16 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
     }
   }
 
+  /**
+   * True when `workerId` is online for agents of `workspaceId` right now: its
+   * RemoteExecute stream is open and it may serve the workspace. The worker
+   * pickers list and accept only these, so a user can never choose a worker
+   * that could not run the command.
+   */
+  isAgentReady(workerId: string, workspaceId: string): boolean {
+    return this.canServe(workerId, workspaceId);
+  }
+
   /** A connected worker of this workspace, or a connected sandboxed global one. */
   private canServe(workerId: string, workspaceId: string): boolean {
     const connected = this.workerScope.get(workerId);

@@ -9,7 +9,13 @@ import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { cn } from '@/lib/utils';
-import { SendMessageDtoAgentMode } from '@/services/apis/gen/queries';
+import { useConnectWorkerState } from '@/hooks/useConnectWorkerState';
+import {
+  agentsControllerGetAgentModes,
+  getAgentsControllerGetAgentModesQueryKey,
+  SendMessageDtoAgentMode,
+} from '@/services/apis/gen/queries';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Plus, Sparkles } from 'lucide-react';
@@ -23,6 +29,27 @@ import {
   CONVERSATION_STARTERS,
 } from './components/landing-constants';
 import { PromptGroups } from './components/prompt-groups';
+
+const WORKER_READY_POLL_MS = 500;
+const WORKER_READY_TIMEOUT_MS = 10_000;
+
+/**
+ * Polls until `workerId` is listed as an online agent worker, or the timeout
+ * passes. True when it showed up.
+ */
+async function waitForAgentWorker(workerId: string): Promise<boolean> {
+  const deadline = Date.now() + WORKER_READY_TIMEOUT_MS;
+  for (;;) {
+    try {
+      const modes = await agentsControllerGetAgentModes();
+      if (modes.workers?.some((worker) => worker.id === workerId)) return true;
+    } catch {
+      // Transient; try again until the deadline.
+    }
+    if (Date.now() >= deadline) return false;
+    await new Promise((resolve) => setTimeout(resolve, WORKER_READY_POLL_MS));
+  }
+}
 
 interface AgentsLandingPageProps {
   /** Mode the page runs in; each mode has its own route. */
@@ -63,10 +90,20 @@ export default function AgentsLandingPage({
     enabled: !!selectedWorkspaceId,
   });
 
-  const handleSendMessage = useCallback(
-    (content: string, options?: { agentMode?: string }) => {
-      if (!content.trim() || isSending) return;
+  const queryClient = useQueryClient();
+  const { openDialog: openConnectWorker } = useConnectWorkerState();
+  // Set while a submit checks for online workers, so it cannot run twice.
+  const checkingWorkersRef = useRef(false);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
+  const startConversation = useCallback(
+    (content: string, mode: string, workerId: string | null) => {
       setIsSending(true);
 
       // Generate UUID v7 for new conversation and navigate immediately
@@ -74,8 +111,8 @@ export default function AgentsLandingPage({
       const navState: Record<string, unknown> = {
         pendingMessage: content.trim(),
         ...(selectedModel && { selectedModel }),
-        agentMode: options?.agentMode ?? agentMode,
-        workerId: selectedWorkerId,
+        agentMode: mode,
+        workerId,
       };
       void navigate({
         to: '/aistudio/conversations/$conversationId',
@@ -83,7 +120,72 @@ export default function AgentsLandingPage({
         state: navState,
       });
     },
-    [isSending, navigate, selectedModel, agentMode, selectedWorkerId],
+    [navigate, selectedModel],
+  );
+  // The resume after a worker joins runs later; it must use the latest one.
+  const startConversationRef = useRef(startConversation);
+  useEffect(() => {
+    startConversationRef.current = startConversation;
+  }, [startConversation]);
+
+  /**
+   * Resumes a submit held back for a worker: waits until the new worker can
+   * serve agents (its RemoteExecute stream opens just after the join), picks
+   * it and sends. If it is not ready in time, sends with Auto instead.
+   */
+  const resumeWithWorker = useCallback(
+    async (content: string, mode: string, workerId: string) => {
+      setIsSending(true);
+      const ready = await waitForAgentWorker(workerId);
+      void queryClient.invalidateQueries({
+        queryKey: getAgentsControllerGetAgentModesQueryKey(),
+      });
+      if (!mountedRef.current) return;
+      if (ready) setSelectedWorkerId(workerId);
+      startConversationRef.current(content, mode, ready ? workerId : null);
+    },
+    [queryClient],
+  );
+
+  const handleSendMessage = useCallback(
+    async (content: string, options?: { agentMode?: string }) => {
+      if (!content.trim() || isSending || checkingWorkersRef.current) return;
+      const mode = options?.agentMode ?? agentMode;
+
+      // Agent mode needs a worker: with none chosen and none online, connect
+      // one first and send once it has joined.
+      if (mode === SendMessageDtoAgentMode.agent && !selectedWorkerId) {
+        checkingWorkersRef.current = true;
+        let hasOnlineWorker = true;
+        try {
+          const modes = await agentsControllerGetAgentModes();
+          hasOnlineWorker = (modes.workers?.length ?? 0) > 0;
+        } catch {
+          // Unknown; let the send go through and the server decide.
+        } finally {
+          checkingWorkersRef.current = false;
+        }
+        if (!mountedRef.current) return;
+        if (!hasOnlineWorker) {
+          // Keep the message in the input in case the dialog is dismissed.
+          setInputText(content);
+          openConnectWorker(undefined, (workerId: string) => {
+            void resumeWithWorker(content, mode, workerId);
+          });
+          return;
+        }
+      }
+
+      startConversation(content, mode, selectedWorkerId);
+    },
+    [
+      isSending,
+      agentMode,
+      selectedWorkerId,
+      openConnectWorker,
+      resumeWithWorker,
+      startConversation,
+    ],
   );
 
   // A new chat starts from the user's last explicit choice, not a past conversation's
@@ -91,9 +193,13 @@ export default function AgentsLandingPage({
     restoreApprovalMode();
   }, []);
 
+  // Once per ?text= value: a submit held for a worker leaves isSending false,
+  // and re-running would open the connect dialog again.
+  const handledQueryTextRef = useRef<string | null>(null);
   useEffect(() => {
-    if (queryText && !isSending) {
-      handleSendMessage(queryText);
+    if (queryText && !isSending && handledQueryTextRef.current !== queryText) {
+      handledQueryTextRef.current = queryText;
+      void handleSendMessage(queryText);
       const url = new URL(window.location.href);
       url.searchParams.delete('text');
       window.history.replaceState({}, '', url.toString());
@@ -116,7 +222,7 @@ export default function AgentsLandingPage({
       }
       return;
     }
-    handleSendMessage(suggestion);
+    void handleSendMessage(suggestion);
   };
 
   if (!hasProviderConnected) {

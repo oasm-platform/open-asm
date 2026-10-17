@@ -20,6 +20,7 @@ import * as path from 'path';
 import { Repository } from 'typeorm';
 
 import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
+import { RemoteExecuteSubscribeService } from '@/modules/workers/remote-execute-subscribe.service';
 import { WorkersService } from '@/modules/workers/workers.service';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import {
@@ -376,6 +377,7 @@ export class AgentsCompletionsService {
     private readonly workspaceEncryption: WorkspaceEncryptionService,
     private readonly approvals: AgentsApprovalsService,
     private readonly workersService: WorkersService,
+    private readonly remoteExecuteSubscribe: RemoteExecuteSubscribeService,
     private readonly agentsConfig: AgentsConfigService,
     private readonly modelsCatalog: AgentsModelsCatalogService,
     private readonly subagents: AgentsSubagentsService,
@@ -795,6 +797,15 @@ export class AgentsCompletionsService {
     ) {
       throw new BadRequestException(
         'Worker is not available to agents in this workspace',
+      );
+    }
+    // Only an online worker may be chosen; an offline pick would never run.
+    if (
+      dto.workerId &&
+      !this.remoteExecuteSubscribe.isAgentReady(dto.workerId, workspaceId)
+    ) {
+      throw new BadRequestException(
+        'Worker is offline; choose an online worker or Auto',
       );
     }
     const agentConfig = await this.agentsConfig.find(workspaceId, userId);

@@ -2,7 +2,6 @@ import type { WrapperType } from '@/common/types/app.types';
 import { WORKER_TIMEOUT } from '@/common/constants/app.constants';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import {
-  ApiKeyType,
   AuditOutcome,
   JobStatus,
   WorkerScope,
@@ -25,7 +24,6 @@ import { Interval } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { LessThan, Repository, SelectQueryBuilder } from 'typeorm';
-import { ApiKeysService } from '../apikeys/apikeys.service';
 import { Asset } from '../assets/entities/assets.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import {
@@ -37,7 +35,6 @@ import { EventBridgeService } from '../event-bridge/publishing/event-bridge.serv
 import { InternalNetwork } from '../internal-networks/entities/internal-network.entity';
 import { NetworkInterface } from '../internal-networks/entities/network-interface.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
-import { Tool } from '../tools/entities/tools.entity';
 import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
 import { ToolsService } from '../tools/tools.service';
 import { Workspace } from '../workspaces/entities/workspace.entity';
@@ -46,6 +43,7 @@ import {
   MAX_RUNNING_JOBS_PER_WORKER,
 } from '@/common/constants/app.constants';
 import { AliveStreamManager } from './alive-stream-manager.service';
+import { WorkerJoinKeyService } from './worker-join-key.service';
 import { WorkerTelemetryService } from './worker-telemetry.service';
 import {
   GetManyWorkersDto,
@@ -80,7 +78,7 @@ export class WorkersService {
     @Inject(forwardRef(() => JobsRegistryService))
     private jobsRegistryService: WrapperType<JobsRegistryService>,
 
-    private apiKeyService: ApiKeysService,
+    private readonly workerJoinKeyService: WorkerJoinKeyService,
 
     private configService: ConfigService,
 
@@ -184,10 +182,15 @@ export class WorkersService {
   /**
    * Announces a worker lifecycle change to its workspace. Cloud workers have
    * no workspace and the bus carries no global events, so they are skipped.
+   *
+   * `joinKeyId` is the public id of the join key a new worker used; the live
+   * event stream forwards it so the console dialog that issued the key can
+   * tell its own worker from one joined with someone else's key.
    */
   private async publishWorkerEvent(
     event: CatalogEvent,
     worker: Pick<WorkerInstance, 'id' | 'workspaceId'> | null,
+    extra?: { joinKeyId?: string },
   ): Promise<void> {
     if (!worker?.workspaceId) return;
     await this.eventBridge.publishSafely(
@@ -197,6 +200,9 @@ export class WorkersService {
         outcome: AuditOutcome.Success,
         resourceType: 'worker',
         resourceId: worker.id,
+        ...(extra?.joinKeyId && {
+          metadata: { joinKeyId: extra.joinKeyId },
+        }),
       } satisfies EventEnvelopeData,
       { subject: `workspace:${worker.workspaceId}/worker:${worker.id}` },
     );
@@ -671,120 +677,94 @@ export class WorkersService {
   }
 
   /**
-   * Determines the worker type and scope based on the API key type.
-   * @param apiKeyType - The type of the API key.
-   * @returns An object containing the worker type and scope.
-   */
-  private determineWorkerTypeAndScope(apiKeyType: ApiKeyType): {
-    type: WorkerType;
-    scope: WorkerScope;
-  } {
-    if (apiKeyType === ApiKeyType.WORKSPACE) {
-      return {
-        type: WorkerType.BUILT_IN,
-        scope: WorkerScope.WORKSPACE,
-      };
-    }
-
-    return {
-      type: WorkerType.PROVIDER,
-      scope: WorkerScope.CLOUD,
-    };
-  }
-
-  /**
-   * Determines the worker association (workspace or tool) based on the API key type and reference.
-   * @param apiKeyType - The type of the API key.
-   * @param ref - The reference ID associated with the API key.
-   * @returns An object containing either the workspace or tool association.
-   */
-  private determineWorkerAssociation(
-    apiKeyType: ApiKeyType,
-    ref: string,
-  ): Partial<Pick<WorkerInstance, 'workspace' | 'tool'>> {
-    if (apiKeyType === ApiKeyType.WORKSPACE) {
-      return { workspace: { id: ref } as Workspace };
-    }
-    if (apiKeyType === ApiKeyType.TOOL) {
-      return { tool: { id: ref } as Tool };
-    }
-    return {};
-  }
-
-  /**
-   * Registers a worker in the database by creating a new worker instance.
-   * Handles both cloud workers (using cloud API key) and regular workers (using API keys).
+   * Registers a worker:
+   * - A live one-time join key is an explicit request to join its workspace,
+   *   so it always wins and is consumed (a key admits exactly one worker). A
+   *   token of a worker already in that workspace resumes it; otherwise a new
+   *   worker is created and the worker adopts the new token it gets back.
+   *   Either way the event carries `joinKeyId` for the dialog that issued it.
+   * - Without one, a known worker token resumes that worker — the usual
+   *   restart, whose join key is long gone.
+   * - Else `OASM_CLOUD_APIKEY` creates a cloud worker.
    *
    * @param dto - The data transfer object containing the API key.
    * @returns A promise that resolves to the created worker instance.
    */
   public async join(dto: WorkerJoinDto): Promise<WorkerInstance> {
-    const { apiKey, signature, token, metadata, ipAddress } = dto;
+    const { apiKey, token, metadata, ipAddress } = dto;
     const runMode = this.mapRunMode(metadata?.mode);
 
-    // 1. Validate signature first (mandatory)
-    const workerSignature =
-      this.configService.get<string>('WORKER_SIGNATURE') || '';
-
-    if (signature !== workerSignature) {
-      throw new UnauthorizedException('Invalid worker signature');
-    }
-
-    // 2. Validate API key
+    const existingWorker = token
+      ? await this.repo.findOne({ where: { token } })
+      : null;
     const cloudApiKey = this.configService.get<string>('OASM_CLOUD_APIKEY');
-    const isCloudWorker = cloudApiKey === apiKey;
+    const isCloudKey = !!cloudApiKey && cloudApiKey === apiKey;
 
-    // 3. For regular workers, validate API key exists in database
-    if (!isCloudWorker) {
-      const apiKeyRecord = await this.apiKeyService.apiKeysRepository.findOne({
-        where: { key: apiKey },
-      });
-      if (!apiKeyRecord) {
-        throw new RpcException(`API key not found: ${apiKey}`);
+    // 1. One-time join key
+    const joinKey = isCloudKey
+      ? null
+      : await this.workerJoinKeyService.consume(apiKey);
+    if (joinKey) {
+      if (
+        existingWorker?.scope === WorkerScope.WORKSPACE &&
+        existingWorker.workspaceId === joinKey.workspaceId
+      ) {
+        return this.rejoinWorker(existingWorker, ipAddress, runMode, {
+          joinKeyId: joinKey.id,
+        });
       }
+      const worker = await this.createWorkspaceWorker(
+        joinKey.workspaceId,
+        metadata,
+        ipAddress,
+        runMode,
+      );
+      await this.publishWorkerEvent(EVENT_CATALOG.worker.joined, worker, {
+        joinKeyId: joinKey.id,
+      });
+      return worker;
     }
 
-    // 4. Token rejoin: if token exists and is valid, allow rejoin for both cloud and regular workers
-    if (token) {
-      const existingWorker = await this.repo.findOne({
-        where: { token },
-      });
-      if (existingWorker) {
-        await this.fallbackWorkerRejoin(existingWorker.id);
-        const updates: Record<string, unknown> = {};
-        if (ipAddress) {
-          updates.ipAddress = ipAddress;
-        }
-        // Update runMode only if changed
-        if (runMode !== existingWorker.runMode) {
-          updates.runMode = runMode;
-        }
-        if (Object.keys(updates).length > 0) {
-          await this.repo.update({ id: existingWorker.id }, updates);
-        }
-        await this.publishWorkerEvent(
-          EVENT_CATALOG.worker.rejoined,
-          existingWorker,
-        );
-        return this.repo.findOne({
-          where: { id: existingWorker.id },
-        }) as Promise<WorkerInstance>;
-      }
+    // 2. Token rejoin
+    if (existingWorker) {
+      return this.rejoinWorker(existingWorker, ipAddress, runMode);
     }
 
-    // 5. Create new worker after successful authentication
-    if (isCloudWorker) {
+    // 3. Cloud worker
+    if (isCloudKey) {
       return this.createCloudWorker(metadata, ipAddress, runMode);
     }
 
-    const worker = await this.createRegularWorker(
-      apiKey,
-      metadata,
-      ipAddress,
-      runMode,
+    throw new RpcException('Join key is invalid, expired or already used');
+  }
+
+  /** Resumes `existingWorker`: reclaims its jobs and refreshes its details. */
+  private async rejoinWorker(
+    existingWorker: WorkerInstance,
+    ipAddress: string | undefined,
+    runMode: string | null,
+    extra?: { joinKeyId?: string },
+  ): Promise<WorkerInstance> {
+    await this.fallbackWorkerRejoin(existingWorker.id);
+    const updates: Record<string, unknown> = {};
+    if (ipAddress) {
+      updates.ipAddress = ipAddress;
+    }
+    // Update runMode only if changed
+    if (runMode !== existingWorker.runMode) {
+      updates.runMode = runMode;
+    }
+    if (Object.keys(updates).length > 0) {
+      await this.repo.update({ id: existingWorker.id }, updates);
+    }
+    await this.publishWorkerEvent(
+      EVENT_CATALOG.worker.rejoined,
+      existingWorker,
+      extra,
     );
-    await this.publishWorkerEvent(EVENT_CATALOG.worker.joined, worker);
-    return worker;
+    return this.repo.findOne({
+      where: { id: existingWorker.id },
+    }) as Promise<WorkerInstance>;
   }
 
   /**
@@ -826,41 +806,28 @@ export class WorkersService {
   }
 
   /**
-   * Creates a regular worker instance based on the provided API key.
-   * @param apiKey - The API key to validate and use for worker creation.
+   * Creates a worker scoped to `workspaceId`, the workspace its join key was
+   * issued for.
+   * @param workspaceId - The workspace the worker belongs to.
    * @param metadata - The worker metadata.
    * @param ipAddress - The IP address of the worker.
    * @returns A promise that resolves to the created worker.
    */
-  private async createRegularWorker(
-    apiKey: string,
+  private async createWorkspaceWorker(
+    workspaceId: string,
     metadata?: WorkerJoinDto['metadata'],
     ipAddress?: string,
     runMode?: string | null,
   ): Promise<WorkerInstance> {
-    const apiKeyRecord = await this.apiKeyService.apiKeysRepository.findOne({
-      where: { key: apiKey },
-    });
-
-    if (!apiKeyRecord) {
-      throw new RpcException(`API key not found: ${apiKey}`);
-    }
-
     const workerId = randomUUID();
     const TOKEN_LENGTH = 48;
-
-    const { type, scope } = this.determineWorkerTypeAndScope(apiKeyRecord.type);
-    const association = this.determineWorkerAssociation(
-      apiKeyRecord.type,
-      apiKeyRecord.ref,
-    );
 
     const data: Partial<WorkerInstance> = {
       id: workerId,
       token: generateToken(TOKEN_LENGTH),
-      type,
-      scope,
-      ...association,
+      type: WorkerType.BUILT_IN,
+      scope: WorkerScope.WORKSPACE,
+      workspace: { id: workspaceId } as Workspace,
       name: metadata?.name,
       os: metadata?.os,
       ipAddress,
@@ -874,7 +841,7 @@ export class WorkersService {
     });
 
     if (!worker) {
-      throw new Error('Failed to create regular worker');
+      throw new Error('Failed to create workspace worker');
     }
 
     return worker;
