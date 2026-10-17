@@ -33,6 +33,7 @@ import {
   GetWorkerResponseDto,
   WorkerAliveDto,
   WorkerJoinDto,
+  WorkerListItemDto,
 } from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
 import { AliveStreamManager } from './alive-stream-manager.service';
@@ -112,15 +113,15 @@ export class WorkersController {
   @Doc({
     summary: 'Get all workers with pagination and sorting.',
     description:
-      'Fetches a paginated list of all active security assessment workers in the cluster.',
+      'Fetches a paginated list of all active security assessment workers in the cluster. Each row carries only list fields; use GET /workers/:id for tools and details.',
     response: {
-      serialization: GetManyResponseDto(WorkerInstance),
+      serialization: GetManyResponseDto(WorkerListItemDto),
     },
   })
   @WorkspaceAccess('worker.read')
   @Get()
   getWorkers(@Query() query: GetManyWorkersDto) {
-    return this.workersService.getWorkers(query);
+    return this.workersService.getWorkerList(query);
   }
 
   @Doc({

@@ -103,6 +103,36 @@ export class GetManyWorkersDto extends GetManyBaseQueryParams {
 }
 
 /**
+ * One row of `GET /workers`: only what the worker list card shows. Everything
+ * else (tools, telemetry, network interfaces) lives on `GET /workers/:id`.
+ */
+export class WorkerListItemDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty({ required: false })
+  name?: string;
+
+  @ApiProperty({ required: false })
+  os?: string;
+
+  @ApiProperty()
+  isOnline: boolean;
+
+  @ApiProperty()
+  lastSeenAt: Date;
+
+  @ApiProperty()
+  createdAt: Date;
+
+  @ApiProperty({ required: false })
+  internalNetworkId?: string;
+
+  @ApiProperty()
+  currentJobsCount: number;
+}
+
+/**
  * A job a worker is running right now, as far as the worker diagram needs it:
  * enough to label the node that is scanning. Deliberately tiny — the detail
  * endpoint is polled every few seconds, and `/jobs-registry` is where full job

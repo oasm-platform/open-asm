@@ -788,6 +788,106 @@ describe('WorkersService', () => {
     });
   });
 
+  describe('getWorkerList', () => {
+    const createdAt = new Date('2026-10-01T00:00:00Z');
+    const lastSeenAt = new Date('2026-10-17T00:00:00Z');
+
+    const mockWorkerQuery = (rows: Record<string, unknown>[]) => {
+      const qb = {
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([rows, rows.length]),
+      };
+      (
+        mockWorkerInstanceRepository.createQueryBuilder as jest.Mock
+      ).mockReturnValue(qb);
+      return qb;
+    };
+
+    const mockJobCountQuery = (rows: { workerId: string; count: string }[]) => {
+      const qb = {
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue(rows),
+      };
+      (mockJobsRegistryService.repo as any).createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(qb);
+      return qb;
+    };
+
+    it('returns only the list fields, without tools or a tool join', async () => {
+      const workerQb = mockWorkerQuery([
+        {
+          id: 'w-1',
+          name: 'node-1',
+          os: 'linux',
+          lastSeenAt,
+          createdAt,
+          internalNetworkId: 'net-1',
+        },
+      ]);
+      mockJobCountQuery([{ workerId: 'w-1', count: '2' }]);
+      (mockAliveStreamManager.isActive as jest.Mock).mockReturnValue(true);
+
+      const result = await service.getWorkerList({
+        page: 1,
+        limit: 10,
+        scope: 'cloud',
+      } as any);
+
+      expect(workerQb.leftJoinAndSelect).not.toHaveBeenCalled();
+      expect(mockToolsService.getBuiltInTools).not.toHaveBeenCalled();
+      expect(result.total).toBe(1);
+      expect(result.data).toEqual([
+        {
+          id: 'w-1',
+          name: 'node-1',
+          os: 'linux',
+          isOnline: true,
+          lastSeenAt,
+          createdAt,
+          internalNetworkId: 'net-1',
+          currentJobsCount: 2,
+        },
+      ]);
+    });
+
+    it('counts active jobs of the whole page in one grouped query', async () => {
+      mockWorkerQuery([{ id: 'w-1' }, { id: 'w-2' }]);
+      const jobQb = mockJobCountQuery([{ workerId: 'w-2', count: '3' }]);
+
+      const result = await service.getWorkerList({ page: 1, limit: 10 } as any);
+
+      expect(
+        (mockJobsRegistryService.repo as any).createQueryBuilder,
+      ).toHaveBeenCalledTimes(1);
+      expect(jobQb.where).toHaveBeenCalledWith('j.workerId IN (:...workerIds)', {
+        workerIds: ['w-1', 'w-2'],
+      });
+      expect(result.data.map((w) => w.currentJobsCount)).toEqual([0, 3]);
+    });
+
+    it('skips the job count query for an empty page', async () => {
+      mockWorkerQuery([]);
+      const jobQb = mockJobCountQuery([]);
+
+      const result = await service.getWorkerList({ page: 1, limit: 10 } as any);
+
+      expect(jobQb.getRawMany).not.toHaveBeenCalled();
+      expect(result.data).toEqual([]);
+    });
+  });
+
   describe('getWorkerById', () => {
     const workerId = '11111111-1111-4111-8111-111111111111';
     const workspaceId = '22222222-2222-4222-8222-222222222222';

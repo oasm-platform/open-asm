@@ -2057,8 +2057,19 @@ export type WorkerJoinDto = {
   metadata?: WorkerMetadataDto;
 };
 
-export type GetManyWorkerInstanceDto = {
-  data: WorkerInstance[];
+export type WorkerListItemDto = {
+  id: string;
+  name?: string;
+  os?: string;
+  isOnline: boolean;
+  lastSeenAt: string;
+  createdAt: string;
+  internalNetworkId?: string;
+  currentJobsCount: number;
+};
+
+export type GetManyWorkerListItemDtoDto = {
+  data: WorkerListItemDto[];
   total: number;
   page: number;
   limit: number;
@@ -23791,7 +23802,7 @@ export const useWorkersControllerJoin = <TError = unknown, TContext = unknown>(
 };
 
 /**
- * Fetches a paginated list of all active security assessment workers in the cluster.
+ * Fetches a paginated list of all active security assessment workers in the cluster. Each row carries only list fields; use GET /workers/:id for tools and details.
  * @summary Get all workers with pagination and sorting.
  */
 export const workersControllerGetWorkers = (
@@ -23799,7 +23810,7 @@ export const workersControllerGetWorkers = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<GetManyWorkerInstanceDto>(
+  return orvalClient<GetManyWorkerListItemDtoDto>(
     { url: `/api/workers`, method: 'GET', params, signal },
     options,
   );
