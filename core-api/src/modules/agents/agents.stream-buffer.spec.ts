@@ -27,7 +27,10 @@ class FakeRedis {
 
   expire = jest.fn(async () => true);
 
-  exists = jest.fn(async () => this.entries.length > 0);
+  xlast = jest.fn(async () => {
+    const last = this.entries.at(-1);
+    return last ? { id: last.id, fields: { ...last.fields } } : null;
+  });
 
   xrange = jest.fn(async () =>
     this.entries.map((e) => ({ id: e.id, fields: { ...e.fields } })),
@@ -53,18 +56,6 @@ function build() {
     redis as unknown as RedisService,
   );
   return { redis, service };
-}
-
-/** Drains a resume stream to the strings it emits before it closes. */
-async function collect(stream: ReadableStream<string>): Promise<string[]> {
-  const reader = stream.getReader();
-  const out: string[] = [];
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (value !== undefined) out.push(value);
-  }
-  return out;
 }
 
 const tick = () => new Promise((r) => setImmediate(r));
@@ -113,15 +104,30 @@ describe('AgentsStreamBufferService', () => {
     expect(stream).toBeNull();
   });
 
-  it('replays the buffered chunks then closes on the done marker', async () => {
+  it('has nothing to resume once the run finished', async () => {
+    // The database holds the whole answer; replaying it would make the client
+    // append it again onto its own copy.
     const { service } = build();
     await service.append('c1', '{"n":1}');
     await service.append('c1', '{"n":2}');
     await service.finish('c1');
 
-    const stream = await service.createResumeStream('c1', () => false);
-    expect(stream).not.toBeNull();
-    expect(await collect(stream!)).toEqual(['{"n":1}', '{"n":2}']);
+    expect(await service.createResumeStream('c1', () => false)).toBeNull();
+  });
+
+  it('replays the buffered chunks of a run still producing them', async () => {
+    const { service } = build();
+    await service.append('c1', '{"n":1}');
+    await service.append('c1', '{"n":2}');
+
+    const stream = await service.createResumeStream('c1', () => true);
+    const reader = stream!.getReader();
+    expect((await reader.read()).value).toBe('{"n":1}');
+    expect((await reader.read()).value).toBe('{"n":2}');
+
+    await service.finish('c1');
+    await tick();
+    expect((await reader.read()).done).toBe(true);
   });
 
   it('replays the backlog, tails a live chunk, de-duplicates, then closes', async () => {

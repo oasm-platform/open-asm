@@ -475,6 +475,7 @@ export function useAgentChat({
   }, [conversationId, createdHereId]);
   const isNewConversation =
     !!conversationId && conversationId === createdHereId;
+  const [resumeOnMount] = useState(() => !isNewConversation);
 
   // Fetch messages with infinite scroll
   const {
@@ -580,13 +581,13 @@ export function useAgentChat({
     setMessages,
     regenerate,
     stop,
+    resumeStream,
   } = useChat({
     transport,
     id: conversationId || 'agent-new-chat',
-    // Reconnect to an in-progress run on mount (reload, or returning to the
-    // chat) and stream the rest, instead of polling the database for it.
-    // A chat just started here has no run to resume yet.
-    resume: !isNewConversation,
+    // No `resume` option: it resumes from an effect, which StrictMode runs
+    // twice, and two resumes of one run interleave into duplicate messages.
+    // The effect below resumes once instead.
     experimental_throttle: 50,
     onError: (error) => {
       // Ignore errors from user-initiated stops — not a real error
@@ -658,6 +659,17 @@ export function useAgentChat({
       }
     },
   });
+
+  // Reconnect to an in-progress run on mount (reload, or returning to the
+  // chat) and stream the rest, instead of polling the database for it.
+  // Decided once at mount: a chat just started here has no run to resume.
+  // The ref keeps it to one request, even when StrictMode re-runs the effect.
+  const resumeAttemptedRef = useRef(false);
+  useEffect(() => {
+    if (!resumeOnMount || !conversationId || resumeAttemptedRef.current) return;
+    resumeAttemptedRef.current = true;
+    void resumeStream();
+  }, [resumeOnMount, conversationId, resumeStream]);
 
   // Keep ref in sync
   useEffect(() => {

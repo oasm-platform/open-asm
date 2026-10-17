@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   regenerate: vi.fn(),
   refetch: vi.fn(),
   chatMessages: [] as UIMessage[],
-  resume: undefined as boolean | undefined,
+  resumeStream: vi.fn(),
   locationState: null as unknown,
 }));
 
@@ -24,7 +24,9 @@ vi.mock('@ai-sdk/react', () => ({
     onError: (error: Error) => void;
     resume?: boolean;
   }) => {
-    mocks.resume = options.resume;
+    // The hook resumes by itself: useChat's own resume (an effect StrictMode
+    // runs twice) must stay off
+    if (options.resume) throw new Error('useChat resume must stay off');
     mocks.onData = options.onData;
     mocks.onError = options.onError;
     return {
@@ -34,6 +36,7 @@ vi.mock('@ai-sdk/react', () => ({
       setMessages: vi.fn(),
       regenerate: mocks.regenerate,
       stop: vi.fn(),
+      resumeStream: mocks.resumeStream,
     };
   },
 }));
@@ -471,21 +474,46 @@ describe('useAgentChat stream resume', () => {
   beforeEach(() => {
     mocks.orvalClient.mockReset();
     mocks.orvalClient.mockResolvedValue({ id: 'c1' });
+    mocks.resumeStream.mockReset();
+    mocks.resumeStream.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
     mocks.locationState = null;
+    mocks.status = 'streaming';
   });
 
-  it('resumes the run of an existing conversation on mount', () => {
-    renderHook(() => useAgentChat({ conversationId: 'c1' }));
-    expect(mocks.resume).toBe(true);
+  it('resumes the run of an existing conversation once, even in StrictMode', () => {
+    // StrictMode runs effects twice; two resumes of one run interleave their
+    // writes into duplicate copies of the answer.
+    const { rerender } = renderHook(
+      () => useAgentChat({ conversationId: 'c1' }),
+      { reactStrictMode: true },
+    );
+    rerender();
+
+    expect(mocks.resumeStream).toHaveBeenCalledTimes(1);
   });
 
   it('does not resume a chat just started from the landing page', () => {
     // It has no row on the server yet, so a resume request would 404.
     mocks.locationState = { pendingMessage: 'scan example.com' };
     renderHook(() => useAgentChat({ conversationId: 'c1' }));
-    expect(mocks.resume).toBe(false);
+    expect(mocks.resumeStream).not.toHaveBeenCalled();
+  });
+
+  it('does not resume a new chat after its first answer ends', () => {
+    // Resuming then would replay the finished answer onto the shown copy.
+    mocks.locationState = { pendingMessage: 'scan example.com' };
+    mocks.status = 'streaming';
+    const { rerender } = renderHook(() =>
+      useAgentChat({ conversationId: 'c1' }),
+    );
+
+    mocks.status = 'ready';
+    rerender();
+    rerender();
+
+    expect(mocks.resumeStream).not.toHaveBeenCalled();
   });
 });

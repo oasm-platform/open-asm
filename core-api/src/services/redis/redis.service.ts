@@ -513,17 +513,6 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Whether a key currently exists.
-   *
-   * Uses `cacheClient` (never the `subscriber`, which rejects non-subscribe
-   * commands) so a resume handler can probe for a stream buffer without
-   * disturbing the pub/sub connection.
-   */
-  public async exists(key: string): Promise<boolean> {
-    return (await this.cacheClient.exists(key)) === 1;
-  }
-
-  /**
    * Reads a range of stream entries, oldest first (`XRANGE key start end`).
    *
    * `-`/`+` are the min/max id sentinels, so the default reads the whole
@@ -549,6 +538,29 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       }
       return { id: entryId, fields };
     });
+  }
+
+  /**
+   * The newest entry of a stream (`XREVRANGE key + - COUNT 1`), or null when
+   * the stream is empty or missing.
+   */
+  public async xlast(stream: string): Promise<StreamEntry | null> {
+    const response = (await this.client.xrevrange(
+      stream,
+      '+',
+      '-',
+      'COUNT',
+      1,
+    )) as [string, string[]][];
+    const [entry] = response;
+    if (!entry) return null;
+
+    const [entryId, values] = entry;
+    const fields: Record<string, string> = {};
+    for (let i = 0; i < values.length; i += 2) {
+      fields[values[i]] = values[i + 1];
+    }
+    return { id: entryId, fields };
   }
 
   /**

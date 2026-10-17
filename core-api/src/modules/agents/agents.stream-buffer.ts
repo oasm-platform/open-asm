@@ -25,7 +25,8 @@ export class AgentsStreamBufferService {
   private static readonly MAX_ENTRIES = 5_000;
   /** Key TTL while the run produces chunks; refreshed on every append. */
   private static readonly ACTIVE_TTL_SECONDS = 600;
-  /** Shorter TTL once done: just long enough for a late reconnect to replay. */
+  /** Shorter TTL once done: a finished run is never replayed, so it only
+   *  waits to be cleaned up. */
   private static readonly DONE_TTL_SECONDS = 120;
   /** Safety net: drop a resume whose run vanished without a done marker. */
   private static readonly IDLE_CHECK_MS = 10_000;
@@ -117,9 +118,11 @@ export class AgentsStreamBufferService {
     const key = this.key(conversationId);
     const channel = this.channel(conversationId);
 
-    if (!(await this.redis.exists(key)) && !isRunActive()) {
-      return null;
-    }
+    // A finished run has nothing to resume: the database holds the whole
+    // answer, and replaying it would append it again onto the client's copy.
+    const last = await this.redis.xlast(key);
+    if (last?.fields.done === '1') return null;
+    if (!last && !isRunActive()) return null;
 
     const redis = this.redis;
     const logger = this.logger;
