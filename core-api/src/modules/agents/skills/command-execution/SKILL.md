@@ -1,120 +1,54 @@
 ---
 name: command-execution
-description: Execute security scanning commands on remote worker agents. Use when you need to run CLI tools like nmap, subfinder, httpx, nuclei, or any shell command on worker nodes.
+description: How to run security tools on the conversation's worker — built-in tools with execute_remote_command, connector tools with run_tool_connector — and basic shell commands. Load before running any tool or command.
 ---
 
-# Command Execution
+# Running tools and commands
 
-Use this skill when you need to run CLI security tools on remote worker nodes via `execute_remote_command`.
+The worker runs tools through two separate calls. Which one to use depends on the tool's `type`.
 
-## Workflow
-
-### 1. Check Worker Availability
-
-Before executing commands, verify workers are online:
-
-```
-Use list_active_workers to confirm at least one worker is available.
-```
-
-If no workers are available, inform the user and suggest they wait or check worker status.
-
-### 2. Understand the Tool
-
-`execute_remote_command` runs arbitrary shell commands on remote workers.
-
-**Parameters:**
-- `command` (string, required): The shell command to execute
-
-**Output fields:**
-- `stdout`: Standard output
-- `stderr`: Standard error
-- `exitCode`: Process exit code (0 = success)
-- `error`: Error message if execution failed
-- `timedOut`: Whether the command exceeded timeout
-
-**Constraints:**
-- No PTY (non-interactive)
-- Strict timeout (60 seconds default)
-- OS-level permissions apply
-- Commands run in the worker's environment (tools must be installed)
-
-### 3. Choose the Right Tool
-
-Not everything needs remote execution. Use the right tool for the job:
-
-| Task | Tool |
+| Need | Use |
 |---|---|
-| Run CLI scanners (nmap, nuclei, subfinder, etc.) | `execute_remote_command` |
-| List workspace assets, vulns, ports, technologies | Use `enumerate_assets`, `discover_vulnerabilities`, `list_network_ports`, `fingerprint_technologies` |
-| Get details on a specific asset or vulnerability | Use `inspect_asset`, `investigate_vulnerability` |
-| Fetch a web page | Use `retrieve_web_page` |
+| A tool with `type: built_in` | `execute_remote_command`, calling the tool's binary by its `name` |
+| A tool with `type: connector` | `run_tool_connector` with the tool's `name` and a target |
+| A basic OS utility (DNS lookup, simple HTTP request, `ping`, `whois`) | `execute_remote_command` |
+| Workspace data (assets, ports, technologies, vulnerabilities) | the workspace data tools — no worker needed |
+| A public web page | `retrieve_web_page` |
 
-Only use `execute_remote_command` when you need to run a CLI tool that is not available through the built-in OASM tools.
+## 1. List the tools and read their type
 
-### 4. Build the Command
+1. Call `display_available_tools` with `agentTool: true`.
+2. Keep only tools with `agentTool`, `isInstalled` and `isReady` all true.
+3. Look at each tool's `type`: `built_in` → section 2, `connector` → section 3. Decide from `type` only, never from the name.
 
-Use standard CLI syntax. Examples by category:
+If the tool you need is missing, not installed or not ready, tell the user which one and that it can be installed from the Tools page.
 
-**Subdomain Discovery:**
+## 2. Built-in tools: `execute_remote_command`
+
+Built-in tool binaries are on the worker's PATH. Run them by `name` like any CLI:
+
 ```
 subfinder -d example.com -silent
-amass enum -passive -d example.com
+httpx -u https://example.com -silent -status-code -title
 ```
 
-**HTTP Probing:**
-```
-httpx -l subdomains.txt -status-code -title -tech-detect
-httpx -u https://example.com -follow-redirects -status-code
-```
+- Non-interactive, no PTY, about 60 seconds per command: use quiet/plain-output flags and keep scope small (one target, rate limits, timeouts).
+- Check `exitCode`, `stdout` and `stderr`; a "command not found" means the tool is not there — do not retry variants of it, and never install anything.
+- The same call runs basic OS utilities (`dig`, `curl -sI`, `ping -c 3`, `whois`).
 
-**Port Scanning:**
-```
-naabu -host example.com -top-ports 1000
-nmap -sV -sC -oX output.xml example.com
-nmap -p 80,443,8080,8443 example.com
-```
+## 3. Connector tools: `run_tool_connector`
 
-**Vulnerability Scanning:**
-```
-nuclei -u https://example.com -severity critical,high
-nuclei -l urls.txt -severity critical,high,medium
-```
+1. Run one with `run_tool_connector(tool, target)`; `tool` is the connector's `name` (its description lists the accepted slugs). Add `configProfileId` only when the user picked a profile.
+2. Output is capped. When `truncated` is true, call `read_tool_output(runId, pattern)` to pull the lines you need instead of paging through everything.
 
-**DNS Enumeration:**
-```
-dig example.com ANY
-dnsx -d example.com -silent
-```
+Never run a connector's binary through `execute_remote_command`, and never pass a built-in tool to `run_tool_connector`.
 
-**Screenshot Capture:**
-```
-gowitness file -f urls.txt -P ./screenshots
-```
+## Approvals
 
-**OSINT / Recon:**
-```
-theHarvester -d example.com -b all
-```
+A command or tool call may wait for the user's approval. If it is rejected, do not retry it.
 
-### 5. Execute and Analyze
+## Safety
 
-1. Run the command via `execute_remote_command`
-2. Check `exitCode` — non-zero may indicate partial results (e.g., nmap found nothing)
-3. Parse `stdout` for findings
-4. Check `stderr` for warnings or errors
-5. If the command times out, suggest breaking it into smaller scans or increasing scope
-
-### 6. Save Results
-
-After scanning, save important findings to memory:
-
-- Use `stm_write` to store scan results (e.g., key: `"subdomain_results"`, value: the output)
-- Use `ltm_append` to persist critical findings across conversations
-
-## Safety Rules
-
-- **Scope check**: Only run scans against targets within the workspace scope. Use `retrieve_targets` to verify scope before scanning.
-- **Avoid destructive flags**: Do not use `--rm`, `rm -rf`, or similar commands that could damage the worker.
-- **Prefer read-only scans**: Use `-sV` (version detection) over `-O` (OS detection) when possible — less intrusive.
-- **Rate limiting**: Add delays between bulk operations (e.g., `--rate-limit` flags) to avoid overwhelming targets.
+- Only targets in the workspace scope (`retrieve_targets`).
+- Nothing destructive, no denial of service, no changes to the worker.
+- Save results you will reuse with `stm_write`.

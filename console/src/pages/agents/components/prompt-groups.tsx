@@ -77,8 +77,12 @@ export function PromptGroups({
 
   return (
     // popLayout: the outgoing view leaves the flow at once, so chips and
-    // panel swap in place
-    <div ref={rootRef} className={cn('relative', className)}>
+    // panel swap in place. prompt-groups-reveal fades them in from the left
+    // when the page opens.
+    <div
+      ref={rootRef}
+      className={cn('prompt-groups-reveal relative', className)}
+    >
       <AnimatePresence initial={false} mode="popLayout">
         {active ? (
           <motion.div

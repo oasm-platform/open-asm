@@ -18,6 +18,7 @@ import { AgentsConfigService, withoutDisabledTools } from './agents.config';
 import { AgentsDefinitionsService } from './agents.definitions';
 import { AgentsModelsCatalogService } from './agents.models-catalog';
 import { AgentTool, READ_ONLY_TOOLS } from './agents.tools';
+import { currentToolName } from './tools/helpers';
 import type { AgentDefinitionResponseDto } from './dto/agent-definition.dto';
 import type { SubagentResponseDto } from './dto/conversation-stats.dto';
 import { AgentConversation } from './entities/agent-conversation.entity';
@@ -77,7 +78,9 @@ export function subagentToolNames(
   def: AgentDefinitionResponseDto,
   allowWrite = false,
 ): string[] {
-  const requested = def.metadata.tools ?? [...READ_ONLY_TOOLS];
+  const requested = (def.metadata.tools ?? [...READ_ONLY_TOOLS]).map(
+    currentToolName,
+  );
   const filtered = allowWrite
     ? requested
     : requested.filter((t) => READ_ONLY_TOOLS.has(t));
@@ -411,7 +414,6 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
         AgentMode.AGENT,
         undefined,
         conversation.id,
-        false,
         approval,
       ) as Record<string, Tool>;
       const tools = withoutDisabledTools(

@@ -484,6 +484,7 @@ export class AgentsService {
       summary: conversation.summary,
       workerId: conversation.workerId,
       metadata: await this.conversationMetadata(conversation),
+      subagents: await this.subagents.listForConversation(id),
     };
   }
 

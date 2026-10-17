@@ -50,20 +50,6 @@ vi.mock('@/components/ui/border-beam', () => ({
   ),
 }));
 
-vi.mock('@/pages/agents/components/agent-tools-tray', () => ({
-  AgentToolsTray: ({
-    onAgentModeChange,
-  }: {
-    onAgentModeChange: (mode: string) => void;
-  }) => (
-    <div data-testid="agent-tools-tray">
-      <button type="button" onClick={() => onAgentModeChange('agent')}>
-        Agent
-      </button>
-    </div>
-  ),
-}));
-
 describe('Agents Page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -87,7 +73,6 @@ describe('Agents Page', () => {
     await waitFor(() => {
       expect(screen.getByTestId('typewriter-text')).toBeInTheDocument();
       expect(screen.getByTestId('agent-prompt-input')).toBeInTheDocument();
-      expect(screen.getByTestId('agent-tools-tray')).toBeInTheDocument();
       expect(
         screen.getByRole('button', { name: 'Vulnerabilities' }),
       ).toBeInTheDocument();
@@ -118,10 +103,30 @@ describe('Agents Page', () => {
 
     const halo = await screen.findByTestId('landing-halo');
     expect(halo).toHaveAttribute('data-mode', 'ask');
+  });
 
-    // Agent mode can run commands on workers: the halo turns orange.
-    screen.getByRole('button', { name: 'Agent' }).click();
-    await waitFor(() => expect(halo).toHaveAttribute('data-mode', 'agent'));
+  it('opens in agent mode on the Agents route', async () => {
+    const { useLLMConfigs } = await import('@/hooks/use-llm-configs');
+    vi.mocked(useLLMConfigs).mockReturnValue({
+      providers: [{ isConnected: true, configId: '1', providerId: 'openai', model: 'gpt-4' }],
+      connectedProviders: [{ isConnected: true, configId: '1', providerId: 'openai', model: 'gpt-4' }],
+      preferredProvider: undefined,
+      hasProviderConnected: true,
+      isLoading: false,
+    } as unknown as ReturnType<typeof useLLMConfigs>);
+
+    renderWithProviders(<AgentsLandingPage initialAgentMode="agent" />, {
+      routePath: '/_authed/aistudio/agents',
+      initialEntries: ['/_authed/aistudio/agents'],
+    });
+
+    (await screen.findByTestId('border-beam')).click();
+
+    // Agent mode can run commands on workers: the halo is orange.
+    expect(await screen.findByTestId('landing-halo')).toHaveAttribute(
+      'data-mode',
+      'agent',
+    );
   });
 
   it('shows connect provider when no LLM provider connected', async () => {

@@ -157,6 +157,36 @@
   }
 }
 
+/* ── Landing prompt suggestions ────────────────────────────────────────
+ * Fades the suggestion chips in from left to right when the landing page
+ * opens: a soft-edged mask sweeps across them. The mask only lives in the
+ * keyframes (fill-mode backwards), so it is gone once the sweep ends.
+ */
+.prompt-groups-reveal {
+  animation: prompt-groups-reveal 900ms ease-out 200ms backwards;
+}
+
+@keyframes prompt-groups-reveal {
+  from {
+    mask-image: linear-gradient(to right, #000 40%, transparent 60%);
+    mask-size: 250% 100%;
+    mask-repeat: no-repeat;
+    mask-position: 100% 0;
+  }
+  to {
+    mask-image: linear-gradient(to right, #000 40%, transparent 60%);
+    mask-size: 250% 100%;
+    mask-repeat: no-repeat;
+    mask-position: 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prompt-groups-reveal {
+    animation: none;
+  }
+}
+
 /* ── Asset graph animations ─────────────────────────────────────────────
  * `graph-dash` drives the dashed `returns` edges (animated alert links);
  * `graph-glow-pulse` is the critical-service glow. Both are disabled for

@@ -62,4 +62,19 @@ describe('ToolCallDisplay for plans', () => {
     expect(screen.getByText('List Active Workers')).toBeInTheDocument();
     expect(screen.queryByRole('list')).not.toBeInTheDocument();
   });
+
+  it('shows the connector and target next to a connector run', () => {
+    render(
+      <ToolCallDisplay
+        toolCall={{
+          toolCallId: 't3',
+          toolName: 'run_tool_connector',
+          status: 'executing',
+          input: { tool: 'nuclei', target: 'example.com' },
+        }}
+      />,
+    );
+    expect(screen.getByText('Run Tool Connector')).toBeInTheDocument();
+    expect(screen.getByText('nuclei example.com')).toHaveClass('text-xs');
+  });
 });

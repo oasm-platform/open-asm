@@ -2691,7 +2691,6 @@ export class AgentsCompletionsService {
         agentMode,
         todosEmitter,
         conversation.id,
-        false,
         approval,
       ) as ToolSet),
       ...this.getPlanTools(planning, conversation.id, todosEmitter, {

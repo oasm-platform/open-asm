@@ -8,7 +8,7 @@ import {
 } from '@/common/enums/enum';
 import { AgentsCompletionsService } from './agents.completions';
 import { AgentsService } from './agents.service';
-import { AgentTool } from './agents.tools';
+import { listWorkersTool } from './tools/workspace.tools';
 import type { SendMessageDto } from './dto/message.dto';
 
 const dto = {
@@ -122,11 +122,10 @@ describe('worker scope enforcement', () => {
           },
         ],
       });
-      const agentTool = Object.assign(Object.create(AgentTool.prototype), {
-        workersService: { getWorkers },
-      }) as AgentTool;
-
-      const tool = agentTool.listWorkersTool('ws-1') as unknown as {
+      const tool = listWorkersTool(
+        { workersService: { getWorkers } } as never,
+        'ws-1',
+      ) as unknown as {
         execute: (params: unknown, options: unknown) => Promise<unknown>;
       };
       const result = (await tool.execute({}, {})) as {

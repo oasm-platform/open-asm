@@ -12,7 +12,7 @@ describe('McpService', () => {
       Promise.resolve({ target }),
     );
     const agentTool = {
-      getTools: jest.fn().mockReturnValue({
+      getMcpTools: jest.fn().mockReturnValue({
         scan_target: tool({
           description: 'Scan one target',
           inputSchema: z.object({ target: z.string() }),

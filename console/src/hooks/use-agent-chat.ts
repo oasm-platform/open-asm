@@ -2,12 +2,14 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import type { UIMessage } from 'ai';
 import type { AgentTodoItem } from '@/pages/agents/components/agent-todo-panel';
+import { isSubagentActive } from '@/pages/agents/components/subagents-panel';
 import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import {
   agentsControllerStopConversation,
   useAgentsControllerGetMessagesInfinite,
   type ConversationMetadataDto,
   type ConversationResponseDto,
+  type SubagentResponseDto,
 } from '@/services/apis/gen/queries';
 import { orvalClient } from '@/services/apis/axios-client';
 import {
@@ -145,6 +147,8 @@ interface UseAgentChatReturn {
   todos: AgentTodoItem[];
   /** Model, context usage and token/cost stats of the conversation */
   conversationMeta: ConversationMetadataDto | null;
+  /** Background subagents: from the detail, then from stream updates */
+  subagents: SubagentResponseDto[];
   selectedModel: SelectedModel | null;
   agentMode: string;
   selectedWorkerId: string | null;
@@ -274,6 +278,21 @@ function messagesSignature(messages: UIMessage[]): string {
     .join('|');
 }
 
+/**
+ * What to seed useChat with: the saved messages, minus a trailing assistant
+ * that the server is still producing. Resuming replays that message from the
+ * start, so seeding the database copy would show it twice.
+ */
+export function seedFromSaved(
+  savedMessages: UIMessage[],
+  pages: Array<{ data?: unknown[] } | unknown[]> | undefined,
+): UIMessage[] {
+  const trailingInProgress =
+    isServerStreaming(pages) &&
+    savedMessages.at(-1)?.role === 'assistant';
+  return trailingInProgress ? savedMessages.slice(0, -1) : savedMessages;
+}
+
 function mapDbMessagesToUI(
   pages: Array<{ data?: unknown[]; items?: unknown[]; messages?: unknown[] } | unknown[]>,
 ): UIMessage[] {
@@ -387,6 +406,11 @@ export function useAgentChat({
   const [createdAt, setCreatedAt] = useState<string | null>(null);
   const [conversationMeta, setConversationMeta] =
     useState<ConversationMetadataDto | null>(null);
+  const [subagents, setSubagents] = useState<SubagentResponseDto[]>([]);
+  const subagentsRef = useRef(subagents);
+  useEffect(() => {
+    subagentsRef.current = subagents;
+  }, [subagents]);
   const { appendEvent, eventsMap } = useRemoteExecuteStream();
   // Parallel tool calls can each need approval, so keep a queue
   const [approvalQueue, setApprovalQueue] = useState<PendingApproval[]>([]);
@@ -451,6 +475,7 @@ export function useAgentChat({
   }, [conversationId, createdHereId]);
   const isNewConversation =
     !!conversationId && conversationId === createdHereId;
+  const [resumeOnMount] = useState(() => !isNewConversation);
 
   // Fetch messages with infinite scroll
   const {
@@ -500,6 +525,13 @@ export function useAgentChat({
     return mapDbMessagesToUI(pages);
   }, [messagesData]);
 
+  // What seeds useChat. `savedMessages` itself stays whole, so the view (and
+  // the polling fallback) still shows the partial until resume takes over.
+  const seedMessages: UIMessage[] = useMemo(
+    () => seedFromSaved(savedMessages, messagesData?.pages),
+    [savedMessages, messagesData],
+  );
+
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
@@ -507,6 +539,12 @@ export function useAgentChat({
         headers: selectedWorkspaceId
           ? { 'x-workspace-id': selectedWorkspaceId }
           : {},
+        // On mount (resume), reconnect to a run still producing the answer.
+        // A plain GET; the server replays from the start and 204s when there
+        // is nothing to resume. The transport headers (workspace id) carry over.
+        prepareReconnectToStreamRequest: ({ id }) => ({
+          api: `/api/agents/conversations/${id}/stream`,
+        }),
         prepareSendMessagesRequest: ({ messages }) => {
           const lastMessage = messages[messages.length - 1];
           const textContent =
@@ -543,9 +581,13 @@ export function useAgentChat({
     setMessages,
     regenerate,
     stop,
+    resumeStream,
   } = useChat({
     transport,
     id: conversationId || 'agent-new-chat',
+    // No `resume` option: it resumes from an effect, which StrictMode runs
+    // twice, and two resumes of one run interleave into duplicate messages.
+    // The effect below resumes once instead.
     experimental_throttle: 50,
     onError: (error) => {
       // Ignore errors from user-initiated stops — not a real error
@@ -604,12 +646,30 @@ export function useAgentChat({
           | undefined;
         if (payload?.metadata) setConversationMeta(payload.metadata);
       }
+      if (data.type === 'data-subagents-updated') {
+        // Sent on every subagent status change, with the whole list
+        const payload = data.data as
+          | { subagents?: SubagentResponseDto[] }
+          | undefined;
+        if (payload?.subagents) setSubagents(payload.subagents);
+      }
       if (data.type === 'data-remote-execute-output') {
         const event = data.data as import('@/hooks/use-remote-execute-stream').RemoteExecuteStreamEvent;
         appendEvent(event);
       }
     },
   });
+
+  // Reconnect to an in-progress run on mount (reload, or returning to the
+  // chat) and stream the rest, instead of polling the database for it.
+  // Decided once at mount: a chat just started here has no run to resume.
+  // The ref keeps it to one request, even when StrictMode re-runs the effect.
+  const resumeAttemptedRef = useRef(false);
+  useEffect(() => {
+    if (!resumeOnMount || !conversationId || resumeAttemptedRef.current) return;
+    resumeAttemptedRef.current = true;
+    void resumeStream();
+  }, [resumeOnMount, conversationId, resumeStream]);
 
   // Keep ref in sync
   useEffect(() => {
@@ -635,6 +695,31 @@ export function useAgentChat({
       setCreatedHereId(undefined);
     }
   }, [isStreaming, createdHereId]);
+
+  // Subagent updates only arrive on this page's stream. When the run ends
+  // (or the run polled after a reload does) with one still queued/running,
+  // reload the detail once to catch changes the stream did not carry.
+  const wasBusyRef = useRef(isBusy);
+  useEffect(() => {
+    const ended = wasBusyRef.current && !isBusy;
+    wasBusyRef.current = isBusy;
+    if (!ended || !conversationId) return;
+    if (!subagentsRef.current.some(isSubagentActive)) return;
+    let cancelled = false;
+    orvalClient<ConversationResponseDto>({
+      url: `/api/agents/conversations/${conversationId}`,
+      method: 'GET',
+    })
+      .then((data) => {
+        if (!cancelled) setSubagents(data.subagents ?? []);
+      })
+      .catch(() => {
+        // Keeps the last known list
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isBusy, conversationId]);
 
   // A pending approval can never outlive its stream
   useEffect(() => {
@@ -695,22 +780,24 @@ export function useAgentChat({
     setMessagesRef.current = setMessages;
   }, [setMessages]);
 
-  // Sync history whenever savedMessages changes but not while streaming
+  // Sync history whenever savedMessages changes but not while streaming.
+  // Seeds the stripped copy (seedMessages), so a message a resume will replay
+  // is not seeded here and then duplicated by the replay.
   useEffect(() => {
     if (!conversationId || isLoadingHistory || isStreamingRef.current) return;
-    if (savedMessages.length > 0) {
+    if (seedMessages.length > 0) {
       // Use functional update to compare and avoid unnecessary re-renders.
       // Compare a lightweight signature (id + part count) rather than only ids:
       // a polled run keeps the same id while its parts grow, and skipping on
       // id alone would freeze the UI on the stale streaming placeholder.
       setMessagesRef.current((prev) => {
-        if (messagesSignature(prev) === messagesSignature(savedMessages)) {
+        if (messagesSignature(prev) === messagesSignature(seedMessages)) {
           return prev;
         }
-        return savedMessages;
+        return seedMessages;
       });
     }
-  }, [conversationId, isLoadingHistory, savedMessages]);
+  }, [conversationId, isLoadingHistory, seedMessages]);
 
   // Display chatMessages when available, otherwise fall back to savedMessages
   const messages: UIMessage[] =
@@ -919,6 +1006,8 @@ export function useAgentChat({
 
   // Fetch initial todos and agentMode for existing conversations
   useEffect(() => {
+    // Subagents belong to one conversation: never show the previous one's
+    setSubagents([]);
     if (!conversationId) {
       setTodos([]);
       setConversationMeta(null);
@@ -959,6 +1048,7 @@ export function useAgentChat({
         }
         if (!cancelled) {
           setConversationMeta(data.metadata ?? null);
+          setSubagents(data.subagents ?? []);
         }
         const savedApprovalMode = (data as { approvalMode?: string })
           .approvalMode;
@@ -1036,6 +1126,7 @@ export function useAgentChat({
     retryAttempt: retryCount,
     todos,
     conversationMeta,
+    subagents,
     title,
     createdAt,
     selectedModel,

@@ -18,6 +18,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  NotFoundException,
   Param,
   Patch,
   Post,
@@ -34,6 +35,7 @@ import { AgentsApprovalsService } from './agents.approvals';
 import { AgentsConfigService } from './agents.config';
 import { AgentsDefinitionsService } from './agents.definitions';
 import { AgentsService } from './agents.service';
+import { AgentsStreamBufferService } from './agents.stream-buffer';
 import {
   AgentConfigResponseDto,
   UpsertAgentConfigDto,
@@ -104,6 +106,7 @@ export class AgentsController {
     private readonly agentsApprovalsService: AgentsApprovalsService,
     private readonly agentsConfigService: AgentsConfigService,
     private readonly agentsDefinitionsService: AgentsDefinitionsService,
+    private readonly agentsStreamBuffer: AgentsStreamBufferService,
   ) {}
 
   @WorkspaceAccess('agent.read')
@@ -543,6 +546,9 @@ export class AgentsController {
           conversationId,
           abortController,
         );
+        // Start this run's resumable buffer from empty, discarding any left by
+        // a previous run of the conversation.
+        await this.agentsStreamBuffer.reset(conversationId);
       }
 
       if (canWrite()) {
@@ -579,10 +585,17 @@ export class AgentsController {
 
           const { done, value } = await reader.read();
           if (done) break;
+          const chunkJson = JSON.stringify(value);
+          // Buffer every chunk so a reconnecting client can replay it. Await
+          // to keep Redis order matching the write order; it swallows its own
+          // errors, so it never breaks the live stream.
+          if (activeConversationId) {
+            await this.agentsStreamBuffer.append(activeConversationId, chunkJson);
+          }
           // Keep reading even after the client left, so the run reaches its
           // end and persists; just stop writing to the dead socket.
           if (canWrite()) {
-            res.write(`data: ${JSON.stringify(value)}\n\n`);
+            res.write(`data: ${chunkJson}\n\n`);
           }
         }
         // Send [DONE] marker to properly terminate the SSE stream
@@ -632,6 +645,9 @@ export class AgentsController {
       res.off('close', onClientDisconnect);
       if (activeConversationId) {
         const conversationId = activeConversationId;
+        // The reader loop has ended, so no more chunks will be appended: close
+        // the resumable buffer so any reconnecting client stops waiting.
+        void this.agentsStreamBuffer.finish(conversationId);
         const clear = () =>
           this.agentsCompletionsService.clearActiveRun(
             conversationId,
@@ -675,6 +691,85 @@ export class AgentsController {
     await this.agentsService.getConversation(id, workspaceId, userId);
     const stopped = this.agentsCompletionsService.stopRun(id);
     return { message: stopped ? 'Response stopped' : 'No active response' };
+  }
+
+  @WorkspaceAccess('agent.read')
+  @Get('conversations/:id/stream')
+  @Doc({
+    summary: 'Resume the active response stream',
+    description:
+      'Reconnects to a run still producing the conversation\'s answer and ' +
+      'streams the rest via SSE, replaying what was produced before the ' +
+      'reconnect. Returns 204 when there is nothing to resume.',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Conversation ID' }],
+    },
+  })
+  async resumeStream(
+    @Param('id') id: string,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    // Ownership check. A chat started on the client has no row until its first
+    // message is saved, so a missing conversation has nothing to resume: 204,
+    // not 404, which the client would report as a stream error.
+    try {
+      await this.agentsService.getConversation(id, workspaceId, userId);
+    } catch (error) {
+      if (!(error instanceof NotFoundException)) throw error;
+      res.status(HttpStatus.NO_CONTENT).end();
+      return;
+    }
+
+    const stream = await this.agentsStreamBuffer.createResumeStream(id, () =>
+      this.agentsCompletionsService.isRunActive(id),
+    );
+    if (!stream) {
+      res.status(HttpStatus.NO_CONTENT).end();
+      return;
+    }
+
+    const canWrite = () => !res.writableEnded;
+    let clientGone = false;
+    const onClientDisconnect = () => {
+      clientGone = true;
+    };
+    res.on('close', onClientDisconnect);
+
+    res.socket?.setNoDelay(true);
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Content-Encoding', 'identity');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    const keepaliveInterval = setInterval(() => {
+      if (canWrite()) res.write(':keepalive\n\n');
+    }, 15_000);
+
+    const reader = stream.getReader();
+    try {
+      while (true) {
+        if (clientGone) {
+          await reader.cancel();
+          break;
+        }
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (canWrite()) res.write(`data: ${value}\n\n`);
+      }
+      if (canWrite()) {
+        res.write('data: [DONE]\n\n');
+        res.end();
+      }
+    } catch {
+      if (!res.writableEnded) res.end();
+    } finally {
+      clearInterval(keepaliveInterval);
+      res.off('close', onClientDisconnect);
+    }
   }
 
   @WorkspaceAccess('agent.write')
