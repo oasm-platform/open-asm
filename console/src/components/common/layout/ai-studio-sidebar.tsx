@@ -247,7 +247,7 @@ export function AiStudioSidebar() {
     <AppSidebar
       groups={[]}
       primary={false}
-      title="AI Studio"
+      title="OASM AI Studio"
       showSwitchWorkspace={false}
     >
       <SidebarGroup className="p-0">

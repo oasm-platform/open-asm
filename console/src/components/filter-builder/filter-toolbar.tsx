@@ -29,7 +29,7 @@ export function FilterToolbar({ fields, value, onApply, search, onSearchChange }
           </Button>
         </PopoverTrigger>
         <PopoverAnchor asChild>
-          <div className="relative flex h-9 min-w-0 flex-1 items-center rounded-md border px-2">
+          <div className="relative flex h-9 min-w-0 flex-1 items-center rounded-md border border-input bg-transparent px-2 dark:bg-input/30">
             <Search className="size-4 shrink-0 text-muted-foreground" />
             {count > 0 ? (
               <button type="button" className="min-w-0 flex-1 truncate px-2 text-left font-mono text-sm"

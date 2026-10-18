@@ -47,6 +47,7 @@ describe('TargetsService', () => {
       delete: jest.fn(),
       findOne: jest.fn(),
       findByIds: jest.fn(),
+      query: jest.fn().mockResolvedValue([]),
       manager: {
         transaction: jest.fn(),
         getRepository: jest.fn(),
@@ -1309,6 +1310,57 @@ describe('TargetsService', () => {
       });
     });
 
+    it('getTargetsInWorkspace returns a logo per target: favicon for hosts, avatar for GitHub orgs', async () => {
+      const builder = baseBuilder();
+      builder.getCount.mockResolvedValue(3);
+      builder.getRawMany.mockResolvedValue([
+        { id: 'domain-1', value: 'example.com', source: 'MANUAL', type: 'DOMAIN' },
+        { id: 'ip-1', value: '10.0.0.1', source: 'MANUAL', type: 'IP' },
+        { id: 'org-1', value: 'github.com/acme', source: 'github', type: 'GIT_ORG' },
+      ]);
+      (mockTargetRepository.createQueryBuilder as jest.Mock).mockReturnValue(
+        builder,
+      );
+      (mockTargetRepository.query as jest.Mock).mockResolvedValue([
+        { targetId: 'domain-1', faviconUrl: 'https://example.com/favicon.ico' },
+      ]);
+
+      const result = await service.getTargetsInWorkspace(
+        { page: 1, limit: 10, sortBy: 'value', sortOrder: 'ASC' },
+        'ws-1',
+      );
+
+      // Only host targets are looked up, in a single query.
+      expect(mockTargetRepository.query).toHaveBeenCalledTimes(1);
+      expect(mockTargetRepository.query).toHaveBeenCalledWith(
+        expect.any(String),
+        [['domain-1', 'ip-1']],
+      );
+      expect(result.data.map((t) => t.logo)).toEqual([
+        'https://example.com/favicon.ico',
+        null,
+        'https://github.com/acme.png',
+      ]);
+    });
+
+    it('getTargetsInWorkspace skips the favicon query when the page has only Git orgs', async () => {
+      const builder = baseBuilder();
+      builder.getRawMany.mockResolvedValue([
+        { id: 'org-1', value: 'gitlab.com/acme', source: 'gitlab', type: 'GIT_ORG' },
+      ]);
+      (mockTargetRepository.createQueryBuilder as jest.Mock).mockReturnValue(
+        builder,
+      );
+
+      const result = await service.getTargetsInWorkspace(
+        { page: 1, limit: 10, sortBy: 'value', sortOrder: 'ASC' },
+        'ws-1',
+      );
+
+      expect(mockTargetRepository.query).not.toHaveBeenCalled();
+      expect(result.data[0].logo).toBeNull();
+    });
+
     it('getTargetById select and groupBy should include targets.source', async () => {
       // Arrange
       const builder = {
@@ -1333,6 +1385,36 @@ describe('TargetsService', () => {
       expect(builder.groupBy).toHaveBeenCalledWith(
         expect.stringContaining('targets.source'),
       );
+    });
+
+    it('getTargetById returns the favicon logo of a host target', async () => {
+      const builder = {
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
+        getRawOne: jest.fn().mockResolvedValue({
+          id: 'target-1',
+          value: 'example.com',
+          type: 'DOMAIN',
+          source: 'MANUAL',
+        }),
+      };
+      (mockTargetRepository.createQueryBuilder as jest.Mock).mockReturnValue(
+        builder,
+      );
+      (mockTargetRepository.query as jest.Mock).mockResolvedValue([
+        { targetId: 'target-1', faviconUrl: 'https://example.com/favicon.ico' },
+      ]);
+
+      const result = await service.getTargetById('target-1', 'ws-1');
+
+      expect(mockTargetRepository.query).toHaveBeenCalledWith(
+        expect.any(String),
+        [['target-1']],
+      );
+      expect(result.logo).toBe('https://example.com/favicon.ico');
     });
   });
 

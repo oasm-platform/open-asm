@@ -1,9 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsUUID } from 'class-validator';
+import { ArrayMaxSize, ArrayNotEmpty, IsArray, IsUUID } from 'class-validator';
 
 export class ScanDto {
-  @ApiProperty({ required: true, description: 'Target ID' })
-  @IsNotEmpty()
-  @IsUUID('4')
-  targetId: string;
+  @ApiProperty({
+    required: true,
+    type: [String],
+    description: 'IDs of the targets to scan',
+  })
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(100)
+  @IsUUID('4', { each: true })
+  targetIds: string[];
 }

@@ -246,7 +246,12 @@ export default function Reports() {
   if (wsLoading) return null;
 
   return (
-    <Page title="Reports" action={null} permission="report.read">
+    <Page
+      title="Reports"
+      description="Generate and download security reports for your workspace"
+      action={null}
+      permission="report.read"
+    >
       <Dialog
         open={generateOpen}
         onOpenChange={(open) => {

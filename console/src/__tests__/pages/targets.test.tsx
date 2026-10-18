@@ -44,8 +44,9 @@ describe('Targets Page', () => {
 
     expect(screen.getByText('Target')).toBeInTheDocument();
     expect(screen.getByText('Services')).toBeInTheDocument();
-    // Type and Source columns were removed
-    expect(screen.queryByText('Type')).not.toBeInTheDocument();
+    // Type is a badge column; Source is an icon next to the target, not a column
+    expect(screen.getByText('Type')).toBeInTheDocument();
+    expect(screen.getByText('Domain')).toBeInTheDocument();
     expect(screen.queryByText('Source')).not.toBeInTheDocument();
   });
 

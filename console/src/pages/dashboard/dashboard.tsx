@@ -27,7 +27,7 @@ export default function Dashboard() {
     isLoading: locationsLoading,
   });
 
-  if (workspacesLoading) return <Page title="Dashboard" />;
+  if (workspacesLoading) return <Page title="Dashboard" description="Workspace security overview" />;
 
   if (workspaces.length === 0) {
     return (

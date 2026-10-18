@@ -1,32 +1,24 @@
 import Page from '@/components/common/page';
 import { Button } from '@/components/ui/button';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import JobStatusBadge from '@/components/ui/job-status';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   JobStatus,
   TargetType,
   useTargetsControllerGetTargetById,
-  useVulnerabilitiesControllerScan,
 } from '@/services/apis/gen/queries';
 import { getRouteApi, useNavigate, useParams } from '@tanstack/react-router';
 import dayjs from 'dayjs';
-import { Bug, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { Loader2 } from 'lucide-react';
+import { useEffect } from 'react';
 import AssetProvider from '../assets/context/asset-context';
 import { ListAssets } from '../assets/list-assets';
+import { FastScanDialog } from '../vulnerabilities/components/fast-scan-dialog';
 import { ListVulnerabilities } from '../vulnerabilities/list-vulnerabilitys';
 import VulnerabilitiesStatistic from '../vulnerabilities/vulnerabilites-statistic';
 import AssetsDiscovering from './assets-discovering';
 import { GitOrgDetail } from './git-org-detail';
 import { TargetSwitcher } from './components/target-switcher';
 import SettingTarget from './setting-target';
-
-// Define tabs configuration
-const TABS = [
-  { value: 'inventory', label: 'Inventory' },
-  { value: 'vulnerabilities', label: 'Vulnerabilities' },
-];
 
 const routeApi = getRouteApi('/_authed/targets/$id/$tab');
 
@@ -44,13 +36,19 @@ export function DetailTarget() {
     query: { enabled: !!id, refetchInterval: 5000 },
   });
 
-  const { mutate: scanVulnerabilities } = useVulnerabilitiesControllerScan();
-
-  const activeTab = TABS.some((t) => t.value === tab) ? tab : 'inventory';
-
-  const handleTabChange = (value: string) => {
-    navigate({ to: '/targets/$id/$tab', params: { id, tab: value } });
-  };
+  // Vulnerabilities used to be its own path tab; it now lives in the asset tab
+  // row (`?tab=vulnerabilities`). Git orgs still use the path tab.
+  const isLegacyVulnPath =
+    !!target && target.type !== TargetType.GIT_ORG && tab === 'vulnerabilities';
+  useEffect(() => {
+    if (!isLegacyVulnPath) return;
+    navigate({
+      to: '/targets/$id/$tab',
+      params: { id, tab: 'inventory' },
+      search: { tab: 'vulnerabilities' },
+      replace: true,
+    });
+  }, [isLegacyVulnPath, id, navigate]);
 
   if (isLoading) {
     return (
@@ -87,6 +85,7 @@ export function DetailTarget() {
         <TargetSwitcher
           currentTargetId={target.id}
           currentTargetValue={target.value}
+          currentTargetLogo={target.logo}
         />
       }
       isShowButtonGoBack
@@ -117,81 +116,40 @@ export function DetailTarget() {
         </div>
       }
     >
-      <Tabs
-        value={activeTab!}
-        onValueChange={handleTabChange}
-        className="w-full"
+      {animation &&
+        (target.status === JobStatus.in_progress ||
+          target.status === JobStatus.pending) && (
+          <AssetsDiscovering targetId={target.id} />
+        )}
+      <AssetProvider
+        targetId={target.id}
+        refetchInterval={
+          target.status === JobStatus.in_progress ? 1000 : 30 * 1000
+        }
       >
-        <div className="flex justify-between items-center gap-5">
-          <TabsList>
-            {TABS.map((t) => (
-              <TabsTrigger
-                key={t.value}
-                value={t.value}
-                className="hover:cursor-pointer"
-              >
-                {t.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          {tab === 'vulnerabilities' && (
-            <ConfirmDialog
-              title="Scan vulnerabilities"
-              description={`Are you sure you want to scan vulnerabilities for target ${target.value}?`}
-              onConfirm={() =>
-                scanVulnerabilities(
-                  {
-                    data: { targetId: target.id },
-                  },
-                  {
-                    onSuccess: () => {
-                      toast.success('Scan started successfully');
-                      navigate({
-                        to: '/targets/$id/$tab',
-                        params: { id: id!, tab: 'vulnerabilities' },
-                      });
-                    },
-                  },
-                )
-              }
-              trigger={
-                <Button
-                  disabled={target.status !== JobStatus.completed}
-                  variant="secondary"
-                  className="hover:cursor-pointer text-sm"
-                  size={'sm'}
-                  title={`Start scan vulnerabilities for target ${target.value}`}
-                >
-                  <Bug className="h-4 w-4" />
-                  Fast scan
-                </Button>
-              }
-            />
-          )}
-        </div>
-        <TabsContent value="inventory">
-          {animation &&
-            (target.status === JobStatus.in_progress ||
-              target.status === JobStatus.pending) && (
-              <AssetsDiscovering targetId={target.id} />
-            )}
-          <AssetProvider
-            targetId={target.id}
-            refetchInterval={
-              target.status === JobStatus.in_progress ? 1000 : 30 * 1000
-            }
-          >
-            <ListAssets />
-          </AssetProvider>
-        </TabsContent>
-        <TabsContent
-          value="vulnerabilities"
-          className="flex flex-col gap-5 py-3"
-        >
-          <VulnerabilitiesStatistic targetId={target.id} />
-          <ListVulnerabilities targetId={target.id} />
-        </TabsContent>
-      </Tabs>
+        <ListAssets
+          extraTabs={[
+            {
+              value: 'vulnerabilities',
+              text: 'Vulnerabilities',
+              tab: (
+                <div className="flex flex-col gap-5">
+                  <VulnerabilitiesStatistic targetId={target.id} />
+                  <ListVulnerabilities
+                    targetId={target.id}
+                    actions={
+                      <FastScanDialog
+                        target={{ id: target.id, value: target.value }}
+                        disabled={target.status !== JobStatus.completed}
+                      />
+                    }
+                  />
+                </div>
+              ),
+            },
+          ]}
+        />
+      </AssetProvider>
     </Page>
   );
 }
