@@ -1,18 +1,9 @@
 import { Card, CardTitle } from '@/components/ui/card';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
-import { Markdown } from '@/components/common/markdown';
 import { useRootControllerGetLatestVersion } from '@/services/apis/gen/queries';
-import { cn } from '@/lib/utils';
-import { CircleCheckBig, ChevronDown, MonitorUp } from 'lucide-react';
-import { useState } from 'react';
+import { CircleCheckBig, MonitorUp } from 'lucide-react';
 
 export default function GetAboutProject() {
   const { data } = useRootControllerGetLatestVersion();
-  const [notesOpen, setNotesOpen] = useState(false);
 
   return (
     <>
@@ -38,27 +29,6 @@ export default function GetAboutProject() {
           </div>
         )}
       </Card>
-
-      {data?.notes && (
-        <Card className="p-4">
-          <Collapsible open={notesOpen} onOpenChange={setNotesOpen}>
-            <CollapsibleTrigger asChild>
-              <button className="flex w-full items-center justify-between text-left">
-                <CardTitle>Release Note</CardTitle>
-                <ChevronDown
-                  className={cn(
-                    'h-4 w-4 text-muted-foreground transition-transform duration-200',
-                    notesOpen && 'rotate-180',
-                  )}
-                />
-              </button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="pt-4">
-              <Markdown content={data.notes} />
-            </CollapsibleContent>
-          </Collapsible>
-        </Card>
-      )}
 
       <a
         target="_blank"
