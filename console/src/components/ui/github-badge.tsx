@@ -1,11 +1,14 @@
 import { cn } from '@/lib/utils';
+import { useRootControllerGetMetadata } from '@/services/apis/gen/queries';
 import { buttonVariants } from './button-variants';
 
-const REPO_URL = 'https://github.com/oasm-platform/open-asm';
 export function GithubBadge() {
+  const { data: metadata } = useRootControllerGetMetadata();
+  if (!metadata?.gitRepoUrl) return null;
+
   return (
     <a
-      href={REPO_URL}
+      href={metadata.gitRepoUrl}
       target="_blank"
       rel="noreferrer noopener"
       className={cn(

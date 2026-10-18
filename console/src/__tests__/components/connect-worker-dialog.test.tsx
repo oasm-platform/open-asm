@@ -23,6 +23,9 @@ vi.mock('@/hooks/use-live-events', () => ({
 }));
 
 vi.mock('@/services/apis/gen/queries', () => ({
+  useRootControllerGetMetadata: vi.fn(() => ({
+    data: { homePageUrl: 'https://oasm.dev' },
+  })),
   workersControllerCreateJoinKey: vi.fn(),
   workersControllerRotateJoinKey: vi.fn(),
   workersControllerRevokeJoinKey: vi.fn(),
