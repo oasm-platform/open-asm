@@ -62,7 +62,7 @@ const ToolCard = ({ tool, onNavigate, openFrom = 'tools' }: ToolCardProps) => {
   return (
     // The detail link is a full-card overlay, so the install button can sit
     // beside it instead of nested inside a button
-    <div className="relative flex h-full flex-col items-start gap-2 rounded-lg border p-5 text-left transition-colors hover:border-primary hover:bg-accent/50">
+    <div className="relative flex h-full flex-col items-start gap-2 rounded-lg border p-5 text-left transition-colors hover:bg-accent/70">
       <button
         type="button"
         aria-label={tool.name}

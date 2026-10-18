@@ -8,6 +8,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { addDays, format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import { type DateRange } from 'react-day-picker';
@@ -33,6 +34,7 @@ export function DatePickerWithRange({
   className,
   label,
 }: DatePickerWithRangeProps) {
+  const isMobile = useIsMobile();
   const internalDate = value ?? {
     from: new Date(new Date().getFullYear(), 0, 20),
     to: addDays(new Date(new Date().getFullYear(), 0, 20), 20),
@@ -80,11 +82,15 @@ export function DatePickerWithRange({
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <div className="flex">
-            {/* Quick select options on the left */}
-            <div className="flex flex-col gap-1 p-2 border-r border-border bg-muted/20">
-              <span className="text-xs font-medium text-muted-foreground mb-1 px-2">
+        <PopoverContent
+          className="w-auto max-h-(--radix-popover-content-available-height) overflow-y-auto p-0"
+          align="start"
+        >
+          {/* Phones: presets wrap above a single month; md+: presets on the left of two months. */}
+          <div className="flex flex-col md:flex-row">
+            {/* Quick select options */}
+            <div className="flex flex-row flex-wrap gap-1 p-2 border-b border-border bg-muted/20 md:flex-col md:flex-nowrap md:border-b-0 md:border-r">
+              <span className="w-full text-xs font-medium text-muted-foreground mb-1 px-2 md:w-auto">
                 Quick select
               </span>
               {PRESET_OPTIONS.map((option) => (
@@ -106,7 +112,7 @@ export function DatePickerWithRange({
                 defaultMonth={internalDate?.from}
                 selected={value}
                 onSelect={handleSelect}
-                numberOfMonths={2}
+                numberOfMonths={isMobile ? 1 : 2}
               />
               {hasValue && (
                 <div className="mt-2 pt-2 border-t border-border p-2">

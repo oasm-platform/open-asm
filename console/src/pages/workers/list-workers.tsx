@@ -188,7 +188,7 @@ const ListWorkers = () => {
         // the internal-network badge can sit beside it instead of nested inside
         <div
           key={worker.id}
-          className={`relative flex h-full flex-col items-start gap-2 rounded-lg border p-5 text-left transition-colors hover:border-primary hover:bg-accent/50 ${isWorkerOnline(worker) ? '' : 'opacity-50'}`}
+          className={`relative flex h-full flex-col items-start gap-2 rounded-lg border p-5 text-left transition-colors hover:bg-accent/70 ${isWorkerOnline(worker) ? '' : 'opacity-50'}`}
         >
           <button
             type="button"

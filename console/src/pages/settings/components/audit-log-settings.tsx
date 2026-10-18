@@ -1,23 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Download, Eye, FilterX, Loader2 } from 'lucide-react';
-import type { ColumnDef } from '@tanstack/react-table';
+import {
+  Bot,
+  Download,
+  KeyRound,
+  Lightbulb,
+  Loader2,
+  Server,
+} from 'lucide-react';
+import { endOfDay, startOfDay } from 'date-fns';
+import type { DateRange } from 'react-day-picker';
 import AccessDenied from '@/components/common/access-denied';
+import { isGroup, type Filter } from '@/components/filter-builder/filter-model';
+import { FilterToolbar } from '@/components/filter-builder/filter-toolbar';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { badgeVariants, type VariantProps } from '@/components/ui/badge-variants';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { DataTable } from '@/components/ui/data-table';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { DatePickerWithRange } from '@/components/ui/date-picker-range';
 import {
   Sheet,
   SheetContent,
@@ -25,6 +26,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Tooltip,
   TooltipContent,
@@ -35,15 +37,16 @@ import {
   useWorkspaceSelector,
   useWorkspaceState,
 } from '@/hooks/useWorkspaceSelector';
-import useDebounce from '@/hooks/use-debounce';
 import {
   auditEventsControllerGetAuditEvents,
   useAuditEventsControllerGetAuditActions,
-  AuditOutcome,
+  type AuditOutcome,
   type AuditEventResponseDto,
   type AuditEventsControllerGetAuditEventsParams,
 } from '@/services/apis/gen/queries';
 import { axiosInstance } from '@/services/apis/axios-client';
+import { AUDIT_FILTER_FIELDS, auditFilterParams } from '../audit-filter-fields';
+import { parseUserAgent } from '../user-agent';
 
 type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>['variant']>;
 
@@ -54,20 +57,6 @@ const OUTCOME_VARIANT: Record<AuditOutcome, BadgeVariant> = {
   failure: 'destructive',
   denied: 'warning',
 };
-
-const OUTCOME_OPTIONS = Object.entries(AuditOutcome).map(([value]) => ({
-  value,
-  label: value.charAt(0).toUpperCase() + value.slice(1),
-}));
-
-const DATE_PRESETS = [
-  { value: 'all', label: 'All time' },
-  { value: '24h', label: 'Last 24 hours' },
-  { value: '7d', label: 'Last 7 days' },
-  { value: '30d', label: 'Last 30 days' },
-] as const;
-
-type DatePreset = (typeof DATE_PRESETS)[number]['value'];
 
 function formatRelativeTime(iso: string): string {
   const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -92,6 +81,10 @@ function formatValue(value: unknown): string {
   if (typeof value === 'string') return value;
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
+}
+
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function isForbiddenError(error: unknown): boolean {
@@ -152,11 +145,54 @@ function actorDisplayName(event: AuditEventResponseDto): string {
 
 function LoadError({ onRetry }: { onRetry: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3">
+    <div className="flex flex-col items-center justify-center gap-3 text-sm">
       <p>Failed to load</p>
       <Button size="sm" variant="outline" onClick={onRetry}>
         Retry
       </Button>
+    </div>
+  );
+}
+
+const ACTOR_ICON = { api_key: KeyRound, system: Server, agent: Bot } as const;
+
+function ActorAvatar({ event }: { event: AuditEventResponseDto }) {
+  const Icon =
+    event.actorType === 'user' ? null : ACTOR_ICON[event.actorType];
+  return (
+    <Avatar className="mt-0.5 size-8 shrink-0">
+      <AvatarFallback className="text-xs">
+        {Icon ? (
+          <Icon className="size-4" />
+        ) : (
+          actorDisplayName(event).slice(0, 2).toUpperCase()
+        )}
+      </AvatarFallback>
+    </Avatar>
+  );
+}
+
+function UserAgentDetails({ userAgent }: { userAgent: string }) {
+  const ua = parseUserAgent(userAgent);
+  const rows: Array<[string, string | undefined]> = [
+    [ua.isBrowser ? 'Browser' : 'Client', ua.client],
+    ['Operating system', ua.os],
+    ['Device type', ua.deviceType],
+    ['Device', ua.device],
+  ];
+  return (
+    <div className="mt-1 space-y-2 rounded-md border bg-muted/30 px-3 py-2">
+      <dl className="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-1">
+        {rows.map(([label, value]) => (
+          <div key={label} className="contents">
+            <dt className="text-muted-foreground">{label}</dt>
+            <dd className="min-w-0 break-words">{value ?? 'Unknown'}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="break-all font-mono text-xs text-muted-foreground">
+        {userAgent}
+      </p>
     </div>
   );
 }
@@ -189,7 +225,7 @@ function AuditEventSheet({ event, label, onClose }: AuditEventSheetProps) {
         <div className="mt-4 space-y-4">
           <div className="flex items-center gap-2">
             <Badge variant={OUTCOME_VARIANT[event.outcome]}>
-              {event.outcome.charAt(0).toUpperCase() + event.outcome.slice(1)}
+              {capitalize(event.outcome)}
             </Badge>
             <span className="text-sm text-muted-foreground">{event.action}</span>
           </div>
@@ -226,7 +262,11 @@ function AuditEventSheet({ event, label, onClose }: AuditEventSheetProps) {
             </div>
             <div>
               <p className="text-muted-foreground">User agent</p>
-              <p className="break-all">{event.userAgent ?? '—'}</p>
+              {event.userAgent ? (
+                <UserAgentDetails userAgent={event.userAgent} />
+              ) : (
+                <p>—</p>
+              )}
             </div>
             <div>
               <p className="text-muted-foreground">Request ID</p>
@@ -304,6 +344,19 @@ function AuditEventSheet({ event, label, onClose }: AuditEventSheetProps) {
   );
 }
 
+function EventSkeleton() {
+  return (
+    <li className="flex gap-3 px-4 py-3">
+      <Skeleton className="size-8 shrink-0 rounded-full" />
+      <div className="flex-1 space-y-2">
+        <Skeleton className="h-4 w-2/5" />
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-3 w-1/4" />
+      </div>
+    </li>
+  );
+}
+
 export default function AuditLogSettings() {
   const {
     state: { selectedWorkspaceId },
@@ -311,34 +364,34 @@ export default function AuditLogSettings() {
   const { hasPermission, isLoading: permissionLoading } = usePermission();
   const { workspaces } = useWorkspaceSelector();
 
-  const [preset, setPreset] = useState<DatePreset>('all');
-  const [from, setFrom] = useState<string | undefined>(undefined);
-  const [to, setTo] = useState<string | undefined>(undefined);
-  const [action, setAction] = useState<string>('all');
-  const [outcome, setOutcome] = useState<AuditOutcome | 'all'>('all');
-  const [actorId, setActorId] = useState('');
-  const debouncedActorId = useDebounce(actorId, 400);
+  const [filter, setFilter] = useState<Filter | undefined>(undefined);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
   const [events, setEvents] = useState<AuditEventResponseDto[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [selectedEvent, setSelectedEvent] = useState<AuditEventResponseDto | null>(
     null,
   );
   const [isExporting, setIsExporting] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
 
-  // Staleness guard for pagination: bumped on every filter/workspace/reload
-  // change so an in-flight loadMore (or aborted first page) never appends
-  // old-filter rows to the new list. Combined with AbortController, stale
-  // requests are both ignored and cancelled at the network level.
-  const requestSeq = useRef(0);
-  const loadMoreAbortRef = useRef<AbortController | null>(null);
+  // Newer/Older paging over the forward-only keyset cursor: a stack of the
+  // cursors that opened each visited page. It belongs to one workspace +
+  // filter + date scope, so a scope change falls back to the first page
+  // without a reset effect (and the double fetch one would cause).
+  const scopeKey = JSON.stringify([selectedWorkspaceId, filter, dateRange]);
+  const [pager, setPager] = useState<{
+    scopeKey: string;
+    cursors: (string | undefined)[];
+  }>({ scopeKey, cursors: [undefined] });
+  const cursors = pager.scopeKey === scopeKey ? pager.cursors : [undefined];
+  const cursor = cursors[cursors.length - 1];
 
   // Action catalog from the backend (GET /workspaces/:id/audit/actions):
-  // the source of truth for the action filter dropdown and row labels.
+  // the source of truth for row labels (the filter's Action field reads it too).
   // ponytail: fallback humanizes unknown actions instead of blocking render.
   const { data: actionCatalog } = useAuditEventsControllerGetAuditActions(
     selectedWorkspaceId,
@@ -359,109 +412,57 @@ export default function AuditLogSettings() {
     [actionLabelMap],
   );
 
-  const actionOptions = useMemo(
-    () =>
-      (actionCatalog?.data ?? [])
-        .slice()
-        .sort((a, b) => a.label.localeCompare(b.label)),
-    [actionCatalog],
-  );
-
   const buildParams = useCallback(
     (): AuditEventsControllerGetAuditEventsParams => ({
       limit: PAGE_SIZE,
-      from: from || undefined,
-      to: to || undefined,
-      action: action === 'all' ? undefined : action,
-      outcome: outcome === 'all' ? undefined : outcome,
-      actorId: debouncedActorId.trim() || undefined,
+      ...auditFilterParams(filter),
+      from: dateRange?.from ? startOfDay(dateRange.from).toISOString() : undefined,
+      to: dateRange?.to ? endOfDay(dateRange.to).toISOString() : undefined,
     }),
-    [from, to, action, outcome, debouncedActorId],
+    [filter, dateRange],
   );
 
   useEffect(() => {
     if (!selectedWorkspaceId) return;
-    const seq = ++requestSeq.current;
-    // A filter change invalidates any in-flight "load more" for the old filter.
-    loadMoreAbortRef.current?.abort();
     const controller = new AbortController();
-    setEvents([]);
-    setNextCursor(null);
     setIsLoading(true);
     setError(null);
 
     auditEventsControllerGetAuditEvents(
       selectedWorkspaceId,
-      buildParams(),
+      { ...buildParams(), cursor },
       undefined,
       controller.signal,
     )
       .then((res) => {
-        if (seq !== requestSeq.current) return;
+        if (controller.signal.aborted) return;
         setEvents(res.data ?? []);
         setNextCursor(res.nextCursor ?? null);
       })
       .catch((err: unknown) => {
-        if (seq !== requestSeq.current) return;
-        setError(err);
+        if (!controller.signal.aborted) setError(err);
       })
       .finally(() => {
-        if (seq === requestSeq.current) setIsLoading(false);
+        if (!controller.signal.aborted) setIsLoading(false);
       });
 
     return () => controller.abort();
-  }, [selectedWorkspaceId, buildParams, reloadKey]);
+  }, [selectedWorkspaceId, buildParams, cursor, reloadKey]);
 
-  const loadMore = useCallback(async () => {
-    if (!selectedWorkspaceId || !nextCursor || isLoadingMore) return;
-    const seq = requestSeq.current;
-    const controller = new AbortController();
-    loadMoreAbortRef.current = controller;
-    setIsLoadingMore(true);
-    try {
-      const res = await auditEventsControllerGetAuditEvents(
-        selectedWorkspaceId,
-        { ...buildParams(), cursor: nextCursor },
-        undefined,
-        controller.signal,
-      );
-      // Filters changed while this page was in flight — discard the rows.
-      if (seq !== requestSeq.current || controller.signal.aborted) return;
-      setEvents((prev) => [...prev, ...(res.data ?? [])]);
-      setNextCursor(res.nextCursor ?? null);
-    } catch (err) {
-      if (seq !== requestSeq.current || controller.signal.aborted) return;
-      toast.error('Failed to load more events', {
-        description: err instanceof Error ? err.message : 'Please try again',
-      });
-    } finally {
-      if (loadMoreAbortRef.current === controller) {
-        loadMoreAbortRef.current = null;
-      }
-      setIsLoadingMore(false);
-    }
-  }, [selectedWorkspaceId, nextCursor, isLoadingMore, buildParams]);
-
-  const handlePresetChange = (value: string) => {
-    const next = value as DatePreset;
-    setPreset(next);
-    if (next === 'all') {
-      setFrom(undefined);
-      setTo(undefined);
-      return;
-    }
-    const hours = next === '24h' ? 24 : next === '7d' ? 24 * 7 : 24 * 30;
-    setFrom(new Date(Date.now() - hours * 60 * 60 * 1000).toISOString());
-    setTo(new Date().toISOString());
+  const goToPage = (next: (string | undefined)[]) => {
+    setPager({ scopeKey, cursors: next });
+    listRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   };
 
-  const handleClearFilters = () => {
-    setPreset('all');
-    setFrom(undefined);
-    setTo(undefined);
-    setAction('all');
-    setOutcome('all');
-    setActorId('');
+  /** Clicking an actor or action narrows the filter to it (replacing that field's condition). */
+  const filterBy = (field: 'actorId' | 'action', value: string) => {
+    setFilter((prev) => ({
+      logic: 'and',
+      items: [
+        ...(prev?.items ?? []).filter((i) => isGroup(i) || i.field !== field),
+        { field, op: 'eq', value },
+      ],
+    }));
   };
 
   const handleExport = async () => {
@@ -506,101 +507,6 @@ export default function AuditLogSettings() {
     }
   };
 
-  const columns = useMemo<ColumnDef<AuditEventResponseDto>[]>(
-    () => [
-      {
-        accessorKey: 'occurredAt',
-        header: 'When',
-        cell: ({ row }) => {
-          const occurredAt = row.original.occurredAt;
-          return (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="cursor-default whitespace-nowrap">
-                  {formatRelativeTime(occurredAt)}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>{formatAbsoluteTime(occurredAt)}</TooltipContent>
-            </Tooltip>
-          );
-        },
-      },
-      {
-        accessorKey: 'actorName',
-        header: 'Actor',
-        cell: ({ row }) => {
-          const event = row.original;
-          const name = actorDisplayName(event);
-          return (
-            <div className="flex items-center gap-2">
-              <Avatar className="size-8">
-                <AvatarFallback>{name.slice(0, 2).toUpperCase()}</AvatarFallback>
-              </Avatar>
-              <div className="min-w-0">
-                <p className="truncate">{name}</p>
-                {event.actorEmail && (
-                  <p className="truncate text-xs text-muted-foreground">
-                    {event.actorEmail}
-                  </p>
-                )}
-              </div>
-            </div>
-          );
-        },
-      },
-      {
-        accessorKey: 'action',
-        header: 'Action',
-        cell: ({ row }) => getActionLabel(row.original.action),
-      },
-      {
-        accessorKey: 'resourceType',
-        header: 'Resource',
-        cell: ({ row }) => {
-          const event = row.original;
-          return (
-            <div className="min-w-0">
-              <p className="truncate">{event.resourceType}</p>
-              {event.resourceId && (
-                <p className="truncate font-mono text-xs text-muted-foreground">
-                  {event.resourceId}
-                </p>
-              )}
-            </div>
-          );
-        },
-      },
-      {
-        accessorKey: 'outcome',
-        header: 'Outcome',
-        cell: ({ row }) => {
-          const outcomeValue = row.original.outcome;
-          return (
-            <Badge variant={OUTCOME_VARIANT[outcomeValue]}>
-              {outcomeValue.charAt(0).toUpperCase() + outcomeValue.slice(1)}
-            </Badge>
-          );
-        },
-      },
-      {
-        id: 'details',
-        header: '',
-        cell: ({ row }) => (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => setSelectedEvent(row.original)}
-            aria-label="View event details"
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
-        ),
-      },
-    ],
-    [getActionLabel],
-  );
-
   if (!selectedWorkspaceId) {
     return (
       <Card>
@@ -631,138 +537,167 @@ export default function AuditLogSettings() {
     return <AccessDenied />;
   }
 
-  const hasActiveFilters =
-    preset !== 'all' || action !== 'all' || outcome !== 'all' || actorId.trim() !== '';
+  const renderEvent = (event: AuditEventResponseDto) => {
+    const name = actorDisplayName(event);
+    // The actor/action links filter instead of opening the sheet.
+    const filterClick =
+      (field: 'actorId' | 'action', value: string) =>
+      (e: React.MouseEvent) => {
+        e.stopPropagation();
+        filterBy(field, value);
+      };
+    return (
+      <li
+        key={event.id}
+        tabIndex={0}
+        className="flex cursor-pointer gap-3 px-4 py-3 transition-colors outline-none hover:bg-muted/50 focus-visible:bg-muted/50"
+        onClick={() => setSelectedEvent(event)}
+        onKeyDown={(e) => {
+          if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            setSelectedEvent(event);
+          }
+        }}
+      >
+        <ActorAvatar event={event} />
+        <div className="min-w-0 flex-1 space-y-0.5 text-sm">
+          <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+            {event.actorId ? (
+              <button
+                type="button"
+                className="font-semibold hover:underline"
+                title="Filter by this actor"
+                onClick={filterClick('actorId', event.actorId)}
+              >
+                {name}
+              </button>
+            ) : (
+              <span className="font-semibold capitalize">{name}</span>
+            )}
+            <span className="text-muted-foreground">–</span>
+            <button
+              type="button"
+              className="break-all text-left font-medium text-primary hover:underline"
+              title="Filter by this action"
+              onClick={filterClick('action', event.action)}
+            >
+              {event.action}
+            </button>
+            {event.outcome !== 'success' && (
+              <Badge variant={OUTCOME_VARIANT[event.outcome]}>
+                {capitalize(event.outcome)}
+              </Badge>
+            )}
+          </p>
+          <p className="break-words">
+            {getActionLabel(event.action)}
+            <span className="text-muted-foreground"> · {event.resourceType}</span>
+            {event.resourceId && (
+              <span className="ml-1 break-all font-mono text-xs text-muted-foreground">
+                {event.resourceId}
+              </span>
+            )}
+          </p>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            <span className="font-mono">{event.sourceIp ?? 'Unknown source'}</span>
+            <span aria-hidden className="h-3 w-px bg-border" />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="whitespace-nowrap">
+                  {formatRelativeTime(event.occurredAt)}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>{formatAbsoluteTime(event.occurredAt)}</TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
+      </li>
+    );
+  };
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-lg border bg-card p-4">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-medium text-muted-foreground">Filters</p>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleExport}
-            disabled={isExporting}
-          >
-            {isExporting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Download className="h-4 w-4" />
-            )}
-            {isExporting ? 'Exporting…' : 'Export CSV'}
-          </Button>
-        </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <div className="space-y-1.5">
-            <Label>Date range</Label>
-            <Select value={preset} onValueChange={handlePresetChange}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {DATE_PRESETS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Action</Label>
-            <Select value={action} onValueChange={setAction}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All actions</SelectItem>
-                {actionOptions.map((entry) => (
-                  <SelectItem key={entry.action} value={entry.action}>
-                    {entry.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Outcome</Label>
-            <Select
-              value={outcome}
-              onValueChange={(value) => setOutcome(value as AuditOutcome | 'all')}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All outcomes</SelectItem>
-                {OUTCOME_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Actor ID</Label>
-            <Input
-              placeholder="User, API key or agent ID"
-              value={actorId}
-              onChange={(e) => setActorId(e.target.value)}
-            />
-          </div>
-          <div className="flex items-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleClearFilters}
-              disabled={!hasActiveFilters}
-            >
-              <FilterX className="h-4 w-4" />
-              Clear
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Cap the rendered table height so an unbounded accumulated list
-          scrolls inside its own container instead of growing the page (DOM
-          still holds all rows — simple and keeps DataTable layout intact). */}
-      <div className="max-h-[65vh] overflow-y-auto overscroll-contain">
-        <DataTable
-          columns={columns}
-          data={events}
-          isLoading={isLoading}
-          page={1}
-          pageSize={Math.max(events.length, 5)}
-          totalItems={events.length}
-          showPagination={false}
-          emptyMessage="No audit events found."
-          error={
-            error ? (
-              <LoadError onRetry={() => setReloadKey((k) => k + 1)} />
-            ) : undefined
-          }
+      <div className="flex w-full flex-col gap-2 md:flex-row md:items-center">
+        <FilterToolbar
+          fields={AUDIT_FILTER_FIELDS}
+          value={filter}
+          onApply={setFilter}
+          flat
         />
+        <DatePickerWithRange
+          label="Date"
+          value={dateRange}
+          onChange={setDateRange}
+          className="w-full md:w-60"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-9 shrink-0"
+          onClick={handleExport}
+          disabled={isExporting}
+        >
+          {isExporting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4" />
+          )}
+          {isExporting ? 'Exporting…' : 'Export CSV'}
+        </Button>
       </div>
 
-      {nextCursor && (
-        <div className="flex justify-center">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={loadMore}
-            disabled={isLoadingMore}
-          >
-            {isLoadingMore && (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            )}
-            Load more
-          </Button>
+      <div ref={listRef} className="scroll-mt-4 overflow-hidden rounded-md border">
+        <div className="border-b bg-muted/40 px-4 py-3 text-sm font-semibold">
+          Recent events
         </div>
-      )}
+        {error ? (
+          <div className="py-10">
+            <LoadError onRetry={() => setReloadKey((k) => k + 1)} />
+          </div>
+        ) : isLoading ? (
+          <ul className="divide-y" aria-busy>
+            {Array.from({ length: 5 }, (_, i) => (
+              <EventSkeleton key={i} />
+            ))}
+          </ul>
+        ) : events.length === 0 ? (
+          <p className="py-10 text-center text-sm text-muted-foreground">
+            No audit events found.
+          </p>
+        ) : (
+          <ul className="divide-y">{events.map(renderEvent)}</ul>
+        )}
+      </div>
+
+      <div className="flex items-center justify-center gap-1">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={cursors.length === 1 || isLoading}
+          onClick={() => goToPage(cursors.slice(0, -1))}
+        >
+          Newer
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={!nextCursor || isLoading}
+          onClick={() => nextCursor && goToPage([...cursors, nextCursor])}
+        >
+          Older
+        </Button>
+      </div>
+
+      <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
+        <Lightbulb className="size-3.5 shrink-0" />
+        <span>
+          <span className="font-semibold">Tip:</span> click an actor or action to
+          filter by it.
+        </span>
+      </p>
 
       {selectedEvent && (
         <AuditEventSheet

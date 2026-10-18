@@ -1,0 +1,63 @@
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { Info, Palette, User } from 'lucide-react';
+import type { JSX, ReactNode } from 'react';
+import { HeaderBar } from './header-bar';
+import { AppSidebar, type NavGroup } from './menu-bar';
+
+interface AdminLayoutProps {
+  children: ReactNode;
+}
+
+const adminMenu: NavGroup[] = [
+  {
+    title: 'Platform',
+    url: '#',
+    roles: ['admin'],
+    items: [
+      {
+        title: 'Users',
+        icon: <User />,
+        url: '/admin/users',
+      },
+    ],
+  },
+  {
+    title: 'System',
+    url: '#',
+    roles: ['admin'],
+    items: [
+      {
+        title: 'Brand name and logo',
+        icon: <Palette />,
+        url: '/admin/brand',
+      },
+      {
+        title: 'About',
+        icon: <Info />,
+        url: '/admin/about',
+      },
+    ],
+  },
+];
+
+export default function AdminLayout({
+  children,
+}: AdminLayoutProps): JSX.Element {
+  return (
+    <SidebarProvider>
+      <AppSidebar
+        groups={adminMenu}
+        primary={false}
+        title="Admin"
+        showSwitchWorkspace={false}
+      />
+      <SidebarInset>
+        {/* Mobile keeps the header: it holds the only sidebar trigger there. */}
+        <HeaderBar className="md:hidden" />
+        <main className="flex flex-1 flex-col gap-4 p-4 md:p-6">
+          {children}
+        </main>
+      </SidebarInset>
+    </SidebarProvider>
+  );
+}

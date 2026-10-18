@@ -11,16 +11,20 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as AuthedRouteImport } from './routes/_authed'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as InitAdminRouteImport } from './routes/init-admin'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as AuthedReportsRouteImport } from './routes/_authed/reports'
 import { Route as AuthedSearchRouteImport } from './routes/_authed/search'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AdminAboutRouteImport } from './routes/admin/about'
+import { Route as AdminBrandRouteImport } from './routes/admin/brand'
+import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as InviteTokenRouteImport } from './routes/invite/$token'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as SettingsTabRouteImport } from './routes/settings/$tab'
-import { Route as AuthedAdminUsersRouteImport } from './routes/_authed/admin/users'
 import { Route as AuthedAgentsCreateRouteImport } from './routes/_authed/agents/create'
 import { Route as AuthedAistudioIndexRouteImport } from './routes/_authed/aistudio/index'
 import { Route as AuthedAistudioAgentsRouteImport } from './routes/_authed/aistudio/agents'
@@ -68,6 +72,11 @@ const AuthedRoute = AuthedRouteImport.update({
   id: '/_authed',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const InitAdminRoute = InitAdminRouteImport.update({
   id: '/init-admin',
   path: '/init-admin',
@@ -98,6 +107,26 @@ const AuthedSearchRoute = AuthedSearchRouteImport.update({
   path: '/search',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAboutRoute = AdminAboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminBrandRoute = AdminBrandRouteImport.update({
+  id: '/brand',
+  path: '/brand',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AdminRoute,
+} as any)
 const InviteTokenRoute = InviteTokenRouteImport.update({
   id: '/invite/$token',
   path: '/invite/$token',
@@ -112,11 +141,6 @@ const SettingsTabRoute = SettingsTabRouteImport.update({
   id: '/$tab',
   path: '/$tab',
   getParentRoute: () => SettingsRoute,
-} as any)
-const AuthedAdminUsersRoute = AuthedAdminUsersRouteImport.update({
-  id: '/admin/users',
-  path: '/admin/users',
-  getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedAgentsCreateRoute = AuthedAgentsCreateRouteImport.update({
   id: '/agents/create',
@@ -317,15 +341,19 @@ const SettingsMembersPermissionGroupsNewRoute =
 export interface FileRoutesByFullPath {
   '/$': typeof SplatRoute
   '/': typeof AuthedIndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/init-admin': typeof InitAdminRoute
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRouteWithChildren
   '/reports': typeof AuthedReportsRoute
   '/search': typeof AuthedSearchRoute
+  '/admin/about': typeof AdminAboutRoute
+  '/admin/brand': typeof AdminBrandRoute
+  '/admin/users': typeof AdminUsersRoute
   '/invite/$token': typeof InviteTokenRoute
   '/settings/$tab': typeof SettingsTabRoute
+  '/admin/': typeof AdminIndexRoute
   '/settings/': typeof SettingsIndexRoute
-  '/admin/users': typeof AuthedAdminUsersRoute
   '/agents/create': typeof AuthedAgentsCreateRoute
   '/aistudio/agents': typeof AuthedAistudioAgentsRoute
   '/groups/$id': typeof AuthedGroupsIdRoute
@@ -370,11 +398,14 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/reports': typeof AuthedReportsRoute
   '/search': typeof AuthedSearchRoute
+  '/admin/about': typeof AdminAboutRoute
+  '/admin/brand': typeof AdminBrandRoute
+  '/admin/users': typeof AdminUsersRoute
   '/invite/$token': typeof InviteTokenRoute
   '/settings/$tab': typeof SettingsTabRoute
   '/': typeof AuthedIndexRoute
+  '/admin': typeof AdminIndexRoute
   '/settings': typeof SettingsIndexRoute
-  '/admin/users': typeof AuthedAdminUsersRoute
   '/agents/create': typeof AuthedAgentsCreateRoute
   '/aistudio/agents': typeof AuthedAistudioAgentsRoute
   '/groups/$id': typeof AuthedGroupsIdRoute
@@ -417,16 +448,20 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/$': typeof SplatRoute
   '/_authed': typeof AuthedRouteWithChildren
+  '/admin': typeof AdminRouteWithChildren
   '/init-admin': typeof InitAdminRoute
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRouteWithChildren
   '/_authed/reports': typeof AuthedReportsRoute
   '/_authed/search': typeof AuthedSearchRoute
+  '/admin/about': typeof AdminAboutRoute
+  '/admin/brand': typeof AdminBrandRoute
+  '/admin/users': typeof AdminUsersRoute
   '/invite/$token': typeof InviteTokenRoute
   '/settings/$tab': typeof SettingsTabRoute
   '/_authed/': typeof AuthedIndexRoute
+  '/admin/': typeof AdminIndexRoute
   '/settings/': typeof SettingsIndexRoute
-  '/_authed/admin/users': typeof AuthedAdminUsersRoute
   '/_authed/agents/create': typeof AuthedAgentsCreateRoute
   '/_authed/aistudio/agents': typeof AuthedAistudioAgentsRoute
   '/_authed/groups/$id': typeof AuthedGroupsIdRoute
@@ -470,15 +505,19 @@ export interface FileRouteTypes {
   fullPaths:
     | '/$'
     | '/'
+    | '/admin'
     | '/init-admin'
     | '/login'
     | '/settings'
     | '/reports'
     | '/search'
+    | '/admin/about'
+    | '/admin/brand'
+    | '/admin/users'
     | '/invite/$token'
     | '/settings/$tab'
+    | '/admin/'
     | '/settings/'
-    | '/admin/users'
     | '/agents/create'
     | '/aistudio/agents'
     | '/groups/$id'
@@ -523,11 +562,14 @@ export interface FileRouteTypes {
     | '/login'
     | '/reports'
     | '/search'
+    | '/admin/about'
+    | '/admin/brand'
+    | '/admin/users'
     | '/invite/$token'
     | '/settings/$tab'
     | '/'
+    | '/admin'
     | '/settings'
-    | '/admin/users'
     | '/agents/create'
     | '/aistudio/agents'
     | '/groups/$id'
@@ -569,16 +611,20 @@ export interface FileRouteTypes {
     | '__root__'
     | '/$'
     | '/_authed'
+    | '/admin'
     | '/init-admin'
     | '/login'
     | '/settings'
     | '/_authed/reports'
     | '/_authed/search'
+    | '/admin/about'
+    | '/admin/brand'
+    | '/admin/users'
     | '/invite/$token'
     | '/settings/$tab'
     | '/_authed/'
+    | '/admin/'
     | '/settings/'
-    | '/_authed/admin/users'
     | '/_authed/agents/create'
     | '/_authed/aistudio/agents'
     | '/_authed/groups/$id'
@@ -621,6 +667,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   SplatRoute: typeof SplatRoute
   AuthedRoute: typeof AuthedRouteWithChildren
+  AdminRoute: typeof AdminRouteWithChildren
   InitAdminRoute: typeof InitAdminRoute
   LoginRoute: typeof LoginRoute
   SettingsRoute: typeof SettingsRouteWithChildren
@@ -641,6 +688,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AuthedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/init-admin': {
@@ -685,6 +739,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedSearchRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/about': {
+      id: '/admin/about'
+      path: '/about'
+      fullPath: '/admin/about'
+      preLoaderRoute: typeof AdminAboutRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/brand': {
+      id: '/admin/brand'
+      path: '/brand'
+      fullPath: '/admin/brand'
+      preLoaderRoute: typeof AdminBrandRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/invite/$token': {
       id: '/invite/$token'
       path: '/invite/$token'
@@ -705,13 +787,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings/$tab'
       preLoaderRoute: typeof SettingsTabRouteImport
       parentRoute: typeof SettingsRoute
-    }
-    '/_authed/admin/users': {
-      id: '/_authed/admin/users'
-      path: '/admin/users'
-      fullPath: '/admin/users'
-      preLoaderRoute: typeof AuthedAdminUsersRouteImport
-      parentRoute: typeof AuthedRoute
     }
     '/_authed/agents/create': {
       id: '/_authed/agents/create'
@@ -979,7 +1054,6 @@ interface AuthedRouteChildren {
   AuthedReportsRoute: typeof AuthedReportsRoute
   AuthedSearchRoute: typeof AuthedSearchRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
-  AuthedAdminUsersRoute: typeof AuthedAdminUsersRoute
   AuthedAgentsCreateRoute: typeof AuthedAgentsCreateRoute
   AuthedAistudioAgentsRoute: typeof AuthedAistudioAgentsRoute
   AuthedGroupsIdRoute: typeof AuthedGroupsIdRoute
@@ -1021,7 +1095,6 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedReportsRoute: AuthedReportsRoute,
   AuthedSearchRoute: AuthedSearchRoute,
   AuthedIndexRoute: AuthedIndexRoute,
-  AuthedAdminUsersRoute: AuthedAdminUsersRoute,
   AuthedAgentsCreateRoute: AuthedAgentsCreateRoute,
   AuthedAistudioAgentsRoute: AuthedAistudioAgentsRoute,
   AuthedGroupsIdRoute: AuthedGroupsIdRoute,
@@ -1063,6 +1136,22 @@ const AuthedRouteChildren: AuthedRouteChildren = {
 const AuthedRouteWithChildren =
   AuthedRoute._addFileChildren(AuthedRouteChildren)
 
+interface AdminRouteChildren {
+  AdminAboutRoute: typeof AdminAboutRoute
+  AdminBrandRoute: typeof AdminBrandRoute
+  AdminUsersRoute: typeof AdminUsersRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminAboutRoute: AdminAboutRoute,
+  AdminBrandRoute: AdminBrandRoute,
+  AdminUsersRoute: AdminUsersRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 interface SettingsRouteChildren {
   SettingsTabRoute: typeof SettingsTabRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
@@ -1086,6 +1175,7 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   SplatRoute: SplatRoute,
   AuthedRoute: AuthedRouteWithChildren,
+  AdminRoute: AdminRouteWithChildren,
   InitAdminRoute: InitAdminRoute,
   LoginRoute: LoginRoute,
   SettingsRoute: SettingsRouteWithChildren,

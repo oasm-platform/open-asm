@@ -23,6 +23,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { WorkspaceSwitcher } from '@/components/ui/workspace-switcher';
+import { useConnectWorkerState } from '@/hooks/useConnectWorkerState';
 import { usePermission } from '@/hooks/usePermission';
 import { cn } from '@/lib/utils';
 import { useSession } from '@/utils/authClient';
@@ -36,15 +37,21 @@ import {
   FileChartPie,
   Group,
   LayoutDashboard,
+  Plug,
   Plus,
   Puzzle,
   Server,
   Sparkles,
   Target,
-  User,
 } from 'lucide-react';
 import { NavUser } from '../../ui/nav-user';
 import { NewBadge } from '../new-badge';
+import {
+  sidebarGroupLabelClassName,
+  sidebarItemClassName,
+  sidebarMenuClassName,
+  sidebarSectionPadding,
+} from './sidebar-styles';
 
 interface SubMenuItem {
   title: string;
@@ -57,6 +64,8 @@ interface SubMenuItem {
 
 export interface NavGroup {
   title: string;
+  /** Render the group without its label (title still keys the group). */
+  hideTitle?: boolean;
   url: string;
   items: SubMenuItem[];
   roles?: string[];
@@ -65,6 +74,7 @@ export interface NavGroup {
 export const menu: NavGroup[] = [
   {
     title: 'Overview',
+    hideTitle: true,
     url: '#',
     items: [
       {
@@ -77,18 +87,6 @@ export const menu: NavGroup[] = [
         icon: <Sparkles />,
         url: '/aistudio',
         permission: 'agent.read',
-      },
-    ],
-  },
-  {
-    title: 'Admin',
-    url: '#',
-    roles: ['admin'],
-    items: [
-      {
-        title: 'Users',
-        icon: <User />,
-        url: '/admin/users',
       },
     ],
   },
@@ -208,6 +206,7 @@ export function AppSidebar({
   const { state, isMobile, setOpenMobile } = useSidebar();
   const { data } = useSession();
   const { hasPermission } = usePermission();
+  const { openDialog: openConnectWorker } = useConnectWorkerState();
   // Animate only when switching menus, not on the first page load.
   const [shouldAnimate] = React.useState(() => hasMountedSidebar);
   React.useEffect(() => {
@@ -225,7 +224,7 @@ export function AppSidebar({
               (primary ? 'sidebar-stack-pop' : 'sidebar-stack-push'),
           )}
         >
-          <SidebarHeader>
+          <SidebarHeader className={cn('pt-3', sidebarSectionPadding)}>
             {primary ? (
               <div className="flex items-center justify-between group-data-[collapsible=icon]:justify-center">
                 <AppLogo type="large" />
@@ -251,7 +250,7 @@ export function AppSidebar({
               </SidebarMenu>
             )}
             {!primary && title && (
-              <h2 className="truncate px-2 pt-1 text-lg font-semibold tracking-tight text-foreground group-data-[collapsible=icon]:hidden">
+              <h2 className="truncate px-2.5 pt-1 text-lg font-semibold tracking-tight text-foreground group-data-[collapsible=icon]:hidden">
                 {title}
               </h2>
             )}
@@ -260,7 +259,7 @@ export function AppSidebar({
                 <WorkspaceSwitcher />
               )}
           </SidebarHeader>
-          <SidebarContent className="gap-1 px-2 py-1.5 md:gap-1.5 group-data-[collapsible=icon]:gap-3">
+          <SidebarContent className={cn('gap-3 py-2', sidebarSectionPadding)}>
             {primary && (
               <SidebarMenu>
                 <SidebarMenuItem>
@@ -268,7 +267,7 @@ export function AppSidebar({
                     <DropdownMenuTrigger asChild>
                       <SidebarMenuButton
                         tooltip="Create"
-                        className="h-8 rounded-lg border border-border/60 text-[13px] font-medium hover:cursor-pointer"
+                        className="h-9 rounded-lg border border-border/60 px-2.5 text-[13px] font-medium hover:cursor-pointer"
                       >
                         <Plus />
                         <span>Create</span>
@@ -297,6 +296,18 @@ export function AppSidebar({
                           Group
                         </Link>
                       </DropdownMenuItem>
+                      {/* Join keys require workspace.apikey on the API. */}
+                      {hasPermission('workspace.apikey') && (
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setOpenMobile(false);
+                            openConnectWorker();
+                          }}
+                        >
+                          <Plug />
+                          Connect worker
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </SidebarMenuItem>
@@ -320,10 +331,17 @@ export function AppSidebar({
               .map((group) => (
                 <SidebarGroup key={group.title} className="p-0">
                   <SidebarGroupContent>
-                    <SidebarGroupLabel className="h-6 px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70 group-data-[collapsible=icon]:-mt-6">
-                      {group.title}
-                    </SidebarGroupLabel>
-                    <SidebarMenu className="gap-px group-data-[collapsible=icon]:gap-1">
+                    {!group.hideTitle && (
+                      <SidebarGroupLabel
+                        className={cn(
+                          sidebarGroupLabelClassName,
+                          'group-data-[collapsible=icon]:-mt-7',
+                        )}
+                      >
+                        {group.title}
+                      </SidebarGroupLabel>
+                    )}
+                    <SidebarMenu className={sidebarMenuClassName}>
                       {group.items.map((item) => {
                         // Ensure all URLs are absolute for comparison
                         const toUrl = item.url;
@@ -341,7 +359,7 @@ export function AppSidebar({
                               asChild
                               isActive={isActive}
                               tooltip={item.title}
-                              className="group h-8 rounded-lg text-[13px] font-medium hover:cursor-pointer data-[active=true]:bg-muted data-[active=true]:text-foreground data-[active=true]:font-semibold"
+                              className={cn('group', sidebarItemClassName)}
                             >
                               <Link
                                 to={toUrl}
@@ -369,7 +387,7 @@ export function AppSidebar({
         </div>
       </div>
       <SidebarRail />
-      <SidebarFooter>
+      <SidebarFooter className={cn('pb-3', sidebarSectionPadding)}>
         <NavUser />
       </SidebarFooter>
     </Sidebar>
