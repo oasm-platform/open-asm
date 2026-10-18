@@ -19,6 +19,15 @@ import { SUBSCRIPTIONS } from '../../routing/subscriptions';
 import { NOTIFICATION_RULES, type NotificationRule } from './notification-rules';
 
 /**
+ * Prefix of the per-user pub/sub channels the live event stream
+ * (`/events/stream`) listens on: `notification:{userId}`.
+ */
+export const NOTIFICATION_CHANNEL_PREFIX = 'notification:';
+
+export const notificationChannel = (userId: string): string =>
+  `${NOTIFICATION_CHANNEL_PREFIX}${userId}`;
+
+/**
  * Consumer group `notifications`: turns domain events into in-app notification
  * rows and SSE pushes. WHICH events notify whom lives in
  * `notification-rules.ts`; this class only executes the rules.
@@ -135,7 +144,7 @@ export class NotificationsSink implements EventSink {
       ...(ref ? { ref: ref.name, refId: ref.id } : {}),
     });
     for (const user of users) {
-      await this.redis.publisher.publish(`notification:${user.id}`, message);
+      await this.redis.publisher.publish(notificationChannel(user.id), message);
     }
   }
 

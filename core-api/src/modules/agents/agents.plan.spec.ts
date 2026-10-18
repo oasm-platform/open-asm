@@ -6,6 +6,7 @@ import { AgentsCompletionsService, planningState } from './agents.completions';
 import { formatTodosToPrompt, type AgentTodoItem } from './agents.todo';
 import { AgentTool } from './agents.tools';
 import type { TodoStatus } from './entities/agent-conversation-todo.entity';
+import { emptyStats } from './shared/turn-stats';
 
 jest.mock('better-auth/node', () => ({
   fromNodeHeaders: jest.fn(),
@@ -351,7 +352,6 @@ describe('AgentTool plan tools', () => {
         AgentMode.AGENT,
         emitter,
         'c1',
-        false,
         { ...settings(AgentApprovalMode.PLAN), planFirst: true },
       ) as unknown as Record<string, { execute: ToolLike['execute'] }>;
 
@@ -376,7 +376,6 @@ describe('AgentTool plan tools', () => {
         AgentMode.AGENT,
         emitter,
         'c1',
-        false,
         approval,
       ) as unknown as Record<string, ToolLike>;
       await formulate(approval, ['a']);
@@ -458,12 +457,24 @@ describe('AgentsCompletionsService plan execution', () => {
     );
     service.buildSystemContext = jest.fn(() => Promise.resolve(['ctx']));
     service.generateEndOfConversationReport = jest.fn(() => Promise.resolve());
+    service.persistTurnMetadata = jest.fn(() => Promise.resolve(null));
+    service.subagents = {
+      subscribe: jest.fn(() => () => {}),
+      hasActive: jest.fn(() => Promise.resolve(false)),
+      countUndelivered: jest.fn(() => Promise.resolve(0)),
+      takeUndelivered: jest.fn(() => Promise.resolve([])),
+      releaseDelivery: jest.fn(() => Promise.resolve()),
+      waitForSettled: jest.fn(() => Promise.resolve('settled')),
+      formatResultsMessage: jest.fn(() => 'RESULTS'),
+    };
     iteration = jest.fn();
     service.executeStreamText = jest.fn(() => {
       iteration();
       return {
         aiStream: new ReadableStream({ start: (c) => c.close() }),
         finishPromise: Promise.resolve(),
+
+        settle: jest.fn(() => Promise.resolve('answer')),
       };
     });
   });
@@ -545,6 +556,38 @@ describe('AgentsCompletionsService plan execution', () => {
     expect(service.executeStreamText).toHaveBeenCalledTimes(3);
   });
 
+  it('settles and retries an iteration the provider ended without an answer', async () => {
+    const settle = jest.fn(() => Promise.resolve('none'));
+    service.executeStreamText.mockImplementation(() => ({
+      aiStream: new ReadableStream({ start: (c) => c.close() }),
+      finishPromise: Promise.resolve(),
+      settle,
+    }));
+
+    await run(AgentMode.ASK, AgentApprovalMode.MANUAL);
+
+    expect(service.executeStreamText).toHaveBeenCalledTimes(3);
+    expect(settle).toHaveBeenCalledWith('error');
+  });
+
+  it('keeps a partial answer instead of re-running the tools it already ran', async () => {
+    repo.rows = [row('a', 'pending', 0)];
+    const settle = jest.fn(() => Promise.resolve('partial'));
+    service.executeStreamText.mockImplementation(() => ({
+      aiStream: new ReadableStream({
+        // Fails after some steps streamed
+        pull: (c) => c.error(new Error('connection reset')),
+      }),
+      finishPromise: Promise.resolve(),
+      settle,
+    }));
+
+    await run();
+
+    expect(service.executeStreamText).toHaveBeenCalledTimes(1);
+    expect(settle).toHaveBeenCalledWith('error');
+  });
+
   it('does not mark unfinished steps as done when the run stops early', async () => {
     repo.rows = [row('a', 'pending', 0), row('b', 'pending', 1)];
     iteration.mockImplementation(() => setStatus('a', 'in_progress'));
@@ -569,6 +612,187 @@ describe('AgentsCompletionsService plan execution', () => {
 
     expect(repo.rows[0].status).toBe('completed');
   });
+
+  describe('background subagents', () => {
+    const finished = [{ id: 's1', status: 'completed', sortOrder: 0 }];
+
+    it('waits for active subagents, then continues with their results', async () => {
+      service.subagents.hasActive.mockResolvedValueOnce(true);
+      service.subagents.takeUndelivered.mockResolvedValueOnce(finished);
+
+      await run(AgentMode.ASK, AgentApprovalMode.MANUAL);
+
+      expect(service.subagents.waitForSettled).toHaveBeenCalledTimes(1);
+      expect(service.executeStreamText).toHaveBeenCalledTimes(2);
+      const second = service.executeStreamText.mock.calls[1][0];
+      expect(second.modelMessages.at(-1)).toEqual({
+        role: 'user',
+        content: 'RESULTS',
+      });
+    });
+
+    it('stops resuming after the per-turn round cap', async () => {
+      service.subagents.hasActive.mockResolvedValue(true);
+      service.subagents.takeUndelivered.mockResolvedValue(finished);
+
+      await run(AgentMode.ASK, AgentApprovalMode.MANUAL);
+
+      expect(service.executeStreamText).toHaveBeenCalledTimes(4);
+    });
+
+    it('hands back finished results between plan steps without waiting', async () => {
+      repo.rows = [row('a', 'pending', 0), row('b', 'pending', 1)];
+      const order = ['a', 'b'];
+      iteration.mockImplementation(() =>
+        setStatus(order.shift()!, 'completed'),
+      );
+      service.subagents.takeUndelivered.mockResolvedValueOnce(finished);
+
+      await run();
+
+      expect(service.subagents.waitForSettled).not.toHaveBeenCalled();
+      const second = service.executeStreamText.mock.calls[1][0];
+      expect(second.modelMessages.at(-1).content).toContain('RESULTS');
+    });
+
+    it('releases injected results when the iteration fails', async () => {
+      service.executeStreamText.mockImplementation(() => {
+        throw new Error('provider down');
+      });
+
+      const stream: ReadableStream = service.createContinuationStream({
+        llmConfig: {},
+        model: {},
+        modelMessages: [],
+        contextParts: ['ctx'],
+        assistantMessageId: 'm1',
+        conversationId: 'c1',
+        assistantMessageMetadata: {},
+        tools: undefined,
+        todosEmitter: new EventEmitter(),
+        agentMode: AgentMode.ASK,
+        approvalMode: AgentApprovalMode.MANUAL,
+        workspaceId: 'w1',
+        userId: 'u1',
+        deliveredSubagentIds: ['s1'],
+      });
+      const reader = stream.getReader();
+      while (!(await reader.read()).done) {
+        /* drain */
+      }
+
+      expect(service.subagents.releaseDelivery).toHaveBeenCalledWith(['s1']);
+    });
+
+    it('keeps injected results pending across a retry that succeeds', async () => {
+      let calls = 0;
+      service.executeStreamText.mockImplementation(() => {
+        if (calls++ === 0) throw new Error('transient');
+        return {
+          aiStream: new ReadableStream({ start: (c) => c.close() }),
+          finishPromise: Promise.resolve(),
+
+          settle: jest.fn(() => Promise.resolve('answer')),
+        };
+      });
+
+      const stream: ReadableStream = service.createContinuationStream({
+        llmConfig: {},
+        model: {},
+        modelMessages: [],
+        contextParts: ['ctx'],
+        assistantMessageId: 'm1',
+        conversationId: 'c1',
+        assistantMessageMetadata: {},
+        tools: undefined,
+        todosEmitter: new EventEmitter(),
+        agentMode: AgentMode.ASK,
+        approvalMode: AgentApprovalMode.MANUAL,
+        workspaceId: 'w1',
+        userId: 'u1',
+        deliveredSubagentIds: ['s1'],
+      });
+      const reader = stream.getReader();
+      while (!(await reader.read()).done) {
+        /* drain */
+      }
+
+      expect(service.executeStreamText).toHaveBeenCalledTimes(2);
+      expect(service.subagents.releaseDelivery).not.toHaveBeenCalled();
+    });
+
+    it('repeats earlier results of the turn in later prompts', async () => {
+      service.subagents.hasActive
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(true);
+      service.subagents.takeUndelivered
+        .mockResolvedValueOnce(finished)
+        .mockResolvedValueOnce([{ id: 's2', status: 'completed', sortOrder: 1 }]);
+      service.subagents.formatResultsMessage
+        .mockReturnValueOnce('FIRST')
+        .mockReturnValueOnce('SECOND');
+
+      await run(AgentMode.ASK, AgentApprovalMode.MANUAL);
+
+      const third = service.executeStreamText.mock.calls[2][0];
+      expect(third.modelMessages.at(-1).content).toBe(
+        'FIRST\n\n---\n\nSECOND',
+      );
+    });
+
+    it('only waits for subagents dispatched in this turn', async () => {
+      await run(AgentMode.ASK, AgentApprovalMode.MANUAL);
+
+      expect(service.subagents.hasActive).toHaveBeenCalledWith(
+        'c1',
+        expect.any(Date),
+      );
+      expect(service.subagents.waitForSettled).not.toHaveBeenCalled();
+    });
+
+    it('forwards subagent updates and unsubscribes when the turn ends', async () => {
+      const unsubscribe = jest.fn();
+      service.subagents.subscribe.mockReturnValue(unsubscribe);
+
+      await run(AgentMode.ASK, AgentApprovalMode.MANUAL);
+
+      expect(service.subagents.subscribe).toHaveBeenCalledWith(
+        'c1',
+        expect.any(Function),
+      );
+      expect(unsubscribe).toHaveBeenCalled();
+    });
+  });
+
+  describe('turn stats', () => {
+    it('persists the turn stats once when the model reported usage', async () => {
+      service.executeStreamText.mockImplementation(
+        (opts: { onStats?: (s: unknown) => void }) => {
+          opts.onStats?.({ ...emptyStats(0), steps: 2, outputTokens: 10 });
+          return {
+            aiStream: new ReadableStream({ start: (c) => c.close() }),
+            finishPromise: Promise.resolve(),
+
+            settle: jest.fn(() => Promise.resolve('answer')),
+          };
+        },
+      );
+
+      await run(AgentMode.ASK, AgentApprovalMode.MANUAL);
+
+      expect(service.persistTurnMetadata).toHaveBeenCalledTimes(1);
+      expect(service.persistTurnMetadata.mock.calls[0][2]).toMatchObject({
+        steps: 2,
+        outputTokens: 10,
+      });
+    });
+
+    it('skips persisting when no step ran', async () => {
+      await run(AgentMode.ASK, AgentApprovalMode.MANUAL);
+
+      expect(service.persistTurnMetadata).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe('AgentsCompletionsService plan mode prompt', () => {
@@ -576,12 +800,16 @@ describe('AgentsCompletionsService plan mode prompt', () => {
     agentMode: AgentMode,
     approvalMode: AgentApprovalMode,
     todos: TodoStatus[] = [],
+    agentConfig: unknown = null,
   ) => {
     const service: any = Object.create(AgentsCompletionsService.prototype);
     service.getPrompt = jest.fn((name: string) => `prompt:${name}`);
     service.agentsMemories = {
       stmFormatForPrompt: jest.fn(() => Promise.resolve('')),
       ltmFormatForPrompt: jest.fn(() => Promise.resolve('')),
+    };
+    service.agentsConfig = {
+      find: jest.fn(() => Promise.resolve(agentConfig)),
     };
     service.todoRepository = createTodoRepo();
     service.todoRepository.rows = todos.map((status, i) => ({
@@ -599,6 +827,17 @@ describe('AgentsCompletionsService plan mode prompt', () => {
       'u1',
     ) as Promise<string[]>;
   };
+
+  it("puts the user's instructions right after the shared system prompt", async () => {
+    const parts = await build(AgentMode.ASK, AgentApprovalMode.MANUAL, [], {
+      instruction: 'Report in tables.',
+    });
+    expect(parts.slice(0, 3)).toEqual([
+      'prompt:ASK.md',
+      'prompt:SYSTEM.md',
+      '## User instructions\nReport in tables.',
+    ]);
+  });
 
   it.each([AgentMode.AGENT, AgentMode.ASK])(
     'asks for a plan first in %s mode when plan mode is on',
@@ -635,6 +874,47 @@ describe('AgentsCompletionsService plan mode prompt', () => {
     expect(text).toContain('AN APPROVED PLAN IS UNFINISHED');
     expect(text).not.toContain('PLAN MODE IS ON');
     expect(text).toContain('step 1');
+  });
+});
+
+describe('subagents by agent mode', () => {
+  const setup = () => {
+    const service: any = Object.create(AgentsCompletionsService.prototype);
+    service.subagents = {
+      buildSubagentsPrompt: jest.fn(() => Promise.resolve('## Available Subagents')),
+      createTools: jest.fn(() => ({ dispatch_subagent: {}, get_subagent_result: {} })),
+    };
+    service.agentTool = { gateTools: jest.fn((tools: object) => tools) };
+    const ctx = {
+      conversationId: 'c1',
+      workspaceId: 'w1',
+      userId: 'u1',
+      approval: {},
+      todosEmitter: new EventEmitter(),
+      onResultRead: jest.fn(),
+    };
+    return { service, ctx };
+  };
+
+  it('offers subagents in AGENT mode', async () => {
+    const { service, ctx } = setup();
+    await expect(
+      service.getSubagentsPrompt(AgentMode.AGENT, 'w1', 'u1'),
+    ).resolves.toBe('## Available Subagents');
+    expect(Object.keys(service.getSubagentTools(AgentMode.AGENT, ctx))).toEqual([
+      'dispatch_subagent',
+      'get_subagent_result',
+    ]);
+  });
+
+  it('never starts subagents in ASK mode', async () => {
+    const { service, ctx } = setup();
+    await expect(
+      service.getSubagentsPrompt(AgentMode.ASK, 'w1', 'u1'),
+    ).resolves.toBe('');
+    expect(service.getSubagentTools(AgentMode.ASK, ctx)).toEqual({});
+    expect(service.subagents.buildSubagentsPrompt).not.toHaveBeenCalled();
+    expect(service.subagents.createTools).not.toHaveBeenCalled();
   });
 });
 

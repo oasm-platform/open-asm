@@ -1,9 +1,11 @@
+import { ToolCategory } from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayUnique,
   IsArray,
+  IsEnum,
   IsObject,
   IsOptional,
   IsString,
@@ -34,6 +36,16 @@ export class AssetGroupToolInput {
   @IsOptional()
   @IsUUID()
   configProfileId?: string;
+
+  @ApiProperty({
+    required: false,
+    enum: ToolCategory,
+    enumName: 'ToolCategory',
+    description: 'Category to run the tool in (default: its first)',
+  })
+  @IsOptional()
+  @IsEnum(ToolCategory)
+  category?: ToolCategory;
 }
 
 export class CreateAssetGroupDto {

@@ -52,6 +52,13 @@ interface ToolConnectorConfigSheetProps {
   mode?: 'profile' | 'inline';
   /** Called in inline mode with the raw form config. */
   onInlineSubmit?: (config: Record<string, unknown>) => void;
+  /**
+   * Called instead of `onOpenChange(false)` when the user closes the sheet
+   * without saving (Cancel, X, Escape, overlay), so the parent can confirm
+   * first. The parent closes the sheet itself. Closes after a save are
+   * unaffected.
+   */
+  onDismiss?: () => void;
 }
 
 export function ToolConnectorConfigSheet({
@@ -66,9 +73,11 @@ export function ToolConnectorConfigSheet({
   defaultProfileId,
   mode = 'profile',
   onInlineSubmit,
+  onDismiss,
 }: ToolConnectorConfigSheetProps) {
   const queryClient = useQueryClient();
   const isEdit = !!initialData;
+  const dismiss = () => (onDismiss ? onDismiss() : onOpenChange(false));
 
   const formRef = useRef<ToolConfigFormHandle>(null);
   const [profileName, setProfileName] = useState('');
@@ -168,7 +177,10 @@ export function ToolConnectorConfigSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet
+      open={open}
+      onOpenChange={(next) => (next ? onOpenChange(true) : dismiss())}
+    >
       <SheetContent side="right" className="w-full sm:max-w-lg">
         <SheetHeader>
           {/* Logo chip mirrors the integration sheets' header: white/black tile
@@ -228,7 +240,7 @@ export function ToolConnectorConfigSheet({
               }
               initialValues={inline || mode === 'inline' ? defaultConfig : initialData?.config}
               onSubmit={handleSubmit}
-              onCancel={() => onOpenChange(false)}
+              onCancel={dismiss}
               submitLabel={mode === 'inline' ? 'Apply' : isEdit ? 'Update' : 'Create'}
               isSubmitting={isPending}
             />
@@ -250,7 +262,7 @@ export function ToolConnectorConfigSheet({
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={dismiss}
               disabled={isPending}
             >
               Cancel

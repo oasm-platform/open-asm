@@ -331,7 +331,7 @@ describe('DataAdapterService', () => {
       },
       assetServiceId: null,
       jobHistory: { id: 'history-id' },
-      tool: { id: 'tool-id', category: ToolCategory.SUBDOMAINS },
+      tool: { id: 'tool-id', categories: [{ name: ToolCategory.SUBDOMAINS, targetTypes: [] }] },
       category: ToolCategory.SUBDOMAINS,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -883,7 +883,7 @@ describe('DataAdapterService', () => {
       },
       assetServiceId: 'service-id',
       jobHistory: { id: 'history-id' },
-      tool: { id: 'tool-id', category: ToolCategory.HTTP_PROBE },
+      tool: { id: 'tool-id', categories: [{ name: ToolCategory.HTTP_PROBE, targetTypes: [] }] },
       assetService: { id: 'service-id' },
       category: ToolCategory.HTTP_PROBE,
       createdAt: new Date(),
@@ -1139,7 +1139,7 @@ describe('DataAdapterService', () => {
       },
       assetServiceId: 'service-id',
       jobHistory: { id: 'history-id' },
-      tool: { id: 'tool-id', category: ToolCategory.URL_DISCOVERY },
+      tool: { id: 'tool-id', categories: [{ name: ToolCategory.URL_DISCOVERY, targetTypes: [] }] },
       assetService: { id: 'service-id' },
       category: ToolCategory.URL_DISCOVERY,
       createdAt: new Date(),
@@ -1318,6 +1318,29 @@ describe('DataAdapterService', () => {
     });
   });
 
+  describe('syncData — category routing', () => {
+    it('routes data by job.category, not by the tool first category', async () => {
+      const job = {
+        id: 'job-id',
+        category: ToolCategory.PORTS_SCANNER,
+        tool: {
+          id: 'tool-id',
+          categories: [
+            { name: ToolCategory.VULNERABILITIES, targetTypes: [] },
+            { name: ToolCategory.PORTS_SCANNER, targetTypes: [] },
+          ],
+        },
+      } as unknown as Job;
+      const ports = jest.spyOn(service, 'portsScanner').mockResolvedValue(undefined);
+      const vulns = jest.spyOn(service, 'vulnerabilities').mockResolvedValue(undefined);
+
+      await service.syncData({ job, data: [80] });
+
+      expect(ports).toHaveBeenCalledWith({ job, data: [80] });
+      expect(vulns).not.toHaveBeenCalled();
+    });
+  });
+
   describe('portsScanner', () => {
     const mockJob = {
       asset: {
@@ -1332,7 +1355,7 @@ describe('DataAdapterService', () => {
       },
       assetServiceId: null,
       jobHistory: { id: 'history-id' },
-      tool: { id: 'tool-id', category: ToolCategory.PORTS_SCANNER },
+      tool: { id: 'tool-id', categories: [{ name: ToolCategory.PORTS_SCANNER, targetTypes: [] }] },
       category: ToolCategory.PORTS_SCANNER,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -1416,7 +1439,7 @@ describe('DataAdapterService', () => {
         id: 'history-id',
         workflow: { workspace: { id: 'workspace-id' } },
       },
-      tool: { id: 'tool-id', category: ToolCategory.VULNERABILITIES },
+      tool: { id: 'tool-id', categories: [{ name: ToolCategory.VULNERABILITIES, targetTypes: [] }] },
       category: ToolCategory.VULNERABILITIES,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -1856,7 +1879,7 @@ describe('DataAdapterService', () => {
         },
         assetServiceId: null,
         jobHistory: { id: 'history-id' },
-        tool: { id: 'tool-id', category: ToolCategory.PORTS_SCANNER },
+        tool: { id: 'tool-id', categories: [{ name: ToolCategory.PORTS_SCANNER, targetTypes: [] }] },
         category: ToolCategory.PORTS_SCANNER,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -1891,7 +1914,7 @@ describe('DataAdapterService', () => {
         },
         assetServiceId: null,
         jobHistory: { id: 'history-id' },
-        tool: { id: 'tool-id', category: ToolCategory.SUBDOMAINS },
+        tool: { id: 'tool-id', categories: [{ name: ToolCategory.SUBDOMAINS, targetTypes: [] }] },
         category: ToolCategory.SUBDOMAINS,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -1937,7 +1960,7 @@ describe('DataAdapterService', () => {
         },
         assetServiceId: 'service-id',
         jobHistory: { id: 'history-id' },
-        tool: { id: 'tool-id', category: ToolCategory.HTTP_PROBE },
+        tool: { id: 'tool-id', categories: [{ name: ToolCategory.HTTP_PROBE, targetTypes: [] }] },
         assetService: { id: 'service-id' },
         category: ToolCategory.HTTP_PROBE,
         createdAt: new Date(),
@@ -2037,7 +2060,7 @@ describe('DataAdapterService', () => {
         },
         assetServiceId: null,
         jobHistory: { id: 'history-id' },
-        tool: { id: 'tool-id', category: ToolCategory.VULNERABILITIES },
+        tool: { id: 'tool-id', categories: [{ name: ToolCategory.VULNERABILITIES, targetTypes: [] }] },
         category: ToolCategory.VULNERABILITIES,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -2096,7 +2119,7 @@ describe('DataAdapterService', () => {
         assetServiceId: 'service-id',
         assetService: { id: 'service-id' },
         jobHistory: { id: 'history-id' },
-        tool: { id: 'tool-id', category: ToolCategory.URL_DISCOVERY },
+        tool: { id: 'tool-id', categories: [{ name: ToolCategory.URL_DISCOVERY, targetTypes: [] }] },
         category: ToolCategory.URL_DISCOVERY,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -2117,7 +2140,7 @@ describe('DataAdapterService', () => {
 
       const httpProbeJob = {
         ...urlDiscoveryJob,
-        tool: { id: 'tool-id', category: ToolCategory.HTTP_PROBE },
+        tool: { id: 'tool-id', categories: [{ name: ToolCategory.HTTP_PROBE, targetTypes: [] }] },
         category: ToolCategory.HTTP_PROBE,
       } as unknown as Job;
       const httpData = { url: 'https://example.com' } as unknown as HttpResponse;
@@ -2161,7 +2184,7 @@ describe('DataAdapterService', () => {
       ).rejects.toThrow('Unsupported tool category: UNSUPPORTED_CATEGORY');
     });
 
-    it('should throw error for undefined tool category', async () => {
+    it('should throw error for undefined job category', async () => {
       const mockJob = {
         asset: {
           id: 'asset-id',
@@ -2175,7 +2198,7 @@ describe('DataAdapterService', () => {
         },
         assetServiceId: null,
         jobHistory: { id: 'history-id' },
-        tool: { id: 'tool-id', category: undefined },
+        tool: { id: 'tool-id', categories: [] },
         category: undefined,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -2186,7 +2209,7 @@ describe('DataAdapterService', () => {
           data: [],
           job: mockJob,
         }),
-      ).rejects.toThrow('Tool category is undefined');
+      ).rejects.toThrow('Job category is undefined');
     });
   });
 });

@@ -33,12 +33,11 @@ import {
   type Tool,
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
-import { useParams } from '@tanstack/react-router';
+import { getRouteApi, useParams } from '@tanstack/react-router';
 import dayjs from 'dayjs';
 import {
   BadgeCheck,
   Box,
-  Crosshair,
   Plus,
   Settings,
   Tag,
@@ -50,6 +49,7 @@ import {
   ConfigProfilesSkeleton,
   ToolDetailSkeleton,
 } from './tool-detail-skeleton';
+import { formatCategory } from './format-category';
 import ToolInstallButton from './tool-install-button';
 
 /** Extended profile shape returned by the API (orval type is incomplete). */
@@ -92,8 +92,11 @@ interface ToolTab {
   visible: boolean;
 }
 
+const routeApi = getRouteApi('/_authed/tools/$id');
+
 export default function ToolDetail() {
   const { id } = useParams({ strict: false });
+  const navigate = routeApi.useNavigate();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -133,8 +136,21 @@ export default function ToolDetail() {
 
   // Callback function to update installation status
   const handleInstallChange = () => {
-    setIsInstalled((prev) => !prev);
+    const nowInstalled = !isInstalled;
+    setIsInstalled(nowInstalled);
     refetch();
+    // A freshly installed connector needs a configuration profile: land on the
+    // Configuration tab with the create sheet already open.
+    if (nowInstalled && toolSlug) {
+      navigate({
+        search: (prev) => ({
+          ...prev,
+          tab: 'configuration',
+          openCreateToolConfiguration: true,
+        }),
+        replace: true,
+      });
+    }
   };
 
   if (isLoading) {
@@ -170,15 +186,6 @@ export default function ToolDetail() {
     // Future tabs (Reviews, Pricing, Support, ...) get appended here with
     // their own visibility condition — they render nothing until data exists.
   ].filter((tab) => tab.visible);
-
-  // Format category name for display
-  const formatCategory = (category: string | undefined) => {
-    if (!category) return 'N/A';
-    return category
-      .split('_')
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  };
 
   // Format type for display
   const formatType = (type: string) => {
@@ -222,26 +229,26 @@ export default function ToolDetail() {
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    {tool.category && (
-                      <Badge variant="secondary" className="gap-1">
+                    {tool.categories?.map((c) => (
+                      <Badge
+                        key={c.name}
+                        variant="secondary"
+                        className="gap-1"
+                        title="Target types this category can scan"
+                      >
                         <Tag />
-                        {formatCategory(tool.category)}
+                        {formatCategory(c.name)}
+                        {c.targetTypes.length > 0 && (
+                          <span className="text-muted-foreground">
+                            · {c.targetTypes.map(formatTargetType).join(', ')}
+                          </span>
+                        )}
                       </Badge>
-                    )}
+                    ))}
                     {tool.type && (
                       <Badge variant="secondary" className="gap-1">
                         <Box />
                         {formatType(tool.type)}
-                      </Badge>
-                    )}
-                    {tool.targetTypes?.length > 0 && (
-                      <Badge
-                        variant="secondary"
-                        className="gap-1"
-                        title="Target types this tool can scan"
-                      >
-                        <Crosshair />
-                        {tool.targetTypes.map(formatTargetType).join(', ')}
                       </Badge>
                     )}
                   </div>
@@ -415,17 +422,33 @@ function OverviewSection({ meta }: { meta: ConnectorMeta }) {
 function ConfigProfilesSection({ tool }: { tool: Tool }) {
   const queryClient = useQueryClient();
   const toolId = tool.id;
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const navigate = routeApi.useNavigate();
+  // The create sheet's open state lives in the URL
+  // (?openCreateToolConfiguration=true) so it survives reloads and can be
+  // linked to; editing an existing profile stays local.
+  const { openCreateToolConfiguration } = routeApi.useSearch();
   const [editingProfile, setEditingProfile] = useState<{
     id: string;
     name: string;
     config: Record<string, unknown>;
     isDefault?: boolean;
   } | null>(null);
+  const sheetOpen = editingProfile !== null || Boolean(openCreateToolConfiguration);
+  const [confirmSkipOpen, setConfirmSkipOpen] = useState(false);
+
+  const setCreateSheetOpen = (open: boolean) => {
+    navigate({
+      search: (prev) => ({
+        ...prev,
+        openCreateToolConfiguration: open ? true : undefined,
+      }),
+      replace: true,
+    });
+  };
 
   const handleCreate = () => {
     setEditingProfile(null);
-    setSheetOpen(true);
+    setCreateSheetOpen(true);
   };
 
   const { data: profilesRaw, isLoading } =
@@ -433,6 +456,13 @@ function ConfigProfilesSection({ tool }: { tool: Tool }) {
 
   // Cast to extended shape (orval type is incomplete)
   const profiles = (profilesRaw ?? []) as unknown as ProfileWithMeta[];
+
+  // Dismissing the URL-opened create sheet while the tool has no profile
+  // leaves it unusable, so confirm the user will add one later.
+  const confirmBeforeDismiss =
+    Boolean(openCreateToolConfiguration) &&
+    editingProfile === null &&
+    profiles.length === 0;
 
   const { mutate: setDefault, isPending: isSettingDefault } =
     useToolConfigProfilesControllerSetDefault({
@@ -477,7 +507,6 @@ function ConfigProfilesSection({ tool }: { tool: Tool }) {
       config: profile.config,
       isDefault: profile.isDefault,
     });
-    setSheetOpen(true);
   };
 
   // The sheet needs the real Tool object for its header (name, logoUrl)
@@ -580,9 +609,13 @@ function ConfigProfilesSection({ tool }: { tool: Tool }) {
         <ToolConnectorConfigSheet
           open={sheetOpen}
           onOpenChange={(open) => {
-            setSheetOpen(open);
-            if (!open) setEditingProfile(null);
+            if (open) return;
+            setEditingProfile(null);
+            if (openCreateToolConfiguration) setCreateSheetOpen(false);
           }}
+          onDismiss={
+            confirmBeforeDismiss ? () => setConfirmSkipOpen(true) : undefined
+          }
           tool={tool}
           initialData={editingProfile ?? undefined}
           onSuccess={() => {
@@ -590,6 +623,16 @@ function ConfigProfilesSection({ tool }: { tool: Tool }) {
               queryKey: getToolConfigProfilesControllerListQueryKey(toolId),
             });
           }}
+        />
+
+        <ConfirmDialog
+          open={confirmSkipOpen}
+          onOpenChange={setConfirmSkipOpen}
+          title="Add configuration later?"
+          description={`"${tool.name}" won't work until it has a configuration profile. You can add one later from the Configuration tab.`}
+          confirmText="Add later"
+          cancelText="Continue setup"
+          onConfirm={() => setCreateSheetOpen(false)}
         />
       </CardContent>
     </Card>

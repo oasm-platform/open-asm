@@ -7,11 +7,12 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import type {
   LanguageModel,
+  StepResult,
   TextStreamPart,
   ToolSet,
   UIMessageChunk,
 } from 'ai';
-import { generateText, isStepCount, streamText, toUIMessageStream } from 'ai';
+import { isStepCount, streamText, toUIMessageStream } from 'ai';
 import * as fs from 'fs';
 import * as Mustache from 'mustache';
 import { EventEmitter } from 'node:events';
@@ -19,6 +20,7 @@ import * as path from 'path';
 import { Repository } from 'typeorm';
 
 import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
+import { RemoteExecuteSubscribeService } from '@/modules/workers/remote-execute-subscribe.service';
 import { WorkersService } from '@/modules/workers/workers.service';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import {
@@ -28,8 +30,21 @@ import {
   type ApprovalResolvedEvent,
   type ApprovalSettings,
 } from './agents.approvals';
+import {
+  AgentsConfigService,
+  formatUserInstructions,
+  type ResolvedLLMConfig,
+  withAgentConfig,
+  withoutDisabledTools,
+} from './agents.config';
 import { AgentsMcpService } from './agents.mcp';
 import { AgentsMemoriesService } from './agents.memories';
+import { AgentsModelsCatalogService } from './agents.models-catalog';
+import {
+  AgentsSubagentsService,
+  SUBAGENT_MAX_ROUNDS_PER_TURN,
+  SUBAGENT_WAIT_BUDGET_MS,
+} from './agents.subagents';
 import { AgentsSkillsService } from './agents.skills';
 import type { AgentTodoItem } from './agents.todo';
 import { formatTodosToPrompt } from './agents.todo';
@@ -41,12 +56,22 @@ import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
 import { AgentMessageToolCall } from './entities/tool-call.entity';
 import { LLMProvider, MessageRole, MessageType } from './enums/agent.enums';
-import {
-  getLLMProviderConfig,
-  getReasoningProviderOptions,
-} from './llm-provider-supported';
+import { getReasoningProviderOptions } from './llm-provider-supported';
 import { ContextBudgetManager } from './shared/context-budget-manager';
+import {
+  type ConversationMetadata,
+  type TurnStats,
+  updateConversationMetadata,
+} from './shared/conversation-metadata';
 import { TokenCounter } from './shared/token-counter';
+import {
+  addSteps,
+  addWait,
+  emptyStats,
+  finalizeStats,
+  mergeStats,
+  type StatsAccumulator,
+} from './shared/turn-stats';
 
 /**
  * Whether this run may plan. Only PLAN mode makes plans (`create`). After a
@@ -85,6 +110,8 @@ const FINISH_PLAN_CONTEXT =
 export interface StreamMessageResult {
   stream: ReadableStream<UIMessageChunk>;
   conversationId: string;
+  /** Resolves once the run has ended and saved its final state */
+  settled?: Promise<void>;
 }
 
 /** Parameters for creating the merged ReadableStream result */
@@ -95,11 +122,22 @@ interface StreamCreationParams {
   abortSignal?: AbortSignal;
   /** Resolves when critical onFinish DB writes (tool calls, parts, message content) complete */
   finishPromise: Promise<void>;
+  /**
+   * After finishPromise: saves the message as stopped/failed unless onEnd
+   * already gave it its final state; resolves once that state is written
+   */
+  settle: (status: 'aborted' | 'error') => Promise<IterationOutcome>;
 }
+
+/**
+ * How a streamText iteration ended: onEnd saved its answer, or it was
+ * stopped/failed after some steps ran (their tools too), or before any
+ */
+type IterationOutcome = 'answer' | 'partial' | 'none';
 
 /** Parameters for building streamText call options */
 interface StreamTextOptions {
-  llmConfig: AgentLLMConfig;
+  llmConfig: ResolvedLLMConfig;
   model: LanguageModel;
   modelMessages: Array<{
     role: 'user' | 'assistant' | 'system';
@@ -120,11 +158,198 @@ interface StreamTextOptions {
   approvalMode?: AgentApprovalMode;
   /** Whether this run may make (or must finish) a plan */
   planning?: PlanningState;
+  /** Receives the token/timing stats of this streamText call (also on abort) */
+  onStats?: (stats: StatsAccumulator) => void;
+}
+
+/** A finished step: its content is kept in stream order */
+export type PartsStep = Pick<StepResult<ToolSet>, 'content'>;
+
+type ToolPartState =
+  | 'input-streaming'
+  | 'input-available'
+  | 'output-available'
+  | 'output-error';
+
+/** One block of the step still streaming, in the order it arrived */
+export type LiveSegment =
+  | { type: 'reasoning' | 'text'; id: string; text: string }
+  | {
+      type: 'tool';
+      toolCallId: string;
+      toolName: string;
+      state: ToolPartState;
+      input?: unknown;
+      output?: unknown;
+      errorText?: string;
+    };
+
+/** The step still streaming: what has arrived of it so far */
+export interface LiveStep {
+  segments: LiveSegment[];
+}
+
+/** Interval between progress writes of a running answer */
+const PROGRESS_FLUSH_MS = 1_000;
+
+const errorText = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
+/** Appends a text or reasoning delta to its block, opening a new block when another started */
+export function appendLiveText(
+  live: LiveStep,
+  type: 'reasoning' | 'text',
+  id: string,
+  delta: string,
+): void {
+  const last = live.segments.at(-1);
+  if (last && last.type === type && last.id === id) {
+    last.text += delta;
+  } else {
+    live.segments.push({ type, id, text: delta });
+  }
+}
+
+/** The live tool block of a call, if it started in this step */
+export function findLiveTool(
+  live: LiveStep,
+  toolCallId: string,
+): Extract<LiveSegment, { type: 'tool' }> | undefined {
+  for (const segment of live.segments) {
+    if (segment.type === 'tool' && segment.toolCallId === toolCallId) {
+      return segment;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Builds the stored `parts` of an assistant message in stream order, the
+ * same order the live stream renders. `live` appends the step still
+ * streaming, so a client that polls mid-run sees the answer as it grows.
+ */
+export function buildMessageParts(
+  steps: readonly PartsStep[],
+  live?: LiveStep,
+  fallbackReasoning = '',
+): Record<string, unknown>[] {
+  const parts: Record<string, unknown>[] = [];
+  let hasReasoningPart = false;
+  const pushText = (type: 'reasoning' | 'text', text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    parts.push({ type, text: trimmed });
+    if (type === 'reasoning') hasReasoningPart = true;
+  };
+
+  for (const step of steps) {
+    const tools = new Map<string, Record<string, unknown>>();
+    for (const content of step.content) {
+      switch (content.type) {
+        case 'reasoning':
+        case 'text':
+          pushText(content.type, content.text);
+          break;
+        case 'tool-call': {
+          const part: Record<string, unknown> = {
+            type: 'dynamic-tool',
+            toolCallId: content.toolCallId,
+            toolName: content.toolName,
+            state: 'input-available',
+            input: content.input,
+            output: null,
+          };
+          tools.set(content.toolCallId, part);
+          parts.push(part);
+          break;
+        }
+        case 'tool-result': {
+          const part = tools.get(content.toolCallId);
+          if (part && !content.preliminary) {
+            part.state = 'output-available';
+            part.output = content.output ?? null;
+          }
+          break;
+        }
+        case 'tool-error': {
+          const part = tools.get(content.toolCallId);
+          if (part) {
+            part.state = 'output-error';
+            part.errorText = errorText(content.error);
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  for (const segment of live?.segments ?? []) {
+    if (segment.type === 'tool') {
+      parts.push({
+        type: 'dynamic-tool',
+        toolCallId: segment.toolCallId,
+        toolName: segment.toolName,
+        state: segment.state,
+        input: segment.input,
+        output: segment.output ?? null,
+        ...(segment.errorText ? { errorText: segment.errorText } : {}),
+      });
+    } else {
+      pushText(segment.type, segment.text);
+    }
+  }
+
+  if (!hasReasoningPart && fallbackReasoning.trim()) {
+    parts.unshift({ type: 'reasoning', text: fallbackReasoning.trim() });
+  }
+  return parts;
 }
 
 @Injectable()
 export class AgentsCompletionsService {
   private readonly logger = new Logger(AgentsCompletionsService.name);
+
+  /**
+   * Active streaming runs by conversation id. A run outlives the HTTP request
+   * that started it (so navigating away does not kill it); only an explicit
+   * stop, or a newer run on the same conversation, aborts it.
+   */
+  private readonly activeRuns = new Map<string, AbortController>();
+
+  /** Registers the run so a later stop can find it; supersedes any older run. */
+  registerActiveRun(conversationId: string, controller: AbortController): void {
+    const previous = this.activeRuns.get(conversationId);
+    if (previous && previous !== controller) previous.abort();
+    this.activeRuns.set(conversationId, controller);
+  }
+
+  /** Unregisters the run, but only if it is still the current one. */
+  clearActiveRun(conversationId: string, controller: AbortController): void {
+    if (this.activeRuns.get(conversationId) === controller) {
+      this.activeRuns.delete(conversationId);
+    }
+  }
+
+  /**
+   * Aborts the active run of a conversation. Returns false if there is none.
+   * The run stays registered (so `running` stays true) until it has saved
+   * its stopped state; clearActiveRun removes it then.
+   */
+  stopRun(conversationId: string): boolean {
+    const controller = this.activeRuns.get(conversationId);
+    if (!controller || controller.signal.aborted) return false;
+    controller.abort();
+    return true;
+  }
+
+  /**
+   * True while a run of the conversation is in progress, including the gaps
+   * between continuation iterations where no message is 'streaming'.
+   */
+  isRunActive(conversationId: string): boolean {
+    return this.activeRuns.has(conversationId);
+  }
+
   private readonly prompts = new Map<string, string>();
   private static readonly PROMPTS_DIR = 'prompts';
   private readonly toolCapableModelsCache = new Map<string, Set<string>>();
@@ -152,6 +377,10 @@ export class AgentsCompletionsService {
     private readonly workspaceEncryption: WorkspaceEncryptionService,
     private readonly approvals: AgentsApprovalsService,
     private readonly workersService: WorkersService,
+    private readonly remoteExecuteSubscribe: RemoteExecuteSubscribeService,
+    private readonly agentsConfig: AgentsConfigService,
+    private readonly modelsCatalog: AgentsModelsCatalogService,
+    private readonly subagents: AgentsSubagentsService,
   ) {
     this.loadAllPrompts();
   }
@@ -203,40 +432,33 @@ export class AgentsCompletionsService {
     return template;
   }
 
-  private async getPreferredLLMConfig(
-    workspaceId: string,
-    userId: string,
-  ): Promise<AgentLLMConfig | null> {
-    return this.llmConfigRepository.findOne({
-      where: { workspaceId, userId, isPreferred: true },
-    });
-  }
-
   private async resolveLLMConfig(
     workspaceId: string,
     userId: string,
     provider?: string,
     model?: string,
-  ): Promise<AgentLLMConfig> {
-    let llmConfig: AgentLLMConfig | null = null;
+  ): Promise<ResolvedLLMConfig> {
+    const agentConfig = await this.agentsConfig.find(workspaceId, userId);
 
     if (model && provider) {
-      llmConfig = await this.llmConfigRepository.findOne({
+      const llmConfig = await this.llmConfigRepository.findOne({
         where: {
           workspaceId,
           userId,
           provider: provider as LLMProvider,
         },
       });
+      if (llmConfig) return withAgentConfig(llmConfig, agentConfig);
     }
 
-    if (!llmConfig) {
-      llmConfig = await this.getPreferredLLMConfig(workspaceId, userId);
-    }
-
+    const llmConfig = await this.agentsConfig.getDefaultLLMConfig(
+      workspaceId,
+      userId,
+      agentConfig,
+    );
     if (!llmConfig) {
       throw new BadRequestException(
-        'No preferred LLM config found. Please create and set a preferred LLM config first.',
+        'No LLM provider connected. Please connect a provider first.',
       );
     }
 
@@ -287,34 +509,37 @@ export class AgentsCompletionsService {
     }
   }
 
-  private async createLanguageModel(
+  private createLanguageModel(
     config: AgentLLMConfig,
     workspaceId: string,
   ): Promise<LanguageModel> {
-    let apiKey = '';
-    if (config.apiKey) {
-      apiKey = await this.workspaceEncryption.decrypt(
-        workspaceId,
-        config.apiKey,
-      );
-    }
-    const providerConfig = getLLMProviderConfig(config.provider);
+    return this.agentsConfig.createLanguageModel(config, workspaceId);
+  }
 
-    if (!providerConfig) {
-      throw new BadRequestException(
-        `Unsupported LLM provider: ${String(config.provider)}`,
-      );
-    }
-
-    const baseURL =
-      config.provider === LLMProvider.CUSTOM ? config.apiUrl : undefined;
-
-    return providerConfig.handler(apiKey, config.model, baseURL);
+  /**
+   * One-shot text completion for background helpers (title, summary, vuln
+   * analysis). Uses streamText, not generateText: some OpenAI-compatible
+   * providers answer a non-streaming request with an SSE-framed body that
+   * generateText cannot parse (see the custom-provider note).
+   */
+  private async completeText(
+    model: LanguageModel,
+    prompt: string,
+    provider?: LLMProvider,
+  ): Promise<string> {
+    const options = provider ? getReasoningProviderOptions(provider) : undefined;
+    const result = streamText({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      maxRetries: 2,
+      ...(options ? { providerOptions: options } : {}),
+    });
+    return (await result.text).trim();
   }
 
   private async generateTitle(
     conversationId: string,
-    llmConfig: AgentLLMConfig,
+    llmConfig: ResolvedLLMConfig,
   ): Promise<void> {
     try {
       const messages = await this.messageRepository.find({
@@ -340,20 +565,11 @@ export class AgentsCompletionsService {
         llmConfig.workspaceId,
       );
 
-      const titleResult = await generateText({
+      const titleText = await this.completeText(
         model,
-        messages: [{ role: 'user', content: prompt }],
-      });
-
-      let titleText = '';
-      if (typeof titleResult.content === 'string') {
-        titleText = titleResult.content;
-      } else if (Array.isArray(titleResult.content)) {
-        const textPart = titleResult.content.find(
-          (part) => part.type === 'text',
-        );
-        titleText = textPart?.type === 'text' ? textPart.text : '';
-      }
+        prompt,
+        llmConfig.provider,
+      );
 
       const title = titleText.trim().slice(0, 500);
 
@@ -373,8 +589,9 @@ export class AgentsCompletionsService {
     conversationId: string,
     accumulatedText: string,
     accumulatedReasoning: string,
-    llmConfig: AgentLLMConfig,
+    llmConfig: ResolvedLLMConfig,
     assistantMsgMetadata: Record<string, unknown> | undefined,
+    stats?: TurnStats,
   ): Promise<void> {
     try {
       await this.messageRepository.update(
@@ -383,6 +600,7 @@ export class AgentsCompletionsService {
           content: accumulatedText,
           metadata: {
             ...assistantMsgMetadata,
+            ...(stats ? { stats } : {}),
             status: 'completed',
           },
         },
@@ -496,7 +714,10 @@ export class AgentsCompletionsService {
       });
 
       const model = await this.createLanguageModel(llmConfig, workspaceId);
-      const tools = this.agentTool.getTools(workspaceId, AgentMode.AGENT);
+      const tools = withoutDisabledTools(
+        this.agentTool.getTools(workspaceId, AgentMode.AGENT),
+        await this.agentsConfig.find(workspaceId, userId),
+      );
 
       let accumulatedText = '';
 
@@ -578,14 +799,27 @@ export class AgentsCompletionsService {
         'Worker is not available to agents in this workspace',
       );
     }
+    // Only an online worker may be chosen; an offline pick would never run.
+    if (
+      dto.workerId &&
+      !this.remoteExecuteSubscribe.isAgentReady(dto.workerId, workspaceId)
+    ) {
+      throw new BadRequestException(
+        'Worker is offline; choose an online worker or Auto',
+      );
+    }
+    const agentConfig = await this.agentsConfig.find(workspaceId, userId);
     const newConversation = this.conversationRepository.create({
       ...(dto.conversationId ? { id: dto.conversationId } : {}),
       workspaceId,
       llmConfigId: llmConfig.id,
       title: dto.question.slice(0, 500),
       createdBy: userId,
-      agentMode: dto.agentMode,
-      approvalMode: dto.approvalMode ?? AgentApprovalMode.MANUAL,
+      agentMode: dto.agentMode ?? agentConfig?.defaultAgentMode ?? undefined,
+      approvalMode:
+        dto.approvalMode ??
+        agentConfig?.defaultApprovalMode ??
+        AgentApprovalMode.MANUAL,
       workerId: dto.workerId,
     });
     return this.conversationRepository.save(newConversation);
@@ -637,7 +871,7 @@ export class AgentsCompletionsService {
     dto: SendMessageDto,
     workspaceId: string,
     userId: string,
-  ): Promise<AgentLLMConfig> {
+  ): Promise<ResolvedLLMConfig> {
     // Get the base config from the conversation
     let llmConfig = await this.llmConfigRepository.findOne({
       where: { id: conversation.llmConfigId, workspaceId, userId },
@@ -658,15 +892,18 @@ export class AgentsCompletionsService {
     }
 
     // If user changed model within the same provider, override in memory only
-    // (Avoids writing to DB which would affect other conversations)
-    if (dto.model && dto.provider === llmConfig.provider) {
-      llmConfig = this.llmConfigRepository.create({
-        ...llmConfig,
-        model: dto.model,
-      });
-    }
+    // (Avoids writing to DB which would affect other conversations).
+    // Otherwise the default connection runs the agent's default model.
+    const agentConfig = await this.agentsConfig.find(workspaceId, userId);
+    const defaultRef = agentConfig?.modelsConfig.default;
+    const model =
+      dto.model && dto.provider === llmConfig.provider
+        ? dto.model
+        : defaultRef?.llmConfigId === llmConfig.id
+          ? defaultRef.model
+          : llmConfig.model;
 
-    return llmConfig;
+    return withAgentConfig(llmConfig, agentConfig, model);
   }
 
   /**
@@ -751,7 +988,7 @@ export class AgentsCompletionsService {
    */
   private async checkAndCompactMidLoop(
     conversationId: string,
-    llmConfig: AgentLLMConfig,
+    llmConfig: ResolvedLLMConfig,
     contextParts: string[],
     modelMessages: Array<{ role: string; content: string }>,
   ): Promise<boolean> {
@@ -797,7 +1034,7 @@ export class AgentsCompletionsService {
    */
   private async generateEndOfConversationReport(
     conversationId: string,
-    llmConfig: AgentLLMConfig,
+    llmConfig: ResolvedLLMConfig,
   ): Promise<void> {
     try {
       const messages = await this.messageRepository.find({
@@ -822,25 +1059,11 @@ export class AgentsCompletionsService {
         llmConfig.workspaceId,
       );
 
-      const result = await generateText({
+      const cleanedSummary = await this.completeText(
         model,
-        messages: [{ role: 'user', content: prompt }],
-      });
-
-      let summaryText = '';
-      if (typeof result.content === 'string') {
-        summaryText = result.content;
-      } else if (Array.isArray(result.content)) {
-        const textPart = result.content.find(
-          (part: { type: string }) => part.type === 'text',
-        );
-        summaryText =
-          textPart && 'text' in textPart
-            ? (textPart as { text: string }).text
-            : '';
-      }
-
-      const cleanedSummary = summaryText.trim();
+        prompt,
+        llmConfig.provider,
+      );
 
       if (cleanedSummary) {
         await this.conversationRepository.update(
@@ -865,7 +1088,7 @@ export class AgentsCompletionsService {
    */
   private async saveAssistantMessage(
     conversationId: string,
-    llmConfig: AgentLLMConfig,
+    llmConfig: ResolvedLLMConfig,
   ): Promise<AgentMessage> {
     const assistantMessage = this.messageRepository.create({
       conversationId,
@@ -879,6 +1102,72 @@ export class AgentsCompletionsService {
       },
     });
     return this.messageRepository.save(assistantMessage);
+  }
+
+  /**
+   * Gives a message still marked 'streaming' its final status. Only touches
+   * that status, so a message that did finish keeps what onEnd wrote.
+   */
+  private async settleStreamingMessage(
+    messageId: string,
+    status: 'aborted' | 'error',
+  ): Promise<void> {
+    try {
+      await this.messageRepository
+        .createQueryBuilder()
+        .update()
+        .set({
+          metadata: () =>
+            `jsonb_set(COALESCE(metadata, '{}'::jsonb), '{status}', to_jsonb(CAST(:status AS text)))`,
+        })
+        .setParameter('status', status)
+        .where('id = :id', { id: messageId })
+        .andWhere(`metadata->>'status' = 'streaming'`)
+        .execute();
+    } catch (err) {
+      this.logger.error('Error settling streaming message', err);
+    }
+  }
+
+  /** Subagents run only in AGENT mode; ASK answers by itself. */
+  private async getSubagentsPrompt(
+    agentMode: AgentMode,
+    workspaceId: string,
+    userId: string,
+  ): Promise<string> {
+    if (agentMode !== AgentMode.AGENT) return '';
+    return this.subagents.buildSubagentsPrompt(workspaceId, userId);
+  }
+
+  /**
+   * dispatch_subagent / get_subagent_result, AGENT mode only. They only
+   * read or queue, but stay gated so PLAN mode blocks them.
+   */
+  private getSubagentTools(
+    agentMode: AgentMode,
+    ctx: {
+      conversationId: string;
+      workspaceId: string;
+      userId: string;
+      approval: ApprovalSettings;
+      todosEmitter: EventEmitter;
+      onResultRead: (id: string) => void;
+    },
+  ): ToolSet {
+    if (agentMode !== AgentMode.AGENT) return {};
+    return this.agentTool.gateTools(
+      this.subagents.createTools({
+        conversationId: ctx.conversationId,
+        workspaceId: ctx.workspaceId,
+        userId: ctx.userId,
+        onResultRead: ctx.onResultRead,
+      }),
+      ctx.workspaceId,
+      ctx.conversationId,
+      ctx.approval,
+      ctx.todosEmitter,
+      true,
+    ) as ToolSet;
   }
 
   /**
@@ -943,13 +1232,17 @@ export class AgentsCompletionsService {
     const now = new Date();
     const currentTimeContext = `Current time: ${now.toISOString()} (${now.toLocaleString('en-US', { timeZoneName: 'short' })})`;
 
-    // Fetch STM and LTM concurrently
-    const [stmContext, ltmContext] = await Promise.all([
+    // Fetch STM, LTM and the user's agent config concurrently
+    const [stmContext, ltmContext, agentConfig] = await Promise.all([
       this.agentsMemories.stmFormatForPrompt(conversation.id),
       userId
         ? this.agentsMemories.ltmFormatForPrompt(workspaceId, userId)
         : Promise.resolve(''),
+      userId
+        ? this.agentsConfig.find(workspaceId, userId)
+        : Promise.resolve(null),
     ]);
+    const userContext = formatUserInstructions(agentConfig);
 
     const todos = await this.loadTodoItems(conversation.id);
     const planning = planningState(conversation.approvalMode, todos);
@@ -974,6 +1267,7 @@ export class AgentsCompletionsService {
     return [
       modePrompt,
       systemPrompt,
+      userContext,
       summaryContext,
       currentTimeContext,
       ltmContext,
@@ -992,15 +1286,55 @@ export class AgentsCompletionsService {
    */
   /**
    * Retrieves the effective context window for a given LLM config.
-   * Priority: contextWindow column (user override) > default (128k).
-   * The contextWindow column is set by the user when creating/updating
-   * an LLM config. If not set, falls back to the default.
+   * Priority: model ref contextWindow (user override) > models.dev catalog
+   * > default (128k).
    */
-  private getModelContextWindow(llmConfig: AgentLLMConfig): number {
-    if (llmConfig.contextWindow && llmConfig.contextWindow > 0) {
-      return llmConfig.contextWindow;
-    }
-    return AgentsCompletionsService.DEFAULT_CONTEXT_WINDOW;
+  private getModelContextWindow(llmConfig: ResolvedLLMConfig): number {
+    return this.modelsCatalog.resolveWindow(llmConfig).tokens;
+  }
+
+  /**
+   * Saves the model, context usage and stats of a finished turn on the
+   * conversation and adds its tokens/cost to the conversation totals.
+   */
+  private persistTurnMetadata(
+    conversationId: string,
+    llmConfig: ResolvedLLMConfig,
+    acc: StatsAccumulator,
+  ): Promise<ConversationMetadata | null> {
+    const lastTurn = finalizeStats(acc, {
+      cost: this.modelsCatalog.costOf(llmConfig.provider, llmConfig.model),
+    });
+    return updateConversationMetadata(
+      this.conversationRepository.manager,
+      conversationId,
+      {
+        ...this.modelMetadata(llmConfig),
+        contextUsedTokens: acc.lastContextTokens,
+        lastTurn,
+      },
+      {
+        inputTokens: lastTurn.inputTokens,
+        outputTokens: lastTurn.outputTokens,
+        costUsd: lastTurn.costUsd,
+        countTurn: true,
+      },
+    );
+  }
+
+  /** Model and context-window fields of the conversation metadata. */
+  private modelMetadata(
+    llmConfig: ResolvedLLMConfig,
+  ): Partial<ConversationMetadata> {
+    const window = this.modelsCatalog.resolveWindow(llmConfig);
+    return {
+      model: llmConfig.model,
+      provider: llmConfig.provider,
+      llmConfigId: llmConfig.id,
+      contextWindow: window.tokens,
+      contextWindowSource: window.source,
+      catalogEstimated: window.estimated,
+    };
   }
 
   /**
@@ -1008,7 +1342,7 @@ export class AgentsCompletionsService {
    * estimated token usage vs the model's context window threshold (70%).
    */
   private shouldCompact(
-    llmConfig: AgentLLMConfig,
+    llmConfig: ResolvedLLMConfig,
     contextParts: string[],
     modelMessages: Array<{ role: string; content: string }>,
   ): boolean {
@@ -1048,7 +1382,7 @@ export class AgentsCompletionsService {
    */
   private async compactConversation(
     conversationId: string,
-    llmConfig: AgentLLMConfig,
+    llmConfig: ResolvedLLMConfig,
   ): Promise<void> {
     try {
       // Fetch recent messages for summarization
@@ -1080,25 +1414,11 @@ export class AgentsCompletionsService {
       );
 
       // Generate the summary
-      const result = await generateText({
+      const cleanedSummary = await this.completeText(
         model,
-        messages: [{ role: 'user', content: prompt }],
-      });
-
-      let summaryText = '';
-      if (typeof result.content === 'string') {
-        summaryText = result.content;
-      } else if (Array.isArray(result.content)) {
-        const textPart = result.content.find(
-          (part: { type: string }) => part.type === 'text',
-        );
-        summaryText =
-          textPart && 'text' in textPart
-            ? (textPart as { text: string }).text
-            : '';
-      }
-
-      const cleanedSummary = summaryText.trim();
+        prompt,
+        llmConfig.provider,
+      );
 
       if (cleanedSummary) {
         await this.conversationRepository.update(
@@ -1123,7 +1443,7 @@ export class AgentsCompletionsService {
    */
   private async handlePostStreamCompaction(
     conversationId: string,
-    llmConfig: AgentLLMConfig,
+    llmConfig: ResolvedLLMConfig,
     contextParts: string[],
     modelMessages: Array<{ role: string; content: string }>,
   ): Promise<void> {
@@ -1162,6 +1482,103 @@ export class AgentsCompletionsService {
     let accumulatedText = '';
     let accumulatedReasoning = '';
 
+    // Progress of the running answer, saved on the placeholder message so a
+    // client that left and came back (and lost the SSE stream) sees it grow.
+    // Only `parts` is written here; content and status stay with onEnd.
+    const completedSteps: StepResult<ToolSet>[] = [];
+    let live: LiveStep = { segments: [] };
+    let progressDirty = false;
+    let progressClosed = false;
+    let progressSaved = false;
+    let progressTimer: NodeJS.Timeout | undefined;
+    // Chains the writes so they land in order
+    let progressWrite: Promise<void> = Promise.resolve();
+
+    const flushProgress = (): Promise<void> => {
+      if (progressTimer) {
+        clearTimeout(progressTimer);
+        progressTimer = undefined;
+      }
+      if (progressClosed || !progressDirty) return progressWrite;
+      progressDirty = false;
+      // Snapshot now: the live step keeps changing while the write is queued
+      const parts = buildMessageParts(completedSteps, live);
+      if (parts.length === 0) return progressWrite;
+      progressWrite = progressWrite
+        .then(async () => {
+          // A write queued just before the final one must not overwrite it
+          if (progressClosed) return;
+          await this.messageRepository.update(
+            { id: assistantMessageId },
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+            { parts: parts as any },
+          );
+          progressSaved = true;
+        })
+        .catch((err) =>
+          this.logger.warn(`Error saving progress parts: ${String(err)}`),
+        );
+      return progressWrite;
+    };
+    const scheduleProgress = () => {
+      progressDirty = true;
+      if (progressTimer || progressClosed) return;
+      progressTimer = setTimeout(() => void flushProgress(), PROGRESS_FLUSH_MS);
+      progressTimer.unref?.();
+    };
+    /** Stops progress writes and waits for the one in flight, so the final write lands last. */
+    const closeProgress = (): Promise<void> => {
+      progressClosed = true;
+      if (progressTimer) {
+        clearTimeout(progressTimer);
+        progressTimer = undefined;
+      }
+      return progressWrite;
+    };
+
+    // The write that gives this message its final state (onEnd's, or a
+    // stopped/failed one); set once, so a late callback cannot overwrite it
+    let finalWrite: Promise<void> | undefined;
+    // Token stats are reported once, by whichever path ends the iteration
+    let statsReported = false;
+    /** Saves the answer so far as stopped or failed: unfinished tools end as errors */
+    const saveStopped = async (status: 'aborted' | 'error'): Promise<void> => {
+      for (const segment of live.segments) {
+        if (
+          segment.type === 'tool' &&
+          (segment.state === 'input-streaming' ||
+            segment.state === 'input-available')
+        ) {
+          segment.state = 'output-error';
+          segment.errorText = status === 'aborted' ? 'Stopped' : 'Failed';
+        }
+      }
+      const parts = buildMessageParts(
+        completedSteps,
+        live,
+        accumulatedReasoning,
+      );
+      await closeProgress();
+      try {
+        await this.messageRepository.update(
+          { id: assistantMessageId },
+          {
+            // Keep what was generated so a stopped turn is not lost
+            content: accumulatedText,
+            ...(parts.length > 0 || progressSaved
+              ? // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+                { parts: parts as any }
+              : {}),
+            metadata: { ...assistantMessageMetadata, status },
+          },
+        );
+      } catch (err) {
+        this.logger.error(`Error saving ${status} message`, err);
+      }
+    };
+    const writeStopped = (status: 'aborted' | 'error'): Promise<void> =>
+      (finalWrite ??= saveStopped(status));
+
     // Use the shared EventEmitter from caller to communicate todo events between tool calls and the stream
     const { todosEmitter } = options;
 
@@ -1190,6 +1607,10 @@ export class AgentsCompletionsService {
         conversationId,
         todosEmitter,
         finishPromise,
+        settle: async (status) => {
+          await this.settleStreamingMessage(assistantMessageId, status);
+          return 'none';
+        },
       };
     }
 
@@ -1198,6 +1619,28 @@ export class AgentsCompletionsService {
     const maxOutputTokens =
       llmConfig.maxOutputTokens ??
       (options.agentMode === AgentMode.AGENT ? 32768 : undefined);
+
+    const startedAt = Date.now();
+
+    // streamText calls onAbort instead of onEnd when aborted, and neither
+    // when the consumer just cancels: never leave the loop awaiting forever
+    abortSignal?.addEventListener(
+      'abort',
+      () => {
+        void closeProgress();
+        resolveFinish?.();
+      },
+      { once: true },
+    );
+    const reportStats = (steps: Parameters<typeof addSteps>[1]) => {
+      const stats = addSteps(emptyStats(startedAt), steps);
+      try {
+        options.onStats?.(stats);
+      } catch (err) {
+        this.logger.error('Error reporting stream stats', err);
+      }
+      return stats;
+    };
 
     // Invoke the AI SDK streamText with all callbacks
     const result = streamText({
@@ -1234,13 +1677,74 @@ export class AgentsCompletionsService {
       })(),
       // AGENT mode needs more output tokens for multi-step execution
       ...(maxOutputTokens ? { maxOutputTokens } : {}),
-      // Accumulate text-delta and reasoning chunks as they arrive
+      // Accumulate text-delta and reasoning chunks as they arrive, and track
+      // the live step for progress writes. Stays synchronous: the SDK pauses
+      // the stream until onChunk resolves, so DB work is only scheduled here.
       onChunk: ({ chunk }) => {
-        if (chunk.type === 'text-delta') {
-          accumulatedText += chunk.text;
-        } else if (chunk.type === 'reasoning-delta') {
-          accumulatedReasoning += chunk.text;
+        switch (chunk.type) {
+          case 'text-delta':
+            accumulatedText += chunk.text;
+            appendLiveText(live, 'text', chunk.id, chunk.text);
+            break;
+          case 'reasoning-delta':
+            accumulatedReasoning += chunk.text;
+            appendLiveText(live, 'reasoning', chunk.id, chunk.text);
+            break;
+          case 'tool-input-start':
+            live.segments.push({
+              type: 'tool',
+              toolCallId: chunk.id,
+              toolName: chunk.toolName,
+              state: 'input-streaming',
+            });
+            break;
+          case 'tool-call': {
+            // Emitted before the tool runs, so a long or approval-gated
+            // tool shows as executing
+            const tool = findLiveTool(live, chunk.toolCallId);
+            if (tool) {
+              tool.state = 'input-available';
+              tool.input = chunk.input;
+            } else {
+              live.segments.push({
+                type: 'tool',
+                toolCallId: chunk.toolCallId,
+                toolName: chunk.toolName,
+                state: 'input-available',
+                input: chunk.input,
+              });
+            }
+            break;
+          }
+          case 'tool-result': {
+            if (chunk.preliminary) return;
+            const tool = findLiveTool(live, chunk.toolCallId);
+            if (!tool) return;
+            tool.state = 'output-available';
+            tool.output = chunk.output;
+            break;
+          }
+          case 'tool-error': {
+            const tool = findLiveTool(live, chunk.toolCallId);
+            if (!tool) return;
+            tool.state = 'output-error';
+            tool.errorText =
+              chunk.error instanceof Error
+                ? chunk.error.message
+                : String(chunk.error);
+            break;
+          }
+          default:
+            return;
         }
+        scheduleProgress();
+      },
+      // A step ended (its tool results are in): save it right away
+      onStepEnd: (step) => {
+        completedSteps.push(step);
+        live = { segments: [] };
+        progressDirty = true;
+        void flushProgress();
       },
       // Handle errors from the AI provider (rate-limit, invalid key, etc.)
       // Never throw here — throwing in onError can crash the stream.
@@ -1275,6 +1779,15 @@ export class AgentsCompletionsService {
       },
       // Pass abort signal so AI SDK can cancel the provider call
       abortSignal,
+      // Tokens were spent even when the run was aborted (onEnd does not run)
+      onAbort: (event) => {
+        if (!statsReported) {
+          statsReported = true;
+          reportStats(event.steps);
+        }
+        void writeStopped('aborted');
+        resolveFinish?.();
+      },
       // When streaming completes, persist accumulated text to DB
       // persist tool call data (for history rendering on page reload),
       // auto-complete stuck todos, and trigger compaction check
@@ -1289,29 +1802,29 @@ export class AgentsCompletionsService {
             `agentMode=${options.agentMode ?? 'unknown'}`,
         );
 
-        const markAborted = () => {
-          this.messageRepository
-            .update(
-              { id: assistantMessageId },
-              {
-                content: '',
-                metadata: { ...assistantMessageMetadata, status: 'aborted' },
-              },
-            )
-            .catch((err) =>
-              this.logger.error('Error saving aborted message', err),
-            );
-        };
+        // Stopped or failed already (the loop settled it): keep that state
+        if (finalWrite) {
+          resolveFinish?.();
+          return;
+        }
+
+        statsReported = true;
+        const messageStats = finalizeStats(reportStats(event.steps), {
+          cost: this.modelsCatalog.costOf(llmConfig.provider, llmConfig.model),
+        });
 
         if (isAborted()) {
-          markAborted();
+          void writeStopped('aborted');
           resolveFinish?.();
           return;
         }
 
         // Critical DB writes are awaited internally and resolve finishPromise
         // when complete. Non-critical operations remain fire-and-forget.
-        (async () => {
+        finalWrite = (async () => {
+          // The final parts write below must not be overtaken by a progress write
+          await closeProgress();
+
           // Persist tool calls for history rendering on page reload
           try {
             const toolCallEntities: AgentMessageToolCall[] = [];
@@ -1342,45 +1855,19 @@ export class AgentsCompletionsService {
           }
 
           if (isAborted()) {
-            markAborted();
+            await saveStopped('aborted');
             return;
           }
 
           // Build parts array for frontend rendering
           try {
-            const parts: Record<string, unknown>[] = [];
-            let hasReasoningPart = false;
-            for (const step of event.steps) {
-              const stepReasoning = step.reasoningText ?? '';
-              if (stepReasoning.trim()) {
-                parts.push({ type: 'reasoning', text: stepReasoning.trim() });
-                hasReasoningPart = true;
-              }
-              for (const tc of step.toolCalls) {
-                const toolResult = step.toolResults?.find(
-                  (r) => r.toolCallId === tc.toolCallId,
-                );
-                parts.push({
-                  type: 'dynamic-tool',
-                  toolCallId: tc.toolCallId,
-                  toolName: tc.toolName,
-                  state: toolResult ? 'output-available' : 'input-available',
-                  input: tc.input,
-                  output: toolResult?.output ?? null,
-                });
-              }
-              const stepText = typeof step.text === 'string' ? step.text : '';
-              if (stepText.trim()) {
-                parts.push({ type: 'text', text: stepText.trim() });
-              }
-            }
-            if (!hasReasoningPart && accumulatedReasoning.trim()) {
-              parts.unshift({
-                type: 'reasoning',
-                text: accumulatedReasoning.trim(),
-              });
-            }
-            if (parts.length > 0) {
+            const parts = buildMessageParts(
+              event.steps,
+              undefined,
+              accumulatedReasoning,
+            );
+            // Also replace progress parts that the final answer no longer has
+            if (parts.length > 0 || progressSaved) {
               await this.messageRepository.update(
                 { id: assistantMessageId },
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
@@ -1399,6 +1886,7 @@ export class AgentsCompletionsService {
             accumulatedReasoning,
             llmConfig,
             assistantMessageMetadata,
+            messageStats,
           ).catch((err) =>
             this.logger.error('Error in handleStreamFinish', err),
           );
@@ -1429,10 +1917,35 @@ export class AgentsCompletionsService {
       },
     });
 
+    // When the provider fails before any step finishes (bad key, context too
+    // long, 5xx after retries) the SDK runs neither onEnd nor onAbort; it
+    // only rejects the result promises. Don't leave the loop awaiting forever.
+    Promise.resolve(result.steps).then(undefined, () => resolveFinish?.());
+
     // Convert the result stream to a UIMessageStream consumable by the frontend
     const aiStream = toUIMessageStream({ stream: result.stream, tools });
 
-    return { aiStream, conversationId, todosEmitter, finishPromise };
+    return {
+      aiStream,
+      conversationId,
+      todosEmitter,
+      finishPromise,
+      // After finishPromise: a message that got no final state from onEnd
+      // (stopped, or the provider failed) is saved as such
+      settle: async (status) => {
+        if (finalWrite) {
+          await finalWrite;
+          return 'answer';
+        }
+        // Tokens of the steps that ran were spent too
+        if (!statsReported) {
+          statsReported = true;
+          reportStats(completedSteps);
+        }
+        await writeStopped(status);
+        return completedSteps.length > 0 ? 'partial' : 'none';
+      },
+    };
   }
 
   // ================================================================
@@ -1457,6 +1970,14 @@ export class AgentsCompletionsService {
       workspaceId: string;
       userId?: string;
       skillsContext?: string;
+      /** Subagent results injected into the first prompt (released if it fails) */
+      deliveredSubagentIds?: string[];
+      /** The formatted text of those results */
+      deliveredSubagentResults?: string;
+      /** Filled by the loop so the subagent tools can report reads */
+      subagentHooks?: { onResultRead?: (id: string) => void };
+      /** Called once the run has ended and saved its final state */
+      onSettled?: () => void;
     },
   ): ReadableStream<UIMessageChunk> {
     const {
@@ -1502,207 +2023,341 @@ export class AgentsCompletionsService {
 
     let currentModelMessages = [...options.modelMessages];
     let currentAssistantMessageId = options.assistantMessageId;
+    // Settles the iteration in progress if the loop ends inside it
+    let settleIteration:
+      | ((status: 'aborted' | 'error') => Promise<IterationOutcome>)
+      | undefined;
     let currentAssistantMetadata = options.assistantMessageMetadata;
     let currentContextParts = [...options.contextParts];
 
-    return new ReadableStream<UIMessageChunk>({
-      start: async (controller) => {
-        let controllerClosed = false;
+    // Token/timing stats of the whole user turn (all iterations)
+    let turnAcc = emptyStats(Date.now());
+    // Subagent results in the prompt of the iteration being run; released
+    // back to "undelivered" if that iteration fails or is aborted
+    let pendingDeliveryIds = [...(options.deliveredSubagentIds ?? [])];
+    let subagentRounds = 0;
+    let subagentWaitBudgetMs = SUBAGENT_WAIT_BUDGET_MS;
+    // Only subagents dispatched in this turn are waited for; results of
+    // earlier ones are still handed back, just never waited on
+    const turnStartedAt = new Date();
+    // Results handed back this turn. Prompts are rebuilt from the DB between
+    // iterations, where these (memory-only) messages do not exist, so every
+    // follow-up repeats them
+    const deliveredResults: string[] = options.deliveredSubagentResults
+      ? [options.deliveredSubagentResults]
+      : [];
+    // A result read with get_subagent_result belongs to the running iteration
+    if (options.subagentHooks) {
+      options.subagentHooks.onResultRead = (id: string) => {
+        if (!pendingDeliveryIds.includes(id)) pendingDeliveryIds.push(id);
+      };
+    }
 
-        const onAbort = () => {
-          if (controllerClosed) return;
-          controllerClosed = true;
-          try {
-            controller.close();
-          } catch {
-            /* ignore */
-          }
-        };
+    const releasePendingDelivery = async () => {
+      if (pendingDeliveryIds.length === 0) return;
+      const ids = pendingDeliveryIds;
+      pendingDeliveryIds = [];
+      await this.subagents
+        .releaseDelivery(ids)
+        .catch((err) =>
+          this.logger.error('Failed to release subagent delivery', err),
+        );
+    };
 
-        if (abortSignal) {
-          abortSignal.addEventListener('abort', onAbort, { once: true });
+    const runLoop = async (
+      controller: ReadableStreamDefaultController<UIMessageChunk>,
+    ) => {
+      let controllerClosed = false;
+
+      /**
+       * Waits (bounded) for this conversation's background subagents and
+       * returns their results as a follow-up prompt, or null when there is
+       * nothing to wait for.
+       */
+      const awaitSubagents = async (): Promise<{
+        message: string;
+        ids: string[];
+      } | null> => {
+        if (
+          subagentRounds >= SUBAGENT_MAX_ROUNDS_PER_TURN ||
+          subagentWaitBudgetMs <= 0
+        ) {
+          return null;
+        }
+        const [active, undelivered] = await Promise.all([
+          this.subagents.hasActive(conversationId, turnStartedAt),
+          this.subagents.countUndelivered(conversationId),
+        ]);
+        if (!active && undelivered === 0) return null;
+
+        const waitStart = Date.now();
+        const outcome = active
+          ? await this.subagents.waitForSettled(
+              conversationId,
+              subagentWaitBudgetMs,
+              abortSignal,
+              turnStartedAt,
+            )
+          : 'settled';
+        const waited = Date.now() - waitStart;
+        subagentWaitBudgetMs -= waited;
+        turnAcc = addWait(turnAcc, waited);
+        if (outcome === 'aborted' || abortSignal?.aborted || controllerClosed) {
+          return null;
         }
 
-        // Subscribe to todos-updated events from the initial emitter
-        const onTodosUpdated = (updatedTodos: AgentTodoItem[]) => {
-          if (controllerClosed) return;
-          controller.enqueue({
-            type: 'data-todos-updated',
-            data: { todos: updatedTodos },
-          } as unknown as UIMessageChunk);
+        // On timeout, whatever finished is delivered now; the rest is
+        // delivered at the start of the next message
+        const rows = await this.subagents.takeUndelivered(conversationId);
+        if (rows.length === 0) return null;
+        subagentRounds++;
+        return {
+          message: this.subagents.formatResultsMessage(rows),
+          ids: rows.map((r) => r.id),
         };
-        todosEmitter.on('todos-updated', onTodosUpdated);
+      };
 
-        // Subscribe to remote-execute-output events for real-time terminal streaming
-        const onRemoteExecuteOutput = (data: {
-          toolCallId: string;
-          type: number;
-          data: string;
-          exitCode: number;
-        }) => {
+      const onAbort = () => {
+        if (controllerClosed) return;
+        controllerClosed = true;
+        try {
+          controller.close();
+        } catch {
+          /* ignore */
+        }
+      };
+
+      if (abortSignal) {
+        abortSignal.addEventListener('abort', onAbort, { once: true });
+      }
+
+      // Subscribe to todos-updated events from the initial emitter
+      const onTodosUpdated = (updatedTodos: AgentTodoItem[]) => {
+        if (controllerClosed) return;
+        controller.enqueue({
+          type: 'data-todos-updated',
+          data: { todos: updatedTodos },
+        } as unknown as UIMessageChunk);
+      };
+      todosEmitter.on('todos-updated', onTodosUpdated);
+
+      // Subscribe to remote-execute-output events for real-time terminal streaming
+      const onRemoteExecuteOutput = (data: {
+        toolCallId: string;
+        type: number;
+        data: string;
+        exitCode: number;
+      }) => {
+        if (controllerClosed) return;
+        // Transient: a non-transient data chunk is appended to the message
+        // parts and the client re-clones the whole message per chunk, so a
+        // long output (thousands of chunks) froze the chat.
+        controller.enqueue({
+          type: 'data-remote-execute-output',
+          data,
+          transient: true,
+        } as unknown as UIMessageChunk);
+      };
+      todosEmitter.on('remote-execute-output', onRemoteExecuteOutput);
+
+      // Subscribe to approval-required events (human-in-the-loop dialog)
+      const onApprovalRequired = (data: ApprovalRequestEvent) => {
+        if (controllerClosed) return;
+        controller.enqueue({
+          type: 'data-approval-required',
+          data,
+        } as unknown as UIMessageChunk);
+      };
+      todosEmitter.on('approval-required', onApprovalRequired);
+
+      // A prompt no longer needs an answer (allowed by "allow all" or
+      // "allow tool", timed out, ...): the UI drops it from its queue
+      const onApprovalResolved = (data: ApprovalResolvedEvent) => {
+        if (controllerClosed) return;
+        controller.enqueue({
+          type: 'data-approval-resolved',
+          data,
+        } as unknown as UIMessageChunk);
+      };
+      todosEmitter.on('approval-resolved', onApprovalResolved);
+
+      // The user approved a plan and picked how it runs: sync the selector
+      const onApprovalModeChanged = (data: { mode: AgentApprovalMode }) => {
+        if (controllerClosed) return;
+        controller.enqueue({
+          type: 'data-approval-mode-changed',
+          data,
+        } as unknown as UIMessageChunk);
+      };
+      todosEmitter.on('approval-mode-changed', onApprovalModeChanged);
+
+      // Subscribe to stream-error events (provider errors propagated to frontend)
+      const onStreamError = (data: { message: string }) => {
+        if (controllerClosed) return;
+        controller.enqueue({
+          type: 'error',
+          error: data,
+        } as unknown as UIMessageChunk);
+      };
+      todosEmitter.on('stream-error', onStreamError);
+
+      // Background subagent status changes for this conversation
+      const unsubscribeSubagents = this.subagents.subscribe(
+        conversationId,
+        (subagents) => {
           if (controllerClosed) return;
-          // Transient: a non-transient data chunk is appended to the message
-          // parts and the client re-clones the whole message per chunk, so a
-          // long output (thousands of chunks) froze the chat.
           controller.enqueue({
-            type: 'data-remote-execute-output',
-            data,
+            type: 'data-subagents-updated',
+            data: { subagents },
             transient: true,
           } as unknown as UIMessageChunk);
-        };
-        todosEmitter.on('remote-execute-output', onRemoteExecuteOutput);
+        },
+      );
 
-        // Subscribe to approval-required events (human-in-the-loop dialog)
-        const onApprovalRequired = (data: ApprovalRequestEvent) => {
-          if (controllerClosed) return;
-          controller.enqueue({
-            type: 'data-approval-required',
-            data,
-          } as unknown as UIMessageChunk);
-        };
-        todosEmitter.on('approval-required', onApprovalRequired);
+      // Emit initial conversation-created event
+      controller.enqueue({
+        type: 'data-conversation-created',
+        data: { conversationId },
+      });
 
-        // A prompt no longer needs an answer (allowed by "allow all" or
-        // "allow tool", timed out, ...): the UI drops it from its queue
-        const onApprovalResolved = (data: ApprovalResolvedEvent) => {
-          if (controllerClosed) return;
-          controller.enqueue({
-            type: 'data-approval-resolved',
-            data,
-          } as unknown as UIMessageChunk);
-        };
-        todosEmitter.on('approval-resolved', onApprovalResolved);
+      try {
+        if (continuesPlan) {
+          lastFingerprint = planFingerprint(
+            await this.loadTodoItems(conversationId),
+          );
+        }
 
-        // The user approved a plan and picked how it runs: sync the selector
-        const onApprovalModeChanged = (data: { mode: AgentApprovalMode }) => {
-          if (controllerClosed) return;
-          controller.enqueue({
-            type: 'data-approval-mode-changed',
-            data,
-          } as unknown as UIMessageChunk);
-        };
-        todosEmitter.on('approval-mode-changed', onApprovalModeChanged);
+        for (
+          let iteration = 0;
+          iteration < MAX_SAFETY_ITERATIONS;
+          iteration++
+        ) {
+          if (abortSignal?.aborted || controllerClosed) break;
 
-        // Subscribe to stream-error events (provider errors propagated to frontend)
-        const onStreamError = (data: { message: string }) => {
-          if (controllerClosed) return;
-          controller.enqueue({
-            type: 'error',
-            error: data,
-          } as unknown as UIMessageChunk);
-        };
-        todosEmitter.on('stream-error', onStreamError);
-
-        // Emit initial conversation-created event
-        controller.enqueue({
-          type: 'data-conversation-created',
-          data: { conversationId },
-        });
-
-        try {
-          if (continuesPlan) {
-            lastFingerprint = planFingerprint(
-              await this.loadTodoItems(conversationId),
+          // Mid-loop compaction: check budget before each iteration
+          if (continuesPlan && iteration > 0) {
+            const compacted = await this.checkAndCompactMidLoop(
+              conversationId,
+              llmConfig,
+              currentContextParts,
+              currentModelMessages,
             );
+            if (compacted) {
+              // Re-fetch context after compaction
+              const postCompactConversation =
+                await this.conversationRepository.findOne({
+                  where: { id: conversationId },
+                });
+              if (postCompactConversation?.summary) {
+                currentContextParts = await rebuildContext(
+                  postCompactConversation,
+                );
+              }
+            }
           }
 
-          for (
-            let iteration = 0;
-            iteration < MAX_SAFETY_ITERATIONS;
-            iteration++
-          ) {
-            if (abortSignal?.aborted || controllerClosed) break;
-
-            // Mid-loop compaction: check budget before each iteration
-            if (continuesPlan && iteration > 0) {
-              const compacted = await this.checkAndCompactMidLoop(
-                conversationId,
-                llmConfig,
-                currentContextParts,
-                currentModelMessages,
-              );
-              if (compacted) {
-                // Re-fetch context after compaction
-                const postCompactConversation =
-                  await this.conversationRepository.findOne({
-                    where: { id: conversationId },
-                  });
-                if (postCompactConversation?.summary) {
-                  currentContextParts = await rebuildContext(
-                    postCompactConversation,
-                  );
-                }
-              }
-            }
-
-            try {
-              // Execute a single streamText iteration
-              const { aiStream, finishPromise } = this.executeStreamText({
-                llmConfig,
-                model,
-                modelMessages: currentModelMessages,
-                contextParts: currentContextParts,
-                assistantMessageId: currentAssistantMessageId,
-                conversationId,
-                assistantMessageMetadata: currentAssistantMetadata,
-                tools: options.tools,
-                todosEmitter,
-                abortSignal,
-                agentMode,
-                approvalMode: options.approvalMode,
-              });
-
-              // Pump chunks from this iteration's stream
-              const reader = aiStream.getReader();
-              while (true) {
-                if (abortSignal?.aborted || controllerClosed) {
-                  await reader.cancel().catch(() => {});
-                  break;
-                }
-                const { done, value } = await reader.read();
-                if (done || controllerClosed) break;
-                controller.enqueue(value);
-              }
-
-              // Wait for critical onFinish DB writes (tool calls, parts, message content)
-              // to complete before reading DB for todo status. Without this,
-              // the continuation loop reads stale data because onFinish DB writes
-              // are async and may not have committed yet when the reader drains.
-              await finishPromise;
-              consecutiveErrors = 0;
-            } catch (iterationError) {
-              this.logger.error(
-                `[Continuation] Error in iteration ${iteration} for ${conversationId}`,
-                iterationError,
-              );
-              // Don't break on non-fatal errors — try next iteration
-              // Only break if abort signal fired or controller is closed
-              if (abortSignal?.aborted || controllerClosed) break;
-              // Reset in_progress todos back to pending so the next iteration
-              // can re-attempt them. Await to ensure DB is updated before
-              // the loop reads stale data.
-              const updatedTodos = await this.resetTodosOnError(conversationId);
-              todosEmitter.emit('todos-updated', updatedTodos);
-              if (++consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) break;
-              continue;
-            }
-
-            if (abortSignal?.aborted || controllerClosed) break;
-
-            // Auto-continue while a plan has pending steps (Agent or Plan mode)
-            if (!continuesPlan) break;
-
-            const conversation = await this.conversationRepository.findOne({
-              where: { id: conversationId },
+          try {
+            // Execute a single streamText iteration
+            const { aiStream, finishPromise, settle } = this.executeStreamText({
+              llmConfig,
+              model,
+              modelMessages: currentModelMessages,
+              contextParts: currentContextParts,
+              assistantMessageId: currentAssistantMessageId,
+              conversationId,
+              assistantMessageMetadata: currentAssistantMetadata,
+              tools: options.tools,
+              todosEmitter,
+              abortSignal,
+              agentMode,
+              approvalMode: options.approvalMode,
+              onStats: (stats) => {
+                turnAcc = mergeStats(turnAcc, stats);
+              },
             });
+            settleIteration = settle;
 
-            const todos = await this.loadTodoItems(conversationId);
-            const hasPending = todos.some(
-              (t) => t.status === 'pending' || t.status === 'in_progress',
+            // Pump chunks from this iteration's stream
+            const reader = aiStream.getReader();
+            while (true) {
+              if (abortSignal?.aborted || controllerClosed) {
+                await reader.cancel().catch(() => {});
+                break;
+              }
+              const { done, value } = await reader.read();
+              if (done || controllerClosed) break;
+              controller.enqueue(value);
+            }
+
+            // Wait for critical onFinish DB writes (tool calls, parts, message content)
+            // to complete before reading DB for todo status. Without this,
+            // the continuation loop reads stale data because onFinish DB writes
+            // are async and may not have committed yet when the reader drains.
+            await finishPromise;
+            // Stopped, or the provider failed before onEnd: give the
+            // message its final state
+            const outcome = await settle(
+              abortSignal?.aborted ? 'aborted' : 'error',
             );
+            settleIteration = undefined;
+            if (!abortSignal?.aborted && !controllerClosed) {
+              // Nothing ran yet: retry it like any other failure
+              if (outcome === 'none') {
+                throw new Error('The model call ended without an answer');
+              }
+              // Failed after some steps ran: retrying from scratch would run
+              // their tools again, so keep the partial answer and stop
+              if (outcome === 'partial') break;
+            }
+            consecutiveErrors = 0;
+          } catch (iterationError) {
+            this.logger.error(
+              `[Continuation] Error in iteration ${iteration} for ${conversationId}`,
+              iterationError,
+            );
+            // Injected results stay pending: the retry re-sends the same
+            // prompt, and `finally` releases them if no retry succeeds
+            // Don't break on non-fatal errors — try next iteration
+            // Only break if abort signal fired or controller is closed
+            if (abortSignal?.aborted || controllerClosed) break;
+            // The stream failed mid-iteration: keep what its steps did rather
+            // than retry from scratch and run their tools again
+            if (settleIteration) {
+              const outcome = await settleIteration('error');
+              settleIteration = undefined;
+              if (outcome !== 'none') break;
+            }
+            // Reset in_progress todos back to pending so the next iteration
+            // can re-attempt them. Await to ensure DB is updated before
+            // the loop reads stale data.
+            const updatedTodos = await this.resetTodosOnError(conversationId);
+            todosEmitter.emit('todos-updated', updatedTodos);
+            if (++consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) break;
+            continue;
+          }
 
-            if (!hasPending) break;
+          if (abortSignal?.aborted || controllerClosed) break;
+          // This iteration's prompt consumed the injected subagent results
+          pendingDeliveryIds = [];
 
+          // Auto-continue while a plan has pending steps (Agent or Plan
+          // mode), or once background subagents hand their results back
+          const todos = continuesPlan
+            ? await this.loadTodoItems(conversationId)
+            : [];
+          const pendingSteps = todos.filter(
+            (t) => t.status === 'pending' || t.status === 'in_progress',
+          );
+
+          // Instruction for the next iteration and results handed back now
+          let followUp = '';
+          let newResults: string | undefined;
+          if (pendingSteps.length === 0) {
+            const delivered = await awaitSubagents();
+            if (!delivered) break;
+            newResults = delivered.message;
+            pendingDeliveryIds = delivered.ids;
+          } else {
             // Stop when the plan stops moving: the model is waiting on the
             // user, keeps failing, or ignores the plan. Without this a stuck
             // run re-prompts until MAX_SAFETY_ITERATIONS, burning tokens.
@@ -1711,106 +2366,168 @@ export class AgentsCompletionsService {
               fingerprint === lastFingerprint ? stalledIterations + 1 : 0;
             lastFingerprint = fingerprint;
             if (stalledIterations >= MAX_STALLED_ITERATIONS) {
-              this.logger.warn(
-                `[Auto-continuation] Plan made no progress in ${stalledIterations} iterations for ${conversationId}; stopping`,
-              );
-              break;
-            }
-
-            // Prepare next iteration context with smart pruning
-            const contextWindow = this.getModelContextWindow(llmConfig);
-            // Always fetch up to 20 messages in continuation loop regardless
-            // of summary. hasSummary=true limits to 5 messages which loses
-            // tool call context from previous iteration.
-            const updatedMessages = await this.getConversationHistory(
-              conversationId,
-              false,
-            );
-            const prunedMessages = this.pruneContextByBudget(
-              updatedMessages,
-              currentContextParts,
-              !!conversation?.summary,
-              contextWindow,
-            );
-            currentModelMessages =
-              this.mapHistoryToModelMessages(prunedMessages);
-
-            // Synthesized "continue" message (NOT saved to DB — memory only)
-            // Include specific pending step IDs to help LLM resume correctly
-            const pendingSteps = todos.filter(
-              (t) => t.status === 'pending' || t.status === 'in_progress',
-            );
-            const pendingList = pendingSteps
-              .map(
-                (t, i) =>
-                  `${i + 1}. [${t.status.toUpperCase()}] ${t.content} (id: ${t.id})`,
-              )
-              .join('\n');
-            currentModelMessages.push({
-              role: 'user' as const,
-              content:
+              // A plan waiting on its subagents is not stuck
+              const delivered = await awaitSubagents();
+              if (!delivered) {
+                this.logger.warn(
+                  `[Auto-continuation] Plan made no progress in ${stalledIterations} iterations for ${conversationId}; stopping`,
+                );
+                break;
+              }
+              stalledIterations = 0;
+              newResults = delivered.message;
+              pendingDeliveryIds = delivered.ids;
+            } else {
+              // Synthesized "continue" message (NOT saved to DB — memory only)
+              // Include specific pending step IDs to help LLM resume correctly
+              const pendingList = pendingSteps
+                .map(
+                  (t, i) =>
+                    `${i + 1}. [${t.status.toUpperCase()}] ${t.content} (id: ${t.id})`,
+                )
+                .join('\n');
+              followUp =
                 `Continue executing the pending plan steps. Here are the remaining steps:\n${pendingList}\n\n` +
-                'Start with the FIRST pending step. Do NOT create new steps. Do NOT skip steps. Execute them in order until all are done.',
-            });
-
-            // Create a new assistant message in DB for the next iteration
-            const newAssistant = await this.saveAssistantMessage(
-              conversationId,
-              llmConfig,
-            );
-            currentAssistantMessageId = newAssistant.id;
-            currentAssistantMetadata = newAssistant.metadata;
-
-            // Rebuild context to reflect updated todos
-            if (conversation) {
-              currentContextParts = await rebuildContext(conversation);
+                'Start with the FIRST pending step. Do NOT create new steps. Do NOT skip steps. Execute them in order until all are done.';
+              // Hand back subagents that finished meanwhile, without waiting
+              const ready = await this.subagents.takeUndelivered(
+                conversationId,
+              );
+              if (ready.length > 0) {
+                newResults = this.subagents.formatResultsMessage(ready);
+                pendingDeliveryIds = ready.map((r) => r.id);
+              }
             }
-
-            this.logger.log(
-              `[Auto-continuation] Iteration ${iteration + 1} for ${conversationId}: ` +
-                `${todos.filter((t) => t.status === 'pending' || t.status === 'in_progress').length} steps remaining`,
-            );
           }
-        } finally {
-          if (abortSignal) {
-            abortSignal.removeEventListener('abort', onAbort);
-          }
-          todosEmitter.off('todos-updated', onTodosUpdated);
-          todosEmitter.off('remote-execute-output', onRemoteExecuteOutput);
-          todosEmitter.off('approval-required', onApprovalRequired);
-          todosEmitter.off('approval-resolved', onApprovalResolved);
-          todosEmitter.off('approval-mode-changed', onApprovalModeChanged);
-          todosEmitter.off('stream-error', onStreamError);
 
-          // Auto-complete stuck in_progress todos AFTER all continuation
-          // iterations are done. This prevents the race condition where
-          // autoCompleteStuckTodos (previously called per-iteration in
-          // onFinish) would mark todos as completed before the continuation
-          // loop could detect them as still pending.
-          if (continuesPlan && !abortSignal?.aborted) {
-            this.autoCompleteStuckTodos(conversationId).catch((err) =>
-              this.logger.error('Error in autoCompleteStuckTodos', err),
-            );
+          const conversation = await this.conversationRepository.findOne({
+            where: { id: conversationId },
+          });
 
-            // Fire-and-forget: report generation should not block stream closure
-            this.generateEndOfConversationReport(
-              conversationId,
-              llmConfig,
-            ).catch((err) =>
-              this.logger.error(
-                'Error in generateEndOfConversationReport',
-                err,
-              ),
-            );
+          // Prepare next iteration context with smart pruning
+          const contextWindow = this.getModelContextWindow(llmConfig);
+          // Always fetch up to 20 messages in continuation loop regardless
+          // of summary. hasSummary=true limits to 5 messages which loses
+          // tool call context from previous iteration.
+          const updatedMessages = await this.getConversationHistory(
+            conversationId,
+            false,
+          );
+          const prunedMessages = this.pruneContextByBudget(
+            updatedMessages,
+            currentContextParts,
+            !!conversation?.summary,
+            contextWindow,
+          );
+          currentModelMessages =
+            this.mapHistoryToModelMessages(prunedMessages);
+          currentModelMessages.push({
+            role: 'user' as const,
+            content: [...deliveredResults, newResults, followUp]
+              .filter(Boolean)
+              .join('\n\n---\n\n'),
+          });
+          if (newResults) deliveredResults.push(newResults);
+
+          // Create a new assistant message in DB for the next iteration
+          const newAssistant = await this.saveAssistantMessage(
+            conversationId,
+            llmConfig,
+          );
+          currentAssistantMessageId = newAssistant.id;
+          currentAssistantMetadata = newAssistant.metadata;
+
+          // Rebuild context to reflect updated todos
+          if (conversation) {
+            currentContextParts = await rebuildContext(conversation);
           }
+
+          this.logger.log(
+            `[Auto-continuation] Iteration ${iteration + 1} for ${conversationId}: ` +
+              `${pendingSteps.length} steps remaining`,
+          );
         }
+      } finally {
+        unsubscribeSubagents();
+        // A placeholder no iteration finished (stopped mid-iteration or
+        // between iterations, or every retry failed) must not stay
+        // 'streaming'
+        const endStatus = abortSignal?.aborted ? 'aborted' : 'error';
+        await settleIteration?.(endStatus);
+        await this.settleStreamingMessage(currentAssistantMessageId, endStatus);
+        // Results injected into a prompt that never completed go back to
+        // the queue so the next message delivers them
+        await releasePendingDelivery();
+        if (abortSignal) {
+          abortSignal.removeEventListener('abort', onAbort);
+        }
+        todosEmitter.off('todos-updated', onTodosUpdated);
+        todosEmitter.off('remote-execute-output', onRemoteExecuteOutput);
+        todosEmitter.off('approval-required', onApprovalRequired);
+        todosEmitter.off('approval-resolved', onApprovalResolved);
+        todosEmitter.off('approval-mode-changed', onApprovalModeChanged);
+        todosEmitter.off('stream-error', onStreamError);
 
-        if (!controllerClosed && !abortSignal?.aborted) {
-          try {
-            controller.close();
-          } catch {
-            /* ignore */
+        // Auto-complete stuck in_progress todos AFTER all continuation
+        // iterations are done. This prevents the race condition where
+        // autoCompleteStuckTodos (previously called per-iteration in
+        // onFinish) would mark todos as completed before the continuation
+        // loop could detect them as still pending.
+        if (continuesPlan && !abortSignal?.aborted) {
+          this.autoCompleteStuckTodos(conversationId).catch((err) =>
+            this.logger.error('Error in autoCompleteStuckTodos', err),
+          );
+
+          // Fire-and-forget: report generation should not block stream closure
+          this.generateEndOfConversationReport(
+            conversationId,
+            llmConfig,
+          ).catch((err) =>
+            this.logger.error(
+              'Error in generateEndOfConversationReport',
+              err,
+            ),
+          );
+        }
+      }
+
+      // Tokens were spent even on abort, so always persist the turn stats;
+      // only the live update needs an open stream
+      if (turnAcc.steps > 0) {
+        try {
+          const metadata = await this.persistTurnMetadata(
+            conversationId,
+            llmConfig,
+            turnAcc,
+          );
+          if (metadata && !controllerClosed && !abortSignal?.aborted) {
+            controller.enqueue({
+              type: 'data-conversation-stats',
+              data: { metadata },
+              transient: true,
+            } as unknown as UIMessageChunk);
           }
+        } catch (err) {
+          this.logger.error('Failed to persist turn stats', err);
+        }
+      }
+
+      if (!controllerClosed && !abortSignal?.aborted) {
+        try {
+          controller.close();
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+
+    return new ReadableStream<UIMessageChunk>({
+      start: async (controller) => {
+        try {
+          await runLoop(controller);
+        } finally {
+          // Final states, turn stats and cleanup are saved: the run is over
+          options.onSettled?.();
         }
       },
     });
@@ -1872,6 +2589,15 @@ export class AgentsCompletionsService {
       userId,
     );
 
+    // Show the model and its context window right away (before the turn ends)
+    updateConversationMetadata(
+      this.conversationRepository.manager,
+      conversation.id,
+      this.modelMetadata(llmConfig),
+    ).catch((err) =>
+      this.logger.error('Failed to save conversation model metadata', err),
+    );
+
     // Step 5: Map history to AI SDK message format
     const modelMessages = this.mapHistoryToModelMessages(historyMessages);
 
@@ -1897,8 +2623,8 @@ export class AgentsCompletionsService {
       };
     }
 
-    // Step 8: Determine agent mode
-    const agentMode = dto.agentMode || AgentMode.ASK;
+    // Step 8: Determine agent mode (a new conversation got the user's default)
+    const agentMode = dto.agentMode || conversation.agentMode || AgentMode.ASK;
 
     // Step 9: Create a placeholder message for the assistant (marks streaming)
     const assistantMessage = await this.saveAssistantMessage(
@@ -1926,6 +2652,20 @@ export class AgentsCompletionsService {
       loadSkillTool = this.agentsSkillsService.createLoadSkillTool(workspaceId);
     }
 
+    // Step 10.6: Background subagents the agent can delegate to
+    const subagentsPrompt = await this.getSubagentsPrompt(
+      agentMode,
+      workspaceId,
+      userId,
+    );
+    if (subagentsPrompt) {
+      contextParts.push(subagentsPrompt);
+      // rebuildContext only re-adds skillsContext between iterations
+      skillsContext = [skillsContext, subagentsPrompt]
+        .filter(Boolean)
+        .join('\n\n');
+    }
+
     // Step 11: Create a shared event emitter for broadcasting todo updates to the stream
     const todosEmitter = new EventEmitter();
 
@@ -1950,6 +2690,9 @@ export class AgentsCompletionsService {
       todosEmitter,
     );
 
+    // Set by the continuation loop: ties results read by a tool to its iteration
+    const subagentHooks: { onResultRead?: (id: string) => void } = {};
+
     // Get tools for the current agent mode
     const tools = {
       // Built-in tools below take precedence over colliding external names.
@@ -1959,7 +2702,6 @@ export class AgentsCompletionsService {
         agentMode,
         todosEmitter,
         conversation.id,
-        false,
         approval,
       ) as ToolSet),
       ...this.getPlanTools(planning, conversation.id, todosEmitter, {
@@ -1967,6 +2709,14 @@ export class AgentsCompletionsService {
         approval,
       }),
       ...(loadSkillTool ? { load_skill: loadSkillTool } : {}),
+      ...this.getSubagentTools(agentMode, {
+        conversationId: conversation.id,
+        workspaceId,
+        userId,
+        approval,
+        todosEmitter,
+        onResultRead: (id) => subagentHooks.onResultRead?.(id),
+      }),
       // Add memory tools
       ...(this.agentTool.getMemoryTools(
         workspaceId,
@@ -1976,10 +2726,33 @@ export class AgentsCompletionsService {
     };
 
     // Step 12: Build the combined stream with auto-continuation
+    const enabledTools = withoutDisabledTools(
+      tools,
+      await this.agentsConfig.find(workspaceId, userId),
+    );
     const toolSetArg: ToolSet | undefined =
-      Object.keys(tools).length > 0 ? tools : undefined;
+      Object.keys(enabledTools).length > 0 ? enabledTools : undefined;
 
+    // Step 12.5: Hand back subagent results no earlier run consumed. They go
+    // into the new question itself: a second consecutive user message is
+    // rejected or merged badly by some providers.
+    const undelivered = await this.subagents.takeUndelivered(conversation.id);
+    const lastMessage = modelMessages[modelMessages.length - 1];
+    let deliveredResults: string | undefined;
+    if (undelivered.length > 0 && lastMessage?.role === 'user') {
+      deliveredResults = this.subagents.formatResultsMessage(undelivered);
+      lastMessage.content = `${deliveredResults}\n\n---\n\n${lastMessage.content}`;
+    } else if (undelivered.length > 0) {
+      await this.subagents.releaseDelivery(undelivered.map((r) => r.id));
+      undelivered.length = 0;
+    }
+
+    let onSettled: (() => void) | undefined;
+    const settled = new Promise<void>((resolve) => {
+      onSettled = resolve;
+    });
     const stream = this.createContinuationStream({
+      onSettled,
       llmConfig,
       model,
       modelMessages,
@@ -1996,12 +2769,16 @@ export class AgentsCompletionsService {
       workspaceId,
       userId,
       skillsContext,
+      deliveredSubagentIds: undelivered.map((r) => r.id),
+      deliveredSubagentResults: deliveredResults,
+      subagentHooks,
     });
 
     // Step 13: Return stream + conversationId to the controller
     return {
       stream,
       conversationId: conversation.id,
+      settled,
     };
   }
 }

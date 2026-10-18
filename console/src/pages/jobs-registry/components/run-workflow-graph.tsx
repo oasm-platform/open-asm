@@ -34,6 +34,7 @@ import {
   buildWorkflowGraphLayout,
   type StepNodeData,
 } from './run-workflow-graph-layout';
+import { formatCategory } from '@/pages/tools/components/format-category';
 
 /**
  * Read-only DAG of a workflow run.
@@ -99,7 +100,7 @@ function statusMeta(status: string) {
 }
 
 function WorkflowStepNode({ data }: NodeProps) {
-  const { id, label, run, status, needs, jobs, failed, reason, logoUrl } =
+  const { id, label, run, category, status, needs, jobs, failed, reason, logoUrl } =
     data as StepNodeData;
   const meta = statusMeta(status);
   const skipped = status === 'skipped';
@@ -149,6 +150,7 @@ function WorkflowStepNode({ data }: NodeProps) {
                   <span className="text-muted-foreground">·</span>
                   <span className="truncate font-mono text-muted-foreground">
                     {run}
+                    {category ? ` · ${formatCategory(category)}` : ''}
                   </span>
                   {jobs > 0 && (
                     <span className="shrink-0 text-muted-foreground">

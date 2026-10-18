@@ -40,11 +40,10 @@ type fakeWorkersService struct {
 }
 
 type joinCall struct {
-	apiKey    string
-	metadata  *workers.WorkerMetadata
-	mode      workers.WorkerRunMode // extracted from metadata.Mode for convenience
-	token     string                // req.Token (persisted token, if any)
-	signature string                // req.Signature
+	apiKey   string
+	metadata *workers.WorkerMetadata
+	mode     workers.WorkerRunMode // extracted from metadata.Mode for convenience
+	token    string                // req.Token (persisted token, if any)
 }
 
 func (f *fakeWorkersService) Join(ctx context.Context, req *workers.JoinRequest) (*workers.JoinResponse, error) {
@@ -57,7 +56,7 @@ func (f *fakeWorkersService) Join(ctx context.Context, req *workers.JoinRequest)
 	if req.Token != nil {
 		token = *req.Token
 	}
-	f.joinCalls = append(f.joinCalls, joinCall{apiKey: req.ApiKey, metadata: req.Metadata, mode: mode, token: token, signature: req.Signature})
+	f.joinCalls = append(f.joinCalls, joinCall{apiKey: req.ApiKey, metadata: req.Metadata, mode: mode, token: token})
 	f.mu.Unlock()
 	if f.joinFn != nil {
 		return f.joinFn(ctx, req)

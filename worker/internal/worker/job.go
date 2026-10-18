@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -466,6 +467,26 @@ func findingToDiscoveredUrl(f *connectorpb.Finding) *pb.DiscoveredUrl {
 	return &pb.DiscoveredUrl{Url: f.GetName()}
 }
 
+// findingTCPPorts extracts the TCP port numbers of a ports_scanner finding,
+// whose Ports entries are "tcp/443" (or a bare "443"). Non-TCP entries are
+// dropped: Core turns each port into an asset service that HTTP probing
+// targets, which a UDP port can never serve.
+func findingTCPPorts(f *connectorpb.Finding) []int32 {
+	var out []int32
+	for _, p := range f.GetPorts() {
+		proto, num, found := strings.Cut(p, "/")
+		if !found {
+			proto, num = "tcp", p
+		}
+		n, err := strconv.ParseInt(num, 10, 32)
+		if !strings.EqualFold(proto, "tcp") || err != nil || n < 1 || n > 65535 {
+			continue
+		}
+		out = append(out, int32(n))
+	}
+	return out
+}
+
 // severityFromString maps the connector's lowercase severity string onto the
 // jobs_registry.Severity enum. Unknown values keep the zero value (Core's
 // default) — the connector's closed set is info/low/medium/high/critical, and
@@ -722,6 +743,7 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 			TraceId:     spec.TraceID,
 			Inputs:      inputs,
 			Config:      configFields,
+			Category:    category,
 		})
 		if sendErr == nil {
 			break // delivered (immediately or queued) — hand off to the drain
@@ -829,11 +851,13 @@ func handleConnectorResult(ctx context.Context, execID string, grpcClient *grpcc
 	var timerC <-chan time.Time = timer.C
 	submittedAny := false
 
-	// Accumulated structured findings for the vulnerabilities and url_discovery
-	// categories: chunks are aggregated and submitted ONCE at drain end (see
-	// finalization below). Other categories keep the per-chunk raw path.
+	// Accumulated structured findings for the vulnerabilities, url_discovery
+	// and ports_scanner categories: chunks are aggregated and submitted ONCE at
+	// drain end (see finalization below). Other categories keep the per-chunk
+	// raw path.
 	var vulns []*pb.Vulnerability
 	var urls []*pb.DiscoveredUrl
+	var ports []int32
 
 	// Drain results from connector until channel closes (Done or disconnect)
 	// or the connector fails to connect within connectTimeout.
@@ -863,6 +887,13 @@ drain:
 				// Same aggregation contract as vulnerabilities: per-chunk log
 				// only, the single submission happens at drain end below.
 				log.Info("[%s] connector result chunk: exec=%s bytes=%d urls=%d", entry.jobID, execID, len(msg.Data), len(msg.Findings))
+			} else if entry.category == "ports_scanner" {
+				// Core persists only the structured port list for a connector;
+				// the raw chunk alone would leave the asset with no services.
+				for _, f := range msg.Findings {
+					ports = append(ports, findingTCPPorts(f)...)
+				}
+				log.Info("[%s] connector result chunk: exec=%s bytes=%d ports=%d", entry.jobID, execID, len(msg.Data), len(msg.Findings))
 			} else if err := submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, false, string(msg.Data)); err != nil {
 				log.ErrorE(fmt.Sprintf("[%s] Failed to submit connector result", entry.jobID), err)
 			} else {
@@ -1022,7 +1053,7 @@ drain:
 	// a success instead and record the reason in the log. With zero results
 	// the same stop stays a failure: nothing to preserve, reason still
 	// matters (e.g. "did not connect within 5m0s").
-	partialOK := (hasError || !hadDone) && (len(vulns) > 0 || len(urls) > 0)
+	partialOK := (hasError || !hadDone) && (len(vulns) > 0 || len(urls) > 0 || len(ports) > 0)
 
 	// Terminal lifecycle line: execution identity + outcome + duration.
 	errDetail := errMsg
@@ -1060,6 +1091,12 @@ drain:
 				log.ErrorE(fmt.Sprintf("[%s] Failed to submit partial url discovery", entry.jobID), err)
 			} else {
 				log.Warning("[%s] Connector stopped early (%s): submitted %d url(s) collected so far", entry.jobID, reason, len(urls))
+			}
+		} else if entry.category == "ports_scanner" {
+			if err := grpcClient.SubmitPortsResult(ctx, entry.jobID, false, "", ports); err != nil {
+				log.ErrorE(fmt.Sprintf("[%s] Failed to submit partial ports", entry.jobID), err)
+			} else {
+				log.Warning("[%s] Connector stopped early (%s): submitted %d port(s) collected so far", entry.jobID, reason, len(ports))
 			}
 		} else {
 			if err := grpcClient.SubmitVulnerabilitiesResult(ctx, entry.jobID, false, "", vulns); err != nil {
@@ -1103,6 +1140,14 @@ drain:
 			log.ErrorE(fmt.Sprintf("[%s] Failed to submit connector url discovery", entry.jobID), err)
 		} else {
 			log.Info("[%s] connector url discovery result submitted: exec=%s urls=%d", entry.jobID, execID, len(urls))
+		}
+	case entry.category == "ports_scanner":
+		// Clean Done: submit the aggregated open TCP ports exactly once, even
+		// when empty, mirroring url_discovery.
+		if err := grpcClient.SubmitPortsResult(ctx, entry.jobID, false, "", ports); err != nil {
+			log.ErrorE(fmt.Sprintf("[%s] Failed to submit connector ports", entry.jobID), err)
+		} else {
+			log.Info("[%s] connector ports result submitted: exec=%s ports=%d", entry.jobID, execID, len(ports))
 		}
 	case !submittedAny:
 		_ = submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, false, "")

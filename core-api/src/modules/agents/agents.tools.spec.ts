@@ -1,9 +1,13 @@
-import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
+import { AgentApprovalMode, AgentMode, WorkerType } from '@/common/enums/enum';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { EventEmitter } from 'node:events';
 import { AgentsMcpService, getMcpToolMetadata } from './agents.mcp';
 import type { AgentsService } from './agents.service';
-import { AgentTool, pageToolOutput, stableStringify } from './agents.tools';
+import { withoutDisabledTools } from './agents.config';
+import { AgentTool, MCP_TOOLS, READ_ONLY_TOOLS } from './agents.tools';
+import { pageToolOutput } from './tools/connector.tools';
+import { stableStringify } from './tools/helpers';
+import { listToolsTool } from './tools/workspace.tools';
 
 describe('MCP tool metadata', () => {
   afterEach(() => {
@@ -228,7 +232,7 @@ describe('approval matching', () => {
   );
 });
 
-describe('AgentTool run_tool', () => {
+describe('AgentTool run_tool_connector', () => {
   const connector = {
     name: 'Nmap',
     slug: 'nmap',
@@ -282,17 +286,23 @@ describe('AgentTool run_tool', () => {
     }) as AgentTool;
 
   const runnable = (agentTool: AgentTool) =>
-    agentTool.runToolTool('w1', 'c1') as unknown as Runnable;
+    agentTool.getTools('w1', AgentMode.AGENT, undefined, 'c1')
+      .run_tool_connector as Runnable;
+  const readOutput = (agentTool: AgentTool) =>
+    agentTool.getTools('w1', AgentMode.AGENT, undefined, 'c1')
+      .read_tool_output as Runnable;
 
   it('is offered in AGENT mode only, and only with a conversation', () => {
     const agentTool = createAgentTool();
     expect(
       agentTool.getTools('w1', AgentMode.AGENT, undefined, 'c1'),
-    ).toHaveProperty('run_tool');
+    ).toHaveProperty('run_tool_connector');
     expect(
       agentTool.getTools('w1', AgentMode.ASK, undefined, 'c1'),
-    ).not.toHaveProperty('run_tool');
-    expect(agentTool.runToolTool('w1', '')).toBeNull();
+    ).not.toHaveProperty('run_tool_connector');
+    expect(agentTool.getTools('w1', AgentMode.AGENT)).not.toHaveProperty(
+      'run_tool_connector',
+    );
   });
 
   it('pushes the tool run to the conversation worker and returns its raw output', async () => {
@@ -448,9 +458,10 @@ describe('AgentTool run_tool', () => {
     );
 
     (agentTool as any).redisService.get = jest.fn().mockResolvedValue(full);
-    const page = (await (
-      agentTool.readToolOutputTool('c1') as unknown as Runnable
-    ).execute({ runId: result.runId, pattern: 'status: 200' })) as {
+    const page = (await readOutput(agentTool).execute({
+      runId: result.runId,
+      pattern: 'status: 200',
+    })) as {
       output: string;
       matchedLines: number;
     };
@@ -461,10 +472,109 @@ describe('AgentTool run_tool', () => {
   it('read_tool_output reports an expired run', async () => {
     const agentTool = createAgentTool();
     await expect(
-      (agentTool.readToolOutputTool('c1') as unknown as Runnable).execute({
+      readOutput(agentTool).execute({
         runId: '00000000-0000-4000-8000-000000000001',
       }),
     ).resolves.toHaveProperty('error');
+  });
+});
+
+describe('AgentTool display_available_tools', () => {
+  type Listing = {
+    inputSchema: { parse: (value: unknown) => unknown };
+    execute: (input: unknown) => Promise<{ data: unknown[] }>;
+  };
+  const listTools = (getManyTools: jest.Mock) =>
+    listToolsTool(
+      { toolsService: { getManyTools } } as any,
+      'w1',
+    ) as unknown as Listing;
+  const page = (data: unknown[]) => ({
+    data,
+    total: data.length,
+    page: 1,
+    limit: 100,
+  });
+
+  it('lists workspace tools with agentTool and readiness', async () => {
+    const getManyTools = jest.fn().mockResolvedValue(
+      page([
+        {
+          id: 't1',
+          name: 'subfinder',
+          type: WorkerType.BUILT_IN,
+          categories: [{ name: 'subdomains', targetTypes: [] }],
+          description: 'Subdomain discovery',
+          agentTool: true,
+          isInstalled: true,
+          isReady: true,
+          availableWorkersCount: 2,
+        },
+        {
+          id: 't2',
+          name: 'wpscan',
+          type: WorkerType.CONNECTOR,
+          categories: [{ name: 'vulnerabilities', targetTypes: [] }],
+          description: 'WordPress scanner',
+          agentTool: false,
+          isInstalled: false,
+          availableWorkersCount: 0,
+        },
+      ]),
+    );
+
+    const result = await listTools(getManyTools).execute({ q: 'scan' });
+
+    expect(getManyTools).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentTool: undefined,
+        workspaceId: 'w1',
+        search: 'scan',
+      }),
+    );
+    expect(result.data).toEqual([
+      {
+        id: 't1',
+        name: 'subfinder',
+        type: WorkerType.BUILT_IN,
+        categories: ['subdomains'],
+        description: 'Subdomain discovery',
+        agentTool: true,
+        isInstalled: true,
+        isReady: true,
+      },
+      {
+        id: 't2',
+        name: 'wpscan',
+        type: WorkerType.CONNECTOR,
+        categories: ['vulnerabilities'],
+        description: 'WordPress scanner',
+        agentTool: false,
+        isInstalled: false,
+        isReady: false,
+      },
+    ]);
+  });
+
+  it.each([true, false])(
+    'passes agentTool=%s through as the filter',
+    async (agentTool) => {
+      const getManyTools = jest.fn().mockResolvedValue(page([]));
+
+      await listTools(getManyTools).execute({ agentTool });
+
+      expect(getManyTools).toHaveBeenCalledWith(
+        expect.objectContaining({ agentTool, workspaceId: 'w1' }),
+      );
+    },
+  );
+
+  it('accepts a boolean agentTool in its input schema', () => {
+    const { inputSchema } = listTools(jest.fn());
+    expect(inputSchema.parse({ agentTool: true })).toMatchObject({
+      agentTool: true,
+    });
+    expect(() => inputSchema.parse({ agentTool: 'yes' })).toThrow();
   });
 });
 
@@ -496,5 +606,36 @@ describe('pageToolOutput', () => {
     expect(page.output.length).toBeLessThanOrEqual(8 * 1024);
     expect(page.output).toContain('[line cut]');
     expect(page.nextOffset).toBe(1);
+  });
+});
+
+describe('AgentTool MCP surface', () => {
+  const agentTool = Object.create(AgentTool.prototype) as AgentTool;
+
+  it('offers only the read-only workspace data tools', () => {
+    const names = Object.keys(agentTool.getMcpTools('w1'));
+    expect(names.sort()).toEqual([...MCP_TOOLS].sort());
+    expect(names.every((name) => READ_ONLY_TOOLS.has(name))).toBe(true);
+  });
+
+  it.each([
+    'execute_remote_command',
+    'run_tool_connector',
+    'read_tool_output',
+    'retrieve_web_page',
+    'display_available_tools',
+  ])('never offers %s', (name) => {
+    expect(agentTool.getMcpTools('w1')).not.toHaveProperty(name);
+  });
+});
+
+describe('renamed tools', () => {
+  it('still honours run_tool in saved disabled tools', () => {
+    const tools = { run_tool_connector: {}, enumerate_assets: {} };
+    expect(
+      Object.keys(
+        withoutDisabledTools(tools, { disabledTools: ['run_tool'] } as never),
+      ),
+    ).toEqual(['enumerate_assets']);
   });
 });

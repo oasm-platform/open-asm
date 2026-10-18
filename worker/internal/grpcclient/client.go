@@ -33,9 +33,7 @@ type Client struct {
 
 	// tokenFile is where the worker token is persisted across restarts so a
 	// rejoin can recover the same worker identity (core matches on the token).
-	// signature is sent with Join when WORKER_SIGNATURE is configured.
 	tokenFile string
-	signature string
 
 	workers workerPb.WorkersServiceClient
 	jobs    jobRegistryPb.JobsRegistryServiceClient
@@ -57,6 +55,10 @@ type Client struct {
 	// stream is still opened but cancels are ignored.
 	streamCancelMu sync.RWMutex
 	streamCancel   StreamCancelFunc
+
+	// agentSandbox is advertised on RemoteExecuteSubscribe (x-agent-sandbox)
+	// when agent shell commands run in a per-session sandbox container.
+	agentSandbox atomic.Bool
 }
 
 // NewClient validates the required configuration and creates a lazily-dialing
@@ -106,7 +108,6 @@ func NewClient(apiKey, grpcHost, toolPath string, logger Logger, dialOpts ...grp
 	}
 
 	c.tokenFile = resolveTokenFilePath()
-	c.signature = os.Getenv("WORKER_SIGNATURE")
 	if tok := readTokenFile(c.tokenFile); tok != "" {
 		auth.setToken(tok)
 		logger.Verbose("resumed worker token from %s", c.tokenFile)

@@ -1,5 +1,4 @@
 import { useLLMConfigs } from '@/hooks/use-llm-configs';
-import { AgentSettingsDialog } from '@/components/agent-settings-dialog';
 import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
 import type {
   ProviderModelDto,
@@ -27,6 +26,8 @@ interface ChatModelSwitcherProps {
   selectedConfigId: string | null;
   selectedModel: string | null;
   onSelectModel: (provider: string, model: string, configId: string) => void;
+  /** False hides the gear that opens the agent settings. */
+  showSettingsButton?: boolean;
 }
 
 interface ModelListProps {
@@ -116,8 +117,9 @@ export function ChatModelSwitcher({
   selectedConfigId,
   selectedModel,
   onSelectModel,
+  showSettingsButton = true,
 }: ChatModelSwitcherProps) {
-  const { setState: openDialog } = useAgentSettingsDialog();
+  const { open: openSettings } = useAgentSettingsDialog();
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
@@ -216,77 +218,76 @@ export function ChatModelSwitcher({
 
   if (connectedConfigs.length === 0) {
     return (
-      <>
-        <button
-          type="button"
-          onClick={() => openDialog(true)}
-          className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors text-muted-foreground"
-        >
-          <Settings className="h-3.5 w-3.5" />
-          Connect LLM
-        </button>
-        <AgentSettingsDialog />
-      </>
+      <button
+        type="button"
+        onClick={() => openSettings('provider')}
+        className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors text-muted-foreground"
+      >
+        <Settings className="h-3.5 w-3.5" />
+        Connect LLM
+      </button>
     );
   }
 
   return (
     <>
-      <div className="flex items-center gap-1">
-        <div className="hidden md:block">
-          <Popover open={open} onOpenChange={handleOpenChange}>
-            <PopoverTrigger asChild>
-              <button
-                disabled={isUpdating}
-                className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors disabled:opacity-50"
-                aria-label="Select model"
-              >
-                {currentDisplay && (
-                  <Image
-                    url={currentDisplay.logo}
-                    height={16}
-                    className="bg-white rounded p-0.5"
-                  />
-                )}
-                <span className="text-muted-foreground max-w-[140px] truncate">
-                  {currentDisplay?.label ?? 'Select model'}
-                </span>
-                <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              className="w-[280px] p-0"
-              align="start"
-              sideOffset={4}
+      <div className="flex min-w-0 items-center gap-1">
+        <Popover open={open} onOpenChange={handleOpenChange}>
+          <PopoverTrigger asChild>
+            <button
+              disabled={isUpdating}
+              className="flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors disabled:opacity-50"
+              aria-label="Select model"
             >
-              <Command shouldFilter={false} className="p-1">
-                <CommandInput
-                  placeholder="Search models..."
-                  value={searchQuery}
-                  onValueChange={setSearchQuery}
+              {currentDisplay && (
+                <Image
+                  url={currentDisplay.logo}
+                  height={16}
+                  className="bg-white rounded p-0.5"
                 />
-                <ModelListContent
-                  models={filteredModels}
-                  isLoading={isLoading}
-                  searchQuery={deferredSearch}
-                  selectedModel={selectedModel}
-                  isActiveConfig={isActiveConfig}
-                  activeProviderLogo={activeConfig?.logo}
-                  onSelect={handleSelect}
-                />
-              </Command>
-            </PopoverContent>
-          </Popover>
-        </div>
-        <button
-          type="button"
-          onClick={() => openDialog(true)}
-          className="flex items-center gap-1.5 rounded-md p-1.5 text-sm hover:bg-accent transition-colors text-muted-foreground"
-        >
-          <Settings className="h-3.5 w-3.5" />
-        </button>
+              )}
+              {/* Narrower on phones so the footer keeps room for the
+                  mode select and send button */}
+              <span className="text-muted-foreground max-w-[110px] truncate sm:max-w-[140px]">
+                {currentDisplay?.label ?? 'Select model'}
+              </span>
+              <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            className="w-[280px] p-0"
+            align="start"
+            sideOffset={4}
+          >
+            <Command shouldFilter={false} className="p-1">
+              <CommandInput
+                placeholder="Search models..."
+                value={searchQuery}
+                onValueChange={setSearchQuery}
+              />
+              <ModelListContent
+                models={filteredModels}
+                isLoading={isLoading}
+                searchQuery={deferredSearch}
+                selectedModel={selectedModel}
+                isActiveConfig={isActiveConfig}
+                activeProviderLogo={activeConfig?.logo}
+                onSelect={handleSelect}
+              />
+            </Command>
+          </PopoverContent>
+        </Popover>
+        {showSettingsButton && (
+          <button
+            type="button"
+            onClick={() => openSettings('provider')}
+            aria-label="Agent settings"
+            className="flex items-center gap-1.5 rounded-md p-1.5 text-sm hover:bg-accent transition-colors text-muted-foreground"
+          >
+            <Settings className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
-      <AgentSettingsDialog />
     </>
   );
 }

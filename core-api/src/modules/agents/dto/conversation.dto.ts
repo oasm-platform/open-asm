@@ -15,6 +15,10 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import {
+  ConversationMetadataDto,
+  SubagentResponseDto,
+} from './conversation-stats.dto';
 
 export class AgentTodoItemDto {
   @ApiProperty({
@@ -167,6 +171,28 @@ export class ConversationResponseDto {
   @IsOptional()
   @IsUUID()
   workerId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Current model, context window usage and token/cost stats (null before the first turn)',
+    type: ConversationMetadataDto,
+    nullable: true,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ConversationMetadataDto)
+  metadata?: ConversationMetadataDto | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Background subagent tasks dispatched in this conversation (detail only)',
+    type: [SubagentResponseDto],
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SubagentResponseDto)
+  subagents?: SubagentResponseDto[];
 }
 
 export class GetConversationsResponseDto {

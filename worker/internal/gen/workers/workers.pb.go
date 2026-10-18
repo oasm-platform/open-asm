@@ -408,7 +408,6 @@ func (ContainerExecutionState) EnumDescriptor() ([]byte, []int) {
 type JoinRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ApiKey        string                 `protobuf:"bytes,1,opt,name=api_key,json=apiKey,proto3" json:"api_key,omitempty"`
-	Signature     string                 `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
 	Token         *string                `protobuf:"bytes,3,opt,name=token,proto3,oneof" json:"token,omitempty"`
 	Metadata      *WorkerMetadata        `protobuf:"bytes,4,opt,name=metadata,proto3,oneof" json:"metadata,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -448,13 +447,6 @@ func (*JoinRequest) Descriptor() ([]byte, []int) {
 func (x *JoinRequest) GetApiKey() string {
 	if x != nil {
 		return x.ApiKey
-	}
-	return ""
-}
-
-func (x *JoinRequest) GetSignature() string {
-	if x != nil {
-		return x.Signature
 	}
 	return ""
 }
@@ -2335,12 +2327,11 @@ func (*CoreToWorker_HeartbeatAck) isCoreToWorker_Payload() {}
 func (*CoreToWorker_Cancel) isCoreToWorker_Payload() {}
 
 // Register is the first frame on every connect. It carries the same identity
-// material as Join: an API key (+ optional signature) for a first-ever connect,
-// or a persisted worker token to rejoin the same identity.
+// material as Join: an API key for a first-ever connect, or a persisted worker
+// token to rejoin the same identity.
 type RegisterRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ApiKey        string                 `protobuf:"bytes,1,opt,name=api_key,json=apiKey,proto3" json:"api_key,omitempty"`
-	Signature     string                 `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
 	Token         *string                `protobuf:"bytes,3,opt,name=token,proto3,oneof" json:"token,omitempty"`
 	Metadata      *WorkerMetadata        `protobuf:"bytes,4,opt,name=metadata,proto3,oneof" json:"metadata,omitempty"`
 	Version       *string                `protobuf:"bytes,5,opt,name=version,proto3,oneof" json:"version,omitempty"`
@@ -2381,13 +2372,6 @@ func (*RegisterRequest) Descriptor() ([]byte, []int) {
 func (x *RegisterRequest) GetApiKey() string {
 	if x != nil {
 		return x.ApiKey
-	}
-	return ""
-}
-
-func (x *RegisterRequest) GetSignature() string {
-	if x != nil {
-		return x.Signature
 	}
 	return ""
 }
@@ -2669,14 +2653,13 @@ var File_workers_proto protoreflect.FileDescriptor
 
 const file_workers_proto_rawDesc = "" +
 	"\n" +
-	"\rworkers.proto\x12\aworkers\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb0\x01\n" +
+	"\rworkers.proto\x12\aworkers\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa3\x01\n" +
 	"\vJoinRequest\x12\x17\n" +
-	"\aapi_key\x18\x01 \x01(\tR\x06apiKey\x12\x1c\n" +
-	"\tsignature\x18\x02 \x01(\tR\tsignature\x12\x19\n" +
+	"\aapi_key\x18\x01 \x01(\tR\x06apiKey\x12\x19\n" +
 	"\x05token\x18\x03 \x01(\tH\x00R\x05token\x88\x01\x01\x128\n" +
 	"\bmetadata\x18\x04 \x01(\v2\x17.workers.WorkerMetadataH\x01R\bmetadata\x88\x01\x01B\b\n" +
 	"\x06_tokenB\v\n" +
-	"\t_metadata\"\x88\x01\n" +
+	"\t_metadataJ\x04\b\x02\x10\x03R\tsignature\"\x88\x01\n" +
 	"\x0eWorkerMetadata\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tH\x00R\x04name\x88\x01\x01\x12\x13\n" +
 	"\x02os\x18\x02 \x01(\tH\x01R\x02os\x88\x01\x01\x12/\n" +
@@ -2848,17 +2831,16 @@ const file_workers_proto_rawDesc = "" +
 	"\rregister_resp\x18\x01 \x01(\v2\x19.workers.RegisterResponseH\x00R\fregisterResp\x12<\n" +
 	"\rheartbeat_ack\x18\x02 \x01(\v2\x15.workers.HeartbeatAckH\x00R\fheartbeatAck\x120\n" +
 	"\x06cancel\x18\x03 \x01(\v2\x16.workers.CancelRequestH\x00R\x06cancelB\t\n" +
-	"\apayload\"\xdf\x01\n" +
+	"\apayload\"\xd2\x01\n" +
 	"\x0fRegisterRequest\x12\x17\n" +
-	"\aapi_key\x18\x01 \x01(\tR\x06apiKey\x12\x1c\n" +
-	"\tsignature\x18\x02 \x01(\tR\tsignature\x12\x19\n" +
+	"\aapi_key\x18\x01 \x01(\tR\x06apiKey\x12\x19\n" +
 	"\x05token\x18\x03 \x01(\tH\x00R\x05token\x88\x01\x01\x128\n" +
 	"\bmetadata\x18\x04 \x01(\v2\x17.workers.WorkerMetadataH\x01R\bmetadata\x88\x01\x01\x12\x1d\n" +
 	"\aversion\x18\x05 \x01(\tH\x02R\aversion\x88\x01\x01B\b\n" +
 	"\x06_tokenB\v\n" +
 	"\t_metadataB\n" +
 	"\n" +
-	"\b_version\"\xba\x01\n" +
+	"\b_versionJ\x04\b\x02\x10\x03R\tsignature\"\xba\x01\n" +
 	"\x10RegisterResponse\x12\x1b\n" +
 	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12!\n" +
 	"\fworker_token\x18\x02 \x01(\tR\vworkerToken\x12\x1a\n" +

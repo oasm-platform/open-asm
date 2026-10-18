@@ -49,9 +49,6 @@ func (c *Client) Join(ctx context.Context) error {
 	if tok := c.auth.currentToken(); tok != "" {
 		req.Token = &tok
 	}
-	if c.signature != "" {
-		req.Signature = c.signature
-	}
 
 	resp, err := c.workers.Join(ctx, req)
 	if err != nil {

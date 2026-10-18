@@ -31,6 +31,9 @@ message ExecuteJob {
   // keeps its first-run env, so the job's config profile travels in-band.
   // The SDK merges "oasm_config" (JSON blob) over its OASM_CONFIG env.
   map<string, string> config = 7;
+  // Platform category this job runs (e.g. "vulnerabilities"): one of the
+  // connector's capabilities mapped to its category. Empty: the connector's default.
+  string category = 8;
 }
 
 message Cancel {

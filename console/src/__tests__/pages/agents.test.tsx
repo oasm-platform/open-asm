@@ -30,10 +30,6 @@ vi.mock('@/hooks/use-llm-configs', () => ({
   })),
 }));
 
-vi.mock('@/components/agent-settings-dialog', () => ({
-  AgentSettingsDialog: () => <div data-testid="agent-settings-dialog">AgentSettingsDialog</div>,
-}));
-
 vi.mock('@/components/typewriter-text', () => ({
   default: ({ texts }: { texts: string[] }) => (
     <div data-testid="typewriter-text">{texts[0]}</div>
@@ -44,12 +40,13 @@ vi.mock('@/components/agent-prompt-input', () => ({
   default: () => <div data-testid="agent-prompt-input">AgentPromptInput</div>,
 }));
 
-vi.mock('@/components/ai-elements/suggestion', () => ({
-  Suggestion: ({ suggestion }: { suggestion: string }) => (
-    <button data-testid="suggestion">{suggestion}</button>
-  ),
-  Suggestions: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="suggestions">{children}</div>
+// framer-motion never finishes animations under jsdom, so the test ends the
+// beam's lap itself.
+vi.mock('@/components/ui/border-beam', () => ({
+  default: ({ onComplete }: { onComplete?: () => void }) => (
+    <button type="button" data-testid="border-beam" onClick={onComplete}>
+      Finish beam
+    </button>
   ),
 }));
 
@@ -76,7 +73,60 @@ describe('Agents Page', () => {
     await waitFor(() => {
       expect(screen.getByTestId('typewriter-text')).toBeInTheDocument();
       expect(screen.getByTestId('agent-prompt-input')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Vulnerabilities' }),
+      ).toBeInTheDocument();
+      // The gradient beam runs around the input as the page loads.
+      expect(screen.getByTestId('border-beam')).toBeInTheDocument();
     });
+  });
+
+  it('fades in the halo once the load-time beam finishes', async () => {
+    const { useLLMConfigs } = await import('@/hooks/use-llm-configs');
+    vi.mocked(useLLMConfigs).mockReturnValue({
+      providers: [{ isConnected: true, configId: '1', providerId: 'openai', model: 'gpt-4' }],
+      connectedProviders: [{ isConnected: true, configId: '1', providerId: 'openai', model: 'gpt-4' }],
+      preferredProvider: undefined,
+      hasProviderConnected: true,
+      isLoading: false,
+    } as unknown as ReturnType<typeof useLLMConfigs>);
+
+    renderWithProviders(<AgentsLandingPage />, {
+      routePath: '/_authed/aistudio/',
+      initialEntries: ['/_authed/aistudio/'],
+    });
+
+    const beam = await screen.findByTestId('border-beam');
+    expect(screen.queryByTestId('landing-halo')).not.toBeInTheDocument();
+
+    beam.click();
+
+    const halo = await screen.findByTestId('landing-halo');
+    expect(halo).toHaveAttribute('data-mode', 'ask');
+  });
+
+  it('opens in agent mode on the Agents route', async () => {
+    const { useLLMConfigs } = await import('@/hooks/use-llm-configs');
+    vi.mocked(useLLMConfigs).mockReturnValue({
+      providers: [{ isConnected: true, configId: '1', providerId: 'openai', model: 'gpt-4' }],
+      connectedProviders: [{ isConnected: true, configId: '1', providerId: 'openai', model: 'gpt-4' }],
+      preferredProvider: undefined,
+      hasProviderConnected: true,
+      isLoading: false,
+    } as unknown as ReturnType<typeof useLLMConfigs>);
+
+    renderWithProviders(<AgentsLandingPage initialAgentMode="agent" />, {
+      routePath: '/_authed/aistudio/agents',
+      initialEntries: ['/_authed/aistudio/agents'],
+    });
+
+    (await screen.findByTestId('border-beam')).click();
+
+    // Agent mode can run commands on workers: the halo is orange.
+    expect(await screen.findByTestId('landing-halo')).toHaveAttribute(
+      'data-mode',
+      'agent',
+    );
   });
 
   it('shows connect provider when no LLM provider connected', async () => {

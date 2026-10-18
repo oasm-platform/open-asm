@@ -198,6 +198,8 @@ export class CreateJobs extends PickType(Job, [
   'isPublishEvent',
 ] as const) {
   tool: Tool;
+  /** Category to run; omitted → the tool's first category. */
+  category?: ToolCategory;
   targetIds?: string[];
   assetIds?: string[];
   /**

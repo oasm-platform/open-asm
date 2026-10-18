@@ -1,5 +1,4 @@
 import { API_GLOBAL_PREFIX } from '@/common/constants/app.constants';
-import { AgentMode } from '@/common/enums/enum';
 import { AgentTool } from '@/modules/agents/agents.tools';
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -141,7 +140,7 @@ export class McpService implements OnModuleInit, OnModuleDestroy {
   }
 
   private registerTools(server: McpServer, workspaceId: string): void {
-    const allTools = this.agentTool.getTools(workspaceId, AgentMode.AGENT, undefined, undefined, true);
+    const allTools = this.agentTool.getMcpTools(workspaceId);
 
     for (const [name, toolInstance] of Object.entries(allTools)) {
       try {

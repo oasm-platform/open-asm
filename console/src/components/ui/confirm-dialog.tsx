@@ -9,13 +9,19 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import React, { useState, type JSX } from 'react';
+import React, { useState, type JSX, type ReactNode } from 'react';
 
 interface ConfirmDialogProps {
   title: string;
   description?: string;
+  /** Extra content rendered between the header and the footer. */
+  children?: ReactNode;
   onConfirm: () => void;
-  trigger: JSX.Element;
+  /** Element that opens the dialog. Omit it and pass `open` to open it from code. */
+  trigger?: JSX.Element;
+  /** Controlled open state; the dialog manages its own state when omitted. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   confirmText?: string;
   disabled?: boolean;
   cancelText?: string;
@@ -25,14 +31,22 @@ interface ConfirmDialogProps {
 export const ConfirmDialog = ({
   title,
   description,
+  children,
   onConfirm,
   trigger,
+  open: controlledOpen,
+  onOpenChange,
   confirmText = 'Confirm',
   disabled = false,
   cancelText = 'Cancel',
   typeToConfirm,
 }: ConfirmDialogProps) => {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = (next: boolean) => {
+    if (controlledOpen === undefined) setInternalOpen(next);
+    onOpenChange?.(next);
+  };
   const [inputValue, setInputValue] = useState('');
 
   const confirmTextRequired =
@@ -58,7 +72,7 @@ export const ConfirmDialog = ({
     ? inputValue === confirmTextRequired
     : !disabled;
 
-  const clonedTrigger = React.cloneElement(trigger, {
+  const clonedTrigger = trigger && React.cloneElement(trigger, {
     onClick: (e: React.MouseEvent) => {
       e.preventDefault(); // Prevent default to avoid dropdown closing
       e.stopPropagation(); // Prevent bubbling up to parent elements
@@ -89,14 +103,17 @@ export const ConfirmDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild disabled={disabled}>
-        {clonedTrigger}
-      </DialogTrigger>
+      {clonedTrigger && (
+        <DialogTrigger asChild disabled={disabled}>
+          {clonedTrigger}
+        </DialogTrigger>
+      )}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
+        {children}
         {showInput && (
           <div className="space-y-4 py-4">
             <p className="text-sm text-muted-foreground">

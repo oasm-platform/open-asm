@@ -1,7 +1,13 @@
 // import { BaseEntity } from '@/common/entities/base.entity';
 import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsEnum,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 import {
   Column,
   Entity,
@@ -11,8 +17,10 @@ import {
   Relation,
   UpdateDateColumn,
 } from 'typeorm';
+import type { ConversationMetadata } from '../shared/conversation-metadata';
 import { AgentConversationTodo } from './agent-conversation-todo.entity';
 import { AgentMessage } from './agent-message.entity';
+import { AgentSubagent } from './agent-subagent.entity';
 
 @Entity('agent_conversations')
 @Index('IDX_agent_conv_workspaceId', ['workspaceId'])
@@ -57,6 +65,9 @@ export class AgentConversation {
   @OneToMany(() => AgentConversationTodo, (todo) => todo.conversation)
   todoItems: Relation<AgentConversationTodo[]>;
 
+  @OneToMany(() => AgentSubagent, (subagent) => subagent.conversation)
+  subagents: Relation<AgentSubagent[]>;
+
   @ApiProperty({ example: AgentMode.ASK })
   @IsEnum(AgentMode)
   @Column({ type: 'varchar', default: AgentMode.ASK })
@@ -84,4 +95,16 @@ export class AgentConversation {
   @IsUUID()
   @Column({ type: 'uuid', nullable: true })
   workerId?: string;
+
+  @ApiProperty({
+    description:
+      'Current model, context window usage and token/cost stats of the conversation',
+    required: false,
+    type: Object,
+    additionalProperties: true,
+  })
+  @IsOptional()
+  @IsObject()
+  @Column({ type: 'jsonb', nullable: true })
+  metadata?: ConversationMetadata | null;
 }

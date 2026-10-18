@@ -8,7 +8,8 @@ option go_package = "oasm-worker/internal/gen/workers";
 
 message JoinRequest {
   string          api_key   = 1;
-  string          signature = 2;
+  reserved 2;
+  reserved "signature";
   optional string token     = 3;
   optional WorkerMetadata metadata = 4;
 }
@@ -267,11 +268,12 @@ message CoreToWorker {
 }
 
 // Register is the first frame on every connect. It carries the same identity
-// material as Join: an API key (+ optional signature) for a first-ever connect,
-// or a persisted worker token to rejoin the same identity.
+// material as Join: an API key for a first-ever connect, or a persisted worker
+// token to rejoin the same identity.
 message RegisterRequest {
   string api_key = 1;
-  string signature = 2;
+  reserved 2;
+  reserved "signature";
   optional string token = 3;
   optional WorkerMetadata metadata = 4;
   optional string version = 5;

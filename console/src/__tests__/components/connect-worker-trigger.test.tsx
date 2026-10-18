@@ -27,7 +27,7 @@ describe('ConnectWorkerTrigger', () => {
     renderWithProviders(<ConnectWorkerTrigger />);
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /connect worker/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^connect$/i })).toBeInTheDocument();
     });
   });
 
@@ -57,7 +57,7 @@ describe('ConnectWorkerTrigger', () => {
     expect(mockOpenDialog).toHaveBeenCalledWith('network-123');
   });
 
-  it('renders SquareTerminal icon', async () => {
+  it('renders Plug icon', async () => {
     const { container } = renderWithProviders(<ConnectWorkerTrigger />);
 
     await waitFor(() => {

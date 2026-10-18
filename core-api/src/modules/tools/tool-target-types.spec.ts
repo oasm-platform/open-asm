@@ -38,13 +38,11 @@ describe('tool target types', () => {
       });
     });
 
-    it('falls back to the host default for a manifest without the field', () => {
-      expect(parseManifestTargetTypes(undefined).targetTypes).toEqual(
-        DEFAULT_TOOL_TARGET_TYPES,
-      );
-      expect(parseManifestTargetTypes(['future_type']).targetTypes).toEqual(
-        DEFAULT_TOOL_TARGET_TYPES,
-      );
+    // Never a host default: a repository scanner that declares nothing usable
+    // must not be handed IP targets. The caller skips an empty result.
+    it('returns no target types when nothing usable is declared', () => {
+      expect(parseManifestTargetTypes(undefined).targetTypes).toEqual([]);
+      expect(parseManifestTargetTypes(['future_type']).targetTypes).toEqual([]);
     });
   });
 

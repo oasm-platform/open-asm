@@ -17,6 +17,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { DataSource, In, Repository } from 'typeorm';
+import { findDefaultLLMConfig } from '../agents/agents.config';
+import { AgentConfig } from '../agents/entities/agent-config.entity';
 import { AgentLLMConfig } from '../agents/entities/agent-llm-config.entity';
 import { LLMProvider } from '../agents/enums/agent.enums';
 import {
@@ -115,6 +117,8 @@ export class AssetsService {
     public readonly dnsRecordRepo: Repository<DnsRecord>,
     @InjectRepository(AgentLLMConfig)
     private readonly llmConfigRepository: Repository<AgentLLMConfig>,
+    @InjectRepository(AgentConfig)
+    private readonly agentConfigRepository: Repository<AgentConfig>,
     private eventEmitter: EventEmitter2,
     private technologyForwarderService: TechnologyForwarderService,
     private workspaceService: WorkspacesService,
@@ -162,13 +166,18 @@ export class AssetsService {
     workspaceId: string,
     userId: string,
   ): Promise<string[]> {
-    const llmConfig = await this.llmConfigRepository.findOne({
-      where: { workspaceId, userId, isPreferred: true },
-    });
+    const llmConfig = await findDefaultLLMConfig(
+      {
+        llmConfigs: this.llmConfigRepository,
+        agentConfigs: this.agentConfigRepository,
+      },
+      workspaceId,
+      userId,
+    );
 
     if (!llmConfig) {
       throw new BadRequestException(
-        'No preferred LLM config found. Please create and set a preferred LLM config first.',
+        'No LLM provider connected. Please connect a provider first.',
       );
     }
 

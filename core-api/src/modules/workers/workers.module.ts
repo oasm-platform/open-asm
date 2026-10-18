@@ -1,6 +1,5 @@
 import { forwardRef, Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ApiKeysModule } from '../apikeys/apikeys.module';
 import { Asset } from '../assets/entities/assets.entity';
 import { ConnectorsModule } from '../connectors/connectors.module';
 import { InternalNetwork } from '../internal-networks/entities/internal-network.entity';
@@ -20,6 +19,7 @@ import { WorkerTelemetryService } from './worker-telemetry.service';
 import { WorkerTelemetryStore } from './worker-telemetry.store';
 import { WorkerStreamController } from './worker-stream.controller';
 import { WorkerStreamRegistry } from './worker-stream-registry.service';
+import { WorkerJoinKeyService } from './worker-join-key.service';
 
 @Global()
 @Module({
@@ -33,7 +33,6 @@ import { WorkerStreamRegistry } from './worker-stream-registry.service';
       InternalNetwork,
       AgentConversation,
     ]),
-    ApiKeysModule,
     forwardRef(() => ToolsModule),
     ConnectorsModule,
   ],
@@ -50,6 +49,7 @@ import { WorkerStreamRegistry } from './worker-stream-registry.service';
     },
     WorkerTelemetryService,
     WorkerStreamRegistry,
+    WorkerJoinKeyService,
   ],
   exports: [
     WorkersService,

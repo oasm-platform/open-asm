@@ -49,10 +49,6 @@ export class WorkerJoinDto {
 
   @ApiProperty({ required: false })
   @IsString()
-  signature: string;
-
-  @ApiProperty({ required: false })
-  @IsString()
   @IsOptional()
   token?: string;
 
@@ -73,6 +69,26 @@ export class WorkerAliveDto {
   @ApiProperty()
   @IsString()
   token: string;
+}
+
+export class WorkerJoinKeyResponseDto {
+  @ApiProperty({
+    description:
+      'Public id of the join key. `worker.joined` live events carry it as `joinKeyId`.',
+  })
+  id: string;
+
+  @ApiProperty({ description: 'One-time API key a worker joins with' })
+  apiKey: string;
+
+  @ApiProperty({ description: 'When the key expires (ISO 8601)' })
+  expiresAt: string;
+
+  @ApiProperty({
+    description:
+      'Seconds until the key expires, counted from this response. Prefer it over expiresAt to avoid client clock skew.',
+  })
+  expiresInSeconds: number;
 }
 
 export class GetManyWorkersDto extends GetManyBaseQueryParams {
@@ -100,6 +116,36 @@ export class GetManyWorkersDto extends GetManyBaseQueryParams {
     return undefined;
   })
   enabledAgentMode?: boolean;
+}
+
+/**
+ * One row of `GET /workers`: only what the worker list card shows. Everything
+ * else (tools, telemetry, network interfaces) lives on `GET /workers/:id`.
+ */
+export class WorkerListItemDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty({ required: false })
+  name?: string;
+
+  @ApiProperty({ required: false })
+  os?: string;
+
+  @ApiProperty()
+  isOnline: boolean;
+
+  @ApiProperty()
+  lastSeenAt: Date;
+
+  @ApiProperty()
+  createdAt: Date;
+
+  @ApiProperty({ required: false })
+  internalNetworkId?: string;
+
+  @ApiProperty()
+  currentJobsCount: number;
 }
 
 /**
@@ -143,8 +189,8 @@ export class WorkerToolDto {
   @ApiProperty({ required: false, nullable: true, type: String })
   logoUrl?: string | null;
 
-  @ApiProperty({ required: false })
-  category?: string;
+  @ApiProperty({ required: false, type: [String] })
+  categories?: string[];
 
   @ApiProperty({ enum: ['builtin', 'connector'] })
   type: 'builtin' | 'connector';

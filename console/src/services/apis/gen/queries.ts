@@ -868,11 +868,23 @@ export type GetManyGetManyWorkflowsResponseDtoDto = {
   pageCount: number;
 };
 
+export type ToolCategory = (typeof ToolCategory)[keyof typeof ToolCategory];
+
+export const ToolCategory = {
+  subdomains: 'subdomains',
+  http_probe: 'http_probe',
+  ports_scanner: 'ports_scanner',
+  vulnerabilities: 'vulnerabilities',
+  screenshot: 'screenshot',
+  url_discovery: 'url_discovery',
+} as const;
+
 export type WorkflowJobConfig = { [key: string]: unknown };
 
 export type WorkflowJob = {
   name?: string;
   run: string;
+  category?: ToolCategory;
   needs?: string[];
   allowFailure?: boolean;
   config?: WorkflowJobConfig;
@@ -1298,16 +1310,10 @@ export type PortsResultDto = {
   payload: number[];
 };
 
-export type ToolCategory = (typeof ToolCategory)[keyof typeof ToolCategory];
-
-export const ToolCategory = {
-  subdomains: 'subdomains',
-  http_probe: 'http_probe',
-  ports_scanner: 'ports_scanner',
-  vulnerabilities: 'vulnerabilities',
-  screenshot: 'screenshot',
-  url_discovery: 'url_discovery',
-} as const;
+export type ToolCategorySpec = {
+  name: ToolCategory;
+  targetTypes: TargetType[];
+};
 
 export type ToolType = (typeof ToolType)[keyof typeof ToolType];
 
@@ -1326,9 +1332,7 @@ export type Tool = {
   name: string;
   description: string;
   command: string;
-  category: ToolCategory;
-  /** Target types whose assets this tool can scan */
-  targetTypes: TargetType[];
+  categories: ToolCategorySpec[];
   version: string;
   /** @nullable */
   logoUrl?: string | null;
@@ -1595,6 +1599,8 @@ export type WorkflowStepStatusDto = {
   /** Display label (the job id when no name is set) */
   name: string;
   run: string;
+  /** Category the step runs its tool in */
+  category?: string;
   /** Ids of the jobs this one waits for */
   needs: string[];
   status: WorkflowStepStatusDtoStatus;
@@ -2045,14 +2051,35 @@ export type WorkerMetadataDto = {
 
 export type WorkerJoinDto = {
   apiKey: string;
-  signature?: string;
   token?: string;
   ipAddress?: string;
   metadata?: WorkerMetadataDto;
 };
 
-export type GetManyWorkerInstanceDto = {
-  data: WorkerInstance[];
+export type WorkerJoinKeyResponseDto = {
+  /** Public id of the join key. `worker.joined` live events carry it as `joinKeyId`. */
+  id: string;
+  /** One-time API key a worker joins with */
+  apiKey: string;
+  /** When the key expires (ISO 8601) */
+  expiresAt: string;
+  /** Seconds until the key expires, counted from this response. Prefer it over expiresAt to avoid client clock skew. */
+  expiresInSeconds: number;
+};
+
+export type WorkerListItemDto = {
+  id: string;
+  name?: string;
+  os?: string;
+  isOnline: boolean;
+  lastSeenAt: string;
+  createdAt: string;
+  internalNetworkId?: string;
+  currentJobsCount: number;
+};
+
+export type GetManyWorkerListItemDtoDto = {
+  data: WorkerListItemDto[];
   total: number;
   page: number;
   limit: number;
@@ -2207,7 +2234,7 @@ export type WorkerToolDto = {
   name: string;
   /** @nullable */
   logoUrl?: string | null;
-  category?: string;
+  categories?: string[];
   type: WorkerToolDtoType;
   /** Jobs this worker is currently running with this tool. Capped server-side; may be shorter than the worker-level `currentJobsCount`. */
   currentJobs: WorkerToolJobDto[];
@@ -2278,25 +2305,13 @@ export type GetWorkerResponseDto = {
   tools: WorkerToolDto[];
 };
 
-export type CreateToolDtoCategory =
-  (typeof CreateToolDtoCategory)[keyof typeof CreateToolDtoCategory];
-
-export const CreateToolDtoCategory = {
-  subdomains: 'subdomains',
-  http_probe: 'http_probe',
-  ports_scanner: 'ports_scanner',
-  vulnerabilities: 'vulnerabilities',
-  screenshot: 'screenshot',
-  url_discovery: 'url_discovery',
-} as const;
-
 export type CreateToolDto = {
   name: string;
   description: string;
-  category: CreateToolDtoCategory;
   version: string;
   /** @nullable */
   logoUrl?: string | null;
+  categories: ToolCategory[];
   /** The ID of the provider */
   providerId: string;
 };
@@ -2326,6 +2341,18 @@ export type GetManyToolDto = {
   pageCount: number;
 };
 
+/**
+ * JSON Schema of the inputs OASM passes to the connector for this category.
+ */
+export type ConnectorCategoryDtoInputsSchema = { [key: string]: unknown };
+
+export type ConnectorCategoryDto = {
+  name: ToolCategory;
+  targetTypes: TargetType[];
+  /** JSON Schema of the inputs OASM passes to the connector for this category. */
+  inputsSchema?: ConnectorCategoryDtoInputsSchema;
+};
+
 export type ConnectorDto = {
   name: string;
   slug: string;
@@ -2339,6 +2366,8 @@ export type ConnectorDto = {
   repositoryUrl?: string;
   supportUrl?: string;
   capabilities: string[];
+  agentTool?: boolean;
+  categories: ConnectorCategoryDto[];
 };
 
 export type ToolConfigProfile = {
@@ -2798,13 +2827,7 @@ export type LLMConfigResponseDto = {
    * @nullable
    */
   apiUrl?: string | null;
-  /**
-   * Custom context window size in tokens
-   * @minimum 1
-   * @nullable
-   */
-  contextWindow?: number | null;
-  /** Whether this is the preferred configuration */
+  /** Whether this is the default model connection */
   isPreferred: boolean;
   /** Masked API key showing only its final characters */
   apiKeyMasked: string;
@@ -2852,11 +2875,6 @@ export type CreateLLMConfigDto = {
    * @maxLength 500
    */
   apiUrl?: string;
-  /**
-   * Custom context window size in tokens
-   * @minimum 1
-   */
-  contextWindow?: number;
 };
 
 /**
@@ -2980,12 +2998,7 @@ export type UpdateLLMConfigDto = {
    * @maxLength 500
    */
   apiUrl?: string;
-  /**
-   * Custom context window size in tokens
-   * @minimum 1
-   */
-  contextWindow?: number;
-  /** Whether this is the preferred configuration for new conversations */
+  /** Make this connection the default model for new conversations */
   isPreferred?: boolean;
 };
 
@@ -3013,6 +3026,137 @@ export type AgentTodoItemDto = {
   sortOrder: number;
   /** ISO timestamp of the most recent plan item update */
   updatedAt: string;
+};
+
+export type TurnStatsDto = {
+  /** Model calls (steps) in the turn */
+  steps: number;
+  /** Prompt tokens, incl. cached */
+  inputTokens: number;
+  /** Output tokens, incl. reasoning */
+  outputTokens: number;
+  /** Prompt tokens read from cache */
+  cacheReadTokens: number;
+  /** Prompt tokens written to cache */
+  cacheWriteTokens: number;
+  /** Reasoning tokens (part of output) */
+  reasoningTokens: number;
+  /** Share of prompt tokens served from cache (0-100) */
+  cachePercent: number;
+  /** Time spent waiting on the model (ms) */
+  modelTimeMs: number;
+  /** Time spent running tools, incl. approval waits (ms) */
+  toolTimeMs: number;
+  /**
+   * Average time to first token (ms)
+   * @nullable
+   */
+  avgTtftMs: number | null;
+  /**
+   * Output tokens/s while streaming
+   * @nullable
+   */
+  responseTokPerSec: number | null;
+  /**
+   * Output tokens/s over the whole turn
+   * @nullable
+   */
+  turnTokPerSec: number | null;
+  /** Turn wall time, excluding subagent waits (ms) */
+  wallTimeMs: number;
+  /** Time spent waiting for background subagents (ms) */
+  subagentWaitMs: number;
+  /**
+   * Cost in USD; null when the model price is unknown
+   * @nullable
+   */
+  costUsd: number | null;
+};
+
+export type ConversationTotalsDto = {
+  inputTokens: number;
+  outputTokens: number;
+  /** USD of all priced turns and subagent runs */
+  costUsd: number;
+  /** False when some turn used a model with no known price */
+  costComplete: boolean;
+  /** Completed user turns */
+  turns: number;
+};
+
+/**
+ * manual = model setting, catalog = models.dev, default = 128k fallback
+ */
+export type ConversationMetadataDtoContextWindowSource =
+  (typeof ConversationMetadataDtoContextWindowSource)[keyof typeof ConversationMetadataDtoContextWindowSource];
+
+export const ConversationMetadataDtoContextWindowSource = {
+  manual: 'manual',
+  catalog: 'catalog',
+  default: 'default',
+} as const;
+
+export type ConversationMetadataDto = {
+  /** Model of the latest turn */
+  model?: string;
+  /** Provider of the latest turn */
+  provider?: string;
+  /** LLM connection of the latest turn */
+  llmConfigId?: string;
+  /** Context window of the model (tokens) */
+  contextWindow?: number;
+  /** manual = model setting, catalog = models.dev, default = 128k fallback */
+  contextWindowSource?: ConversationMetadataDtoContextWindowSource;
+  /** True when the window is a guess (default, or models.dev match by bare model id) */
+  catalogEstimated?: boolean;
+  /** Tokens in the context after the latest step */
+  contextUsedTokens?: number;
+  lastTurn?: TurnStatsDto;
+  totals?: ConversationTotalsDto;
+  /** ISO time of the last metadata update */
+  updatedAt?: string;
+};
+
+export type SubagentResponseDtoStatus =
+  (typeof SubagentResponseDtoStatus)[keyof typeof SubagentResponseDtoStatus];
+
+export const SubagentResponseDtoStatus = {
+  pending: 'pending',
+  in_progress: 'in_progress',
+  completed: 'completed',
+  failed: 'failed',
+} as const;
+
+export type SubagentResponseDto = {
+  id: string;
+  /** Subagent key */
+  name: string;
+  status: SubagentResponseDtoStatus;
+  /** Task dispatched by the main agent */
+  task: string;
+  /**
+   * Final summary of the subagent
+   * @nullable
+   */
+  result: string | null;
+  /**
+   * Failure reason
+   * @nullable
+   */
+  error: string | null;
+  createdAt: string;
+  /** @nullable */
+  startedAt: string | null;
+  /** @nullable */
+  completedAt: string | null;
+  /**
+   * When the main agent received the result
+   * @nullable
+   */
+  deliveredAt: string | null;
+  sortOrder: number;
+  /** @nullable */
+  stats: TurnStatsDto | null;
 };
 
 /**
@@ -3063,6 +3207,13 @@ export type ConversationResponseDto = {
   summary?: string;
   /** Worker currently assigned to remote tool execution */
   workerId?: string;
+  /**
+   * Current model, context window usage and token/cost stats (null before the first turn)
+   * @nullable
+   */
+  metadata?: ConversationMetadataDto | null;
+  /** Background subagent tasks dispatched in this conversation (detail only) */
+  subagents?: SubagentResponseDto[];
 };
 
 export type GetManyConversationResponseDtoDto = {
@@ -3346,6 +3497,222 @@ export type MCPServerPingResponseDto = {
   latency?: number;
 };
 
+/**
+ * Reasoning effort; unset uses the provider's default (saved, not used yet)
+ */
+export type AgentModelRefDtoReasoningEffort =
+  (typeof AgentModelRefDtoReasoningEffort)[keyof typeof AgentModelRefDtoReasoningEffort];
+
+export const AgentModelRefDtoReasoningEffort = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const;
+
+export type AgentModelRefDto = {
+  /** LLM connection the model runs on */
+  llmConfigId: string;
+  /** Model identifier */
+  model: string;
+  /**
+   * Context window in tokens (default 128k)
+   * @minimum 1
+   * @maximum 10000000
+   */
+  contextWindow?: number;
+  /**
+   * Max output tokens per response
+   * @minimum 1
+   * @maximum 10000000
+   */
+  maxOutputTokens?: number;
+  /** Reasoning effort; unset uses the provider's default (saved, not used yet) */
+  reasoningEffort?: AgentModelRefDtoReasoningEffort;
+};
+
+export type AgentModelsConfigDto = {
+  /** Model for new conversations */
+  default?: AgentModelRefDto;
+  /** Cheap model for titles, summaries and reports (saved, not used yet) */
+  small?: AgentModelRefDto;
+  /** Models available to subagents (saved, not used yet) */
+  subagents?: AgentModelRefDto[];
+};
+
+/**
+ * Web search provider
+ */
+export type AgentSearchProviderResponseDtoProvider =
+  (typeof AgentSearchProviderResponseDtoProvider)[keyof typeof AgentSearchProviderResponseDtoProvider];
+
+export const AgentSearchProviderResponseDtoProvider = {
+  exa: 'exa',
+  firecrawl: 'firecrawl',
+  tinyfish: 'tinyfish',
+} as const;
+
+export type AgentSearchProviderResponseDto = {
+  /** Web search provider */
+  provider: AgentSearchProviderResponseDtoProvider;
+  /** Masked API key showing only its final characters */
+  apiKeyMasked: string;
+  /** Whether web search uses this provider first */
+  isDefault: boolean;
+};
+
+/**
+ * Agent mode for new conversations
+ * @nullable
+ */
+export type AgentConfigResponseDtoDefaultAgentMode =
+  | (typeof AgentConfigResponseDtoDefaultAgentMode)[keyof typeof AgentConfigResponseDtoDefaultAgentMode]
+  | null;
+
+export const AgentConfigResponseDtoDefaultAgentMode = {
+  ask: 'ask',
+  agent: 'agent',
+} as const;
+
+/**
+ * Approval mode for new conversations
+ * @nullable
+ */
+export type AgentConfigResponseDtoDefaultApprovalMode =
+  | (typeof AgentConfigResponseDtoDefaultApprovalMode)[keyof typeof AgentConfigResponseDtoDefaultApprovalMode]
+  | null;
+
+export const AgentConfigResponseDtoDefaultApprovalMode = {
+  auto: 'auto',
+  plan: 'plan',
+  manual: 'manual',
+} as const;
+
+export type AgentConfigResponseDto = {
+  /** Models used by the agent */
+  modelsConfig: AgentModelsConfigDto;
+  /** Web search providers */
+  searchProviders: AgentSearchProviderResponseDto[];
+  /**
+   * Custom instructions added to the system prompt
+   * @nullable
+   */
+  instruction: string | null;
+  /**
+   * Max tool call steps per run
+   * @nullable
+   */
+  maxSteps: number | null;
+  /**
+   * Agent mode for new conversations
+   * @nullable
+   */
+  defaultAgentMode: AgentConfigResponseDtoDefaultAgentMode;
+  /**
+   * Approval mode for new conversations
+   * @nullable
+   */
+  defaultApprovalMode: AgentConfigResponseDtoDefaultApprovalMode;
+  /** Built-in tool names the agent must not use */
+  disabledTools: string[];
+  /**
+   * Language the agent answers in
+   * @nullable
+   */
+  responseLanguage: string | null;
+};
+
+/**
+ * Web search provider
+ */
+export type AgentSearchProviderInputDtoProvider =
+  (typeof AgentSearchProviderInputDtoProvider)[keyof typeof AgentSearchProviderInputDtoProvider];
+
+export const AgentSearchProviderInputDtoProvider = {
+  exa: 'exa',
+  firecrawl: 'firecrawl',
+  tinyfish: 'tinyfish',
+} as const;
+
+export type AgentSearchProviderInputDto = {
+  /** Web search provider */
+  provider: AgentSearchProviderInputDtoProvider;
+  /** Provider API key; omit to keep the saved one */
+  apiKey?: string;
+  /** Whether web search uses this provider first */
+  isDefault?: boolean;
+};
+
+/**
+ * Agent mode for new conversations
+ * @nullable
+ */
+export type UpsertAgentConfigDtoDefaultAgentMode =
+  | (typeof UpsertAgentConfigDtoDefaultAgentMode)[keyof typeof UpsertAgentConfigDtoDefaultAgentMode]
+  | null;
+
+export const UpsertAgentConfigDtoDefaultAgentMode = {
+  ask: 'ask',
+  agent: 'agent',
+} as const;
+
+/**
+ * Approval mode for new conversations
+ * @nullable
+ */
+export type UpsertAgentConfigDtoDefaultApprovalMode =
+  | (typeof UpsertAgentConfigDtoDefaultApprovalMode)[keyof typeof UpsertAgentConfigDtoDefaultApprovalMode]
+  | null;
+
+export const UpsertAgentConfigDtoDefaultApprovalMode = {
+  auto: 'auto',
+  plan: 'plan',
+  manual: 'manual',
+} as const;
+
+export type UpsertAgentConfigDto = {
+  /**
+   * Models used by the agent; replaces the saved value
+   * @nullable
+   */
+  modelsConfig?: AgentModelsConfigDto | null;
+  /**
+   * Web search providers; replaces the whole list
+   * @nullable
+   */
+  searchProviders?: AgentSearchProviderInputDto[] | null;
+  /**
+   * Custom instructions added to the system prompt
+   * @maxLength 20000
+   * @nullable
+   */
+  instruction?: string | null;
+  /**
+   * Max tool call steps per run (default 20)
+   * @minimum 1
+   * @maximum 1000
+   * @nullable
+   */
+  maxSteps?: number | null;
+  /**
+   * Agent mode for new conversations
+   * @nullable
+   */
+  defaultAgentMode?: UpsertAgentConfigDtoDefaultAgentMode;
+  /**
+   * Approval mode for new conversations
+   * @nullable
+   */
+  defaultApprovalMode?: UpsertAgentConfigDtoDefaultApprovalMode;
+  /** Built-in tool names the agent must not use */
+  disabledTools?: string[];
+  /**
+   * Language the agent answers in
+   * @maxLength 16
+   * @nullable
+   */
+  responseLanguage?: string | null;
+};
+
 export type WorkspaceMemoryResponseDto = {
   /** Unique workspace memory identifier */
   id: string;
@@ -3368,6 +3735,153 @@ export type GetManyWorkspaceMemoryResponseDtoDto = {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
+};
+
+export type AgentDefinitionModelDto = {
+  /** LLM connection the model runs on */
+  llmConfigId: string;
+  /** Model identifier */
+  model: string;
+};
+
+export type AgentDefinitionMetadataDto = {
+  /** Override model; unset uses the user's default model */
+  model?: AgentDefinitionModelDto;
+  /** Provider thinking variant; unset uses the default */
+  variant?: string;
+  /**
+   * Sampling temperature
+   * @minimum 0
+   * @maximum 2
+   */
+  temperature?: number;
+  /**
+   * Nucleus sampling
+   * @minimum 0
+   * @maximum 1
+   */
+  topP?: number;
+  /**
+   * Max tool call steps per run
+   * @minimum 1
+   * @maximum 1000
+   */
+  maxSteps?: number;
+  /** Tool allowlist; unset gives every tool of the mode */
+  tools?: string[];
+  /** Skill names the agent can load */
+  skills?: string[];
+  /** MCP server names the agent can use */
+  mcpServers?: string[];
+};
+
+export type AgentDefinitionResponseDtoMode =
+  (typeof AgentDefinitionResponseDtoMode)[keyof typeof AgentDefinitionResponseDtoMode];
+
+export const AgentDefinitionResponseDtoMode = {
+  primary: 'primary',
+  subagent: 'subagent',
+  all: 'all',
+} as const;
+
+export type AgentDefinitionResponseDtoScope =
+  (typeof AgentDefinitionResponseDtoScope)[keyof typeof AgentDefinitionResponseDtoScope];
+
+export const AgentDefinitionResponseDtoScope = {
+  builtin: 'builtin',
+  user: 'user',
+  workspace: 'workspace',
+} as const;
+
+export type AgentDefinitionResponseDto = {
+  /** Row id, or "builtin-<name>" for built-in agents */
+  id: string;
+  name: string;
+  /** @nullable */
+  title: string | null;
+  description: string;
+  mode: AgentDefinitionResponseDtoMode;
+  scope: AgentDefinitionResponseDtoScope;
+  isBuiltin: boolean;
+  /** Whether the current user can edit or delete it */
+  canEdit: boolean;
+  systemPrompt: string;
+  metadata: AgentDefinitionMetadataDto;
+  /**
+   * null for built-in agents
+   * @nullable
+   */
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateAgentDefinitionDtoMode =
+  (typeof CreateAgentDefinitionDtoMode)[keyof typeof CreateAgentDefinitionDtoMode];
+
+export const CreateAgentDefinitionDtoMode = {
+  primary: 'primary',
+  subagent: 'subagent',
+  all: 'all',
+} as const;
+
+/**
+ * user: only you see it; workspace: every workspace member does
+ */
+export type CreateAgentDefinitionDtoScope =
+  (typeof CreateAgentDefinitionDtoScope)[keyof typeof CreateAgentDefinitionDtoScope];
+
+export const CreateAgentDefinitionDtoScope = {
+  user: 'user',
+  workspace: 'workspace',
+} as const;
+
+export type CreateAgentDefinitionDto = {
+  /**
+   * Slug mentioned as @name; unique for the user in the workspace
+   * @maxLength 64
+   */
+  name: string;
+  /** Display name */
+  title?: string;
+  /** What the agent does */
+  description?: string;
+  mode: CreateAgentDefinitionDtoMode;
+  /** user: only you see it; workspace: every workspace member does */
+  scope: CreateAgentDefinitionDtoScope;
+  /** System prompt of the agent */
+  systemPrompt?: string;
+  metadata?: AgentDefinitionMetadataDto;
+};
+
+export type UpdateAgentDefinitionDtoMode =
+  (typeof UpdateAgentDefinitionDtoMode)[keyof typeof UpdateAgentDefinitionDtoMode];
+
+export const UpdateAgentDefinitionDtoMode = {
+  primary: 'primary',
+  subagent: 'subagent',
+  all: 'all',
+} as const;
+
+export type UpdateAgentDefinitionDtoScope =
+  (typeof UpdateAgentDefinitionDtoScope)[keyof typeof UpdateAgentDefinitionDtoScope];
+
+export const UpdateAgentDefinitionDtoScope = {
+  user: 'user',
+  workspace: 'workspace',
+} as const;
+
+export type UpdateAgentDefinitionDto = {
+  /** @maxLength 64 */
+  name?: string;
+  /** @nullable */
+  title?: string | null;
+  description?: string;
+  mode?: UpdateAgentDefinitionDtoMode;
+  scope?: UpdateAgentDefinitionDtoScope;
+  systemPrompt?: string;
+  /** Replaces the whole metadata object */
+  metadata?: AgentDefinitionMetadataDto;
 };
 
 export type SkillResponseDto = {
@@ -3654,6 +4168,8 @@ export type AssetGroupToolInput = {
   config?: AssetGroupToolInputConfig;
   /** Reference to a saved config profile */
   configProfileId?: string;
+  /** Category to run the tool in (default: its first) */
+  category?: ToolCategory;
 };
 
 export type CreateAssetGroupDto = {
@@ -4400,6 +4916,10 @@ export type ToolsControllerGetManyToolsParams = {
   category?: ToolsControllerGetManyToolsCategory;
   workspaceId?: string;
   providerId?: string;
+  /**
+   * true → only AI agent tools (built-in tools always count), false → only the others
+   */
+  agentTool?: boolean;
 };
 
 export type ToolsControllerGetManyToolsType =
@@ -4499,6 +5019,10 @@ export type VulnerabilitiesControllerGetVulnerabilitiesParams = {
    * Filter vulnerabilities by target ID
    */
   targetId?: string;
+  /**
+   * JSON filter tree, e.g. {"logic":"and","items":[{"field":"severity","op":"in","value":["high","critical"]},{"logic":"or","conditions":[{"field":"cve","op":"contains","value":"2024"},{"field":"cvssScore","op":"gte","value":"7"}]}]}. Fields: name, severity, tag, host, ip, port, cve, cwe, target, tool, affectedUrl, cvssScore, epssScore. Ops: eq, neq, contains, notContains, in, notIn, gt, gte, lt, lte.
+   */
+  filter?: string;
 };
 
 export type VulnerabilitiesControllerGetVulnerabilitiesStatus =
@@ -23288,7 +23812,268 @@ export const useWorkersControllerJoin = <TError = unknown, TContext = unknown>(
 };
 
 /**
- * Fetches a paginated list of all active security assessment workers in the cluster.
+ * Issues a one-time API key a worker joins this workspace with. It expires after a few minutes and is consumed by the first successful join; the `worker.joined` live event carries its id as `joinKeyId`.
+ * @summary Create a worker join key
+ */
+export const workersControllerCreateJoinKey = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<WorkerJoinKeyResponseDto>(
+    { url: `/api/workers/join-keys`, method: 'POST', signal },
+    options,
+  );
+};
+
+export const getWorkersControllerCreateJoinKeyMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workersControllerCreateJoinKey>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workersControllerCreateJoinKey>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ['workersControllerCreateJoinKey'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workersControllerCreateJoinKey>>,
+    void
+  > = () => {
+    return workersControllerCreateJoinKey(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkersControllerCreateJoinKeyMutationResult = NonNullable<
+  Awaited<ReturnType<typeof workersControllerCreateJoinKey>>
+>;
+
+export type WorkersControllerCreateJoinKeyMutationError = unknown;
+
+/**
+ * @summary Create a worker join key
+ */
+export const useWorkersControllerCreateJoinKey = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workersControllerCreateJoinKey>>,
+      TError,
+      void,
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workersControllerCreateJoinKey>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(
+    getWorkersControllerCreateJoinKeyMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Deletes the join key `id` and issues a new one. An already expired or used key is simply replaced.
+ * @summary Rotate a worker join key
+ */
+export const workersControllerRotateJoinKey = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<WorkerJoinKeyResponseDto>(
+    { url: `/api/workers/join-keys/${id}/rotate`, method: 'POST', signal },
+    options,
+  );
+};
+
+export const getWorkersControllerRotateJoinKeyMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workersControllerRotateJoinKey>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workersControllerRotateJoinKey>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['workersControllerRotateJoinKey'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workersControllerRotateJoinKey>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return workersControllerRotateJoinKey(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkersControllerRotateJoinKeyMutationResult = NonNullable<
+  Awaited<ReturnType<typeof workersControllerRotateJoinKey>>
+>;
+
+export type WorkersControllerRotateJoinKeyMutationError = unknown;
+
+/**
+ * @summary Rotate a worker join key
+ */
+export const useWorkersControllerRotateJoinKey = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workersControllerRotateJoinKey>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workersControllerRotateJoinKey>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getWorkersControllerRotateJoinKeyMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Deletes the join key `id` before it expires, e.g. when the connect dialog closes.
+ * @summary Revoke a worker join key
+ */
+export const workersControllerRevokeJoinKey = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/workers/join-keys/${id}`, method: 'DELETE', signal },
+    options,
+  );
+};
+
+export const getWorkersControllerRevokeJoinKeyMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workersControllerRevokeJoinKey>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workersControllerRevokeJoinKey>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['workersControllerRevokeJoinKey'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workersControllerRevokeJoinKey>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return workersControllerRevokeJoinKey(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkersControllerRevokeJoinKeyMutationResult = NonNullable<
+  Awaited<ReturnType<typeof workersControllerRevokeJoinKey>>
+>;
+
+export type WorkersControllerRevokeJoinKeyMutationError = unknown;
+
+/**
+ * @summary Revoke a worker join key
+ */
+export const useWorkersControllerRevokeJoinKey = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workersControllerRevokeJoinKey>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workersControllerRevokeJoinKey>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getWorkersControllerRevokeJoinKeyMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Fetches a paginated list of all active security assessment workers in the cluster. Each row carries only list fields; use GET /workers/:id for tools and details.
  * @summary Get all workers with pagination and sorting.
  */
 export const workersControllerGetWorkers = (
@@ -23296,7 +24081,7 @@ export const workersControllerGetWorkers = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<GetManyWorkerInstanceDto>(
+  return orvalClient<GetManyWorkerListItemDtoDto>(
     { url: `/api/workers`, method: 'GET', params, signal },
     options,
   );
@@ -24878,7 +25663,7 @@ export function useToolsControllerGetInstalledTools<
 }
 
 /**
- * Fetches connector metadata (name, version, image, author, pricingTier, descriptions, capabilities, links) from the connector manifest.
+ * Fetches connector metadata (name, version, image, author, pricingTier, descriptions, capabilities, categories with their target types and inputs schema, links) from the connector manifest.
  * @summary Get connector metadata by slug
  */
 export const toolsControllerGetConnectorBySlug = (
@@ -25217,7 +26002,7 @@ export function useToolsControllerGetToolById<
 }
 
 /**
- * Returns the effective JSON Schema for a tool's configuration. Uses configSchema when present, falls back to inputsSchema.
+ * Returns the JSON Schema of a tool's configuration (the connector configSchema).
  * @summary Get tool config schema
  */
 export const toolsControllerGetToolSchema = (
@@ -31862,6 +32647,180 @@ export const useAgentsControllerDeleteConversation = <
 };
 
 /**
+ * Background subagent tasks dispatched in this conversation, with status and result
+ * @summary List conversation subagents
+ */
+export const agentsControllerGetConversationSubagents = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SubagentResponseDto[]>(
+    { url: `/api/agents/conversations/${id}/subagents`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerGetConversationSubagentsQueryKey = (
+  id: string,
+) => {
+  return [`/api/agents/conversations/${id}/subagents`] as const;
+};
+
+export const getAgentsControllerGetConversationSubagentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof agentsControllerGetConversationSubagents>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetConversationSubagents>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAgentsControllerGetConversationSubagentsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerGetConversationSubagents>>
+  > = ({ signal }) =>
+    agentsControllerGetConversationSubagents(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerGetConversationSubagents>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerGetConversationSubagentsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerGetConversationSubagents>>
+>;
+export type AgentsControllerGetConversationSubagentsQueryError = unknown;
+
+export function useAgentsControllerGetConversationSubagents<
+  TData = Awaited<ReturnType<typeof agentsControllerGetConversationSubagents>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetConversationSubagents>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetConversationSubagents>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetConversationSubagents>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetConversationSubagents<
+  TData = Awaited<ReturnType<typeof agentsControllerGetConversationSubagents>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetConversationSubagents>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetConversationSubagents>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetConversationSubagents>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetConversationSubagents<
+  TData = Awaited<ReturnType<typeof agentsControllerGetConversationSubagents>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetConversationSubagents>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List conversation subagents
+ */
+
+export function useAgentsControllerGetConversationSubagents<
+  TData = Awaited<ReturnType<typeof agentsControllerGetConversationSubagents>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetConversationSubagents>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAgentsControllerGetConversationSubagentsQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
  * Get all conversations for the workspace
  * @summary List conversations
  */
@@ -32803,6 +33762,261 @@ export const useAgentsControllerStreamMessage = <
 };
 
 /**
+ * Aborts the in-progress agent run of a conversation. Use this instead of dropping the stream connection, which now lets the run finish in the background.
+ * @summary Stop the active response
+ */
+export const agentsControllerStopConversation = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/agents/conversations/${id}/stop`, method: 'POST', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerStopConversationMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerStopConversation>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerStopConversation>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerStopConversation'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerStopConversation>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return agentsControllerStopConversation(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerStopConversationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerStopConversation>>
+>;
+
+export type AgentsControllerStopConversationMutationError = unknown;
+
+/**
+ * @summary Stop the active response
+ */
+export const useAgentsControllerStopConversation = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerStopConversation>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerStopConversation>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerStopConversationMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Reconnects to a run still producing the conversation's answer and streams the rest via SSE, replaying what was produced before the reconnect. Returns 204 when there is nothing to resume.
+ * @summary Resume the active response stream
+ */
+export const agentsControllerResumeStream = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/agents/conversations/${id}/stream`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerResumeStreamQueryKey = (id: string) => {
+  return [`/api/agents/conversations/${id}/stream`] as const;
+};
+
+export const getAgentsControllerResumeStreamQueryOptions = <
+  TData = Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAgentsControllerResumeStreamQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerResumeStream>>
+  > = ({ signal }) => agentsControllerResumeStream(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerResumeStreamQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerResumeStream>>
+>;
+export type AgentsControllerResumeStreamQueryError = unknown;
+
+export function useAgentsControllerResumeStream<
+  TData = Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerResumeStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerResumeStream<
+  TData = Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerResumeStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerResumeStream<
+  TData = Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Resume the active response stream
+ */
+
+export function useAgentsControllerResumeStream<
+  TData = Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerResumeStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAgentsControllerResumeStreamQueryOptions(id, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
  * Delete a specific message in a conversation
  * @summary Delete message
  */
@@ -33499,6 +34713,255 @@ export function useAgentsControllerPingMCPServer<
 }
 
 /**
+ * Get the current user's agent settings in the workspace: models, web search providers and instructions
+ * @summary Get agent config
+ */
+export const agentsControllerGetAgentConfig = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AgentConfigResponseDto>(
+    { url: `/api/agents/config`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerGetAgentConfigQueryKey = () => {
+  return [`/api/agents/config`] as const;
+};
+
+export const getAgentsControllerGetAgentConfigQueryOptions = <
+  TData = Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAgentsControllerGetAgentConfigQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>
+  > = ({ signal }) => agentsControllerGetAgentConfig(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerGetAgentConfigQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>
+>;
+export type AgentsControllerGetAgentConfigQueryError = unknown;
+
+export function useAgentsControllerGetAgentConfig<
+  TData = Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetAgentConfig<
+  TData = Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetAgentConfig<
+  TData = Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get agent config
+ */
+
+export function useAgentsControllerGetAgentConfig<
+  TData = Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetAgentConfig>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAgentsControllerGetAgentConfigQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Update the current user's agent settings in the workspace. Only the fields sent change
+ * @summary Update agent config
+ */
+export const agentsControllerUpsertAgentConfig = (
+  upsertAgentConfigDto: UpsertAgentConfigDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AgentConfigResponseDto>(
+    {
+      url: `/api/agents/config`,
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      data: upsertAgentConfigDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAgentsControllerUpsertAgentConfigMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerUpsertAgentConfig>>,
+    TError,
+    { data: UpsertAgentConfigDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerUpsertAgentConfig>>,
+  TError,
+  { data: UpsertAgentConfigDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerUpsertAgentConfig'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerUpsertAgentConfig>>,
+    { data: UpsertAgentConfigDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return agentsControllerUpsertAgentConfig(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerUpsertAgentConfigMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerUpsertAgentConfig>>
+>;
+export type AgentsControllerUpsertAgentConfigMutationBody =
+  UpsertAgentConfigDto;
+export type AgentsControllerUpsertAgentConfigMutationError = unknown;
+
+/**
+ * @summary Update agent config
+ */
+export const useAgentsControllerUpsertAgentConfig = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerUpsertAgentConfig>>,
+      TError,
+      { data: UpsertAgentConfigDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerUpsertAgentConfig>>,
+  TError,
+  { data: UpsertAgentConfigDto },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerUpsertAgentConfigMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
  * Get long-term memory records for the workspace (paginated, per user)
  * @summary Get workspace memory
  */
@@ -33944,6 +35407,441 @@ export const useAgentsControllerDeleteWorkspaceMemory = <
 > => {
   return useMutation(
     getAgentsControllerDeleteWorkspaceMemoryMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Built-in agents, the workspace's shared agents and the current user's personal agents
+ * @summary List agent definitions
+ */
+export const agentsControllerGetAgentDefinitions = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AgentDefinitionResponseDto[]>(
+    { url: `/api/agents/definitions`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerGetAgentDefinitionsQueryKey = () => {
+  return [`/api/agents/definitions`] as const;
+};
+
+export const getAgentsControllerGetAgentDefinitionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof agentsControllerGetAgentDefinitions>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof agentsControllerGetAgentDefinitions>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAgentsControllerGetAgentDefinitionsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerGetAgentDefinitions>>
+  > = ({ signal }) =>
+    agentsControllerGetAgentDefinitions(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerGetAgentDefinitions>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerGetAgentDefinitionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerGetAgentDefinitions>>
+>;
+export type AgentsControllerGetAgentDefinitionsQueryError = unknown;
+
+export function useAgentsControllerGetAgentDefinitions<
+  TData = Awaited<ReturnType<typeof agentsControllerGetAgentDefinitions>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetAgentDefinitions>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetAgentDefinitions>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetAgentDefinitions>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetAgentDefinitions<
+  TData = Awaited<ReturnType<typeof agentsControllerGetAgentDefinitions>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetAgentDefinitions>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetAgentDefinitions>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetAgentDefinitions>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetAgentDefinitions<
+  TData = Awaited<ReturnType<typeof agentsControllerGetAgentDefinitions>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetAgentDefinitions>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List agent definitions
+ */
+
+export function useAgentsControllerGetAgentDefinitions<
+  TData = Awaited<ReturnType<typeof agentsControllerGetAgentDefinitions>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetAgentDefinitions>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAgentsControllerGetAgentDefinitionsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Create a personal (scope user) or workspace-shared agent. The name is a slug mentioned as @name
+ * @summary Create agent definition
+ */
+export const agentsControllerCreateAgentDefinition = (
+  createAgentDefinitionDto: CreateAgentDefinitionDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AgentDefinitionResponseDto>(
+    {
+      url: `/api/agents/definitions`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createAgentDefinitionDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAgentsControllerCreateAgentDefinitionMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerCreateAgentDefinition>>,
+    TError,
+    { data: CreateAgentDefinitionDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerCreateAgentDefinition>>,
+  TError,
+  { data: CreateAgentDefinitionDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerCreateAgentDefinition'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerCreateAgentDefinition>>,
+    { data: CreateAgentDefinitionDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return agentsControllerCreateAgentDefinition(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerCreateAgentDefinitionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerCreateAgentDefinition>>
+>;
+export type AgentsControllerCreateAgentDefinitionMutationBody =
+  CreateAgentDefinitionDto;
+export type AgentsControllerCreateAgentDefinitionMutationError = unknown;
+
+/**
+ * @summary Create agent definition
+ */
+export const useAgentsControllerCreateAgentDefinition = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerCreateAgentDefinition>>,
+      TError,
+      { data: CreateAgentDefinitionDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerCreateAgentDefinition>>,
+  TError,
+  { data: CreateAgentDefinitionDto },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerCreateAgentDefinitionMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Update a custom agent you created
+ * @summary Update agent definition
+ */
+export const agentsControllerUpdateAgentDefinition = (
+  id: string,
+  updateAgentDefinitionDto: UpdateAgentDefinitionDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AgentDefinitionResponseDto>(
+    {
+      url: `/api/agents/definitions/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateAgentDefinitionDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAgentsControllerUpdateAgentDefinitionMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerUpdateAgentDefinition>>,
+    TError,
+    { id: string; data: UpdateAgentDefinitionDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerUpdateAgentDefinition>>,
+  TError,
+  { id: string; data: UpdateAgentDefinitionDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerUpdateAgentDefinition'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerUpdateAgentDefinition>>,
+    { id: string; data: UpdateAgentDefinitionDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return agentsControllerUpdateAgentDefinition(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerUpdateAgentDefinitionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerUpdateAgentDefinition>>
+>;
+export type AgentsControllerUpdateAgentDefinitionMutationBody =
+  UpdateAgentDefinitionDto;
+export type AgentsControllerUpdateAgentDefinitionMutationError = unknown;
+
+/**
+ * @summary Update agent definition
+ */
+export const useAgentsControllerUpdateAgentDefinition = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerUpdateAgentDefinition>>,
+      TError,
+      { id: string; data: UpdateAgentDefinitionDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerUpdateAgentDefinition>>,
+  TError,
+  { id: string; data: UpdateAgentDefinitionDto },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerUpdateAgentDefinitionMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Delete a custom agent you created
+ * @summary Delete agent definition
+ */
+export const agentsControllerDeleteAgentDefinition = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/agents/definitions/${id}`, method: 'DELETE', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerDeleteAgentDefinitionMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerDeleteAgentDefinition>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerDeleteAgentDefinition>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerDeleteAgentDefinition'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerDeleteAgentDefinition>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return agentsControllerDeleteAgentDefinition(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerDeleteAgentDefinitionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerDeleteAgentDefinition>>
+>;
+
+export type AgentsControllerDeleteAgentDefinitionMutationError = unknown;
+
+/**
+ * @summary Delete agent definition
+ */
+export const useAgentsControllerDeleteAgentDefinition = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerDeleteAgentDefinition>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerDeleteAgentDefinition>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerDeleteAgentDefinitionMutationOptions(options),
     queryClient,
   );
 };
@@ -34831,160 +36729,6 @@ export function useNotificationsControllerGetNotifications<
     params,
     options,
   );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-/**
- * Subscribe to a Server-Sent Events (SSE) stream for real-time notifications
- * @summary Subscribe to notifications stream
- */
-export const notificationsControllerStream = (
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<AppResponseSerialization>(
-    { url: `/api/notifications/stream`, method: 'GET', signal },
-    options,
-  );
-};
-
-export const getNotificationsControllerStreamQueryKey = () => {
-  return [`/api/notifications/stream`] as const;
-};
-
-export const getNotificationsControllerStreamQueryOptions = <
-  TData = Awaited<ReturnType<typeof notificationsControllerStream>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof notificationsControllerStream>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getNotificationsControllerStreamQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof notificationsControllerStream>>
-  > = ({ signal }) => notificationsControllerStream(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof notificationsControllerStream>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type NotificationsControllerStreamQueryResult = NonNullable<
-  Awaited<ReturnType<typeof notificationsControllerStream>>
->;
-export type NotificationsControllerStreamQueryError = unknown;
-
-export function useNotificationsControllerStream<
-  TData = Awaited<ReturnType<typeof notificationsControllerStream>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerStream>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof notificationsControllerStream>>,
-          TError,
-          Awaited<ReturnType<typeof notificationsControllerStream>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useNotificationsControllerStream<
-  TData = Awaited<ReturnType<typeof notificationsControllerStream>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerStream>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof notificationsControllerStream>>,
-          TError,
-          Awaited<ReturnType<typeof notificationsControllerStream>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useNotificationsControllerStream<
-  TData = Awaited<ReturnType<typeof notificationsControllerStream>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerStream>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Subscribe to notifications stream
- */
-
-export function useNotificationsControllerStream<
-  TData = Awaited<ReturnType<typeof notificationsControllerStream>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof notificationsControllerStream>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getNotificationsControllerStreamQueryOptions(options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -42323,6 +44067,160 @@ export const useReportsControllerDeleteReport = <
     queryClient,
   );
 };
+
+/**
+ * Server-Sent Events stream of the current user's notification pushes plus, when the X-Workspace-Id header is sent, the allowlisted events of that workspace. Each message is a JSON ClientEvent `{ id, type, time, resourceType, resourceId, joinKeyId? }` (`joinKeyId` only on `worker.joined` from a one-time join key); a `ping` event is sent periodically as a heartbeat.
+ * @summary Subscribe to live events
+ */
+export const eventsControllerStream = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/events/stream`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getEventsControllerStreamQueryKey = () => {
+  return [`/api/events/stream`] as const;
+};
+
+export const getEventsControllerStreamQueryOptions = <
+  TData = Awaited<ReturnType<typeof eventsControllerStream>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof eventsControllerStream>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getEventsControllerStreamQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof eventsControllerStream>>
+  > = ({ signal }) => eventsControllerStream(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof eventsControllerStream>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type EventsControllerStreamQueryResult = NonNullable<
+  Awaited<ReturnType<typeof eventsControllerStream>>
+>;
+export type EventsControllerStreamQueryError = unknown;
+
+export function useEventsControllerStream<
+  TData = Awaited<ReturnType<typeof eventsControllerStream>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof eventsControllerStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof eventsControllerStream>>,
+          TError,
+          Awaited<ReturnType<typeof eventsControllerStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useEventsControllerStream<
+  TData = Awaited<ReturnType<typeof eventsControllerStream>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof eventsControllerStream>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof eventsControllerStream>>,
+          TError,
+          Awaited<ReturnType<typeof eventsControllerStream>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useEventsControllerStream<
+  TData = Awaited<ReturnType<typeof eventsControllerStream>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof eventsControllerStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Subscribe to live events
+ */
+
+export function useEventsControllerStream<
+  TData = Awaited<ReturnType<typeof eventsControllerStream>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof eventsControllerStream>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getEventsControllerStreamQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
 
 /**
  * @summary Create a presigned URL for direct app-logo upload

@@ -28,8 +28,9 @@ export function resolveToolTargetTypes(tool: {
 /**
  * Maps a connector manifest's lowercase `targetTypes` (`domain`, `git_org`)
  * onto TargetType values. Values this platform version does not know yet are
- * returned separately so the caller can log them; a manifest that declares
- * nothing usable falls back to the host default.
+ * returned separately so the caller can log them. Nothing usable declared
+ * yields an empty list — never the host default, so a repository scanner can
+ * never be handed IP targets.
  */
 export function parseManifestTargetTypes(raw: unknown): {
   targetTypes: TargetType[];
@@ -48,11 +49,7 @@ export function parseManifestTargetTypes(raw: unknown): {
       unknown.push(String(value));
     }
   }
-  return {
-    targetTypes:
-      targetTypes.length > 0 ? targetTypes : [...DEFAULT_TOOL_TARGET_TYPES],
-    unknown,
-  };
+  return { targetTypes, unknown };
 }
 
 /** Order-insensitive equality, so a re-ordered manifest is not a change. */

@@ -3,6 +3,12 @@ import * as React from 'react';
 
 import AppLogo from '@/components/ui/app-logo';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
@@ -23,12 +29,14 @@ import { useSession } from '@/utils/authClient';
 import {
   ArrowLeft,
   Bug,
+  ChevronDown,
   CirclePlay,
   CloudCheck,
   Cpu,
   FileChartPie,
   Group,
   LayoutDashboard,
+  Plus,
   Puzzle,
   Server,
   Sparkles,
@@ -219,7 +227,7 @@ export function AppSidebar({
         >
           <SidebarHeader>
             {primary ? (
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between group-data-[collapsible=icon]:justify-center">
                 <AppLogo type="large" />
               </div>
             ) : (
@@ -252,7 +260,48 @@ export function AppSidebar({
                 <WorkspaceSwitcher />
               )}
           </SidebarHeader>
-          <SidebarContent className="gap-1 px-2 py-2 md:gap-2">
+          <SidebarContent className="gap-1 px-2 py-1.5 md:gap-1.5 group-data-[collapsible=icon]:gap-3">
+            {primary && (
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <SidebarMenuButton
+                        tooltip="Create"
+                        className="h-8 rounded-lg border border-border/60 text-[13px] font-medium hover:cursor-pointer"
+                      >
+                        <Plus />
+                        <span>Create</span>
+                        <ChevronDown className="ml-auto group-data-[collapsible=icon]:hidden" />
+                      </SidebarMenuButton>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      side={isMobile ? 'bottom' : 'right'}
+                      align="start"
+                    >
+                      <DropdownMenuItem asChild>
+                        <Link
+                          to="/targets/start-discovery"
+                          onClick={() => setOpenMobile(false)}
+                        >
+                          <Target />
+                          Target
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link
+                          to="/groups/create"
+                          onClick={() => setOpenMobile(false)}
+                        >
+                          <Group />
+                          Group
+                        </Link>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            )}
             {groups
               .map((group) => ({
                 ...group,
@@ -271,10 +320,10 @@ export function AppSidebar({
               .map((group) => (
                 <SidebarGroup key={group.title} className="p-0">
                   <SidebarGroupContent>
-                    <SidebarGroupLabel className="px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
+                    <SidebarGroupLabel className="h-6 px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70 group-data-[collapsible=icon]:-mt-6">
                       {group.title}
                     </SidebarGroupLabel>
-                    <SidebarMenu className="mt-1 gap-0.5">
+                    <SidebarMenu className="gap-px group-data-[collapsible=icon]:gap-1">
                       {group.items.map((item) => {
                         // Ensure all URLs are absolute for comparison
                         const toUrl = item.url;
@@ -292,7 +341,7 @@ export function AppSidebar({
                               asChild
                               isActive={isActive}
                               tooltip={item.title}
-                              className="group h-9 rounded-lg text-[13px] font-medium hover:cursor-pointer data-[active=true]:bg-muted data-[active=true]:text-foreground data-[active=true]:font-semibold data-[active=true]:before:absolute data-[active=true]:before:left-0 data-[active=true]:before:top-1/2 data-[active=true]:before:h-5 data-[active=true]:before:w-[3px] data-[active=true]:before:-translate-y-1/2 data-[active=true]:before:rounded-r-full data-[active=true]:before:bg-primary"
+                              className="group h-8 rounded-lg text-[13px] font-medium hover:cursor-pointer data-[active=true]:bg-muted data-[active=true]:text-foreground data-[active=true]:font-semibold"
                             >
                               <Link
                                 to={toUrl}

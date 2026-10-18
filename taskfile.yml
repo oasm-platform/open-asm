@@ -95,6 +95,8 @@ tasks:
       - go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
       - go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
       - cd core-api && pnpm exec protoc -I src/proto src/proto/*.proto --go_out=../worker/internal/gen --go_opt=module=oasm-worker/internal/gen --go-grpc_out=../worker/internal/gen --go-grpc_opt=module=oasm-worker/internal/gen
+      # Worker ↔ connector contract (copy of oasm-connectors/sdk/proto/connector.proto).
+      - cd core-api && pnpm exec protoc -I ../worker/internal/proto ../worker/internal/proto/connector.proto --go_out=../worker/internal/gen/connector --go_opt=paths=source_relative --go-grpc_out=../worker/internal/gen/connector --go-grpc_opt=paths=source_relative
 
   # Project initialization
   # Sets up environment files and initializes the development environment

@@ -1,16 +1,21 @@
-import { WORKER_TOKEN_HEADER } from '@/common/constants/app.constants';
-import { Public } from '@/common/decorators/app.decorator';
+import {
+  AGENT_SANDBOX_HEADER,
+  WORKER_TOKEN_HEADER,
+} from '@/common/constants/app.constants';
+import { Public, UserContext } from '@/common/decorators/app.decorator';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
 import { GrpcWorkerTokenGuard } from '@/common/guards/grpc-worker-token.guard';
+import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Metadata } from '@grpc/grpc-js';
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Logger,
   Param,
@@ -30,6 +35,8 @@ import {
   GetWorkerResponseDto,
   WorkerAliveDto,
   WorkerJoinDto,
+  WorkerJoinKeyResponseDto,
+  WorkerListItemDto,
 } from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
 import { AliveStreamManager } from './alive-stream-manager.service';
@@ -38,6 +45,7 @@ import {
   RemoteExecuteSubscribeService,
 } from './remote-execute-subscribe.service';
 import { WorkersService } from './workers.service';
+import { WorkerJoinKeyService } from './worker-join-key.service';
 import { WorkerTelemetryService } from './worker-telemetry.service';
 import type {
   WorkerTelemetryAck,
@@ -76,6 +84,7 @@ export class WorkersController {
     private readonly grpcWorkerContext: GrpcWorkerContext,
     private readonly aliveStreamManager: AliveStreamManager,
     private readonly workerTelemetryService: WorkerTelemetryService,
+    private readonly workerJoinKeyService: WorkerJoinKeyService,
   ) {}
 
   @Doc({
@@ -107,17 +116,79 @@ export class WorkersController {
   }
 
   @Doc({
+    summary: 'Create a worker join key',
+    description:
+      'Issues a one-time API key a worker joins this workspace with. It expires after a few minutes and is consumed by the first successful join; the `worker.joined` live event carries its id as `joinKeyId`.',
+    response: {
+      serialization: WorkerJoinKeyResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('workspace.apikey')
+  @Post('join-keys')
+  createJoinKey(
+    @WorkspaceId() workspaceId: string,
+    @UserContext() user: UserContextPayload,
+  ): Promise<WorkerJoinKeyResponseDto> {
+    return this.workerJoinKeyService.create(workspaceId, user.id);
+  }
+
+  @Doc({
+    summary: 'Rotate a worker join key',
+    description:
+      'Deletes the join key `id` and issues a new one. An already expired or used key is simply replaced.',
+    response: {
+      serialization: WorkerJoinKeyResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('workspace.apikey')
+  @Post('join-keys/:id/rotate')
+  rotateJoinKey(
+    @Param('id', ParseUUIDPipe) id: string,
+    @WorkspaceId() workspaceId: string,
+    @UserContext() user: UserContextPayload,
+  ): Promise<WorkerJoinKeyResponseDto> {
+    return this.workerJoinKeyService.rotate(workspaceId, user.id, id);
+  }
+
+  @Doc({
+    summary: 'Revoke a worker join key',
+    description:
+      'Deletes the join key `id` before it expires, e.g. when the connect dialog closes.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('workspace.apikey')
+  @Delete('join-keys/:id')
+  async revokeJoinKey(
+    @Param('id', ParseUUIDPipe) id: string,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    await this.workerJoinKeyService.revoke(workspaceId, id);
+    return { message: 'Join key revoked' };
+  }
+
+  @Doc({
     summary: 'Get all workers with pagination and sorting.',
     description:
-      'Fetches a paginated list of all active security assessment workers in the cluster.',
+      'Fetches a paginated list of all active security assessment workers in the cluster. Each row carries only list fields; use GET /workers/:id for tools and details.',
     response: {
-      serialization: GetManyResponseDto(WorkerInstance),
+      serialization: GetManyResponseDto(WorkerListItemDto),
     },
   })
   @WorkspaceAccess('worker.read')
   @Get()
   getWorkers(@Query() query: GetManyWorkersDto) {
-    return this.workersService.getWorkers(query);
+    return this.workersService.getWorkerList(query);
   }
 
   @Doc({
@@ -177,7 +248,6 @@ export class WorkersController {
   async grpcJoin(
     requests: {
       apiKey: string;
-      signature: string;
       token?: string;
       metadata?: { name?: string; os?: string; mode?: number | string };
     },
@@ -188,7 +258,6 @@ export class WorkersController {
 
     const worker = await this.workersService.join({
       apiKey: requests.apiKey,
-      signature: requests.signature,
       token: requests.token,
       metadata: requests.metadata,
       ipAddress,
@@ -250,7 +319,16 @@ export class WorkersController {
           this.logger.log(
             `[grpcAlive] Worker ${registeredWorkerId} stream disconnected, releasing jobs`,
           );
-          void this.workersService.releaseWorkerJobs(registeredWorkerId);
+          const workerId = registeredWorkerId;
+          this.workersService
+            .workerDisconnected(workerId)
+            .catch((error: unknown) =>
+              this.logger.error(
+                `[grpcAlive] Worker ${workerId} disconnect handling failed: ${
+                  error instanceof Error ? error.message : 'unknown error'
+                }`,
+              ),
+            );
         }
       };
     });
@@ -319,16 +397,13 @@ export class WorkersController {
     _request: Record<string, never>,
     metadata: Metadata,
   ): Observable<RemoteExecuteCommand> {
-    const tokenValues = metadata.get(WORKER_TOKEN_HEADER);
-    const workerToken = tokenValues?.[0] as string | undefined;
-    const worker = this.grpcWorkerContext.getWorker(workerToken!);
-
-    if (!worker) {
-      throw new RpcException('Worker not found in context');
-    }
+    const worker = this.getGrpcWorker(metadata);
+    // "1" = the worker runs agent shell commands in a per-session sandbox
+    const sandboxed =
+      String(metadata.get(AGENT_SANDBOX_HEADER)?.[0] ?? '') === '1';
 
     const { subject, observable } =
-      this.remoteExecuteSubscribeService.registerWorker(worker);
+      this.remoteExecuteSubscribeService.registerWorker(worker, { sandboxed });
 
     subject.next({
       id: '',
@@ -343,17 +418,49 @@ export class WorkersController {
 
   @UseGuards(GrpcWorkerTokenGuard)
   @GrpcMethod('WorkersService', 'RemoteExecuteResult')
-  async grpcRemoteExecuteResult(request: {
-    id: string;
-    sessionId: string;
-    type: number;
-    data: Uint8Array;
-    exitCode: number;
-  }): Promise<{ success: boolean; message: string }> {
+  async grpcRemoteExecuteResult(
+    request: {
+      id: string;
+      sessionId: string;
+      type: number;
+      data: Uint8Array;
+      exitCode: number;
+    },
+    metadata: Metadata,
+  ): Promise<{ success: boolean; message: string }> {
+    const worker = this.getGrpcWorker(metadata);
     this.logger.log(
-      `[grpcRemoteExecuteResult] Received: sessionId=${request.sessionId}, type=${request.type}, exitCode=${request.exitCode}`,
+      `[grpcRemoteExecuteResult] Received: sessionId=${request.sessionId}, type=${request.type}, exitCode=${request.exitCode}, worker=${worker.id}`,
     );
+    // Only the worker the session was pushed to may answer for it
+    if (
+      !this.remoteExecuteSubscribeService.isResultFromAssignedWorker(
+        request.sessionId,
+        worker.id,
+      )
+    ) {
+      this.logger.warn(
+        `[grpcRemoteExecuteResult] Dropped a result for session ${request.sessionId} from worker ${worker.id}: the session is assigned to another worker`,
+      );
+      return {
+        success: false,
+        message: 'Session is not assigned to this worker',
+      };
+    }
     await this.workersService.handleRemoteExecuteResult(request);
     return { success: true, message: 'Result acknowledged' };
+  }
+
+  /** The worker GrpcWorkerTokenGuard resolved from the call's token. */
+  private getGrpcWorker(metadata: Metadata): WorkerInstance {
+    const workerToken = metadata.get(WORKER_TOKEN_HEADER)?.[0] as
+      string | undefined;
+    const worker = workerToken
+      ? this.grpcWorkerContext.getWorker(workerToken)
+      : undefined;
+    if (!worker) {
+      throw new RpcException('Worker not found in context');
+    }
+    return worker;
   }
 }

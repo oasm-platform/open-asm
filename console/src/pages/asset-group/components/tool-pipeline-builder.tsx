@@ -24,10 +24,12 @@ import {
 } from '@/components/ui/tooltip';
 import { ToolConnectorConfigSheet } from '@/components/tools/tool-connector-config-sheet';
 import { cn } from '@/lib/utils';
+import { formatCategory } from '@/pages/tools/components/format-category';
 import {
   ToolType,
   useToolConfigProfilesControllerList,
   type Tool,
+  type ToolCategory,
 } from '@/services/apis/gen/queries';
 import {
   CheckIcon,
@@ -52,6 +54,8 @@ export interface PipelineToolEntry {
   toolId: string;
   config?: Record<string, unknown>;
   configProfileId?: string;
+  /** Category to run the tool in; omitted → the tool's first. */
+  category?: ToolCategory;
 }
 
 interface ToolPipelineBuilderProps {
@@ -378,6 +382,26 @@ const SelectedToolPanel = memo(function SelectedToolPanel({
         {usesDefault && <Badge variant="soft">Using default</Badge>}
 
       </div>
+      {tool.categories && tool.categories.length > 1 && (
+        <Select
+          value={entry.category ?? tool.categories[0].name}
+          onValueChange={(value) =>
+            onPatchEntry(tool.id, { category: value as ToolCategory })
+          }
+          disabled={disabled}
+        >
+          <SelectTrigger aria-label="Category" className="h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {tool.categories.map((c) => (
+              <SelectItem key={c.name} value={c.name}>
+                {formatCategory(c.name)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
       <ToolProfileSelect
         toolId={tool.id}
         value={entry.configProfileId}

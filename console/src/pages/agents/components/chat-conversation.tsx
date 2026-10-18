@@ -280,6 +280,9 @@ export const ChatConversation = ({
                     remoteExecuteEvents={
                       hasToolCalls ? remoteExecuteEvents : undefined
                     }
+                    selectedToolCallId={
+                      hasToolCalls ? selectedToolCallId : undefined
+                    }
                   />
                 );
               })}
@@ -350,6 +353,7 @@ export const ChatConversation = ({
               onAgentModeChange={onAgentModeChange}
               selectedWorkerId={selectedWorkerId}
               onWorkerSelect={onWorkerSelect}
+              showSettingsButton={false}
               placeholder={
                 isStreaming
                   ? 'Waiting for response…'

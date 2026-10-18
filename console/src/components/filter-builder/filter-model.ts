@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export type FilterOp = 'eq' | 'neq' | 'contains' | 'notContains' | 'in' | 'notIn' | 'inSubnet';
+export type FilterOp = 'eq' | 'neq' | 'contains' | 'notContains' | 'in' | 'notIn' | 'inSubnet' | 'gt' | 'gte' | 'lt' | 'lte';
 export type FilterLogic = 'and' | 'or';
 export interface FilterCondition { field: string; op: FilterOp; value: string | string[] }
 export interface FilterGroup { logic: FilterLogic; conditions: FilterCondition[] }
@@ -18,16 +18,16 @@ export type Path = [number] | [number, number];
 
 export const OP_LABELS: Record<FilterOp, string> = {
   eq: '=', neq: '!=', contains: 'contains', notContains: 'does not contain',
-  in: 'in', notIn: 'not in', inSubnet: 'in subnet',
+  in: 'in', notIn: 'not in', inSubnet: 'in subnet', gt: '>', gte: '>=', lt: '<', lte: '<=',
 };
 export const LIST_OPS: ReadonlySet<FilterOp> = new Set<FilterOp>(['in', 'notIn', 'inSubnet']);
-// Mirrors core-api asset-filter.ts FILTER_LIMITS.
+// Mirrors core-api common/utils/filter-tree.ts FILTER_LIMITS.
 export const FILTER_LIMITS = { conditions: 20, values: 50, length: 255 } as const;
 
 const logicSchema = z.enum(['and', 'or']);
 const conditionSchema = z.object({
   field: z.string(),
-  op: z.enum(['eq', 'neq', 'contains', 'notContains', 'in', 'notIn', 'inSubnet']),
+  op: z.enum(['eq', 'neq', 'contains', 'notContains', 'in', 'notIn', 'inSubnet', 'gt', 'gte', 'lt', 'lte']),
   value: z.union([z.string(), z.array(z.string())]),
 });
 const filterSchema = z.object({

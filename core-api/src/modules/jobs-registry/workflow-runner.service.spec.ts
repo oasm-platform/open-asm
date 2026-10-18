@@ -19,8 +19,13 @@ import { JobHistory } from './entities/job-history.entity';
 import type { Job } from './entities/job.entity';
 import { WorkflowRunnerService } from './workflow-runner.service';
 
-function tool(name: string, category: ToolCategory): Tool {
-  return { id: `tool-${name}`, name, category, priority: 4 } as Tool;
+function tool(name: string, ...categories: ToolCategory[]): Tool {
+  return {
+    id: `tool-${name}`,
+    name,
+    categories: categories.map((category) => ({ name: category, targetTypes: [] })),
+    priority: 4,
+  } as unknown as Tool;
 }
 
 /**
@@ -66,6 +71,7 @@ interface CreateNewJobArgs {
   jobHistory: JobHistory;
   priority?: number;
   workspaceId: string;
+  category?: string;
 }
 
 /**
@@ -81,6 +87,7 @@ interface QueryRunnerChain {
   where: jest.Mock;
   andWhere: jest.Mock;
   groupBy: jest.Mock;
+  addGroupBy: jest.Mock;
   orderBy: jest.Mock;
   addOrderBy: jest.Mock;
   getOne: jest.Mock;
@@ -112,6 +119,7 @@ function createFakeDb(overrides: Partial<JobHistory> = {}): FakeDb {
     where: jest.fn(() => historyBuilder),
     andWhere: jest.fn(() => historyBuilder),
     groupBy: jest.fn(() => historyBuilder),
+    addGroupBy: jest.fn(() => historyBuilder),
     orderBy: jest.fn(() => historyBuilder),
     addOrderBy: jest.fn(() => historyBuilder),
     getOne: jest.fn(() => Promise.resolve(history)),
@@ -128,6 +136,7 @@ function createFakeDb(overrides: Partial<JobHistory> = {}): FakeDb {
     where: jest.fn(() => jobBuilder),
     andWhere: jest.fn(() => jobBuilder),
     groupBy: jest.fn(() => jobBuilder),
+    addGroupBy: jest.fn(() => jobBuilder),
     orderBy: jest.fn(() => jobBuilder),
     addOrderBy: jest.fn(() => jobBuilder),
     getOne: jest.fn(() => Promise.resolve(lastJob)),
@@ -273,6 +282,59 @@ describe('WorkflowRunnerService', () => {
       expect(createNewJob.mock.calls[0][0].tool.name).toBe('subfinder');
       expect(db.history.steps['Scan Subdomain'].status).toBe('dispatched');
       expect(db.history.steps['Port Scan'].status).toBe('pending');
+    });
+
+    it('passes the step category to createNewJob', async () => {
+      await setup(createFakeDb());
+      getToolByNames.mockResolvedValue([
+        tool('nmap', ToolCategory.PORTS_SCANNER, ToolCategory.VULNERABILITIES),
+      ]);
+
+      await service.startRun({
+        workflow: workflow([{ name: 'Vuln Scan', run: 'nmap', category: 'vulnerabilities' }]),
+        workspaceId: 'workspace-1',
+        jobName: 'domain_discovery - example.com',
+        targetIds: ['target-1'],
+      });
+
+      expect(createNewJob).toHaveBeenCalledTimes(1);
+      expect(createNewJob.mock.calls[0][0].category).toBe('vulnerabilities');
+    });
+
+    it('dispatches a step without category with its tool default', async () => {
+      await setup(createFakeDb());
+      getToolByNames.mockResolvedValue([tool('naabu', ToolCategory.PORTS_SCANNER)]);
+
+      await service.startRun({
+        workflow: workflow([{ name: 'Port Scan', run: 'naabu' }]),
+        workspaceId: 'workspace-1',
+        jobName: 'domain_discovery - example.com',
+        targetIds: ['target-1'],
+      });
+
+      expect(createNewJob.mock.calls[0][0].category).toBe('ports_scanner');
+    });
+
+    it('dispatches one tool in two steps as two job sets', async () => {
+      await setup(createFakeDb());
+      getToolByNames.mockResolvedValue([
+        tool('nmap', ToolCategory.PORTS_SCANNER, ToolCategory.VULNERABILITIES),
+      ]);
+
+      await service.startRun({
+        workflow: workflow([
+          { name: 'Ports', run: 'nmap', category: 'ports_scanner' },
+          { name: 'Vulns', run: 'nmap', category: 'vulnerabilities' },
+        ]),
+        workspaceId: 'workspace-1',
+        jobName: 'domain_discovery - example.com',
+        targetIds: ['target-1'],
+      });
+
+      expect(createNewJob.mock.calls.map(([args]) => args.category).sort()).toEqual([
+        'ports_scanner',
+        'vulnerabilities',
+      ]);
     });
 
     it('records the skipped subdomain step and roots the chain when assets discovery is off', async () => {
@@ -433,6 +495,7 @@ describe('WorkflowRunnerService', () => {
       db.setSummaries([
         {
           tool: 'subfinder',
+          category: 'subdomains',
           total: 2,
           pending: 0,
           inProgress: 0,
@@ -469,6 +532,7 @@ describe('WorkflowRunnerService', () => {
       db.setSummaries([
         {
           tool: 'subfinder',
+          category: 'subdomains',
           total: 1,
           pending: 0,
           inProgress: 0,
@@ -506,6 +570,7 @@ describe('WorkflowRunnerService', () => {
       db.setSummaries([
         {
           tool: 'naabu',
+          category: 'ports_scanner',
           total: 1,
           pending: 1,
           inProgress: 0,
@@ -632,6 +697,7 @@ describe('WorkflowRunnerService', () => {
       db.setSummaries([
         {
           tool: 'nuclei',
+          category: 'vulnerabilities',
           total: 1,
           pending: 0,
           inProgress: 0,
@@ -668,6 +734,7 @@ describe('WorkflowRunnerService', () => {
       db.setSummaries([
         {
           tool: 'naabu',
+          category: 'ports_scanner',
           total: 1,
           pending: 0,
           inProgress: 0,
@@ -707,6 +774,7 @@ describe('WorkflowRunnerService', () => {
       db.setSummaries([
         {
           tool: 'naabu',
+          category: 'ports_scanner',
           total: 1,
           pending: 0,
           inProgress: 0,

@@ -18,6 +18,7 @@ import {
   encryptInlineConfig,
   getSensitiveFields,
 } from '../tools/validators/tool-config-profiles.crypto';
+import { resolveToolCategory } from '../tools/tool-categories';
 import { ToolsService } from '../tools/tools.service';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { Workflow } from '../workflows/entities/workflow.entity';
@@ -407,6 +408,17 @@ export class AssetGroupService {
       }
     }
 
+    // A category the tool does not declare would fail every scheduled run.
+    for (const tool of tools) {
+      const category = inputByToolId.get(tool.id!)?.category;
+      if (!category) continue;
+      try {
+        resolveToolCategory(tool, category);
+      } catch (error) {
+        throw new BadRequestException((error as Error).message);
+      }
+    }
+
     // Resolve DEK + sensitive-fields schema once for all connector tools
     const dek = await this.encryptionService.getDEK(workspaceId);
 
@@ -423,7 +435,7 @@ export class AssetGroupService {
             let config = input?.config;
             if (config && tool.type === WorkerType.CONNECTOR) {
               const entry = this.connectorRegistry.getConnector(tool.name);
-              const schema = entry?.configSchema ?? entry?.inputsSchema;
+              const schema = entry?.configSchema;
               const sensitiveFields = getSensitiveFields(schema);
               config = encryptInlineConfig(config, sensitiveFields, dek);
             }
@@ -431,6 +443,7 @@ export class AssetGroupService {
               tool.name,
               {
                 run: tool.name,
+                ...(input?.category ? { category: input.category } : {}),
                 ...(config ? { config } : {}),
                 ...(input?.configProfileId
                   ? { configProfileId: input.configProfileId }

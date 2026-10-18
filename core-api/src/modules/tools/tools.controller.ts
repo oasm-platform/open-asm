@@ -18,6 +18,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { ConnectorDto } from './dto/connector.dto';
+import { connectorCategories } from './tool-categories';
 import { CreateToolDto } from './dto/create-tool.dto';
 import { GetConnectorBySlugDto } from './dto/get-connector-by-slug.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
@@ -177,7 +178,7 @@ export class ToolsController {
   @Doc({
     summary: 'Get connector metadata by slug',
     description:
-      'Fetches connector metadata (name, version, image, author, pricingTier, descriptions, capabilities, links) from the connector manifest.',
+      'Fetches connector metadata (name, version, image, author, pricingTier, descriptions, capabilities, categories with their target types and inputs schema, links) from the connector manifest.',
     response: {
       serialization: ConnectorDto,
     },
@@ -204,7 +205,8 @@ export class ToolsController {
       homepage: connector.homepage,
       repositoryUrl: connector.repositoryUrl,
       supportUrl: connector.supportUrl,
-      capabilities: connector.capabilities,
+      capabilities: (connector.capabilities ?? []).map((c) => c.name),
+      categories: connectorCategories(connector.capabilities),
     };
   }
 
@@ -231,7 +233,7 @@ export class ToolsController {
   @Doc({
     summary: 'Get tool config schema',
     description:
-      'Returns the effective JSON Schema for a tool\'s configuration. Uses configSchema when present, falls back to inputsSchema.',
+      "Returns the JSON Schema of a tool's configuration (the connector configSchema).",
     request: {
       getWorkspaceId: true,
     },

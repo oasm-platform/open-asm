@@ -146,6 +146,11 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 		proxy             *connector.Proxy
 		mgr               *execution.Manager
 		telemetryProvider *telemetry.Provider
+		// agentSandbox/cmdSandbox decide where agent shell commands run; set
+		// before Connect, read by the remote execute handler after it.
+		agentSandbox    *runtime.AgentSandbox
+		agentSandboxErr error
+		cmdSandbox      agentCommandSandbox
 	)
 
 	semaphore := make(chan struct{}, cfg.MaxConcurrency)
@@ -325,7 +330,7 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 					runAgentTool(runCtx, sessionID, grpcClient.OwnerID(), run, events, mgr, proxy, send)
 				}()
 			}
-			go startRemoteExecuteHandler(sessionCtx, grpcClient, workspaceRoot, toolPath, events, runTool, toolRuns.cancel)
+			go startRemoteExecuteHandler(sessionCtx, grpcClient, workspaceRoot, toolPath, cmdSandbox, events, runTool, toolRuns.cancel)
 			return sessionCtx, sessionCancel
 		},
 		startPoller: func(sessionCtx context.Context) context.CancelFunc {
@@ -458,10 +463,27 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 				// startup; failures are logged by the runtime, never fatal.
 				reconcileStartupOrphans(workerCtx, dockerRT, grpcClient.OwnerID(), 30*time.Second)
 				log.Success("execution manager ready (Docker runtime, unlimited concurrency, %s)", poolMode)
+
+				if cfg.AgentSandbox {
+					agentSandbox, agentSandboxErr = initAgentSandbox(workerCtx, dockerRT, cfg, toolPath, grpcClient, log)
+				}
 			}
 		}
 		mgr = mgrInit
 	}
+
+	if cfg.AgentSandbox {
+		if agentSandbox == nil && agentSandboxErr == nil {
+			agentSandboxErr = fmt.Errorf("docker runtime unavailable (WORKER_MODE=%q)", cfg.Mode)
+		}
+		if agentSandboxErr != nil {
+			log.Error("agent sandbox unavailable — agent shell commands will FAIL (no host fallback): %v", agentSandboxErr)
+		}
+	}
+	cmdSandbox = selectCommandSandbox(cfg.AgentSandbox, agentSandbox, agentSandboxErr)
+	// Advertise only a sandbox that actually works: core lets a shared global
+	// worker serve every workspace's agents on the strength of this header.
+	grpcClient.SetAgentSandbox(agentSandbox != nil)
 
 	var telemetryManager telemetry.Manager
 	if mgr != nil {
@@ -567,6 +589,13 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 
 	wg.Wait()
 	toolRuns.stopAndWait()
+	if agentSandbox != nil {
+		// The stream-end cleanup normally removes them; this covers a
+		// shutdown racing that cleanup.
+		cleanupCtx, cancelCleanup := newDetachedCleanupContext()
+		agentSandbox.CloseAll(cleanupCtx)
+		cancelCleanup()
+	}
 	log.Info("All jobs finished")
 
 	if lazyBrowser != nil {

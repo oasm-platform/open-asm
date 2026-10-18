@@ -17,7 +17,7 @@ type orphanReconciler interface {
 // reconcileStartupOrphans runs the one-shot orphan reconcile with a bounded
 // timeout so a hung Docker engine cannot stall worker startup. Called once
 // from Start() for every node worker — pool enabled or not — before
-// grpcClient.Connect; ownerID is the boot identity (signature or persisted
+// grpcClient.Connect; ownerID is the boot identity (the persisted join
 // token), i.e. the same fingerprint the previous run stamped its containers
 // with. The runtime logs its own tier summary; the report is returned for
 // callers/tests that want to inspect it.

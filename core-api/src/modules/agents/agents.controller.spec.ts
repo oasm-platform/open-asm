@@ -1,4 +1,5 @@
 import { WorkspacePermissions } from '@/common/decorators/workspace-permissions.decorator';
+import { HttpStatus, NotFoundException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AgentsController } from './agents.controller';
 
@@ -15,12 +16,16 @@ describe('AgentsController workspace permission guards', () => {
     ['getConnectedProviders', 'GET /providers/connected'],
     ['getProviderModels', 'GET /llm-configs/:id/models'],
     ['getConversation', 'GET /conversations/:id'],
+    ['getConversationSubagents', 'GET /conversations/:id/subagents'],
     ['getConversations', 'GET /conversations'],
     ['getMessages', 'GET /conversations/:id/messages'],
+    ['resumeStream', 'GET /conversations/:id/stream'],
     ['getMCPConfig', 'GET /mcp-configs'],
     ['pingMCPServer', 'GET /mcp-configs/:name/ping'],
     ['getWorkspaceMemory', 'GET /workspace-memory'],
     ['getSkills', 'GET /skills'],
+    ['getAgentConfig', 'GET /config'],
+    ['getAgentDefinitions', 'GET /definitions'],
   ];
 
   const write: Array<[string, string]> = [
@@ -36,6 +41,10 @@ describe('AgentsController workspace permission guards', () => {
     ['deleteMCPServer', 'DELETE /mcp-configs/:name'],
     ['toggleMCPServer', 'PATCH /mcp-configs/:name/toggle'],
     ['deleteWorkspaceMemory', 'DELETE /workspace-memory/:id'],
+    ['stopConversation', 'POST /conversations/:id/stop'],
+    ['createAgentDefinition', 'POST /definitions'],
+    ['updateAgentDefinition', 'PATCH /definitions/:id'],
+    ['deleteAgentDefinition', 'DELETE /definitions/:id'],
     ['createSkill', 'POST /skills'],
     ['updateSkill', 'PATCH /skills/:id'],
     ['deleteSkill', 'DELETE /skills/:id'],
@@ -43,6 +52,7 @@ describe('AgentsController workspace permission guards', () => {
     ['decideCommandApproval', 'PATCH /command-approvals/:id'],
     ['revokeCommandApproval', 'DELETE /command-approvals/:id'],
     ['decidePlanApproval', 'PATCH /plan-approvals/:id'],
+    ['upsertAgentConfig', 'PUT /config'],
   ];
 
   it.each(read)('%s (%s) requires agent.read', (method, _route) => {
@@ -80,5 +90,47 @@ describe('AgentsController workspace permission guards', () => {
       AgentsController,
     ]);
     expect(required).toEqual(['agent.read']);
+  });
+});
+
+describe('AgentsController.resumeStream', () => {
+  function setup(getConversation: jest.Mock) {
+    const createResumeStream = jest.fn();
+    const controller = Object.assign(
+      Object.create(AgentsController.prototype) as AgentsController,
+      {
+        agentsService: { getConversation },
+        agentsStreamBuffer: { createResumeStream },
+        agentsCompletionsService: { isRunActive: jest.fn() },
+      },
+    );
+    const end = jest.fn();
+    const res = { status: jest.fn(() => ({ end })) };
+    return { controller, createResumeStream, res, end };
+  }
+
+  it('answers 204 for a conversation that is not saved yet', async () => {
+    // A chat started on the client has no row until its first message is
+    // saved; a 404 here would surface as a stream error in the chat.
+    const { controller, createResumeStream, res, end } = setup(
+      jest.fn().mockRejectedValue(new NotFoundException()),
+    );
+
+    await controller.resumeStream('c1', 'w1', 'u1', res);
+
+    expect(res.status).toHaveBeenCalledWith(HttpStatus.NO_CONTENT);
+    expect(end).toHaveBeenCalled();
+    expect(createResumeStream).not.toHaveBeenCalled();
+  });
+
+  it('rethrows other errors from the ownership check', async () => {
+    const { controller, res } = setup(
+      jest.fn().mockRejectedValue(new Error('db down')),
+    );
+
+    await expect(
+      controller.resumeStream('c1', 'w1', 'u1', res as never),
+    ).rejects.toThrow('db down');
+    expect(res.status).not.toHaveBeenCalled();
   });
 });

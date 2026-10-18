@@ -3,6 +3,7 @@ import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import {
   BullMQName,
   Severity,
+  ToolCategory,
   VulnerabilityAnalyzeStatus,
 } from '@/common/enums/enum';
 import { getManyResponse } from '@/utils/getManyResponse';
@@ -33,6 +34,7 @@ import {
 } from './dto/get-vulnerability.dto';
 import { VulnerabilityDismissal } from './entities/vulnerability-dismissal.entity';
 import { Vulnerability } from './entities/vulnerability.entity';
+import { compileVulnerabilityFilter } from './vulnerability-filter';
 
 @Injectable()
 export class VulnerabilitiesService {
@@ -88,6 +90,7 @@ export class VulnerabilitiesService {
       workspaceId,
       config: job?.config,
       configProfileId: job?.configProfileId,
+      category: job?.category as ToolCategory | undefined,
     });
     return { message: `Scanning target ${targetId}...` };
   }
@@ -115,6 +118,7 @@ export class VulnerabilitiesService {
       createdTo,
       tags,
       targetId,
+      filter,
     } = query;
 
     const { sortBy } = query;
@@ -196,6 +200,9 @@ export class VulnerabilitiesService {
       });
       queryBuilder.andWhere(`(${conditions})`, params);
     }
+
+    const compiled = filter && compileVulnerabilityFilter(filter, 'vf');
+    if (compiled) queryBuilder.andWhere(compiled.sql, compiled.params);
 
     const [vulnerabilities, total] = await queryBuilder.getManyAndCount();
 

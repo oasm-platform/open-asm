@@ -2,6 +2,7 @@ import { ToolCategory, WorkerType } from '@/common/enums/enum';
 import { BadRequestException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import type { Repository } from 'typeorm';
+import { And, ILike, In, Not } from 'typeorm';
 import type { Tool } from './entities/tools.entity';
 import { ToolConfigProfile } from './entities/tool-config-profiles.entity';
 import type { WorkspaceTool } from './entities/workspace_tools.entity';
@@ -44,7 +45,7 @@ const makeTool = (overrides: Partial<Tool> & { name: string }): Tool => ({
   isOfficialSupport: false,
   type: WorkerType.CONNECTOR,
   priority: 'medium' as any,
-  category: 'vulnerabilities' as any,
+  categories: [{ name: 'vulnerabilities', targetTypes: ['DOMAIN', 'IP', 'CIDR'] }] as any,
   ...overrides,
 });
 
@@ -201,7 +202,7 @@ describe('ToolsService — readiness flags', () => {
     });
 
     it('should combine search with category filter', async () => {
-      const tool = makeTool({ id: 't1', name: 'nuclei', category: ToolCategory.VULNERABILITIES });
+      const tool = makeTool({ id: 't1', name: 'nuclei' });
       toolsRepo.findAndCount.mockResolvedValue([[tool], 1]);
       workspaceToolRepo.find.mockResolvedValue([]);
       mockWorkerCount();
@@ -214,6 +215,25 @@ describe('ToolsService — readiness flags', () => {
       expect(result.data).toHaveLength(1);
       const callArg = toolsRepo.findAndCount.mock.calls[0][0];
       expect(callArg.where).toBeDefined();
+    });
+
+    it('filters by category with a jsonb containment on categories', async () => {
+      toolsRepo.findAndCount.mockResolvedValue([[], 0]);
+      workspaceToolRepo.find.mockResolvedValue([]);
+      mockWorkerCount();
+
+      await service.getManyTools({
+        page: 1, limit: 10, category: ToolCategory.URL_DISCOVERY,
+        workspaceId: 'ws-001',
+      } as any);
+
+      const where = toolsRepo.findAndCount.mock.calls[0][0].where;
+      const branch = (Array.isArray(where) ? where[0] : where) as Record<string, any>;
+      expect(branch).not.toHaveProperty('category');
+      expect(branch.categories.getSql('"categories"')).toBe('"categories" @> :categoryFilter::jsonb');
+      expect(branch.categories.objectLiteralParameters).toEqual({
+        categoryFilter: JSON.stringify([{ name: 'url_discovery' }]),
+      });
     });
 
     it('should combine search with type filter', async () => {
@@ -335,6 +355,79 @@ describe('ToolsService — readiness flags', () => {
 
       const callArg = toolsRepo.findAndCount.mock.calls[0][0];
       expect(callArg.order).toEqual({ name: 'ASC' });
+    });
+  });
+
+  describe('getManyTools — agentTool filter', () => {
+    beforeEach(() => {
+      toolsRepo.findAndCount.mockResolvedValue([[], 0]);
+      connectorRegistry.getAllConnectors.mockReturnValue([
+        { slug: 'acunetix', agentTool: true },
+        { slug: 'wpscan' },
+      ]);
+    });
+
+    const whereFor = async (query: Record<string, unknown>) => {
+      await service.getManyTools({ page: 1, limit: 10, ...query } as any);
+      const [options] = toolsRepo.findAndCount.mock.calls[0] as [
+        { where: unknown },
+      ];
+      return options.where;
+    };
+
+    it('agentTool=true matches built-ins OR manifest-flagged connectors', async () => {
+      expect(await whereFor({ agentTool: true })).toEqual([
+        { type: WorkerType.BUILT_IN },
+        { name: In(['acunetix']) },
+      ]);
+    });
+
+    it('agentTool=false excludes built-ins and manifest-flagged connectors', async () => {
+      expect(await whereFor({ agentTool: false })).toEqual({
+        type: Not(WorkerType.BUILT_IN),
+        name: Not(In(['acunetix'])),
+      });
+    });
+
+    it('agentTool=true keeps a non-built-in type filter intact', async () => {
+      expect(
+        await whereFor({ agentTool: true, type: WorkerType.CONNECTOR }),
+      ).toEqual({ type: WorkerType.CONNECTOR, name: In(['acunetix']) });
+    });
+
+    it('agentTool=false with type=built_in matches nothing', async () => {
+      expect(
+        await whereFor({ agentTool: false, type: WorkerType.BUILT_IN }),
+      ).toEqual({ type: WorkerType.BUILT_IN, id: In([]) });
+    });
+
+    it('combines with search, requiring both name constraints', async () => {
+      expect(await whereFor({ agentTool: false, search: 'scan' })).toEqual([
+        {
+          type: Not(WorkerType.BUILT_IN),
+          name: And(Not(In(['acunetix'])), ILike('%scan%')),
+        },
+        {
+          type: Not(WorkerType.BUILT_IN),
+          name: Not(In(['acunetix'])),
+          description: ILike('%scan%'),
+        },
+      ]);
+    });
+
+    it('flags built-in tools as agentTool=true in the response', async () => {
+      toolsRepo.findAndCount.mockResolvedValue([
+        [
+          makeTool({ id: 't1', name: 'subfinder', type: WorkerType.BUILT_IN }),
+          makeTool({ id: 't2', name: 'wpscan' }),
+        ],
+        2,
+      ]);
+      connectorRegistry.getConnector.mockReturnValue(null);
+
+      const result = await service.getManyTools({ page: 1, limit: 10 } as any);
+
+      expect(result.data.map((t) => t.agentTool)).toEqual([true, false]);
     });
   });
 

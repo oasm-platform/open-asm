@@ -25,8 +25,16 @@ interface AgentPromptInputProps {
   onAgentModeChange?: (mode: string) => void;
   selectedWorkerId?: string | null;
   onWorkerSelect?: (workerId: string | null) => void;
+  /** False when the page renders the Agent toggle outside the input. */
+  showAgentModeToggle?: boolean;
+  /** False hides the agent settings gear next to the model picker. */
+  showSettingsButton?: boolean;
   placeholder?: string;
   className?: string;
+  /** Controlled text value; falls back to internal state when omitted. */
+  value?: string;
+  /** Required with `value` to make the input controlled. */
+  onValueChange?: (value: string) => void;
 }
 
 export default function AgentPromptInput({
@@ -39,10 +47,19 @@ export default function AgentPromptInput({
   onAgentModeChange,
   selectedWorkerId,
   onWorkerSelect,
+  showAgentModeToggle = true,
+  showSettingsButton = true,
   placeholder = 'Ask anything about security...',
   className,
+  value,
+  onValueChange,
 }: AgentPromptInputProps) {
-  const [input, setInput] = useState('');
+  const [internalInput, setInternalInput] = useState('');
+  const input = value ?? internalInput;
+  const setInput = (next: string) => {
+    if (onValueChange) onValueChange(next);
+    else setInternalInput(next);
+  };
 
   const handleSubmit = (message: PromptInputMessage) => {
     if (message.text.trim()) {
@@ -69,6 +86,7 @@ export default function AgentPromptInput({
                 selectedConfigId={selectedModel?.configId ?? null}
                 selectedModel={selectedModel?.model ?? null}
                 onSelectModel={onSelectModel}
+                showSettingsButton={showSettingsButton}
               />
             )}
           </PromptInputTools>
@@ -79,6 +97,7 @@ export default function AgentPromptInput({
                 onChange={onAgentModeChange}
                 selectedWorkerId={selectedWorkerId}
                 onWorkerChange={onWorkerSelect}
+                showToggle={showAgentModeToggle}
               />
             )}
             <PromptInputSubmit

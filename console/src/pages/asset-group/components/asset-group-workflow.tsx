@@ -81,9 +81,15 @@ export default function AssetGroupWorkflow({
       workspaceToolsInstalled?.data?.filter(
         (tool) =>
           tool.type === ToolsControllerGetManyToolsType.provider ||
-          tool.category === ToolCategory.vulnerabilities ||
-          tool.category === ToolCategory.url_discovery ||
-          tool.category === ToolCategory.ports_scanner,
+          tool.categories?.some((c) =>
+            (
+              [
+                ToolCategory.vulnerabilities,
+                ToolCategory.url_discovery,
+                ToolCategory.ports_scanner,
+              ] as ToolCategory[]
+            ).includes(c.name),
+          ),
       ) || [],
     [workspaceToolsInstalled?.data],
   );
@@ -138,6 +144,7 @@ export default function AssetGroupWorkflow({
       string,
       {
         run?: string;
+        category?: ToolCategory;
         config?: Record<string, unknown>;
         configProfileId?: string;
       }
@@ -148,6 +155,7 @@ export default function AssetGroupWorkflow({
         const tool = job.run ? toolByName.get(job.run) : undefined;
         return {
           toolId: tool?.id ?? job.run ?? '',
+          ...(job.category ? { category: job.category } : {}),
           ...(job.config
             ? { config: job.config as Record<string, unknown> }
             : {}),
@@ -183,6 +191,7 @@ export default function AssetGroupWorkflow({
             name,
             {
               run: name,
+              ...(entry.category ? { category: entry.category } : {}),
               ...(entry.config ? { config: entry.config } : {}),
               ...(entry.configProfileId
                 ? { configProfileId: entry.configProfileId }

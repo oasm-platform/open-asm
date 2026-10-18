@@ -7,7 +7,7 @@ import { RedisService } from '@/services/redis/redis.service';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Job as BullJob } from 'bullmq';
+import { Job as BullJob, UnrecoverableError } from 'bullmq';
 import { Repository } from 'typeorm';
 import { DataPayloadResult } from '../dto/jobs-registry.dto';
 import { Job } from '../entities/job.entity';
@@ -143,6 +143,15 @@ export class JobResultProcessor extends WorkerHost {
     }
 
     try {
+      // A result is shaped by the endpoint it was posted to; syncing it through
+      // a different category's handler would write the wrong data. Retrying
+      // cannot fix it, so the job fails on this attempt.
+      if (category && category !== (job.category as string)) {
+        throw new UnrecoverableError(
+          `Result posted as "${category}" but job ${job.id} runs "${job.category}"`,
+        );
+      }
+
       // Read result JSON. The new split-result endpoint stores the full DTO
       // (e.g. SubdomainResultDto → {jobId, error, raw, payload}) while the
       // deprecated endpoint stores only DataPayloadResult ({error, raw, payload}).
@@ -213,15 +222,14 @@ export class JobResultProcessor extends WorkerHost {
           dataForSync = builtInStep.parser(raw);
         }
       } else {
-        // External/custom tool — use the structured payload directly.
-        // For the new category-specific endpoint the category is available
-        // in the BullMQ data; fall back to job.tool.category for old endpoint.
+        // External/custom tool — use the structured payload directly; it is
+        // synced by job.category (the guard above rejected a mismatch).
         dataForSync = (payload ?? undefined) as JobDataResultType;
 
         if (!dataForSync) {
           this.logger.warn(
             `No structured payload for external tool ${job.tool.name} ` +
-              `(category: ${category ?? job.tool.category}). Skipping data sync.`,
+              `(category: ${category ?? job.category}). Skipping data sync.`,
           );
         }
       }
@@ -284,6 +292,7 @@ export class JobResultProcessor extends WorkerHost {
       }
     } catch (e) {
       const isLastAttempt =
+        e instanceof UnrecoverableError ||
         bullJob.attemptsMade + 1 >= (bullJob.opts.attempts || 1);
 
       if (isLastAttempt) {

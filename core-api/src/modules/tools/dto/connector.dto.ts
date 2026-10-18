@@ -1,4 +1,16 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ToolCategorySpec } from '../tool-categories';
+
+/** One connector category with the inputs it takes. */
+export class ConnectorCategoryDto extends ToolCategorySpec {
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: true,
+    description:
+      'JSON Schema of the inputs OASM passes to the connector for this category.',
+  })
+  inputsSchema?: Record<string, unknown>;
+}
 
 /**
  * Connector metadata exposed by GET /tools/connectors/:slug. Mirrors the
@@ -44,4 +56,7 @@ export class ConnectorDto {
 
   @ApiProperty({ required: false })
   agentTool?: boolean;
+
+  @ApiProperty({ type: ConnectorCategoryDto, isArray: true })
+  categories: ConnectorCategoryDto[];
 }

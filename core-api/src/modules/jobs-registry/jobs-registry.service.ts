@@ -7,13 +7,11 @@ import {
 } from '@/common/constants/app.constants';
 import {
   BullMQName,
-  CATEGORY_DATA_SOURCE_MAP,
   EventTriggerType,
   JobPriority,
   JobRunType,
   JobStatus,
   ToolCategory,
-  DataSource as ToolDataSource,
   WorkerScope,
   WorkerType,
 } from '@/common/enums/enum';
@@ -48,6 +46,7 @@ import {
   getSensitiveFields,
   maskProfile,
 } from '../tools/validators/tool-config-profiles.crypto';
+import { resolveToolCategory } from '../tools/tool-categories';
 import { resolveToolTargetTypes } from '../tools/tool-target-types';
 import { builtInTools } from '../tools/tools-provider/built-in-tools';
 import { ToolsService } from '../tools/tools.service';
@@ -115,6 +114,7 @@ const JOB_SORTABLE_COLUMNS: string[] = [
 const orderJob = (job: WorkflowStepDefinition): WorkflowJob => ({
   ...(job.name ? { name: job.name } : {}),
   run: job.run,
+  ...(job.category ? { category: job.category as ToolCategory } : {}),
   // Authored `needs` may be a single string (legacy array form); the
   // definition is always stored canonical.
   ...(normalizeNeeds(job.needs).length ? { needs: normalizeNeeds(job.needs) } : {}),
@@ -234,9 +234,7 @@ export class JobsRegistryService {
     const entry = job.tool
       ? this.connectorRegistry.getConnector(job.tool.name)
       : null;
-    const schemaFields = getSensitiveFields(
-      entry?.configSchema ?? entry?.inputsSchema,
-    );
+    const schemaFields = getSensitiveFields(entry?.configSchema);
     // Synthesize a schema from the real keys: isSensitiveField() only needs the
     // property name plus a truthy object value to apply the name heuristic.
     const nameFields = getSensitiveFields({
@@ -269,14 +267,15 @@ export class JobsRegistryService {
     jobRunType,
     configProfileId,
     config,
+    category,
   }: CreateJobs): Promise<Job[]> {
     if (!tool) {
       throw new Error('Tool is required for creating a job');
     }
 
-    if (!tool.category) {
-      throw new Error('Tool category is required for creating a job');
-    }
+    // Throws for a category the tool does not declare — the step fails with that message.
+    const categorySpec = resolveToolCategory(tool, category);
+    const jobCategory = categorySpec.name;
 
     // Detect connector jobs: Tool.name IS the connector slug
     const connectorEntry = this.connectorRegistry.getConnector(tool.name);
@@ -307,7 +306,7 @@ export class JobsRegistryService {
         // If no config resolved but tool requires config (has schema), fail fast.
         if (!mergedConfig && (!config || Object.keys(config).length === 0)) {
           const entry = this.connectorRegistry.getConnector(tool.name);
-          const schema = entry?.configSchema ?? entry?.inputsSchema;
+          const schema = entry?.configSchema;
           if (schema) {
             throw new BadRequestException(
               `missing/default profile for connector "${tool.name}": tool requires configuration but no profile was provided or found`,
@@ -322,6 +321,7 @@ export class JobsRegistryService {
         );
         await this.persistFailedConfigJob({
           tool,
+          category: jobCategory,
           workflow,
           jobHistory: existingJobHistory,
           jobRunType,
@@ -377,20 +377,20 @@ export class JobsRegistryService {
     // host scanner never sees a repository (and vice versa) — whether the run
     // came from a trigger, a schedule, an asset group or a manual dispatch.
     // A step left with no eligible asset produces no job and is skipped.
-    const targetTypes = resolveToolTargetTypes(tool);
+    const targetTypes = resolveToolTargetTypes(categorySpec);
 
-    // Step 2: find appropriate data source based on tool category
+    // Step 2: find appropriate data source based on the job category
     if (
-      tool.category === ToolCategory.HTTP_PROBE ||
-      tool.category === ToolCategory.SCREENSHOT ||
-      tool.category === ToolCategory.URL_DISCOVERY
+      jobCategory === ToolCategory.HTTP_PROBE ||
+      jobCategory === ToolCategory.SCREENSHOT ||
+      jobCategory === ToolCategory.URL_DISCOVERY
     ) {
       // HTTP_PROBE must probe every enabled asset_service port; SCREENSHOT and
       // URL_DISCOVERY are HTTP-crawl follow-ups and must only target services
       // httpx actually confirmed live.
       const liveOnly =
-        tool.category === ToolCategory.SCREENSHOT ||
-        tool.category === ToolCategory.URL_DISCOVERY;
+        jobCategory === ToolCategory.SCREENSHOT ||
+        jobCategory === ToolCategory.URL_DISCOVERY;
       const assetServices = await this.findAssetServicesForJob(
         targetIds,
         assetIds,
@@ -413,7 +413,7 @@ export class JobsRegistryService {
           assetService, // Store the asset service reference
           jobName: tool.name,
           status: JobStatus.PENDING,
-          category: tool.category,
+          category: jobCategory,
           tool,
           priority: priority ?? 4,
           jobHistory,
@@ -441,7 +441,7 @@ export class JobsRegistryService {
         targetTypes,
       );
 
-      const filteredAssets = this.filterAssetsByCategory(assets, tool.category);
+      const filteredAssets = this.filterAssetsByCategory(assets, jobCategory);
 
       // Step 3: iterate tools and create jobs
       const defaultCommand = builtInTools.find(
@@ -454,7 +454,7 @@ export class JobsRegistryService {
           asset,
           jobName: tool.name,
           status: JobStatus.PENDING,
-          category: tool.category,
+          category: jobCategory,
           tool,
           priority: priority ?? 4,
           jobHistory,
@@ -489,6 +489,7 @@ export class JobsRegistryService {
    */
   private async persistFailedConfigJob(args: {
     tool: CreateJobs['tool'];
+    category: ToolCategory;
     workflow: CreateJobs['workflow'];
     jobHistory?: CreateJobs['jobHistory'];
     jobRunType: CreateJobs['jobRunType'];
@@ -500,6 +501,7 @@ export class JobsRegistryService {
   }): Promise<Job> {
     const {
       tool,
+      category,
       workflow,
       jobHistory: existingJobHistory,
       jobRunType,
@@ -524,7 +526,7 @@ export class JobsRegistryService {
     const failedJob = jobRepo.create({
       id: randomUUID(),
       status: JobStatus.FAILED,
-      category: tool.category,
+      category,
       tool,
       priority: tool.priority ?? JobPriority.BACKGROUND,
       jobHistory,
@@ -801,19 +803,9 @@ export class JobsRegistryService {
         });
       }
 
-      const toolDataSource = worker.tool?.category
-        ? CATEGORY_DATA_SOURCE_MAP[worker.tool.category]
-        : ToolDataSource.ASSET;
-
-      if (toolDataSource === ToolDataSource.ASSET_SERVICE) {
-        queryBuilder
-          .leftJoinAndSelect('jobs.assetService', 'assetService')
-          .andWhere('jobs.category = :category', {
-            category: worker.tool?.category,
-          });
-      } else {
-        queryBuilder.leftJoinAndSelect('jobs.assetService', 'assetService');
-      }
+      // Every claimed job carries its own asset/service; the tool filter above
+      // already scopes tool-bound workers.
+      queryBuilder.leftJoinAndSelect('jobs.assetService', 'assetService');
 
       // [OPT-4] SKIP LOCKED avoids workers blocking each other on the same rows
       const jobs = await queryBuilder
@@ -1100,7 +1092,7 @@ export class JobsRegistryService {
         select
           tools.name,
           tools.description as tool_description,
-          tools.category as tool_category,
+          jobs.category as tool_category,
           assets.value as asset_value,
           targets.value as target,
           targets.id as target_id,
@@ -1112,6 +1104,7 @@ export class JobsRegistryService {
           -- check if a new group should start
           case
             when lag(tools.name) over (partition by jobs."jobHistoryId" order by jobs."createdAt" desc) = tools.name
+             and lag(jobs.category) over (partition by jobs."jobHistoryId" order by jobs."createdAt" desc) = jobs.category
              and lag(targets.value) over (partition by jobs."jobHistoryId" order by jobs."createdAt" desc) = targets.value
             then 0 else 1
           end as is_new_group
@@ -1140,10 +1133,10 @@ export class JobsRegistryService {
         max(COALESCE("completedAt", "updatedAt")) as end_time,
         string_agg(status::text, ', ') as statuses,
         max(tool_description) as description,
-        max(tool_category) as tool_category,
+        tool_category,
         EXTRACT(EPOCH FROM (max(COALESCE("completedAt", "updatedAt")) - min("createdAt"))) as duration_seconds
       from grouped_with_id
-      group by grp_id, name, target, target_id, "jobHistoryId"
+      group by grp_id, name, tool_category, target, target_id, "jobHistoryId"
       order by "jobHistoryId", min("createdAt") desc
       limit 15;
     `,
@@ -1419,6 +1412,19 @@ export class JobsRegistryService {
     };
   }
 
+  /** A run step's category: the declared one, else its tool's default. */
+  private stepCategory(
+    tool: Parameters<typeof resolveToolCategory>[0] | undefined,
+    declared: string | undefined,
+  ): string | undefined {
+    if (!tool) return declared;
+    try {
+      return resolveToolCategory(tool, declared).name;
+    } catch {
+      return declared;
+    }
+  }
+
   /**
    * Everything a run's views need from its workflow definition and job rows:
    * the tool badges and the DAG steps.
@@ -1479,6 +1485,8 @@ export class JobsRegistryService {
   const tools = workflowJobs
     .map(([, job]) => installedToolsByName.get(job.run))
     .filter((tool): tool is NonNullable<typeof tool> => tool !== undefined)
+    // One entry per tool, even when several steps run it in different categories.
+    .filter((tool, index, all) => all.findIndex((t) => t.id === tool.id) === index)
     .map((tool) => ({
       id: tool.id,
       name: tool.name,
@@ -1514,6 +1522,7 @@ export class JobsRegistryService {
       id,
       name: job.name ?? id,
       run: job.run,
+      category: this.stepCategory(tool, job.category),
       needs: normalizeNeeds(job.needs),
       status: state?.status ?? this.toRunStepStatus(derived),
       reason: state?.reason,

@@ -11,6 +11,7 @@ import {
   withStepFailed,
   withStepSkipped,
   WorkflowGraphError,
+  withResolvedCategories,
   type RunStepState,
   type StepJobSummary,
   type WorkflowJobsInput,
@@ -222,12 +223,12 @@ describe('buildWorkflowGraph', () => {
     ).toThrow(/duplicate job id/i);
   });
 
-  it('throws on a duplicate tool', () => {
+  it('throws on a tool repeated without categories', () => {
     expect(() =>
       buildWorkflowGraph(
         content({ first: { run: 'naabu' }, second: { run: 'naabu' } }),
       ),
-    ).toThrow(/duplicate/i);
+    ).toThrow(/runs in several jobs/);
   });
 
   it('throws on an unknown need and lists the known job ids', () => {
@@ -373,33 +374,126 @@ describe('validateWorkflowGraph', () => {
 });
 
 describe('filterGraphByAssetsDiscovery', () => {
-  const categories = new Map<string, ToolCategory>([
-    ['subfinder', 'subdomains' as ToolCategory],
-    ['naabu', 'ports_scanner' as ToolCategory],
-  ]);
+  const resolved = (jobs: WorkflowJobsInput, categories: Record<string, string>) =>
+    withResolvedCategories(
+      buildWorkflowGraph(content(jobs)),
+      (step) => categories[step.id] as ToolCategory | undefined,
+    );
+  const chainCategories = { a: 'subdomains', b: 'ports_scanner', c: 'http_probe' };
 
   it('returns the graph untouched when assets discovery is enabled', () => {
-    const graph = buildWorkflowGraph(content(chainJobs));
+    const graph = resolved(chainJobs, chainCategories);
 
-    expect(filterGraphByAssetsDiscovery(graph, true, categories).steps).toHaveLength(3);
+    expect(filterGraphByAssetsDiscovery(graph, true).steps).toHaveLength(3);
   });
 
   it('drops SUBDOMAINS jobs and rewires their dependents when disabled', () => {
-    const graph = buildWorkflowGraph(content(chainJobs));
+    const graph = resolved(chainJobs, chainCategories);
 
-    const filtered = filterGraphByAssetsDiscovery(graph, false, categories);
+    const filtered = filterGraphByAssetsDiscovery(graph, false);
 
     expect(filtered.steps.map((step) => step.id)).toEqual(['b', 'c']);
     expect(filtered.byId.get('b')?.needs).toEqual([]);
     expect(filtered.byId.get('c')?.needs).toEqual(['b']);
   });
 
-  it('keeps jobs whose tool category is unknown', () => {
-    const graph = buildWorkflowGraph(content({ a: { run: 'mystery-tool' } }));
+  it('keeps jobs whose category is unknown', () => {
+    const graph = resolved({ a: { run: 'mystery-tool' } }, {});
 
+    expect(filterGraphByAssetsDiscovery(graph, false).steps).toHaveLength(1);
+  });
+
+  it('drops only the step that runs subdomains, even when its tool has other steps', () => {
+    const graph = resolved(
+      {
+        enum: { run: 'amass', category: 'subdomains' },
+        vuln: { run: 'amass', category: 'vulnerabilities', needs: 'enum' },
+      },
+      { enum: 'subdomains', vuln: 'vulnerabilities' },
+    );
+
+    const filtered = filterGraphByAssetsDiscovery(graph, false);
+
+    expect(filtered.steps.map((step) => step.id)).toEqual(['vuln']);
+    expect(filtered.byId.get('vuln')?.needs).toEqual([]);
+  });
+});
+
+describe('step category', () => {
+  it('keeps a declared category and normalizes it back out', () => {
+    const jobs = { scan: { run: 'nmap', category: 'vulnerabilities' } };
+
+    expect(buildWorkflowGraph(content(jobs)).steps[0].category).toBe('vulnerabilities');
+    expect(normalizeWorkflowContent(content(jobs)).jobs).toEqual(jobs);
+  });
+
+  it('leaves category undefined when omitted', () => {
+    const jobs = { scan: { run: 'nmap' } };
+
+    expect(buildWorkflowGraph(content(jobs)).steps[0].category).toBeUndefined();
+    expect(normalizeWorkflowContent(content(jobs)).jobs).toEqual(jobs);
+  });
+
+  it('rejects an unknown category', () => {
     expect(
-      filterGraphByAssetsDiscovery(graph, false, categories).steps,
-    ).toHaveLength(1);
+      validateWorkflowGraph(content({ scan: { run: 'nmap', category: 'teleport' } })),
+    ).toContain('Unknown category "teleport" for job "scan"');
+  });
+});
+
+describe('same tool in several steps', () => {
+  it('allows one tool twice with distinct explicit categories', () => {
+    const graph = buildWorkflowGraph(
+      content({
+        ports: { run: 'nmap', category: 'ports_scanner' },
+        vulns: { run: 'nmap', category: 'vulnerabilities', needs: 'ports' },
+      }),
+    );
+
+    expect(graph.steps.map((step) => [step.id, step.category])).toEqual([
+      ['ports', 'ports_scanner'],
+      ['vulns', 'vulnerabilities'],
+    ]);
+  });
+
+  it('rejects a repeated tool when one step omits its category', () => {
+    expect(
+      validateWorkflowGraph(
+        content({ a: { run: 'nmap' }, b: { run: 'nmap', category: 'vulnerabilities' } }),
+      ),
+    ).toEqual(['Tool "nmap" runs in several jobs — set a different category on each']);
+  });
+
+  it('rejects a repeated tool where no step names a category, once', () => {
+    expect(
+      validateWorkflowGraph(content({ a: { run: 'nmap' }, b: { run: 'nmap' } })),
+    ).toEqual(['Tool "nmap" runs in several jobs — set a different category on each']);
+  });
+
+  it('rejects the same tool and category twice', () => {
+    expect(
+      validateWorkflowGraph(
+        content({
+          a: { run: 'nmap', category: 'vulnerabilities' },
+          b: { run: 'nmap', category: 'vulnerabilities' },
+        }),
+      ),
+    ).toContain('Duplicate tool "nmap" with category "vulnerabilities"');
+  });
+});
+
+describe('withResolvedCategories', () => {
+  it('fills each step with its effective category and keeps the graph indexed', () => {
+    const graph = withResolvedCategories(
+      buildWorkflowGraph(
+        content({ a: { run: 'naabu' }, b: { run: 'nmap', category: 'vulnerabilities', needs: 'a' } }),
+      ),
+      (step) => (step.category ?? 'ports_scanner') as ToolCategory,
+    );
+
+    expect(graph.byId.get('a')?.category).toBe('ports_scanner');
+    expect(graph.byId.get('b')?.category).toBe('vulnerabilities');
+    expect(graph.dependents.get('a')).toEqual(['b']);
   });
 });
 
@@ -515,6 +609,42 @@ describe('reconcileStepStates', () => {
     ]);
 
     expect(state.a).toMatchObject({ status: 'dispatched', jobs: 2 });
+  });
+
+  it('keeps two steps of the same tool apart by category', () => {
+    const graph = withResolvedCategories(
+      buildWorkflowGraph(
+        content({
+          ports: { run: 'nmap', category: 'ports_scanner' },
+          vulns: { run: 'nmap', category: 'vulnerabilities', needs: 'ports' },
+        }),
+      ),
+      (step) => step.category,
+    );
+
+    const state = reconcileStepStates(graph, stateOf({}), [
+      summary('nmap', { category: 'ports_scanner', total: 2, completed: 2 }),
+      summary('nmap', { category: 'vulnerabilities', total: 1, pending: 1 }),
+    ]);
+
+    expect(state.ports).toMatchObject({ status: 'done', jobs: 2 });
+    expect(state.vulns).toMatchObject({ status: 'dispatched', jobs: 1 });
+  });
+
+  // A tool used in one step can only have that step's jobs, so it is matched by
+  // tool alone: if a deploy reorders the tool's categories mid-run, its default
+  // changes but the jobs already created under the old one still count.
+  it('matches a single-step tool by tool even when its resolved category changed', () => {
+    const graph = withResolvedCategories(
+      buildWorkflowGraph(content({ scan: { run: 'nmap' } })),
+      () => 'vulnerabilities' as ToolCategory,
+    );
+
+    const state = reconcileStepStates(graph, stateOf({}), [
+      summary('nmap', { category: 'ports_scanner', total: 2, completed: 2 }),
+    ]);
+
+    expect(state.scan).toMatchObject({ status: 'done', jobs: 2 });
   });
 
   it('marks a job done when every job row completed', () => {

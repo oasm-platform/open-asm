@@ -37,8 +37,8 @@ type JobSpec struct {
 	// legacy shared-secret behavior (backend compatibility).
 	ConnectorToken string
 	// WorkerID is the owning worker's identity fingerprint
-	// (grpcclient.OwnerID(): hash of WORKER_SIGNATURE or the persisted join
-	// token — never the raw secret). Stamped as the oasm.worker_id container
+	// (grpcclient.OwnerID(): hash of the persisted join token — never the
+	// raw secret). Stamped as the oasm.worker_id container
 	// label so a restarted worker's ReconcileOrphans can tell its own orphans
 	// from a sibling worker's live containers on a shared engine. Empty
 	// (direct runtime users) → label omitted → never tier-2 removable by

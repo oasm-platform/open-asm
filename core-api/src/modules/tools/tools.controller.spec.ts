@@ -94,3 +94,65 @@ describe('ToolsController.getToolSchema', () => {
     expect(result).toEqual({ schema: null, source: null });
   });
 });
+
+describe('ToolsController.getConnectorBySlug', () => {
+  const inputsSchema = {
+    type: 'object',
+    properties: { target: { type: 'string', description: 'Scan target' } },
+    required: ['target'],
+  };
+  let mockConnectorRegistryService: Record<string, jest.Mock>;
+  let controller: ToolsController;
+
+  beforeEach(() => {
+    mockConnectorRegistryService = { getConnector: jest.fn() };
+    controller = new ToolsController(
+      {} as any,
+      mockConnectorRegistryService as any,
+    );
+  });
+
+  it('exposes each category with its inputsSchema, not a top-level one', () => {
+    mockConnectorRegistryService.getConnector.mockReturnValue({
+      name: 'Nuclei',
+      slug: 'nuclei',
+      version: '1.0.0',
+      image: 'ghcr.io/oasm-platform/connector-nuclei:1.0.0',
+      capabilities: [
+        { name: 'vulnerabilities', targetTypes: ['domain', 'ip'], inputsSchema },
+      ],
+      configSchema: { type: 'object' },
+    });
+
+    const result = controller.getConnectorBySlug({ slug: 'nuclei' });
+
+    expect(result.capabilities).toEqual(['vulnerabilities']);
+    expect(result.categories).toEqual([
+      { name: 'vulnerabilities', targetTypes: ['DOMAIN', 'IP'], inputsSchema },
+    ]);
+    expect(result).not.toHaveProperty('inputsSchema');
+    expect(result).not.toHaveProperty('configSchema');
+  });
+
+  it('returns empty capabilities and categories for an entry without capabilities', () => {
+    mockConnectorRegistryService.getConnector.mockReturnValue({
+      name: 'Broken',
+      slug: 'broken',
+      version: '1.0.0',
+      image: 'img',
+    });
+
+    const result = controller.getConnectorBySlug({ slug: 'broken' });
+
+    expect(result.capabilities).toEqual([]);
+    expect(result.categories).toEqual([]);
+  });
+
+  it('throws NotFoundException for an unknown slug', () => {
+    mockConnectorRegistryService.getConnector.mockReturnValue(null);
+
+    expect(() => controller.getConnectorBySlug({ slug: 'nope' })).toThrow(
+      NotFoundException,
+    );
+  });
+});
