@@ -3125,6 +3125,8 @@ export type ConversationMetadataDto = {
   contextUsedTokens?: number;
   lastTurn?: TurnStatsDto;
   totals?: ConversationTotalsDto;
+  /** Goal of the current plan, pinned until it is replaced or dropped */
+  goal?: string | null;
   /** ISO time of the last metadata update */
   updatedAt?: string;
 };

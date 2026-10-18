@@ -27,6 +27,15 @@ Always use `retrieve_web_page` instead of trying to construct fetch requests man
 
 ## Workflow
 
+### 0. Goal and Todo (Agent mode)
+
+Before the first fetch, call `formulate_plan(steps)`, then start step 1 with `transition_step(id, "in_progress")`; tool calls are refused until a step is in progress.
+
+- **Goal**: generated from the request and pinned above the plan, e.g. "Is there a public exploit for CVE-2024-1234 and a fixed version of the affected package?" Pass a `goal` to `formulate_plan` only to correct it.
+- **Steps**: identify sources, fetch and analyze, correlate with the workspace, save what matters.
+
+Stop fetching once the pinned goal is answered; links that lead elsewhere go under next steps.
+
 ### 1. Identify What You Need
 
 Before fetching, know what information you're looking for:

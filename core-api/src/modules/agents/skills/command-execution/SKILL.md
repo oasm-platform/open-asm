@@ -7,6 +7,16 @@ description: How to run security tools on the conversation's worker — built-in
 
 The worker runs tools through two separate calls. Which one to use depends on the tool's `type`.
 
+## 0. Goal and todo first
+
+In Agent mode no tool or command runs until you have a goal and a todo list:
+
+1. `formulate_plan(steps)` — the goal is generated from the request and pinned above the plan already (e.g. "Find which web ports of api.example.com are open and what serves them"); the steps name the tool each one uses. The first step of a security test is "Check scope and list the available tools".
+2. `transition_step(id, "in_progress")` on the step a command belongs to, before running it. A call made while no step is in progress is refused.
+3. `transition_step(id, "completed")` once that step's output is in hand, then the next step.
+
+Run only the commands the current step needs, and check their output against the pinned goal: a command that does not move toward it does not belong in this plan.
+
 | Need | Use |
 |---|---|
 | A tool with `type: built_in` | `execute_remote_command`, calling the tool's binary by its `name` |
@@ -52,3 +62,4 @@ A command or tool call may wait for the user's approval. If it is rejected, do n
 - Only targets in the workspace scope (`retrieve_targets`).
 - Nothing destructive, no denial of service, no changes to the worker.
 - Save results you will reuse with `stm_write`.
+- A result outside the goal (an unexpected host, an unrelated service) goes in the report as a next step, not into new commands.

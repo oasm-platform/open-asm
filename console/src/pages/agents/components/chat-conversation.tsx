@@ -58,6 +58,8 @@ interface ChatConversationProps {
   selectedWorkerId?: string | null;
   onWorkerSelect?: (workerId: string | null) => void;
   todos?: AgentTodoItem[];
+  /** Goal of the plan, pinned in the todo panel */
+  goal?: string | null;
   showTodoAboveInput?: boolean;
   selectedToolCallId?: string | null;
   remoteExecuteEvents?: Map<string, RemoteExecuteStreamEvent[]>;
@@ -90,6 +92,7 @@ export const ChatConversation = ({
   selectedWorkerId,
   onWorkerSelect,
   todos,
+  goal,
   showTodoAboveInput = true,
   selectedToolCallId,
   remoteExecuteEvents,
@@ -190,9 +193,7 @@ export const ChatConversation = ({
       const relativeTop =
         elementRect.top - containerRect.top + scrollContainer.scrollTop;
       const targetScrollTop =
-        relativeTop -
-        scrollContainer.clientHeight / 2 +
-        el.offsetHeight / 2;
+        relativeTop - scrollContainer.clientHeight / 2 + el.offsetHeight / 2;
 
       scrollContainer.scrollTo({
         top: Math.max(0, targetScrollTop),
@@ -234,7 +235,9 @@ export const ChatConversation = ({
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <Conversation className="flex-1">
-        <ConversationContent className="max-w-3xl mx-auto w-full p-1 gap-6">
+        {/* md:pt-14 starts the messages below the page's transparent
+            header, which they scroll under */}
+        <ConversationContent className="max-w-3xl mx-auto w-full p-1 md:pt-14 gap-6">
           {isLoadingHistory ? (
             <LoadingSkeleton />
           ) : isEmpty ? (
@@ -325,9 +328,10 @@ export const ChatConversation = ({
 
       <div className="shrink-0 bg-background/90 backdrop-blur-sm px-4 pb-4">
         <div className="max-w-3xl mx-auto w-full flex flex-col">
-          {showTodoAboveInput && todos && todos.length > 0 && (
+          {showTodoAboveInput && ((todos && todos.length > 0) || goal) && (
             <AgentTodoPanel
               todos={todos}
+              goal={goal}
               className="rounded-b-none border-b-0 mx-2"
             />
           )}

@@ -99,7 +99,9 @@ describe('formatTodosToPrompt', () => {
   });
 
   it('says when there is no plan', () => {
-    expect(formatTodosToPrompt([])).toBe('No specific plan has been set up yet.');
+    expect(formatTodosToPrompt([])).toBe(
+      'No specific plan has been set up yet.',
+    );
   });
 
   it('marks the first unfinished step as current', () => {
@@ -119,11 +121,35 @@ describe('formatTodosToPrompt', () => {
       '>>> ALL STEPS COMPLETED <<<',
     );
   });
+
+  it('pins the goal above the plan while steps remain', () => {
+    const prompt = formatTodosToPrompt(
+      [todo('recon', 'in_progress')],
+      'Map the exposed ports of example.com',
+    );
+    expect(prompt).toContain(
+      '# PINNED GOAL (stays pinned until every step is completed or failed):\nMap the exposed ports of example.com',
+    );
+    expect(prompt.indexOf('PINNED GOAL')).toBeLessThan(
+      prompt.indexOf('CURRENT EXECUTION PLAN'),
+    );
+  });
+
+  it('asks whether the goal was met once the plan is finished', () => {
+    const prompt = formatTodosToPrompt([todo('recon', 'completed')], 'g');
+    expect(prompt).not.toContain('PINNED GOAL');
+    expect(prompt).toContain('# GOAL OF THE FINISHED PLAN:\ng');
+  });
 });
 
 describe('AgentTool plan tools', () => {
   let repo: ReturnType<typeof createTodoRepo>;
-  let conversations: { update: jest.Mock };
+  let conversations: {
+    update: jest.Mock;
+    manager: { transaction: jest.Mock };
+  };
+  /** The conversation's metadata, as written by updateConversationMetadata */
+  let metadata: Record<string, unknown> | null;
   let approvals: {
     requestPlanApproval: jest.Mock;
     resetConversation: jest.Mock;
@@ -146,14 +172,37 @@ describe('AgentTool plan tools', () => {
 
   beforeEach(() => {
     repo = createTodoRepo();
-    conversations = { update: jest.fn(() => Promise.resolve()) };
+    metadata = null;
+    const metadataManager = {
+      findOne: jest.fn(() => Promise.resolve({ id: 'c1', metadata })),
+      update: jest.fn(
+        (
+          _entity: unknown,
+          _where: unknown,
+          set: { metadata: typeof metadata },
+        ) => {
+          metadata = set.metadata;
+          return Promise.resolve();
+        },
+      ),
+    };
+    conversations = {
+      update: jest.fn(() => Promise.resolve()),
+      manager: {
+        transaction: jest.fn((cb: (m: unknown) => Promise<unknown>) =>
+          cb(metadataManager),
+        ),
+      },
+    };
     approvals = {
       requestPlanApproval: jest.fn(),
       resetConversation: jest.fn(() => Promise.resolve()),
       authorize: jest.fn(() => Promise.resolve({ allowed: true })),
     };
     emitter = new EventEmitter();
-    agentTool = new (AgentTool as unknown as new (...args: unknown[]) => AgentTool)(
+    agentTool = new (
+      AgentTool as unknown as new (...args: unknown[]) => AgentTool
+    )(
       ...(Array(9).fill(null) as unknown[]),
       conversations,
       repo,
@@ -176,6 +225,66 @@ describe('AgentTool plan tools', () => {
         expect(repo.rows).toHaveLength(0);
       },
     );
+  });
+
+  describe('agent mode (self-managed todo)', () => {
+    const agentTools = (mode: AgentApprovalMode) =>
+      agentTool.getTodoTools('c1', emitter, {
+        workspaceId: 'w1',
+        approval: settings(mode),
+        selfManaged: true,
+      }) as unknown as Record<string, ToolLike>;
+
+    it.each([AgentApprovalMode.AUTO, AgentApprovalMode.MANUAL])(
+      'sets the plan without review and pins its goal in %s mode',
+      async (mode) => {
+        const tools = agentTools(mode);
+        const made = await tools.formulate_plan.execute({
+          goal: '  List open ports of example.com  ',
+          steps: ['scan', 'report'],
+        });
+        expect(made).toMatchObject({
+          success: true,
+          goal: 'List open ports of example.com',
+        });
+        expect(approvals.requestPlanApproval).not.toHaveBeenCalled();
+        expect(metadata).toMatchObject({
+          goal: 'List open ports of example.com',
+        });
+        expect(repo.rows.map((r) => r.content)).toEqual(['scan', 'report']);
+
+        expect(
+          (await tools.append_step.execute({ content: 'verify' })).success,
+        ).toBe(true);
+        expect(repo.rows).toHaveLength(3);
+      },
+    );
+
+    it('sends the goal to the client only when it changes', async () => {
+      const emitted = jest.fn();
+      emitter.on('todos-updated', emitted);
+      const tools = agentTools(AgentApprovalMode.AUTO);
+
+      await tools.formulate_plan.execute({ goal: 'g', steps: ['a'] });
+      expect(emitted).toHaveBeenLastCalledWith(expect.any(Array), 'g');
+
+      await tools.transition_step.execute({
+        id: repo.rows[0].id,
+        status: 'in_progress',
+      });
+      expect(emitted).toHaveBeenLastCalledWith(expect.any(Array), undefined);
+
+      await tools.scrap_plan.execute({});
+      expect(emitted).toHaveBeenLastCalledWith([], null);
+    });
+
+    it('unpins the goal when the plan is scrapped', async () => {
+      const tools = agentTools(AgentApprovalMode.AUTO);
+      await tools.formulate_plan.execute({ goal: 'g', steps: ['a'] });
+      await tools.scrap_plan.execute({});
+      expect(repo.rows).toHaveLength(0);
+      expect(metadata).toMatchObject({ goal: null });
+    });
   });
 
   describe('plan mechanics', () => {
@@ -202,10 +311,12 @@ describe('AgentTool plan tools', () => {
       ]);
       expect(repo.manager.transaction).toHaveBeenCalled();
       expect(approvals.requestPlanApproval).not.toHaveBeenCalled();
+      // No goal passed: the UI is told the plan changed but the goal did not
       expect(emitted).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({ content: 'Scan ports' }),
         ]),
+        undefined,
       );
     });
 
@@ -306,7 +417,10 @@ describe('AgentTool plan tools', () => {
         const approval = settings(AgentApprovalMode.PLAN);
         const changed = jest.fn();
         emitter.on('approval-mode-changed', changed);
-        approvals.requestPlanApproval.mockResolvedValue({ allowed: true, mode });
+        approvals.requestPlanApproval.mockResolvedValue({
+          allowed: true,
+          mode,
+        });
 
         const result = await formulate(approval, ['a', 'b']);
 
@@ -337,7 +451,7 @@ describe('AgentTool plan tools', () => {
       expect(result.error).toContain('was not approved by the user');
       expect(result.error).toContain('skip the port scan');
       expect(repo.rows).toHaveLength(0);
-      expect(emitted).toHaveBeenLastCalledWith([]);
+      expect(emitted).toHaveBeenLastCalledWith([], null);
       expect(approval.mode).toBe(AgentApprovalMode.PLAN);
       expect(conversations.update).not.toHaveBeenCalled();
     });
@@ -347,13 +461,10 @@ describe('AgentTool plan tools', () => {
         allowed: false,
         planRequired: true,
       });
-      const tools = agentTool.getTools(
-        'w1',
-        AgentMode.AGENT,
-        emitter,
-        'c1',
-        { ...settings(AgentApprovalMode.PLAN), planFirst: true },
-      ) as unknown as Record<string, { execute: ToolLike['execute'] }>;
+      const tools = agentTool.getTools('w1', AgentMode.AGENT, emitter, 'c1', {
+        ...settings(AgentApprovalMode.PLAN),
+        planFirst: true,
+      }) as unknown as Record<string, { execute: ToolLike['execute'] }>;
 
       const result = (await tools.enumerate_assets.execute(
         {},
@@ -401,7 +512,10 @@ describe('AgentTool plan tools', () => {
         mode: AgentApprovalMode.MANUAL,
       });
       const tools = todoTools(approval);
-      await tools.formulate_plan.execute({ steps: ['a'] }, { toolCallId: 'tc1' });
+      await tools.formulate_plan.execute(
+        { steps: ['a'] },
+        { toolCallId: 'tc1' },
+      );
       const [a] = repo.rows;
       await tools.transition_step.execute({ id: a.id, status: 'in_progress' });
       await tools.transition_step.execute({ id: a.id, status: 'completed' });
@@ -422,15 +536,14 @@ describe('AgentsCompletionsService plan execution', () => {
   let service: any;
   let iteration: jest.Mock;
 
-  const row = (content: string, status: TodoStatus, sortOrder: number) =>
-    ({
-      id: content,
-      conversationId: 'c1',
-      content,
-      status,
-      sortOrder,
-      updatedAt: new Date(),
-    });
+  const row = (content: string, status: TodoStatus, sortOrder: number) => ({
+    id: content,
+    conversationId: 'c1',
+    content,
+    status,
+    sortOrder,
+    updatedAt: new Date(),
+  });
 
   const setStatus = (id: string, status: TodoStatus) => {
     repo.rows.find((r) => r.id === id)!.status = status;
@@ -456,7 +569,6 @@ describe('AgentsCompletionsService plan execution', () => {
       Promise.resolve({ id: 'm2', metadata: {} }),
     );
     service.buildSystemContext = jest.fn(() => Promise.resolve(['ctx']));
-    service.generateEndOfConversationReport = jest.fn(() => Promise.resolve());
     service.persistTurnMetadata = jest.fn(() => Promise.resolve(null));
     service.subagents = {
       subscribe: jest.fn(() => () => {}),
@@ -475,6 +587,7 @@ describe('AgentsCompletionsService plan execution', () => {
         finishPromise: Promise.resolve(),
 
         settle: jest.fn(() => Promise.resolve('answer')),
+        getFinishReason: () => undefined,
       };
     });
   });
@@ -545,6 +658,35 @@ describe('AgentsCompletionsService plan execution', () => {
     expect(repo.rows.map((r) => r.status)).toEqual(['pending', 'pending']);
   });
 
+  it('continues past the step cap until the model finishes', async () => {
+    repo.rows = [];
+    const reasons = ['tool-calls', 'tool-calls', 'stop'];
+    service.executeStreamText.mockImplementation(() => ({
+      aiStream: new ReadableStream({ start: (c) => c.close() }),
+      finishPromise: Promise.resolve(),
+      settle: jest.fn(() => Promise.resolve('answer')),
+      getFinishReason: () => reasons.shift(),
+    }));
+
+    await run();
+
+    expect(service.executeStreamText).toHaveBeenCalledTimes(3);
+  });
+
+  it('stops at one iteration when the model finishes on its own', async () => {
+    repo.rows = [];
+    service.executeStreamText.mockImplementation(() => ({
+      aiStream: new ReadableStream({ start: (c) => c.close() }),
+      finishPromise: Promise.resolve(),
+      settle: jest.fn(() => Promise.resolve('answer')),
+      getFinishReason: () => 'stop',
+    }));
+
+    await run();
+
+    expect(service.executeStreamText).toHaveBeenCalledTimes(1);
+  });
+
   it('stops after repeated iteration errors', async () => {
     repo.rows = [row('a', 'pending', 0)];
     service.executeStreamText.mockImplementation(() => {
@@ -562,6 +704,7 @@ describe('AgentsCompletionsService plan execution', () => {
       aiStream: new ReadableStream({ start: (c) => c.close() }),
       finishPromise: Promise.resolve(),
       settle,
+      getFinishReason: () => undefined,
     }));
 
     await run(AgentMode.ASK, AgentApprovalMode.MANUAL);
@@ -580,6 +723,7 @@ describe('AgentsCompletionsService plan execution', () => {
       }),
       finishPromise: Promise.resolve(),
       settle,
+      getFinishReason: () => undefined,
     }));
 
     await run();
@@ -693,6 +837,7 @@ describe('AgentsCompletionsService plan execution', () => {
           finishPromise: Promise.resolve(),
 
           settle: jest.fn(() => Promise.resolve('answer')),
+          getFinishReason: () => undefined,
         };
       });
 
@@ -727,7 +872,9 @@ describe('AgentsCompletionsService plan execution', () => {
         .mockResolvedValueOnce(true);
       service.subagents.takeUndelivered
         .mockResolvedValueOnce(finished)
-        .mockResolvedValueOnce([{ id: 's2', status: 'completed', sortOrder: 1 }]);
+        .mockResolvedValueOnce([
+          { id: 's2', status: 'completed', sortOrder: 1 },
+        ]);
       service.subagents.formatResultsMessage
         .mockReturnValueOnce('FIRST')
         .mockReturnValueOnce('SECOND');
@@ -735,9 +882,7 @@ describe('AgentsCompletionsService plan execution', () => {
       await run(AgentMode.ASK, AgentApprovalMode.MANUAL);
 
       const third = service.executeStreamText.mock.calls[2][0];
-      expect(third.modelMessages.at(-1).content).toBe(
-        'FIRST\n\n---\n\nSECOND',
-      );
+      expect(third.modelMessages.at(-1).content).toBe('FIRST\n\n---\n\nSECOND');
     });
 
     it('only waits for subagents dispatched in this turn', async () => {
@@ -774,6 +919,7 @@ describe('AgentsCompletionsService plan execution', () => {
             finishPromise: Promise.resolve(),
 
             settle: jest.fn(() => Promise.resolve('answer')),
+            getFinishReason: () => undefined,
           };
         },
       );
@@ -801,6 +947,7 @@ describe('AgentsCompletionsService plan mode prompt', () => {
     approvalMode: AgentApprovalMode,
     todos: TodoStatus[] = [],
     agentConfig: unknown = null,
+    goal?: string,
   ) => {
     const service: any = Object.create(AgentsCompletionsService.prototype);
     service.getPrompt = jest.fn((name: string) => `prompt:${name}`);
@@ -821,7 +968,7 @@ describe('AgentsCompletionsService plan mode prompt', () => {
       updatedAt: new Date(),
     }));
     return service.buildSystemContext(
-      { id: 'c1', summary: null, approvalMode },
+      { id: 'c1', summary: null, approvalMode, metadata: { goal } },
       'w1',
       agentMode,
       'u1',
@@ -843,16 +990,22 @@ describe('AgentsCompletionsService plan mode prompt', () => {
     'asks for a plan first in %s mode when plan mode is on',
     async (agentMode) => {
       const parts = await build(agentMode, AgentApprovalMode.PLAN);
-      const last = parts[parts.length - 1];
+      // The last instruction; only the clock follows it
+      const last = parts[parts.length - 2];
       expect(last).toContain('PLAN MODE IS ON');
       expect(last).toContain('formulate_plan');
     },
   );
 
+  it('ends with the time so the rest of the prompt can be cached', async () => {
+    const parts = await build(AgentMode.AGENT, AgentApprovalMode.PLAN);
+    expect(parts[parts.length - 1]).toMatch(/^Current time: /);
+  });
+
   it.each([AgentApprovalMode.AUTO, AgentApprovalMode.MANUAL])(
-    'says nothing about plans in %s mode, not even a finished one',
+    'says nothing about plans in %s mode outside Agent mode, not even a finished one',
     async (mode) => {
-      const parts = await build(AgentMode.AGENT, mode, ['completed']);
+      const parts = await build(AgentMode.ASK, mode, ['completed']);
       const text = parts.join('\n');
       expect(text).not.toContain('PLAN MODE IS ON');
       expect(text).not.toContain('prompt:PLAN.md');
@@ -865,8 +1018,30 @@ describe('AgentsCompletionsService plan mode prompt', () => {
     expect(parts.join('\n')).toContain('prompt:PLAN.md');
   });
 
+  it.each([AgentApprovalMode.AUTO, AgentApprovalMode.MANUAL])(
+    'requires a goal and todo in Agent mode (%s) and pins the goal',
+    async (mode) => {
+      const empty = (await build(AgentMode.AGENT, mode)).join('\n');
+      expect(empty).toContain('prompt:PLAN.md');
+      expect(empty).toContain('GOAL AND TODO FIRST');
+      expect(empty).not.toContain('PLAN MODE IS ON');
+
+      const running = (
+        await build(
+          AgentMode.AGENT,
+          mode,
+          ['in_progress'],
+          null,
+          'Find open ports',
+        )
+      ).join('\n');
+      expect(running).toContain('PINNED GOAL');
+      expect(running).toContain('Find open ports');
+    },
+  );
+
   it('only lets an approved plan finish once the mode switched', async () => {
-    const parts = await build(AgentMode.AGENT, AgentApprovalMode.MANUAL, [
+    const parts = await build(AgentMode.ASK, AgentApprovalMode.MANUAL, [
       'completed',
       'pending',
     ]);
@@ -881,8 +1056,13 @@ describe('subagents by agent mode', () => {
   const setup = () => {
     const service: any = Object.create(AgentsCompletionsService.prototype);
     service.subagents = {
-      buildSubagentsPrompt: jest.fn(() => Promise.resolve('## Available Subagents')),
-      createTools: jest.fn(() => ({ dispatch_subagent: {}, get_subagent_result: {} })),
+      buildSubagentsPrompt: jest.fn(() =>
+        Promise.resolve('## Available Subagents'),
+      ),
+      createTools: jest.fn(() => ({
+        dispatch_subagent: {},
+        get_subagent_result: {},
+      })),
     };
     service.agentTool = { gateTools: jest.fn((tools: object) => tools) };
     const ctx = {
@@ -901,10 +1081,9 @@ describe('subagents by agent mode', () => {
     await expect(
       service.getSubagentsPrompt(AgentMode.AGENT, 'w1', 'u1'),
     ).resolves.toBe('## Available Subagents');
-    expect(Object.keys(service.getSubagentTools(AgentMode.AGENT, ctx))).toEqual([
-      'dispatch_subagent',
-      'get_subagent_result',
-    ]);
+    expect(Object.keys(service.getSubagentTools(AgentMode.AGENT, ctx))).toEqual(
+      ['dispatch_subagent', 'get_subagent_result'],
+    );
   });
 
   it('never starts subagents in ASK mode', async () => {
@@ -925,6 +1104,18 @@ describe('planning state', () => {
     expect(planningState(AgentApprovalMode.PLAN, [])).toBe('create');
     expect(planningState(AgentApprovalMode.MANUAL, [])).toBe('off');
     expect(planningState(AgentApprovalMode.AUTO, [todo('completed')])).toBe(
+      'off',
+    );
+  });
+
+  it('keeps its own todo in Agent mode outside plan mode', () => {
+    for (const mode of [AgentApprovalMode.AUTO, AgentApprovalMode.MANUAL]) {
+      expect(planningState(mode, [], AgentMode.AGENT)).toBe('track');
+    }
+    expect(planningState(AgentApprovalMode.PLAN, [], AgentMode.AGENT)).toBe(
+      'create',
+    );
+    expect(planningState(AgentApprovalMode.AUTO, [], AgentMode.ASK)).toBe(
       'off',
     );
   });
@@ -955,5 +1146,86 @@ describe('planning state', () => {
     expect(tools('off')).toEqual([]);
     expect(tools('finish')).toEqual(['transition_step', 'scrap_plan']);
     expect(tools('create')).toHaveLength(4);
+    expect(tools('track')).toHaveLength(4);
+    expect(service.agentTool.getTodoTools).toHaveBeenLastCalledWith(
+      'c1',
+      expect.any(EventEmitter),
+      { selfManaged: true },
+    );
+  });
+});
+
+describe('generateGoal', () => {
+  const makeService = (overrides: Record<string, unknown> = {}) => {
+    const service: any = Object.create(AgentsCompletionsService.prototype);
+    service.goaling = new Set<string>();
+    service.getPrompt = jest.fn(() => 'prompt');
+    service.createLanguageModel = jest.fn(() => Promise.resolve({}));
+    service.completeText = jest.fn(() =>
+      Promise.resolve(
+        '"Find the open ports of example.com"\nignored second line',
+      ),
+    );
+    service.todoRepository = {
+      exists: jest.fn(() => Promise.resolve(false)),
+      find: jest.fn(() => Promise.resolve([])),
+    };
+    let metadata: Record<string, unknown> | null = null;
+    service.conversationRepository = {
+      manager: {
+        transaction: jest.fn((cb: (m: unknown) => unknown) =>
+          cb({
+            findOne: () => Promise.resolve({ id: 'c1', metadata }),
+            update: (
+              _e: unknown,
+              _w: unknown,
+              set: { metadata: typeof metadata },
+            ) => {
+              metadata = set.metadata;
+              return Promise.resolve();
+            },
+          }),
+        ),
+      },
+    };
+    Object.assign(service, overrides);
+    return { service, meta: () => metadata };
+  };
+
+  const llmConfig = { workspaceId: 'w1', provider: 'openai' } as never;
+
+  it('streams a one-line goal and pins it on the conversation', async () => {
+    const { service, meta } = makeService();
+    const emitter = new EventEmitter();
+    const emitted = jest.fn();
+    emitter.on('todos-updated', emitted);
+
+    await service.generateGoal('c1', llmConfig, 'scan example.com', emitter);
+
+    // First line, surrounding quotes stripped
+    expect(emitted).toHaveBeenCalledWith(
+      [],
+      'Find the open ports of example.com',
+    );
+    expect(meta()).toMatchObject({
+      goal: 'Find the open ports of example.com',
+    });
+  });
+
+  it('does not clobber the goal of a plan already running', async () => {
+    const { service, meta } = makeService({
+      todoRepository: {
+        exists: jest.fn(() => Promise.resolve(true)),
+        find: jest.fn(() => Promise.resolve([])),
+      },
+    });
+    const emitter = new EventEmitter();
+    const emitted = jest.fn();
+    emitter.on('todos-updated', emitted);
+
+    await service.generateGoal('c1', llmConfig, 'scan example.com', emitter);
+
+    expect(emitted).not.toHaveBeenCalled();
+    expect(meta()).toBeNull();
   });
 });

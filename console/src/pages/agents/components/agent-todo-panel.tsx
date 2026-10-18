@@ -9,6 +9,7 @@ import {
   ChevronDown,
   Circle,
   Loader2,
+  Target,
   XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -22,7 +23,9 @@ export interface AgentTodoItem {
 }
 
 interface AgentTodoPanelProps {
-  todos: AgentTodoItem[];
+  todos?: AgentTodoItem[];
+  /** Goal of the plan: pinned above the steps, visible even when collapsed */
+  goal?: string | null;
   className?: string;
 }
 
@@ -67,10 +70,74 @@ function TodoStatusIcon({ status }: { status: AgentTodoItem['status'] }) {
   );
 }
 
-export function AgentTodoPanel({ todos, className }: AgentTodoPanelProps) {
+/** The plan's goal, pinned until every step is completed or failed. */
+function PinnedGoal({
+  goal,
+  finished,
+  expanded,
+}: {
+  goal: string;
+  finished: boolean;
+  expanded: boolean;
+}) {
+  const Icon = finished ? CheckCircle2 : Target;
+  return (
+    <div
+      className={cn(
+        'mx-3 mb-2 flex items-start gap-2 rounded-lg border px-2.5 py-2',
+        finished
+          ? 'border-green-500/20 bg-green-500/5'
+          : 'border-primary/20 bg-primary/5',
+      )}
+      title={expanded ? undefined : goal}
+    >
+      <Icon
+        aria-hidden="true"
+        className={cn(
+          'size-4 shrink-0 mt-0.5',
+          finished ? 'text-green-500' : 'text-primary',
+        )}
+      />
+      <div className="min-w-0 flex-1">
+        <span className="block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          {finished ? 'Goal · done' : 'Goal'}
+        </span>
+        <p
+          className={cn(
+            'text-sm leading-snug text-foreground break-words',
+            !expanded && 'line-clamp-2',
+          )}
+        >
+          {goal}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export function AgentTodoPanel({
+  todos,
+  goal,
+  className,
+}: AgentTodoPanelProps) {
   const [isOpen, setIsOpen] = useState(true);
 
-  if (!todos || todos.length === 0) return null;
+  const hasTodos = !!todos && todos.length > 0;
+  if (!hasTodos) {
+    // The goal arrives before the plan (auto-generated like the title): show it
+    // on its own until the first step exists.
+    if (!goal) return null;
+    return (
+      <div
+        className={cn(
+          'rounded-xl border border-border bg-background/80 backdrop-blur-sm shadow-xs py-2',
+          className,
+        )}
+      >
+        <PinnedGoal goal={goal} finished={false} expanded />
+      </div>
+    );
+  }
 
   const sortedTodos = [...todos].sort((a, b) => a.sortOrder - b.sortOrder);
   const counts = {
@@ -81,6 +148,7 @@ export function AgentTodoPanel({ todos, className }: AgentTodoPanelProps) {
   };
 
   const activeCount = counts.in_progress + counts.pending;
+  const finished = activeCount === 0;
   const currentTask = sortedTodos.find((t) => t.status === 'in_progress');
 
   return (
@@ -106,7 +174,8 @@ export function AgentTodoPanel({ todos, className }: AgentTodoPanelProps) {
             />
             {currentTask && !isOpen ? (
               <span className="truncate text-muted-foreground font-normal">
-                <span className="text-foreground font-medium">Todo</span> — {currentTask.content}
+                <span className="text-foreground font-medium">Todo</span> —{' '}
+                {currentTask.content}
               </span>
             ) : (
               <span className="flex items-center gap-1.5">
@@ -138,6 +207,7 @@ export function AgentTodoPanel({ todos, className }: AgentTodoPanelProps) {
           </span>
         </button>
       </CollapsibleTrigger>
+      {goal && <PinnedGoal goal={goal} finished={finished} expanded={isOpen} />}
       <CollapsibleContent>
         <ul className="space-y-1 px-3 pb-2">
           {sortedTodos.map((todo) => (
