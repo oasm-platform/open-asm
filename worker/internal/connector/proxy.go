@@ -339,23 +339,26 @@ func (p *Proxy) RemoveContainer(containerID string) {
 	p.mu.Unlock()
 }
 
-// UnregisterConnector detaches the live stream from execID's container (EOF /
-// sweep). The container entry and execution index survive — Phase 2 pool
-// reuse. It does not touch the result channel — OnConnectorDown owns that
-// (avoids double close).
-func (p *Proxy) UnregisterConnector(execID string) {
-	if execID == "" {
-		return
+// UnregisterConnector detaches a dead stream from its container (EOF / sweep)
+// and returns the execution that currently owns the container ("" if the
+// stream is not attached). It is keyed by the stream, not the registering
+// execID: after warm-pool reuse that execID's index entry is gone and the
+// container belongs to a later execution. The container entry and execution
+// index survive — Phase 2 pool reuse. It does not touch the result channel —
+// OnConnectorDown owns that (avoids double close).
+func (p *Proxy) UnregisterConnector(stream pb.ConnectorService_ConnectServer) string {
+	if stream == nil {
+		return ""
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	cid, ok := p.execIndex[execID]
-	if !ok {
-		return
+	for _, cs := range p.containers {
+		if cs.stream == stream {
+			cs.stream = nil
+			return cs.ownerExecID
+		}
 	}
-	if cs := p.containers[cid]; cs != nil {
-		cs.stream = nil
-	}
+	return ""
 }
 
 // SendExecute delivers job to the connector stream for execID's container, or

@@ -249,3 +249,49 @@ func TestServerNotifiesContainerDownOnStreamDeath(t *testing.T) {
 		t.Fatal("stream must be detached after unexpected death")
 	}
 }
+
+// Stream death AFTER warm-pool reuse must be reported for the execution that
+// currently owns the container, not the one that first registered the stream:
+// the pool and proxy dropped the first exec's mappings on reuse, so tearing
+// down under that ID evicted nothing, left the dead stream attached to the
+// container, and never closed the running exec's result channel.
+func TestServerStreamDeathAfterReuseTearsDownCurrentOwner(t *testing.T) {
+	srv, proxy := startTestServer(t, "secret")
+	notif := &notifierRecorder{}
+	srv.SetPoolNotifier(notif)
+	conn := dialTestServer(t, srv)
+
+	proxy.BindExec("exec-own-1", "c1")
+	stream, ack := connectAndRegisterWithExecID(t, conn, "secret", "exec-own-1")
+	if !ack.GetAccepted() {
+		t.Fatalf("expected accepted=true, got %v", ack.GetAccepted())
+	}
+	if err := stream.Send(&pb.ConnectorMessage{
+		Message: &pb.ConnectorMessage_Done{Done: &pb.Done{ExecutionId: "exec-own-1"}},
+	}); err != nil {
+		t.Fatalf("Send Done: %v", err)
+	}
+	waitForNotifier(t, func() bool { return notif.released("exec-own-1") }, "pool ReleaseToIdle(exec-own-1)")
+	proxy.ReleaseExec("exec-own-1")
+
+	// exec-2 adopts the stream and is mid-run (no Result yet) when it dies.
+	if err := proxy.AdoptStream("c1", "exec-own-2"); err != nil {
+		t.Fatalf("AdoptStream: %v", err)
+	}
+	resultCh := make(chan ResultMsg, 1)
+	proxy.Register("exec-own-2", resultCh)
+
+	_ = conn.Close()
+	waitForNotifier(t, func() bool { return notif.downed("exec-own-2") }, "pool ContainerDown(exec-own-2)")
+	select {
+	case _, ok := <-resultCh:
+		if ok {
+			t.Fatal("expected exec-own-2 result channel closed, got a message")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("exec-own-2 result channel not closed after stream death")
+	}
+	if proxy.HasContainerStream("c1") {
+		t.Fatal("dead stream must be detached from container c1")
+	}
+}
