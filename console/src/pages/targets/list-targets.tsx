@@ -18,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 
 import { Badge } from '@/components/ui/badge';
 import Image from '@/components/ui/image';
+import LogoFrame from '@/components/ui/logo-frame';
 import JobStatusBadge from '@/components/ui/job-status';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
@@ -26,6 +27,8 @@ import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import { ScanStatusFilter } from './components/scan-status-filter';
 import { ScopeFilter } from './components/scope-filter';
 import { StartDiscoveryButton } from './components/start-discovery-button';
+import { TargetLogo } from './components/target-logo';
+import { TargetTypeBadge } from './components/target-type-badge';
 import { TargetTypeFilter } from './components/target-type-filter';
 
 interface TargetSourceCellProps {
@@ -51,7 +54,9 @@ function TargetSourceCell({ icon, source }: TargetSourceCellProps) {
             });
           }}
         >
-          <Image url={icon} width={16} height={16} />
+          <LogoFrame className="rounded-md">
+            <Image url={icon} width={16} height={16} />
+          </LogoFrame>
         </span>
       </TooltipTrigger>
       <TooltipContent>Sync from {source}</TooltipContent>
@@ -65,6 +70,7 @@ const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
     header: 'Target',
     cell: ({ row }) => (
       <div className="flex items-center gap-2">
+        <TargetLogo url={row.original.logo} />
         <span className="font-medium">{row.getValue('value')}</span>
 
         {row.original.source?.icon && (
@@ -80,6 +86,12 @@ const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
         )}
       </div>
     ),
+  },
+  {
+    accessorKey: 'type',
+    header: 'Type',
+    enableSorting: false,
+    cell: ({ row }) => <TargetTypeBadge type={row.original.type} />,
   },
   {
     accessorKey: 'totalAssetServices',

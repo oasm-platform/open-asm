@@ -81,7 +81,11 @@ export function AssetGroups() {
   const total = data?.total ?? 0;
 
   return (
-    <Page title="Groups" permission="group.read">
+    <Page
+      title="Groups"
+      description="Group hosts and run security scans on them on a schedule"
+      permission="group.read"
+    >
       <DataTable
         data={assetGroups}
         columns={columns}

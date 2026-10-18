@@ -40,9 +40,9 @@ export class VulnerabilitiesController {
   ) {}
 
   @Doc({
-    summary: 'Scan target',
+    summary: 'Scan targets',
     description:
-      'Initiates a vulnerability scan for a specified target, identifying potential security risks and vulnerabilities.',
+      'Initiates a vulnerability scan for one or more targets. Domain, CIDR and IP targets run the vulnerability_scan_basic workflow (nuclei); Git organization targets run the repository_scan workflow.',
     request: {
       getWorkspaceId: true,
     },
@@ -50,7 +50,7 @@ export class VulnerabilitiesController {
   @WorkspaceAccess('vulnerability.write')
   @Post('scan')
   scan(@Body() scanDto: ScanDto, @WorkspaceId() workspaceId: string) {
-    return this.vulnerabilitiesService.scan(scanDto.targetId, workspaceId);
+    return this.vulnerabilitiesService.scan(scanDto.targetIds, workspaceId);
   }
 
   @Doc({

@@ -2,7 +2,9 @@ import { DefaultMessageResponseDto } from '@/common/dtos/default-message-respons
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import {
   BullMQName,
+  JobRunType,
   Severity,
+  TargetType,
   ToolCategory,
   VulnerabilityAnalyzeStatus,
 } from '@/common/enums/enum';
@@ -20,7 +22,9 @@ import { In, Repository } from 'typeorm';
 import { AgentsCompletionsService } from '../agents/agents.completions';
 import { User } from '../auth/entities/user.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
+import { WorkflowRunnerService } from '../jobs-registry/workflow-runner.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { Target } from '../targets/entities/target.entity';
 import { ToolsService } from '../tools/tools.service';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { orderedJobEntries } from '../workflows/workflow-graph';
@@ -52,47 +56,89 @@ export class VulnerabilitiesService {
     private workflowService: WorkflowsService,
     private agentsCompletionsService: AgentsCompletionsService,
     private notificationsService: NotificationsService,
+    @InjectRepository(Target)
+    private targetRepository: Repository<Target>,
+    private workflowRunnerService: WorkflowRunnerService,
   ) {}
 
   /**
-   * Initiates a vulnerability scan for a given target.
-   * This method creates a job in the job registry to start the scanning process.
+   * Initiates a vulnerability scan for the given targets. Host targets
+   * (DOMAIN, CIDR, IP) run the nuclei step of `vulnerability_scan_basic`;
+   * Git organization targets run the whole `repository_scan` workflow.
    *
-   * @param targetId - The ID of the target to scan.
+   * @param targetIds - The IDs of the targets to scan.
    * @returns A message indicating the scan has started.
    */
-  public async scan(targetId: string, workspaceId: string) {
-    const tools = await this.toolsService.getToolByNames({ names: ['nuclei'] });
-    const workflow = await this.workflowService.workflowRepository.findOne({
-      where: {
-        workspace: {
-          id: workspaceId,
-        },
-        filePath: 'vulnerability_scan_basic.yaml',
-      },
+  public async scan(targetIds: string[], workspaceId: string) {
+    const targets = await this.targetRepository.find({
+      where: { id: In(targetIds), workspaceId },
+      select: { id: true, type: true, value: true },
     });
-
-    if (!workflow) {
-      throw new NotFoundException(
-        'Vulnerability scanning workflow not found in the workspace.',
-      );
+    if (targets.length === 0) {
+      throw new NotFoundException('No targets found in the workspace.');
     }
 
-    // Dependency order, not stored order: `content.jobs` is a map and jsonb does
-    // not preserve its key order, so "the first job" is only meaningful when it
-    // is derived from the graph.
-    const job = orderedJobEntries(workflow.content.jobs)[0]?.[1];
-    await this.jobRegistryService.createNewJob({
-      tool: tools[0],
-      workflow,
-      targetIds: [targetId],
-      priority: tools[0].priority,
-      workspaceId,
-      config: job?.config,
-      configProfileId: job?.configProfileId,
-      category: job?.category as ToolCategory | undefined,
+    const gitOrgTargets = targets.filter((t) => t.type === TargetType.GIT_ORG);
+    const hostTargetIds = targets
+      .filter((t) => t.type !== TargetType.GIT_ORG)
+      .map((t) => t.id);
+
+    // Resolve every workflow first so a missing one fails before anything is
+    // dispatched.
+    const hostWorkflow = hostTargetIds.length
+      ? await this.findScanWorkflow('vulnerability_scan_basic.yaml', workspaceId)
+      : null;
+    const repositoryWorkflow = gitOrgTargets.length
+      ? await this.findScanWorkflow('repository_scan.yaml', workspaceId)
+      : null;
+
+    if (hostWorkflow) {
+      const tools = await this.toolsService.getToolByNames({
+        names: ['nuclei'],
+      });
+      // Dependency order, not stored order: `content.jobs` is a map and jsonb
+      // does not preserve its key order, so "the first job" is only meaningful
+      // when it is derived from the graph.
+      const job = orderedJobEntries(hostWorkflow.content.jobs)[0]?.[1];
+      await this.jobRegistryService.createNewJob({
+        tool: tools[0],
+        workflow: hostWorkflow,
+        targetIds: hostTargetIds,
+        priority: tools[0].priority,
+        workspaceId,
+        config: job?.config,
+        configProfileId: job?.configProfileId,
+        category: job?.category as ToolCategory | undefined,
+      });
+    }
+
+    if (repositoryWorkflow) {
+      // Every step (secrets, dependencies…) runs, not just the first one.
+      await this.workflowRunnerService.startRun({
+        workflow: repositoryWorkflow,
+        workspaceId,
+        jobName:
+          gitOrgTargets.length === 1
+            ? `${repositoryWorkflow.name} - ${gitOrgTargets[0].value}`
+            : `${repositoryWorkflow.name} - ${gitOrgTargets.length} targets`,
+        jobRunType: JobRunType.MANUAL,
+        targetIds: gitOrgTargets.map((t) => t.id),
+      });
+    }
+
+    return { message: `Scanning ${targets.length} target(s)...` };
+  }
+
+  private async findScanWorkflow(filePath: string, workspaceId: string) {
+    const workflow = await this.workflowService.workflowRepository.findOne({
+      where: { workspace: { id: workspaceId }, filePath },
     });
-    return { message: `Scanning target ${targetId}...` };
+    if (!workflow) {
+      throw new NotFoundException(
+        `Scanning workflow ${filePath} not found in the workspace.`,
+      );
+    }
+    return workflow;
   }
 
   /**

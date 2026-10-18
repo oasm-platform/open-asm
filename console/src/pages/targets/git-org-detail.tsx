@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import useDebounce from '@/hooks/use-debounce';
 import {
+  JobStatus,
   useTargetsControllerGetTargetRepositoriesInfinite,
   useTargetsControllerReScanTarget,
   type Target,
@@ -22,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { FastScanDialog } from '../vulnerabilities/components/fast-scan-dialog';
 import { ListVulnerabilities } from '../vulnerabilities/list-vulnerabilitys';
 import VulnerabilitiesStatistic from '../vulnerabilities/vulnerabilites-statistic';
 import { TargetSwitcher } from './components/target-switcher';
@@ -71,6 +73,7 @@ export function GitOrgDetail({
         <TargetSwitcher
           currentTargetId={target.id}
           currentTargetValue={target.value}
+          currentTargetLogo={target.logo}
         />
       }
       isShowButtonGoBack
@@ -122,7 +125,15 @@ export function GitOrgDetail({
         </TabsContent>
         <TabsContent value="vulnerabilities" className="flex flex-col gap-5 py-3">
           <VulnerabilitiesStatistic targetId={target.id} />
-          <ListVulnerabilities targetId={target.id} />
+          <ListVulnerabilities
+            targetId={target.id}
+            actions={
+              <FastScanDialog
+                target={{ id: target.id, value: target.value }}
+                disabled={target.status !== JobStatus.completed}
+              />
+            }
+          />
         </TabsContent>
       </Tabs>
     </Page>

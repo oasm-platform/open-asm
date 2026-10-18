@@ -1,4 +1,5 @@
 import { Tabs, useQueryTab } from '@/components/ui/tabs';
+import type { ReactNode } from 'react';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import CreateWorkspace from '../workspaces/create-workspace';
 import AssetTabContent from './components/asset-tab';
@@ -25,8 +26,19 @@ const VALID_VALUES = [
   'graph',
 ];
 
-export function ListAssets() {
-  const tabList = [
+type ExtraTab = {
+  value: string;
+  text: string;
+  tab: ReactNode;
+};
+
+type ListAssetsProps = {
+  /** Tabs inserted right after Services; they render without the asset filter bar. */
+  extraTabs?: ExtraTab[];
+};
+
+export function ListAssets({ extraTabs = [] }: ListAssetsProps) {
+  const assetTabList = [
     {
       value: 'service',
       text: 'Services',
@@ -73,24 +85,29 @@ export function ListAssets() {
       tab: <GraphTab />,
     },
   ];
+  const tabList = [assetTabList[0], ...extraTabs, ...assetTabList.slice(1)];
 
   const { workspaces } = useWorkspaceSelector();
   const [tab, setTab] = useQueryTab({
     tabParam: 'tab',
     defaultValue: 'service',
-    validValues: VALID_VALUES,
+    validValues: [...VALID_VALUES, ...extraTabs.map((t) => t.value)],
   });
+  const isExtraTab = extraTabs.some((t) => t.value === tab);
 
   if (workspaces.length === 0) return <CreateWorkspace />;
 
   return (
-    <div className="w-full space-y-2">
-      <div className="flex justify-between items-center">
-        <AssetFilterBar />
-        {/* <ExportDataButton api="api/assets/services/export" prefix="assets" /> */}
-      </div>
+    <div className="w-full">
       <Tabs value={tab} onValueChange={setTab}>
         <TriggerList tabTriggerList={tabList} />
+        {/* mb-2 + the Tabs gap-2 = the 16px DataTable leaves between its toolbar and table (vulns, targets). */}
+        {!isExtraTab && (
+          <div className="mb-2 flex justify-between items-center">
+            <AssetFilterBar />
+            {/* <ExportDataButton api="api/assets/services/export" prefix="assets" /> */}
+          </div>
+        )}
         {tabList.find((t) => t.value == tab)?.tab}
       </Tabs>
     </div>

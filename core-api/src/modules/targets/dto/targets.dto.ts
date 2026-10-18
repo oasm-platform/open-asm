@@ -144,6 +144,14 @@ export class GetManyTargetResponseDto {
   @ApiProperty({ type: TargetSourceDto })
   source: TargetSourceDto;
 
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'GitHub org: owner avatar. Domain/IP: favicon of the asset matching the target value. Null when none.',
+  })
+  logo: string | null;
+
   @ApiProperty()
   reScanCount: number;
 

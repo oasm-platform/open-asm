@@ -39,6 +39,7 @@ import {
   UpdateTargetDto,
 } from './dto/targets.dto';
 import { Target, TargetSource, TargetType } from './entities/target.entity';
+import { resolveTargetLogo } from './target-logo';
 import { TargetSourceDto, toTargetSourceDto } from './target-source.dto';
 
 /** Rows per INSERT — 4 bind params each, well under PostgreSQL's 65535 limit. */
@@ -329,6 +330,17 @@ export class TargetsService implements OnModuleInit {
         'targets.id, targets.value, targets.type, targets.source, targets.lastDiscoveredAt, targets.scanSchedule, targets.integrationId, targets.settings',
       )
       .getRawOne()) as Target;
+
+    if (result) {
+      const favicons =
+        result.type === TargetType.GIT_ORG
+          ? new Map<string, string>()
+          : await this.getTargetFavicons([result.id]);
+      result.logo = resolveTargetLogo(
+        { type: result.type, value: result.value, source: String(result.source) },
+        favicons.get(result.id),
+      );
+    }
 
     return result;
   }
@@ -657,6 +669,7 @@ export class TargetsService implements OnModuleInit {
         totalAssetServices: number;
         status: string;
         duration: number;
+        logo: string | null;
       }
     >
   > {
@@ -741,19 +754,59 @@ export class TargetsService implements OnModuleInit {
 
     const total = await queryBuilder.getCount();
 
-    const targets = await queryBuilder.limit(limit).offset(offset).getRawMany();
+    const targets: (Omit<Target, 'source'> & {
+      source: unknown;
+      duration: number;
+    })[] = await queryBuilder.limit(limit).offset(offset).getRawMany();
 
-    // Enrich each raw source value into its display DTO (label + icon).
-    const data = targets.map(
-      (
-        row: Omit<Target, 'source'> & { source: unknown; duration: number },
-      ) => ({
-        ...row,
-        source: toTargetSourceDto(String(row.source)),
-      }),
+    const favicons = await this.getTargetFavicons(
+      targets
+        .filter((row) => row.type !== TargetType.GIT_ORG)
+        .map((row) => row.id),
     );
 
+    // Enrich each raw source value into its display DTO (label + icon).
+    const data = targets.map((row) => ({
+      ...row,
+      source: toTargetSourceDto(String(row.source)),
+      logo: resolveTargetLogo(
+        { type: row.type, value: row.value, source: String(row.source) },
+        favicons.get(row.id),
+      ),
+    }));
+
     return getManyResponse({ query, data, total });
+  }
+
+  /**
+   * Favicon of the asset whose value equals its target's value, per target —
+   * an https one first (no mixed content in the console), then the newest.
+   * One query for the whole page, kept out of the aggregated list query so it
+   * cannot skew its counts.
+   */
+  private async getTargetFavicons(
+    targetIds: string[],
+  ): Promise<Map<string, string>> {
+    if (targetIds.length === 0) return new Map();
+    const rows: { targetId: string; faviconUrl: string }[] =
+      await this.repo.query(
+        `SELECT DISTINCT ON (asset."targetId")
+           asset."targetId" AS "targetId",
+           hr.favicon_url AS "faviconUrl"
+         FROM assets asset
+         INNER JOIN targets target ON target.id = asset."targetId"
+           AND target.value = asset.value
+         INNER JOIN asset_services service ON service."assetId" = asset.id
+         INNER JOIN http_responses hr ON hr."assetServiceId" = service.id
+         WHERE asset."targetId" = ANY($1)
+           AND hr.favicon_url IS NOT NULL
+           AND hr.favicon_url <> ''
+         ORDER BY asset."targetId",
+           (hr.favicon_url LIKE 'https://%') DESC,
+           hr."createdAt" DESC`,
+        [targetIds],
+      );
+    return new Map(rows.map((row) => [row.targetId, row.faviconUrl]));
   }
 
   /**

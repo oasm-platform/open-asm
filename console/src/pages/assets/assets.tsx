@@ -4,7 +4,11 @@ import { ListAssets } from './list-assets';
 
 const Assets = () => {
   return (
-    <Page title="Assets" permission="asset.read">
+    <Page
+      title="Assets"
+      description="Services, hosts and other assets discovered from your targets"
+      permission="asset.read"
+    >
       <AssetProvider>
         <ListAssets />
       </AssetProvider>

@@ -407,6 +407,8 @@ export type Target = {
   totalAssetServices: number;
   totalAssets?: number;
   /** @nullable */
+  logo?: string | null;
+  /** @nullable */
   integrationId?: string | null;
   /**
    * GIT_ORG options: includeArchived, includeForks
@@ -484,6 +486,11 @@ export type GetManyTargetResponseDto = {
   value: string;
   type: TargetType;
   source: TargetSourceDto;
+  /**
+   * GitHub org: owner avatar. Domain/IP: favicon of the asset matching the target value. Null when none.
+   * @nullable
+   */
+  logo: string | null;
   reScanCount: number;
   scanSchedule: GetManyTargetResponseDtoScanSchedule;
   status: GetManyTargetResponseDtoStatus;
@@ -2590,8 +2597,8 @@ export type TopTechnologiesResponseDto = {
 };
 
 export type ScanDto = {
-  /** Target ID */
-  targetId: string;
+  /** IDs of the targets to scan */
+  targetIds: string[];
 };
 
 export type GetManyVulnerabilityDto = {
@@ -29286,8 +29293,8 @@ export function useStatisticControllerGetTopTechnologies<
 }
 
 /**
- * Initiates a vulnerability scan for a specified target, identifying potential security risks and vulnerabilities.
- * @summary Scan target
+ * Initiates a vulnerability scan for one or more targets. Domain, CIDR and IP targets run the vulnerability_scan_basic workflow (nuclei); Git organization targets run the repository_scan workflow.
+ * @summary Scan targets
  */
 export const vulnerabilitiesControllerScan = (
   scanDto: ScanDto,
@@ -29351,7 +29358,7 @@ export type VulnerabilitiesControllerScanMutationBody = ScanDto;
 export type VulnerabilitiesControllerScanMutationError = unknown;
 
 /**
- * @summary Scan target
+ * @summary Scan targets
  */
 export const useVulnerabilitiesControllerScan = <
   TError = unknown,

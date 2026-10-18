@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentsModule } from '../agents/agents.module';
 import { Asset } from '../assets/entities/assets.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { Target } from '../targets/entities/target.entity';
 import { VulnerabilityDismissal } from './entities/vulnerability-dismissal.entity';
 import { Vulnerability } from './entities/vulnerability.entity';
 import { VulnerabilityAnalysisProcessor } from './processors/vulnerability-analysis.processor';
@@ -14,7 +15,12 @@ import { VulnerabilitiesService } from './vulnerabilities.service';
 @Global()
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Vulnerability, Asset, VulnerabilityDismissal]),
+    TypeOrmModule.forFeature([
+      Vulnerability,
+      Asset,
+      VulnerabilityDismissal,
+      Target,
+    ]),
     forwardRef(() => AgentsModule),
     NotificationsModule,
     BullModule.registerQueue({

@@ -24,7 +24,8 @@ export default function ProtectedLayout({ children }: ProtectedLayoutProps) {
       {isHasWorkspace && (isAiStudio ? <AiStudioSidebar /> : <AppSidebar />)}
       {/* AI Studio pages fill the viewport below the header instead of
           growing the document, so they size with flex rather than vh math. */}
-      <SidebarInset className={cn(isAiStudio && 'h-svh')}>
+      {/* min-w-0: wide tables scroll inside their own container instead of widening the page. */}
+      <SidebarInset className={cn('min-w-0', isAiStudio && 'h-svh')}>
         {/* Mobile keeps the header: it holds the only sidebar trigger there. */}
         <HeaderBar className={cn(isAiStudio && 'md:hidden')} />
         <main

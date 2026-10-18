@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
@@ -20,6 +20,7 @@ export function ValueInput({ field, condition, onChange, error }: {
   const [listText, setListText] = useState('');
   const text = isList ? listText : (condition.value as string);
   const [open, setOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const search = useDebounce(text, 300);
   const { options, isFetching } = field.useSuggestions(search, open && condition.op !== 'inSubnet');
 
@@ -52,6 +53,7 @@ export function ValueInput({ field, condition, onChange, error }: {
       <Popover open={open && options.length > 0} onOpenChange={setOpen}>
         <PopoverAnchor asChild>
           <Input
+            ref={inputRef}
             aria-label="Value"
             aria-invalid={!!error}
             value={text}
@@ -79,7 +81,10 @@ export function ValueInput({ field, condition, onChange, error }: {
             className="h-9"
           />
         </PopoverAnchor>
-        <PopoverContent className="p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
+        {/* The input is the anchor, not part of the content: with static options the list mounts during the
+            input's own focus event, which Radix then treats as focus-outside and dismisses immediately. */}
+        <PopoverContent className="p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}
+          onInteractOutside={(e) => { if (e.target === inputRef.current) e.preventDefault(); }}>
           <Command shouldFilter={false}>
             <CommandList>
               <CommandEmpty>{isFetching ? 'Loading…' : 'No suggestions'}</CommandEmpty>

@@ -223,14 +223,17 @@ export function DataTable<TData, TValue>({
               toolbarComponents (the actions) keep the right side */}
           <div className="flex flex-wrap items-center gap-2 md:min-w-0 md:flex-1">
             {filterColumnKey && (
-              <Input
-                placeholder={filterPlaceholder}
-                className="w-full md:min-w-48 md:flex-1 md:max-w-xs xl:max-w-sm"
-                value={searchValue}
-                onChange={(e) => {
-                  setSearchValue(e.target.value);
-                }}
-              />
+              // Sizing lives on this wrapper: Input renders inside its own flex-col div, where
+              // flex-1 on the <input> flexes its height (to ~28px) instead of its width.
+              <div className="w-full md:min-w-48 md:flex-1 md:max-w-xs xl:max-w-sm">
+                <Input
+                  placeholder={filterPlaceholder}
+                  value={searchValue}
+                  onChange={(e) => {
+                    setSearchValue(e.target.value);
+                  }}
+                />
+              </div>
             )}
             {filterComponents}
           </div>

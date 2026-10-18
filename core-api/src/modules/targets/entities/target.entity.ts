@@ -146,6 +146,10 @@ export class Target extends BaseEntity {
   @ApiProperty({ required: false })
   totalAssets?: number;
 
+  /** Computed, not stored: org avatar or matching asset favicon (see resolveTargetLogo). */
+  @ApiProperty({ type: String, nullable: true, required: false })
+  logo?: string | null;
+
   /**
    * SOURCE_CODE integration a GIT_ORG target syncs its repositories through.
    * SET NULL when the integration is removed: the target and its history stay,
