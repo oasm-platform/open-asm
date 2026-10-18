@@ -346,7 +346,7 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 				// and retries; no container is created, no Core failure is
 				// recorded.
 				busy, max := p.busyCount(poolKey), p.maxReplicasPerImage
-				line := fmt.Sprintf("pool exhausted: pool_key=%s busy=%d max=%d (node budget cpu=%dm mem=%dB, request cpu=%dm mem=%dB)",
+				detail := fmt.Sprintf("pool_key=%s busy=%d max=%d (node budget cpu=%dm mem=%dB, request cpu=%dm mem=%dB)",
 					poolKey, busy, max, p.cpuBudgetMillis, p.memBudgetBytes, cpuRequestMillis, memRequestBytes)
 				// No execution was created — drop the token so a stray
 				// connector can never authenticate against a ghost execution,
@@ -362,8 +362,10 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 				// Waiting for a free slot is normal queueing, not an incident:
 				// the retry loop asks again every couple of seconds, so this is
 				// rate-limited per image instead of flooding the activity feed.
-				m.logPoolExhausted(poolKey, line)
-				return "", fmt.Errorf("%w: %s", reserveErr, poolKey)
+				m.logPoolExhausted(poolKey, "pool exhausted: "+detail)
+				// The detail rides on the error so a job that finally gives up
+				// reports why the slot could not be found.
+				return "", fmt.Errorf("%w: %s", reserveErr, detail)
 			}
 			reserved = true
 		}
@@ -556,6 +558,16 @@ func (m *Manager) cancelTimeout(execID string) {
 	if err := m.Cancel(context.Background(), execID); err != nil {
 		m.logError("timeout cancel failed", err)
 	}
+}
+
+// FreedSlots reports how many busy container slots have been freed for spec's
+// pool key and node-wide (see PoolManager.FreedSlots). Zero when the pool is
+// disabled.
+func (m *Manager) FreedSlots(spec JobSpec) (image, node uint64) {
+	if m.pool == nil {
+		return 0, 0
+	}
+	return m.pool.FreedSlots(poolKeyFor(spec))
 }
 
 // SubmitWithTimeout submits and auto-cancels after timeout (0 disables).

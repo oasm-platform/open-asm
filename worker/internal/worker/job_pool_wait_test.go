@@ -103,3 +103,29 @@ func TestProcessConnectorJobPoolWaitIsSilent(t *testing.T) {
 		t.Fatalf("expected at most 2 terminal lines, got %d", terminal)
 	}
 }
+
+// TestPoolWaitDeadlineRestartsOnFreedSlot (#717): nuclei's own timeout (600s)
+// equals the pool wait budget, so a fixed total budget failed every job queued
+// behind one full-length scan. A queue that keeps draining must keep waiting;
+// a pool that frees nothing for the whole budget must still fail.
+func TestPoolWaitDeadlineRestartsOnFreedSlot(t *testing.T) {
+	const budget = 10 * time.Minute
+	start := time.Unix(1_000, 0)
+	d := newPoolWaitDeadline(start, budget)
+
+	// Third job in a cap-1 queue: two full-length scans finish ahead of it.
+	if d.expired(start.Add(budget-time.Second), 0) {
+		t.Fatal("expired before the budget")
+	}
+	if d.expired(start.Add(budget+time.Second), 1) {
+		t.Fatal("first scan freed a slot: budget must restart")
+	}
+	if d.expired(start.Add(2*budget), 2) {
+		t.Fatal("second scan freed a slot: budget must restart")
+	}
+
+	// Wedged: nothing freed for a whole budget after the last progress.
+	if !d.expired(start.Add(3*budget+time.Second), 2) {
+		t.Fatal("no slot freed for the whole budget: must expire")
+	}
+}
