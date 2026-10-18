@@ -508,26 +508,21 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     // MAXLEN after the fields is not a slower trim — Redis rejects the whole
     // command with "ERR wrong number of arguments", so the event is never
     // written at all.
-    const id = maxLen
-      ? await this.client.xadd(
-          stream,
-          'MAXLEN',
-          '~',
-          String(maxLen),
-          '*',
-          ...pairs,
-        )
-      : await this.client.xadd(stream, '*', ...pairs);
-
-    if (id === null) {
-      throw new Error(`XADD to ${stream} returned no entry id`);
-    }
+    const added = maxLen
+      ? this.client.xadd(stream, 'MAXLEN', '~', String(maxLen), '*', ...pairs)
+      : this.client.xadd(stream, '*', ...pairs);
 
     // EXPIRE after XADD so a stream that just received its first entry gets a
     // full TTL window; setting it before would leave the newest entry with a
-    // nearly-expired key.
-    if (ttlSeconds) {
-      await this.client.expire(stream, ttlSeconds);
+    // nearly-expired key. Both are sent before either reply is awaited: one
+    // connection runs them in order, in one round trip instead of two.
+    const [id] = await Promise.all([
+      added,
+      ttlSeconds ? this.client.expire(stream, ttlSeconds) : undefined,
+    ]);
+
+    if (id === null) {
+      throw new Error(`XADD to ${stream} returned no entry id`);
     }
     return id;
   }

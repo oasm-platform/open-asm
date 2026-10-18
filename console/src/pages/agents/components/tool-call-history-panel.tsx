@@ -140,7 +140,8 @@ export const ToolCallHistoryPanel = memo(function ToolCallHistoryPanel({
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    // Hugs its rows and scrolls inside once the sidebar runs out of room
+    <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-background/80 shadow-xs">
       <div className="flex items-center gap-2 px-2 py-2 text-sm font-medium text-foreground shrink-0">
         <Terminal className="size-4" />
         <span>Tool Calls</span>

@@ -131,14 +131,24 @@ describe('AgentsApprovalsService', () => {
     });
 
     await expect(
-      service.authorize('nmap host', 't1', ctx(AgentApprovalMode.MANUAL), emitter),
+      service.authorize(
+        'nmap host',
+        't1',
+        ctx(AgentApprovalMode.MANUAL),
+        emitter,
+      ),
     ).resolves.toEqual({ allowed: true });
 
     // identical command now passes without a new prompt
     const prompt = jest.fn();
     emitter.on('approval-required', prompt);
     await expect(
-      service.authorize(' nmap host ', 't2', ctx(AgentApprovalMode.MANUAL), emitter),
+      service.authorize(
+        ' nmap host ',
+        't2',
+        ctx(AgentApprovalMode.MANUAL),
+        emitter,
+      ),
     ).resolves.toEqual({ allowed: true });
     expect(prompt).not.toHaveBeenCalled();
   });
@@ -156,8 +166,18 @@ describe('AgentsApprovalsService', () => {
     emitter.on('approval-required', prompt);
 
     const results = await Promise.all([
-      service.authorize('nmap host', 't1', ctx(AgentApprovalMode.MANUAL), emitter),
-      service.authorize('nmap host', 't2', ctx(AgentApprovalMode.MANUAL), emitter),
+      service.authorize(
+        'nmap host',
+        't1',
+        ctx(AgentApprovalMode.MANUAL),
+        emitter,
+      ),
+      service.authorize(
+        'nmap host',
+        't2',
+        ctx(AgentApprovalMode.MANUAL),
+        emitter,
+      ),
     ]);
 
     expect(results).toEqual([{ allowed: true }, { allowed: true }]);
@@ -176,7 +196,12 @@ describe('AgentsApprovalsService', () => {
       );
     });
     await expect(
-      service.authorize('nuclei -u x', 't1', ctx(AgentApprovalMode.MANUAL), emitter),
+      service.authorize(
+        'nuclei -u x',
+        't1',
+        ctx(AgentApprovalMode.MANUAL),
+        emitter,
+      ),
     ).resolves.toMatchObject({ allowed: false });
   });
 
@@ -217,6 +242,37 @@ describe('AgentsApprovalsService', () => {
         'nmap host',
         't2',
         { ...ctx(AgentApprovalMode.AUTO), planFirst: true },
+        emitter,
+      ),
+    ).resolves.toEqual({ allowed: true });
+  });
+
+  it('refuses every call in Agent mode until a todo step is in progress', async () => {
+    const emitter = new EventEmitter();
+    const prompt = jest.fn();
+    emitter.on('approval-required', prompt);
+    let started = false;
+    const needsTodo = () => Promise.resolve(!started);
+
+    for (const mode of [AgentApprovalMode.AUTO, AgentApprovalMode.MANUAL]) {
+      await expect(
+        service.authorize(
+          'enumerate_assets {}',
+          't1',
+          { ...ctx(mode), needsTodo },
+          emitter,
+          { tool: 'enumerate_assets', readOnly: true },
+        ),
+      ).resolves.toEqual({ allowed: false, todoRequired: true });
+    }
+    expect(prompt).not.toHaveBeenCalled();
+
+    started = true;
+    await expect(
+      service.authorize(
+        'nmap host',
+        't2',
+        { ...ctx(AgentApprovalMode.AUTO), needsTodo },
         emitter,
       ),
     ).resolves.toEqual({ allowed: true });
@@ -295,7 +351,9 @@ describe('AgentsApprovalsService', () => {
       jest.advanceTimersByTime(APPROVAL_TIMEOUT_MS);
       await expect(ignored).resolves.toEqual({ allowed: false });
 
-      await expect(service.requestPlanApproval(steps, 't1', ctx(AgentApprovalMode.PLAN))).resolves.toEqual({ allowed: false });
+      await expect(
+        service.requestPlanApproval(steps, 't1', ctx(AgentApprovalMode.PLAN)),
+      ).resolves.toEqual({ allowed: false });
     });
 
     it("does not let another user decide someone else's plan", () => {
@@ -404,7 +462,12 @@ describe('AgentsApprovalsService', () => {
       );
     });
     await expect(
-      service.authorize('nmap -p-', 't1', ctx(AgentApprovalMode.MANUAL), emitter),
+      service.authorize(
+        'nmap -p-',
+        't1',
+        ctx(AgentApprovalMode.MANUAL),
+        emitter,
+      ),
     ).resolves.toEqual({ allowed: false, feedback: 'use a lighter scan' });
   });
 
@@ -441,9 +504,15 @@ describe('AgentsApprovalsService', () => {
     abort.abort();
     await expect(inA).resolves.toMatchObject({ allowed: false });
 
-    await service.decide(ids[1], AgentCommandApprovalStatus.APPROVED, 'w1', 'u1', {
-      allowConversation: true,
-    });
+    await service.decide(
+      ids[1],
+      AgentCommandApprovalStatus.APPROVED,
+      'w1',
+      'u1',
+      {
+        allowConversation: true,
+      },
+    );
     await expect(inB).resolves.toEqual({ allowed: true });
 
     // "allow all" applied to B, the conversation that was asked, not A
@@ -465,11 +534,21 @@ describe('AgentsApprovalsService', () => {
     emitter.on('approval-required', (e: { approvalId: string }) => {
       approvalId = e.approvalId;
     });
-    void service.authorize('nmap host', 't1', ctx(AgentApprovalMode.MANUAL), emitter);
+    void service.authorize(
+      'nmap host',
+      't1',
+      ctx(AgentApprovalMode.MANUAL),
+      emitter,
+    );
     await new Promise((r) => setImmediate(r));
 
     await expect(
-      service.decide(approvalId, AgentCommandApprovalStatus.APPROVED, 'w1', 'u2'),
+      service.decide(
+        approvalId,
+        AgentCommandApprovalStatus.APPROVED,
+        'w1',
+        'u2',
+      ),
     ).rejects.toThrow('Approval not found');
   });
 
@@ -484,12 +563,22 @@ describe('AgentsApprovalsService', () => {
       );
     });
     emitter.on('approval-required', prompt);
-    await service.authorize('nmap host', 't1', ctx(AgentApprovalMode.MANUAL), emitter);
+    await service.authorize(
+      'nmap host',
+      't1',
+      ctx(AgentApprovalMode.MANUAL),
+      emitter,
+    );
     expect(prompt).toHaveBeenCalledTimes(1);
 
     // the same conversation does not ask again
     await expect(
-      service.authorize('nmap host', 't2', ctx(AgentApprovalMode.MANUAL), emitter),
+      service.authorize(
+        'nmap host',
+        't2',
+        ctx(AgentApprovalMode.MANUAL),
+        emitter,
+      ),
     ).resolves.toEqual({ allowed: true });
     expect(prompt).toHaveBeenCalledTimes(1);
 
@@ -513,14 +602,30 @@ describe('AgentsApprovalsService', () => {
     emitter.on('approval-required', (e: { approvalId: string }) => {
       ids.push(e.approvalId);
     });
-    const first = service.authorize('a', 't1', ctx(AgentApprovalMode.MANUAL), emitter);
-    const second = service.authorize('b', 't2', ctx(AgentApprovalMode.MANUAL), emitter);
+    const first = service.authorize(
+      'a',
+      't1',
+      ctx(AgentApprovalMode.MANUAL),
+      emitter,
+    );
+    const second = service.authorize(
+      'b',
+      't2',
+      ctx(AgentApprovalMode.MANUAL),
+      emitter,
+    );
     await new Promise((r) => setImmediate(r));
     expect(ids).toHaveLength(2);
 
-    await service.decide(ids[0], AgentCommandApprovalStatus.APPROVED, 'w1', 'u1', {
-      allowConversation: true,
-    });
+    await service.decide(
+      ids[0],
+      AgentCommandApprovalStatus.APPROVED,
+      'w1',
+      'u1',
+      {
+        allowConversation: true,
+      },
+    );
     await expect(first).resolves.toEqual({ allowed: true });
     await expect(second).resolves.toEqual({ allowed: true });
 
@@ -551,7 +656,12 @@ describe('AgentsApprovalsService', () => {
         'u1',
       );
     });
-    await service.authorize('nmap host', 't2', ctx(AgentApprovalMode.MANUAL), emitter);
+    await service.authorize(
+      'nmap host',
+      't2',
+      ctx(AgentApprovalMode.MANUAL),
+      emitter,
+    );
     expect(rows).toEqual([
       expect.objectContaining({ status: AgentCommandApprovalStatus.REJECTED }),
     ]);
@@ -622,7 +732,12 @@ describe('AgentsApprovalsService', () => {
 
   it('forgets the approvals and "allow all" of deleted conversations', async () => {
     const emitter = new EventEmitter();
-    const waiting = service.authorize('a', 't1', ctx(AgentApprovalMode.MANUAL), emitter);
+    const waiting = service.authorize(
+      'a',
+      't1',
+      ctx(AgentApprovalMode.MANUAL),
+      emitter,
+    );
     await new Promise((r) => setImmediate(r));
     redisStore.set('agents:approval:all:c1', '1');
 
@@ -649,22 +764,39 @@ describe('AgentsApprovalsService', () => {
         );
       });
       emitter.on('approval-required', prompt);
-      await service.authorize(big('A'), 't1', ctx(AgentApprovalMode.MANUAL), emitter);
+      await service.authorize(
+        big('A'),
+        't1',
+        ctx(AgentApprovalMode.MANUAL),
+        emitter,
+      );
       expect(rows[0].command).toHaveLength(COMMAND_PREVIEW_LENGTH + 1);
 
       // identical: remembered
-      await service.authorize(big('A'), 't2', ctx(AgentApprovalMode.MANUAL), emitter);
+      await service.authorize(
+        big('A'),
+        't2',
+        ctx(AgentApprovalMode.MANUAL),
+        emitter,
+      );
       expect(prompt).toHaveBeenCalledTimes(1);
 
       // differs only past the preview: asks again
-      await service.authorize(big('B'), 't3', ctx(AgentApprovalMode.MANUAL), emitter);
+      await service.authorize(
+        big('B'),
+        't3',
+        ctx(AgentApprovalMode.MANUAL),
+        emitter,
+      );
       expect(prompt).toHaveBeenCalledTimes(2);
     });
 
     it('sends the full input once, with the command only as a label', async () => {
       const events: { command: string; input?: unknown }[] = [];
       const emitter = new EventEmitter();
-      emitter.on('approval-required', (e: { command: string }) => events.push(e));
+      emitter.on('approval-required', (e: { command: string }) =>
+        events.push(e),
+      );
       const input = { data: 'x'.repeat(50_000) };
 
       void service.authorize(
@@ -710,7 +842,9 @@ describe('AgentsApprovalsService', () => {
       const emitter = new EventEmitter();
       const prompts: { approvalId: string; tool?: string }[] = [];
       const resolved: string[] = [];
-      emitter.on('approval-required', (e: { approvalId: string }) => prompts.push(e));
+      emitter.on('approval-required', (e: { approvalId: string }) =>
+        prompts.push(e),
+      );
       emitter.on('approval-resolved', (e: { approvalId: string }) =>
         resolved.push(e.approvalId),
       );
@@ -721,16 +855,24 @@ describe('AgentsApprovalsService', () => {
       await new Promise((r) => setImmediate(r));
       expect(prompts).toHaveLength(3);
 
-      await service.decide(prompts[0].approvalId, AgentCommandApprovalStatus.APPROVED, 'w1', 'u1', {
-        allowTool: true,
-      });
+      await service.decide(
+        prompts[0].approvalId,
+        AgentCommandApprovalStatus.APPROVED,
+        'w1',
+        'u1',
+        {
+          allowTool: true,
+        },
+      );
       await expect(first).resolves.toEqual({ allowed: true });
       await expect(queued).resolves.toEqual({ allowed: true });
       // the UI is told both prompts are answered; the other tool still waits
       expect(resolved).toEqual([prompts[0].approvalId, prompts[1].approvalId]);
 
       // a new input for the allowed tool passes without asking
-      await expect(call('fetch {"url":"c"}', 'fetch', emitter)).resolves.toEqual({
+      await expect(
+        call('fetch {"url":"c"}', 'fetch', emitter),
+      ).resolves.toEqual({
         allowed: true,
       });
       expect(prompts).toHaveLength(3);
@@ -740,16 +882,27 @@ describe('AgentsApprovalsService', () => {
       await new Promise((r) => setImmediate(r));
       expect(prompts).toHaveLength(4);
 
-      await service.decide(prompts[2].approvalId, AgentCommandApprovalStatus.REJECTED, 'w1', 'u1');
+      await service.decide(
+        prompts[2].approvalId,
+        AgentCommandApprovalStatus.REJECTED,
+        'w1',
+        'u1',
+      );
       await expect(other).resolves.toMatchObject({ allowed: false });
     });
 
     it('forgets allowed tools when the mode changes', async () => {
       const emitter = new EventEmitter();
       emitter.on('approval-required', (e: { approvalId: string }) => {
-        void service.decide(e.approvalId, AgentCommandApprovalStatus.APPROVED, 'w1', 'u1', {
-          allowTool: true,
-        });
+        void service.decide(
+          e.approvalId,
+          AgentCommandApprovalStatus.APPROVED,
+          'w1',
+          'u1',
+          {
+            allowTool: true,
+          },
+        );
       });
       await call('fetch {"url":"a"}', 'fetch', emitter);
       await service.resetConversation('c1');
@@ -769,10 +922,16 @@ describe('AgentsApprovalsService', () => {
       const emitter = new EventEmitter();
       emitter.on('approval-required', prompt);
       await expect(
-        service.authorize('enumerate_assets {}', 't1', ctx(AgentApprovalMode.MANUAL), emitter, {
-          tool: 'enumerate_assets',
-          readOnly: true,
-        }),
+        service.authorize(
+          'enumerate_assets {}',
+          't1',
+          ctx(AgentApprovalMode.MANUAL),
+          emitter,
+          {
+            tool: 'enumerate_assets',
+            readOnly: true,
+          },
+        ),
       ).resolves.toEqual({ allowed: true });
       expect(prompt).not.toHaveBeenCalled();
       expect(rows).toHaveLength(0);

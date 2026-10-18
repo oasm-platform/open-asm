@@ -586,16 +586,17 @@ export class AgentsController {
           const { done, value } = await reader.read();
           if (done) break;
           const chunkJson = JSON.stringify(value);
+          // Keep reading even after the client left, so the run reaches its
+          // end and persists; just stop writing to the dead socket. Written
+          // before buffering, so the live client never waits on Redis.
+          if (canWrite()) {
+            res.write(`data: ${chunkJson}\n\n`);
+          }
           // Buffer every chunk so a reconnecting client can replay it. Await
           // to keep Redis order matching the write order; it swallows its own
           // errors, so it never breaks the live stream.
           if (activeConversationId) {
             await this.agentsStreamBuffer.append(activeConversationId, chunkJson);
-          }
-          // Keep reading even after the client left, so the run reaches its
-          // end and persists; just stop writing to the dead socket.
-          if (canWrite()) {
-            res.write(`data: ${chunkJson}\n\n`);
           }
         }
         // Send [DONE] marker to properly terminate the SSE stream
