@@ -13,7 +13,28 @@ const STATUS_SYMBOLS: Record<AgentTodoItem['status'], string> = {
   failed: '[-]',
 };
 
-export function formatTodosToPrompt(todos: AgentTodoItem[]): string {
+/**
+ * The goal of the plan, pinned above it while any step is unfinished so
+ * every iteration of a long run keeps working toward the same outcome.
+ */
+function formatGoal(goal: string, finished: boolean): string {
+  return finished
+    ? [
+        '# GOAL OF THE FINISHED PLAN:',
+        goal,
+        'Your final answer must say whether this goal was met, with the evidence. A new request needs a new goal and plan (formulate_plan).',
+      ].join('\n')
+    : [
+        '# PINNED GOAL (stays pinned until every step is completed or failed):',
+        goal,
+        'Every step, tool call and answer must move toward this goal. Do not drift into unrelated work. If the user changes the goal, call scrap_plan, then formulate_plan with the new goal.',
+      ].join('\n');
+}
+
+export function formatTodosToPrompt(
+  todos: AgentTodoItem[],
+  goal?: string | null,
+): string {
   if (!todos || todos.length === 0) {
     return 'No specific plan has been set up yet.';
   }
@@ -23,22 +44,19 @@ export function formatTodosToPrompt(todos: AgentTodoItem[]): string {
   const currentStep = todos.find(
     (t) => t.status === 'pending' || t.status === 'in_progress',
   );
-  const currentStepIndex = currentStep
-    ? todos.indexOf(currentStep)
-    : -1;
+  const currentStepIndex = currentStep ? todos.indexOf(currentStep) : -1;
 
   const list = todos
-    .map(
-      (t, index) => {
-        const isCurrent = index === currentStepIndex;
-        const marker = isCurrent ? ' <<<< YOU ARE HERE' : '';
-        return `${STATUS_SYMBOLS[t.status]} Step ${index + 1}: ${t.content} (${t.status.toUpperCase()})${marker}`;
-      },
-    )
+    .map((t, index) => {
+      const isCurrent = index === currentStepIndex;
+      const marker = isCurrent ? ' <<<< YOU ARE HERE' : '';
+      return `${STATUS_SYMBOLS[t.status]} Step ${index + 1}: ${t.content} (${t.status.toUpperCase()})${marker}`;
+    })
     .join('\n');
 
   return [
     '',
+    ...(goal ? [formatGoal(goal, !currentStep), ''] : []),
     '# CURRENT EXECUTION PLAN:',
     '',
     `Progress: ${completedCount} completed, ${failedCount} failed, ${todos.length - completedCount - failedCount} remaining.`,
@@ -50,26 +68,21 @@ export function formatTodosToPrompt(todos: AgentTodoItem[]): string {
       ? `>>> CURRENT STEP: Step ${currentStepIndex + 1} — "${currentStep.content}" <<<`
       : '>>> ALL STEPS COMPLETED <<<',
     '',
-    '# STRICT SEQUENTIAL EXECUTION RULES (MANDATORY — violating these WILL cause wrong results):',
+    '# HOW TO WORK THROUGH THE PLAN:',
     '',
-    'Rule 1 (ORDER): Execute steps in STRICT numerical order: Step 1 → Step 2 → Step 3 → ... NEVER skip ahead. NEVER jump to a later step. NEVER reorder steps.',
-    'Rule 2 (CURRENT): Your CURRENT step is the FIRST step with status "PENDING" or "IN_PROGRESS". Look at the plan above — find the "<<<< YOU ARE HERE" marker. That is your step. Execute ONLY that step.',
-    'Rule 3 (TRANSITION IN): Before doing ANY work on the current step, call transition_step(id, "in_progress") FIRST.',
-    'Rule 4 (TRANSITION OUT): After finishing the current step, call transition_step(id, "completed") IMMEDIATELY. Then move to the NEXT sequential step.',
-    'Rule 5 (NO SKIP): Do NOT skip to Step 3 when Step 2 is still "pending". Do NOT work on Step 5 when Step 4 is not yet "completed".',
-    'Rule 6 (SINGLE RESPONSE): Execute ALL steps in a SINGLE response. Do NOT stop mid-plan. Keep calling tools until every step is done.',
-    'Rule 7 (SHORT TEXT): Keep analysis text SHORT (1-2 sentences max per step). Save detailed analysis for the final step.',
-    'Rule 8 (RETRIES): If a step fails, retry up to 2 times with different approaches. Only mark "failed" after exhausting retries. Then advance to the NEXT step.',
-    'Rule 9 (NO PARALLEL): Do NOT call multiple tools for different steps in parallel. Complete one step fully before starting the next.',
+    'Rule 1 (ORDER): Steps run in order. Your current step is the one marked "<<<< YOU ARE HERE"; the system only lets you start the first unfinished step.',
+    'Rule 2 (TRANSITIONS): Call transition_step(id, "in_progress") before working on a step and transition_step(id, "completed") (or "failed") as soon as it is done, then start the next one.',
+    'Rule 3 (PARALLEL INSIDE A STEP): Within the current step, independent tool calls may run in parallel (e.g. several lookups, or dispatching several subagents at once).',
+    'Rule 4 (DELEGATE): A step that matches a subagent is done by dispatching it. A dispatch step is completed once every subagent it needs has been dispatched; do not wait for the results there. Check the results in a later step (they are delivered to you automatically) and judge them against the goal.',
+    "Rule 5 (KEEP GOING): Work through the steps without stopping to ask, unless a decision is really the user's (scope change, risky action).",
+    'Rule 6 (SHORT TEXT): Keep text between steps to 1-2 sentences. Save detailed analysis for the final step.',
+    'Rule 7 (FAILURES): If a step fails, try one or two other approaches, then mark it "failed" with the reason and move on.',
     '',
-    '# FORBIDDEN ACTIONS:',
+    '# PLAN CHANGES:',
     '',
-    '- DO NOT call formulate_plan while this plan has pending/in_progress steps — it will be REJECTED.',
+    '- formulate_plan is rejected while this plan has pending/in_progress steps.',
     '- If the user cancels or replaces the task, call scrap_plan first — that is the ONLY way to drop this plan.',
-    '- DO NOT call append_step to add steps you "forgot" — execute what is listed above first.',
-    '- DO NOT reorder steps based on what seems "easier" or "more important".',
-    '- DO NOT skip a step because you think it can be done later.',
-    '- DO NOT attempt Step N+1 before Step N is marked "completed" or "failed".',
+    '- Work the goal needs that you discover on the way: append_step (Agent mode). Do not reorder or skip steps.',
     '',
   ].join('\n');
 }

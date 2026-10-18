@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Tool } from 'ai';
-import { isStepCount, streamText, tool } from 'ai';
+import { streamText, tool } from 'ai';
 import { EventEmitter } from 'node:events';
 import { In, IsNull, MoreThanOrEqual, Repository } from 'typeorm';
 import { z } from 'zod';
@@ -29,6 +29,7 @@ import {
   type SubagentMetadata,
   updateConversationMetadata,
 } from './shared/conversation-metadata';
+import { DEFAULT_MAX_STEPS, stepLimit } from './shared/step-limit';
 import { addSteps, emptyStats, finalizeStats } from './shared/turn-stats';
 
 /** Background runs per process. */
@@ -70,9 +71,9 @@ const truncate = (text: string, max: number): string =>
 
 /**
  * Tools a subagent run gets. Its allowlist (every read-only tool when unset).
- * Write/exec tools are kept only when `allowWrite` (the conversation is in
- * AUTO approval mode, so the gate auto-allows); otherwise narrowed to the
- * read-only tools, since nobody is around to approve in the background.
+ * Write/exec tools are kept only when `allowWrite` (the conversation is AUTO,
+ * or the definition is built-in, so the gate auto-allows); otherwise narrowed
+ * to the read-only tools, since nobody is around to approve in the background.
  */
 export function subagentToolNames(
   def: AgentDefinitionResponseDto,
@@ -89,7 +90,9 @@ export function subagentToolNames(
 
 /** Where the instructions of a dispatched row came from. */
 const instructionSource = (def: AgentDefinitionResponseDto): string =>
-  def.isBuiltin ? `builtin-agents/${def.name}.md` : `agent_definitions/${def.id}`;
+  def.isBuiltin
+    ? `builtin-agents/${def.name}.md`
+    : `agent_definitions/${def.id}`;
 
 /**
  * Background subagents (issue #675). Any agent definition that is not
@@ -135,9 +138,7 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
     this.sweepTimer = setInterval(() => {
       this.recoverStale()
         .then(() => this.kick())
-        .catch((error) =>
-          this.logger.error('Subagent sweep failed', error),
-        );
+        .catch((error) => this.logger.error('Subagent sweep failed', error));
     }, SUBAGENT_SWEEP_MS);
     this.sweepTimer.unref();
   }
@@ -158,7 +159,10 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
   // ---------------------------------------------------------------
 
   /** Subagents this user can dispatch in the workspace. */
-  list(workspaceId: string, userId: string): Promise<AgentDefinitionResponseDto[]> {
+  list(
+    workspaceId: string,
+    userId: string,
+  ): Promise<AgentDefinitionResponseDto[]> {
     return this.definitions.listSubagents(workspaceId, userId);
   }
 
@@ -168,11 +172,17 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
     name: string,
   ): Promise<{ def: AgentDefinitionResponseDto | undefined; names: string[] }> {
     const defs = await this.list(workspaceId, userId);
-    return { def: defs.find((d) => d.name === name), names: defs.map((d) => d.name) };
+    return {
+      def: defs.find((d) => d.name === name),
+      names: defs.map((d) => d.name),
+    };
   }
 
   /** System prompt section listing the subagents, or '' when there are none. */
-  async buildSubagentsPrompt(workspaceId: string, userId: string): Promise<string> {
+  async buildSubagentsPrompt(
+    workspaceId: string,
+    userId: string,
+  ): Promise<string> {
     const defs = await this.list(workspaceId, userId);
     if (defs.length === 0) return '';
     const lines = defs.map((d) => {
@@ -188,12 +198,14 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
       : '';
     return (
       '## Available Subagents\n' +
-      'You are the main agent and talk with the user. When a request (or part of it) matches a subagent below, ' +
-      'delegate that part with `dispatch_subagent(name, task)` instead of doing it yourself; handle small talk, ' +
-      'quick lookups and the final answer yourself. A subagent runs in the background on its own context and ' +
-      'returns a summary; results are delivered to you automatically when it finishes ' +
-      '(use `get_subagent_result(id)` to check early). Write the task so it can be done without this conversation: ' +
-      'include ids, targets and the question. Independent tasks can run in parallel.\n' +
+      'You are the main agent and talk with the user. Prefer to delegate: when a request (or a part of it) matches a subagent below, ' +
+      'make that part a plan step and run it with `dispatch_subagent(name, task)` instead of doing it yourself. ' +
+      'A subagent has its own context and tools and keeps the heavy work (scanning, enumeration, research, reporting) out of yours, ' +
+      'so reach for one whenever the work fits a role — not only for large tasks.\n' +
+      'Do it yourself only for small talk, a single quick lookup, and the final answer to the user.\n' +
+      'A subagent runs in the background and returns a summary; results are delivered to you automatically when it finishes ' +
+      '(use `get_subagent_result(id)` to check early). Dispatch independent subagents in the same step so they run in parallel, ' +
+      'then check their results in a later step. Write each task so it stands alone: include the ids, targets and the question.\n' +
       lines.join('\n') +
       closing
     );
@@ -235,7 +247,8 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
           select: ['id'],
           lock: { mode: 'pessimistic_write' },
         });
-        if (!conversation) throw new NotFoundException('Conversation not found');
+        if (!conversation)
+          throw new NotFoundException('Conversation not found');
 
         const active = await m.count(AgentSubagent, {
           where: { conversationId: ctx.conversationId, status: In(ACTIVE) },
@@ -306,9 +319,7 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
     this.logger.warn(
       `Recovered interrupted subagents: ${rows.length - failed.length} requeued, ${failed.length} failed`,
     );
-    new Set(rows.map((r) => r.conversationId)).forEach((id) =>
-      this.notify(id),
-    );
+    new Set(rows.map((r) => r.conversationId)).forEach((id) => this.notify(id));
   }
 
   /** Starts drain slots up to the concurrency limit. */
@@ -401,12 +412,17 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
         workspaceId,
       );
 
-      // AUTO conversations let a subagent run its declared write/exec tools
-      // (the gate auto-allows, and execute_remote_command uses the pinned
-      // worker). Otherwise read-only only: nobody is around to approve in the
-      // background. Never any subagent tools (no recursion).
+      // A subagent may run the write/exec tools it declares when either the
+      // conversation is AUTO, or the definition is built-in: built-in roles
+      // (pentest, worker, retester) exist to run those tools, and the user
+      // dispatched one deliberately. The gate then auto-allows and
+      // execute_remote_command uses the pinned worker. A custom subagent in a
+      // non-AUTO conversation stays read-only: nobody can approve its
+      // arbitrary tools in the background. Never any subagent tools (no
+      // recursion).
       const autonomous = conversation.approvalMode === AgentApprovalMode.AUTO;
-      const approval: ApprovalSettings | undefined = autonomous
+      const allowWrite = autonomous || def.isBuiltin;
+      const approval: ApprovalSettings | undefined = allowWrite
         ? { userId, mode: AgentApprovalMode.AUTO }
         : undefined;
       const allTools = this.agentTool.getTools(
@@ -418,7 +434,7 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
       ) as Record<string, Tool>;
       const tools = withoutDisabledTools(
         Object.fromEntries(
-          subagentToolNames(def, autonomous)
+          subagentToolNames(def, allowWrite)
             .filter((t) => allTools[t])
             .map((t) => [t, allTools[t]]),
         ),
@@ -426,7 +442,8 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
       );
       const hasTools = Object.keys(tools).length > 0;
       const providerOptions = getReasoningProviderOptions(llmConfig.provider);
-      const maxSteps = overrides.maxSteps ?? llmConfig.maxSteps ?? 20;
+      const maxSteps =
+        overrides.maxSteps ?? llmConfig.maxSteps ?? DEFAULT_MAX_STEPS;
 
       const startedAt = Date.now();
       // Streaming, not generateText: some OpenAI-compatible providers answer a
@@ -442,7 +459,7 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
             content: `<task>\n${neutralizeTags(job.task)}\n</task>`,
           },
         ],
-        ...(hasTools ? { tools, stopWhen: isStepCount(maxSteps) } : {}),
+        ...(hasTools ? { tools, ...stepLimit(maxSteps) } : {}),
         ...(overrides.temperature !== undefined
           ? { temperature: overrides.temperature }
           : {}),
@@ -470,9 +487,7 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
         llmConfigId: llmConfig.id,
         stats,
         toolsUsed: [
-          ...new Set(
-            steps.flatMap((s) => s.toolCalls.map((c) => c.toolName)),
-          ),
+          ...new Set(steps.flatMap((s) => s.toolCalls.map((c) => c.toolName))),
         ],
       };
       const text = rawText.trim() || '(The subagent returned no summary.)';
@@ -680,8 +695,9 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
   }): Record<string, Tool> {
     const dispatchConfig = {
       description:
-        'Delegate a self-contained task to the background subagent whose role matches it (see Available Subagents); it has read-only tools. ' +
-        'Returns immediately with the subagent id; the result is delivered to you automatically when it finishes.',
+        'Delegate a self-contained task to the background subagent whose role matches it (see Available Subagents). ' +
+        'A built-in subagent runs the security tools its role needs (scans, connectors, commands on the pinned worker); a custom one runs them when the conversation is in auto-approval. ' +
+        'Returns immediately with the subagent id; the result is delivered to you automatically when it finishes. Independent subagents can be dispatched in parallel.',
       inputSchema: z.object({
         name: z
           .string()

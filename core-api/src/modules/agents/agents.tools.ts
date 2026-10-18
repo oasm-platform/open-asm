@@ -203,7 +203,7 @@ export class AgentTool {
   getTodoTools(
     conversationId: string,
     emitter?: EventEmitter,
-    plan?: { workspaceId: string; approval: ApprovalSettings },
+    plan?: Parameters<typeof planTools>[3],
   ): Record<string, ToolType> {
     return planTools(this.deps, conversationId, emitter, plan);
   }
@@ -253,10 +253,11 @@ export class AgentTool {
         emitter,
         approval,
       );
+      // Pages the long outputs of execute_remote_command and run_tool_connector
+      tools.read_tool_output = readToolOutputTool(deps, conversation);
       const runTool = runConnectorTool(deps, workspaceId, conversation);
       if (runTool) {
         tools.run_tool_connector = runTool;
-        tools.read_tool_output = readToolOutputTool(deps, conversation);
       }
     }
 

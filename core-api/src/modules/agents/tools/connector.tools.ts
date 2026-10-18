@@ -31,6 +31,38 @@ function outputLines(raw: string): string[] {
   return lines;
 }
 
+/**
+ * What the model gets of a tool's stdout: its first page and, when there is
+ * more, a runId under which read_tool_output pages through the rest.
+ */
+export async function pageForModel(
+  deps: Deps<'redisService'>,
+  conversationId: string,
+  runId: string,
+  stdout: string,
+) {
+  const truncated = stdout.length > AGENT_TOOL_OUTPUT_PAGE;
+  let stored = false;
+  if (truncated) {
+    try {
+      await deps.redisService.setex(
+        toolOutputKey(conversationId, runId),
+        AGENT_TOOL_OUTPUT_TTL_SECONDS,
+        stdout,
+      );
+      stored = true;
+    } catch (error) {
+      logger.warn(`Failed to keep tool output ${runId}: ${errorMessage(error)}`);
+    }
+  }
+  return {
+    stdout: stdout.slice(0, AGENT_TOOL_OUTPUT_PAGE),
+    truncated,
+    totalLines: outputLines(stdout).length,
+    ...(stored ? { runId } : {}),
+  };
+}
+
 /** Required config fields of a connector that `config` leaves empty. */
 function missingRequiredConfig(
   schema: Record<string, unknown> | undefined,
@@ -48,10 +80,34 @@ function missingRequiredConfig(
 }
 
 /**
+ * A JSON line (an object, or an array of objects as nuclei prints) cut down
+ * to `fields`; any other line is returned as is.
+ */
+function pickJsonFields(line: string, fields: string[]): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(line);
+  } catch {
+    return line;
+  }
+  const pick = (value: unknown) =>
+    value && typeof value === 'object' && !Array.isArray(value)
+      ? Object.fromEntries(
+          fields
+            .filter((key) => key in value)
+            .map((key) => [key, (value as Record<string, unknown>)[key]]),
+        )
+      : value;
+  if (Array.isArray(parsed)) return JSON.stringify(parsed.map(pick));
+  if (parsed && typeof parsed === 'object') return JSON.stringify(pick(parsed));
+  return line;
+}
+
+/**
  * One page of a stored tool output: lines from `offset` (into the matching
  * lines when `pattern` is set, a case-insensitive substring), at most `limit`
  * lines and AGENT_TOOL_OUTPUT_PAGE characters. Lines are numbered 1-based as
- * in the full output.
+ * in the full output. With `fields`, JSON lines keep only those keys.
  */
 export function pageToolOutput(
   raw: string,
@@ -59,7 +115,8 @@ export function pageToolOutput(
     offset,
     limit,
     pattern,
-  }: { offset: number; limit: number; pattern?: string },
+    fields,
+  }: { offset: number; limit: number; pattern?: string; fields?: string[] },
 ) {
   const lines = outputLines(raw);
   const needle = pattern?.toLowerCase();
@@ -71,7 +128,8 @@ export function pageToolOutput(
   let output = '';
   let next = offset;
   for (const i of picked.slice(offset, offset + limit)) {
-    const row = `${i + 1}: ${lines[i]}\n`;
+    const line = fields?.length ? pickJsonFields(lines[i], fields) : lines[i];
+    const row = `${i + 1}: ${line}\n`;
     const room = AGENT_TOOL_OUTPUT_PAGE - output.length;
     if (row.length > room) {
       // A single oversized line still advances, cut, so paging cannot stall.
@@ -239,33 +297,17 @@ export function runConnectorTool(
       }
       // stdout is already capped at AGENT_TOOL_OUTPUT_STORE_MAX, so
       // totalLines matches what read_tool_output pages over.
-      const { stdout } = result;
-      const truncated = stdout.length > AGENT_TOOL_OUTPUT_PAGE;
-      let stored = false;
-      if (truncated) {
-        try {
-          await deps.redisService.setex(
-            toolOutputKey(conversationId, runId),
-            AGENT_TOOL_OUTPUT_TTL_SECONDS,
-            stdout,
-          );
-          stored = true;
-        } catch (error) {
-          logger.warn(
-            `Failed to keep tool output ${runId}: ${errorMessage(error)}`,
-          );
-        }
-      }
+      const page = await pageForModel(deps, conversationId, runId, result.stdout);
       return {
         tool: slug,
         target,
-        stdout: stdout.slice(0, AGENT_TOOL_OUTPUT_PAGE),
+        stdout: page.stdout,
         exitCode: result.exitCode,
         error: result.error,
         timedOut: result.timedOut,
-        truncated,
-        totalLines: outputLines(stdout).length,
-        ...(stored ? { runId } : {}),
+        truncated: page.truncated,
+        totalLines: page.totalLines,
+        ...(page.runId ? { runId: page.runId } : {}),
         ...(result.stdoutTruncated
           ? { note: 'Output over 10MB: only the first 10MB is kept.' }
           : {}),
@@ -275,7 +317,10 @@ export function runConnectorTool(
 }
 
 const readToolOutputSchema = z.object({
-  runId: z.string().uuid().describe('runId returned by run_tool_connector'),
+  runId: z
+    .string()
+    .uuid()
+    .describe('runId returned by run_tool_connector or execute_remote_command'),
   offset: z
     .number()
     .int()
@@ -289,19 +334,28 @@ const readToolOutputSchema = z.object({
     .max(200)
     .optional()
     .describe('Keep only lines containing this text (case-insensitive)'),
+  fields: z
+    .array(z.string().min(1).max(100))
+    .min(1)
+    .max(20)
+    .optional()
+    .describe(
+      'For JSON lines: keep only these top-level keys (e.g. ["name","severity","matched_at"])',
+    ),
 });
 
-/** Pages through a run_tool_connector output kept in Redis for this conversation. */
+/** Pages through a tool output kept in Redis for this conversation. */
 export function readToolOutputTool(
   deps: Deps<'redisService'>,
   conversationId: string,
 ): Tool {
   return defineTool({
     description: [
-      'Read the full output of a run_tool_connector call that came back truncated.',
+      'Read the full output of a run_tool_connector or execute_remote_command call that came back truncated.',
       `Returns at most ${AGENT_TOOL_OUTPUT_PAGE / 1024}KB per call, lines numbered as in the full output; continue from nextOffset.`,
       'Prefer pattern (e.g. "200", "admin") to pull only the relevant lines.',
-      'Params: runId, optional offset (default 0), limit (default 200), pattern.',
+      'When each line is a JSON record (e.g. nuclei findings), pass fields to keep only the keys you need: far fewer calls than paging whole records.',
+      'Params: runId, optional offset (default 0), limit (default 200), pattern, fields.',
     ].join('\n'),
     inputSchema: readToolOutputSchema,
     execute: async (params: z.infer<typeof readToolOutputSchema>) => {
@@ -320,6 +374,7 @@ export function readToolOutputTool(
           offset: params.offset ?? 0,
           limit: params.limit ?? 200,
           pattern: params.pattern,
+          fields: params.fields,
         }),
       };
     },

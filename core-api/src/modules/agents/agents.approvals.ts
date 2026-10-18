@@ -36,6 +36,12 @@ export interface ApprovalContext {
    * switches the mode), so the user sees the plan before anything runs.
    */
   planFirst?: boolean;
+  /**
+   * Agent mode outside PLAN: resolves true while no todo step is in
+   * progress, and tool calls are refused until the agent has written its
+   * goal and todo list and started a step.
+   */
+  needsTodo?: () => Promise<boolean>;
 }
 
 /**
@@ -102,6 +108,8 @@ export interface ApprovalDecision {
   feedback?: string;
   /** Refused without asking: the agent must get a plan approved first */
   planRequired?: boolean;
+  /** Refused without asking: the agent must write and start its todo list first */
+  todoRequired?: boolean;
 }
 
 interface UserDecision {
@@ -185,9 +193,7 @@ export class AgentsApprovalsService {
    */
   static hash(command: string, conversationId = ''): string {
     return createHash('sha256')
-      .update(
-        `${conversationId}\0${AgentsApprovalsService.normalize(command)}`,
-      )
+      .update(`${conversationId}\0${AgentsApprovalsService.normalize(command)}`)
       .digest('hex');
   }
 
@@ -196,8 +202,9 @@ export class AgentsApprovalsService {
    * always may; otherwise a previously approved identical command passes, and
    * anything else blocks until the user decides (or the request times out).
    * PLAN mode asks like MANUAL here: it only differs once a plan exists (see
-   * requestPlanApproval), and approving that plan switches the mode.
-   * Read-only tools and tools the user allowed for the conversation pass
+   * requestPlanApproval), and approving that plan switches the mode. In
+   * Agent mode (`needsTodo`) nothing runs, in any mode, while no todo step
+   * is in progress. Read-only tools and tools the user allowed for the conversation pass
    * without asking. When the user rejects with a message, it comes back as
    * `feedback`. `command` may be any size: only its hash is used for matching.
    */
@@ -209,10 +216,13 @@ export class AgentsApprovalsService {
     meta?: ApprovalToolMeta,
     abortSignal?: AbortSignal,
   ): Promise<ApprovalDecision> {
-    if (ctx.mode === AgentApprovalMode.AUTO) return { allowed: true };
     if (ctx.mode === AgentApprovalMode.PLAN && ctx.planFirst) {
       return { allowed: false, planRequired: true };
     }
+    if (ctx.needsTodo && (await ctx.needsTodo())) {
+      return { allowed: false, todoRequired: true };
+    }
+    if (ctx.mode === AgentApprovalMode.AUTO) return { allowed: true };
     if (meta?.readOnly) return { allowed: true };
     if (await this.isConversationAllowed(ctx.conversationId, meta?.tool)) {
       return { allowed: true };
@@ -449,8 +459,7 @@ export class AgentsApprovalsService {
   async decide(
     id: string,
     status:
-      | AgentCommandApprovalStatus.APPROVED
-      | AgentCommandApprovalStatus.REJECTED,
+      AgentCommandApprovalStatus.APPROVED | AgentCommandApprovalStatus.REJECTED,
     workspaceId: string,
     userId: string,
     options: {
@@ -488,7 +497,9 @@ export class AgentsApprovalsService {
     }
     if (options.allowConversation) {
       await this.remember(AgentsApprovalsService.allKey(conversationId));
-      await this.approveQueued((other) => other.conversationId === conversationId);
+      await this.approveQueued(
+        (other) => other.conversationId === conversationId,
+      );
     } else if (options.allowTool && live?.tool) {
       const tool = live.tool;
       await this.rememberTool(conversationId, tool);
@@ -610,7 +621,10 @@ export class AgentsApprovalsService {
       const [all, toolAllowed] = await Promise.all([
         client.exists(AgentsApprovalsService.allKey(conversationId)),
         tool
-          ? client.sismember(AgentsApprovalsService.toolsKey(conversationId), tool)
+          ? client.sismember(
+              AgentsApprovalsService.toolsKey(conversationId),
+              tool,
+            )
           : Promise.resolve(0),
       ]);
       return all > 0 || toolAllowed > 0;

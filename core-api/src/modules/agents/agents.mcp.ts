@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { jsonSchema, tool } from 'ai';
+import { createHash } from 'node:crypto';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -19,9 +20,34 @@ export function getMcpToolMetadata(serverName: string, mcpTool: McpTool) {
   };
 }
 
+/** How long one server may take to connect and list its tools */
+const MCP_LIST_TIMEOUT_MS = 5_000;
+/** A server's tool list is reused this long before it is listed again */
+const MCP_TOOLS_TTL_MS = 5 * 60_000;
+/** A server that failed is not retried before this, so it can't slow every message */
+const MCP_FAILURE_TTL_MS = 30_000;
+
+/** Rejects when `promise` takes longer than `ms` */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 @Injectable()
 export class AgentsMcpService {
   private readonly logger = new Logger(AgentsMcpService.name);
+
+  /**
+   * Tool lists by workspace and server config: a changed config (URL,
+   * headers, allowed tools) gets a new key, so it is never served stale.
+   */
+  private readonly toolsCache = new Map<
+    string,
+    { tools: Record<string, unknown>; expiresAt: number }
+  >();
 
   constructor(private readonly agentsService: AgentsService) {}
 
@@ -29,21 +55,41 @@ export class AgentsMcpService {
     const mcpConfig = await this.agentsService.getMCPConfig(workspaceId);
     const enabledServers = mcpConfig.servers.filter((s) => !s.disabled);
 
-    const allTools: Record<string, unknown> = {};
+    // Servers are listed concurrently: one slow server no longer adds its
+    // delay to every other one
+    const serverTools = await Promise.all(
+      enabledServers.map((server) => this.getServerTools(workspaceId, server)),
+    );
+    return Object.assign({}, ...serverTools) as Record<string, unknown>;
+  }
 
-    for (const server of enabledServers) {
-      try {
-        const serverTools = await this.fetchToolsFromServer(server);
-        Object.assign(allTools, serverTools);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        this.logger.error(
-          `Failed to fetch tools from MCP server "${server.name}": ${message}`,
-        );
-      }
+  /** One server's tools, from the cache or listed with a timeout */
+  private async getServerTools(
+    workspaceId: string,
+    server: MCPServerResponseDto,
+  ): Promise<Record<string, unknown>> {
+    const now = Date.now();
+    const key = `${workspaceId}:${createHash('sha256').update(JSON.stringify(server)).digest('hex')}`;
+    const cached = this.toolsCache.get(key);
+    if (cached && cached.expiresAt > now) return cached.tools;
+
+    let tools: Record<string, unknown> = {};
+    let ttl = MCP_TOOLS_TTL_MS;
+    try {
+      tools = await this.fetchToolsFromServer(server);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Failed to fetch tools from MCP server "${server.name}": ${message}`,
+      );
+      ttl = MCP_FAILURE_TTL_MS;
     }
 
-    return allTools;
+    for (const [k, entry] of this.toolsCache) {
+      if (entry.expiresAt <= now) this.toolsCache.delete(k);
+    }
+    this.toolsCache.set(key, { tools, expiresAt: now + ttl });
+    return tools;
   }
 
   private createTransport(server: MCPServerResponseDto) {
@@ -88,8 +134,10 @@ export class AgentsMcpService {
     }
 
     try {
-      await client.connect(transport);
-      const { tools } = await client.listTools();
+      const { tools } = await withTimeout(
+        client.connect(transport).then(() => client.listTools()),
+        MCP_LIST_TIMEOUT_MS,
+      );
 
       const mcpTools: Record<string, unknown> = {};
       const allowedTools = server.allowed_tools
@@ -108,17 +156,21 @@ export class AgentsMcpService {
           description: t.description,
           metadata: getMcpToolMetadata(server.name, t),
           inputSchema: jsonSchema(t.inputSchema as Parameters<typeof jsonSchema>[0]),
-          execute: async (params: unknown) => {
-            return this.callMcpTool(server, t.name, params);
+          execute: async (
+            params: unknown,
+            options: { abortSignal?: AbortSignal },
+          ) => {
+            return this.callMcpTool(
+              server,
+              t.name,
+              params,
+              options.abortSignal,
+            );
           },
         });
       }
 
       return mcpTools;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`MCP connection error for ${server.name}: ${message}`);
-      return {};
     } finally {
       try {
         await client.close();
@@ -132,6 +184,7 @@ export class AgentsMcpService {
     server: MCPServerResponseDto,
     toolName: string,
     args: unknown,
+    abortSignal?: AbortSignal,
   ): Promise<unknown> {
     const client = new Client(
       {
@@ -149,11 +202,16 @@ export class AgentsMcpService {
     }
 
     try {
-      await client.connect(transport);
-      const result = await client.callTool({
-        name: toolName,
-        arguments: args as Record<string, unknown>,
-      });
+      // Stopping the run cancels the call instead of waiting it out
+      await client.connect(transport, { signal: abortSignal });
+      const result = await client.callTool(
+        {
+          name: toolName,
+          arguments: args as Record<string, unknown>,
+        },
+        undefined,
+        { signal: abortSignal },
+      );
       return result;
     } finally {
       try {

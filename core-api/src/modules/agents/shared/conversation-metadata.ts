@@ -52,6 +52,8 @@ export interface ConversationMetadata {
   contextUsedTokens?: number;
   lastTurn?: TurnStats;
   totals?: ConversationTotals;
+  /** Goal of the current plan (formulate_plan), pinned in the prompt */
+  goal?: string | null;
   updatedAt?: string;
 }
 
@@ -121,7 +123,11 @@ export async function updateConversationMetadata(
     });
     if (!row) return null;
     const next = mergeConversationMetadata(row.metadata, patch, delta);
-    await m.update(AgentConversation, { id: conversationId }, { metadata: next });
+    await m.update(
+      AgentConversation,
+      { id: conversationId },
+      { metadata: next },
+    );
     return next;
   });
 }

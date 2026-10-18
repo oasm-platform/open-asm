@@ -88,7 +88,7 @@ export const TurnStatsPanel = memo(function TurnStatsPanel({
     metadata.catalogEstimated || metadata.contextWindowSource === 'default';
 
   return (
-    <div className="shrink-0 border-b px-3 py-2 text-xs">
+    <div className="mx-3 mt-3 shrink-0 rounded-xl border border-border bg-background/80 px-3 py-2 text-xs shadow-xs">
       {metadata.model && (
         <div className="space-y-1.5 pb-2">
           <div className="flex items-center justify-between gap-2">
