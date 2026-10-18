@@ -14,6 +14,7 @@ import { useLiveEvents } from '@/hooks/use-live-events';
 import { useConnectWorkerState } from '@/hooks/useConnectWorkerState';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import {
+  useRootControllerGetMetadata,
   type WorkerJoinKeyResponseDto,
   workersControllerCreateJoinKey,
   workersControllerRevokeJoinKey,
@@ -171,6 +172,9 @@ export function ConnectWorkerDialog() {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
 
+  const { data: metadata } = useRootControllerGetMetadata();
+  const homePageUrl = metadata?.homePageUrl;
+
   const [joinKey, setJoinKey] = useState<JoinKey | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [isRotating, setIsRotating] = useState(false);
@@ -325,9 +329,11 @@ export function ConnectWorkerDialog() {
       case 'docker':
         return `docker run -d --name open-asm-worker -e WORKER_API_KEY=${apiKey} -e WORKER_GRPC_HOST=${grpcHost} -e WORKER_GRPC_PORT=16276 -e WORKER_MAX_CONCURRENCY=10 open-asm-worker:latest`;
       case 'windows':
-        return `powershell irm https://oasm.dev/install.ps1 -OutFile "$env:TEMP\\install.ps1"; & "$env:TEMP\\install.ps1" -ApiKey "${apiKey}"${grpcFlagPowerShell}${networkFlagPowerShell} -Run`;
+        if (!homePageUrl) return 'Loading...';
+        return `powershell irm ${homePageUrl}/install.ps1 -OutFile "$env:TEMP\\install.ps1"; & "$env:TEMP\\install.ps1" -ApiKey "${apiKey}"${grpcFlagPowerShell}${networkFlagPowerShell} -Run`;
       case 'linux':
-        return `curl -fsSL https://oasm.dev/install.sh | bash -s -- --api-key "${apiKey}"${grpcFlagBash}${networkFlagBash} --run`;
+        if (!homePageUrl) return 'Loading...';
+        return `curl -fsSL ${homePageUrl}/install.sh | bash -s -- --api-key "${apiKey}"${grpcFlagBash}${networkFlagBash} --run`;
       default:
         return '';
     }

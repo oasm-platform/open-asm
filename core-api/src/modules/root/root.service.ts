@@ -1,3 +1,8 @@
+import {
+  DOCS_URL,
+  GIT_REPO_URL,
+  HOME_PAGE_URL,
+} from '@/common/constants/app.constants';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { Role } from '@/common/enums/enum';
 import { ReleaseVersion } from '@/common/interfaces/app.interface';
@@ -67,19 +72,19 @@ export class RootService {
           DAYS_PER_YEAR,
       },
     });
-    const isAssistant = false;
-
     const systemConfig = await this.systemConfigsService.getConfig();
 
     const currentVersion = this.configService.get<string>('APP_VERSION');
 
     return {
       isInit,
-      isAssistant,
       name: systemConfig.name,
       logoPath: systemConfig.logoPath,
       currentVersion: currentVersion || null,
       storagePresignTtlSeconds: this.storageService.getPresignTtlSeconds(),
+      gitRepoUrl: GIT_REPO_URL,
+      docsUrl: DOCS_URL,
+      homePageUrl: HOME_PAGE_URL,
     };
   }
 

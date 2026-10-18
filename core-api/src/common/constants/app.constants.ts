@@ -51,6 +51,9 @@ export const BOT_ID = '019b3ae4-189e-7dfe-b10e-20d847717733';
 export const BOT_EMAIL = 'bot@oasm.local';
 export const BOT_NAME = 'Cai';
 export const GITHUB_REPO = 'oasm-platform/open-asm';
+export const GIT_REPO_URL = `https://github.com/${GITHUB_REPO}`;
+export const DOCS_URL = 'https://docs.oasm.dev';
+export const HOME_PAGE_URL = 'https://oasm.dev';
 export const DEFAULT_ENCRYPTION_KEY = 'OASM_DEFAULT_ENCRYPTION_KEY';
 
 // --- Jobs registry ---------------------------------------------------------

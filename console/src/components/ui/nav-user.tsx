@@ -14,6 +14,8 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
+import { useBugReportUrl } from '@/hooks/use-bug-report-url';
+import { useRootControllerGetMetadata } from '@/services/apis/gen/queries';
 import {
   authClient,
   markVoluntaryLogout,
@@ -21,7 +23,7 @@ import {
 } from '@/utils/authClient';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { LogOut, Settings, ShieldUser } from 'lucide-react';
+import { BookOpen, Bug, LogOut, Settings, ShieldUser } from 'lucide-react';
 
 interface NavUserProps {
   isOnlyAvatar?: boolean;
@@ -34,6 +36,8 @@ export function NavUser({ isOnlyAvatar = false, dropdownSide }: NavUserProps) {
   const { useSession, signOut } = authClient;
   const navigate = useNavigate();
   const { data: session } = useSession();
+  const { data: metadata } = useRootControllerGetMetadata();
+  const bugReportUrl = useBugReportUrl();
   const user = session?.user;
   if (!user) {
     return <></>;
@@ -118,6 +122,37 @@ export function NavUser({ isOnlyAvatar = false, dropdownSide }: NavUserProps) {
                 </DropdownMenuItem>
               )}
             </DropdownMenuGroup>
+            {(metadata?.docsUrl || bugReportUrl) && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  {metadata?.docsUrl && (
+                    <DropdownMenuItem asChild>
+                      <a
+                        href={metadata.docsUrl}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                      >
+                        <BookOpen />
+                        Docs
+                      </a>
+                    </DropdownMenuItem>
+                  )}
+                  {bugReportUrl && (
+                    <DropdownMenuItem asChild>
+                      <a
+                        href={bugReportUrl}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                      >
+                        <Bug />
+                        Report an issue
+                      </a>
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuGroup>
+              </>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>
               <LogOut />

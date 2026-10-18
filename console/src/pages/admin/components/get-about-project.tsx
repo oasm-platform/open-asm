@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import {
   useRootControllerGetLatestVersion,
+  useRootControllerGetMetadata,
   type GetVersionDto,
 } from '@/services/apis/gen/queries';
 import dayjs from 'dayjs';
@@ -26,26 +27,24 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 
-const REPO_URL = 'https://github.com/oasm-platform/open-asm';
-
-const LINKS = [
+const getLinks = (repoUrl: string) => [
   {
     icon: FolderGit2,
     title: 'Source code',
-    description: 'oasm-platform/open-asm on GitHub',
-    href: REPO_URL,
+    description: `${repoUrl.replace(/^https?:\/\/(www\.)?github\.com\//, '')} on GitHub`,
+    href: repoUrl,
   },
   {
     icon: Bug,
     title: 'Report an issue',
     description: 'Bugs and feature requests',
-    href: `${REPO_URL}/issues`,
+    href: `${repoUrl}/issues`,
   },
   {
     icon: Scale,
     title: 'License',
     description: 'GPL-3.0',
-    href: `${REPO_URL}/blob/main/LICENSE`,
+    href: `${repoUrl}/blob/main/LICENSE`,
   },
 ];
 
@@ -54,6 +53,8 @@ const formatDate = (value: string | null) =>
 
 export default function GetAboutProject() {
   const { data, isLoading, isError } = useRootControllerGetLatestVersion();
+  const { data: metadata } = useRootControllerGetMetadata();
+  const repoUrl = metadata?.gitRepoUrl;
 
   return (
     <div className="flex flex-col gap-4">
@@ -77,7 +78,10 @@ export default function GetAboutProject() {
           {isLoading ? (
             <Skeleton className="h-16 w-full rounded-lg" />
           ) : (
-            <VersionStatus data={isError ? undefined : data} />
+            <VersionStatus
+              data={isError ? undefined : data}
+              repoUrl={repoUrl}
+            />
           )}
         </CardContent>
       </Card>
@@ -90,34 +94,44 @@ export default function GetAboutProject() {
         />
       )}
 
-      <Card className="py-0">
-        <ul className="divide-y">
-          {LINKS.map(({ icon: Icon, title, description, href }) => (
-            <li key={href}>
-              <a
-                href={href}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="group flex items-center gap-3 px-6 py-4 transition-colors hover:bg-muted/50"
-              >
-                <Icon className="size-4 shrink-0 text-muted-foreground" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">{title}</p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {description}
-                  </p>
-                </div>
-                <ExternalLink className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-              </a>
-            </li>
-          ))}
-        </ul>
-      </Card>
+      {repoUrl && (
+        <Card className="py-0">
+          <ul className="divide-y">
+            {getLinks(repoUrl).map(
+              ({ icon: Icon, title, description, href }) => (
+                <li key={href}>
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="group flex items-center gap-3 px-6 py-4 transition-colors hover:bg-muted/50"
+                  >
+                    <Icon className="size-4 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium">{title}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {description}
+                      </p>
+                    </div>
+                    <ExternalLink className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                  </a>
+                </li>
+              ),
+            )}
+          </ul>
+        </Card>
+      )}
     </div>
   );
 }
 
-function VersionStatus({ data }: { data?: GetVersionDto }) {
+function VersionStatus({
+  data,
+  repoUrl,
+}: {
+  data?: GetVersionDto;
+  repoUrl?: string;
+}) {
   const released = formatDate(data?.releaseDate ?? null);
   const status = !data
     ? {
@@ -155,10 +169,10 @@ function VersionStatus({ data }: { data?: GetVersionDto }) {
         </div>
         <p className="text-xs text-muted-foreground">{status.message}</p>
       </div>
-      {data && !data.isLatest && (
+      {data && !data.isLatest && repoUrl && (
         <Button asChild size="sm" variant="outline">
           <a
-            href={`${REPO_URL}/releases/latest`}
+            href={`${repoUrl}/releases/latest`}
             target="_blank"
             rel="noreferrer noopener"
           >

@@ -954,7 +954,6 @@ export type GetMetadataDtoCurrentVersion = { [key: string]: unknown };
 
 export type GetMetadataDto = {
   isInit: boolean;
-  isAssistant: boolean;
   /** System name */
   name: string;
   /**
@@ -966,6 +965,12 @@ export type GetMetadataDto = {
   currentVersion: GetMetadataDtoCurrentVersion;
   /** TTL in seconds for storage presigned URLs */
   storagePresignTtlSeconds: number;
+  /** Source code repository URL */
+  gitRepoUrl: string;
+  /** Documentation URL */
+  docsUrl: string;
+  /** Project home page URL */
+  homePageUrl: string;
 };
 
 export type GetVersionDto = {
