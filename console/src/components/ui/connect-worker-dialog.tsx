@@ -1,3 +1,4 @@
+import { CodeBlock } from '@/components/common/code-block';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -9,8 +10,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useConnectWorkerState } from '@/hooks/useConnectWorkerState';
 import { useLiveEvents } from '@/hooks/use-live-events';
+import { useConnectWorkerState } from '@/hooks/useConnectWorkerState';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import {
   type WorkerJoinKeyResponseDto,
@@ -28,7 +29,6 @@ import {
   useState,
 } from 'react';
 import { toast } from 'sonner';
-import { CodeBlock } from '@/components/common/code-block';
 
 const workerTabs: {
   value: string;
@@ -321,7 +321,7 @@ export function ConnectWorkerDialog() {
     if (!isApiKeyReady) return 'Loading...';
     switch (value) {
       case 'devmode':
-        return `task worker:dev replicas=1 maxJobs=10 apiKey=${apiKey}${networkFlag}`;
+        return `task worker:dev apiKey=${apiKey} replicas=1 maxJobs=10${networkFlag}`;
       case 'docker':
         return `docker run -d --name open-asm-worker -e WORKER_API_KEY=${apiKey} -e WORKER_GRPC_HOST=${grpcHost} -e WORKER_GRPC_PORT=16276 -e WORKER_MAX_CONCURRENCY=10 open-asm-worker:latest`;
       case 'windows':
@@ -343,6 +343,8 @@ export function ConnectWorkerDialog() {
   const visibleTabs = workerTabs.filter(
     (tab) => !tab.env || (tab.env === 'dev' ? isDev : !isDev),
   );
+  // Nothing to pick between with a single environment, so skip the tab bar.
+  const showTabList = visibleTabs.length > 1;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && closeDialog()}>
@@ -350,28 +352,36 @@ export function ConnectWorkerDialog() {
         <DialogHeader>
           <DialogTitle>Connect worker</DialogTitle>
           <DialogDescription>
-            Select your environment and copy the command to connect a worker:
+            {showTabList
+              ? 'Select your environment and copy the command to connect a worker:'
+              : 'Copy the command to connect a worker:'}
           </DialogDescription>
         </DialogHeader>
         {joined ? (
           <JoinSuccess />
         ) : (
           <Tabs defaultValue={visibleTabs[0]?.value} className="space-y-4">
-            <TabsList className="w-full">
-              {visibleTabs.map(({ value, label, icon }) => (
-                <TabsTrigger
-                  key={value}
-                  value={value}
-                  className="flex-1 gap-1.5"
-                >
-                  {icon}
-                  {label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+            {showTabList && (
+              <TabsList className="w-full">
+                {visibleTabs.map(({ value, label, icon }) => (
+                  <TabsTrigger
+                    key={value}
+                    value={value}
+                    className="flex-1 gap-1.5"
+                  >
+                    {icon}
+                    {label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            )}
             {visibleTabs.map(({ value }) => (
               <TabsContent key={value} value={value}>
-                <CodeBlock language="terminal" value={getCommand(value)} />
+                <CodeBlock
+                  language="terminal"
+                  value={getCommand(value)}
+                  sensitive={[{ value: apiKey, replace: '<api_key>' }]}
+                />
               </TabsContent>
             ))}
           </Tabs>

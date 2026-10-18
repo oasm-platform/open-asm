@@ -82,4 +82,24 @@ describe('FilterBuilder', () => {
     await user.click(screen.getByRole('button', { name: 'Apply' }));
     expect(onApply).toHaveBeenCalledWith({ logic: 'and', items: [{ field: 'port', op: 'in', value: ['443', '80'] }] });
   });
+
+  it('flat mode: no groups or OR, each field used once', async () => {
+    const user = userEvent.setup();
+    const onApply = vi.fn();
+    render(<FilterBuilder fields={fields} value={undefined} onApply={onApply} onCancel={() => {}} flat />);
+
+    await user.type(screen.getByLabelText('Value'), 'a{Enter}');
+    const add = screen.getByRole('button', { name: 'Add filter' });
+    await user.click(add); // next unused field: port
+    expect(add).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Group with row above' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Toggle/ })).toBeNull();
+
+    await user.type(screen.getAllByLabelText('Value')[1], '443');
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onApply).toHaveBeenCalledWith({
+      logic: 'and',
+      items: [{ field: 'host', op: 'eq', value: 'a' }, { field: 'port', op: 'eq', value: '443' }],
+    });
+  });
 });

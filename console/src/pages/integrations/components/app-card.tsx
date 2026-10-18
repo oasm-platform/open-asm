@@ -25,7 +25,7 @@ export function AppCard({ appSchema, onClick, formatCategory }: AppCardProps) {
       onClick={onClick}
       className={`flex flex-col items-start gap-2 rounded-lg border p-5 text-left transition-colors ${
         available
-          ? 'hover:border-primary hover:bg-accent/50 cursor-pointer'
+          ? 'hover:bg-accent/70 cursor-pointer'
           : 'opacity-50 cursor-not-allowed'
       }`}
     >

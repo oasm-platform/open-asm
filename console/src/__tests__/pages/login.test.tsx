@@ -3,8 +3,13 @@ import { renderWithProviders, screen, waitFor } from '@/test/utils';
 import userEvent from '@testing-library/user-event';
 import Login from '@/pages/login/login';
 
-const { mockSignInEmail } = vi.hoisted(() => ({
+const { mockSignInEmail, mockToastError } = vi.hoisted(() => ({
   mockSignInEmail: vi.fn(),
+  mockToastError: vi.fn(),
+}));
+
+vi.mock('sonner', () => ({
+  toast: { error: mockToastError },
 }));
 
 vi.mock('@/utils/authClient', () => ({
@@ -28,6 +33,7 @@ vi.mock('@/components/common/layout/auth-layout', () => ({
 describe('Login Page', () => {
   beforeEach(() => {
     mockSignInEmail.mockReset();
+    mockToastError.mockReset();
     mockSignInEmail.mockResolvedValue({});
   });
 
@@ -82,7 +88,7 @@ describe('Login Page', () => {
 
   it('shows error message on invalid credentials', async () => {
     mockSignInEmail.mockResolvedValue({
-      error: { message: 'Invalid email or password' },
+      error: { status: 401, message: 'Invalid email or password' },
     });
 
     const user = userEvent.setup();
@@ -101,6 +107,52 @@ describe('Login Page', () => {
         screen.getByText('Invalid email or password')
       ).toBeInTheDocument();
     });
+  });
+
+  it('shows a toast instead of a field error on server errors', async () => {
+    mockSignInEmail.mockResolvedValue({
+      error: { status: 502, message: 'Bad Gateway' },
+    });
+
+    const user = userEvent.setup();
+    renderWithProviders(<Login />, {
+      routePath: '/login',
+      initialEntries: ['/login'],
+    });
+
+    await screen.findByLabelText(/email/i);
+    await user.type(screen.getByLabelText(/email/i), 'test@example.com');
+    await user.type(screen.getByLabelText(/password/i), 'validpassword');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith('Bad Gateway', {
+        richColors: true,
+      });
+    });
+    expect(screen.queryByText('Bad Gateway')).not.toBeInTheDocument();
+  });
+
+  it('shows a toast when the server is unreachable', async () => {
+    mockSignInEmail.mockRejectedValue(new TypeError('Failed to fetch'));
+
+    const user = userEvent.setup();
+    renderWithProviders(<Login />, {
+      routePath: '/login',
+      initialEntries: ['/login'],
+    });
+
+    await screen.findByLabelText(/email/i);
+    await user.type(screen.getByLabelText(/email/i), 'test@example.com');
+    await user.type(screen.getByLabelText(/password/i), 'validpassword');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalled();
+    });
+    expect(
+      screen.getByRole('button', { name: /sign in/i })
+    ).not.toBeDisabled();
   });
 
   it('disables submit button while loading', async () => {
@@ -124,12 +176,32 @@ describe('Login Page', () => {
       expect(screen.getByRole('button', { name: /sign in/i })).toBeDisabled();
     });
 
-    resolveSignIn({});
+    resolveSignIn({ error: { status: 401, message: 'Invalid email or password' } });
 
     await waitFor(() => {
       expect(
         screen.getByRole('button', { name: /sign in/i })
       ).not.toBeDisabled();
     });
+  });
+
+  it('keeps submit button disabled after successful sign-in until redirect', async () => {
+    mockSignInEmail.mockResolvedValue({ data: {} });
+
+    const user = userEvent.setup();
+    renderWithProviders(<Login />, {
+      routePath: '/login',
+      initialEntries: ['/login'],
+    });
+
+    await screen.findByLabelText(/email/i);
+    await user.type(screen.getByLabelText(/email/i), 'test@example.com');
+    await user.type(screen.getByLabelText(/password/i), 'validpassword');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(mockSignInEmail).toHaveBeenCalled();
+    });
+    expect(screen.getByRole('button', { name: /sign in/i })).toBeDisabled();
   });
 });

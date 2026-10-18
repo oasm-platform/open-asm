@@ -40,7 +40,7 @@ export function ConnectedCard({
   const [showDialog, setShowDialog] = useState(false);
 
   return (
-    <div className="flex items-start justify-between gap-2 rounded-lg border p-5 transition-colors hover:border-primary hover:bg-accent/50">
+    <div className="flex items-start justify-between gap-2 rounded-lg border p-5 transition-colors hover:bg-accent/70">
       <button
         type="button"
         className="flex min-w-0 flex-col items-start gap-2 text-left"

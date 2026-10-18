@@ -45,14 +45,6 @@ vi.mock('@/pages/settings/components/security-settings', () => ({
   default: () => <div data-testid="security-settings">SecuritySettings</div>,
 }));
 
-vi.mock('@/pages/settings/components/brand-name-and-logo', () => ({
-  default: () => <div data-testid="brand-settings">BrandNameAndLogoSettings</div>,
-}));
-
-vi.mock('@/pages/settings/components/get-about-project', () => ({
-  default: () => <div data-testid="about-settings">GetAboutProject</div>,
-}));
-
 describe('Settings Page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -75,7 +67,7 @@ describe('Settings Page', () => {
     renderWithProviders(<Settings />);
 
     await waitFor(() => {
-      expect(screen.getByText('API Keys')).toBeInTheDocument();
+      expect(screen.getByText('Workspace API key')).toBeInTheDocument();
       expect(screen.getByTestId('api-keys-settings')).toBeInTheDocument();
     });
   });
