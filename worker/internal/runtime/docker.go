@@ -20,6 +20,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/system"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
 
@@ -33,7 +34,10 @@ type DockerRuntime struct {
 	host           string // e.g. unix:///var/run/docker.sock (from WORKER_DOCKER_HOST)
 	connectorAddr  string // resolved dial address containers use to reach the worker's connector gRPC server
 	connectorToken string // shared secret for connector authentication
-	logger         Logger
+	// cpuQuotaUnsupported is set when the daemon lacks CPU CFS quota support;
+	// such daemons reject any NanoCPUs value at container create (#734).
+	cpuQuotaUnsupported bool
+	logger              Logger
 	// pullProgress, when set, receives image pull progress: jobID, image,
 	// fraction downloaded (negative = indeterminate) and a terminal flag.
 	pullProgress func(jobID, image string, pulled float64, done bool)
@@ -282,12 +286,35 @@ func NewDockerRuntime(host string, connectorAddr string, connectorPort int, conn
 			return nil, err
 		}
 	}
+	cpuQuotaUnsupported := detectCPUQuotaUnsupported(context.Background(), cli)
+	if cpuQuotaUnsupported {
+		fmt.Fprintf(os.Stderr, "WARNING: Docker host does not support CPU CFS quota; tool containers will run without CPU limits.\n")
+	}
 	return &DockerRuntime{
-		cli:            cli,
-		host:           host,
-		connectorAddr:  addr,
-		connectorToken: connectorToken,
+		cli:                 cli,
+		host:                host,
+		connectorAddr:       addr,
+		connectorToken:      connectorToken,
+		cpuQuotaUnsupported: cpuQuotaUnsupported,
 	}, nil
+}
+
+// systemInfoer is the Docker Engine API subset needed to probe host
+// capabilities. Satisfied by *client.Client.
+type systemInfoer interface {
+	Info(ctx context.Context) (system.Info, error)
+}
+
+// detectCPUQuotaUnsupported reports whether the daemon cannot enforce CPU CFS
+// quota. An Info error keeps CPU limits on (today's behaviour).
+func detectCPUQuotaUnsupported(ctx context.Context, c systemInfoer) bool {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	info, err := c.Info(ctx)
+	if err != nil {
+		return false
+	}
+	return !info.CPUCfsQuota
 }
 
 // dockerInspector is the Docker Engine API subset needed to auto-derive the
@@ -580,13 +607,17 @@ func persistPathsFromLabels(labels map[string]string) []string {
 // re-multiplied: the Phase 1 unit bug (×1024*1024 on already-byte values)
 // inflated 512Mi to ~512Gi. MemorySwap == Memory disables swap. Zero means
 // "unlimited", which is what the runtime expects for legacy specs without
-// resource defaults.
-func hostResources(opts RuntimeOpts) container.Resources {
-	return container.Resources{
-		NanoCPUs:   int64(opts.CPU) * 1e6,
+// resource defaults. NanoCPUs stays zero when the daemon lacks CPU CFS quota
+// support, since it rejects any CPU limit there (#734).
+func hostResources(opts RuntimeOpts, cpuQuotaUnsupported bool) container.Resources {
+	r := container.Resources{
 		Memory:     int64(opts.Memory),
 		MemorySwap: int64(opts.Memory),
 	}
+	if !cpuQuotaUnsupported {
+		r.NanoCPUs = int64(opts.CPU) * 1e6
+	}
+	return r
 }
 
 // applyDefaultIsolation wires security.DefaultIsolation into the container's
@@ -701,7 +732,7 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	// Tmpfs backs HOME/XDG_CACHE_HOME under /tmp: fast, container-local and
 	// ephemeral, so no cross-job state leaks.
 	hostConfig := &container.HostConfig{
-		Resources:  hostResources(opts),
+		Resources:  hostResources(opts, d.cpuQuotaUnsupported),
 		ExtraHosts: []string{"host.docker.internal:host-gateway"},
 		Binds:      persistBinds,
 		Tmpfs: map[string]string{
