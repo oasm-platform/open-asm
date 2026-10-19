@@ -8,6 +8,7 @@ import type { Inline, Line, MessageDraft, MessageFormat } from './message-draft'
 export function formatForAppType(appType: string): MessageFormat {
   if (appType === 'telegram') return 'telegram';
   if (appType === 'slack') return 'slack';
+  if (appType === 'discord') return 'discord';
   return 'plain';
 }
 
@@ -49,8 +50,11 @@ function span(part: Inline, format: MessageFormat): string {
     const text = escape(part.bold, format);
     if (format === 'telegram') return `<b>${text}</b>`;
     if (format === 'slack') return `*${text}*`;
+    if (format === 'discord') return `**${text}**`;
     return text;
   }
+  // Markdown code spans are literal, so Discord only needs backticks neutralised.
+  if (format === 'discord') return `\`${part.code.replace(/`/g, "'")}\``;
   const text = escape(part.code, format);
   if (format === 'telegram') return `<code>${text}</code>`;
   if (format === 'slack') return `\`${text.replace(/`/g, "'")}\``;
@@ -63,6 +67,8 @@ function span(part: Inline, format: MessageFormat): string {
  */
 function escape(text: string, format: MessageFormat): string {
   if (format === 'plain') return text;
+  // Discord markdown has no entities; backslash-escape its markup characters.
+  if (format === 'discord') return text.replace(/[\\*_~`|>[\]()#-]/g, '\\$&');
   return text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

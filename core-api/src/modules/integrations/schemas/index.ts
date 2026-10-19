@@ -1,4 +1,5 @@
 export { awsSchema } from './aws.schema';
+export { discordSchema } from './discord.schema';
 export { githubSchema } from './github.schema';
 export { gitlabSchema } from './gitlab.schema';
 export { jiraSchema } from './jira.schema';
