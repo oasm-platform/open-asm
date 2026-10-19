@@ -8,6 +8,7 @@ import { AgentApprovalMode } from '@/common/enums/enum';
 import type { ApprovalSettings, PlanRunMode } from '../agents.approvals';
 import type { AgentTodoItem } from '../agents.todo';
 import { AgentConversationTodo } from '../entities/agent-conversation-todo.entity';
+import { updateConversationMetadata } from '../shared/conversation-metadata';
 import {
   PLANNING_OFF_MESSAGE,
   defineTool,
@@ -189,41 +190,65 @@ async function switchApprovalMode(
 /**
  * Plan tools. With `plan.approval` in PLAN mode, formulate_plan shows the
  * new plan to the user and waits for them to approve it, choosing whether
- * the rest of the run asks per command (MANUAL) or not (AUTO). Outside
- * PLAN mode formulate_plan and append_step refuse: only transition_step and
- * scrap_plan remain, to finish or drop a plan approved earlier.
+ * the rest of the run asks per command (MANUAL) or not (AUTO). With
+ * `plan.selfManaged` (Agent mode outside PLAN) the agent keeps its own todo
+ * list: plans are set without review. Otherwise formulate_plan and
+ * append_step refuse: only transition_step and scrap_plan remain, to finish
+ * or drop a plan approved earlier. The plan's goal is pinned in the
+ * conversation metadata until the plan is replaced or dropped.
  */
 export function planTools(
   deps: PlanDeps,
   conversationId: string,
   emitter?: EventEmitter,
-  plan?: { workspaceId: string; approval: ApprovalSettings },
+  plan?: {
+    workspaceId: string;
+    approval: ApprovalSettings;
+    selfManaged?: boolean;
+  },
 ): Record<string, Tool> {
   const todoRepo = deps.todoRepository;
 
   const findTodos = () =>
     todoRepo.find({ where: { conversationId }, order: { sortOrder: 'ASC' } });
 
-  const emitTodos = async (): Promise<void> => {
+  const pinGoal = (goal: string | null) =>
+    updateConversationMetadata(
+      deps.conversationRepository.manager,
+      conversationId,
+      { goal },
+    );
+
+  /** `goal` is sent only when it changed (null: unpinned) */
+  const emitTodos = async (goal?: string | null): Promise<void> => {
     if (emitter) {
       const todos = await findTodos();
-      emitter.emit('todos-updated', todos.map(toTodoItem));
+      emitter.emit('todos-updated', todos.map(toTodoItem), goal);
     }
   };
 
   // Read at call time: approving a plan switches the run out of PLAN mode,
   // and the plan it approved is the last one this run may make
   const planningAllowed = () =>
-    !plan || plan.approval.mode === AgentApprovalMode.PLAN;
+    !plan ||
+    !!plan.selfManaged ||
+    plan.approval.mode === AgentApprovalMode.PLAN;
 
   const formulatePlan = defineTool({
     description:
-      'Set/reset execution plan with step array. Params: steps (string[]). Output: success, message, todos. ONLY call this when no active plan exists (all steps completed/failed, or plan is empty). If a plan is already in progress, you MUST execute existing steps — do NOT call this tool.',
+      'Set the execution plan (todo list) before starting the work. Params: steps (string[]); goal (string, OPTIONAL). The goal is generated for you from the request and pinned in your context already — pass goal only to correct it. Output: success, message, goal, todos. ONLY call this when no active plan exists (all steps completed/failed, or plan is empty). If a plan is already in progress, you MUST execute existing steps — do NOT call this tool.',
     inputSchema: z.object({
+      goal: z
+        .string()
+        .max(1000)
+        .optional()
+        .describe(
+          'Optional: a corrected goal (outcome + success criterion). Omit to keep the auto-generated one.',
+        ),
       steps: z.array(z.string().min(1)).min(1).describe('Plan steps'),
     }),
     execute: async (
-      params: { steps: string[] },
+      params: { goal?: string; steps: string[] },
       options?: Partial<ToolCallOptions>,
     ) => {
       if (!planningAllowed()) {
@@ -259,6 +284,13 @@ export function planTools(
           };
         }
 
+        // The goal is usually generated for the turn and already pinned; only
+        // a goal the agent passes here overrides it. `undefined` means "keep
+        // the current (auto-generated) goal", so the UI is not told it changed.
+        const override = params.goal?.trim() || null;
+        const goal = override ?? undefined;
+        if (override) await pinGoal(override);
+
         // Replace the old plan atomically: a failed insert must not leave
         // the conversation with no plan at all
         await todoRepo.manager.transaction(async (manager) => {
@@ -282,7 +314,7 @@ export function planTools(
         );
 
         // Show the plan right away, also while the user reviews it
-        emitter?.emit('todos-updated', todos);
+        emitter?.emit('todos-updated', todos, goal);
 
         if (plan?.approval.mode === AgentApprovalMode.PLAN) {
           const decision = await deps.approvals.requestPlanApproval(
@@ -298,7 +330,8 @@ export function planTools(
           );
           if (!decision.allowed) {
             await todoRepo.delete({ conversationId });
-            await emitTodos();
+            await pinGoal(null);
+            await emitTodos(null);
             return {
               success: false,
               error: rejectionMessage('The plan', decision.feedback),
@@ -323,13 +356,18 @@ export function planTools(
                 ? ' and lets it run without asking.'
                 : '; each command still asks for approval.') +
               ' Start with step 1 now.',
+            goal,
             todos,
           };
         }
 
         return {
           success: true,
-          message: `Plan set with ${todos.length} steps.`,
+          message:
+            `Plan set with ${todos.length} steps` +
+            (goal ? ' and its goal pinned' : '') +
+            '. Call transition_step(id, "in_progress") on step 1 and start it now.',
+          goal,
           todos,
         };
       } catch (error) {
@@ -433,12 +471,13 @@ export function planTools(
 
   const scrapPlan = defineTool({
     description:
-      'Clear entire plan (irreversible). Then call formulate_plan to create a new one.',
+      'Clear entire plan and its pinned goal (irreversible). Then call formulate_plan to create a new one.',
     inputSchema: z.object({}),
     execute: () =>
       failSoft('clear plan', async () => {
         await todoRepo.delete({ conversationId });
-        await emitTodos();
+        await pinGoal(null);
+        await emitTodos(null);
         return { success: true, message: 'Plan cleared.' };
       }),
   });

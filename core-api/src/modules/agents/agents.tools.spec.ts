@@ -469,6 +469,28 @@ describe('AgentTool run_tool_connector', () => {
     expect(page.output).toBe('2501: admin [Status: 200]\n');
   });
 
+  it('read_tool_output keeps only the requested fields of JSON lines', async () => {
+    const agentTool = createAgentTool();
+    const finding = (name: string) =>
+      JSON.stringify([
+        { name, severity: 'high', description: 'x'.repeat(2000) },
+      ]);
+    const full = [finding('A'), 'not json', finding('B')].join('\n');
+    (agentTool as any).redisService.get = jest.fn().mockResolvedValue(full);
+
+    const page = (await readOutput(agentTool).execute({
+      runId: '00000000-0000-4000-8000-000000000001',
+      fields: ['name', 'severity'],
+    })) as { output: string; nextOffset: number | null };
+
+    expect(page.nextOffset).toBeNull();
+    expect(page.output).toBe(
+      '1: [{"name":"A","severity":"high"}]\n' +
+        '2: not json\n' +
+        '3: [{"name":"B","severity":"high"}]\n',
+    );
+  });
+
   it('read_tool_output reports an expired run', async () => {
     const agentTool = createAgentTool();
     await expect(

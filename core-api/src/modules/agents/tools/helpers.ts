@@ -57,7 +57,11 @@ export function rejectionMessage(what: string, feedback?: string): string {
 export const PLAN_REQUIRED_MESSAGE =
   'Not executed: this conversation needs an approved plan first. Call formulate_plan with the full plan (put this work in its steps) and wait for the user to approve it before calling other tools.';
 
-/** Plans exist only in PLAN mode; AUTO and MANUAL just do the work. */
+/** Agent mode works from its own todo list: no tool runs before one exists. */
+export const TODO_REQUIRED_MESSAGE =
+  'Not executed: Agent mode needs a goal and a todo list first. Call formulate_plan with the goal and the steps (put this work in them), then transition_step the first step to in_progress before calling other tools. If the plan is finished, add this work with append_step or start a new plan.';
+
+/** Outside Agent mode, plans exist only in PLAN mode; AUTO and MANUAL just do the work. */
 export const PLANNING_OFF_MESSAGE =
   'Not executed: planning is off in this conversation (only plan mode makes plans). Do the work directly with the other tools, without a plan.';
 
@@ -65,9 +69,9 @@ export function deniedMessage(
   what: string,
   decision: ApprovalDecision,
 ): string {
-  return decision.planRequired
-    ? PLAN_REQUIRED_MESSAGE
-    : rejectionMessage(what, decision.feedback);
+  if (decision.planRequired) return PLAN_REQUIRED_MESSAGE;
+  if (decision.todoRequired) return TODO_REQUIRED_MESSAGE;
+  return rejectionMessage(what, decision.feedback);
 }
 
 /**
