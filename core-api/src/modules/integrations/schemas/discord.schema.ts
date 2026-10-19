@@ -27,6 +27,8 @@ export const discordSchema = {
       title: 'Webhook URL',
       description:
         'Discord channel webhook URL (Channel settings → Integrations → Webhooks).',
+      // The URL embeds the webhook token, so it is encrypted and masked like a token.
+      'ui:widget': 'password',
       'ui:placeholder': 'https://discord.com/api/webhooks/000/xxxx',
     },
     username: {
