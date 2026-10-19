@@ -1,5 +1,6 @@
 import { awsSchema } from './aws.schema';
 import { cloudflareSchema } from './cloudflare.schema';
+import { discordSchema } from './discord.schema';
 import { githubSchema } from './github.schema';
 import { gitlabSchema } from './gitlab.schema';
 import { jiraSchema } from './jira.schema';
@@ -31,6 +32,7 @@ export const universalIntegrationSchema = {
   oneOf: [
     awsSchema,
     cloudflareSchema,
+    discordSchema,
     githubSchema,
     gitlabSchema,
     jiraSchema,

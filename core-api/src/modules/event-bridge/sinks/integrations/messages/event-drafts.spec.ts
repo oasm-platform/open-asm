@@ -53,6 +53,7 @@ describe('event drafts + render', () => {
   it('maps app types to their markup dialect', () => {
     expect(formatForAppType('telegram')).toBe('telegram');
     expect(formatForAppType('slack')).toBe('slack');
+    expect(formatForAppType('discord')).toBe('discord');
     expect(formatForAppType('webhook')).toBe('plain');
   });
 
@@ -109,6 +110,18 @@ describe('event drafts + render', () => {
     expect(slack).toContain('*Asset:* `app.example.com`');
     expect(plain).toContain('Asset: app.example.com');
     expect(plain).not.toMatch(/[*`]|<b>/);
+  });
+
+  it('renders Discord markdown and escapes markup in values', () => {
+    const discord = render('vulnerability.detected', detected, 'discord');
+    expect(discord).toContain('**Asset:** `app.example.com`');
+
+    const hostile = render(
+      'vulnerability.detected',
+      { ...detected, payload: { assetValue: 'a`b', vulnerabilities: [] } },
+      'discord',
+    );
+    expect(hostile).toContain("`a'b`");
   });
 
   it('describes a complete and an incomplete scan run', () => {
