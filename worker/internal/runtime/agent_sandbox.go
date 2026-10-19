@@ -68,6 +68,8 @@ type AgentSandboxSpec struct {
 	OwnerID     string
 	ToolsMount  *mount.Mount // nil = no tools mount
 	ToolsTarget string       // tool dir inside the sandbox, first on PATH
+	// CPUQuotaUnsupported drops the CPU limit on daemons without CFS quota (#734).
+	CPUQuotaUnsupported bool
 }
 
 // AgentSandbox owns the per-session sandbox containers of one worker.
@@ -77,7 +79,9 @@ type AgentSandbox struct {
 	toolsMount  *mount.Mount
 	toolsTarget string
 	ownerID     func() string
-	logger      Logger
+	// cpuQuotaUnsupported mirrors DockerRuntime.cpuQuotaUnsupported.
+	cpuQuotaUnsupported bool
+	logger              Logger
 
 	mu       sync.Mutex
 	sessions map[string]*sandboxSession
@@ -106,13 +110,14 @@ func NewAgentSandbox(ctx context.Context, rt *DockerRuntime, opts AgentSandboxOp
 		ownerID = func() string { return "" }
 	}
 	return &AgentSandbox{
-		cli:         rt.cli,
-		image:       resolveSandboxImage(opts.Image, self),
-		toolsMount:  resolveSandboxToolsMount(opts.ToolsSource, opts.ToolPath, target, self),
-		toolsTarget: target,
-		ownerID:     ownerID,
-		logger:      rt.logger,
-		sessions:    make(map[string]*sandboxSession),
+		cli:                 rt.cli,
+		image:               resolveSandboxImage(opts.Image, self),
+		toolsMount:          resolveSandboxToolsMount(opts.ToolsSource, opts.ToolPath, target, self),
+		toolsTarget:         target,
+		ownerID:             ownerID,
+		logger:              rt.logger,
+		cpuQuotaUnsupported: rt.cpuQuotaUnsupported,
+		sessions:            make(map[string]*sandboxSession),
 	}, nil
 }
 
@@ -273,8 +278,10 @@ func BuildAgentSandboxConfig(spec AgentSandboxSpec) (*container.Config, *contain
 			PidsLimit:  &pids,
 			Memory:     agentSandboxMemory,
 			MemorySwap: agentSandboxMemory,
-			NanoCPUs:   agentSandboxNanoCPUs,
 		},
+	}
+	if !spec.CPUQuotaUnsupported {
+		hc.Resources.NanoCPUs = agentSandboxNanoCPUs
 	}
 	if spec.ToolsMount != nil {
 		hc.Mounts = []mount.Mount{*spec.ToolsMount}
@@ -447,11 +454,12 @@ func (s *AgentSandbox) create(ctx context.Context, sessionID string) (string, er
 		return "", err
 	}
 	cfg, hc := BuildAgentSandboxConfig(AgentSandboxSpec{
-		Image:       s.image,
-		SessionID:   sessionID,
-		OwnerID:     s.ownerID(),
-		ToolsMount:  s.toolsMount,
-		ToolsTarget: s.toolsTarget,
+		Image:               s.image,
+		SessionID:           sessionID,
+		OwnerID:             s.ownerID(),
+		ToolsMount:          s.toolsMount,
+		ToolsTarget:         s.toolsTarget,
+		CPUQuotaUnsupported: s.cpuQuotaUnsupported,
 	})
 	name := agentSandboxName(sessionID)
 	resp, err := s.cli.ContainerCreate(ctx, cfg, hc, nil, nil, name)

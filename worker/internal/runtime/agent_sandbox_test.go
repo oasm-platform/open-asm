@@ -110,6 +110,18 @@ func TestBuildAgentSandboxConfig_HostHardening(t *testing.T) {
 	}
 }
 
+// Issue #734: without CPU CFS quota the daemon rejects NanoCPUs, so the sandbox
+// drops only the CPU limit and keeps memory and PID caps.
+func TestBuildAgentSandboxConfigWithoutCFS(t *testing.T) {
+	_, hc := BuildAgentSandboxConfig(AgentSandboxSpec{Image: "x", SessionID: "s", CPUQuotaUnsupported: true})
+	if hc.Resources.NanoCPUs != 0 {
+		t.Errorf("NanoCPUs = %d, want 0 without CFS quota", hc.Resources.NanoCPUs)
+	}
+	if hc.Resources.Memory <= 0 || hc.Resources.PidsLimit == nil {
+		t.Errorf("memory and PID caps must stay set: Memory=%d PidsLimit=%v", hc.Resources.Memory, hc.Resources.PidsLimit)
+	}
+}
+
 // Only the tools mount, read-only: no docker.sock, no state/token volume,
 // no other host path.
 func TestBuildAgentSandboxConfig_OnlyReadOnlyToolsMount(t *testing.T) {
