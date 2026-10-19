@@ -181,6 +181,7 @@ export class RemoteExecuteService {
     workspaceId: string,
     timeoutMs = 60_000,
     onEvent?: ResultEventListener,
+    abortSignal?: AbortSignal,
   ): Promise<RemoteCommandResult> {
     return this.collectResults(
       sessionId,
@@ -193,7 +194,7 @@ export class RemoteExecuteService {
           command,
         ),
       timeoutMs,
-      { onEvent },
+      { onEvent, abortSignal },
     );
   }
 

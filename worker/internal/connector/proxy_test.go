@@ -272,7 +272,9 @@ func TestUnregisterConnectorRemovesStream(t *testing.T) {
 		t.Fatal("expected HasStream=true after register")
 	}
 
-	p.UnregisterConnector("exec-1")
+	if owner := p.UnregisterConnector(stream); owner != "exec-1" {
+		t.Fatalf("UnregisterConnector owner = %q, want exec-1", owner)
+	}
 	if p.HasStream("exec-1") {
 		t.Fatal("expected HasStream=false after unregister")
 	}

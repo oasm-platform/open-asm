@@ -279,27 +279,33 @@ func (s *Server) Connect(stream pb.ConnectorService_ConnectServer) error {
 	// (EOF/error → ContainerDown → sweep), which keeps this handler from
 	// returning until the container is removed.
 	seenExecIDs := make(map[string]bool)
+	// streamDown tears the container down for the execution that owns it NOW:
+	// after warm-pool reuse that is a later execution than reg.ExecutionId,
+	// whose pool and proxy mappings are already gone. Its result channel is
+	// closed even if it never sent a Result, so its drain cannot hang.
+	streamDown := func(err error) {
+		for execID := range seenExecIDs {
+			s.proxy.OnConnectorDown(execID)
+		}
+		owner := s.proxy.UnregisterConnector(stream)
+		if owner == "" {
+			owner = reg.ExecutionId
+		}
+		s.proxy.OnConnectorDown(owner)
+		s.notifyContainerDown(owner)
+		s.logWarning("connector stream closed: exec=%s err=%v", owner, err)
+	}
 	for {
 		msg, err := stream.Recv()
 		if err == io.EOF {
 			// Stream ended without a Done (or the container was swept): the
 			// container can never be reused — evict it from the pool.
-			for execID := range seenExecIDs {
-				s.proxy.OnConnectorDown(execID)
-			}
-			s.proxy.UnregisterConnector(reg.ExecutionId)
-			s.notifyContainerDown(reg.ExecutionId)
-			s.logWarning("connector stream closed: exec=%s err=EOF", reg.ExecutionId)
+			streamDown(err)
 			return nil
 		}
 		if err != nil {
 			// Stream error — evict the container.
-			for execID := range seenExecIDs {
-				s.proxy.OnConnectorDown(execID)
-			}
-			s.proxy.UnregisterConnector(reg.ExecutionId)
-			s.notifyContainerDown(reg.ExecutionId)
-			s.logWarning("connector stream closed: exec=%s err=%v", reg.ExecutionId, err)
+			streamDown(err)
 			return err
 		}
 

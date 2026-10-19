@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -120,5 +121,9 @@ func TestManagerSubmit_RegistryLaneReplicaCapStillApplies(t *testing.T) {
 	_, err := m.Submit(context.Background(), spec)
 	if !errors.Is(err, ErrPoolExhausted) || errors.Is(err, ErrNodeBudgetExhausted) {
 		t.Fatalf("want plain ErrPoolExhausted, got %v", err)
+	}
+	// The job that finally gives up reports this error: it must say why.
+	if !strings.Contains(err.Error(), "busy=1 max=1") {
+		t.Fatalf("exhausted error must carry pool diagnostics, got %v", err)
 	}
 }

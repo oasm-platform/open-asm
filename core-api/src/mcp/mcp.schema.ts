@@ -8,6 +8,7 @@ export const getManyBaseRequestSchema = z.object({
     .number()
     .int()
     .positive()
+    .max(100)
     .optional()
     .default(100)
     .describe(

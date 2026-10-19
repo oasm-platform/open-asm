@@ -96,6 +96,11 @@ type PoolManager struct {
 	// each spawn a replica (the race that started 12 nuclei containers for a cap
 	// of 1). ReleaseReplica drops it on Create/Start failure or after Add.
 	pendingReplicas map[string]replicaRequest
+	// freedByKey / freedTotal count busy slots freed (released or evicted) per
+	// pool key and node-wide. A job queued on ErrPoolExhausted watches them to
+	// tell a draining queue from a wedged one.
+	freedByKey map[string]uint64
+	freedTotal uint64
 	// now is injectable for deterministic Sweep tests; defaults to time.Now.
 	now func() time.Time
 }
@@ -119,6 +124,7 @@ func NewPoolManager(idleTimeout time.Duration, maxReplicasPerImage, maxJobsPerCo
 		idleByKey:           map[string][]string{},
 		owner:               map[string]string{},
 		pendingReplicas:     map[string]replicaRequest{},
+		freedByKey:          map[string]uint64{},
 		now:                 time.Now,
 	}
 }
@@ -254,6 +260,9 @@ func (p *PoolManager) ReleaseToIdle(execID string) {
 		return
 	}
 	if e, ok := p.byID[cid]; ok && e.ExecID == execID {
+		if e.State == PoolStateBusy {
+			p.markFreedLocked(e.PoolKey)
+		}
 		e.State = PoolStateIdle
 		e.ExecID = ""
 		e.LastUsedAt = p.now()
@@ -313,6 +322,8 @@ func (p *PoolManager) Evict(execID string) string {
 	}
 	if e.State == PoolStateIdle {
 		p.unindexIdle(cid, e.PoolKey)
+	} else {
+		p.markFreedLocked(e.PoolKey)
 	}
 	delete(p.byID, cid)
 	delete(p.owner, execID)
@@ -335,6 +346,20 @@ func (p *PoolManager) IsIdle(execID string) bool {
 	}
 	e, ok := p.byID[cid]
 	return ok && e.State == PoolStateIdle
+}
+
+// markFreedLocked records that a busy slot of key was freed (must hold mu).
+func (p *PoolManager) markFreedLocked(key string) {
+	p.freedByKey[key]++
+	p.freedTotal++
+}
+
+// FreedSlots reports how many busy slots have been freed for poolKey and
+// node-wide since the pool was created. Monotonic; only changes matter.
+func (p *PoolManager) FreedSlots(poolKey string) (image, node uint64) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.freedByKey[normalizePoolKey(poolKey)], p.freedTotal
 }
 
 // busyCount reports how many containers of a pool key are currently busy.

@@ -206,3 +206,33 @@ func TestPoolSweepClearsOwnerMappingOfExpiredIdle(t *testing.T) {
 		t.Fatalf("owner map must be empty after the container is swept, got %v", p.owner)
 	}
 }
+
+// A queued job tells a draining pool from a wedged one by FreedSlots: only a
+// busy slot being released or evicted counts, per key and node-wide (#717).
+func TestPoolFreedSlotsCountsOnlyFreedBusySlots(t *testing.T) {
+	p, now := newPoolForTest(t, time.Unix(1_000, 0))
+	p.Add(idleEntry("c1", "nuclei", now))
+	p.Add(idleEntry("c2", "nmap", now))
+
+	if _, ok := p.Acquire("exec-1", "nuclei"); !ok {
+		t.Fatal("acquire c1")
+	}
+	p.ReleaseToIdle("exec-1")
+	p.ReleaseToIdle("exec-1") // already idle: no second free
+	if img, node := p.FreedSlots("NUCLEI"); img != 1 || node != 1 {
+		t.Fatalf("after release: image=%d node=%d, want 1/1", img, node)
+	}
+
+	if _, ok := p.Acquire("exec-2", "nmap"); !ok {
+		t.Fatal("acquire c2")
+	}
+	p.Evict("exec-2") // busy evict frees a slot of another image
+	if img, node := p.FreedSlots("nuclei"); img != 1 || node != 2 {
+		t.Fatalf("after nmap evict: image=%d node=%d, want 1/2", img, node)
+	}
+
+	p.Evict("exec-1") // c1 is idle: evicting it frees no busy slot
+	if img, node := p.FreedSlots("nuclei"); img != 1 || node != 2 {
+		t.Fatalf("after idle evict: image=%d node=%d, want 1/2", img, node)
+	}
+}
