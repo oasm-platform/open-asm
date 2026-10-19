@@ -27,6 +27,8 @@ export const slackSchema = {
       title: 'Webhook URL',
       description:
         'Slack incoming webhook URL, e.g. https://hooks.slack.com/services/...',
+      // The URL embeds the webhook's secret, so it is encrypted and masked like a token.
+      'ui:widget': 'password',
       'ui:placeholder': 'https://hooks.slack.com/services/T00/B00/xxxx',
     },
     username: {

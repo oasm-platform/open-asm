@@ -11,7 +11,11 @@ import {
   runConnector,
   testConnectorConnection,
 } from './connectors/connector.factory';
+import { randomBytes } from 'crypto';
 import {
+  decryptSensitiveConfigFields,
+  encryptSensitiveConfigFields,
+  maskSensitiveConfigFields,
   restoreMaskedSecrets,
   validateIntegrationConfig,
 } from './validators/integration.validator';
@@ -149,6 +153,29 @@ describe('integration capabilities', () => {
       expect(restoreMaskedSecrets({ apiToken: 'ghp_new' }, stored)).toEqual({
         apiToken: 'ghp_new',
       });
+    });
+  });
+
+  describe('webhookUrl secrecy', () => {
+    const webhookUrl = 'https://hooks.slack.com/services/T00/B00/secretabcd';
+    const dek = randomBytes(32);
+
+    it('encrypts at rest, decrypts back and masks in responses', () => {
+      const encrypted = encryptSensitiveConfigFields({ webhookUrl }, dek);
+      expect(encrypted.webhookUrl).not.toContain('secret');
+      expect(decryptSensitiveConfigFields(encrypted, dek)).toEqual({ webhookUrl });
+      expect(maskSensitiveConfigFields({ webhookUrl })).toEqual({ webhookUrl: '****abcd' });
+    });
+
+    it('still reads a webhookUrl stored as plain text before encryption', () => {
+      expect(decryptSensitiveConfigFields({ webhookUrl }, dek)).toEqual({ webhookUrl });
+    });
+
+    it('restores a masked webhookUrl so the uri format still validates', () => {
+      const config = restoreMaskedSecrets({ webhookUrl: '****abcd' }, { webhookUrl });
+      expect(
+        validateIntegrationConfig({ appType: 'slack', category: 'NOTIFICATION', config }).valid,
+      ).toBe(true);
     });
   });
 
