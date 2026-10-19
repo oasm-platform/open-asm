@@ -145,6 +145,8 @@ interface UseAgentChatReturn {
   title: string | null;
   createdAt: string | null;
   todos: AgentTodoItem[];
+  /** Goal of the current plan, pinned above its todo list */
+  goal: string | null;
   /** Model, context usage and token/cost stats of the conversation */
   conversationMeta: ConversationMetadataDto | null;
   /** Background subagents: from the detail, then from stream updates */
@@ -155,7 +157,10 @@ interface UseAgentChatReturn {
   hasSentFirstMessage: boolean;
   hasMoreMessages: boolean;
   isLoadingMoreMessages: boolean;
-  remoteExecuteEvents: Map<string, import('@/hooks/use-remote-execute-stream').RemoteExecuteStreamEvent[]>;
+  remoteExecuteEvents: Map<
+    string,
+    import('@/hooks/use-remote-execute-stream').RemoteExecuteStreamEvent[]
+  >;
   onSendMessage: (content: string, options?: { agentMode?: string }) => void;
   onRetry: (() => void) | undefined;
   onStop: () => void;
@@ -202,7 +207,8 @@ function isServerStreaming(
     ? first
     : ((first as { data?: unknown[] })?.data ?? []);
   const latest = list[0] as Record<string, unknown> | undefined;
-  if (!latest || String(latest.role).toLowerCase() !== 'assistant') return false;
+  if (!latest || String(latest.role).toLowerCase() !== 'assistant')
+    return false;
   const status = (latest.metadata as { status?: string } | undefined)?.status;
   return status === 'streaming';
 }
@@ -288,19 +294,23 @@ export function seedFromSaved(
   pages: Array<{ data?: unknown[] } | unknown[]> | undefined,
 ): UIMessage[] {
   const trailingInProgress =
-    isServerStreaming(pages) &&
-    savedMessages.at(-1)?.role === 'assistant';
+    isServerStreaming(pages) && savedMessages.at(-1)?.role === 'assistant';
   return trailingInProgress ? savedMessages.slice(0, -1) : savedMessages;
 }
 
 function mapDbMessagesToUI(
-  pages: Array<{ data?: unknown[]; items?: unknown[]; messages?: unknown[] } | unknown[]>,
+  pages: Array<
+    { data?: unknown[]; items?: unknown[]; messages?: unknown[] } | unknown[]
+  >,
 ): UIMessage[] {
   const dataArray = pages
     .flatMap((p) => {
       if (Array.isArray(p)) return p;
       const pageData = p as Record<string, unknown>;
-      return (pageData?.data ?? pageData?.items ?? pageData?.messages ?? []) as unknown[];
+      return (pageData?.data ??
+        pageData?.items ??
+        pageData?.messages ??
+        []) as unknown[];
     })
     .reverse();
 
@@ -402,6 +412,7 @@ export function useAgentChat({
   const abortRetryRef = useRef<AbortController | null>(null);
   const isUserStoppedRef = useRef(false);
   const [todos, setTodos] = useState<AgentTodoItem[]>([]);
+  const [goal, setGoal] = useState<string | null>(null);
   const [title, setTitle] = useState<string | null>(null);
   const [createdAt, setCreatedAt] = useState<string | null>(null);
   const [conversationMeta, setConversationMeta] =
@@ -417,7 +428,9 @@ export function useAgentChat({
   const pendingApproval = approvalQueue[0] ?? null;
   const [isDecidingApproval, setIsDecidingApproval] = useState(false);
   const { preferredProvider } = useLLMConfigs();
-  const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(null);
+  const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(
+    null,
+  );
   const selectedModelRef = useRef<SelectedModel | null>(selectedModel);
   const hasUserSelectedModel = useRef(false);
 
@@ -435,9 +448,7 @@ export function useAgentChat({
   }, [preferredProvider]);
   const [agentMode, setAgentMode] = useState('ask');
   const agentModeRef = useRef('ask');
-  const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(
-    null,
-  );
+  const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
 
   const {
     state: { selectedWorkspaceId },
@@ -469,7 +480,10 @@ export function useAgentChat({
     }
     // Once left, it is loaded like any other: the modes on screen belong to
     // the conversation switched to
-    if (startedHereIdRef.current && conversationId !== startedHereIdRef.current) {
+    if (
+      startedHereIdRef.current &&
+      conversationId !== startedHereIdRef.current
+    ) {
       startedHereIdRef.current = undefined;
     }
   }, [conversationId, createdHereId]);
@@ -601,7 +615,10 @@ export function useAgentChat({
       setStreamError(error.message ?? 'An error occurred while streaming');
 
       // For permanent errors or retries exhausted, reset retry state immediately.
-      if (!isTransientError(error) || retryCountRef.current >= MAX_AUTO_RETRIES) {
+      if (
+        !isTransientError(error) ||
+        retryCountRef.current >= MAX_AUTO_RETRIES
+      ) {
         setIsRetrying(false);
         retryCountRef.current = 0;
         setRetryCount(0);
@@ -609,7 +626,10 @@ export function useAgentChat({
     },
     onData: (data: { type: string; data: unknown }) => {
       if (data.type === 'data-todos-updated') {
-        const payload = data.data as { todos: AgentTodoItem[] } | undefined;
+        const payload = data.data as
+          { todos: AgentTodoItem[]; goal?: string | null } | undefined;
+        // Only sent when the plan tools changed it (null: unpinned)
+        if (payload && payload.goal !== undefined) setGoal(payload.goal);
         if (payload?.todos) {
           // Use functional update to avoid stale closure issues
           setTodos((prevTodos) => {
@@ -642,19 +662,23 @@ export function useAgentChat({
       if (data.type === 'data-conversation-stats') {
         // Sent once a turn ends: model, context usage and turn stats
         const payload = data.data as
-          | { metadata?: ConversationMetadataDto }
-          | undefined;
-        if (payload?.metadata) setConversationMeta(payload.metadata);
+          { metadata?: ConversationMetadataDto } | undefined;
+        if (payload?.metadata) {
+          setConversationMeta(payload.metadata);
+          if (payload.metadata.goal !== undefined) {
+            setGoal(payload.metadata.goal);
+          }
+        }
       }
       if (data.type === 'data-subagents-updated') {
         // Sent on every subagent status change, with the whole list
         const payload = data.data as
-          | { subagents?: SubagentResponseDto[] }
-          | undefined;
+          { subagents?: SubagentResponseDto[] } | undefined;
         if (payload?.subagents) setSubagents(payload.subagents);
       }
       if (data.type === 'data-remote-execute-output') {
-        const event = data.data as import('@/hooks/use-remote-execute-stream').RemoteExecuteStreamEvent;
+        const event =
+          data.data as import('@/hooks/use-remote-execute-stream').RemoteExecuteStreamEvent;
         appendEvent(event);
       }
     },
@@ -854,6 +878,14 @@ export function useAgentChat({
     retryCountRef.current = 0;
     setRetryCount(0);
     setIsRetrying(false);
+    // Stop the spinner on the current todo step right away: a stopped run has
+    // no step running. The server resets it too (for the next load); this is
+    // the optimistic local reflection, since the stream is closing.
+    setTodos((prev) =>
+      prev.map((t) =>
+        t.status === 'in_progress' ? { ...t, status: 'pending' } : t,
+      ),
+    );
     // Dropping the stream no longer aborts the run (so navigating away keeps
     // it going); an explicit stop must tell the server to abort it.
     if (conversationId) {
@@ -911,8 +943,7 @@ export function useAgentChat({
     if (!isTransientError(testError)) return;
 
     const backoffMs =
-      BASE_RETRY_DELAY_MS * Math.pow(2, retryCount) +
-      Math.random() * 500;
+      BASE_RETRY_DELAY_MS * Math.pow(2, retryCount) + Math.random() * 500;
 
     const controller = new AbortController();
     abortRetryRef.current = controller;
@@ -1010,6 +1041,7 @@ export function useAgentChat({
     setSubagents([]);
     if (!conversationId) {
       setTodos([]);
+      setGoal(null);
       setConversationMeta(null);
       restoreApprovalMode();
       return;
@@ -1048,6 +1080,7 @@ export function useAgentChat({
         }
         if (!cancelled) {
           setConversationMeta(data.metadata ?? null);
+          setGoal(data.metadata?.goal ?? null);
           setSubagents(data.subagents ?? []);
         }
         const savedApprovalMode = (data as { approvalMode?: string })
@@ -1125,6 +1158,7 @@ export function useAgentChat({
     isRetrying,
     retryAttempt: retryCount,
     todos,
+    goal,
     conversationMeta,
     subagents,
     title,
