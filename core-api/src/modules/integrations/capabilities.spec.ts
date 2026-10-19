@@ -156,7 +156,7 @@ describe('integration capabilities', () => {
     });
   });
 
-  describe('webhookUrl secrecy', () => {
+  describe('webhook URL secrecy', () => {
     const webhookUrl = 'https://hooks.slack.com/services/T00/B00/secretabcd';
     const dek = randomBytes(32);
 
@@ -175,6 +175,18 @@ describe('integration capabilities', () => {
       const config = restoreMaskedSecrets({ webhookUrl: '****abcd' }, { webhookUrl });
       expect(
         validateIntegrationConfig({ appType: 'slack', category: 'NOTIFICATION', config }).valid,
+      ).toBe(true);
+    });
+
+    it('treats the generic webhook url as a secret too', () => {
+      const url = 'https://hooks.example.com/webhook?token=secretabcd';
+      const encrypted = encryptSensitiveConfigFields({ url }, dek);
+      expect(encrypted.url).not.toContain('secret');
+      expect(maskSensitiveConfigFields({ url })).toEqual({ url: '****abcd' });
+
+      const config = restoreMaskedSecrets({ url: '****abcd' }, { url });
+      expect(
+        validateIntegrationConfig({ appType: 'webhook', category: 'NOTIFICATION', config }).valid,
       ).toBe(true);
     });
   });

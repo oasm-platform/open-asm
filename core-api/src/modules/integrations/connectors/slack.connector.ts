@@ -68,8 +68,7 @@ export class SlackConnector extends NotificationConnector {
       );
     }
 
-    this.logger.log(`Sending Slack notification to ${webhookUrl}`);
-
+    // The webhook URL embeds its secret, so it is never logged.
     const body: Record<string, unknown> = {
       text,
     };
@@ -87,7 +86,7 @@ export class SlackConnector extends NotificationConnector {
     if (!response.ok) {
       const errorBody = await response.text();
       this.logger.error(
-        `Slack API error (${webhookUrl}): ${response.status} — ${errorBody}`,
+        `Slack API error: ${response.status} — ${errorBody}`,
       );
       throw new Error(
         `Slack webhook returned ${response.status}: ${errorBody}`,

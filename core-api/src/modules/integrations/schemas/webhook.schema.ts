@@ -26,6 +26,8 @@ export const webhookSchema = {
       format: 'uri',
       title: 'Webhook URL',
       description: 'Target webhook endpoint URL.',
+      // Endpoints often carry a token in the path or query, so treat the URL as a secret.
+      'ui:widget': 'password',
       'ui:placeholder': 'https://hooks.example.com/webhook',
     },
     ...notificationTypeProperties,

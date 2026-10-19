@@ -71,8 +71,7 @@ export class WebhookConnector extends NotificationConnector {
       );
     }
 
-    this.logger.log(`Sending webhook notification to ${url}`);
-
+    // The URL may embed a token, so it is never logged.
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -91,14 +90,14 @@ export class WebhookConnector extends NotificationConnector {
     if (!response.ok) {
       const errorBody = await response.text();
       this.logger.error(
-        `Webhook API error (${url}): ${response.status} — ${errorBody}`,
+        `Webhook API error: ${response.status} — ${errorBody}`,
       );
       throw new Error(
-        `Webhook returned ${response.status} for ${url}: ${errorBody}`,
+        `Webhook returned ${response.status}: ${errorBody}`,
       );
     }
 
-    this.logger.log(`Webhook notification sent to ${url}`);
+    this.logger.log('Webhook notification sent successfully');
   }
 }
 
