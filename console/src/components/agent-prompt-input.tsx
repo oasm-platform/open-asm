@@ -22,11 +22,8 @@ interface AgentPromptInputProps {
   } | null;
   onSelectModel?: (provider: string, model: string, configId: string) => void;
   agentMode?: string;
-  onAgentModeChange?: (mode: string) => void;
   selectedWorkerId?: string | null;
   onWorkerSelect?: (workerId: string | null) => void;
-  /** False when the page renders the Agent toggle outside the input. */
-  showAgentModeToggle?: boolean;
   /** False hides the agent settings gear next to the model picker. */
   showSettingsButton?: boolean;
   placeholder?: string;
@@ -44,10 +41,8 @@ export default function AgentPromptInput({
   selectedModel,
   onSelectModel,
   agentMode = 'ask',
-  onAgentModeChange,
   selectedWorkerId,
   onWorkerSelect,
-  showAgentModeToggle = true,
   showSettingsButton = true,
   placeholder = 'Ask anything about security...',
   className,
@@ -91,15 +86,11 @@ export default function AgentPromptInput({
             )}
           </PromptInputTools>
           <div className="flex items-center gap-2">
-            {onAgentModeChange && (
-              <AgentModeSelect
-                value={agentMode}
-                onChange={onAgentModeChange}
-                selectedWorkerId={selectedWorkerId}
-                onWorkerChange={onWorkerSelect}
-                showToggle={showAgentModeToggle}
-              />
-            )}
+            <AgentModeSelect
+              value={agentMode}
+              selectedWorkerId={selectedWorkerId}
+              onWorkerChange={onWorkerSelect}
+            />
             <PromptInputSubmit
               status={isSending ? 'streaming' : 'ready'}
               disabled={!input.trim() || isSending}

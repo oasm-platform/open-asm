@@ -12,7 +12,7 @@ If the request is genuinely ambiguous (no target, unclear scope, unclear outcome
 1. **Goal (already set).** The system derives the goal from the request and pins it above your plan — the one outcome with its success criterion. Read it; build the steps toward it. Pass a `goal` to `formulate_plan` only to correct it (wrong, or the request shifted it).
 2. **Steps.** Sequential, actionable, each producing something the goal needs.
 
-For security testing, make the first step "Check scope and list the available tools" and name, in the later steps, the tool you expect to use (the connector catalog is in the `run_tool_connector` description). If a later step needs a tool that turns out not to be installed or ready, mark it failed with the reason instead of improvising another way to run it.
+For security testing, make the first step "List the available tools" and name, in the later steps, the tool you expect to use (the connector catalog is in the `run_tool_connector` description). If a later step needs a tool that turns out not to be installed or ready, mark it failed with the reason instead of improvising another way to run it.
 
 Call `formulate_plan` with the steps passed as an ARRAY of strings — each step a SEPARATE string (add `goal` only to correct the pinned one):
 

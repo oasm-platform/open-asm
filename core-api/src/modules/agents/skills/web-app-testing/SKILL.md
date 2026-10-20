@@ -1,21 +1,21 @@
 ---
 name: web-app-testing
-description: OWASP-aligned methodology for authorized, non-destructive web application security testing — auth, access control, injection, SSRF, misconfiguration and sensitive-data exposure — with safe proofs and evidence capture. Use when assessing a web app or API in scope.
+description: OWASP-aligned methodology for authorized, non-destructive web application security testing — auth, access control, injection, SSRF, misconfiguration and sensitive-data exposure — with safe proofs and evidence capture. Use when assessing a web app or API.
 ---
 
 # Web application testing
 
-Use this skill to assess an in-scope web application or API the way a professional does: methodically, by category, with safe proofs. Follow the OWASP Web Security Testing Guide (WSTG) structure and the OWASP Top 10 as the coverage checklist. Every test is read-mostly and non-destructive — you demonstrate a weakness, you do not exploit it for impact.
+Use this skill to assess a web application or API the way a professional does: methodically, by category, with safe proofs. Follow the OWASP Web Security Testing Guide (WSTG) structure and the OWASP Top 10 as the coverage checklist. Every test is read-mostly and non-destructive — you demonstrate a weakness, you do not exploit it for impact.
 
 ## When to use
 
-- A web app, site or API is in scope and you need to test it for vulnerabilities.
+- You need to test a web app, site or API for vulnerabilities.
 - You found an entry point in recon and want to assess it by category.
 - You need to produce evidence a weakness exists without harming the app.
 
 ## Goal and todo first (Agent mode)
 
-`formulate_plan(steps)` with the pinned goal (e.g. "Assess the auth and access control of app.example.com for exploitable weaknesses, with evidence"), then `transition_step(id, "in_progress")`. First step: "Confirm scope (`retrieve_targets`) and map the app (`httpx`, `screenshot`, `fingerprint_technologies`)".
+`formulate_plan(steps)` with the pinned goal (e.g. "Assess the auth and access control of app.example.com for exploitable weaknesses, with evidence"), then `transition_step(id, "in_progress")`. First step: "Map the app (`httpx`, `screenshot`, `fingerprint_technologies`)".
 
 ## Coverage checklist
 
@@ -46,7 +46,7 @@ Work the categories that fit the app; skip those that do not apply and say why. 
 
 ## Safety
 
-- Only in-scope hosts (`retrieve_targets`). Respect approvals; if a step is rejected, do not retry it.
+- Respect approvals; if a step is rejected, do not retry it.
 - No denial of service, no mass or automated destructive actions, no data exfiltration, no persistence.
 - Stop at the minimum that proves the point; hand off confirmation of impact to `exploit-verification`.
 

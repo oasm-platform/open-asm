@@ -316,16 +316,25 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    * Removes all registered callbacks for this channel to prevent memory leaks.
    *
    * @param channel - Redis channel name
+   * @param callback - Remove only this listener, and leave the channel while
+   *   no other listener of this process still reads it
    */
-  public async unsubscribe(channel: string): Promise<void> {
+  public async unsubscribe(
+    channel: string,
+    callback?: MessageCallback,
+  ): Promise<void> {
     try {
       const callbacks = this.channelCallbacks.get(channel);
-      if (callbacks) {
-        for (const callback of callbacks) {
-          this.subscriber.removeListener('message', callback);
+      if (callback) {
+        this.subscriber.removeListener('message', callback);
+        callbacks?.delete(callback);
+        if (callbacks?.size) return;
+      } else if (callbacks) {
+        for (const registered of callbacks) {
+          this.subscriber.removeListener('message', registered);
         }
-        this.channelCallbacks.delete(channel);
       }
+      this.channelCallbacks.delete(channel);
       await this.subscriber.unsubscribe(channel);
     } catch (error) {
       const errorMessage =

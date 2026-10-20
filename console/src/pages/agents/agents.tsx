@@ -1,5 +1,13 @@
 import { CommandApprovalPrompt } from './components/command-approval-prompt';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { useAgentChat } from '@/hooks/use-agent-chat';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { useParams } from '@tanstack/react-router';
 import { useCallback, useState } from 'react';
 import { ChatConversation } from './components/chat-conversation';
@@ -21,6 +29,7 @@ const SIDE_PANEL_STORAGE_KEY = 'agent-side-panel-open';
 
 export default function AgentsChatPage() {
   const { conversationId } = useParams({ strict: false });
+  const isMobile = useIsMobile();
   const isLargeScreen = useMediaQuery('(min-width: 1024px)');
 
   const {
@@ -49,7 +58,6 @@ export default function AgentsChatPage() {
     onSelectModel,
     onDismissError,
     onLoadMore,
-    onAgentModeChange,
     onWorkerSelect,
     pendingApproval,
     pendingApprovalCount,
@@ -74,12 +82,18 @@ export default function AgentsChatPage() {
     }
   }, []);
 
+  // Smaller screens have no room to split: the panel opens full screen there,
+  // for a look, so it is not kept like the split one
+  const [sheetOpen, setSheetOpen] = useState(false);
+
   const [panelTab, setPanelTab] = useState<SidePanelTab>('plan');
 
   const [selectedToolCallId, setSelectedToolCallId] = useState<string | null>(
     null,
   );
   const handleSelectToolCall = useCallback((id: string) => {
+    // Full screen, the panel covers the chat: close it to show the call
+    setSheetOpen(false);
     setSelectedToolCallId(id);
     // Reset after scroll animation completes
     setTimeout(() => setSelectedToolCallId(null), 2500);
@@ -99,8 +113,26 @@ export default function AgentsChatPage() {
       const firstWithContent = SIDE_PANEL_TABS.find((t) => panelContent[t]);
       if (firstWithContent) setPanelTab(firstWithContent);
     }
-    setPanel(true);
+    if (isLargeScreen) setPanel(true);
+    else setSheetOpen(true);
   };
+
+  const renderSidePanel = (onClose: () => void) => (
+    <ChatSidePanel
+      tab={panelTab}
+      onTabChange={setPanelTab}
+      onClose={onClose}
+      todos={todos}
+      goal={goal}
+      subagents={subagents}
+      messages={messages}
+      metadata={conversationMeta}
+      conversationId={conversationId}
+      onSelectToolCall={handleSelectToolCall}
+      remoteExecuteEvents={remoteExecuteEvents}
+      className="flex-1"
+    />
+  );
 
   return (
     // Fills the layout's main area edge to edge (the negative margins undo
@@ -114,8 +146,11 @@ export default function AgentsChatPage() {
             conversationId={conversationId}
             title={title}
             createdAt={createdAt}
-            onOpenPanel={panelOpen ? undefined : handleOpenPanel}
+            onOpenPanel={
+              isLargeScreen && panelOpen ? undefined : handleOpenPanel
+            }
             hasActivity={subagents.some(isSubagentActive)}
+            agentMode={agentMode}
           />
           <ChatConversation
             messages={messages}
@@ -136,14 +171,13 @@ export default function AgentsChatPage() {
             hasMoreMessages={hasMoreMessages}
             isLoadingMoreMessages={isLoadingMoreMessages}
             agentMode={agentMode}
-            onAgentModeChange={onAgentModeChange}
             selectedWorkerId={selectedWorkerId}
             onWorkerSelect={onWorkerSelect}
             todos={todos}
             goal={goal}
-            // Large screens keep the plan in the side panel only; smaller
-            // ones have no panel, so it sits above the input there
-            showTodoAboveInput={!isLargeScreen}
+            // Large screens and mobile keep the plan in the side panel
+            // only; in between it also sits above the input
+            showTodoAboveInput={!isMobile && !isLargeScreen}
             selectedToolCallId={selectedToolCallId}
             remoteExecuteEvents={remoteExecuteEvents}
             approvalPrompt={
@@ -165,23 +199,27 @@ export default function AgentsChatPage() {
             calls or turn stats one tab at a time */}
         {panelOpen && (
           <aside className="hidden lg:flex w-2/5 xl:w-1/2 2xl:max-w-3xl shrink-0 flex-col border-l animate-in fade-in-0 slide-in-from-right-4 duration-300">
-            <ChatSidePanel
-              tab={panelTab}
-              onTabChange={setPanelTab}
-              onClose={() => setPanel(false)}
-              todos={todos}
-              goal={goal}
-              subagents={subagents}
-              messages={messages}
-              metadata={conversationMeta}
-              conversationId={conversationId}
-              onSelectToolCall={handleSelectToolCall}
-              remoteExecuteEvents={remoteExecuteEvents}
-              className="flex-1"
-            />
+            {renderSidePanel(() => setPanel(false))}
           </aside>
         )}
       </div>
+
+      {/* Side panel below lg: full screen over the chat. The panel has its
+          own close button, so the sheet's is hidden */}
+      <Sheet open={sheetOpen && !isLargeScreen} onOpenChange={setSheetOpen}>
+        <SheetContent
+          side="right"
+          className="w-full gap-0 p-0 sm:max-w-none [&>button]:hidden"
+        >
+          <SheetHeader className="sr-only">
+            <SheetTitle>Side panel</SheetTitle>
+            <SheetDescription>
+              Plan, subagents, tool calls and stats of this conversation.
+            </SheetDescription>
+          </SheetHeader>
+          {renderSidePanel(() => setSheetOpen(false))}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

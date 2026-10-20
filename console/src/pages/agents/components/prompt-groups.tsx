@@ -88,18 +88,18 @@ export function PromptGroups({
           <motion.div
             key={active.id}
             {...fade}
-            className="mx-2 overflow-hidden rounded-2xl border bg-card shadow-sm"
+            className="overflow-hidden rounded-lg border bg-muted"
           >
-            <div className="flex items-center justify-between pl-4 pr-2 pt-2.5 pb-1">
-              <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                <active.icon className="size-3.5" />
+            <div className="relative flex items-center py-1.5 pl-3 pr-9">
+              <span className="flex items-center gap-1.5 text-sm font-medium text-foreground/90">
+                <active.icon className="size-4 shrink-0 text-muted-foreground" />
                 {active.label}
               </span>
               <button
                 type="button"
                 aria-label="Close"
                 onClick={() => setActiveId(null)}
-                className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground cursor-pointer"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground cursor-pointer"
               >
                 <X className="size-4" />
               </button>
