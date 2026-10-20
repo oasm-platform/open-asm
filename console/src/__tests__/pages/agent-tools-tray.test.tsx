@@ -4,17 +4,12 @@ import { renderWithProviders, screen, waitFor } from '@/test/utils';
 import { AgentToolsTray } from '@/pages/agents/components/agent-tools-tray';
 
 const getManyToolsMock = vi.fn();
-const openSettingsMock = vi.fn();
 const motion = vi.hoisted(() => ({ reduce: false }));
 
 // Reduced motion skips exit animations, which never finish under jsdom.
 vi.mock('framer-motion', async (importOriginal) => ({
   ...(await importOriginal<typeof import('framer-motion')>()),
   useReducedMotion: () => motion.reduce,
-}));
-
-vi.mock('@/hooks/useAgentSettingsDialog', () => ({
-  useAgentSettingsDialog: () => ({ open: openSettingsMock }),
 }));
 
 vi.mock('@/hooks/useWorkspaceSelector', () => ({
@@ -118,7 +113,7 @@ describe('AgentToolsTray', () => {
       vi.advanceTimersByTime(5000);
     });
     expect(screen.getByText('Connectors')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Agent tools' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Agent tools' })).toBeInTheDocument();
   });
 
   it('shows the Agent toggle and one logo per tool', async () => {
@@ -155,14 +150,15 @@ describe('AgentToolsTray', () => {
     expect(onAgentModeChange).toHaveBeenCalledWith('agent');
   });
 
-  it('opens the Connectors tab of the agent settings from the logos', async () => {
+  it('links the logos to the connectors page', async () => {
     getManyToolsMock.mockReturnValue({ data: { data: [tool('subfinder')] } });
 
     renderWithProviders(
       <AgentToolsTray agentMode="ask" onAgentModeChange={vi.fn()} />,
     );
-    (await screen.findByRole('button', { name: 'Agent tools' })).click();
 
-    expect(openSettingsMock).toHaveBeenCalledWith('connectors');
+    expect(
+      await screen.findByRole('link', { name: 'Agent tools' }),
+    ).toHaveAttribute('href', '/aistudio/connectors');
   });
 });
