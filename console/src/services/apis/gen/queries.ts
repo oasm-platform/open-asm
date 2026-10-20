@@ -3125,7 +3125,10 @@ export type ConversationMetadataDto = {
   contextUsedTokens?: number;
   lastTurn?: TurnStatsDto;
   totals?: ConversationTotalsDto;
-  /** Goal of the current plan, pinned until it is replaced or dropped */
+  /**
+   * Goal of the current plan, pinned until it is replaced or dropped
+   * @nullable
+   */
   goal?: string | null;
   /** ISO time of the last metadata update */
   updatedAt?: string;
@@ -3228,6 +3231,78 @@ export type ConversationResponseDto = {
   metadata?: ConversationMetadataDto | null;
   /** Background subagent tasks dispatched in this conversation (detail only) */
   subagents?: SubagentResponseDto[];
+};
+
+export type SubagentToolCallDto = {
+  toolCallId: string;
+  toolName: string;
+  /**
+   * Tool input as JSON text, cut to size
+   * @nullable
+   */
+  input: string | null;
+  /**
+   * Tool output (JSON text unless it was a string), cut to size
+   * @nullable
+   */
+  output: string | null;
+  /** @nullable */
+  error: string | null;
+};
+
+export type SubagentStepDto = {
+  /**
+   * Text the model wrote in this step
+   * @nullable
+   */
+  text: string | null;
+  toolCalls: SubagentToolCallDto[];
+};
+
+export type SubagentDetailResponseDtoStatus =
+  (typeof SubagentDetailResponseDtoStatus)[keyof typeof SubagentDetailResponseDtoStatus];
+
+export const SubagentDetailResponseDtoStatus = {
+  pending: 'pending',
+  in_progress: 'in_progress',
+  completed: 'completed',
+  failed: 'failed',
+} as const;
+
+export type SubagentDetailResponseDto = {
+  id: string;
+  /** Subagent key */
+  name: string;
+  status: SubagentDetailResponseDtoStatus;
+  /** Task dispatched by the main agent */
+  task: string;
+  /**
+   * Final summary of the subagent
+   * @nullable
+   */
+  result: string | null;
+  /**
+   * Failure reason
+   * @nullable
+   */
+  error: string | null;
+  createdAt: string;
+  /** @nullable */
+  startedAt: string | null;
+  /** @nullable */
+  completedAt: string | null;
+  /**
+   * When the main agent received the result
+   * @nullable
+   */
+  deliveredAt: string | null;
+  sortOrder: number;
+  /** @nullable */
+  stats: TurnStatsDto | null;
+  /** Steps of the latest attempt, in order */
+  transcript: SubagentStepDto[];
+  /** Later steps were not recorded (size budget reached) */
+  transcriptTruncated: boolean;
 };
 
 export type GetManyConversationResponseDtoDto = {
@@ -32823,6 +32898,201 @@ export function useAgentsControllerGetConversationSubagents<
 } {
   const queryOptions = getAgentsControllerGetConversationSubagentsQueryOptions(
     id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * One subagent task with the transcript of its steps and tool calls
+ * @summary Get conversation subagent
+ */
+export const agentsControllerGetConversationSubagent = (
+  id: string,
+  subagentId: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SubagentDetailResponseDto>(
+    {
+      url: `/api/agents/conversations/${id}/subagents/${subagentId}`,
+      method: 'GET',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAgentsControllerGetConversationSubagentQueryKey = (
+  id: string,
+  subagentId: string,
+) => {
+  return [`/api/agents/conversations/${id}/subagents/${subagentId}`] as const;
+};
+
+export const getAgentsControllerGetConversationSubagentQueryOptions = <
+  TData = Awaited<ReturnType<typeof agentsControllerGetConversationSubagent>>,
+  TError = unknown,
+>(
+  id: string,
+  subagentId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetConversationSubagent>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAgentsControllerGetConversationSubagentQueryKey(id, subagentId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerGetConversationSubagent>>
+  > = ({ signal }) =>
+    agentsControllerGetConversationSubagent(
+      id,
+      subagentId,
+      requestOptions,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled:
+      id !== null &&
+      id !== undefined &&
+      subagentId !== null &&
+      subagentId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerGetConversationSubagent>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerGetConversationSubagentQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerGetConversationSubagent>>
+>;
+export type AgentsControllerGetConversationSubagentQueryError = unknown;
+
+export function useAgentsControllerGetConversationSubagent<
+  TData = Awaited<ReturnType<typeof agentsControllerGetConversationSubagent>>,
+  TError = unknown,
+>(
+  id: string,
+  subagentId: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetConversationSubagent>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetConversationSubagent>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetConversationSubagent>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetConversationSubagent<
+  TData = Awaited<ReturnType<typeof agentsControllerGetConversationSubagent>>,
+  TError = unknown,
+>(
+  id: string,
+  subagentId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetConversationSubagent>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetConversationSubagent>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetConversationSubagent>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetConversationSubagent<
+  TData = Awaited<ReturnType<typeof agentsControllerGetConversationSubagent>>,
+  TError = unknown,
+>(
+  id: string,
+  subagentId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetConversationSubagent>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get conversation subagent
+ */
+
+export function useAgentsControllerGetConversationSubagent<
+  TData = Awaited<ReturnType<typeof agentsControllerGetConversationSubagent>>,
+  TError = unknown,
+>(
+  id: string,
+  subagentId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetConversationSubagent>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAgentsControllerGetConversationSubagentQueryOptions(
+    id,
+    subagentId,
     options,
   );
 

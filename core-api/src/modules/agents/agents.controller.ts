@@ -20,6 +20,7 @@ import {
   HttpStatus,
   NotFoundException,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Put,
@@ -49,7 +50,10 @@ import {
 } from './dto/command-approval.dto';
 import { AgentsSkillsService } from './agents.skills';
 import { GetAgentModesResponseDto } from './dto/agent-mode.dto';
-import { SubagentResponseDto } from './dto/conversation-stats.dto';
+import {
+  SubagentDetailResponseDto,
+  SubagentResponseDto,
+} from './dto/conversation-stats.dto';
 import {
   ConversationResponseDto,
   UpdateConversationDto,
@@ -383,6 +387,35 @@ export class AgentsController {
   ): Promise<SubagentResponseDto[]> {
     return this.agentsService.getConversationSubagents(
       id,
+      workspaceId,
+      userId,
+    );
+  }
+
+  @WorkspaceAccess('agent.read')
+  @Get('conversations/:id/subagents/:subagentId')
+  @Doc({
+    summary: 'Get conversation subagent',
+    description:
+      'One subagent task with the transcript of its steps and tool calls',
+    request: {
+      getWorkspaceId: true,
+      params: [
+        { name: 'id', description: 'Conversation ID' },
+        { name: 'subagentId', description: 'Subagent ID' },
+      ],
+    },
+    response: { serialization: SubagentDetailResponseDto },
+  })
+  async getConversationSubagent(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('subagentId', ParseUUIDPipe) subagentId: string,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<SubagentDetailResponseDto> {
+    return this.agentsService.getConversationSubagent(
+      id,
+      subagentId,
       workspaceId,
       userId,
     );

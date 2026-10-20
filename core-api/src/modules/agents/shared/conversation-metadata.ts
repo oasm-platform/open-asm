@@ -57,6 +57,21 @@ export interface ConversationMetadata {
   updatedAt?: string;
 }
 
+/** One tool call of a subagent step; input/output are JSON text, cut to size. */
+export interface SubagentToolCall {
+  toolCallId: string;
+  toolName: string;
+  input: string | null;
+  output: string | null;
+  error: string | null;
+}
+
+/** One model step of a subagent run. */
+export interface SubagentStep {
+  text: string | null;
+  toolCalls: SubagentToolCall[];
+}
+
 /** Shape of `agent_subagents.metadata`. */
 export interface SubagentMetadata {
   model?: string;
@@ -65,6 +80,10 @@ export interface SubagentMetadata {
   attempts?: number;
   stats?: TurnStats;
   toolsUsed?: string[];
+  /** Steps of the current attempt, appended as each one ends. */
+  transcript?: SubagentStep[];
+  /** Later steps were not recorded: the transcript hit its size budget. */
+  transcriptTruncated?: boolean;
 }
 
 export interface MetadataDelta {

@@ -242,7 +242,7 @@ export function CommandApprovalPrompt({
           event.preventDefault();
           decide('rejected');
         }}
-        className="rounded-xl border bg-card p-4 shadow-sm"
+        className="rounded-2xl border bg-card p-4 shadow-md outline-none animate-in fade-in-0 slide-in-from-bottom-2 duration-200"
       >
       <div className="flex items-baseline gap-2">
         <DialogPrimitive.Title asChild>
@@ -313,19 +313,28 @@ export function CommandApprovalPrompt({
             onClick={option.run}
             onFocus={() => setSelected(index)}
             className={cn(
-              'flex items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors disabled:opacity-50',
+              'flex items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm outline-none transition-colors cursor-pointer disabled:opacity-50',
               selected === index
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'bg-muted/50 hover:bg-muted',
+                ? 'border-primary/60 bg-primary/10 text-foreground'
+                : 'bg-muted/40 hover:bg-muted',
             )}
           >
-            <span className="font-medium opacity-70">{index + 1}</span>
+            <span
+              className={cn(
+                'inline-flex size-5 shrink-0 items-center justify-center rounded-md border bg-background font-mono text-[11px] font-medium text-muted-foreground',
+                selected === index && 'border-primary/60 text-primary',
+              )}
+            >
+              {index + 1}
+            </span>
             <span className="flex flex-col">
               <span className={cn(selected === index && 'font-semibold')}>
                 {option.label}
               </span>
               {option.hint && (
-                <span className="text-xs opacity-70">{option.hint}</span>
+                <span className="text-xs text-muted-foreground">
+                  {option.hint}
+                </span>
               )}
             </span>
           </button>
@@ -343,13 +352,15 @@ export function CommandApprovalPrompt({
               : 'Tell the agent what to do instead'
           }
           className={cn(
-            'rounded-lg border bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground',
-            selected === feedbackIndex && 'border-primary',
+            'rounded-lg border bg-transparent px-3 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground',
+            selected === feedbackIndex && 'border-primary/60 ring-2 ring-primary/15',
           )}
         />
       </div>
 
-      <p className="mt-2 text-xs text-muted-foreground">Esc to cancel</p>
+      <p className="mt-2.5 text-xs text-muted-foreground">
+        Press a number, or ↑↓ and Enter · Esc to cancel
+      </p>
       </DialogPrimitive.Content>
     </DialogPrimitive.Root>
   );

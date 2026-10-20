@@ -3,7 +3,6 @@ import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import {
   Bot,
   Loader2,
-  MessageSquare,
   MoreHorizontal,
   Pencil,
   Plug,
@@ -90,8 +89,7 @@ function ConversationItem({
   if (editing) {
     return (
       <SidebarMenuItem>
-        <div className="flex h-9 items-center gap-2 px-2.5">
-          <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
+        <div className="flex h-9 items-center px-1">
           <SidebarInput
             ref={inputRef}
             aria-label="Conversation title"
@@ -118,7 +116,7 @@ function ConversationItem({
           params={{ conversationId: conversation.id }}
           onClick={onOpen}
         >
-          <MessageSquare />
+          {/* No icon: the same one on every chat is noise; the title is the cue */}
           <span className="truncate">{title}</span>
         </Link>
       </SidebarMenuButton>
@@ -126,7 +124,8 @@ function ConversationItem({
         <DropdownMenuTrigger asChild>
           <SidebarMenuAction
             aria-label="Conversation actions"
-            className="text-muted-foreground hover:cursor-pointer peer-data-[size=default]/menu-button:top-2"
+            showOnHover
+            className="text-muted-foreground transition-opacity hover:cursor-pointer peer-data-[size=default]/menu-button:top-2"
           >
             <MoreHorizontal />
           </SidebarMenuAction>

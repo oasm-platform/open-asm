@@ -34,7 +34,7 @@ In plan mode the same `formulate_plan` call is shown to the user for approval fi
 
 The todo for a security test always starts with the scope and tool check:
 
-1. **Scope and tools** (first step). Check the target is in the workspace with `retrieve_targets`; only test targets in the workspace scope. Call `display_available_tools` with `agentTool: true`: only tools with `agentTool`, `isInstalled` and `isReady` all true can run. Note each tool's `type`: it decides how the tool runs (see below).
+1. **Scope and tools** (first step). Check the target is in the workspace with `retrieve_targets`; only test targets in the workspace scope. Call `display_available_tools`: it lists only the tools the agent can use in this workspace, and only those with `isReady` can run. Note each tool's `type`: it decides how the tool runs (see below).
 2. **Testing steps**, one per tool or technique, each naming the tool you expect to use. If the scope step shows a needed tool is missing, mark that step `failed` with the reason (or replace the work with `append_step` using an available tool) instead of improvising.
 3. **Report** (last step): what was run, key findings with evidence, risks by severity, recommended next steps, and whether the goal was met.
 
