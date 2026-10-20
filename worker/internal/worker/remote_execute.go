@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -133,7 +134,7 @@ func (s *sessionSandbox) close() error {
 // startRemoteExecuteHandler serves the remote execute stream. cmdSandbox nil
 // runs agent commands on the host; non-nil runs them through it (see
 // selectCommandSandbox).
-func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Client, workspaceRoot string, toolPath string, cmdSandbox agentCommandSandbox, events chan<- TuiEvent, runTool func(sessionID string, run *pb.ToolRun, send toolResultSender), cancelTool func(sessionID string) bool) {
+func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Client, workspaceRoot string, toolPath string, cmdSandbox agentCommandSandbox, browsers *agentBrowsers, events chan<- TuiEvent, runTool func(sessionID string, run *pb.ToolRun, send toolResultSender), cancelTool func(sessionID string) bool) {
 	log := NewTuiLogger(events, "RemoteExec")
 	remoteSem := make(chan struct{}, 16)
 
@@ -267,7 +268,7 @@ func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Clien
 				case remoteSem <- struct{}{}:
 					go func(h *grpcclient.RemoteExecuteHandler, sid, cid, wid, cmd string, sbox *sessionSandbox) {
 						defer func() { <-remoteSem }()
-						executeRemoteCommand(ctx, h, sid, cid, wid, cmd, sbox, events, toolPath)
+						executeRemoteCommand(ctx, h, sid, cid, wid, cmd, sbox, browsers, events, toolPath)
 					}(handler, sessionID, cmdID, cmdWorkerID, command, sb)
 				default:
 					log.Warning("remote exec concurrency limit reached")
@@ -347,7 +348,7 @@ func startSandboxedCommand(ctx context.Context, handler *grpcclient.RemoteExecut
 		go func() {
 			defer func() { <-remoteSem }()
 			defer sbSessions.end(sessionID)
-			executeRemoteCommand(ctx, handler, sessionID, cmdID, cmdWorkerID, command, sb, events, toolPath)
+			executeRemoteCommand(ctx, handler, sessionID, cmdID, cmdWorkerID, command, sb, nil, events, toolPath)
 		}()
 	default:
 		sbSessions.end(sessionID)
@@ -356,11 +357,17 @@ func startSandboxedCommand(ctx context.Context, handler *grpcclient.RemoteExecut
 	}
 }
 
-func executeRemoteCommand(ctx context.Context, handler remoteResultSender, sessionID, cmdID, workerID, command string, sandbox *sessionSandbox, events chan<- TuiEvent, toolPath string) {
+func executeRemoteCommand(ctx context.Context, handler remoteResultSender, sessionID, cmdID, workerID, command string, sandbox *sessionSandbox, browsers *agentBrowsers, events chan<- TuiEvent, toolPath string) {
 	log := NewTuiLogger(events, "RemoteExec")
 	log.Info("Executing in session %s: %s", sessionID, command)
 	_ = cmdID
 	_ = workerID
+
+	// Recognised before any shell wrapping, like the "screenshot " job.
+	if rest, ok := strings.CutPrefix(command, "browser "); ok || command == "browser" {
+		executeBrowserCommand(ctx, handler, sessionID, rest, sandbox, browsers, events)
+		return
+	}
 
 	if sandbox.container != nil {
 		executeSandboxedCommand(ctx, handler, sessionID, command, sandbox.container, events)
@@ -427,6 +434,40 @@ func executeRemoteCommand(ctx context.Context, handler remoteResultSender, sessi
 		log.Success("Command completed: %s", command)
 	}
 
+	_ = handler.SendExit(ctx, exitCode)
+}
+
+// executeBrowserCommand runs a "browser ..." command in the worker's agent
+// Chromium and reports it like a shell command: stdout, then EXIT 0 or 1.
+// Refused on a sandboxed worker: the browser runs in this process, outside
+// the per-session container, and core routes other workspaces' agents only
+// to sandboxed (global) workers.
+func executeBrowserCommand(ctx context.Context, handler remoteResultSender, sessionID, line string, sandbox *sessionSandbox, browsers *agentBrowsers, events chan<- TuiEvent) {
+	if sandbox.container != nil {
+		_ = handler.SendError(ctx, "browser commands are not available on a sandboxed worker")
+		return
+	}
+	if browsers == nil {
+		_ = handler.SendError(ctx, "browser is not available on this worker")
+		return
+	}
+	out, failed, err := browsers.run(ctx, line)
+	if err != nil {
+		NewTuiLogger(events, "RemoteExec").ErrorE("Browser unavailable", err)
+		_ = handler.SendError(ctx, err.Error())
+		return
+	}
+	if !strings.HasSuffix(out, "\n") {
+		out += "\n"
+	}
+	if err := handler.SendStdout(ctx, []byte(out)); err != nil {
+		return
+	}
+	Emit(events, TuiEvent{Type: EventSessionOutput, SessionID: sessionID, SessionOutput: out, SessionStream: "stdout"})
+	exitCode := int32(0)
+	if failed {
+		exitCode = 1
+	}
 	_ = handler.SendExit(ctx, exitCode)
 }
 

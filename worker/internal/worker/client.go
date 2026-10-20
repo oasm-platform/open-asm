@@ -92,6 +92,17 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 		return lazyBrowser, nil
 	}
 
+	// Agent browser sessions: own Chromium, separate from screenshot jobs, and
+	// outlive remote execute stream reconnects.
+	agentBrowser := newAgentBrowsers(log, func() (*rod.Browser, func(), error) {
+		log.Info("Initializing agent browser (lazy)...")
+		b, l, err := launchBrowser(log)
+		if err != nil {
+			return nil, nil, err
+		}
+		return b, func() { _ = b.Close(); l.Kill(); l.Cleanup() }, nil
+	})
+
 	workspaceRoot, err := filepath.Abs(cfg.WorkspaceRoot)
 	if err != nil {
 		log.ErrorE("Failed to resolve workspace root", err)
@@ -303,7 +314,7 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 					runAgentTool(runCtx, sessionID, grpcClient.OwnerID(), run, events, mgr, proxy, send)
 				}()
 			}
-			go startRemoteExecuteHandler(sessionCtx, grpcClient, workspaceRoot, toolPath, cmdSandbox, events, runTool, toolRuns.cancel)
+			go startRemoteExecuteHandler(sessionCtx, grpcClient, workspaceRoot, toolPath, cmdSandbox, agentBrowser, events, runTool, toolRuns.cancel)
 			return sessionCtx, sessionCancel
 		},
 		startPoller: func(sessionCtx context.Context) context.CancelFunc {
@@ -571,6 +582,7 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 	}
 	log.Info("All jobs finished")
 
+	agentBrowser.shutdown()
 	if lazyBrowser != nil {
 		if err := lazyBrowser.Close(); err != nil {
 			log.Warning("Browser close: %v", err)

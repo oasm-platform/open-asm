@@ -83,6 +83,7 @@ type browserSession struct {
 	frame        *rod.Page // non-nil while inside an iframe of the active tab
 	dialogAccept bool
 	dialogText   string
+	blocked      []string // proxy refusals since the last command
 
 	console, errs, requests ringLog
 }
@@ -154,6 +155,24 @@ func (s *browserSession) adopt(p *rod.Page, ctx context.Context) {
 			s.requests.add(fmt.Sprintf("  <- FAILED %s", e.ErrorText))
 		},
 	)()
+}
+
+func (s *browserSession) recordBlocked(line string) {
+	s.requests.add(line)
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+	if len(s.blocked) < 20 {
+		s.blocked = append(s.blocked, line)
+	}
+}
+
+// drainBlocked returns and clears the refusals since the last call.
+func (s *browserSession) drainBlocked() []string {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+	b := s.blocked
+	s.blocked = nil
+	return b
 }
 
 // forget drops a page that closed (tab close, window.close()).
@@ -243,11 +262,11 @@ func (a *agentBrowsers) ensureBrowser() error {
 		a.stopBrowser()
 	}
 	if a.launch == nil {
-		return errors.New("browser is not available on this worker")
+		return errBrowserUnavailable
 	}
 	b, stop, err := a.launch()
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %w", errBrowserUnavailable, err)
 	}
 	a.browser, a.stop = b, stop
 	return nil
@@ -273,7 +292,7 @@ func (a *agentBrowsers) open(allow []string) (*browserSession, func(), error) {
 		return nil, nil, fmt.Errorf("too many browser sessions on this worker (%d); close one with \"browser -s <id> close\"", maxBrowserSessions)
 	}
 	s := &browserSession{id: id}
-	proxy, err := newScopeProxy(allow, s.requests.add)
+	proxy, err := newScopeProxy(allow, s.recordBlocked)
 	if err != nil {
 		a.life.end(id)
 		return nil, nil, err

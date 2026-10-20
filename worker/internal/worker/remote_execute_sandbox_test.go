@@ -87,7 +87,7 @@ func TestExecuteRemoteCommand_SandboxUnavailableFailsClosed(t *testing.T) {
 	}
 
 	rec := &recordingSender{}
-	executeRemoteCommand(context.Background(), rec, "sess-1", "cmd-1", "w-1", "echo hi > "+filepath.ToSlash(marker), sb, nil, dir)
+	executeRemoteCommand(context.Background(), rec, "sess-1", "cmd-1", "w-1", "echo hi > "+filepath.ToSlash(marker), sb, nil, nil, dir)
 
 	if _, err := os.Stat(marker); !os.IsNotExist(err) {
 		t.Fatal("command ran on the host despite the sandbox being required")
@@ -105,7 +105,7 @@ func TestExecuteRemoteCommand_SandboxStreamsOutputAndExitCode(t *testing.T) {
 	sb, _ := newSessionSandbox(t.TempDir(), "sess-2", fake)
 	rec := &recordingSender{}
 
-	executeRemoteCommand(context.Background(), rec, "sess-2", "cmd-1", "w-1", "false", sb, nil, "/tools")
+	executeRemoteCommand(context.Background(), rec, "sess-2", "cmd-1", "w-1", "false", sb, nil, nil, "/tools")
 
 	if strings.Join(rec.stdout, "") != "a\nb\n" {
 		t.Errorf("stdout = %q", rec.stdout)
@@ -126,7 +126,7 @@ func TestExecuteRemoteCommand_SandboxExecErrorIsErrorResult(t *testing.T) {
 	sb, _ := newSessionSandbox(t.TempDir(), "sess-3", &fakeSandbox{err: errors.New("sandbox create: boom")})
 	rec := &recordingSender{}
 
-	executeRemoteCommand(context.Background(), rec, "sess-3", "cmd-1", "w-1", "id", sb, nil, "/tools")
+	executeRemoteCommand(context.Background(), rec, "sess-3", "cmd-1", "w-1", "id", sb, nil, nil, "/tools")
 
 	if len(rec.errs) != 1 || !strings.Contains(rec.errs[0], "boom") || len(rec.exits) != 0 {
 		t.Fatalf("want a single ERROR result, got errs=%v exits=%v", rec.errs, rec.exits)
