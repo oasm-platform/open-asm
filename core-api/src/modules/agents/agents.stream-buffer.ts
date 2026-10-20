@@ -127,6 +127,8 @@ export class AgentsStreamBufferService {
     const redis = this.redis;
     const logger = this.logger;
     const idleCheckMs = AgentsStreamBufferService.IDLE_CHECK_MS;
+    // Set by `start`, so a cancelled reader (the client left) closes it too
+    let closeStream = (): void => undefined;
 
     return new ReadableStream<string>({
       async start(controller) {
@@ -147,7 +149,9 @@ export class AgentsStreamBufferService {
           if (closed) return;
           closed = true;
           if (idleTimer) clearInterval(idleTimer);
-          void redis.unsubscribe(channel).catch(() => undefined);
+          // Only this reader's listener: other resumers of the conversation
+          // (another tab, or the client that came back) keep theirs
+          void redis.unsubscribe(channel, onMessage).catch(() => undefined);
           try {
             controller.close();
           } catch {
@@ -190,6 +194,7 @@ export class AgentsStreamBufferService {
           pending.push(raw);
           drain();
         };
+        closeStream = close;
 
         try {
           // Subscribe BEFORE reading the backlog: anything published in between
@@ -233,7 +238,7 @@ export class AgentsStreamBufferService {
         }
       },
       cancel() {
-        void redis.unsubscribe(channel).catch(() => undefined);
+        closeStream();
       },
     });
   }

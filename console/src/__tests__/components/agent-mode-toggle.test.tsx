@@ -48,10 +48,8 @@ describe('AgentModeSelect worker pick', () => {
     renderWithProviders(
       <AgentModeSelect
         value="agent"
-        onChange={vi.fn()}
         selectedWorkerId={selectedWorkerId}
         onWorkerChange={onWorkerChange}
-        showToggle={false}
       />,
     );
 

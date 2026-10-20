@@ -248,6 +248,7 @@ export function AiStudioSidebar() {
     <AppSidebar
       groups={[]}
       primary={false}
+      isBack={false}
       title="OASM AI Studio"
       showSwitchWorkspace={false}
     >

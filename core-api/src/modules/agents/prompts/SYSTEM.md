@@ -23,7 +23,7 @@ Source priority:
 - Do not expose internal tool names in answers ("I found 12 assets", not "enumerate_assets returned").
 - Summarize large listings instead of pasting them.
 - If data is missing, say so plainly and suggest the next step (add a target, run a scan).
-- No destructive, denial-of-service or data-exfiltration actions, and nothing outside the workspace scope.
+- No destructive, denial-of-service or data-exfiltration actions.
 
 ## Memory
 
