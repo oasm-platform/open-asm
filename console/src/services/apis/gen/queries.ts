@@ -3314,6 +3314,95 @@ export type GetManyConversationResponseDtoDto = {
   pageCount: number;
 };
 
+export type UsageSummaryDto = {
+  /** Model calls (steps) */
+  requests: number;
+  /** Prompt tokens, incl. cached */
+  inputTokens: number;
+  /** Output tokens, incl. reasoning */
+  outputTokens: number;
+  /** Prompt tokens read from cache */
+  cacheReadTokens: number;
+  /** USD of all priced calls */
+  costUsd: number;
+  /** False when some call used a model with no known price */
+  costComplete: boolean;
+  /** Conversations with usage in the range */
+  sessions: number;
+  /** Main agent answers */
+  responses: number;
+  /** Completed background subagent runs */
+  subagentRuns: number;
+};
+
+export type UsageDayDto = {
+  /** Model calls (steps) */
+  requests: number;
+  /** Prompt tokens, incl. cached */
+  inputTokens: number;
+  /** Output tokens, incl. reasoning */
+  outputTokens: number;
+  /** Prompt tokens read from cache */
+  cacheReadTokens: number;
+  /** USD of all priced calls */
+  costUsd: number;
+  /** False when some call used a model with no known price */
+  costComplete: boolean;
+  /** Day in the requested time zone */
+  date: string;
+};
+
+export type UsageModelDto = {
+  /** Model calls (steps) */
+  requests: number;
+  /** Prompt tokens, incl. cached */
+  inputTokens: number;
+  /** Output tokens, incl. reasoning */
+  outputTokens: number;
+  /** Prompt tokens read from cache */
+  cacheReadTokens: number;
+  /** USD of all priced calls */
+  costUsd: number;
+  /** False when some call used a model with no known price */
+  costComplete: boolean;
+  model: string;
+  /** @nullable */
+  provider: string | null;
+};
+
+export type UsageSessionDto = {
+  /** Model calls (steps) */
+  requests: number;
+  /** Prompt tokens, incl. cached */
+  inputTokens: number;
+  /** Output tokens, incl. reasoning */
+  outputTokens: number;
+  /** Prompt tokens read from cache */
+  cacheReadTokens: number;
+  /** USD of all priced calls */
+  costUsd: number;
+  /** False when some call used a model with no known price */
+  costComplete: boolean;
+  /** Conversation ID */
+  id: string;
+  /** @nullable */
+  title: string | null;
+  /** Latest usage of the conversation in the range */
+  lastActiveAt: string;
+};
+
+export type AgentUsageResponseDto = {
+  days: number;
+  tz: string;
+  summary: UsageSummaryDto;
+  /** One entry per day, oldest first */
+  daily: UsageDayDto[];
+  /** Most tokens first */
+  models: UsageModelDto[];
+  /** Conversations with the most tokens, at most 10 */
+  sessions: UsageSessionDto[];
+};
+
 export type UpdateConversationDto = {
   /**
    * Replacement conversation title
@@ -5182,6 +5271,19 @@ export type AgentsControllerGetConversationsParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
+};
+
+export type AgentsControllerGetUsageParams = {
+  /**
+   * Days to include, today included
+   * @minimum 1
+   * @maximum 90
+   */
+  days?: number;
+  /**
+   * IANA time zone the days are counted in
+   */
+  tz?: string;
 };
 
 export type AgentsControllerGetMessagesParams = {
@@ -33552,6 +33654,170 @@ export const useAgentsControllerDeleteAllConversations = <
     queryClient,
   );
 };
+
+/**
+ * Tokens, cost and sessions of the current user in the workspace, per day, model and conversation
+ * @summary Get AI Studio usage
+ */
+export const agentsControllerGetUsage = (
+  params?: AgentsControllerGetUsageParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AgentUsageResponseDto>(
+    { url: `/api/agents/usage`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getAgentsControllerGetUsageQueryKey = (
+  params?: AgentsControllerGetUsageParams,
+) => {
+  return [`/api/agents/usage`, ...(params ? [params] : [])] as const;
+};
+
+export const getAgentsControllerGetUsageQueryOptions = <
+  TData = Awaited<ReturnType<typeof agentsControllerGetUsage>>,
+  TError = unknown,
+>(
+  params?: AgentsControllerGetUsageParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetUsage>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAgentsControllerGetUsageQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerGetUsage>>
+  > = ({ signal }) => agentsControllerGetUsage(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerGetUsage>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerGetUsageQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerGetUsage>>
+>;
+export type AgentsControllerGetUsageQueryError = unknown;
+
+export function useAgentsControllerGetUsage<
+  TData = Awaited<ReturnType<typeof agentsControllerGetUsage>>,
+  TError = unknown,
+>(
+  params: undefined | AgentsControllerGetUsageParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetUsage>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetUsage>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetUsage>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetUsage<
+  TData = Awaited<ReturnType<typeof agentsControllerGetUsage>>,
+  TError = unknown,
+>(
+  params?: AgentsControllerGetUsageParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetUsage>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetUsage>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetUsage>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetUsage<
+  TData = Awaited<ReturnType<typeof agentsControllerGetUsage>>,
+  TError = unknown,
+>(
+  params?: AgentsControllerGetUsageParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetUsage>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get AI Studio usage
+ */
+
+export function useAgentsControllerGetUsage<
+  TData = Awaited<ReturnType<typeof agentsControllerGetUsage>>,
+  TError = unknown,
+>(
+  params?: AgentsControllerGetUsageParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetUsage>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAgentsControllerGetUsageQueryOptions(params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
 
 /**
  * Get all messages in a conversation

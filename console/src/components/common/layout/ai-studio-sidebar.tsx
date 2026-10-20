@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import {
+  BarChart3,
   Bot,
   Loader2,
   MoreHorizontal,
@@ -283,15 +284,31 @@ export function AiStudioSidebar() {
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton
+                asChild
+                isActive={pathname === '/aistudio/usage'}
+                tooltip="Usage"
+                className={sidebarItemClassName}
+              >
+                <Link to="/aistudio/usage" onClick={() => setOpenMobile(false)}>
+                  <BarChart3 />
+                  <span className="truncate">Usage</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={pathname === '/aistudio/connectors'}
                 tooltip="Connectors"
                 className={sidebarItemClassName}
-                onClick={() => {
-                  setOpenMobile(false);
-                  openSettings('connectors');
-                }}
               >
-                <Plug />
-                <span className="truncate">Connectors</span>
+                <Link
+                  to="/aistudio/connectors"
+                  onClick={() => setOpenMobile(false)}
+                >
+                  <Plug />
+                  <span className="truncate">Connectors</span>
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>

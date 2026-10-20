@@ -37,6 +37,7 @@ import { AgentsConfigService } from './agents.config';
 import { AgentsDefinitionsService } from './agents.definitions';
 import { AgentsService } from './agents.service';
 import { AgentsStreamBufferService } from './agents.stream-buffer';
+import { AgentsUsageService } from './agents.usage';
 import {
   AgentConfigResponseDto,
   UpsertAgentConfigDto,
@@ -80,6 +81,7 @@ import {
   ToggleSkillDto,
   UpdateSkillDto,
 } from './dto/skill.dto';
+import { AgentUsageResponseDto, GetAgentUsageQueryDto } from './dto/usage.dto';
 import { WorkspaceMemoryResponseDto } from './dto/workspace-memory.dto';
 import {
   AgentDefinitionResponseDto,
@@ -111,6 +113,7 @@ export class AgentsController {
     private readonly agentsConfigService: AgentsConfigService,
     private readonly agentsDefinitionsService: AgentsDefinitionsService,
     private readonly agentsStreamBuffer: AgentsStreamBufferService,
+    private readonly agentsUsageService: AgentsUsageService,
   ) {}
 
   @WorkspaceAccess('agent.read')
@@ -435,6 +438,23 @@ export class AgentsController {
     @UserId() userId: string,
   ) {
     return this.agentsService.getConversations(workspaceId, userId, query);
+  }
+
+  @WorkspaceAccess('agent.read')
+  @Get('usage')
+  @Doc({
+    summary: 'Get AI Studio usage',
+    description:
+      'Tokens, cost and sessions of the current user in the workspace, per day, model and conversation',
+    request: { getWorkspaceId: true },
+    response: { serialization: AgentUsageResponseDto },
+  })
+  getUsage(
+    @Query() query: GetAgentUsageQueryDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<AgentUsageResponseDto> {
+    return this.agentsUsageService.getUsage(workspaceId, userId, query);
   }
 
   @WorkspaceAccess('agent.write')
