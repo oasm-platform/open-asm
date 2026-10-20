@@ -138,6 +138,10 @@ func (s *browserSession) leaveFrame() {
 }
 
 // describeWithSnapshot follows a page header with the interactive snapshot.
-func describeWithSnapshot(_ context.Context, _ *browserSession, header string) (string, error) {
-	return header, nil
+func describeWithSnapshot(ctx context.Context, s *browserSession, header string) (string, error) {
+	snap, err := snapshot(ctx, s, true, 0, "")
+	if err != nil {
+		return header + "\n\n(snapshot failed: " + trimRodStack(err.Error()) + ")", nil
+	}
+	return header + "\n\n" + snap, nil
 }
