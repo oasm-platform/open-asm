@@ -6,6 +6,8 @@ import {
   CircleIcon,
   ClockIcon,
   ListChecksIcon,
+  Loader2Icon,
+  WrenchIcon,
   XCircleIcon,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -89,7 +91,7 @@ function PlanCallDisplay({ toolCall }: { toolCall: ToolCallState }) {
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      className="rounded-lg border bg-muted/30 p-3 text-sm"
+      className="rounded-xl border bg-card p-3 text-sm shadow-xs"
     >
       <div className="flex items-center gap-2">
         <ListChecksIcon className="size-4 text-muted-foreground shrink-0" />
@@ -163,6 +165,22 @@ const labelTextClass: Record<ToolCallState['status'], string | undefined> = {
   'needs-plan': 'text-amber-500',
 };
 
+/** Leading icon per status: a neutral wrench once done, so only problems stand out */
+const labelIcon: Record<
+  ToolCallState['status'],
+  { icon: typeof CheckCircleIcon; className: string }
+> = {
+  pending: { icon: Loader2Icon, className: 'animate-spin text-muted-foreground' },
+  executing: {
+    icon: Loader2Icon,
+    className: 'animate-spin text-muted-foreground',
+  },
+  completed: { icon: WrenchIcon, className: 'text-muted-foreground/70' },
+  error: { icon: XCircleIcon, className: 'text-red-500' },
+  rejected: { icon: BanIcon, className: 'text-amber-500' },
+  'needs-plan': { icon: ListChecksIcon, className: 'text-amber-500' },
+};
+
 /** Connector slug and target of a run_tool_connector call, e.g. "nuclei example.com" */
 function connectorRunDetail(toolCall: ToolCallState): string | null {
   if (toolCall.toolName !== 'run_tool_connector') return null;
@@ -183,12 +201,17 @@ export function ToolCallLabel({
 }) {
   const config = statusConfig[toolCall.status];
   const detail = connectorRunDetail(toolCall);
+  const { icon: Icon, className: iconClassName } = labelIcon[toolCall.status];
 
   return (
     <div
       className={cn('flex min-w-0 items-center text-sm', className)}
       title={config.label}
     >
+      <Icon
+        aria-hidden="true"
+        className={cn('mr-2 size-3.5 shrink-0', iconClassName)}
+      />
       <span
         className={cn(
           'font-medium truncate',

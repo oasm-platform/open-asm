@@ -27,11 +27,11 @@ Run only the commands the current step needs, and check their output against the
 
 ## 1. List the tools and read their type
 
-1. Call `display_available_tools` with `agentTool: true`.
-2. Keep only tools with `agentTool`, `isInstalled` and `isReady` all true.
+1. Call `display_available_tools`: it lists only the tools the agent can use in this workspace.
+2. Keep only tools with `isReady` true.
 3. Look at each tool's `type`: `built_in` → section 2, `connector` → section 3. Decide from `type` only, never from the name.
 
-If the tool you need is missing, not installed or not ready, tell the user which one and that it can be installed from the Tools page.
+If the tool you need is not listed or not ready, tell the user which one and that it can be installed from the Tools page.
 
 ## 2. Built-in tools: `execute_remote_command`
 

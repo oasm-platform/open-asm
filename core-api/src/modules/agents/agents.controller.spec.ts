@@ -17,6 +17,10 @@ describe('AgentsController workspace permission guards', () => {
     ['getProviderModels', 'GET /llm-configs/:id/models'],
     ['getConversation', 'GET /conversations/:id'],
     ['getConversationSubagents', 'GET /conversations/:id/subagents'],
+    [
+      'getConversationSubagent',
+      'GET /conversations/:id/subagents/:subagentId',
+    ],
     ['getConversations', 'GET /conversations'],
     ['getMessages', 'GET /conversations/:id/messages'],
     ['resumeStream', 'GET /conversations/:id/stream'],

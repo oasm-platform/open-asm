@@ -251,44 +251,35 @@ export function detailIssueTool(
 }
 
 /**
- * display_available_tools: security tools with their install/readiness
- * state in this workspace. `agentTool` narrows the list to the tools the
- * agent can use (built-in tools always count) or to the others.
+ * display_available_tools: the tools the agent can use in this workspace —
+ * built-in tools plus the installed agent connectors — with their readiness.
  */
-export function listToolsTool(
+export function listConnectorsTool(
   deps: Deps<'toolsService'>,
   workspaceId: string,
 ): Tool {
   return defineTool({
     description: [
-      'List security tools/scanners with their state in this workspace.',
-      'Each item: id, name, type (built_in or connector), categories (modes it can run in), description, agentTool, isInstalled, isReady.',
-      'agentTool=true means the agent can use the tool; it runs only when agentTool, isInstalled and isReady are all true.',
+      'List the security tools/scanners the agent can use in this workspace: built-in tools and the installed connectors that support the agent.',
+      'Each item: id, name, type (built_in or connector), categories (modes it can run in), description, isReady.',
+      'A tool runs only when isReady is true; isReady=false means the connector still needs a config profile in this workspace.',
       'type decides how it runs: built_in → execute_remote_command with the tool name as the command; connector → run_tool_connector.',
-      'Params: page, limit, q (search by name or description), agentTool (true → only agent tools, false → only the others, omit → all).',
+      'Returns a JSON array, sorted by name. Params: q (search by name or description).',
     ].join('\n'),
     inputSchema: listToolsSchema,
     execute: async (params: z.infer<typeof listToolsSchema>) => {
-      const response = await deps.toolsService.getManyTools({
-        ...pageOf(params),
-        ...NEWEST_FIRST,
-        search: params.q,
-        agentTool: params.agentTool,
+      const tools = await deps.toolsService.getAgentTools(
         workspaceId,
-      });
-      return {
-        ...response,
-        data: response.data.map((i) => ({
-          id: i.id,
-          name: i.name,
-          type: i.type,
-          categories: (i.categories ?? []).map((c) => c.name),
-          description: i.description,
-          agentTool: i.agentTool ?? false,
-          isInstalled: i.isInstalled ?? false,
-          isReady: i.isReady ?? false,
-        })),
-      };
+        params.q,
+      );
+      return tools.map((i) => ({
+        id: i.id,
+        name: i.name,
+        type: i.type,
+        categories: (i.categories ?? []).map((c) => c.name),
+        description: i.description,
+        isReady: i.isReady,
+      }));
     },
   });
 }
