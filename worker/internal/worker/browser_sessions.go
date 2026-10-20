@@ -85,6 +85,8 @@ type browserSession struct {
 	dialogText   string
 	blocked      []string // proxy refusals since the last command
 
+	headers map[string]string // extra request headers for every tab; command-owned
+
 	console, errs, requests ringLog
 }
 
@@ -203,6 +205,9 @@ func (s *browserSession) newTab(ctx context.Context) (*rod.Page, error) {
 	}
 	_ = p.SetViewport(&proto.EmulationSetDeviceMetricsOverride{Width: 1920, Height: 1080, DeviceScaleFactor: 1})
 	_ = p.SetUserAgent(&proto.NetworkSetUserAgentOverride{UserAgent: getRandomUserAgent(), AcceptLanguage: "en-US,en;q=0.9"})
+	if len(s.headers) > 0 {
+		_ = applyHeadersTo(p, s.headers)
+	}
 	s.adopt(p, ctx)
 	s.stateMu.Lock()
 	for i, q := range s.pages {
