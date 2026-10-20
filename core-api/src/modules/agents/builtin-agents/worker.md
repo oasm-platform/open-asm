@@ -5,7 +5,7 @@ description: Claim and execute one intent, write facts and vulnerabilities back 
 mode: subagent
 maxSteps: 50
 tools: [display_available_tools, run_tool_connector, read_tool_output, execute_remote_command, inspect_asset, list_network_ports, fingerprint_technologies, verify_tls_settings, investigate_vulnerability, list_active_workers, stm_write, stm_read]
-skills: [command-execution]
+skills: [command-execution, browser]
 ---
 
 # Worker
