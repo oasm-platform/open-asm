@@ -81,34 +81,7 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 	getBrowser := func() (*rod.Browser, error) {
 		browserOnce.Do(func() {
 			log.Info("Initializing headless browser (lazy)...")
-			l := launcher.New().Leakless(false).Headless(true)
-			if _, err := os.Stat("/usr/bin/chromium"); err == nil {
-				log.Verbose("Using system chromium at /usr/bin/chromium")
-				l = l.Bin("/usr/bin/chromium")
-			} else if _, err := os.Stat("/usr/bin/chromium-browser"); err == nil {
-				log.Verbose("Using system chromium at /usr/bin/chromium-browser")
-				l = l.Bin("/usr/bin/chromium-browser")
-			} else if _, err := os.Stat("/usr/bin/google-chrome"); err == nil {
-				log.Verbose("Using system chromium at /usr/bin/google-chrome")
-				l = l.Bin("/usr/bin/google-chrome")
-			} else {
-				log.Verbose("No system chromium found, go-rod will download Chrome automatically")
-			}
-			lazyLauncher = l
-			url, err := l.Launch()
-			if err != nil {
-				browserInitErr = fmt.Errorf("browser launch failed: %w", err)
-				return
-			}
-			b := rod.New().ControlURL(url)
-			if err := b.Connect(); err != nil {
-				browserInitErr = fmt.Errorf("browser connect failed: %w", err)
-				// Best-effort cleanup on connect failure
-				l.Cleanup()
-				l.Kill()
-				return
-			}
-			lazyBrowser = b
+			lazyBrowser, lazyLauncher, browserInitErr = launchBrowser(log)
 		})
 		if browserInitErr != nil {
 			return nil, browserInitErr
