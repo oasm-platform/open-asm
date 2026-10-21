@@ -1,13 +1,13 @@
 import { AgentApprovalMode, AgentMode, WorkerType } from '@/common/enums/enum';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { EventEmitter } from 'node:events';
+import { withoutDisabledTools } from './agents.config';
 import { AgentsMcpService, getMcpToolMetadata } from './agents.mcp';
 import type { AgentsService } from './agents.service';
-import { withoutDisabledTools } from './agents.config';
 import { AgentTool, MCP_TOOLS, READ_ONLY_TOOLS } from './agents.tools';
 import { pageToolOutput } from './tools/connector.tools';
 import { stableStringify } from './tools/helpers';
-import { listToolsTool } from './tools/workspace.tools';
+import { listConnectorsTool } from './tools/workspace.tools';
 
 describe('MCP tool metadata', () => {
   afterEach(() => {
@@ -504,62 +504,21 @@ describe('AgentTool run_tool_connector', () => {
 describe('AgentTool display_available_tools', () => {
   type Listing = {
     inputSchema: { parse: (value: unknown) => unknown };
-    execute: (input: unknown) => Promise<{ data: unknown[] }>;
+    execute: (input: unknown) => Promise<unknown[]>;
   };
-  const listTools = (getManyTools: jest.Mock) =>
-    listToolsTool(
-      { toolsService: { getManyTools } } as any,
+  const listTools = (getAgentTools: jest.Mock) =>
+    listConnectorsTool(
+      { toolsService: { getAgentTools } } as any,
       'w1',
     ) as unknown as Listing;
-  const page = (data: unknown[]) => ({
-    data,
-    total: data.length,
-    page: 1,
-    limit: 100,
-  });
 
-  it('lists workspace tools with agentTool and readiness', async () => {
-    const getManyTools = jest.fn().mockResolvedValue(
-      page([
-        {
-          id: 't1',
-          name: 'subfinder',
-          type: WorkerType.BUILT_IN,
-          categories: [{ name: 'subdomains', targetTypes: [] }],
-          description: 'Subdomain discovery',
-          agentTool: true,
-          isInstalled: true,
-          isReady: true,
-          availableWorkersCount: 2,
-        },
-        {
-          id: 't2',
-          name: 'wpscan',
-          type: WorkerType.CONNECTOR,
-          categories: [{ name: 'vulnerabilities', targetTypes: [] }],
-          description: 'WordPress scanner',
-          agentTool: false,
-          isInstalled: false,
-          availableWorkersCount: 0,
-        },
-      ]),
-    );
-
-    const result = await listTools(getManyTools).execute({ q: 'scan' });
-
-    expect(getManyTools).toHaveBeenCalledWith(
-      expect.objectContaining({
-        agentTool: undefined,
-        workspaceId: 'w1',
-        search: 'scan',
-      }),
-    );
-    expect(result.data).toEqual([
+  it("lists the workspace's agent tools with readiness as an array", async () => {
+    const getAgentTools = jest.fn().mockResolvedValue([
       {
         id: 't1',
         name: 'subfinder',
         type: WorkerType.BUILT_IN,
-        categories: ['subdomains'],
+        categories: [{ name: 'subdomains', targetTypes: [] }],
         description: 'Subdomain discovery',
         agentTool: true,
         isInstalled: true,
@@ -567,36 +526,49 @@ describe('AgentTool display_available_tools', () => {
       },
       {
         id: 't2',
-        name: 'wpscan',
+        name: 'acunetix',
+        type: WorkerType.CONNECTOR,
+        categories: [{ name: 'vulnerabilities', targetTypes: [] }],
+        description: 'Web scanner',
+        agentTool: true,
+        isInstalled: true,
+        hasConfigProfile: false,
+        isReady: false,
+      },
+    ]);
+
+    const result = await listTools(getAgentTools).execute({ q: 'scan' });
+
+    expect(getAgentTools).toHaveBeenCalledWith('w1', 'scan');
+    expect(result).toEqual([
+      {
+        id: 't1',
+        name: 'subfinder',
+        type: WorkerType.BUILT_IN,
+        categories: ['subdomains'],
+        description: 'Subdomain discovery',
+        isReady: true,
+      },
+      {
+        id: 't2',
+        name: 'acunetix',
         type: WorkerType.CONNECTOR,
         categories: ['vulnerabilities'],
-        description: 'WordPress scanner',
-        agentTool: false,
-        isInstalled: false,
+        description: 'Web scanner',
         isReady: false,
       },
     ]);
   });
 
-  it.each([true, false])(
-    'passes agentTool=%s through as the filter',
-    async (agentTool) => {
-      const getManyTools = jest.fn().mockResolvedValue(page([]));
+  it('ignores stale agentTool and paging params', async () => {
+    const getAgentTools = jest.fn().mockResolvedValue([]);
+    const listing = listTools(getAgentTools);
 
-      await listTools(getManyTools).execute({ agentTool });
+    await listing.execute(
+      listing.inputSchema.parse({ agentTool: true, page: 2, limit: 5 }),
+    );
 
-      expect(getManyTools).toHaveBeenCalledWith(
-        expect.objectContaining({ agentTool, workspaceId: 'w1' }),
-      );
-    },
-  );
-
-  it('accepts a boolean agentTool in its input schema', () => {
-    const { inputSchema } = listTools(jest.fn());
-    expect(inputSchema.parse({ agentTool: true })).toMatchObject({
-      agentTool: true,
-    });
-    expect(() => inputSchema.parse({ agentTool: 'yes' })).toThrow();
+    expect(getAgentTools).toHaveBeenCalledWith('w1', undefined);
   });
 });
 

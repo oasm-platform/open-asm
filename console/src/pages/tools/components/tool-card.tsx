@@ -22,10 +22,10 @@ interface ToolCardProps {
   onNavigate?: () => void;
   /**
    * Where the card is shown. From the tools page, installing a connector
-   * opens its configuration; from agent settings it stays on the list.
+   * opens its configuration; from AI Studio it stays on the list.
    * Default 'tools'.
    */
-  openFrom?: 'tools' | 'agent-settings';
+  openFrom?: 'tools' | 'aistudio';
 }
 
 const ToolCard = ({ tool, onNavigate, openFrom = 'tools' }: ToolCardProps) => {

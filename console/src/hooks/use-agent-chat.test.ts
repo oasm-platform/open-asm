@@ -12,10 +12,15 @@ const mocks = vi.hoisted(() => ({
   messagesData: undefined as unknown,
   onError: undefined as ((error: Error) => void) | undefined,
   regenerate: vi.fn(),
-  refetch: vi.fn(),
+  // Fresh history, as the hook refetches it before resuming
+  refetch: vi.fn(async (): Promise<unknown> => ({ data: undefined })),
   chatMessages: [] as UIMessage[],
+  setMessages: vi.fn(),
   resumeStream: vi.fn(),
   locationState: null as unknown,
+  transportOptions: undefined as
+    | { fetch: (input: string, init?: RequestInit) => Promise<Response> }
+    | undefined,
 }));
 
 vi.mock('@ai-sdk/react', () => ({
@@ -33,7 +38,7 @@ vi.mock('@ai-sdk/react', () => ({
       messages: mocks.chatMessages,
       status: mocks.status,
       sendMessage: vi.fn(),
-      setMessages: vi.fn(),
+      setMessages: mocks.setMessages,
       regenerate: mocks.regenerate,
       stop: vi.fn(),
       resumeStream: mocks.resumeStream,
@@ -45,7 +50,11 @@ vi.mock('ai', async (importOriginal) => {
   const actual = await importOriginal<typeof import('ai')>();
   return {
     ...actual,
-    DefaultChatTransport: class DefaultChatTransport {},
+    DefaultChatTransport: class DefaultChatTransport {
+      constructor(options: typeof mocks.transportOptions) {
+        mocks.transportOptions = options;
+      }
+    },
   };
 });
 
@@ -471,19 +480,50 @@ describe('seedFromSaved', () => {
 });
 
 describe('useAgentChat stream resume', () => {
+  // Newest first, as the server pages them: a run still writing its answer
+  const history = (conversationId: string, running: boolean) => ({
+    data: {
+      pages: [
+        {
+          running,
+          data: [
+            {
+              id: `${conversationId}-a2`,
+              role: 'assistant',
+              parts: [{ type: 'text', text: 'partial' }],
+              metadata: { status: running ? 'streaming' : 'completed' },
+            },
+            { id: `${conversationId}-u2`, role: 'user', content: 'scan it' },
+          ],
+        },
+      ],
+    },
+  });
+
+  const flush = () =>
+    act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
   beforeEach(() => {
     mocks.orvalClient.mockReset();
     mocks.orvalClient.mockResolvedValue({ id: 'c1' });
     mocks.resumeStream.mockReset();
     mocks.resumeStream.mockResolvedValue(undefined);
+    mocks.setMessages.mockReset();
+    mocks.refetch.mockReset();
+    mocks.refetch.mockResolvedValue(history('c1', true));
+    mocks.status = 'ready';
   });
 
   afterEach(() => {
     mocks.locationState = null;
     mocks.status = 'streaming';
+    mocks.refetch.mockReset();
+    vi.unstubAllGlobals();
   });
 
-  it('resumes the run of an existing conversation once, even in StrictMode', () => {
+  it('resumes the run of an existing conversation once, even in StrictMode', async () => {
     // StrictMode runs effects twice; two resumes of one run interleave their
     // writes into duplicate copies of the answer.
     const { rerender } = renderHook(
@@ -491,18 +531,111 @@ describe('useAgentChat stream resume', () => {
       { reactStrictMode: true },
     );
     rerender();
+    await flush();
 
     expect(mocks.resumeStream).toHaveBeenCalledTimes(1);
   });
 
-  it('does not resume a chat just started from the landing page', () => {
-    // It has no row on the server yet, so a resume request would 404.
-    mocks.locationState = { pendingMessage: 'scan example.com' };
+  it('seeds fresh history without the answer the replay rewrites', async () => {
+    // The replay continues the newest message when it is an assistant one:
+    // seeding the partial answer would show it twice.
     renderHook(() => useAgentChat({ conversationId: 'c1' }));
+    await flush();
+
+    expect(mocks.refetch).toHaveBeenCalledWith({ cancelRefetch: false });
+    const seeded = mocks.setMessages.mock.calls.at(-1)?.[0] as UIMessage[];
+    expect(seeded.map((m) => m.id)).toEqual(['c1-u2']);
+    expect(mocks.setMessages.mock.invocationCallOrder.at(-1)).toBeLessThan(
+      mocks.resumeStream.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('does not resume a conversation whose run is over', async () => {
+    mocks.refetch.mockResolvedValue(history('c1', false));
+    renderHook(() => useAgentChat({ conversationId: 'c1' }));
+    await flush();
+
     expect(mocks.resumeStream).not.toHaveBeenCalled();
   });
 
-  it('does not resume a new chat after its first answer ends', () => {
+  it('resumes a running conversation switched to on the same page', async () => {
+    // The page stays mounted across conversations, so this is no mount
+    mocks.refetch.mockResolvedValue(history('c1', false));
+    const { rerender } = renderHook(
+      ({ id }) => useAgentChat({ conversationId: id }),
+      { initialProps: { id: 'c1' } },
+    );
+    await flush();
+    expect(mocks.resumeStream).not.toHaveBeenCalled();
+
+    mocks.refetch.mockResolvedValue(history('c2', true));
+    rerender({ id: 'c2' });
+    await flush();
+    expect(mocks.resumeStream).toHaveBeenCalledTimes(1);
+
+    // And again on coming back to it while its run goes on
+    mocks.refetch.mockResolvedValue(history('c1', false));
+    rerender({ id: 'c1' });
+    await flush();
+    mocks.refetch.mockResolvedValue(history('c2', true));
+    rerender({ id: 'c2' });
+    await flush();
+    expect(mocks.resumeStream).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not resume a conversation left before its history came back', async () => {
+    let answerC1: (value: unknown) => void = () => undefined;
+    mocks.refetch.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answerC1 = resolve;
+      }),
+    );
+    const { rerender } = renderHook(
+      ({ id }) => useAgentChat({ conversationId: id }),
+      { initialProps: { id: 'c1' } },
+    );
+    mocks.refetch.mockResolvedValue(history('c2', false));
+    rerender({ id: 'c2' });
+    await flush();
+
+    answerC1(history('c1', true));
+    await flush();
+    expect(mocks.resumeStream).not.toHaveBeenCalled();
+  });
+
+  it('drops the streams of a conversation it leaves, without an error', async () => {
+    const fetchMock = vi.fn(async () => new Response(null));
+    vi.stubGlobal('fetch', fetchMock);
+    const { result, rerender } = renderHook(
+      ({ id }) => useAgentChat({ conversationId: id }),
+      { initialProps: { id: 'c1' } },
+    );
+    await flush();
+
+    await mocks.transportOptions!.fetch('/api/agents/conversations/c1/stream');
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const signal = init.signal!;
+    expect(signal.aborted).toBe(false);
+
+    rerender({ id: 'c2' });
+    expect(signal.aborted).toBe(true);
+
+    // A resume cut while connecting reaches onError with the abort reason
+    act(() => {
+      mocks.onError?.(signal.reason as Error);
+    });
+    expect(result.current.streamError).toBeNull();
+  });
+
+  it('does not resume a chat just started from the landing page', async () => {
+    // It has no row on the server yet, so a resume request would 404.
+    mocks.locationState = { pendingMessage: 'scan example.com' };
+    renderHook(() => useAgentChat({ conversationId: 'c1' }));
+    await flush();
+    expect(mocks.resumeStream).not.toHaveBeenCalled();
+  });
+
+  it('does not resume a new chat after its first answer ends', async () => {
     // Resuming then would replay the finished answer onto the shown copy.
     mocks.locationState = { pendingMessage: 'scan example.com' };
     mocks.status = 'streaming';
@@ -513,6 +646,7 @@ describe('useAgentChat stream resume', () => {
     mocks.status = 'ready';
     rerender();
     rerender();
+    await flush();
 
     expect(mocks.resumeStream).not.toHaveBeenCalled();
   });

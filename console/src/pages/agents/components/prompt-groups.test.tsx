@@ -117,15 +117,17 @@ describe('PromptGroups', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Recon' }));
-    const list = screen.getByRole('list', { name: 'Recon prompts' });
+    await user.click(screen.getByRole('button', { name: 'External recon' }));
+    const list = screen.getByRole('list', { name: 'External recon prompts' });
     const first = AGENT_PROMPT_GROUPS[0].prompts[0];
 
     await user.click(within(list).getByRole('button', { name: first }));
 
     expect(onSelect).toHaveBeenCalledWith(first);
     // The panel stays open so the user can pick again or edit the input.
-    expect(screen.getByRole('list', { name: 'Recon prompts' })).toBeTruthy();
+    expect(
+      screen.getByRole('list', { name: 'External recon prompts' }),
+    ).toBeTruthy();
   });
 
   it('shows a different set of groups per mode and closes the panel on switch', () => {
@@ -133,10 +135,12 @@ describe('PromptGroups', () => {
       <PromptGroups groups={ASK_PROMPT_GROUPS} onSelect={vi.fn()} />,
     );
     expect(screen.getByRole('button', { name: 'Overview' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Recon' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'External recon' })).toBeNull();
 
     rerender(<PromptGroups groups={AGENT_PROMPT_GROUPS} onSelect={vi.fn()} />);
-    expect(screen.getByRole('button', { name: 'Recon' })).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'External recon' }),
+    ).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Overview' })).toBeNull();
   });
 

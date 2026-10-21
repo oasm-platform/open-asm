@@ -183,6 +183,8 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   groups?: NavGroup[];
   /** Primary menu shows the app logo; a secondary menu shows a back button in its place. */
   primary?: boolean;
+  /** Show the back button of a secondary menu. Without it, the title links to `backUrl`. */
+  isBack?: boolean;
   /** Where the back button navigates to when `primary` is false. */
   backUrl?: string;
   /** Page name shown below the back button when `primary` is false. */
@@ -196,6 +198,7 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 export function AppSidebar({
   groups = menu,
   primary = true,
+  isBack = true,
   backUrl = '/',
   title,
   showSwitchWorkspace = true,
@@ -230,28 +233,40 @@ export function AppSidebar({
                 <AppLogo type="large" />
               </div>
             ) : (
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    tooltip="Back"
-                    className="h-10 items-center rounded-lg text-[15px] font-semibold hover:cursor-pointer"
-                  >
-                    <Link
-                      to={backUrl}
-                      onClick={() => setOpenMobile(false)}
-                      className="flex items-center"
+              isBack && (
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
+                      tooltip="Back"
+                      className="h-10 items-center rounded-lg text-[15px] font-semibold hover:cursor-pointer"
                     >
-                      <ArrowLeft className="size-5!" />
-                      <span>Back</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
+                      <Link
+                        to={backUrl}
+                        onClick={() => setOpenMobile(false)}
+                        className="flex items-center"
+                      >
+                        <ArrowLeft className="size-5!" />
+                        <span>Back</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              )
             )}
             {!primary && title && (
               <h2 className="truncate px-2.5 pt-1 text-lg font-semibold tracking-tight text-foreground group-data-[collapsible=icon]:hidden">
-                {title}
+                {isBack ? (
+                  title
+                ) : (
+                  <Link
+                    to={backUrl}
+                    onClick={() => setOpenMobile(false)}
+                    className="transition-opacity hover:opacity-80"
+                  >
+                    {title}
+                  </Link>
+                )}
               </h2>
             )}
             {showSwitchWorkspace &&

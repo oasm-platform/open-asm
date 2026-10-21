@@ -282,22 +282,14 @@ export const detailIssueSchema = z.object({
     ),
 });
 
-export const listToolsSchema = z
-  .object({
-    q: z
-      .string()
-      .optional()
-      .describe(
-        'Search query to filter security tools/scanners by name or description.',
-      ),
-    agentTool: z
-      .boolean()
-      .optional()
-      .describe(
-        'true → only tools the agent can use (built-in tools and connectors that support the agent), false → only the others, omit → all tools.',
-      ),
-  })
-  .extend(getManyBaseRequestSchema.shape);
+export const listToolsSchema = z.object({
+  q: z
+    .string()
+    .optional()
+    .describe(
+      'Search query to filter security tools/scanners by name or description.',
+    ),
+});
 
 export const listWorkersSchema = z
   .object({

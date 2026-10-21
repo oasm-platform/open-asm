@@ -19,6 +19,7 @@ import { AgentsMemoriesService } from './agents.memories';
 import { AgentsModelsCatalogService } from './agents.models-catalog';
 import { AgentsStreamBufferService } from './agents.stream-buffer';
 import { AgentsSubagentsService } from './agents.subagents';
+import { AgentsUsageService } from './agents.usage';
 import { AgentsService } from './agents.service';
 import { AgentTool } from './agents.tools';
 import { AgentsMcpService } from './agents.mcp';
@@ -74,6 +75,7 @@ import { HttpModule } from '@nestjs/axios';
     AgentsSubagentsService,
     AgentsDefinitionsService,
     AgentsStreamBufferService,
+    AgentsUsageService,
   ],
   exports: [
     AgentsService,
