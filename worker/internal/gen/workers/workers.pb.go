@@ -138,6 +138,9 @@ const (
 	RemoteExecuteResultEventType_REMOTE_EXECUTE_RESULT_STDERR  RemoteExecuteResultEventType = 2
 	RemoteExecuteResultEventType_REMOTE_EXECUTE_RESULT_EXIT    RemoteExecuteResultEventType = 3
 	RemoteExecuteResultEventType_REMOTE_EXECUTE_RESULT_ERROR   RemoteExecuteResultEventType = 4
+	// data is a JPEG screenshot taken after a "browser ..." command; sent
+	// before that command's EXIT.
+	RemoteExecuteResultEventType_REMOTE_EXECUTE_RESULT_IMAGE RemoteExecuteResultEventType = 5
 )
 
 // Enum value maps for RemoteExecuteResultEventType.
@@ -148,6 +151,7 @@ var (
 		2: "REMOTE_EXECUTE_RESULT_STDERR",
 		3: "REMOTE_EXECUTE_RESULT_EXIT",
 		4: "REMOTE_EXECUTE_RESULT_ERROR",
+		5: "REMOTE_EXECUTE_RESULT_IMAGE",
 	}
 	RemoteExecuteResultEventType_value = map[string]int32{
 		"REMOTE_EXECUTE_RESULT_UNKNOWN": 0,
@@ -155,6 +159,7 @@ var (
 		"REMOTE_EXECUTE_RESULT_STDERR":  2,
 		"REMOTE_EXECUTE_RESULT_EXIT":    3,
 		"REMOTE_EXECUTE_RESULT_ERROR":   4,
+		"REMOTE_EXECUTE_RESULT_IMAGE":   5,
 	}
 )
 
@@ -2868,13 +2873,14 @@ const file_workers_proto_rawDesc = "" +
 	"(REMOTE_EXECUTE_SUBSCRIBE_EVENT_CONNECTED\x10\x01\x12*\n" +
 	"&REMOTE_EXECUTE_SUBSCRIBE_EVENT_COMMAND\x10\x02\x12+\n" +
 	"'REMOTE_EXECUTE_SUBSCRIBE_EVENT_RUN_TOOL\x10\x03\x12.\n" +
-	"*REMOTE_EXECUTE_SUBSCRIBE_EVENT_CANCEL_TOOL\x10\x04*\xc6\x01\n" +
+	"*REMOTE_EXECUTE_SUBSCRIBE_EVENT_CANCEL_TOOL\x10\x04*\xe7\x01\n" +
 	"\x1cRemoteExecuteResultEventType\x12!\n" +
 	"\x1dREMOTE_EXECUTE_RESULT_UNKNOWN\x10\x00\x12 \n" +
 	"\x1cREMOTE_EXECUTE_RESULT_STDOUT\x10\x01\x12 \n" +
 	"\x1cREMOTE_EXECUTE_RESULT_STDERR\x10\x02\x12\x1e\n" +
 	"\x1aREMOTE_EXECUTE_RESULT_EXIT\x10\x03\x12\x1f\n" +
-	"\x1bREMOTE_EXECUTE_RESULT_ERROR\x10\x04*\xa0\x01\n" +
+	"\x1bREMOTE_EXECUTE_RESULT_ERROR\x10\x04\x12\x1f\n" +
+	"\x1bREMOTE_EXECUTE_RESULT_IMAGE\x10\x05*\xa0\x01\n" +
 	"\x12WorkerRuntimeState\x12$\n" +
 	" WORKER_RUNTIME_STATE_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aWORKER_RUNTIME_STATE_READY\x10\x01\x12!\n" +

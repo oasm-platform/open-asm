@@ -41,9 +41,21 @@ On a sandboxed worker, each session's browser context sends all of its traffic t
 
 At each launch on a sandboxed worker, the worker checks that the browser really routes a context through its proxy, by loading an unresolvable `.invalid` URL that only the proxy can answer. A browser that ignores the proxy is refused (go-rod's Chromium 128 on Windows does), because its sessions could reach local addresses. On such a host the shared-worker integration test skips.
 
+## Live view for the user
+
+After every command that runs in an open session (all but `close`), the worker captures the active tab's viewport as a JPEG, scaled to at most 1280 px wide (`browserSession.screenshot`). It sends the image as a `REMOTE_EXECUTE_RESULT_IMAGE` result before the command's EXIT. The image is a live view for the user only. It is never stored, and never reaches the model:
+
+1. Core publishes the image bytes as base64 on the command's Redis result channel. `RemoteExecuteService` returns the last image with the result but does not pass it to live terminal listeners.
+2. `execute_remote_command` keeps the image out of its result, and emits it as `browser-screenshot` on the run's emitter.
+3. The run streams it as a transient `data-browser-screenshot` chunk, which is not saved with the message. The stream buffer does not record it for replay either: `publishLive` hands it only to clients resuming at that moment.
+4. The console keeps the latest one in memory (`useAgentChat().browserScreenshot`), and the Browser tab of the chat side panel shows it. After a reload or a conversation switch, the tab stays empty until the next browser command.
+
+A failed capture only drops the picture; the command's result is unchanged.
+
 ## Not supported
 
-- Returning screenshots, PDFs or downloads to the agent. Output is text only.
+- Returning screenshots, PDFs or downloads to the agent. The agent's output is text only.
+- Keeping screenshots: the live view is gone after a reload.
 - File upload.
 - Traces or HAR capture.
 - Keeping sessions across a worker restart.

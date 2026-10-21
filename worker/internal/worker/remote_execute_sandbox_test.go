@@ -16,12 +16,23 @@ type recordingSender struct {
 	stdout []string
 	exits  []int32
 	errs   []string
+	images [][]byte
+	order  []string // event kinds as sent: stdout, image, exit, error
+}
+
+func (r *recordingSender) SendImage(_ context.Context, b []byte) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.images = append(r.images, b)
+	r.order = append(r.order, "image")
+	return nil
 }
 
 func (r *recordingSender) SendStdout(_ context.Context, b []byte) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.stdout = append(r.stdout, string(b))
+	r.order = append(r.order, "stdout")
 	return nil
 }
 
@@ -29,6 +40,7 @@ func (r *recordingSender) SendExit(_ context.Context, c int32) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.exits = append(r.exits, c)
+	r.order = append(r.order, "exit")
 	return nil
 }
 
@@ -36,6 +48,7 @@ func (r *recordingSender) SendError(_ context.Context, m string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.errs = append(r.errs, m)
+	r.order = append(r.order, "error")
 	return nil
 }
 

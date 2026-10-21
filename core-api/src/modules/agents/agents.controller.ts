@@ -647,9 +647,23 @@ export class AgentsController {
           }
           // Buffer every chunk so a reconnecting client can replay it. Await
           // to keep Redis order matching the write order; it swallows its own
-          // errors, so it never breaks the live stream.
+          // errors, so it never breaks the live stream. Browser screenshots
+          // are a live view: resumers get them as they come, but none is
+          // kept, so Redis never holds every image of the run.
           if (activeConversationId) {
-            await this.agentsStreamBuffer.append(activeConversationId, chunkJson);
+            if (
+              (value as { type?: string }).type === 'data-browser-screenshot'
+            ) {
+              await this.agentsStreamBuffer.publishLive(
+                activeConversationId,
+                chunkJson,
+              );
+            } else {
+              await this.agentsStreamBuffer.append(
+                activeConversationId,
+                chunkJson,
+              );
+            }
           }
         }
         // Send [DONE] marker to properly terminate the SSE stream

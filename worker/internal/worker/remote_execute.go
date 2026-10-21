@@ -80,6 +80,16 @@ func (c commandSender) SendError(ctx context.Context, errMsg string) error {
 	return c.h.SendResultFor(ctx, c.sessionID, c.cmdID, pb.RemoteExecuteResultEventType_REMOTE_EXECUTE_RESULT_ERROR, []byte(errMsg), 0)
 }
 
+func (c commandSender) SendImage(ctx context.Context, jpeg []byte) error {
+	return c.h.SendResultFor(ctx, c.sessionID, c.cmdID, pb.RemoteExecuteResultEventType_REMOTE_EXECUTE_RESULT_IMAGE, jpeg, 0)
+}
+
+// browserResultSender also delivers a browser command's screenshot.
+type browserResultSender interface {
+	remoteResultSender
+	SendImage(ctx context.Context, jpeg []byte) error
+}
+
 type sessionSandbox struct {
 	sessionID string
 	rootPath  string              // host session dir; empty when containerized
@@ -496,17 +506,19 @@ func executeRemoteCommand(ctx context.Context, handler remoteResultSender, sessi
 // Chromium and reports it like a shell command: stdout, then EXIT 0 or 1.
 // On a sandboxed (shared) worker the browser still runs in this process; its
 // sessions then reach only public addresses (agentBrowsers.publicOnly).
-func executeBrowserCommand(ctx context.Context, handler remoteResultSender, sessionID, line string, browsers *agentBrowsers, events chan<- TuiEvent) {
+func executeBrowserCommand(ctx context.Context, handler browserResultSender, sessionID, line string, browsers *agentBrowsers, events chan<- TuiEvent) {
+	log := NewTuiLogger(events, "RemoteExec")
 	if browsers == nil {
 		_ = handler.SendError(ctx, "browser is not available on this worker")
 		return
 	}
-	out, failed, err := browsers.run(ctx, line)
+	r, err := browsers.runWithScreenshot(ctx, line)
 	if err != nil {
-		NewTuiLogger(events, "RemoteExec").ErrorE("Browser unavailable", err)
+		log.ErrorE("Browser unavailable", err)
 		_ = handler.SendError(ctx, err.Error())
 		return
 	}
+	out := r.out
 	if !strings.HasSuffix(out, "\n") {
 		out += "\n"
 	}
@@ -514,8 +526,14 @@ func executeBrowserCommand(ctx context.Context, handler remoteResultSender, sess
 		return
 	}
 	Emit(events, TuiEvent{Type: EventSessionOutput, SessionID: sessionID, SessionOutput: out, SessionStream: "stdout"})
+	if r.shot != nil {
+		// Before EXIT: core stops collecting a command's results at its exit.
+		if err := handler.SendImage(ctx, r.shot); err != nil {
+			log.ErrorE("Failed to send browser screenshot", err)
+		}
+	}
 	exitCode := int32(0)
-	if failed {
+	if r.failed {
 		exitCode = 1
 	}
 	_ = handler.SendExit(ctx, exitCode)

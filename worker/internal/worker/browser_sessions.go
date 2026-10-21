@@ -238,6 +238,54 @@ func (s *browserSession) newTab(ctx context.Context) (*rod.Page, error) {
 	return p, nil
 }
 
+const (
+	// browserShotWidth caps a screenshot's width: readable for a model, small
+	// enough (~50-150 KB as JPEG) to send after every command.
+	browserShotWidth = 1280
+	// browserShotTimeout bounds taking a screenshot after a command.
+	browserShotTimeout = 5 * time.Second
+)
+
+// screenshot returns the visible part of the active tab as JPEG, scaled down
+// to browserShotWidth. Best effort: nil when the session is closed, has no
+// tab, or the capture fails.
+func (s *browserSession) screenshot(ctx context.Context) []byte {
+	if s.closed.Load() {
+		return nil
+	}
+	s.stateMu.Lock()
+	var p *rod.Page
+	if s.active < len(s.pages) {
+		p = s.pages[s.active] // the whole tab, also while inside an iframe
+	}
+	s.stateMu.Unlock()
+	if p == nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, browserShotTimeout)
+	defer cancel()
+	p = p.Context(ctx)
+	m, err := proto.PageGetLayoutMetrics{}.Call(p)
+	if err != nil || m.CSSVisualViewport == nil || m.CSSVisualViewport.ClientWidth <= 0 {
+		return nil
+	}
+	vp := m.CSSVisualViewport
+	scale := 1.0
+	if vp.ClientWidth > browserShotWidth {
+		scale = browserShotWidth / vp.ClientWidth
+	}
+	quality := 70
+	res, err := proto.PageCaptureScreenshot{
+		Format:  proto.PageCaptureScreenshotFormatJpeg,
+		Quality: &quality,
+		Clip:    &proto.PageViewport{X: vp.PageX, Y: vp.PageY, Width: vp.ClientWidth, Height: vp.ClientHeight, Scale: scale},
+	}.Call(p)
+	if err != nil {
+		return nil
+	}
+	return res.Data
+}
+
 // shutdown ends the session. Cancelling sessCtx first makes any command
 // still running in it return, whatever its page is doing.
 func (s *browserSession) shutdown() {

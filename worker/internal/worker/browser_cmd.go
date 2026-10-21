@@ -234,36 +234,51 @@ func runHandler(ctx context.Context, h browserHandler, s *browserSession, args [
 	}
 }
 
+// browserResult is what one browser command gives the agent.
+type browserResult struct {
+	out    string
+	failed bool   // exit code 1
+	shot   []byte // JPEG of the session's page after the command; nil if none
+}
+
 // run executes one browser command line (the text after "browser "). out is
 // what the agent reads; failed sets exit code 1; err is a worker failure.
 func (a *agentBrowsers) run(ctx context.Context, line string) (out string, failed bool, err error) {
+	r, err := a.runWithScreenshot(ctx, line)
+	return r.out, r.failed, err
+}
+
+// runWithScreenshot is run, plus a screenshot of the session's page once a
+// command has run in a session that is still open.
+func (a *agentBrowsers) runWithScreenshot(ctx context.Context, line string) (browserResult, error) {
 	toks, err := tokenize(line)
 	if err != nil {
-		return "error: " + err.Error(), true, nil
+		return browserResult{out: "error: " + err.Error(), failed: true}, nil
 	}
 	// No shell runs these, so a chained command would arrive as stray args.
 	for _, t := range toks {
 		if op := chainOperator(t); op != "" {
-			return fmt.Sprintf("error: an unquoted %q would chain commands, but no shell runs here; send one browser command per call (quote it if it is part of a value)", op), true, nil
+			return browserResult{out: fmt.Sprintf("error: an unquoted %q would chain commands, but no shell runs here; send one browser command per call (quote it if it is part of a value)", op), failed: true}, nil
 		}
 	}
 	c, err := parseBrowserCmd(toks)
 	if err != nil {
-		return "error: " + err.Error() + "\n\n" + browserUsage, true, nil
+		return browserResult{out: "error: " + err.Error() + "\n\n" + browserUsage, failed: true}, nil
 	}
 	switch {
 	case c.name == "" || c.name == "help":
-		return browserUsage, c.name == "", nil
+		return browserResult{out: browserUsage, failed: c.name == ""}, nil
 	case c.name == "sessions":
 		// Never the ids: on a shared worker they would hand one conversation's
 		// session to another.
-		return fmt.Sprintf("%d browser session(s) open on this worker; ids are shown only by the \"browser open\" that created them", a.count()), false, nil
+		return browserResult{out: fmt.Sprintf("%d browser session(s) open on this worker; ids are shown only by the \"browser open\" that created them", a.count())}, nil
 	case browserCommands[c.name] == nil:
-		return fmt.Sprintf("error: unknown command %q%s\n\n%s", c.name, unknownCmdHint(c), browserUsage), true, nil
+		return browserResult{out: fmt.Sprintf("error: unknown command %q%s\n\n%s", c.name, unknownCmdHint(c), browserUsage), failed: true}, nil
 	case c.name == "open" && len(c.args) > 1:
-		return fmt.Sprintf("error: open takes one url, got %q; quote a url with spaces", c.args), true, nil
+		return browserResult{out: fmt.Sprintf("error: open takes one url, got %q; quote a url with spaces", c.args), failed: true}, nil
 	}
 
+	parent := ctx // the screenshot gets its own time, after the command's
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
@@ -272,26 +287,26 @@ func (a *agentBrowsers) run(ctx context.Context, line string) (out string, faile
 	prefix := ""
 	if c.session == "" {
 		if c.name != "open" || len(c.args) == 0 {
-			return `error: -s <session> is required; start one with "browser open <url>"`, true, nil
+			return browserResult{out: `error: -s <session> is required; start one with "browser open <url>"`, failed: true}, nil
 		}
 		target, perr := url.Parse(formatURL(c.args[0]))
 		if perr != nil || target.Hostname() == "" {
-			return fmt.Sprintf("error: invalid url %q", c.args[0]), true, nil
+			return browserResult{out: fmt.Sprintf("error: invalid url %q", c.args[0]), failed: true}, nil
 		}
 		if a.publicOnly {
 			if herr := sharedWorkerHostErr(target.Hostname()); herr != nil {
-				return "error: " + herr.Error(), true, nil
+				return browserResult{out: "error: " + herr.Error(), failed: true}, nil
 			}
 		}
 		s, done, err = a.open(ctx)
 		if errors.Is(err, errBrowserUnavailable) {
-			return "", false, err
+			return browserResult{}, err
 		}
 	} else {
 		s, done, err = a.acquire(c.session)
 	}
 	if err != nil {
-		return "error: " + err.Error(), true, nil
+		return browserResult{out: "error: " + err.Error(), failed: true}, nil
 	}
 	defer done()
 	if c.session == "" {
@@ -304,16 +319,17 @@ func (a *agentBrowsers) run(ctx context.Context, line string) (out string, faile
 		out += fmt.Sprintf("\n\nblocked (this worker is shared, so it reaches only public addresses):\n%s", strings.Join(blocked, "\n"))
 	}
 	if wedged {
-		return strings.TrimLeft(out+fmt.Sprintf("\nerror: timed out after %s and the page stopped responding, so browser session %s was closed; run \"browser open <url>\" again", c.timeout, s.id), "\n"), true, nil
+		return browserResult{out: strings.TrimLeft(out+fmt.Sprintf("\nerror: timed out after %s and the page stopped responding, so browser session %s was closed; run \"browser open <url>\" again", c.timeout, s.id), "\n"), failed: true}, nil
 	}
+	r := browserResult{out: out, shot: s.screenshot(parent)}
 	if err != nil {
 		msg := trimRodStack(err.Error())
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			msg = fmt.Sprintf("timed out after %s (%s)", c.timeout, msg)
 		}
-		return strings.TrimLeft(out+"\nerror: "+msg, "\n"), true, nil
+		r.out, r.failed = strings.TrimLeft(out+"\nerror: "+msg, "\n"), true
 	}
-	return out, false, nil
+	return r, nil
 }
 
 // unknownCmdHint corrects the slips agents make: a bare URL, or a word in

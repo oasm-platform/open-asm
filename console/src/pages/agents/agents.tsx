@@ -52,6 +52,7 @@ export default function AgentsChatPage() {
     hasMoreMessages,
     isLoadingMoreMessages,
     remoteExecuteEvents,
+    browserScreenshot,
     onSendMessage,
     onRetry,
     onStop,
@@ -108,6 +109,7 @@ export default function AgentsChatPage() {
       subagents,
       messages,
       metadata: conversationMeta,
+      browserScreenshot,
     });
     if (!panelContent[panelTab]) {
       const firstWithContent = SIDE_PANEL_TABS.find((t) => panelContent[t]);
@@ -130,6 +132,7 @@ export default function AgentsChatPage() {
       conversationId={conversationId}
       onSelectToolCall={handleSelectToolCall}
       remoteExecuteEvents={remoteExecuteEvents}
+      browserScreenshot={browserScreenshot}
       className="flex-1"
     />
   );
@@ -195,8 +198,8 @@ export default function AgentsChatPage() {
         </div>
 
         {/* Side panel — large screens only: splits the view with the chat
-            (2/5 until xl, then half) and shows the plan, subagents, tool
-            calls or turn stats one tab at a time */}
+            (2/5 until xl, then half) and shows the plan, subagents, browser,
+            tool calls or turn stats one tab at a time */}
         {panelOpen && (
           <aside className="hidden lg:flex w-2/5 xl:w-1/2 2xl:max-w-3xl shrink-0 flex-col border-l animate-in fade-in-0 slide-in-from-right-4 duration-300">
             {renderSidePanel(() => setPanel(false))}
@@ -214,7 +217,8 @@ export default function AgentsChatPage() {
           <SheetHeader className="sr-only">
             <SheetTitle>Side panel</SheetTitle>
             <SheetDescription>
-              Plan, subagents, tool calls and stats of this conversation.
+              Plan, subagents, browser, tool calls and stats of this
+              conversation.
             </SheetDescription>
           </SheetHeader>
           {renderSidePanel(() => setSheetOpen(false))}

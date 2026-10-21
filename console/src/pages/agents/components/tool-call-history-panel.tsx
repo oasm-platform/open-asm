@@ -21,7 +21,7 @@ import { SIDE_PANEL_INDENT, SIDE_PANEL_ROW } from './side-panel-layout';
 // Types
 // ---------------------------------------------------------------------------
 
-interface ToolCallEntry {
+export interface ToolCallEntry {
   toolCallId: string;
   toolName: string;
   status: ToolCallState['status'];

@@ -9,6 +9,7 @@ import type { UIMessage } from 'ai';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { AgentTodoItem } from './agent-todo-panel';
+import type { LiveBrowserScreenshot } from './browser-panel';
 import {
   ChatSidePanel,
   sidePanelContent,
@@ -60,16 +61,43 @@ const toolMessages: UIMessage[] = [
   },
 ];
 
+const browserCommand = (
+  toolCallId: string,
+  command: string,
+  state: 'input-available' | 'output-available',
+): UIMessage => ({
+  id: `m-${toolCallId}`,
+  role: 'assistant',
+  parts: [
+    {
+      type: 'dynamic-tool',
+      toolName: 'execute_remote_command',
+      toolCallId,
+      state,
+      input: { command },
+      ...(state === 'output-available' ? { output: { stdout: 'ok' } } : {}),
+    } as UIMessage['parts'][number],
+  ],
+});
+
+const liveShot: LiveBrowserScreenshot = {
+  toolCallId: 'b2',
+  command: 'browser -s b-1 click @e3',
+  image: '/9j/4AAQ',
+};
+
 function Harness({
   subagents = [],
   messages = [],
   remoteExecuteEvents,
+  browserScreenshot,
   onClose = () => {},
   onSelectToolCall,
 }: {
   subagents?: SubagentResponseDto[];
   messages?: UIMessage[];
   remoteExecuteEvents?: Map<string, RemoteExecuteStreamEvent[]>;
+  browserScreenshot?: LiveBrowserScreenshot | null;
   onClose?: () => void;
   onSelectToolCall?: (id: string) => void;
 }) {
@@ -86,6 +114,7 @@ function Harness({
       metadata={null}
       onSelectToolCall={onSelectToolCall}
       remoteExecuteEvents={remoteExecuteEvents}
+      browserScreenshot={browserScreenshot}
     />
   );
 }
@@ -169,9 +198,50 @@ describe('ChatSidePanel', () => {
     expect(screen.queryByText('Input')).toBeNull();
   });
 
+  it('shows the live browser view, and the command still running', async () => {
+    const user = userEvent.setup();
+    const onSelectToolCall = vi.fn();
+    const done = [
+      browserCommand('b1', 'browser open https://example.com', 'output-available'),
+      browserCommand('b2', 'browser -s b-1 click @e3', 'output-available'),
+    ];
+    const { rerender } = render(
+      <Harness
+        messages={done}
+        browserScreenshot={liveShot}
+        onSelectToolCall={onSelectToolCall}
+      />,
+    );
+
+    await user.click(screen.getByRole('tab', { name: /Browser/ }));
+    expect(screen.getByRole('img', { name: /click @e3/ })).toHaveAttribute(
+      'src',
+      'data:image/jpeg;base64,/9j/4AAQ',
+    );
+    await user.click(screen.getByRole('button', { name: 'Show in chat' }));
+    expect(onSelectToolCall).toHaveBeenCalledWith('b2');
+
+    rerender(
+      <Harness
+        messages={[
+          ...done,
+          browserCommand('b3', 'browser -s b-1 press Enter', 'input-available'),
+        ]}
+        browserScreenshot={liveShot}
+      />,
+    );
+    expect(screen.getByText('Running')).toBeInTheDocument();
+    expect(screen.getByText('browser -s b-1 press Enter')).toBeInTheDocument();
+    // The last picture stays until the running command brings a new one
+    expect(screen.getByRole('img', { name: /click @e3/ })).toBeInTheDocument();
+  });
+
   it('says so when a tab has nothing to show', async () => {
     const user = userEvent.setup();
     render(<Harness />);
+
+    await user.click(screen.getByRole('tab', { name: /Browser/ }));
+    expect(screen.getByText('No live view yet')).toBeInTheDocument();
 
     await user.click(screen.getByRole('tab', { name: /Subagents/ }));
     expect(screen.getByText('No subagents')).toBeInTheDocument();
@@ -198,14 +268,15 @@ describe('sidePanelContent', () => {
     const metadata = { model: 'claude-sonnet-4-5' } as ConversationMetadataDto;
     expect(
       sidePanelContent({ goal: 'g', subagents: [], messages: [], metadata: null }),
-    ).toEqual({ plan: true, subagents: false, tools: false, stats: false });
+    ).toEqual({ plan: true, subagents: false, browser: false, tools: false, stats: false });
     expect(
       sidePanelContent({
         todos: [],
         subagents: [subagent],
         messages: toolMessages,
         metadata,
+        browserScreenshot: liveShot,
       }),
-    ).toEqual({ plan: false, subagents: true, tools: true, stats: true });
+    ).toEqual({ plan: false, subagents: true, browser: true, tools: true, stats: true });
   });
 });

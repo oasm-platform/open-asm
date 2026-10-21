@@ -1,8 +1,10 @@
 package worker
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"image/jpeg"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -396,4 +398,38 @@ func TestWedgedPageClosesItsSession(t *testing.T) {
 		t.Fatalf("wedged session still counted: %d", n)
 	}
 	openSession(t, a, srv.URL) // the browser itself still works
+}
+
+func TestSessionCommandsSendAScreenshotBeforeExit(t *testing.T) {
+	a := newTestBrowsers(t)
+	srv := serveHTML(t, map[string]string{"/": `<title>S</title><h1>Hello</h1>`})
+	run := func(line string) *recordingSender {
+		rec := &recordingSender{}
+		executeBrowserCommand(context.Background(), rec, "s", line, a, nil)
+		return rec
+	}
+
+	rec := run("open " + srv.URL)
+	if !slices.Equal(rec.order, []string{"stdout", "image", "exit"}) {
+		t.Fatalf("open sent %v", rec.order)
+	}
+	cfg, err := jpeg.DecodeConfig(bytes.NewReader(rec.images[0]))
+	if err != nil || cfg.Width != browserShotWidth || cfg.Height != 720 {
+		t.Fatalf("screenshot %dx%d err=%v, want the 1920x1080 viewport scaled to %d wide", cfg.Width, cfg.Height, err, browserShotWidth)
+	}
+	m := sessionLine.FindStringSubmatch(rec.stdout[0])
+	if m == nil {
+		t.Fatalf("no session id in %q", rec.stdout)
+	}
+	if rec := run("-s " + m[1] + " click h1"); !slices.Equal(rec.order, []string{"stdout", "image", "exit"}) || rec.exits[0] != 0 {
+		t.Fatalf("click sent %v exits=%v", rec.order, rec.exits)
+	}
+	if rec := run("-s " + m[1] + " click #missing --timeout 500"); !slices.Equal(rec.order, []string{"stdout", "image", "exit"}) || rec.exits[0] != 1 {
+		t.Fatalf("a failed command still shows the page: sent %v exits=%v", rec.order, rec.exits)
+	}
+	for _, line := range []string{"-s " + m[1] + " close", "help", "-s b-x title"} {
+		if rec := run(line); len(rec.images) != 0 {
+			t.Fatalf("%q sent a screenshot without an open session", line)
+		}
+	}
 }
