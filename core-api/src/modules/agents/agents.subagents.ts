@@ -17,6 +17,7 @@ import { type ApprovalSettings } from './agents.approvals';
 import { AgentsConfigService, withoutDisabledTools } from './agents.config';
 import { AgentsDefinitionsService } from './agents.definitions';
 import { AgentsModelsCatalogService } from './agents.models-catalog';
+import { AgentsSkillsService } from './agents.skills';
 import { AgentTool, READ_ONLY_TOOLS } from './agents.tools';
 import { currentToolName } from './tools/helpers';
 import type { AgentDefinitionResponseDto } from './dto/agent-definition.dto';
@@ -176,6 +177,7 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
     private readonly agentsConfig: AgentsConfigService,
     private readonly modelsCatalog: AgentsModelsCatalogService,
     private readonly definitions: AgentsDefinitionsService,
+    private readonly skills: AgentsSkillsService,
   ) {
     this.events.setMaxListeners(0);
   }
@@ -506,12 +508,28 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
         conversation.id,
         approval,
       ) as Record<string, Tool>;
-      const tools = withoutDisabledTools(
-        Object.fromEntries(
-          subagentToolNames(def, allowWrite)
-            .filter((t) => allTools[t])
-            .map((t) => [t, allTools[t]]),
-        ),
+      // The skills the definition declares, offered as the main agent's are:
+      // listed in the prompt, loaded on demand with load_skill
+      const skills = await this.skills.resolveSkills(
+        workspaceId,
+        overrides.skills ?? [],
+      );
+      const tools = withoutDisabledTools<Record<string, Tool>>(
+        {
+          ...Object.fromEntries(
+            subagentToolNames(def, allowWrite)
+              .filter((t) => allTools[t])
+              .map((t) => [t, allTools[t]]),
+          ),
+          ...(skills.length > 0
+            ? {
+                load_skill: this.skills.createLoadSkillTool(
+                  workspaceId,
+                  skills.map((s) => s.name),
+                ),
+              }
+            : {}),
+        },
         agentConfig,
       );
       const hasTools = Object.keys(tools).length > 0;
@@ -526,7 +544,13 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
       // without flipping the shutdown flag, so it fails rather than requeues.
       const result = streamText({
         model,
-        system: `${SECURITY_PREAMBLE}\n\n${def.systemPrompt}`,
+        system: [
+          SECURITY_PREAMBLE,
+          def.systemPrompt,
+          this.skills.formatSubagentSkillsPrompt(skills),
+        ]
+          .filter(Boolean)
+          .join('\n\n'),
         messages: [
           {
             role: 'user',

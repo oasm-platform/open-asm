@@ -172,7 +172,50 @@ export class AgentsSkillsService {
     return null;
   }
 
-  createLoadSkillTool(workspaceId: string): Tool {
+  /**
+   * The skills of `names` that exist for the workspace (built-in, or one of
+   * its enabled skills), in the given order. A subagent definition may name a
+   * skill that was since deleted or disabled: that one is left out.
+   */
+  async resolveSkills(
+    workspaceId: string,
+    names: string[],
+  ): Promise<{ name: string; description: string }[]> {
+    const found: { name: string; description: string }[] = [];
+    for (const name of new Set(names)) {
+      const skill = await this.getSkillByName(workspaceId, name);
+      if (skill) {
+        found.push({ name: skill.name, description: skill.description });
+      } else {
+        this.logger.warn(`Skill '${name}' not found or disabled; not offered`);
+      }
+    }
+    return found;
+  }
+
+  /**
+   * The skills prompt of a subagent: only the skills its definition
+   * declares, each loaded on demand with `load_skill`. Empty for none.
+   */
+  formatSubagentSkillsPrompt(
+    skills: { name: string; description: string }[],
+  ): string {
+    if (skills.length === 0) return '';
+    return [
+      '## Available Skills',
+      '',
+      'Use the `load_skill` tool to load a skill when your task would benefit from its specialized instructions.',
+      '',
+      ...skills.map((s) => `- ${s.name}: ${s.description}`),
+    ].join('\n');
+  }
+
+  /**
+   * @param only Limits the tool to these skill names (a subagent's declared
+   *   skills); all of the workspace's skills when omitted.
+   */
+  createLoadSkillTool(workspaceId: string, only?: string[]): Tool {
+    const allowed = only ? new Set(only) : undefined;
     const toolConfig = {
       description:
         "Load a skill to get specialized instructions. Call this when the user's request matches a skill description and you need detailed guidance.",
@@ -180,6 +223,11 @@ export class AgentsSkillsService {
         name: z.string().describe('The skill name to load'),
       }),
       execute: async ({ name }: { name: string }) => {
+        if (allowed && !allowed.has(name)) {
+          return {
+            error: `Skill '${name}' is not available here; available: ${[...allowed].join(', ')}`,
+          };
+        }
         const skill = await this.getSkillByName(workspaceId, name);
         if (!skill) {
           return { error: `Skill '${name}' not found or is disabled` };

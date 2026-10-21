@@ -7,6 +7,7 @@ import {
   subagentToolNames,
   toTranscriptStep,
 } from './agents.subagents';
+import { AgentsSkillsService } from './agents.skills';
 import { READ_ONLY_TOOLS } from './agents.tools';
 import type { AgentDefinitionResponseDto } from './dto/agent-definition.dto';
 import { SubagentStatus } from './enums/agent.enums';
@@ -139,6 +140,7 @@ describe('AgentsSubagentsService', () => {
   let agentTool: { getTools: jest.Mock };
   let agentsConfig: Record<string, jest.Mock>;
   let definitions: { listSubagents: jest.Mock };
+  let skillRepo: { findOne: jest.Mock; find: jest.Mock };
   let tx: Record<string, jest.Mock>;
 
   beforeEach(() => {
@@ -194,6 +196,11 @@ describe('AgentsSubagentsService', () => {
       ),
       createLanguageModel: jest.fn(() => Promise.resolve({})),
     };
+    // The real service: built-in skills come from the skills directory
+    skillRepo = {
+      findOne: jest.fn(() => Promise.resolve(null)),
+      find: jest.fn(() => Promise.resolve([])),
+    };
     service = new AgentsSubagentsService(
       repo as never,
       conversationRepo as never,
@@ -201,6 +208,7 @@ describe('AgentsSubagentsService', () => {
       agentsConfig as never,
       { costOf: jest.fn(() => undefined) } as never,
       definitions as never,
+      new AgentsSkillsService(skillRepo as never, {} as never),
     );
   });
 
@@ -290,6 +298,67 @@ describe('AgentsSubagentsService', () => {
     expect(Object.keys(call.tools)).toEqual(
       expect.arrayContaining(['inspect_issue', 'execute_remote_command']),
     );
+  });
+
+  it('offers a subagent only the skills it declares, through load_skill', async () => {
+    skillRepo.findOne.mockImplementation(({ where }: { where: { name: string } }) =>
+      Promise.resolve(
+        where.name === 'team-playbook'
+          ? { name: 'team-playbook', description: 'How our team tests', content: 'Steps' }
+          : null,
+      ),
+    );
+    definitions.listSubagents.mockResolvedValue([
+      definition({
+        metadata: {
+          tools: ['inspect_issue'],
+          skills: ['browser', 'team-playbook', 'deleted-skill'],
+        },
+      }),
+    ]);
+    (streamText as jest.Mock).mockReturnValue(
+      streamResult({ text: 'ok', steps: [] }),
+    );
+    await (service as unknown as { run: (j: unknown) => Promise<void> }).run({
+      id: 's1',
+      conversationId: 'c1',
+      name: 'researcher',
+      task: 't',
+    });
+
+    const call = (streamText as jest.Mock).mock.calls[0][0];
+    expect(call.system).toContain('## Available Skills');
+    expect(call.system).toMatch(/^- browser: /m);
+    expect(call.system).toContain('- team-playbook: How our team tests');
+    expect(call.system).not.toContain('deleted-skill');
+    expect(call.system).not.toContain('- command-execution:');
+
+    const loadSkill = call.tools.load_skill as {
+      execute: (input: { name: string }) => Promise<Record<string, unknown>>;
+    };
+    expect(await loadSkill.execute({ name: 'browser' })).toMatchObject({
+      name: 'browser',
+      content: expect.stringContaining('# Browser'),
+    });
+    expect(await loadSkill.execute({ name: 'command-execution' })).toEqual({
+      error: expect.stringContaining('not available here'),
+    });
+  });
+
+  it('gives a subagent no skills when it declares none', async () => {
+    (streamText as jest.Mock).mockReturnValue(
+      streamResult({ text: 'ok', steps: [] }),
+    );
+    await (service as unknown as { run: (j: unknown) => Promise<void> }).run({
+      id: 's1',
+      conversationId: 'c1',
+      name: 'researcher',
+      task: 't',
+    });
+
+    const call = (streamText as jest.Mock).mock.calls[0][0];
+    expect(call.tools).not.toHaveProperty('load_skill');
+    expect(call.system).not.toContain('## Available Skills');
   });
 
   it('gives a subagent its write/exec tools in an AUTO conversation', async () => {
