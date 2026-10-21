@@ -118,8 +118,9 @@ interface ChatSidePanelProps extends SidePanelData {
 }
 
 /**
- * The half of a split AI Studio conversation beside the chat: the plan,
- * subagents, tool calls and turn stats, one tab at a time.
+ * The half of a split AI Studio conversation beside the chat (full screen
+ * over it below lg): the plan, subagents, tool calls and turn stats, one tab
+ * at a time.
  */
 export function ChatSidePanel({
   tab,

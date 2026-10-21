@@ -55,7 +55,6 @@ interface ChatConversationProps {
   agentMode?: string;
   /** Inline permission prompt shown right above the input */
   approvalPrompt?: ReactNode;
-  onAgentModeChange?: (mode: string) => void;
   selectedWorkerId?: string | null;
   onWorkerSelect?: (workerId: string | null) => void;
   todos?: AgentTodoItem[];
@@ -89,7 +88,6 @@ export const ChatConversation = ({
   isLoadingMoreMessages = false,
   agentMode = 'false',
   approvalPrompt,
-  onAgentModeChange,
   selectedWorkerId,
   onWorkerSelect,
   todos,
@@ -242,9 +240,9 @@ export const ChatConversation = ({
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <Conversation className="flex-1" contextRef={stickToBottomRef}>
-        {/* md:pt-16 starts the messages below the page's floating header,
+        {/* pt-16 starts the messages below the page's floating header,
             which they scroll under */}
-        <ConversationContent className="max-w-3xl mx-auto w-full gap-7 px-1.5 pt-4 pb-6 sm:px-4 md:pt-16">
+        <ConversationContent className="max-w-3xl mx-auto w-full gap-7 px-1.5 pt-16 pb-6 sm:px-4">
           {isLoadingHistory ? (
             <LoadingSkeleton />
           ) : isEmpty ? (
@@ -373,7 +371,6 @@ export const ChatConversation = ({
               }
               onSelectModel={onSelectModel}
               agentMode={agentMode}
-              onAgentModeChange={onAgentModeChange}
               selectedWorkerId={selectedWorkerId}
               onWorkerSelect={onWorkerSelect}
               showSettingsButton={false}

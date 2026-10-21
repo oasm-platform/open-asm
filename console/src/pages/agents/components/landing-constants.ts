@@ -81,22 +81,23 @@ export const ASK_PROMPT_GROUPS: PromptGroup[] = [
 
 /**
  * Agent mode: the agent runs tools on the connected workers and acts on the
- * workspace's own in-scope targets (discovery, scanning, verification). Every
- * prompt maps to the agent-callable connectors (nmap, rustscan, nuclei, nikto,
- * zap, wpscan, katana, gau, arjun, ffuf, dirsearch, gitleaks, trivy) or to
- * `execute_remote_command` on a worker.
+ * workspace's own in-scope targets (discovery, scanning, verification). Each
+ * entry is a sample pentest scenario playbook: a full task the agent can carry
+ * out end to end, phrased without naming any specific tool. Scenarios stay on
+ * the external attack surface: recon, port and service scanning, web app
+ * scanning.
  */
 export const AGENT_PROMPT_GROUPS: PromptGroup[] = [
   {
     id: 'recon',
-    label: 'Recon',
+    label: 'External recon',
     icon: Telescope,
     prompts: [
-      'Discover live hosts and URLs for my targets',
-      'Crawl my web assets to map their endpoints',
-      'Find historical URLs for my domains from public archives',
-      'Discover hidden parameters on my key endpoints',
-      'Fuzz for hidden directories and files on my web assets',
+      'Run an external recon pass on my in-scope domains: enumerate subdomains, crawl the live hosts to map their endpoints, collect archived URLs from public sources, then summarize the exposed attack surface',
+      'Map the web attack surface of my target: crawl it to depth 3, gather historical paths, and fuzz the top forms to find hidden parameters',
+      'Find hidden directories and files on my web asset using a common wordlist, and flag anything that looks like an admin panel, backup or config file',
+      'Fingerprint the technologies behind my live host so I can choose the right next steps for it',
+      'Check my public web asset and build repositories for leaked credentials and API keys, then report what to rotate',
     ],
   },
   {
@@ -104,23 +105,23 @@ export const AGENT_PROMPT_GROUPS: PromptGroup[] = [
     label: 'Ports & services',
     icon: Network,
     prompts: [
-      'Scan my in-scope assets for open ports and services',
-      'Run a fast port sweep across my hosts',
-      'Fingerprint the service versions on my open ports',
-      'Check my hosts for exposed databases or admin services',
-      'Compare open ports now against the last scan',
+      'Scan my public host for open ports, then fingerprint the services on what is open and report what is unexpectedly exposed to the internet',
+      'Run a full TCP scan, fingerprint the service versions, and list any service that is end-of-life or outdated',
+      'Compare my open ports against the previous scan and highlight new or changed services since then',
+      'Report which non-web services are exposed to the internet, and whether those services require authentication',
+      'Check my public-facing host for exposed admin panels, debug pages and default installations',
     ],
   },
   {
     id: 'web-scan',
-    label: 'Web scan',
+    label: 'Web app pentest',
     icon: ShieldAlert,
     prompts: [
-      'Run a Nuclei scan against my web assets',
-      'Scan my main domain for common web vulnerabilities',
-      'Check my WordPress sites for known issues',
-      'Run a baseline web app scan on my in-scope sites',
-      'Scan my web servers for misconfigurations',
+      'Run a vulnerability scan with the critical and high severity templates, then summarize the findings with a fix for each',
+      'Baseline scan for common web misconfigurations and rank the results by severity',
+      'Scan my web asset for outdated components and known-vulnerable libraries, and report what to upgrade',
+      'Test my web server for TLS misconfigurations, missing security headers and exposed config or backup files',
+      'Review the APIs exposed by my site for broken authentication and authorization, and report what needs fixing',
     ],
   },
 ];

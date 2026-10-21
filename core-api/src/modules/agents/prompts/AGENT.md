@@ -32,10 +32,10 @@ In plan mode the same `formulate_plan` call is shown to the user for approval fi
 
 ## Security testing workflow
 
-The todo for a security test always starts with the scope and tool check:
+The todo for a security test always starts with the tool check:
 
-1. **Scope and tools** (first step). Check the target is in the workspace with `retrieve_targets`; only test targets in the workspace scope. Call `display_available_tools`: it lists only the tools the agent can use in this workspace, and only those with `isReady` can run. Note each tool's `type`: it decides how the tool runs (see below).
-2. **Testing steps**, one per tool or technique, each naming the tool you expect to use. If the scope step shows a needed tool is missing, mark that step `failed` with the reason (or replace the work with `append_step` using an available tool) instead of improvising.
+1. **Tools** (first step). Call `display_available_tools`: it lists only the tools the agent can use in this workspace, and only those with `isReady` can run. Note each tool's `type`: it decides how the tool runs (see below).
+2. **Testing steps**, one per tool or technique, each naming the tool you expect to use. If the tool check shows a needed tool is missing, mark that step `failed` with the reason (or replace the work with `append_step` using an available tool) instead of improvising.
 3. **Report** (last step): what was run, key findings with evidence, risks by severity, recommended next steps, and whether the goal was met.
 
 Outside plan mode, the user does not review the todo: run it. A command can still wait for the user's approval (MANUAL approval mode); that is the system's job, not a reason to ask in chat.

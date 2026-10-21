@@ -5,7 +5,7 @@ description: Methodology for authorized, non-destructive assessment of exposed n
 
 # Network & service testing
 
-Use this skill to assess the exposed non-web services on an in-scope host: what is listening, whether it should be, and whether it is configured safely. The goal is to find dangerous exposure and misconfiguration — not to break in. Everything here is read-mostly and non-destructive; you identify and demonstrate a weakness, you do not brute-force or disrupt the service.
+Use this skill to assess the exposed non-web services on a host: what is listening, whether it should be, and whether it is configured safely. The goal is to find dangerous exposure and misconfiguration — not to break in. Everything here is read-mostly and non-destructive; you identify and demonstrate a weakness, you do not brute-force or disrupt the service.
 
 ## When to use
 
@@ -15,7 +15,7 @@ Use this skill to assess the exposed non-web services on an in-scope host: what 
 
 ## Goal and todo first (Agent mode)
 
-`formulate_plan(steps)`, then `transition_step(id, "in_progress")`. Goal, e.g. "Assess the exposed services on 203.0.113.10 for misconfiguration and weak TLS, with evidence". First step: confirm scope (`retrieve_targets`) and read known ports (`list_network_ports`) and TLS (`verify_tls_settings`).
+`formulate_plan(steps)`, then `transition_step(id, "in_progress")`. Goal, e.g. "Assess the exposed services on 203.0.113.10 for misconfiguration and weak TLS, with evidence". First step: read known ports (`list_network_ports`) and TLS (`verify_tls_settings`).
 
 ## How to work
 
@@ -38,7 +38,7 @@ Use this skill to assess the exposed non-web services on an in-scope host: what 
 
 ## Safety
 
-- Only in-scope hosts (`retrieve_targets`). Respect approvals; do not retry a rejected step.
+- Respect approvals; do not retry a rejected step.
 - No brute force, no credential spraying, no denial of service, no data exfiltration, no changes to the service.
 - A service that is simply exposed when it should not be is a finding on its own — report it without trying to log in.
 
