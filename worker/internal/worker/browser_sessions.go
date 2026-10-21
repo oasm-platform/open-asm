@@ -268,6 +268,13 @@ func (a *agentBrowsers) ensureBrowser() error {
 			return nil
 		}
 		a.stopBrowser()
+		// Its sessions died with it: free their slots now, not at the idle TTL.
+		for id, s := range a.sessions {
+			s.cancel()
+			s.proxy.close()
+			delete(a.sessions, id)
+			a.life.remove(id)
+		}
 	}
 	if a.launch == nil {
 		return errBrowserUnavailable

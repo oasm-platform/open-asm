@@ -107,3 +107,39 @@ func TestSessionCapAndCloseFreesSlot(t *testing.T) {
 	}
 	done()
 }
+
+func TestBrowserCrashFreesSessionSlots(t *testing.T) {
+	log := NewTuiLogger(nil, "test")
+	var kill func()
+	a := newAgentBrowsers(log, func() (*rod.Browser, func(), error) {
+		b, l, err := launchBrowser(log)
+		if err != nil {
+			return nil, nil, err
+		}
+		kill = l.Kill
+		return b, func() { _ = b.Close(); l.Kill(); l.Cleanup() }, nil
+	})
+	t.Cleanup(a.shutdown)
+	var ids []string
+	for i := range maxBrowserSessions {
+		s, done, err := a.open(nil)
+		if i == 0 && errors.Is(err, errBrowserUnavailable) {
+			t.Skipf("chromium unavailable: %v", err)
+		}
+		if err != nil {
+			t.Fatalf("open %d: %v", i, err)
+		}
+		ids = append(ids, s.id)
+		done()
+	}
+
+	kill() // Chromium dies under all live sessions
+	_, done, err := a.open(nil)
+	if err != nil {
+		t.Fatalf("relaunch must free the dead sessions' slots: %v", err)
+	}
+	done()
+	if _, _, err := a.acquire(ids[0]); err == nil || !strings.Contains(err.Error(), "not found") {
+		t.Fatalf("dead session must be not found, got %v", err)
+	}
+}
