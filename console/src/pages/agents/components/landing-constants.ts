@@ -27,6 +27,25 @@ export const CONVERSATION_STARTERS = [
   'I am tuned in. What security topics interest you?',
 ];
 
+/**
+ * Agent mode hero: the agent runs tools on connected workers, so the copy
+ * speaks as an autonomous pentester rather than a read-only assistant.
+ */
+export const AGENT_CONVERSATION_STARTERS = [
+  'I am your security engineer. Point me at a target.',
+  'Ready to run the pentest. Give me a target.',
+  'Recon first, exploitation next. Name a scope.',
+  'Autonomous pentest armed. Which target?',
+  'I will scan, fingerprint and report. Start me off.',
+  'Give me a domain and I will map its attack surface.',
+  'Let me chain recon, scanning and verification for you.',
+  'Ready to hunt vulnerabilities on your in-scope assets.',
+  'I run the tools, you get the findings. Target?',
+  'Drop a target and I will begin the engagement.',
+  'I will own the recon pass. What is in scope?',
+  'Point me at your asset and I will find the way in.',
+];
+
 export interface PromptGroup {
   id: string;
   label: string;

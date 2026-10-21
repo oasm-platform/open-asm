@@ -132,6 +132,9 @@ enum RemoteExecuteResultEventType {
   REMOTE_EXECUTE_RESULT_STDERR  = 2;
   REMOTE_EXECUTE_RESULT_EXIT    = 3;
   REMOTE_EXECUTE_RESULT_ERROR   = 4;
+  // data is a JPEG screenshot taken after a "browser ..." command; sent
+  // before that command's EXIT.
+  REMOTE_EXECUTE_RESULT_IMAGE   = 5;
 }
 
 message RemoteExecuteResultAck {

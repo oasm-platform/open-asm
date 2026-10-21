@@ -2267,6 +2267,22 @@ export class AgentsCompletionsService {
       };
       todosEmitter.on('remote-execute-output', onRemoteExecuteOutput);
 
+      // The page after each browser command, for the live Browser panel.
+      // Transient: never part of the saved message.
+      const onBrowserScreenshot = (data: {
+        toolCallId: string;
+        command: string;
+        image: string;
+      }) => {
+        if (controllerClosed) return;
+        controller.enqueue({
+          type: 'data-browser-screenshot',
+          data,
+          transient: true,
+        } as unknown as UIMessageChunk);
+      };
+      todosEmitter.on('browser-screenshot', onBrowserScreenshot);
+
       // Subscribe to approval-required events (human-in-the-loop dialog)
       const onApprovalRequired = (data: ApprovalRequestEvent) => {
         if (controllerClosed) return;
@@ -2589,6 +2605,7 @@ export class AgentsCompletionsService {
         }
         todosEmitter.off('todos-updated', onTodosUpdated);
         todosEmitter.off('remote-execute-output', onRemoteExecuteOutput);
+        todosEmitter.off('browser-screenshot', onBrowserScreenshot);
         todosEmitter.off('approval-required', onApprovalRequired);
         todosEmitter.off('approval-resolved', onApprovalResolved);
         todosEmitter.off('approval-mode-changed', onApprovalModeChanged);

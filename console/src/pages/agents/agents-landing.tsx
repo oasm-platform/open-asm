@@ -24,6 +24,7 @@ import { v7 as uuidv7 } from 'uuid';
 // import AgentIcon from './components/agent-icon';
 
 import {
+  AGENT_CONVERSATION_STARTERS,
   AGENT_PROMPT_GROUPS,
   ASK_PROMPT_GROUPS,
   CONVERSATION_STARTERS,
@@ -301,7 +302,11 @@ export default function AgentsLandingPage({
             {/* Hero */}
             <div className="absolute inset-x-0 bottom-full mb-8 flex flex-col items-center gap-3 text-center">
               <TypewriterText
-                texts={CONVERSATION_STARTERS}
+                texts={
+                  isAgentMode
+                    ? AGENT_CONVERSATION_STARTERS
+                    : CONVERSATION_STARTERS
+                }
                 className="hidden sm:inline text-xl font-medium text-foreground max-w-lg"
               />
             </div>

@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import { cn } from '@/lib/utils';
 import {
   formatCost,
   formatTokens,
@@ -65,19 +66,44 @@ export function formatCacheHit({
   return `${Math.round((cacheReadTokens / inputTokens) * 100)}%`;
 }
 
+/**
+ * Colour band for a cache-hit ratio: green once the provider serves ≥90% of
+ * input tokens from cache, cooling off through amber and red below that.
+ */
+export function cacheHitTone({
+  inputTokens,
+  cacheReadTokens,
+}: Pick<UsageTotals, 'inputTokens' | 'cacheReadTokens'>): string {
+  if (inputTokens <= 0) return 'text-muted-foreground';
+  const pct = (cacheReadTokens / inputTokens) * 100;
+  if (pct >= 90) return 'text-emerald-600 dark:text-emerald-400';
+  if (pct >= 70) return 'text-lime-600 dark:text-lime-400';
+  if (pct >= 40) return 'text-amber-600 dark:text-amber-400';
+  return 'text-red-600 dark:text-red-400';
+}
+
 function StatTile({
   label,
   value,
   hint,
+  valueClassName,
 }: {
   label: string;
   value: string;
   hint: string;
+  valueClassName?: string;
 }) {
   return (
     <div className="rounded-xl border bg-card/50 p-4">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tracking-tight">{value}</p>
+      <p
+        className={cn(
+          'mt-1 text-2xl font-semibold tracking-tight',
+          valueClassName,
+        )}
+      >
+        {value}
+      </p>
       <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
     </div>
   );
@@ -275,6 +301,7 @@ export default function AgentUsagePage() {
               <StatTile
                 label="Cache hit"
                 value={formatCacheHit(summary)}
+                valueClassName={cacheHitTone(summary)}
                 hint="Of input tokens, served from cache"
               />
             </div>
@@ -333,7 +360,12 @@ export default function AgentUsagePage() {
                         <td className="px-3 py-2 text-right tabular-nums">
                           {formatTokens(model.outputTokens)}
                         </td>
-                        <td className="px-3 py-2 text-right tabular-nums">
+                        <td
+                          className={cn(
+                            'px-3 py-2 text-right font-medium tabular-nums',
+                            cacheHitTone(model),
+                          )}
+                        >
                           {formatCacheHit(model)}
                         </td>
                         <td className="px-3 py-2 text-right tabular-nums">
@@ -371,8 +403,10 @@ export default function AgentUsagePage() {
                         {formatTokens(session.outputTokens)} out
                       </p>
                       <p className="text-muted-foreground">
-                        {formatCacheHit(session)} cache ·{' '}
-                        {formatUsageCost(session)}
+                        <span className={cacheHitTone(session)}>
+                          {formatCacheHit(session)} cache
+                        </span>{' '}
+                        · {formatUsageCost(session)}
                       </p>
                     </div>
                   </Link>

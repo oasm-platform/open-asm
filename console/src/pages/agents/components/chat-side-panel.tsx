@@ -9,6 +9,7 @@ import type {
 import type { UIMessage } from 'ai';
 import {
   BarChart3,
+  Globe,
   ListChecks,
   Network,
   PanelRightClose,
@@ -17,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useMemo, type ReactNode } from 'react';
 import { AgentTodoPanel, type AgentTodoItem } from './agent-todo-panel';
+import { BrowserPanel, type LiveBrowserScreenshot } from './browser-panel';
 import { isSubagentActive, SubagentsPanel } from './subagents-panel';
 import {
   extractToolCalls,
@@ -27,6 +29,7 @@ import { TurnStatsPanel } from './turn-stats-panel';
 export const SIDE_PANEL_TABS = [
   'plan',
   'subagents',
+  'browser',
   'tools',
   'stats',
 ] as const;
@@ -38,6 +41,8 @@ interface SidePanelData {
   subagents: SubagentResponseDto[];
   messages: UIMessage[];
   metadata: ConversationMetadataDto | null | undefined;
+  /** Live view of the agent's browser, streamed by the current run */
+  browserScreenshot?: LiveBrowserScreenshot | null;
 }
 
 /** Which tabs have something to show, e.g. to pick one when the panel opens */
@@ -47,10 +52,12 @@ export function sidePanelContent({
   subagents,
   messages,
   metadata,
+  browserScreenshot,
 }: SidePanelData): Record<SidePanelTab, boolean> {
   return {
     plan: (todos?.length ?? 0) > 0 || !!goal,
     subagents: subagents.length > 0,
+    browser: !!browserScreenshot,
     tools: extractToolCalls(messages).length > 0,
     stats: !!(metadata?.model || metadata?.lastTurn),
   };
@@ -119,8 +126,8 @@ interface ChatSidePanelProps extends SidePanelData {
 
 /**
  * The half of a split AI Studio conversation beside the chat (full screen
- * over it below lg): the plan, subagents, tool calls and turn stats, one tab
- * at a time.
+ * over it below lg): the plan, subagents, browser, tool calls and turn
+ * stats, one tab at a time.
  */
 export function ChatSidePanel({
   tab,
@@ -134,11 +141,20 @@ export function ChatSidePanel({
   conversationId,
   onSelectToolCall,
   remoteExecuteEvents,
+  browserScreenshot,
   className,
 }: ChatSidePanelProps) {
   const has = useMemo(
-    () => sidePanelContent({ todos, goal, subagents, messages, metadata }),
-    [todos, goal, subagents, messages, metadata],
+    () =>
+      sidePanelContent({
+        todos,
+        goal,
+        subagents,
+        messages,
+        metadata,
+        browserScreenshot,
+      }),
+    [todos, goal, subagents, messages, metadata, browserScreenshot],
   );
   const completed = todos?.filter((t) => t.status === 'completed').length ?? 0;
   const running = subagents.filter(isSubagentActive).length;
@@ -182,6 +198,10 @@ export function ChatSidePanel({
                 {running > 0 ? running : subagents.length}
               </TabCount>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="browser" title="Browser">
+            <Globe />
+            <TabLabel>Browser</TabLabel>
           </TabsTrigger>
           <TabsTrigger value="tools" title="Tool calls">
             <Wrench />
@@ -234,6 +254,21 @@ export function ChatSidePanel({
             icon={Network}
             title="No subagents"
             description="Background agents started in this conversation show up here."
+          />
+        )}
+      </TabsContent>
+      <TabsContent value="browser" className={contentClassName}>
+        {browserScreenshot ? (
+          <BrowserPanel
+            screenshot={browserScreenshot}
+            toolCalls={toolCalls}
+            onSelectToolCall={onSelectToolCall}
+          />
+        ) : (
+          <EmptyTab
+            icon={Globe}
+            title="No live view yet"
+            description="While the agent drives the browser, the page after each command shows up here."
           />
         )}
       </TabsContent>

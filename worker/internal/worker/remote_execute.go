@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -51,12 +52,42 @@ func selectCommandSandbox(enabled bool, sb *runtime.AgentSandbox, initErr error)
 	return sb
 }
 
-// remoteResultSender is the subset of RemoteExecuteHandler a command uses to
-// report its result.
+// remoteResultSender is what a command uses to report its result.
 type remoteResultSender interface {
 	SendStdout(ctx context.Context, data []byte) error
 	SendExit(ctx context.Context, exitCode int32) error
 	SendError(ctx context.Context, errMsg string) error
+}
+
+// commandSender reports one command's results under that command's ids. The
+// handler's own SendStdout/SendExit/SendError use the ids of the latest
+// event, which Next() overwrites while earlier commands are still running.
+type commandSender struct {
+	h         *grpcclient.RemoteExecuteHandler
+	sessionID string
+	cmdID     string
+}
+
+func (c commandSender) SendStdout(ctx context.Context, data []byte) error {
+	return c.h.SendResultFor(ctx, c.sessionID, c.cmdID, pb.RemoteExecuteResultEventType_REMOTE_EXECUTE_RESULT_STDOUT, data, 0)
+}
+
+func (c commandSender) SendExit(ctx context.Context, exitCode int32) error {
+	return c.h.SendResultFor(ctx, c.sessionID, c.cmdID, pb.RemoteExecuteResultEventType_REMOTE_EXECUTE_RESULT_EXIT, nil, exitCode)
+}
+
+func (c commandSender) SendError(ctx context.Context, errMsg string) error {
+	return c.h.SendResultFor(ctx, c.sessionID, c.cmdID, pb.RemoteExecuteResultEventType_REMOTE_EXECUTE_RESULT_ERROR, []byte(errMsg), 0)
+}
+
+func (c commandSender) SendImage(ctx context.Context, jpeg []byte) error {
+	return c.h.SendResultFor(ctx, c.sessionID, c.cmdID, pb.RemoteExecuteResultEventType_REMOTE_EXECUTE_RESULT_IMAGE, jpeg, 0)
+}
+
+// browserResultSender also delivers a browser command's screenshot.
+type browserResultSender interface {
+	remoteResultSender
+	SendImage(ctx context.Context, jpeg []byte) error
 }
 
 type sessionSandbox struct {
@@ -133,7 +164,7 @@ func (s *sessionSandbox) close() error {
 // startRemoteExecuteHandler serves the remote execute stream. cmdSandbox nil
 // runs agent commands on the host; non-nil runs them through it (see
 // selectCommandSandbox).
-func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Client, workspaceRoot string, toolPath string, cmdSandbox agentCommandSandbox, events chan<- TuiEvent, runTool func(sessionID string, run *pb.ToolRun, send toolResultSender), cancelTool func(sessionID string) bool) {
+func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Client, workspaceRoot string, toolPath string, cmdSandbox agentCommandSandbox, browsers *agentBrowsers, events chan<- TuiEvent, runTool func(sessionID string, run *pb.ToolRun, send toolResultSender), cancelTool func(sessionID string) bool) {
 	log := NewTuiLogger(events, "RemoteExec")
 	remoteSem := make(chan struct{}, 16)
 
@@ -241,6 +272,13 @@ func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Clien
 					continue
 				}
 
+				// Browser commands run in the worker's agent Chromium, never
+				// in a shell, so they need neither a session dir nor a sandbox.
+				if line, ok := browserCommandLine(command); ok {
+					startBrowserCommand(ctx, handler, resp, line, browsers, remoteSem, events)
+					continue
+				}
+
 				if sbSessions != nil {
 					startSandboxedCommand(ctx, handler, resp, sbSessions, cmdSandbox, remoteSem, events, toolPath)
 					continue
@@ -256,19 +294,20 @@ func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Clien
 				Emit(events, TuiEvent{
 					Type:           EventSessionCommand,
 					SessionID:      sessionID,
-					SessionCommand: command,
+					SessionCommand: loggableCommand(command),
 				})
 
 				// Capture ids at command-receive time to avoid misattribution if
 				// Next() overwrites handler ids before the goroutine sends.
 				cmdID := resp.Id
 				cmdWorkerID := resp.WorkerId
+				send := commandSender{h: handler, sessionID: sessionID, cmdID: cmdID}
 				select {
 				case remoteSem <- struct{}{}:
-					go func(h *grpcclient.RemoteExecuteHandler, sid, cid, wid, cmd string, sbox *sessionSandbox) {
+					go func() {
 						defer func() { <-remoteSem }()
-						executeRemoteCommand(ctx, h, sid, cid, wid, cmd, sbox, events, toolPath)
-					}(handler, sessionID, cmdID, cmdWorkerID, command, sb)
+						executeRemoteCommand(ctx, send, sessionID, command, sb, events, toolPath)
+					}()
 				default:
 					log.Warning("remote exec concurrency limit reached")
 					_ = handler.SendErrorFor(ctx, sessionID, cmdID, cmdWorkerID, "server busy")
@@ -339,15 +378,16 @@ func startSandboxedCommand(ctx context.Context, handler *grpcclient.RemoteExecut
 		log.Info("Session sandbox: %s -> isolated container", sessionID)
 		Emit(events, TuiEvent{Type: EventSessionCreated, SessionID: sessionID, SessionActive: true})
 	}
-	Emit(events, TuiEvent{Type: EventSessionCommand, SessionID: sessionID, SessionCommand: command})
+	Emit(events, TuiEvent{Type: EventSessionCommand, SessionID: sessionID, SessionCommand: loggableCommand(command)})
 
 	sb := &sessionSandbox{sessionID: sessionID, container: cmdSandbox}
+	send := commandSender{h: handler, sessionID: sessionID, cmdID: cmdID}
 	select {
 	case remoteSem <- struct{}{}:
 		go func() {
 			defer func() { <-remoteSem }()
 			defer sbSessions.end(sessionID)
-			executeRemoteCommand(ctx, handler, sessionID, cmdID, cmdWorkerID, command, sb, events, toolPath)
+			executeRemoteCommand(ctx, send, sessionID, command, sb, events, toolPath)
 		}()
 	default:
 		sbSessions.end(sessionID)
@@ -356,11 +396,43 @@ func startSandboxedCommand(ctx context.Context, handler *grpcclient.RemoteExecut
 	}
 }
 
-func executeRemoteCommand(ctx context.Context, handler remoteResultSender, sessionID, cmdID, workerID, command string, sandbox *sessionSandbox, events chan<- TuiEvent, toolPath string) {
+// startBrowserCommand runs one "browser ..." COMMAND event. It holds a
+// remoteSem slot like a shell command, but no session dir or sandbox.
+func startBrowserCommand(ctx context.Context, handler *grpcclient.RemoteExecuteHandler, resp *pb.RemoteExecuteSubscribeResponse, line string, browsers *agentBrowsers, remoteSem chan struct{}, events chan<- TuiEvent) {
+	sessionID := resp.SessionId
+	send := commandSender{h: handler, sessionID: sessionID, cmdID: resp.Id}
+	Emit(events, TuiEvent{Type: EventSessionCommand, SessionID: sessionID, SessionCommand: loggableCommand(resp.Command)})
+	select {
+	case remoteSem <- struct{}{}:
+		go func() {
+			defer func() { <-remoteSem }()
+			executeBrowserCommand(ctx, send, sessionID, line, browsers, events)
+		}()
+	default:
+		NewTuiLogger(events, "RemoteExec").Warning("remote exec concurrency limit reached")
+		_ = send.SendError(ctx, "server busy")
+	}
+}
+
+// browserCommandLine reports whether command is a browser command and
+// returns the text after "browser ". Recognised before any shell wrapping,
+// like the "screenshot " job.
+func browserCommandLine(command string) (string, bool) {
+	if command == "browser" {
+		return "", true
+	}
+	return strings.CutPrefix(command, "browser ")
+}
+
+func executeRemoteCommand(ctx context.Context, handler remoteResultSender, sessionID, command string, sandbox *sessionSandbox, events chan<- TuiEvent, toolPath string) {
 	log := NewTuiLogger(events, "RemoteExec")
-	log.Info("Executing in session %s: %s", sessionID, command)
-	_ = cmdID
-	_ = workerID
+	log.Info("Executing in session %s: %s", sessionID, loggableCommand(command))
+
+	// startBrowserCommand takes these before here; a shell must never see one.
+	if _, ok := browserCommandLine(command); ok {
+		_ = handler.SendError(ctx, "browser commands do not run in a shell")
+		return
+	}
 
 	if sandbox.container != nil {
 		executeSandboxedCommand(ctx, handler, sessionID, command, sandbox.container, events)
@@ -427,6 +499,43 @@ func executeRemoteCommand(ctx context.Context, handler remoteResultSender, sessi
 		log.Success("Command completed: %s", command)
 	}
 
+	_ = handler.SendExit(ctx, exitCode)
+}
+
+// executeBrowserCommand runs a "browser ..." command in the worker's agent
+// Chromium and reports it like a shell command: stdout, then EXIT 0 or 1.
+// On a sandboxed (shared) worker the browser still runs in this process; its
+// sessions then reach only public addresses (agentBrowsers.publicOnly).
+func executeBrowserCommand(ctx context.Context, handler browserResultSender, sessionID, line string, browsers *agentBrowsers, events chan<- TuiEvent) {
+	log := NewTuiLogger(events, "RemoteExec")
+	if browsers == nil {
+		_ = handler.SendError(ctx, "browser is not available on this worker")
+		return
+	}
+	r, err := browsers.runWithScreenshot(ctx, line)
+	if err != nil {
+		log.ErrorE("Browser unavailable", err)
+		_ = handler.SendError(ctx, err.Error())
+		return
+	}
+	out := r.out
+	if !strings.HasSuffix(out, "\n") {
+		out += "\n"
+	}
+	if err := handler.SendStdout(ctx, []byte(out)); err != nil {
+		return
+	}
+	Emit(events, TuiEvent{Type: EventSessionOutput, SessionID: sessionID, SessionOutput: out, SessionStream: "stdout"})
+	if r.shot != nil {
+		// Before EXIT: core stops collecting a command's results at its exit.
+		if err := handler.SendImage(ctx, r.shot); err != nil {
+			log.ErrorE("Failed to send browser screenshot", err)
+		}
+	}
+	exitCode := int32(0)
+	if r.failed {
+		exitCode = 1
+	}
 	_ = handler.SendExit(ctx, exitCode)
 }
 

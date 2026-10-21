@@ -163,6 +163,36 @@ describe('RemoteExecuteService', () => {
       }, 10);
     });
 
+    it('should not stream screenshots to a terminal', (done) => {
+      let capturedCb: SubscribeCallback;
+      mockRedisService.subscribe.mockImplementation(
+        (_ch: string, cb: SubscribeCallback) => {
+          capturedCb = cb;
+          return Promise.resolve();
+        },
+      );
+
+      const received: string[] = [];
+      service
+        .subscribeToStream(testSessionId, {} as any)
+        .subscribe({ next: (event) => received.push(event.data as string) });
+
+      const stdout = JSON.stringify({
+        type: 'REMOTE_EXECUTE_RESULT_STDOUT',
+        data: 'hi',
+      });
+      const image = JSON.stringify({
+        type: 'REMOTE_EXECUTE_RESULT_IMAGE',
+        data: '/9j/',
+      });
+      setTimeout(() => {
+        capturedCb!(channel, stdout);
+        capturedCb!(channel, image);
+        expect(received).toEqual([stdout]);
+        done();
+      }, 10);
+    });
+
     it('should NOT emit messages on a different channel (P0)', (done) => {
       let capturedCb: SubscribeCallback;
       mockRedisService.subscribe.mockImplementation(
@@ -283,6 +313,12 @@ describe('RemoteExecuteService', () => {
       expect(normalizeEventType(2)).toBe(2);
       expect(normalizeEventType(3)).toBe(3);
       expect(normalizeEventType(4)).toBe(4);
+      expect(normalizeEventType(5)).toBe(5);
+    });
+
+    it('should map the image event by name and number', () => {
+      expect(normalizeEventType('REMOTE_EXECUTE_RESULT_IMAGE')).toBe(5);
+      expect(normalizeEventType('5')).toBe(5);
     });
 
     it('should return null for unknown numeric values', () => {
@@ -400,6 +436,39 @@ describe('RemoteExecuteService', () => {
       expect(result.id).toBe('cmd-1');
       expect(result.workerId).toBe('worker-1');
       expect(result.error).toBeNull();
+      expect(result).not.toHaveProperty('image');
+    });
+
+    it('should keep a browser screenshot for the result only, without ending the wait', async () => {
+      const { getCallback } = setupCapturedSubscribe();
+      setupPushSuccess();
+      const onEvent = jest.fn();
+
+      const resultPromise = service.waitForResult(
+        testCommand,
+        testSessionId,
+        testConversationId,
+        testWorkspaceId,
+        5000,
+        onEvent,
+      );
+
+      await new Promise((r) => setTimeout(r, 10));
+      const cb = getCallback();
+      fireMessage(cb, channel, 'REMOTE_EXECUTE_RESULT_STDOUT', 'Example\n');
+      fireMessage(cb, channel, 'REMOTE_EXECUTE_RESULT_IMAGE', '/9j/AAAA');
+      fireMessage(cb, channel, 'REMOTE_EXECUTE_RESULT_EXIT', '', 0);
+
+      const result = await resultPromise;
+
+      expect(result.image).toBe('/9j/AAAA');
+      expect(result.stdout).toBe('Example\n');
+      expect(result.error).toBeNull();
+      expect(result.exitCode).toBe(0);
+      // The live terminal streams text: the image never reaches it.
+      expect(
+        (onEvent.mock.calls as Array<[{ type: number }]>).map(([e]) => e.type),
+      ).toEqual([1, 3]);
     });
 
     it('should collect STDERR alongside STDOUT', async () => {

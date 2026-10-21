@@ -155,6 +155,30 @@ describe('AgentsStreamBufferService', () => {
     expect(redis.hasSubscribers('agent:stream:chan:c1')).toBe(false);
   });
 
+  it('passes a live-only chunk to resumers without recording it', async () => {
+    const { redis, service } = build();
+    await service.append('c1', '{"n":1}');
+
+    const stream = await service.createResumeStream('c1', () => true);
+    const reader = stream!.getReader();
+    expect((await reader.read()).value).toBe('{"n":1}');
+
+    await service.publishLive('c1', '{"type":"data-browser-screenshot"}');
+    await service.append('c1', '{"n":2}');
+    await tick();
+    expect((await reader.read()).value).toBe(
+      '{"type":"data-browser-screenshot"}',
+    );
+    expect((await reader.read()).value).toBe('{"n":2}');
+
+    // Never replayed to a later resumer
+    expect(redis.entries.map((e) => e.fields.chunk)).toEqual([
+      '{"n":1}',
+      '{"n":2}',
+    ]);
+    await reader.cancel();
+  });
+
   it('keeps tailing for one resumer when another of the run leaves', async () => {
     // The client that left (a closed tab, or the one that switched away and
     // came back) must not cut the live chunks of the one still reading

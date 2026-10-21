@@ -81,34 +81,7 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 	getBrowser := func() (*rod.Browser, error) {
 		browserOnce.Do(func() {
 			log.Info("Initializing headless browser (lazy)...")
-			l := launcher.New().Leakless(false).Headless(true)
-			if _, err := os.Stat("/usr/bin/chromium"); err == nil {
-				log.Verbose("Using system chromium at /usr/bin/chromium")
-				l = l.Bin("/usr/bin/chromium")
-			} else if _, err := os.Stat("/usr/bin/chromium-browser"); err == nil {
-				log.Verbose("Using system chromium at /usr/bin/chromium-browser")
-				l = l.Bin("/usr/bin/chromium-browser")
-			} else if _, err := os.Stat("/usr/bin/google-chrome"); err == nil {
-				log.Verbose("Using system chromium at /usr/bin/google-chrome")
-				l = l.Bin("/usr/bin/google-chrome")
-			} else {
-				log.Verbose("No system chromium found, go-rod will download Chrome automatically")
-			}
-			lazyLauncher = l
-			url, err := l.Launch()
-			if err != nil {
-				browserInitErr = fmt.Errorf("browser launch failed: %w", err)
-				return
-			}
-			b := rod.New().ControlURL(url)
-			if err := b.Connect(); err != nil {
-				browserInitErr = fmt.Errorf("browser connect failed: %w", err)
-				// Best-effort cleanup on connect failure
-				l.Cleanup()
-				l.Kill()
-				return
-			}
-			lazyBrowser = b
+			lazyBrowser, lazyLauncher, browserInitErr = launchBrowser(log)
 		})
 		if browserInitErr != nil {
 			return nil, browserInitErr
@@ -118,6 +91,27 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 		}
 		return lazyBrowser, nil
 	}
+
+	// Agent browser sessions: own Chromium, separate from screenshot jobs, and
+	// outlive remote execute stream reconnects.
+	agentBrowser := newAgentBrowsers(log, func() (*rod.Browser, func(), error) {
+		log.Info("Initializing agent browser (lazy)...")
+		b, l, err := launchBrowser(log, agentBrowserFlags(cfg.AgentSandbox))
+		if err != nil {
+			return nil, nil, err
+		}
+		return b, func() {
+			// Bounded: a hung Chromium must not stall the relaunch or exit.
+			cctx, cancel := context.WithTimeout(context.Background(), browserCleanupTimeout)
+			defer cancel()
+			_ = b.Context(cctx).Close()
+			l.Kill()
+			l.Cleanup()
+		}, nil
+	})
+	// A sandboxed worker may serve other workspaces, and its local network is
+	// not theirs to browse: sessions there reach only public addresses.
+	agentBrowser.publicOnly = cfg.AgentSandbox
 
 	workspaceRoot, err := filepath.Abs(cfg.WorkspaceRoot)
 	if err != nil {
@@ -330,7 +324,7 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 					runAgentTool(runCtx, sessionID, grpcClient.OwnerID(), run, events, mgr, proxy, send)
 				}()
 			}
-			go startRemoteExecuteHandler(sessionCtx, grpcClient, workspaceRoot, toolPath, cmdSandbox, events, runTool, toolRuns.cancel)
+			go startRemoteExecuteHandler(sessionCtx, grpcClient, workspaceRoot, toolPath, cmdSandbox, agentBrowser, events, runTool, toolRuns.cancel)
 			return sessionCtx, sessionCancel
 		},
 		startPoller: func(sessionCtx context.Context) context.CancelFunc {
@@ -598,6 +592,7 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 	}
 	log.Info("All jobs finished")
 
+	agentBrowser.shutdown()
 	if lazyBrowser != nil {
 		if err := lazyBrowser.Close(); err != nil {
 			log.Warning("Browser close: %v", err)

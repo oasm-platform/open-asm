@@ -2,6 +2,7 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import type { UIMessage } from 'ai';
 import type { AgentTodoItem } from '@/pages/agents/components/agent-todo-panel';
+import type { LiveBrowserScreenshot } from '@/pages/agents/components/browser-panel';
 import { isSubagentActive } from '@/pages/agents/components/subagents-panel';
 import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import {
@@ -180,6 +181,8 @@ interface UseAgentChatReturn {
     string,
     import('@/hooks/use-remote-execute-stream').RemoteExecuteStreamEvent[]
   >;
+  /** The page after the last browser command of a run seen live; never saved */
+  browserScreenshot: LiveBrowserScreenshot | null;
   onSendMessage: (content: string, options?: { agentMode?: string }) => void;
   onRetry: (() => void) | undefined;
   onStop: () => void;
@@ -441,6 +444,8 @@ export function useAgentChat({
     subagentsRef.current = subagents;
   }, [subagents]);
   const { appendEvent, eventsMap } = useRemoteExecuteStream();
+  const [browserScreenshot, setBrowserScreenshot] =
+    useState<LiveBrowserScreenshot | null>(null);
   // Parallel tool calls can each need approval, so keep a queue
   const [approvalQueue, setApprovalQueue] = useState<PendingApproval[]>([]);
   const pendingApproval = approvalQueue[0] ?? null;
@@ -712,6 +717,9 @@ export function useAgentChat({
         const event =
           data.data as import('@/hooks/use-remote-execute-stream').RemoteExecuteStreamEvent;
         appendEvent(event);
+      }
+      if (data.type === 'data-browser-screenshot') {
+        setBrowserScreenshot(data.data as LiveBrowserScreenshot);
       }
     },
   });
@@ -1110,6 +1118,7 @@ export function useAgentChat({
   useEffect(() => {
     // Subagents belong to one conversation: never show the previous one's
     setSubagents([]);
+    setBrowserScreenshot(null);
     if (!conversationId) {
       setTodos([]);
       setGoal(null);
@@ -1241,6 +1250,7 @@ export function useAgentChat({
     hasMoreMessages: hasNextPage ?? false,
     isLoadingMoreMessages: isFetchingNextPage,
     remoteExecuteEvents: eventsMap,
+    browserScreenshot,
     onSendMessage: handleSendMessage,
     onRetry: onRetryAction,
     onStop: handleStop,
