@@ -9,23 +9,17 @@ The worker has a headless Chromium. Each command is one `execute_remote_command`
 
 Use `retrieve_web_page` for a static page you only need to read. Use the browser when the page needs JavaScript, a login, clicks or form input.
 
-The browser runs only on the workspace's own worker. On a shared, sandboxed worker the command fails with `browser commands are not available on a sandboxed worker`. When that happens, tell the user and do not retry.
+The browser is available on every worker and can load any site. A session follows redirects, iframes and popups to any host.
+
+The one exception is a shared worker, which serves several workspaces. There the browser reaches only public addresses. Opening `localhost`, a private address such as `10.x` or `192.168.x`, or a host that resolves to one fails. Such requests from a page are listed under `blocked (this worker is shared ...)` in the command's output. To test an internal app, the user needs to connect a worker of their own.
 
 ## Sessions
 
 1. `browser open https://app.example.com` starts a session. The first output line is `session: b-<id>`. The rest shows the page title, the URL and the interactive elements.
 2. Pass that id to every later command: `browser -s b-<id> click @e3`. The `id` field of the tool result is the id of that one command, not the browser session. Never pass it to `-s`.
-3. A session ends after 10 minutes without commands, when the worker restarts, or when you run `browser -s b-<id> close`. Close it when you are done, because a worker allows only 8 sessions at once. If a command reports `browser session ... not found`, run `browser open` again.
-4. Each session has its own cookies and storage. Sessions do not share logins.
-
-## Scope
-
-A session can reach only the host it opened, plus the hosts allowed with `--allow`. Requests to any other host, including redirects, iframes, scripts and `localhost`, are blocked. Blocked requests are listed under `blocked (out of scope ...)` in the command's output.
-
-- Allow more hosts when opening: `browser --allow api.example.com --allow '*.cdn.example.com' open https://app.example.com`
-- Allow more hosts later: `browser -s b-<id> allow api.example.com`
-
-Only add hosts that are in the user's scope. The user approves every command, so they can see each `--allow`.
+3. Keep the id. `browser sessions` shows only how many sessions are open, never their ids, so a lost id means opening a new session.
+4. A session ends after 10 minutes without commands, when the worker restarts, or when you run `browser -s b-<id> close`. It also ends when its page stops responding: the command then fails with `the page stopped responding, so browser session ... was closed`. Close a session when you are done, because a worker allows only 8 sessions at once. If a command reports `browser session ... not found`, run `browser open` again.
+5. Each session has its own cookies and storage. Sessions do not share logins.
 
 ## Snapshot and refs
 
@@ -52,13 +46,13 @@ All commands below take `-s <id>`. `<t>` is a target.
 | Wait | `wait <t>` (until visible), `wait 1000`, `wait --text "Welcome"`, `wait --url /dashboard`, `wait --load` or `wait --load idle`, `wait --fn "window.appReady === true"` |
 | JavaScript | `eval "document.cookie"`, `eval "const r = await fetch('/api/me'); return r.status"` |
 | Tabs and frames | `tab list`, `tab new [url]`, `tab 1`, `tab close [n]`, `frame <iframe t>`, `frame main`. Popups opened by the page show up in `tab list`. |
-| Dialogs | Dialogs are handled automatically: alerts are accepted, while confirm and prompt dialogs are dismissed. `dialog accept ["prompt text"]` and `dialog dismiss` change this policy for later dialogs. Handled dialogs appear in `console`. |
+| Dialogs | Dialogs are handled automatically: alerts and "leave this page?" prompts are accepted, while confirm and prompt dialogs are dismissed. `dialog accept ["prompt text"]` and `dialog dismiss` change this policy for later confirm and prompt dialogs. Handled dialogs appear in `console`. |
 | State | `cookies`, `cookies set <name> <value> [--domain d] [--path p]`, `cookies clear`, `storage local\|session [get k \| set k v \| clear]` |
 | Network | `requests [--filter text] [--clear]`, `set headers '{"X-Api-Key":"..."}'`, `set credentials <user> <pass>` (HTTP Basic), `set offline on\|off` |
 | Emulate | `set viewport 390 844`, `set useragent "..."`, `set media dark`, `set geo 10.77 106.69` |
 | Debug | `console [--clear]`, `errors [--clear]` |
 
-Quote any argument that contains spaces. A command fails after 30 seconds by default. Set another limit with `--timeout <ms>` before the subcommand, up to 55000.
+Quote any argument that contains spaces, and any `;`, `|` or `&&` that is part of a value. A command fails after 30 seconds by default. Set another limit with `--timeout <ms>` before the subcommand, up to 55000. Downloads are blocked.
 
 ## Example: log in and check a page
 

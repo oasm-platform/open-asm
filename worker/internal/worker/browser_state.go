@@ -75,10 +75,15 @@ func browserTab(ctx context.Context, s *browserSession, args []string) (string, 
 		if err != nil {
 			return "", err
 		}
-		if err := p.Close(); err != nil {
+		// Target.closeTarget, not rod's Page.Close: that one runs beforeunload
+		// (a dismissed dialog cancels the close yet it reports success) and
+		// waits on it without a deadline, holding rod's browser-wide target
+		// lock.
+		if _, err := (proto.TargetCloseTarget{TargetID: p.TargetID}).Call(s.ctx.Context(ctx)); err != nil {
 			return "", err
 		}
 		s.forget(p.TargetID)
+		s.ctx.RemoveState(p.TargetID) // rod's page cache entry
 		return fmt.Sprintf("closed tab %d", i), nil
 	}
 	n, err := strconv.Atoi(sub)
@@ -127,18 +132,18 @@ func browserFrame(ctx context.Context, s *browserSession, args []string) (string
 		s.leaveFrame()
 		return "in main frame", nil
 	}
-	// The frame page outlives this command, and rod ties its mouse/keyboard
-	// to the context it was created with, so not this command's ctx.
-	el, err := s.target(context.WithoutCancel(ctx), t)
+	el, err := s.target(ctx, t)
 	if err != nil {
 		return "", err
 	}
-	f, err := el.Frame()
+	// The frame page outlives this command, and rod resolves its JS context
+	// through the iframe element, so neither may keep this command's ctx.
+	f, err := el.Context(s.sessCtx).Frame()
 	if err != nil {
 		return "", fmt.Errorf("%s is not an iframe: %w", t, err)
 	}
 	s.stateMu.Lock()
-	s.frame = f
+	s.frame = f.Context(s.sessCtx)
 	s.stateMu.Unlock()
 	return "in frame " + t + ` (run "snapshot" for its refs)`, nil
 }
@@ -380,6 +385,9 @@ func browserSet(ctx context.Context, s *browserSession, args []string) (string, 
 		var h map[string]string
 		if err := json.Unmarshal([]byte(raw), &h); err != nil {
 			return "", fmt.Errorf("headers must be a JSON object of strings: %w", err)
+		}
+		if h == nil { // "null"
+			h = map[string]string{}
 		}
 		s.stateMu.Lock()
 		if auth := s.headers["Authorization"]; auth != "" {

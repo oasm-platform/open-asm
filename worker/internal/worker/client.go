@@ -96,12 +96,22 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 	// outlive remote execute stream reconnects.
 	agentBrowser := newAgentBrowsers(log, func() (*rod.Browser, func(), error) {
 		log.Info("Initializing agent browser (lazy)...")
-		b, l, err := launchBrowser(log)
+		b, l, err := launchBrowser(log, agentBrowserFlags(cfg.AgentSandbox))
 		if err != nil {
 			return nil, nil, err
 		}
-		return b, func() { _ = b.Close(); l.Kill(); l.Cleanup() }, nil
+		return b, func() {
+			// Bounded: a hung Chromium must not stall the relaunch or exit.
+			cctx, cancel := context.WithTimeout(context.Background(), browserCleanupTimeout)
+			defer cancel()
+			_ = b.Context(cctx).Close()
+			l.Kill()
+			l.Cleanup()
+		}, nil
 	})
+	// A sandboxed worker may serve other workspaces, and its local network is
+	// not theirs to browse: sessions there reach only public addresses.
+	agentBrowser.publicOnly = cfg.AgentSandbox
 
 	workspaceRoot, err := filepath.Abs(cfg.WorkspaceRoot)
 	if err != nil {

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"strings"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
@@ -27,13 +26,6 @@ func init() {
 	browserCommands["close"] = func(_ context.Context, s *browserSession, _ []string) (string, error) {
 		s.shutdown()
 		return "closed session " + s.id, nil
-	}
-	browserCommands["allow"] = func(_ context.Context, s *browserSession, args []string) (string, error) {
-		if len(args) == 0 {
-			return "", fmt.Errorf("missing host")
-		}
-		s.proxy.allowHosts(args...)
-		return "scope: " + strings.Join(s.proxy.scope(), ", "), nil
 	}
 }
 
@@ -65,8 +57,8 @@ func pageInfo(pick func(pageSummary) string) browserHandler {
 
 func (i pageSummary) String() string { return i.title + " — " + i.url }
 
-// browserOpen navigates the active tab (opening one if none) to an in-scope
-// URL and prints where it landed plus the interactive snapshot.
+// browserOpen navigates the active tab (opening one if none) to a URL and
+// prints where it landed plus the interactive snapshot.
 func browserOpen(ctx context.Context, s *browserSession, args []string) (string, error) {
 	raw, err := argN(args, 0, "url")
 	if err != nil {
@@ -77,8 +69,10 @@ func browserOpen(ctx context.Context, s *browserSession, args []string) (string,
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" {
 		return "", fmt.Errorf("only http(s) URLs can be opened, got %q", raw)
 	}
-	if !s.proxy.allowed(u.Host) {
-		return "", fmt.Errorf("%s is not in this session's scope (%s); extend it with \"allow %s\"", u.Hostname(), strings.Join(s.proxy.scope(), ", "), u.Hostname())
+	if s.proxy != nil { // shared worker
+		if err := sharedWorkerHostErr(u.Hostname()); err != nil {
+			return "", err
+		}
 	}
 	if _, err := s.page(); err != nil {
 		if _, err := s.newTab(ctx); err != nil {
@@ -98,8 +92,12 @@ func navigateAndDescribe(ctx context.Context, s *browserSession, nav func(*rod.P
 	}
 	p = p.Context(ctx)
 	// FrameNavigated also fires for back/forward cache restores, which send
-	// no load lifecycle event.
-	wait := p.EachEvent(func(e *proto.PageFrameNavigated) bool { return e.Frame.ParentID == "" })
+	// no load lifecycle event. A same-document navigation (history.pushState
+	// routes, #fragment) sends only NavigatedWithinDocument.
+	wait := p.EachEvent(
+		func(e *proto.PageFrameNavigated) bool { return e.Frame.ParentID == "" },
+		func(e *proto.PageNavigatedWithinDocument) bool { return e.FrameID == p.FrameID },
+	)
 	if err := nav(p); err != nil {
 		return "", err
 	}

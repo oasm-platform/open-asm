@@ -127,6 +127,11 @@ func TestCookiesStorageHeadersAndEmulation(t *testing.T) {
 	if gotTest != "yes" || gotAuth != "Basic YWxpY2U6czNjcmV0" {
 		t.Fatalf("headers not sent: X-Test=%q Authorization=%q", gotTest, gotAuth)
 	}
+	run("set headers null") // clears the extra headers, keeps the credentials
+	run("reload")
+	if gotTest != "" || gotAuth != "Basic YWxpY2U6czNjcmV0" {
+		t.Fatalf("after set headers null: X-Test=%q Authorization=%q", gotTest, gotAuth)
+	}
 	if !strings.Contains(run("requests --filter "+srv.URL), "GET "+srv.URL) {
 		t.Fatal("requests log")
 	}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -16,7 +17,6 @@ var errBrowserUnavailable = errors.New("browser unavailable")
 
 type browserCmd struct {
 	session string
-	allow   []string
 	timeout time.Duration
 	name    string
 	args    []string
@@ -28,10 +28,10 @@ type browserHandler func(ctx context.Context, s *browserSession, args []string) 
 // browserCommands is filled by the files that implement each group.
 var browserCommands = map[string]browserHandler{}
 
-const browserUsage = `usage: browser [-s <session>] [--allow <host>]... [--timeout <ms>] <command> [args]
+const browserUsage = `usage: browser [-s <session>] [--timeout <ms>] <command> [args]
 
 Commands (one per call; <t> is a target):
-  open <url> (no -s: new session, prints its id) | sessions | close | allow <host>...
+  open <url> (no -s: new session, prints its id) | sessions | close
   back | forward | reload | url | title
   snapshot [-i] [-d <depth>] [-s <selector>]
   click <t> [--double|--right] | dblclick <t> | hover <t> | focus <t> | fill <t> <text> | type <t> <text>
@@ -50,19 +50,29 @@ Commands (one per call; <t> is a target):
 
 <t> is a ref from the last snapshot (@e3), a CSS selector, xpath=<expr> or text=<substring>.`
 
-// splitArgs splits a command line like a POSIX shell, without expansion:
+// argToken is one parsed argument. bare is the argument as typed outside
+// quotes and escapes, with each quoted or escaped byte replaced by \x00, so
+// syntax checks can tell `;` from `";"`.
+type argToken struct{ val, bare string }
+
+// tokenize splits a command line like a POSIX shell, without expansion:
 // '...' is literal, "..." honours \" and \\, a backslash escapes outside quotes.
-func splitArgs(s string) ([]string, error) {
-	var args []string
-	var cur strings.Builder
+func tokenize(s string) ([]argToken, error) {
+	var toks []argToken
+	var val, bare strings.Builder
 	inArg := false
+	quoted := func(b string) {
+		val.WriteString(b)
+		bare.WriteString(strings.Repeat("\x00", len(b)))
+	}
 	for i := 0; i < len(s); i++ {
 		c := s[i]
 		switch {
 		case c == ' ' || c == '\t' || c == '\n':
 			if inArg {
-				args = append(args, cur.String())
-				cur.Reset()
+				toks = append(toks, argToken{val.String(), bare.String()})
+				val.Reset()
+				bare.Reset()
 				inArg = false
 			}
 		case c == '\'':
@@ -70,7 +80,7 @@ func splitArgs(s string) ([]string, error) {
 			if end < 0 {
 				return nil, errors.New("unterminated quote")
 			}
-			cur.WriteString(s[i+1 : i+1+end])
+			quoted(s[i+1 : i+1+end])
 			i += end + 1
 			inArg = true
 		case c == '"':
@@ -79,7 +89,7 @@ func splitArgs(s string) ([]string, error) {
 				if s[i] == '\\' && i+1 < len(s) && (s[i+1] == '"' || s[i+1] == '\\') {
 					i++
 				}
-				cur.WriteByte(s[i])
+				quoted(s[i : i+1])
 			}
 			if i >= len(s) {
 				return nil, errors.New("unterminated quote")
@@ -87,78 +97,171 @@ func splitArgs(s string) ([]string, error) {
 			inArg = true
 		case c == '\\' && i+1 < len(s):
 			i++
-			cur.WriteByte(s[i])
+			quoted(s[i : i+1])
 			inArg = true
 		default:
-			cur.WriteByte(c)
+			val.WriteByte(c)
+			bare.WriteByte(c)
 			inArg = true
 		}
 	}
 	if inArg {
-		args = append(args, cur.String())
+		toks = append(toks, argToken{val.String(), bare.String()})
 	}
-	return args, nil
+	return toks, nil
 }
 
-// parseBrowserCmd reads the global flags, which come before the command name.
-func parseBrowserCmd(args []string) (browserCmd, error) {
-	c := browserCmd{timeout: browserCmdTimeout}
-	for len(args) > 0 && strings.HasPrefix(args[0], "-") {
-		if len(args) < 2 {
-			return c, fmt.Errorf("%s needs a value", args[0])
-		}
-		switch args[0] {
-		case "-s", "--session":
-			c.session = args[1]
-		case "--allow":
-			c.allow = append(c.allow, args[1])
-		case "--timeout":
-			ms, err := strconv.Atoi(args[1])
-			if err != nil || ms <= 0 || ms > 55000 {
-				return c, errors.New("--timeout must be 1..55000 ms (core stops waiting at 60s)")
-			}
-			c.timeout = time.Duration(ms) * time.Millisecond
-		default:
-			return c, fmt.Errorf("unknown flag %s", args[0])
-		}
-		args = args[2:]
+// chainOperator returns the shell operator an argument carries unquoted:
+// the agent meant to chain commands, which no shell runs here. A lone `|`
+// inside a token is left alone (xpath unions use it).
+func chainOperator(t argToken) string {
+	switch {
+	case t.bare == ";" || t.bare == "&&" || t.bare == "||" || t.bare == "|":
+		return t.bare
+	case strings.HasSuffix(t.bare, ";"):
+		return ";"
+	case strings.Contains(t.bare, "&&"):
+		return "&&"
+	case strings.Contains(t.bare, "||"):
+		return "||"
 	}
-	if len(args) > 0 {
-		c.name, c.args = args[0], args[1:]
+	return ""
+}
+
+var browserSessionIDPattern = regexp.MustCompile(`^b-[0-9a-f]{32}$`)
+
+// parseBrowserCmd reads the global flags. They belong before the command
+// name, but agents also put them after it. There a flag counts only when
+// unquoted, and -s only with a b-<id> value ("snapshot -s" takes a selector).
+func parseBrowserCmd(toks []argToken) (browserCmd, error) {
+	c := browserCmd{timeout: browserCmdTimeout}
+	i := 0
+	for ; i < len(toks) && strings.HasPrefix(toks[i].val, "-"); i += 2 {
+		if i+1 >= len(toks) {
+			return c, fmt.Errorf("%s needs a value", toks[i].val)
+		}
+		if err := c.setFlag(toks[i].val, toks[i+1].val); err != nil {
+			return c, err
+		}
+	}
+	if i == len(toks) {
+		return c, nil
+	}
+	c.name = toks[i].val
+	for i++; i < len(toks); i++ {
+		t := toks[i]
+		if t.bare == t.val && i+1 < len(toks) && c.isTrailingFlag(t.val, toks[i+1].val) {
+			if err := c.setFlag(t.val, toks[i+1].val); err != nil {
+				return c, err
+			}
+			i++
+			continue
+		}
+		c.args = append(c.args, t.val)
 	}
 	return c, nil
+}
+
+func (c *browserCmd) setFlag(flag, value string) error {
+	switch flag {
+	case "-s", "--session":
+		c.session = value
+	case "--timeout":
+		ms, err := strconv.Atoi(value)
+		if err != nil || ms <= 0 || ms > 55000 {
+			return errors.New("--timeout must be 1..55000 ms (core stops waiting at 60s)")
+		}
+		c.timeout = time.Duration(ms) * time.Millisecond
+	default:
+		return fmt.Errorf("unknown flag %s", flag)
+	}
+	return nil
+}
+
+// isTrailingFlag reports whether flag, seen after the command name, is a
+// global flag rather than an argument of the command.
+func (c *browserCmd) isTrailingFlag(flag, value string) bool {
+	switch flag {
+	case "--timeout":
+		return true
+	case "-s", "--session":
+		return c.session == "" && browserSessionIDPattern.MatchString(value)
+	}
+	return false
+}
+
+// browserWedgeGrace is how long a command may overrun its timeout before its
+// session is shut down. rod's mouse and keyboard calls ignore the command's
+// ctx, so a page that stops answering would otherwise hold the session, and a
+// remote exec slot, forever.
+const browserWedgeGrace = 3 * time.Second
+
+// runHandler runs h, recovering a panic into an error. If h outlives ctx by
+// browserWedgeGrace, the session is shut down, which aborts every CDP call
+// pending on its pages; wedged then reports that.
+func runHandler(ctx context.Context, h browserHandler, s *browserSession, args []string) (out string, wedged bool, err error) {
+	type result struct {
+		out string
+		err error
+	}
+	res := make(chan result, 1)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				res <- result{err: fmt.Errorf("internal error: %v", r)}
+			}
+		}()
+		out, err := h(ctx, s, args)
+		res <- result{out, err}
+	}()
+	select {
+	case r := <-res:
+		return r.out, false, r.err
+	case <-ctx.Done():
+	}
+	select {
+	case r := <-res:
+		return r.out, false, r.err
+	case <-time.After(browserWedgeGrace):
+	}
+	s.shutdown()
+	select {
+	case r := <-res:
+		return r.out, true, r.err
+	case <-time.After(browserWedgeGrace):
+		// Still stuck; the session is closed, so nothing else will use it.
+		return "", true, ctx.Err()
+	}
 }
 
 // run executes one browser command line (the text after "browser "). out is
 // what the agent reads; failed sets exit code 1; err is a worker failure.
 func (a *agentBrowsers) run(ctx context.Context, line string) (out string, failed bool, err error) {
-	args, err := splitArgs(line)
+	toks, err := tokenize(line)
 	if err != nil {
 		return "error: " + err.Error(), true, nil
 	}
-	c, err := parseBrowserCmd(args)
+	// No shell runs these, so a chained command would arrive as stray args.
+	for _, t := range toks {
+		if op := chainOperator(t); op != "" {
+			return fmt.Sprintf("error: an unquoted %q would chain commands, but no shell runs here; send one browser command per call (quote it if it is part of a value)", op), true, nil
+		}
+	}
+	c, err := parseBrowserCmd(toks)
 	if err != nil {
 		return "error: " + err.Error() + "\n\n" + browserUsage, true, nil
-	}
-	// No shell runs these, so a chained command would arrive as stray args.
-	for _, arg := range args {
-		if arg == "&&" || arg == "||" || arg == ";" || arg == "|" {
-			return fmt.Sprintf("error: %q does not chain commands here; send one browser command per call", arg), true, nil
-		}
 	}
 	switch {
 	case c.name == "" || c.name == "help":
 		return browserUsage, c.name == "", nil
 	case c.name == "sessions":
-		ids := a.list()
-		if len(ids) == 0 {
-			return "no browser sessions", false, nil
-		}
-		return strings.Join(ids, "\n"), false, nil
+		// Never the ids: on a shared worker they would hand one conversation's
+		// session to another.
+		return fmt.Sprintf("%d browser session(s) open on this worker; ids are shown only by the \"browser open\" that created them", a.count()), false, nil
 	case browserCommands[c.name] == nil:
 		return fmt.Sprintf("error: unknown command %q%s\n\n%s", c.name, unknownCmdHint(c), browserUsage), true, nil
-	case len(c.allow) > 0 && (c.name != "open" || c.session != ""):
-		return `error: --allow only applies when "open" creates a session; use "allow <host>" on an existing one`, true, nil
+	case c.name == "open" && len(c.args) > 1:
+		return fmt.Sprintf("error: open takes one url, got %q; quote a url with spaces", c.args), true, nil
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
@@ -175,7 +278,12 @@ func (a *agentBrowsers) run(ctx context.Context, line string) (out string, faile
 		if perr != nil || target.Hostname() == "" {
 			return fmt.Sprintf("error: invalid url %q", c.args[0]), true, nil
 		}
-		s, done, err = a.open(append(c.allow, target.Hostname()))
+		if a.publicOnly {
+			if herr := sharedWorkerHostErr(target.Hostname()); herr != nil {
+				return "error: " + herr.Error(), true, nil
+			}
+		}
+		s, done, err = a.open(ctx)
 		if errors.Is(err, errBrowserUnavailable) {
 			return "", false, err
 		}
@@ -190,10 +298,13 @@ func (a *agentBrowsers) run(ctx context.Context, line string) (out string, faile
 		prefix = "session: " + s.id + "\n"
 	}
 
-	out, err = browserCommands[c.name](ctx, s, c.args)
+	out, wedged, err := runHandler(ctx, browserCommands[c.name], s, c.args)
 	out = prefix + out
 	if blocked := s.drainBlocked(); len(blocked) > 0 {
-		out += fmt.Sprintf("\n\nblocked (out of scope, add with \"allow <host>\"):\n%s", strings.Join(blocked, "\n"))
+		out += fmt.Sprintf("\n\nblocked (this worker is shared, so it reaches only public addresses):\n%s", strings.Join(blocked, "\n"))
+	}
+	if wedged {
+		return strings.TrimLeft(out+fmt.Sprintf("\nerror: timed out after %s and the page stopped responding, so browser session %s was closed; run \"browser open <url>\" again", c.timeout, s.id), "\n"), true, nil
 	}
 	if err != nil {
 		msg := trimRodStack(err.Error())
@@ -226,8 +337,8 @@ func loggableCommand(command string) string {
 	if !ok {
 		return command
 	}
-	args, _ := splitArgs(rest)
-	c, _ := parseBrowserCmd(args)
+	toks, _ := tokenize(rest)
+	c, _ := parseBrowserCmd(toks)
 	return strings.TrimSpace("browser " + c.name)
 }
 
