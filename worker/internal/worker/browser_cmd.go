@@ -30,22 +30,23 @@ var browserCommands = map[string]browserHandler{}
 
 const browserUsage = `usage: browser [-s <session>] [--allow <host>]... [--timeout <ms>] <command> [args]
 
-session     open <url> (no -s: new session, prints its id) | sessions | close | allow <host>...
-navigate    open <url> | back | forward | reload | url | title
-snapshot    snapshot [-i] [-d <depth>] [-s <selector>]
-interact    click <t> [--double|--right] | dblclick <t> | hover <t> | focus <t> | fill <t> <text> | type <t> <text>
-            press <key> | select <t> <value>... | check <t> | uncheck <t> | scroll <up|down|left|right> [px]
-            scrollintoview <t> | drag <src> <dst> | mouse move|down|up|wheel ...
-read        get text|html|value|attr|count|box|title|url ... | is visible|enabled|checked <t>
-find        find role <role> [--name <n>] [action [value]] | find text|label|placeholder|alt|title|testid <v> [action [value]]
-wait        wait <t> | wait <ms> | wait --text <s> | wait --url <substr> | wait --load [load|idle] | wait --fn <js>
-js          eval <js>
-tabs        tab list | tab new [url] | tab <n> | tab close [n] | frame <t> | frame main
-dialogs     dialog accept [text] | dialog dismiss | dialog status
-state       cookies [set <name> <value> [--domain d] [--path p] | clear] | storage local|session [get <k> | set <k> <v> | clear]
-network     requests [--filter <s>] [--clear] | set headers <json> | set credentials <user> <pass> | set offline on|off
-emulate     set viewport <w> <h> | set useragent <ua> | set media dark|light | set geo <lat> <lng>
-debug       console [--clear] | errors [--clear]
+Commands (one per call; <t> is a target):
+  open <url> (no -s: new session, prints its id) | sessions | close | allow <host>...
+  back | forward | reload | url | title
+  snapshot [-i] [-d <depth>] [-s <selector>]
+  click <t> [--double|--right] | dblclick <t> | hover <t> | focus <t> | fill <t> <text> | type <t> <text>
+  press <key> | select <t> <value>... | check <t> | uncheck <t> | scroll <up|down|left|right> [px]
+  scrollintoview <t> | drag <src> <dst> | mouse move|down|up|wheel ...
+  get text|html|value|attr|count|box|title|url ... | is visible|enabled|checked <t>
+  find role <role> [--name <n>] [action [value]] | find text|label|placeholder|alt|title|testid <v> [action [value]]
+  wait <t> | wait <ms> | wait --text <s> | wait --url <substr> | wait --load [load|idle] | wait --fn <js>
+  eval <js>
+  tab list | tab new [url] | tab <n> | tab close [n] | frame <t> | frame main
+  dialog accept [text] | dialog dismiss | dialog status
+  cookies [set <name> <value> [--domain d] [--path p] | clear] | storage local|session [get <k> | set <k> <v> | clear]
+  requests [--filter <s>] [--clear] | set headers <json> | set credentials <user> <pass> | set offline on|off
+  set viewport <w> <h> | set useragent <ua> | set media dark|light | set geo <lat> <lng>
+  console [--clear] | errors [--clear]
 
 <t> is a ref from the last snapshot (@e3), a CSS selector, xpath=<expr> or text=<substring>.`
 
@@ -139,6 +140,12 @@ func (a *agentBrowsers) run(ctx context.Context, line string) (out string, faile
 	if err != nil {
 		return "error: " + err.Error() + "\n\n" + browserUsage, true, nil
 	}
+	// No shell runs these, so a chained command would arrive as stray args.
+	for _, arg := range args {
+		if arg == "&&" || arg == "||" || arg == ";" || arg == "|" {
+			return fmt.Sprintf("error: %q does not chain commands here; send one browser command per call", arg), true, nil
+		}
+	}
 	switch {
 	case c.name == "" || c.name == "help":
 		return browserUsage, c.name == "", nil
@@ -149,7 +156,7 @@ func (a *agentBrowsers) run(ctx context.Context, line string) (out string, faile
 		}
 		return strings.Join(ids, "\n"), false, nil
 	case browserCommands[c.name] == nil:
-		return fmt.Sprintf("error: unknown command %q\n\n%s", c.name, browserUsage), true, nil
+		return fmt.Sprintf("error: unknown command %q%s\n\n%s", c.name, unknownCmdHint(c), browserUsage), true, nil
 	case len(c.allow) > 0 && (c.name != "open" || c.session != ""):
 		return `error: --allow only applies when "open" creates a session; use "allow <host>" on an existing one`, true, nil
 	}
@@ -196,6 +203,20 @@ func (a *agentBrowsers) run(ctx context.Context, line string) (out string, faile
 		return strings.TrimLeft(out+"\nerror: "+msg, "\n"), true, nil
 	}
 	return out, false, nil
+}
+
+// unknownCmdHint corrects the slips agents make: a bare URL, or a word in
+// front of a real command.
+func unknownCmdHint(c browserCmd) string {
+	switch {
+	case strings.Contains(c.name, "."):
+		return fmt.Sprintf("; to load a page run \"browser open %s\"", c.name)
+	case len(c.args) > 0 && strings.Contains(c.args[0], "."):
+		return fmt.Sprintf("; to load a page run \"browser open %s\"", c.args[0])
+	case len(c.args) > 0 && browserCommands[c.args[0]] != nil:
+		return fmt.Sprintf("; %q is a command, drop %q", c.args[0], c.name)
+	}
+	return ""
 }
 
 // argN returns args[i] or an error naming what is missing.

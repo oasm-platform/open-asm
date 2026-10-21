@@ -100,6 +100,14 @@ func TestBrowserUsageAndArgumentErrors(t *testing.T) {
 		{`-s b-x fill @e1 "oops`, true, "unterminated quote"},
 		{"-s b-x --allow a.com open http://a.com", true, "--allow only applies"},
 		{"sessions", false, "no browser sessions"},
+		{"https://voz.vn", true, `run "browser open https://voz.vn"`},
+		{"-s b-x read get title", true, `"get" is a command, drop "read"`},
+		{"-s d068ba57-b397 title", true, `"d068ba57-b397" is not a browser session id`},
+		{"navigate https://voz.vn", true, `run "browser open https://voz.vn"`},
+		{"navigate https://voz.vn && browser title && browser links", true, "one browser command per call"},
+		{"-s b-x navigate title", true, `"title" is a command, drop "navigate"`},
+		{"-s b-x js eval document.title", true, `"eval" is a command, drop "js"`},
+		{"-s b-x title && browser links", true, "one browser command per call"},
 	}
 	for _, c := range cases {
 		out, failed, err := a.run(context.Background(), c.line)

@@ -14,7 +14,7 @@ The browser runs only on the workspace's own worker. On a shared, sandboxed work
 ## Sessions
 
 1. `browser open https://app.example.com` starts a session. The first output line is `session: b-<id>`. The rest shows the page title, the URL and the interactive elements.
-2. Pass that id to every later command: `browser -s b-<id> click @e3`.
+2. Pass that id to every later command: `browser -s b-<id> click @e3`. The `id` field of the tool result is the id of that one command, not the browser session. Never pass it to `-s`.
 3. A session ends after 10 minutes without commands, when the worker restarts, or when you run `browser -s b-<id> close`. Close it when you are done, because a worker allows only 8 sessions at once. If a command reports `browser session ... not found`, run `browser open` again.
 4. Each session has its own cookies and storage. Sessions do not share logins.
 

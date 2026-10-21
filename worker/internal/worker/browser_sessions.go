@@ -254,6 +254,9 @@ func newBrowserSessionID() string {
 }
 
 func errBrowserSessionNotFound(id string) error {
+	if !strings.HasPrefix(id, "b-") {
+		return fmt.Errorf("%q is not a browser session id; pass the b-<id> from the \"session:\" line that \"browser open <url>\" printed", id)
+	}
 	return fmt.Errorf("browser session %s not found (expired or worker restarted); run \"browser open <url>\" again", id)
 }
 
