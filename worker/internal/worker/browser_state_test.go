@@ -167,3 +167,26 @@ func TestClosingAnEarlierTabKeepsTheActiveOne(t *testing.T) {
 		t.Fatalf("tab list:\n%s", list)
 	}
 }
+
+func TestPopupsGetSessionHeaders(t *testing.T) {
+	a := newTestBrowsers(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/echo" {
+			_, _ = w.Write([]byte(r.Header.Get("Authorization")))
+			return
+		}
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(`<title>Main</title><a href="/pop" target="_blank">pop</a>`))
+	}))
+	defer srv.Close()
+	id, _ := openSession(t, a, srv.URL)
+	run := func(line string) string { return runOK(t, a, "-s "+id+" "+line) }
+
+	run("set credentials alice s3cret")
+	run("click text=pop")
+	run("wait 300")
+	run("tab 1")
+	if got := run(`eval "fetch('/echo').then(r => r.text())"`); got != "Basic YWxpY2U6czNjcmV0" {
+		t.Fatalf("popup request Authorization = %q", got)
+	}
+}

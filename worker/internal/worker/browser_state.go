@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
 
@@ -380,32 +381,39 @@ func browserSet(ctx context.Context, s *browserSession, args []string) (string, 
 		if err := json.Unmarshal([]byte(raw), &h); err != nil {
 			return "", fmt.Errorf("headers must be a JSON object of strings: %w", err)
 		}
-		auth := s.headers["Authorization"]
-		s.headers = h
-		if _, ok := h["Authorization"]; !ok && auth != "" {
-			s.headers["Authorization"] = auth
+		s.stateMu.Lock()
+		if auth := s.headers["Authorization"]; auth != "" {
+			if _, ok := h["Authorization"]; !ok {
+				h["Authorization"] = auth
+			}
 		}
-		return "extra headers set on this session's tabs", s.applyHeaders()
+		s.stateMu.Unlock()
+		return "extra headers set on this session's tabs", s.applyHeaders(h)
 	case "credentials":
 		if len(args) < 3 {
 			return "", errors.New("usage: set credentials <user> <password>")
 		}
-		if s.headers == nil {
-			s.headers = map[string]string{}
+		s.stateMu.Lock()
+		h := maps.Clone(s.headers)
+		s.stateMu.Unlock()
+		if h == nil {
+			h = map[string]string{}
 		}
-		s.headers["Authorization"] = "Basic " + base64.StdEncoding.EncodeToString([]byte(args[1]+":"+args[2]))
-		return "basic auth set on this session's tabs", s.applyHeaders()
+		h["Authorization"] = "Basic " + base64.StdEncoding.EncodeToString([]byte(args[1]+":"+args[2]))
+		return "basic auth set on this session's tabs", s.applyHeaders(h)
 	}
 	return "", fmt.Errorf("unknown setting %q", what)
 }
 
-// applyHeaders sends the session's extra headers with every tab's requests.
-func (s *browserSession) applyHeaders() error {
+// applyHeaders makes headers the session's extra headers and sends them with
+// every tab's requests; tabs opened later get them in adopt.
+func (s *browserSession) applyHeaders(headers map[string]string) error {
 	s.stateMu.Lock()
+	s.headers = headers
 	pages := append(s.pages[:0:0], s.pages...)
 	s.stateMu.Unlock()
 	for _, p := range pages {
-		if err := applyHeadersTo(p, s.headers); err != nil {
+		if err := applyHeadersTo(p, headers); err != nil {
 			return err
 		}
 	}

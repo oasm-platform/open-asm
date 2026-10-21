@@ -84,9 +84,8 @@ type browserSession struct {
 	frame        *rod.Page // non-nil while inside an iframe of the active tab
 	dialogAccept bool
 	dialogText   string
-	blocked      []string // proxy refusals since the last command
-
-	headers map[string]string // extra request headers for every tab; command-owned
+	blocked      []string          // proxy refusals since the last command
+	headers      map[string]string // extra request headers for every tab; replaced, never mutated
 
 	console, errs, requests ringLog
 }
@@ -115,7 +114,13 @@ func (s *browserSession) adopt(p *rod.Page, ctx context.Context) {
 		}
 	}
 	s.pages = append(s.pages, p)
+	headers := s.headers
 	s.stateMu.Unlock()
+	// shortcut: a popup's first request can leave before this lands; later ones
+	// carry the headers. Fixing that needs auto-attach with waitForDebuggerOnStart.
+	if len(headers) > 0 {
+		_ = applyHeadersTo(p, headers)
+	}
 
 	go p.Context(ctx).EachEvent(
 		func(e *proto.PageJavascriptDialogOpening) {
@@ -207,9 +212,6 @@ func (s *browserSession) newTab(ctx context.Context) (*rod.Page, error) {
 	}
 	_ = p.SetViewport(&proto.EmulationSetDeviceMetricsOverride{Width: 1920, Height: 1080, DeviceScaleFactor: 1})
 	_ = p.SetUserAgent(&proto.NetworkSetUserAgentOverride{UserAgent: getRandomUserAgent(), AcceptLanguage: "en-US,en;q=0.9"})
-	if len(s.headers) > 0 {
-		_ = applyHeadersTo(p, s.headers)
-	}
 	s.adopt(p, ctx)
 	s.stateMu.Lock()
 	for i, q := range s.pages {
