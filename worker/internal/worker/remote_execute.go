@@ -257,7 +257,7 @@ func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Clien
 				Emit(events, TuiEvent{
 					Type:           EventSessionCommand,
 					SessionID:      sessionID,
-					SessionCommand: command,
+					SessionCommand: loggableCommand(command),
 				})
 
 				// Capture ids at command-receive time to avoid misattribution if
@@ -340,7 +340,7 @@ func startSandboxedCommand(ctx context.Context, handler *grpcclient.RemoteExecut
 		log.Info("Session sandbox: %s -> isolated container", sessionID)
 		Emit(events, TuiEvent{Type: EventSessionCreated, SessionID: sessionID, SessionActive: true})
 	}
-	Emit(events, TuiEvent{Type: EventSessionCommand, SessionID: sessionID, SessionCommand: command})
+	Emit(events, TuiEvent{Type: EventSessionCommand, SessionID: sessionID, SessionCommand: loggableCommand(command)})
 
 	sb := &sessionSandbox{sessionID: sessionID, container: cmdSandbox}
 	select {
@@ -359,7 +359,7 @@ func startSandboxedCommand(ctx context.Context, handler *grpcclient.RemoteExecut
 
 func executeRemoteCommand(ctx context.Context, handler remoteResultSender, sessionID, cmdID, workerID, command string, sandbox *sessionSandbox, browsers *agentBrowsers, events chan<- TuiEvent, toolPath string) {
 	log := NewTuiLogger(events, "RemoteExec")
-	log.Info("Executing in session %s: %s", sessionID, command)
+	log.Info("Executing in session %s: %s", sessionID, loggableCommand(command))
 	_ = cmdID
 	_ = workerID
 

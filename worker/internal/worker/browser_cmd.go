@@ -219,6 +219,18 @@ func unknownCmdHint(c browserCmd) string {
 	return ""
 }
 
+// loggableCommand drops a browser command's arguments, which may hold
+// credentials (fill, set credentials), before it reaches logs or the TUI.
+func loggableCommand(command string) string {
+	rest, ok := strings.CutPrefix(command, "browser ")
+	if !ok {
+		return command
+	}
+	args, _ := splitArgs(rest)
+	c, _ := parseBrowserCmd(args)
+	return strings.TrimSpace("browser " + c.name)
+}
+
 // argN returns args[i] or an error naming what is missing.
 func argN(args []string, i int, what string) (string, error) {
 	if i >= len(args) {

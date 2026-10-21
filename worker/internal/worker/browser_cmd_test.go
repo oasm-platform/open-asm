@@ -243,3 +243,21 @@ func TestConcurrentCommandsOnOneSession(t *testing.T) {
 		t.Error(e)
 	}
 }
+
+func TestBrowserCommandLogOmitsArguments(t *testing.T) {
+	events := make(chan TuiEvent, 16)
+	sb := &sessionSandbox{sessionID: "s", rootPath: t.TempDir()}
+	executeRemoteCommand(context.Background(), &recordingSender{}, "s", "c", "w", "browser -s b-x set credentials admin s3cret", sb, newAgentBrowsers(nil, nil), events, "")
+	close(events)
+	logged := false
+	for ev := range events {
+		line := fmt.Sprintf("%+v", ev)
+		if strings.Contains(line, "s3cret") {
+			t.Fatalf("password logged: %s", line)
+		}
+		logged = logged || strings.Contains(line, "browser set")
+	}
+	if !logged {
+		t.Fatal("browser command not logged at all")
+	}
+}
