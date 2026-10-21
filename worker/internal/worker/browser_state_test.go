@@ -149,3 +149,21 @@ func TestCookiesStorageHeadersAndEmulation(t *testing.T) {
 	}
 	run("set offline off")
 }
+
+func TestClosingAnEarlierTabKeepsTheActiveOne(t *testing.T) {
+	a := newTestBrowsers(t)
+	srv := serveHTML(t, map[string]string{"/": `<title>A</title>`, "/b": `<title>B</title>`, "/c": `<title>C</title>`})
+	id, _ := openSession(t, a, srv.URL)
+	run := func(line string) string { return runOK(t, a, "-s "+id+" "+line) }
+
+	run("tab new " + srv.URL + "/b")
+	run("tab new " + srv.URL + "/c")
+	run("tab 1")
+	run("tab close 0")
+	if got := run("title"); got != "B" {
+		t.Fatalf("active tab after closing tab 0 = %q, want B", got)
+	}
+	if list := run("tab list"); !strings.Contains(list, "* 0 B") {
+		t.Fatalf("tab list:\n%s", list)
+	}
+}

@@ -186,11 +186,12 @@ func (s *browserSession) forget(id proto.TargetTargetID) {
 			continue
 		}
 		s.pages = append(s.pages[:i], s.pages[i+1:]...)
-		if s.active >= len(s.pages) && s.active > 0 {
-			s.active = len(s.pages) - 1
+		if i == s.active {
+			s.frame = nil // it belonged to the closed tab
 		}
-		if s.frame != nil && i == s.active {
-			s.frame = nil
+		// Keep the same tab active when an earlier one closes.
+		if i < s.active || (s.active >= len(s.pages) && s.active > 0) {
+			s.active--
 		}
 		return
 	}
