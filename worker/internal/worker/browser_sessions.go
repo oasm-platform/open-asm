@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-rod/rod"
@@ -71,7 +72,7 @@ type browserSession struct {
 	ctx    *rod.Browser
 	proxy  *scopeProxy
 	cancel context.CancelFunc // stops the session's event listeners
-	closed bool
+	closed atomic.Bool        // written under mu; list reads it without
 
 	// refs maps "eN" from the last snapshot to DOM nodes of refsPage.
 	refs     map[string]proto.DOMBackendNodeID
@@ -222,7 +223,7 @@ func (s *browserSession) newTab(ctx context.Context) (*rod.Page, error) {
 }
 
 func (s *browserSession) shutdown() {
-	s.closed = true
+	s.closed.Store(true)
 	s.cancel()
 	_ = s.ctx.Close()
 	s.proxy.close()
@@ -363,7 +364,7 @@ func (a *agentBrowsers) acquire(id string) (*browserSession, func(), error) {
 		return nil, nil, errBrowserSessionNotFound(id)
 	}
 	s.mu.Lock()
-	if s.closed {
+	if s.closed.Load() {
 		s.mu.Unlock()
 		a.life.end(id)
 		return nil, nil, errBrowserSessionNotFound(id)
@@ -373,7 +374,7 @@ func (a *agentBrowsers) acquire(id string) (*browserSession, func(), error) {
 
 func (a *agentBrowsers) doneFunc(s *browserSession) func() {
 	return func() {
-		closed := s.closed
+		closed := s.closed.Load()
 		s.mu.Unlock()
 		if !closed {
 			a.life.end(s.id)
@@ -398,7 +399,7 @@ func (a *agentBrowsers) release(id string) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if !s.closed {
+	if !s.closed.Load() {
 		s.shutdown()
 	}
 }
@@ -409,7 +410,7 @@ func (a *agentBrowsers) list() []string {
 	defer a.mu.Unlock()
 	ids := make([]string, 0, len(a.sessions))
 	for id, s := range a.sessions {
-		if !s.closed {
+		if !s.closed.Load() {
 			ids = append(ids, id)
 		}
 	}

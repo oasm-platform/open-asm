@@ -143,3 +143,28 @@ func TestBrowserCrashFreesSessionSlots(t *testing.T) {
 		t.Fatalf("dead session must be not found, got %v", err)
 	}
 }
+
+func TestListWhileClosingIsRaceFree(t *testing.T) {
+	a := newTestBrowsers(t)
+	s, done, err := a.open(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stop := make(chan struct{})
+	listed := make(chan struct{})
+	go func() {
+		defer close(listed)
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				a.list()
+			}
+		}
+	}()
+	s.shutdown() // what "close" does, holding s.mu
+	done()
+	close(stop)
+	<-listed
+}
