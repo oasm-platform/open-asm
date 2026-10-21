@@ -202,3 +202,18 @@ func TestActionsWaitForRefsAndText(t *testing.T) {
 	run("reload")
 	run("wait text=shown later")
 }
+
+func TestEvalRunsOnceWhenItThrowsSyntaxError(t *testing.T) {
+	a := newTestBrowsers(t)
+	srv := serveHTML(t, map[string]string{"/": formPage})
+	id, _ := openSession(t, a, srv.URL)
+
+	// A valid expression whose JSON.parse throws SyntaxError at run time.
+	out := runFail(t, a, "-s "+id+` eval "(window.runs = (window.runs || 0) + 1, JSON.parse('x'))"`)
+	if !strings.Contains(out, "SyntaxError") {
+		t.Fatalf("want the JSON error, got:\n%s", out)
+	}
+	if got := runOK(t, a, "-s "+id+" eval window.runs"); got != "1" {
+		t.Fatalf("script ran %s times, want 1", got)
+	}
+}

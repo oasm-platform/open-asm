@@ -694,11 +694,17 @@ func browserEval(ctx context.Context, s *browserSession, args []string) (string,
 		return "", err
 	}
 	p := page.Context(ctx)
-	res, err := p.Evaluate(rod.Eval("async () => (" + js + "\n)").ByPromise())
-	var evalErr *rod.EvalError
-	if errors.As(err, &evalErr) && strings.Contains(err.Error(), "SyntaxError") {
-		res, err = p.Evaluate(rod.Eval("async () => {" + js + "\n}").ByPromise())
+	fn := "async () => (" + js + "\n)"
+	// Decide expression vs body by compiling only: retrying after a failed
+	// run would repeat its side effects (a runtime SyntaxError, e.g. JSON.parse).
+	compiled, err := proto.RuntimeCompileScript{Expression: fn}.Call(p)
+	if err != nil {
+		return "", err
 	}
+	if compiled.ExceptionDetails != nil {
+		fn = "async () => {" + js + "\n}"
+	}
+	res, err := p.Evaluate(rod.Eval(fn).ByPromise())
 	if err != nil {
 		return "", err
 	}
