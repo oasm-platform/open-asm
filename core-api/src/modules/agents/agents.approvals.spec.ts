@@ -388,6 +388,22 @@ describe('AgentsApprovalsService', () => {
         service.decidePlan(approvalId, 'w1', 'u1', { allowed: false }),
       ).toThrow('Plan approval not found');
     });
+
+    it('tells the client an answered prompt is done', async () => {
+      const emitter = new EventEmitter();
+      const resolved: string[] = [];
+      emitter.on('approval-required', (e: { approvalId: string }) => {
+        service.decidePlan(e.approvalId, 'w1', 'u1', { allowed: true });
+      });
+      emitter.on('approval-resolved', (e: { approvalId: string }) =>
+        resolved.push(e.approvalId),
+      );
+
+      await ask(emitter);
+      // Without it, a client reconnecting mid-run replays the prompt and
+      // shows a dialog it can never answer
+      expect(resolved).toHaveLength(1);
+    });
   });
 
   it('keeps "allow all" until the mode changes', async () => {

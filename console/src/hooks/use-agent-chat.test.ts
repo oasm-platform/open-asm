@@ -142,6 +142,38 @@ describe('useAgentChat approvals', () => {
     expect(result.current.streamError).toBeNull();
   });
 
+  it('drops a prompt the server no longer knows about', async () => {
+    // A reload replays the answer stream, so an already answered plan prompt
+    // can reappear: it can never be decided, and must not block the chat.
+    mocks.orvalClient.mockRejectedValueOnce({ response: { status: 404 } });
+    const { result } = renderHook(() =>
+      useAgentChat({ conversationId: undefined }),
+    );
+
+    act(() => {
+      mocks.onData?.({
+        type: 'data-approval-required',
+        data: {
+          approvalId: 'stale-1',
+          toolCallId: 'tool-1',
+          kind: 'plan',
+          command: '',
+          mode: 'plan',
+          plan: ['Enumerate subdomains'],
+        },
+      });
+    });
+    expect(result.current.pendingApprovalCount).toBe(1);
+
+    await act(async () => {
+      result.current.onDecideApproval('approved', { mode: 'auto' });
+      await Promise.resolve();
+    });
+
+    expect(result.current.pendingApproval).toBeNull();
+    expect(result.current.streamError).toBeNull();
+  });
+
   it('drops prompts the server answered another way', () => {
     const { result } = renderHook(() => useAgentChat({ conversationId: undefined }));
     const prompt = (approvalId: string) => ({
