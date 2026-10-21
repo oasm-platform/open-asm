@@ -210,7 +210,7 @@ func (s *browserSession) target(ctx context.Context, t string) (*rod.Element, er
 		if rerr != nil {
 			return nil, stale
 		}
-		return p.ElementFromObject(obj.Object)
+		el, err = p.ElementFromObject(obj.Object)
 	case strings.HasPrefix(t, "xpath="):
 		el, err = p.ElementX(strings.TrimPrefix(t, "xpath="))
 	case strings.HasPrefix(t, "text="):
@@ -222,8 +222,15 @@ func (s *browserSession) target(ctx context.Context, t string) (*rod.Element, er
 	if errors.As(err, &notFound) || (err == nil && el == nil) {
 		return nil, fmt.Errorf("no element matches %q", t)
 	}
-	return el, err
+	if err != nil {
+		return nil, err
+	}
+	return actionable(el), nil
 }
+
+// actionable lets an element found without waiting still wait, up to the
+// command timeout, for what its action needs (visible, not covered).
+func actionable(el *rod.Element) *rod.Element { return el.Sleeper(rod.DefaultSleeper) }
 
 // findByTextJS returns the innermost visible element whose text contains the
 // argument, preferring clickable ones.

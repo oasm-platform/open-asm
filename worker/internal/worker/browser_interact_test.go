@@ -169,3 +169,36 @@ func TestDragHTML5(t *testing.T) {
 		t.Fatalf("title after drag = %q", got)
 	}
 }
+
+// latePage covers its button and keeps its text hidden for a moment, like a
+// modal fading out.
+const latePage = `<title>Late</title>
+<button onclick="document.title = 'clicked'">Hit</button>
+<p data-testid="hid" style="display:none">hidden at first</p>
+<div id="cover" style="position:fixed;inset:0;background:#fff"></div>
+<script>setTimeout(() => {
+	cover.remove();
+	document.querySelector('[data-testid=hid]').style.display = 'block';
+	const p = document.createElement('p'); p.textContent = 'shown later'; document.body.append(p);
+}, 1500)</script>`
+
+func TestActionsWaitForRefsAndText(t *testing.T) {
+	a := newTestBrowsers(t)
+	srv := serveHTML(t, map[string]string{"/": latePage})
+	id, out := openSession(t, a, srv.URL)
+	m := regexp.MustCompile(`button "Hit" \[ref=(e\d+)\]`).FindStringSubmatch(out)
+	if m == nil {
+		t.Fatalf("no button ref in:\n%s", out)
+	}
+	run := func(line string) string { return runOK(t, a, "-s "+id+" "+line) }
+
+	run("click @" + m[1]) // covered until the timer fires
+	if got := run("title"); got != "clicked" {
+		t.Fatalf("title = %q", got)
+	}
+	run("reload")
+	hid := regexp.MustCompile(`\[ref=(e\d+)\]`).FindStringSubmatch(run("find testid hid"))
+	run("wait @" + hid[1])
+	run("reload")
+	run("wait text=shown later")
+}

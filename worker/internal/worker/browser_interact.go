@@ -554,7 +554,7 @@ func browserFind(ctx context.Context, s *browserSession, args []string) (string,
 		if !ok {
 			return "", fmt.Errorf("unknown find action %q", rest[0])
 		}
-		out, err := op(ctx, s, els[0], rest[1:])
+		out, err := op(ctx, s, actionable(els[0]), rest[1:])
 		if err != nil || opsWithResult[rest[0]] {
 			return out, err
 		}
@@ -664,11 +664,13 @@ func browserWait(ctx context.Context, s *browserSession, args []string) (string,
 		}
 		return "loaded", p.WaitLoad()
 	}
-	// A target that may not exist yet: CSS and xpath retry until the timeout.
+	// A target that may not exist yet: CSS, xpath and text= retry until the timeout.
 	var el *rod.Element
 	switch {
-	case strings.HasPrefix(what, "@"), strings.HasPrefix(what, "text="):
+	case strings.HasPrefix(what, "@"):
 		el, err = s.target(ctx, what)
+	case strings.HasPrefix(what, "text="):
+		el, err = p.ElementByJS(rod.Eval(findByTextJS, strings.TrimPrefix(what, "text=")))
 	case strings.HasPrefix(what, "xpath="):
 		el, err = p.ElementX(strings.TrimPrefix(what, "xpath="))
 	default:
