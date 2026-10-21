@@ -361,6 +361,12 @@ export class AgentsApprovalsService {
         if (!this.pendingPlans.delete(approvalId)) return;
         clearTimeout(timer);
         abortSignal?.removeEventListener('abort', onAbort);
+        // Like a command prompt, tell the UI it is done: a client that
+        // reconnected mid-run replays the prompt from the stream buffer and
+        // would otherwise show a dialog that can never be answered
+        emitter?.emit('approval-resolved', {
+          approvalId,
+        } satisfies ApprovalResolvedEvent);
         resolve(d);
       };
       const onAbort = () => settle({ allowed: false });

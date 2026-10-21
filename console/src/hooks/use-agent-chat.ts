@@ -30,6 +30,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 const MAX_AUTO_RETRIES = 3;
 const BASE_RETRY_DELAY_MS = 1_000;
 
+/** 404: the approval is gone, so the prompt can never be decided. */
+function isGoneApprovalError(error: unknown): boolean {
+  return (
+    (error as { response?: { status?: number } } | null)?.response?.status === 404
+  );
+}
+
 /**
  * Determines whether a streaming error is transient and worth retrying
  * automatically. Permanent errors (auth, validation) should surface immediately.
@@ -803,8 +810,20 @@ export function useAgentChat({
           q.filter((a) => a.approvalId !== pendingApproval.approvalId),
         );
       } catch (error) {
-        console.error('[Chat] Failed to submit approval decision', error);
-        setStreamError('Could not submit approval decision. Please try again.');
+        // 404: the server has no such approval (answered already, or its run
+        // ended). Keeping the prompt would block the chat for good, since it
+        // can never be decided.
+        if (isGoneApprovalError(error)) {
+          setApprovalQueue((q) =>
+            q.filter((a) => a.approvalId !== pendingApproval.approvalId),
+          );
+          setStreamError(null);
+        } else {
+          console.error('[Chat] Failed to submit approval decision', error);
+          setStreamError(
+            'Could not submit approval decision. Please try again.',
+          );
+        }
       } finally {
         setIsDecidingApproval(false);
       }
