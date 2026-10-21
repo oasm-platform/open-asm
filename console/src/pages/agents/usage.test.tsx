@@ -1,7 +1,11 @@
 import { renderWithProviders, screen } from '@/test/utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentUsageResponseDto } from '@/services/apis/gen/queries';
-import AgentUsagePage, { formatCacheHit, formatUsageCost } from './usage';
+import AgentUsagePage, {
+  cacheHitTone,
+  formatCacheHit,
+  formatUsageCost,
+} from './usage';
 
 vi.mock('@/hooks/useWorkspaceSelector', () => ({
   useWorkspaceState: () => ({ state: { selectedWorkspaceId: 'ws-1' } }),
@@ -82,6 +86,20 @@ describe('formatCacheHit', () => {
   });
 });
 
+describe('cacheHitTone', () => {
+  it('grades the cache hit ratio', () => {
+    const tone = (cacheReadTokens: number) =>
+      cacheHitTone({ inputTokens: 100, cacheReadTokens });
+    expect(tone(90)).toContain('text-emerald-600');
+    expect(tone(70)).toContain('text-lime-600');
+    expect(tone(40)).toContain('text-amber-600');
+    expect(tone(39)).toContain('text-red-600');
+    expect(cacheHitTone({ inputTokens: 0, cacheReadTokens: 0 })).toBe(
+      'text-muted-foreground',
+    );
+  });
+});
+
 describe('AgentUsagePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -98,7 +116,9 @@ describe('AgentUsagePage', () => {
     expect(screen.getAllByText('50%')).toHaveLength(2);
     // The session row
     expect(screen.getByText('900K in · 20K out')).toBeInTheDocument();
-    expect(screen.getByText('50% cache · $1.50')).toBeInTheDocument();
+    const sessionCache = screen.getByText('50% cache');
+    expect(sessionCache).toHaveClass('text-amber-600');
+    expect(sessionCache.parentElement).toHaveTextContent('50% cache · $1.50');
     expect(screen.getByTestId('usage-chart')).toBeInTheDocument();
     expect(screen.getByText('claude-sonnet-4-5')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Recon acme\.com/ })).toHaveAttribute(
