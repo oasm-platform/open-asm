@@ -57,6 +57,12 @@ type AgentToolWhere = {
   type?: WorkerType | FindOperator<WorkerType>;
 };
 
+/** One OR-branch of the search filter (see buildSearchBranches). */
+type SearchWhere = {
+  name?: FindOperator<string>;
+  description?: FindOperator<string>;
+};
+
 @Injectable()
 export class ToolsService {
   constructor(
@@ -351,6 +357,19 @@ export class ToolsService {
   }
 
   /**
+   * OR-branches matching `search` in name OR description (ILIKE,
+   * case-insensitive); a single empty branch when there is no search term.
+   */
+  private buildSearchBranches(search?: string): SearchWhere[] {
+    const searchTerm = (search ?? '').trim().slice(0, MAX_SEARCH_LENGTH);
+    if (!searchTerm) return [{}];
+    // Escape LIKE wildcards so user input is matched literally; ILike()
+    // keeps the value parameterized (no SQL injection).
+    const pattern = `%${searchTerm.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    return [{ name: ILike(pattern) }, { description: ILike(pattern) }];
+  }
+
+  /**
    * Builds a TypeORM where clause for getManyTools.
    * When search is provided, creates an OR branch matching name OR description
    * (ILIKE, case-insensitive); agentTool adds its own OR branches. Every branch
@@ -364,14 +383,7 @@ export class ToolsService {
     if (query.category) base.categories = hasCategory(query.category);
     if (query.providerId) base.provider = { id: query.providerId };
 
-    const searchTerm = (query.search ?? '').trim().slice(0, MAX_SEARCH_LENGTH);
-    // Escape LIKE wildcards so user input is matched literally; ILike()
-    // keeps the value parameterized (no SQL injection).
-    const pattern = `%${searchTerm.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-    const searchBranches: { name?: FindOperator<string>; description?: FindOperator<string> }[] =
-      searchTerm
-        ? [{ name: ILike(pattern) }, { description: ILike(pattern) }]
-        : [{}];
+    const searchBranches = this.buildSearchBranches(query.search);
     const agentBranches: AgentToolWhere[] =
       query.agentTool === undefined
         ? [{}]
@@ -542,6 +554,64 @@ export class ToolsService {
       }
       return getManyResponse({ query, data, total });
     }
+  }
+
+  /**
+   * The AI agent tools usable in a workspace: every built-in tool plus the
+   * agent-flagged connectors installed (and enabled) there. Connectors the
+   * workspace has not installed are left out. `search` matches name or
+   * description, as in getManyTools. Only the agent reads this, so it is a
+   * plain array (no pagination), sorted by name.
+   */
+  async getAgentTools(workspaceId: string, search?: string) {
+    const workspaceTools = await this.workspaceToolRepository.find({
+      where: { workspace: { id: workspaceId }, isEnabled: true },
+      relations: ['tool'],
+    });
+    const installedIds = workspaceTools
+      .map((wt) => wt.tool)
+      .filter(
+        (tool) => tool.type !== WorkerType.BUILT_IN && this.isAgentTool(tool),
+      )
+      .map((tool) => tool.id!)
+      .filter(Boolean);
+
+    // Built-ins are always installed; In([]) renders 0=1 when none are.
+    const agentBranches: AgentToolWhere[] = [
+      { type: WorkerType.BUILT_IN },
+      { id: In(installedIds) },
+    ];
+    const searchBranches = this.buildSearchBranches(search);
+    const tools = await this.toolsRepository.find({
+      where: agentBranches.flatMap((agent) =>
+        searchBranches.map((branch) => ({ ...agent, ...branch })),
+      ),
+      order: { name: 'ASC' },
+    });
+
+    const profileToolIds = await this.getProfileToolIds(
+      workspaceId,
+      tools
+        .filter((tool) => tool.type !== WorkerType.BUILT_IN)
+        .map((tool) => tool.id!),
+    );
+
+    return tools.map((tool) => {
+      if (tool.type === WorkerType.BUILT_IN) {
+        return { ...tool, isInstalled: true, isReady: true, agentTool: true };
+      }
+      const hasConfigProfile = profileToolIds.has(tool.id!);
+      // Connector without a config schema needs no config → installed means ready.
+      const needsConfig =
+        this.connectorRegistry.getConnectorSchema(tool.name) !== null;
+      return {
+        ...tool,
+        isInstalled: true,
+        hasConfigProfile,
+        isReady: needsConfig ? hasConfigProfile : true,
+        agentTool: true,
+      };
+    });
   }
 
   async getInstalledTools(dto: GetInstalledToolsDto, workspaceId?: string) {

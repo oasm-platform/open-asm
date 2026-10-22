@@ -114,3 +114,16 @@ func (s *sandboxSessions) closeAll() {
 		s.release(id)
 	}
 }
+
+// remove forgets a session at once without calling release; for a caller
+// that has already torn the session down itself.
+func (s *sandboxSessions) remove(sessionID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if st, found := s.live[sessionID]; found {
+		if st.timer != nil {
+			st.timer.Stop()
+		}
+		delete(s.live, sessionID)
+	}
+}

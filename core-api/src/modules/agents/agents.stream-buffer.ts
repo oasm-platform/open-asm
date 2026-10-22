@@ -79,6 +79,22 @@ export class AgentsStreamBufferService {
   }
 
   /**
+   * Pushes a chunk to live resumers without recording it: for a live view
+   * (browser screenshots) that only matters while it is current and is too
+   * big to keep for replay.
+   */
+  async publishLive(conversationId: string, chunkJson: string): Promise<void> {
+    try {
+      await this.redis.publish(
+        this.channel(conversationId),
+        JSON.stringify({ live: chunkJson }),
+      );
+    } catch (error) {
+      this.logger.warn(`Failed to publish live chunk: ${String(error)}`);
+    }
+  }
+
+  /**
    * Marks the run complete: appends a done sentinel so any resumer closes, and
    * shortens the key's TTL to the late-reconnect window.
    */
@@ -127,6 +143,8 @@ export class AgentsStreamBufferService {
     const redis = this.redis;
     const logger = this.logger;
     const idleCheckMs = AgentsStreamBufferService.IDLE_CHECK_MS;
+    // Set by `start`, so a cancelled reader (the client left) closes it too
+    let closeStream = (): void => undefined;
 
     return new ReadableStream<string>({
       async start(controller) {
@@ -147,7 +165,9 @@ export class AgentsStreamBufferService {
           if (closed) return;
           closed = true;
           if (idleTimer) clearInterval(idleTimer);
-          void redis.unsubscribe(channel).catch(() => undefined);
+          // Only this reader's listener: other resumers of the conversation
+          // (another tab, or the client that came back) keep theirs
+          void redis.unsubscribe(channel, onMessage).catch(() => undefined);
           try {
             controller.close();
           } catch {
@@ -166,10 +186,21 @@ export class AgentsStreamBufferService {
         const drain = (): void => {
           while (pending.length > 0 && !closed) {
             const raw = pending.shift()!;
-            let msg: { id: string; chunk?: string; done?: boolean };
+            let msg: {
+              id: string;
+              chunk?: string;
+              done?: boolean;
+              live?: string;
+            };
             try {
               msg = JSON.parse(raw) as typeof msg;
             } catch {
+              continue;
+            }
+            if (msg.live !== undefined) {
+              // Never recorded, so never replayed: no id to order by
+              controller.enqueue(msg.live);
+              lastActivityAt = Date.now();
               continue;
             }
             if (!isAfter(msg.id, lastId)) continue; // already replayed
@@ -190,6 +221,7 @@ export class AgentsStreamBufferService {
           pending.push(raw);
           drain();
         };
+        closeStream = close;
 
         try {
           // Subscribe BEFORE reading the backlog: anything published in between
@@ -233,7 +265,7 @@ export class AgentsStreamBufferService {
         }
       },
       cancel() {
-        void redis.unsubscribe(channel).catch(() => undefined);
+        closeStream();
       },
     });
   }

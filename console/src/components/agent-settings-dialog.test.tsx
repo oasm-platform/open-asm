@@ -21,9 +21,6 @@ vi.mock('@/components/skills-manager', () => ({
 vi.mock('@/components/memory-manager', () => ({
   MemoryManager: () => <div>memory content</div>,
 }));
-vi.mock('@/components/connectors-manager', () => ({
-  ConnectorsManager: () => <div>connectors content</div>,
-}));
 
 function Opener({ tab }: { tab?: AgentSettingsTab }) {
   const { open } = useAgentSettingsDialog();
@@ -64,17 +61,6 @@ describe('AgentSettingsDialog', () => {
       await screen.findByRole('heading', { name: 'Models' }),
     ).toBeInTheDocument();
     expect(screen.getByText('models content')).toBeInTheDocument();
-  });
-
-  it('opens straight on the connectors tab', async () => {
-    const { user } = setup('connectors');
-
-    await user.click(await screen.findByRole('button', { name: 'Open settings' }));
-
-    expect(
-      await screen.findByRole('heading', { name: 'Connectors' }),
-    ).toBeInTheDocument();
-    expect(screen.getByText('connectors content')).toBeInTheDocument();
   });
 
   it('switches sections from the side nav', async () => {

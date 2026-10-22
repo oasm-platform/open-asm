@@ -32,6 +32,8 @@ export interface RemoteCommandResult {
   timedOut: boolean;
   /** stdout went past maxOutputChars: only its start is kept. */
   stdoutTruncated: boolean;
+  /** Base64 JPEG the worker sent with the result: the page after a browser command. */
+  image?: string;
 }
 
 /** Default cap on the stdout/stderr kept in memory per call. */
@@ -58,6 +60,8 @@ enum ResultEventType {
   STDERR = 2,
   EXIT = 3,
   ERROR = 4,
+  /** data: base64 JPEG screenshot, sent before a browser command's EXIT. */
+  IMAGE = 5,
 }
 
 type ResultEventListener = (event: {
@@ -87,7 +91,7 @@ export class RemoteExecuteService {
     raw: string | number,
   ): ResultEventType | null {
     if (typeof raw === 'number') {
-      if (raw >= 1 && raw <= 4) return raw;
+      if (raw >= 1 && raw <= 5) return raw;
       return null;
     }
 
@@ -96,13 +100,26 @@ export class RemoteExecuteService {
       REMOTE_EXECUTE_RESULT_STDERR: ResultEventType.STDERR,
       REMOTE_EXECUTE_RESULT_EXIT: ResultEventType.EXIT,
       REMOTE_EXECUTE_RESULT_ERROR: ResultEventType.ERROR,
+      REMOTE_EXECUTE_RESULT_IMAGE: ResultEventType.IMAGE,
       '1': ResultEventType.STDOUT,
       '2': ResultEventType.STDERR,
       '3': ResultEventType.EXIT,
       '4': ResultEventType.ERROR,
+      '5': ResultEventType.IMAGE,
     };
 
     return map[raw] ?? null;
+  }
+
+  private static isImageMessage(raw: string): boolean {
+    try {
+      const { type } = JSON.parse(raw) as { type: string | number };
+      return (
+        RemoteExecuteService.normalizeEventType(type) === ResultEventType.IMAGE
+      );
+    } catch {
+      return false;
+    }
   }
 
   runCommand(
@@ -141,6 +158,8 @@ export class RemoteExecuteService {
 
       const handler = (ch: string, message: string) => {
         if (ch !== channel) return;
+        // Screenshots are for agents; a terminal shows text only.
+        if (RemoteExecuteService.isImageMessage(message)) return;
         observer.next({ data: message });
       };
 
@@ -257,6 +276,7 @@ export class RemoteExecuteService {
     let eventCount = 0;
     let exitEvent: ResultEvent | undefined;
     let errorEvent: ResultEvent | undefined;
+    let image: string | undefined;
     const append = (kept: string, data: string): string => {
       const room = maxOutputChars - kept.length;
       if (room <= 0) return kept;
@@ -303,6 +323,11 @@ export class RemoteExecuteService {
         };
         eventCount++;
         const data = event.data ?? '';
+        if (event.type === ResultEventType.IMAGE) {
+          // Kept for the result only: live listeners stream text.
+          if (data) image = data;
+          return;
+        }
         if (event.type === ResultEventType.STDOUT) {
           if (stdout.length + data.length > maxOutputChars) {
             stdoutTruncated = true;
@@ -463,6 +488,7 @@ export class RemoteExecuteService {
       error: errorEvent?.data ?? (aborted ? 'Cancelled by user' : null),
       timedOut: isTimedOut && !aborted,
       stdoutTruncated,
+      ...(image ? { image } : {}),
     };
   }
 }

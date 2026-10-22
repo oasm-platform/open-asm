@@ -92,6 +92,13 @@ tasks:
     cmds:
       - go test ./...
 
+  # Run matching tests in one package: task worker:test:one PKG=./internal/worker RUN=TestWait [FLAGS=-race]
+  test:one:
+    requires:
+      vars: [PKG, RUN]
+    cmds:
+      - go test {{.FLAGS}} {{.PKG}} -run '{{.RUN}}' -count=1
+
   # Run tests with the race detector (slow; use for concurrency changes)
   test-race:
     cmds:

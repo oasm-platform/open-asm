@@ -11,7 +11,7 @@ The worker runs tools through two separate calls. Which one to use depends on th
 
 In Agent mode no tool or command runs until you have a goal and a todo list:
 
-1. `formulate_plan(steps)` — the goal is generated from the request and pinned above the plan already (e.g. "Find which web ports of api.example.com are open and what serves them"); the steps name the tool each one uses. The first step of a security test is "Check scope and list the available tools".
+1. `formulate_plan(steps)` — the goal is generated from the request and pinned above the plan already (e.g. "Find which web ports of api.example.com are open and what serves them"); the steps name the tool each one uses. The first step of a security test is "List the available tools".
 2. `transition_step(id, "in_progress")` on the step a command belongs to, before running it. A call made while no step is in progress is refused.
 3. `transition_step(id, "completed")` once that step's output is in hand, then the next step.
 
@@ -27,11 +27,11 @@ Run only the commands the current step needs, and check their output against the
 
 ## 1. List the tools and read their type
 
-1. Call `display_available_tools` with `agentTool: true`.
-2. Keep only tools with `agentTool`, `isInstalled` and `isReady` all true.
+1. Call `display_available_tools`: it lists only the tools the agent can use in this workspace.
+2. Keep only tools with `isReady` true.
 3. Look at each tool's `type`: `built_in` → section 2, `connector` → section 3. Decide from `type` only, never from the name.
 
-If the tool you need is missing, not installed or not ready, tell the user which one and that it can be installed from the Tools page.
+If the tool you need is not listed or not ready, tell the user which one and that it can be installed from the Tools page.
 
 ## 2. Built-in tools: `execute_remote_command`
 
@@ -59,7 +59,6 @@ A command or tool call may wait for the user's approval. If it is rejected, do n
 
 ## Safety
 
-- Only targets in the workspace scope (`retrieve_targets`).
 - Nothing destructive, no denial of service, no changes to the worker.
 - Save results you will reuse with `stm_write`.
 - A result outside the goal (an unexpected host, an unrelated service) goes in the report as a next step, not into new commands.

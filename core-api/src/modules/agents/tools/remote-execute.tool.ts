@@ -71,17 +71,23 @@ export function remoteExecuteTool(
         };
       }
 
-      const result = await deps.remoteExecuteService.waitForResult(
-        command,
-        sessionId,
-        conversationId,
-        workspaceId,
-        60_000,
-        (event) => {
-          emitter?.emit('remote-execute-output', { toolCallId, ...event });
-        },
-        options.abortSignal,
-      );
+      const { image, ...result } =
+        await deps.remoteExecuteService.waitForResult(
+          command,
+          sessionId,
+          conversationId,
+          workspaceId,
+          60_000,
+          (event) => {
+            emitter?.emit('remote-execute-output', { toolCallId, ...event });
+          },
+          options.abortSignal,
+        );
+      // A browser command comes back with the page as a JPEG: a live view
+      // for the user's Browser panel, never stored nor shown to the model
+      if (image) {
+        emitter?.emit('browser-screenshot', { toolCallId, command, image });
+      }
       // The live terminal already streamed everything; the model gets the
       // first page, since the result is resent on every later step
       const page = await pageForModel(

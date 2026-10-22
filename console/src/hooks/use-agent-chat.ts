@@ -2,6 +2,7 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import type { UIMessage } from 'ai';
 import type { AgentTodoItem } from '@/pages/agents/components/agent-todo-panel';
+import type { LiveBrowserScreenshot } from '@/pages/agents/components/browser-panel';
 import { isSubagentActive } from '@/pages/agents/components/subagents-panel';
 import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import {
@@ -29,6 +30,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 const MAX_AUTO_RETRIES = 3;
 const BASE_RETRY_DELAY_MS = 1_000;
+
+/** 404: the approval is gone, so the prompt can never be decided. */
+function isGoneApprovalError(error: unknown): boolean {
+  return (
+    (error as { response?: { status?: number } } | null)?.response?.status === 404
+  );
+}
 
 /**
  * Determines whether a streaming error is transient and worth retrying
@@ -77,6 +85,18 @@ function isTransientError(error: Error): boolean {
   }
 
   return false;
+}
+
+/**
+ * Why this page dropped its streams of a conversation: the user left it. An
+ * abort, so the SDK ends that chat's stream quietly; the run goes on on the
+ * server and is resumed when the user comes back.
+ */
+class LeftConversationError extends Error {
+  constructor() {
+    super('Left the conversation');
+    this.name = 'AbortError';
+  }
 }
 
 import { useLocation, useNavigate } from '@tanstack/react-router';
@@ -161,13 +181,14 @@ interface UseAgentChatReturn {
     string,
     import('@/hooks/use-remote-execute-stream').RemoteExecuteStreamEvent[]
   >;
+  /** The page after the last browser command of a run seen live; never saved */
+  browserScreenshot: LiveBrowserScreenshot | null;
   onSendMessage: (content: string, options?: { agentMode?: string }) => void;
   onRetry: (() => void) | undefined;
   onStop: () => void;
   onSelectModel: (provider: string, model: string, configId: string) => void;
   onDismissError: () => void;
   onLoadMore: (() => void) | undefined;
-  onAgentModeChange: (mode: string) => void;
   onWorkerSelect: (workerId: string | null) => void;
   pendingApproval: PendingApproval | null;
   pendingApprovalCount: number;
@@ -423,6 +444,8 @@ export function useAgentChat({
     subagentsRef.current = subagents;
   }, [subagents]);
   const { appendEvent, eventsMap } = useRemoteExecuteStream();
+  const [browserScreenshot, setBrowserScreenshot] =
+    useState<LiveBrowserScreenshot | null>(null);
   // Parallel tool calls can each need approval, so keep a queue
   const [approvalQueue, setApprovalQueue] = useState<PendingApproval[]>([]);
   const pendingApproval = approvalQueue[0] ?? null;
@@ -489,7 +512,6 @@ export function useAgentChat({
   }, [conversationId, createdHereId]);
   const isNewConversation =
     !!conversationId && conversationId === createdHereId;
-  const [resumeOnMount] = useState(() => !isNewConversation);
 
   // Fetch messages with infinite scroll
   const {
@@ -546,6 +568,10 @@ export function useAgentChat({
     [savedMessages, messagesData],
   );
 
+  // Aborts this page's streams of the conversation on screen once the user
+  // leaves it (see the resume effect)
+  const streamsRef = useRef<AbortController | null>(null);
+
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
@@ -553,6 +579,15 @@ export function useAgentChat({
         headers: selectedWorkspaceId
           ? { 'x-workspace-id': selectedWorkspaceId }
           : {},
+        fetch: (input, init) =>
+          fetch(input, {
+            ...init,
+            signal: AbortSignal.any(
+              [init?.signal, streamsRef.current?.signal].filter(
+                (s): s is AbortSignal => !!s,
+              ),
+            ),
+          }),
         // On mount (resume), reconnect to a run still producing the answer.
         // A plain GET; the server replays from the start and 204s when there
         // is nothing to resume. The transport headers (workspace id) carry over.
@@ -604,6 +639,8 @@ export function useAgentChat({
     // The effect below resumes once instead.
     experimental_throttle: 50,
     onError: (error) => {
+      // A stream of a conversation the user left, dropped on purpose
+      if (error instanceof LeftConversationError) return;
       // Ignore errors from user-initiated stops — not a real error
       if (isUserStoppedRef.current) {
         isUserStoppedRef.current = false;
@@ -681,19 +718,11 @@ export function useAgentChat({
           data.data as import('@/hooks/use-remote-execute-stream').RemoteExecuteStreamEvent;
         appendEvent(event);
       }
+      if (data.type === 'data-browser-screenshot') {
+        setBrowserScreenshot(data.data as LiveBrowserScreenshot);
+      }
     },
   });
-
-  // Reconnect to an in-progress run on mount (reload, or returning to the
-  // chat) and stream the rest, instead of polling the database for it.
-  // Decided once at mount: a chat just started here has no run to resume.
-  // The ref keeps it to one request, even when StrictMode re-runs the effect.
-  const resumeAttemptedRef = useRef(false);
-  useEffect(() => {
-    if (!resumeOnMount || !conversationId || resumeAttemptedRef.current) return;
-    resumeAttemptedRef.current = true;
-    void resumeStream();
-  }, [resumeOnMount, conversationId, resumeStream]);
 
   // Keep ref in sync
   useEffect(() => {
@@ -789,8 +818,20 @@ export function useAgentChat({
           q.filter((a) => a.approvalId !== pendingApproval.approvalId),
         );
       } catch (error) {
-        console.error('[Chat] Failed to submit approval decision', error);
-        setStreamError('Could not submit approval decision. Please try again.');
+        // 404: the server has no such approval (answered already, or its run
+        // ended). Keeping the prompt would block the chat for good, since it
+        // can never be decided.
+        if (isGoneApprovalError(error)) {
+          setApprovalQueue((q) =>
+            q.filter((a) => a.approvalId !== pendingApproval.approvalId),
+          );
+          setStreamError(null);
+        } else {
+          console.error('[Chat] Failed to submit approval decision', error);
+          setStreamError(
+            'Could not submit approval decision. Please try again.',
+          );
+        }
       } finally {
         setIsDecidingApproval(false);
       }
@@ -822,6 +863,44 @@ export function useAgentChat({
       });
     }
   }, [conversationId, isLoadingHistory, seedMessages]);
+
+  // Reconnect to a run still producing the answer whenever a conversation
+  // opens (reload, or switching to it: the page stays mounted across
+  // conversations, only useChat's chat changes) and stream the rest, instead
+  // of polling the database for it. A chat just started here has no run to
+  // resume. Leaving drops this page's streams of the conversation: the old
+  // chat would keep reading, feeding its todos and approvals into the one on
+  // screen and holding a connection open per visit. The run goes on.
+  useEffect(() => {
+    if (!conversationId) return;
+    const streams = new AbortController();
+    streamsRef.current = streams;
+    if (startedHereIdRef.current !== conversationId) {
+      // The replay continues the chat's newest message when it is an
+      // assistant one, so seed from fresh history first: a cached copy can
+      // predate the last question, and the replay would merge into the turn
+      // before it. Joins the fetch the query already started, if any.
+      void refetchMessagesRef
+        .current({ cancelRefetch: false })
+        .catch(() => undefined)
+        .then((fresh) => {
+          // Left meanwhile (or StrictMode's first run), or a message was sent
+          if (streams.signal.aborted || isStreamingRef.current) return;
+          const pages = fresh?.data?.pages;
+          if (pages) {
+            if (!isServerRunning(pages)) return;
+            setMessagesRef.current(
+              seedFromSaved(mapDbMessagesToUI(pages), pages),
+            );
+          }
+          return resumeStream();
+        });
+    }
+    return () => {
+      streams.abort(new LeftConversationError());
+      if (streamsRef.current === streams) streamsRef.current = null;
+    };
+  }, [conversationId, resumeStream]);
 
   // Display chatMessages when available, otherwise fall back to savedMessages
   const messages: UIMessage[] =
@@ -1039,6 +1118,7 @@ export function useAgentChat({
   useEffect(() => {
     // Subagents belong to one conversation: never show the previous one's
     setSubagents([]);
+    setBrowserScreenshot(null);
     if (!conversationId) {
       setTodos([]);
       setGoal(null);
@@ -1170,13 +1250,13 @@ export function useAgentChat({
     hasMoreMessages: hasNextPage ?? false,
     isLoadingMoreMessages: isFetchingNextPage,
     remoteExecuteEvents: eventsMap,
+    browserScreenshot,
     onSendMessage: handleSendMessage,
     onRetry: onRetryAction,
     onStop: handleStop,
     onSelectModel: handleSelectModel,
     onDismissError: handleDismissError,
     onLoadMore: onLoadMoreAction,
-    onAgentModeChange: setAgentMode,
     onWorkerSelect: setSelectedWorkerId,
     pendingApproval,
     pendingApprovalCount: approvalQueue.length,

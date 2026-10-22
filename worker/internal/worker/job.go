@@ -12,9 +12,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-rod/rod"
 	connectorpb "oasm-worker/internal/gen/connector"
 	pb "oasm-worker/internal/gen/jobs_registry"
+
+	"github.com/go-rod/rod"
 
 	"oasm-worker/internal/connector"
 	"oasm-worker/internal/execution"

@@ -1009,11 +1009,16 @@ export class WorkersService {
     exitCode: number;
   }) {
     const channel = `remote-execute:results:${result.sessionId}`;
+    // The proto loader hands enums over as names. An image is binary, so it
+    // travels as base64; everything else is text.
+    const isImage =
+      (result.type as unknown) === 'REMOTE_EXECUTE_RESULT_IMAGE' ||
+      result.type === 5;
     const payload = JSON.stringify({
       id: result.id,
       sessionId: result.sessionId,
       type: result.type,
-      data: Buffer.from(result.data).toString('utf-8'),
+      data: Buffer.from(result.data).toString(isImage ? 'base64' : 'utf-8'),
       exitCode: result.exitCode,
     });
 

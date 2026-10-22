@@ -297,3 +297,68 @@ export class SubagentResponseDto {
   @Type(() => TurnStatsDto)
   stats: TurnStatsDto | null;
 }
+
+export class SubagentToolCallDto {
+  @ApiProperty({ example: 'call_1' })
+  @IsString()
+  toolCallId: string;
+
+  @ApiProperty({ example: 'inspect_issue' })
+  @IsString()
+  toolName: string;
+
+  @ApiProperty({
+    description: 'Tool input as JSON text, cut to size',
+    type: String,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  input: string | null;
+
+  @ApiProperty({
+    description: 'Tool output (JSON text unless it was a string), cut to size',
+    type: String,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  output: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  @IsOptional()
+  @IsString()
+  error: string | null;
+}
+
+export class SubagentStepDto {
+  @ApiProperty({
+    description: 'Text the model wrote in this step',
+    type: String,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  text: string | null;
+
+  @ApiProperty({ type: [SubagentToolCallDto] })
+  @ValidateNested({ each: true })
+  @Type(() => SubagentToolCallDto)
+  toolCalls: SubagentToolCallDto[];
+}
+
+export class SubagentDetailResponseDto extends SubagentResponseDto {
+  @ApiProperty({
+    type: [SubagentStepDto],
+    description: 'Steps of the latest attempt, in order',
+  })
+  @ValidateNested({ each: true })
+  @Type(() => SubagentStepDto)
+  transcript: SubagentStepDto[];
+
+  @ApiProperty({
+    description: 'Later steps were not recorded (size budget reached)',
+  })
+  @IsBoolean()
+  transcriptTruncated: boolean;
+}

@@ -77,12 +77,29 @@ describe('AiStudioSidebar', () => {
     openSettingsMock.mockReset();
   });
 
-  it('opens the agent settings on the Connectors tab', async () => {
+  it('opens the agent settings from Settings', async () => {
     const { user } = setup();
 
-    await user.click(await screen.findByRole('button', { name: 'Connectors' }));
+    await user.click(await screen.findByRole('button', { name: 'Settings' }));
 
-    expect(openSettingsMock).toHaveBeenCalledWith('connectors');
+    expect(openSettingsMock).toHaveBeenCalledWith();
+  });
+
+  it('links to the connectors page', async () => {
+    setup();
+
+    expect(
+      await screen.findByRole('link', { name: 'Connectors' }),
+    ).toHaveAttribute('href', '/aistudio/connectors');
+  });
+
+  it('links to the usage page', async () => {
+    setup();
+
+    expect(await screen.findByRole('link', { name: 'Usage' })).toHaveAttribute(
+      'href',
+      '/aistudio/usage',
+    );
   });
 
   it('shows Chats as a plain label, not a link', async () => {

@@ -24,6 +24,7 @@ import { v7 as uuidv7 } from 'uuid';
 // import AgentIcon from './components/agent-icon';
 
 import {
+  AGENT_CONVERSATION_STARTERS,
   AGENT_PROMPT_GROUPS,
   ASK_PROMPT_GROUPS,
   CONVERSATION_STARTERS,
@@ -69,7 +70,8 @@ export default function AgentsLandingPage({
     model: string;
     configId: string;
   } | null>(null);
-  const [agentMode, setAgentMode] = useState<string>(initialAgentMode);
+  // Set by the route: the page has no switch for it
+  const agentMode = initialAgentMode;
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
   // Starter prompt under the pointer, previewed as the input placeholder
   const [previewPrompt, setPreviewPrompt] = useState<string | null>(null);
@@ -300,7 +302,11 @@ export default function AgentsLandingPage({
             {/* Hero */}
             <div className="absolute inset-x-0 bottom-full mb-8 flex flex-col items-center gap-3 text-center">
               <TypewriterText
-                texts={CONVERSATION_STARTERS}
+                texts={
+                  isAgentMode
+                    ? AGENT_CONVERSATION_STARTERS
+                    : CONVERSATION_STARTERS
+                }
                 className="hidden sm:inline text-xl font-medium text-foreground max-w-lg"
               />
             </div>
@@ -316,11 +322,8 @@ export default function AgentsLandingPage({
                   setSelectedModel({ provider, model, configId });
                 }}
                 agentMode={agentMode}
-                onAgentModeChange={setAgentMode}
                 selectedWorkerId={selectedWorkerId}
                 onWorkerSelect={setSelectedWorkerId}
-                // The mode comes from the route (/aistudio or /aistudio/agents).
-                showAgentModeToggle={false}
                 showSettingsButton={false}
                 placeholder={previewPrompt ?? undefined}
                 value={inputText}
