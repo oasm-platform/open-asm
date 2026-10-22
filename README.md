@@ -16,7 +16,7 @@
   <a href="https://docs.oasm.io"><img src="https://img.shields.io/badge/docs-2fc414?style=flat-square&logo=gitbook&logoColor=white" alt="Documentation"></a>
 </p>
 
-OASM is a self-hostable, open-source Attack Surface Management platform. It inventories internet-facing assets, runs distributed scans through pluggable connectors, and tracks the resulting vulnerabilities in one workspace, with an AI security agent that works directly on that data. Security teams stop stitching together spreadsheets, one-off scanners, and hosted-only tools.
+OASM is a self-hostable, open-source Attack Surface Management platform. It inventories internet-facing assets, runs distributed scans through pluggable connectors, and tracks the resulting vulnerabilities in one workspace, with AI Studio — a security agent that works directly on that data. Security teams stop stitching together spreadsheets, one-off scanners, and hosted-only tools.
 
 📖 **Documentation → [docs.oasm.io](https://docs.oasm.io)**
 
@@ -24,6 +24,7 @@ OASM is a self-hostable, open-source Attack Surface Management platform. It inve
 
 - [Overview](#overview)
 - [Key Features](#key-features)
+- [AI Studio](#ai-studio)
 - [Architecture](#architecture)
 - [Connectors](#connectors)
 - [Integrations](#integrations)
@@ -57,17 +58,36 @@ OASM implements these loops as one integrated, self-hosted stack: a web console 
 | **Distributed workers** | Workers join over gRPC, pull queued jobs, run each scan in an isolated container, and stream findings back. One worker per host. |
 | **Pluggable connectors** | Each scanner ships as a versioned container image from a companion repo and is synced locally — adding or upgrading a tool never requires an OASM release. |
 | **Workflows** | Cron-scheduled or event-triggered scan workflows with a job graph, so recurring coverage runs without manual kicks. |
-| **Notifications** | In-app notifications plus Slack, Telegram (webhook with polling fallback), and generic webhooks for alert delivery. |
+| **Notifications** | In-app notifications plus Slack, Discord, Telegram, and generic webhooks, filtered per integration by event type and severity. |
 | **Cloud asset sync** | Scheduled pull of assets from AWS, Cloudflare, and Vercel, keeping the inventory in sync with cloud estates. |
-| **AI security agent** | Ask in plain language and get answers grounded in your own assets and findings. In Agent mode it plans the investigation, waits for your approval, then queries the workspace, enriches CVEs from the web, and runs commands on your workers — ending with a report and clear next steps. Bring your own model: OpenAI, Anthropic, Gemini, DeepSeek, OpenRouter and more, or a custom endpoint. |
+| **Repositories & ticketing** | Keep GitHub and GitLab repositories in the inventory, and open an issue for every new vulnerability. See [Integrations](#integrations). |
+| **AI Studio** | A security agent that works on your own data and workers: it plans, delegates to subagents, runs commands in a sandboxed terminal, drives a headless browser, and reports back — within the approval level you set. See [AI Studio](#ai-studio). |
 | **MCP server** | Connect any MCP-compatible AI client to your instance with an API key and work with OASM data from the tools you already use. |
 | **Enrichment & storage** | Automatic IP geolocation plus S3-compatible storage for scan artifacts and PDF reports. |
 | **Multi-workspace & access control** | Isolated workspaces per team or project, with owner/member roles, API keys, and an audit log archived as JSONL. |
 | **API & docs** | Versioned REST API with interactive Swagger/Scalar docs, backed by a tracked OpenAPI spec the console client is generated from. |
 
+## AI Studio
+
+AI Studio is the security agent built into OASM. It works on your workspace data and your own workers, with the model you choose, and it only acts as far as your approval setting allows.
+
+- **Ask and Agent modes.** Ask answers questions from your inventory and findings. Agent turns a goal into a visible to-do plan and works through it step by step until it reaches an answer.
+- **Subagents.** The main agent hands parts of a task to background subagents that run in parallel, each with its own model and limits — planner, researcher, pentest, retester, reporter, asset analyst, or your own. Every subagent's steps and tool calls are recorded and open in the chat side panel.
+- **Terminal on your workers.** Shell commands run on a worker node, never on the API host. On shared workers each session gets its own locked-down container: no host environment or Docker socket, read-only filesystem, all capabilities dropped, CPU and memory limits.
+- **Headless browser.** The agent drives Chromium on the workspace's worker: open a page, read its accessibility tree, click, fill forms, and inspect requests, cookies, storage and console logs. Each session is a separate incognito context whose proxy only lets traffic through to the host it opened, plus hosts you allow.
+- **Connectors.** Scanners installed in the workspace are tools the agent can run directly, and the Connectors page shows which ones it has. Large outputs are paged instead of flooding the context.
+- **Skills.** Built-in playbooks for reconnaissance, web app testing, network service testing, exploit verification, vulnerability analysis, command execution, browser use and web research — plus skills you write for your workspace.
+- **Custom agents.** Define `@name` agents with their own prompt, model, tool allowlist and skills, kept personal or shared with the workspace.
+- **Approvals.** Manual asks for every new command, Plan asks once for the whole plan, Auto runs without asking.
+- **Web and MCP.** The agent can read web pages for CVE and advisory context, and call tools from external MCP servers you connect.
+- **Memory.** Short-term notes per conversation and long-term notes shared across the workspace.
+- **Runs that outlive the tab.** Close the page and the run keeps going; come back to see its progress, or stop it at any time.
+- **Usage.** Tokens, cost, requests and sessions per day, per model and per conversation.
+- **Bring your own model.** OpenAI, Anthropic, Gemini, DeepSeek, OpenRouter and more, or a custom endpoint.
+
 ## Architecture
 
-Five tiers: the **web console** you operate daily, the **core API** holding business logic and orchestration, an **infrastructure tier** storing and enriching data, a **distributed worker tier** executing scans, and **connector containers** running each security tool in isolation. The core API also runs the **AI security agent**: it reads workspace data in place and hands any command execution to worker nodes, never the API host, with every side-effecting step gated on your approval.
+Five tiers: the **web console** you operate daily, the **core API** holding business logic and orchestration, an **infrastructure tier** storing and enriching data, a **distributed worker tier** executing scans, and **connector containers** running each security tool in isolation. The core API also runs the **AI Studio** agent: it reads workspace data in place and hands any command execution to worker nodes, never the API host, with every side-effecting step gated on your approval.
 
 ```mermaid
 graph TD
@@ -126,16 +146,70 @@ graph TD
 
 Scanning tools live as isolated Docker images in the companion repo [oasm-connectors](https://github.com/oasm-platform/oasm-connectors), each wrapping a tool in a small adapter. OASM reads that catalog as data (`task sync-connectors`), so a worker resolves the right image and runs the tool on demand inside its own container — adding or upgrading a scanner never needs an OASM release.
 
+Browse every connector in the [marketplace](https://oasm.dev/marketplace), then install the ones you need from **Tools** in the console.
+
+<table>
+  <tr>
+    <td align="center" width="72"><img src="https://raw.githubusercontent.com/oasm-platform/oasm-connectors/main/ports_scanner/nmap/logo.png" width="40" height="40" alt="Nmap" title="Nmap"></td>
+    <td align="center" width="72"><img src="https://raw.githubusercontent.com/oasm-platform/oasm-connectors/main/ports_scanner/rustscan/logo.png" width="40" height="40" alt="RustScan" title="RustScan"></td>
+    <td align="center" width="72"><img src="https://raw.githubusercontent.com/oasm-platform/oasm-connectors/main/url_discovery/katana/logo.png" width="40" height="40" alt="Katana" title="Katana"></td>
+    <td align="center" width="72"><img src="https://raw.githubusercontent.com/oasm-platform/oasm-connectors/main/url_discovery/ffuf/logo.png" width="40" height="40" alt="ffuf" title="ffuf"></td>
+    <td align="center" width="72"><img src="https://raw.githubusercontent.com/oasm-platform/oasm-connectors/main/url_discovery/dirsearch/logo.png" width="40" height="40" alt="dirsearch" title="dirsearch"></td>
+    <td align="center" width="72"><img src="https://raw.githubusercontent.com/oasm-platform/oasm-connectors/main/url_discovery/arjun/logo.png" width="40" height="40" alt="Arjun" title="Arjun"></td>
+    <td align="center" width="72"><img src="https://raw.githubusercontent.com/oasm-platform/oasm-connectors/main/secrets/gitleaks/logo.png" width="40" height="40" alt="Gitleaks" title="Gitleaks"></td>
+  </tr>
+  <tr>
+    <td align="center" width="72"><img src="https://raw.githubusercontent.com/oasm-platform/oasm-connectors/main/vulnerabilities/nuclei/logo.png" width="40" height="40" alt="Nuclei" title="Nuclei"></td>
+    <td align="center" width="72"><img src="https://raw.githubusercontent.com/oasm-platform/oasm-connectors/main/vulnerabilities/zap/logo.png" width="40" height="40" alt="OWASP ZAP" title="OWASP ZAP"></td>
+    <td align="center" width="72"><img src="https://raw.githubusercontent.com/oasm-platform/oasm-connectors/main/vulnerabilities/nikto/logo.png" width="40" height="40" alt="Nikto" title="Nikto"></td>
+    <td align="center" width="72"><img src="https://raw.githubusercontent.com/oasm-platform/oasm-connectors/main/vulnerabilities/wpscan/logo.png" width="40" height="40" alt="WPScan" title="WPScan"></td>
+    <td align="center" width="72"><img src="https://raw.githubusercontent.com/oasm-platform/oasm-connectors/main/vulnerabilities/nessus/logo.png" width="40" height="40" alt="Nessus" title="Nessus"></td>
+    <td align="center" width="72"><img src="https://raw.githubusercontent.com/oasm-platform/oasm-connectors/main/vulnerabilities/acunetix/logo.png" width="40" height="40" alt="Acunetix" title="Acunetix"></td>
+    <td align="center" width="72"><img src="https://raw.githubusercontent.com/oasm-platform/oasm-connectors/main/sca/trivy/logo.png" width="40" height="40" alt="Trivy" title="Trivy"></td>
+  </tr>
+</table>
+
 ## Integrations
 
-Built-in integration connectors in `core-api/src/modules/integrations/connectors/`:
+Connect OASM to the tools your team already uses. Integrations are set up per workspace from **Integrations** in the console.
 
-- **Alerting:** Slack, Telegram (bot webhook per integration + polling fallback when `BASE_URL` is unset), generic Webhook.
-- **Cloud asset pull:** AWS (incl. SSO device flow), Cloudflare, Vercel — each with a `syncSchedule` cron for periodic sync.
+**Alerts — Slack, Discord, Telegram, Webhook**
 
-Config is stored as JSONB and validated per `appType` + `category` JSON Schema. Each Telegram bot gets a unique webhook URL (`/api/integrations/telegram/webhook/:integrationId`) secured by an HMAC-derived secret header.
+OASM pushes only the events worth acting on: new vulnerabilities, vulnerability status changes, finished or failed scans, and failed syncs. Each integration chooses which event types and which severity levels it receives.
 
-Marketplace catalog: [oasm.dev/marketplace](https://oasm.dev/marketplace). Marketplace listings are not all bundled into core — check what is installed via Tools / Integrations in the console.
+- **Slack** and **Discord** post to a channel through an incoming webhook.
+- **Telegram** uses your own bot. Members link a chat with `/pair` (and `/unpair` to stop). It works through a Telegram webhook, or falls back to polling when the instance has no public URL.
+- **Webhook** sends a JSON `POST` to any endpoint, for SIEM, SOAR or in-house tooling.
+
+**Cloud asset sync — AWS, Cloudflare, Vercel**
+
+Pull assets straight from your cloud accounts on a schedule, so new infrastructure lands in the inventory without anyone adding it by hand.
+
+- **AWS:** Route 53 public zones and records, EC2, VPCs and subnets, load balancers, CloudFront, API Gateway, RDS and S3, across regions. Connect with access keys, assume role, cross-account role, workload identity, or AWS SSO sign-in.
+- **Cloudflare:** zones and their DNS records.
+- **Vercel:** project domains, skipping preview and redirect hosts.
+
+**Source code — GitHub, GitLab**
+
+Add a GitHub or GitLab organization as a target and OASM keeps its repositories in the inventory: new ones are added, renamed ones are followed, and deleted ones are disabled with their history kept. Workflows can scan repositories as soon as a sync finishes. GitHub Enterprise Server and self-managed GitLab are supported.
+
+**Ticketing — GitHub Issues, GitLab Issues**
+
+The same GitHub or GitLab connection can open an issue in a repository you choose for every new vulnerability, so findings land in the backlog your developers already work from. Jira is on the way.
+
+<table>
+  <tr>
+    <td align="center" width="72"><img src="core-api/public/images/integrations/slack.svg" width="40" height="40" alt="Slack" title="Slack"></td>
+    <td align="center" width="72"><img src="core-api/public/images/integrations/discord.svg" width="40" height="40" alt="Discord" title="Discord"></td>
+    <td align="center" width="72"><img src="core-api/public/images/integrations/telegram.svg" width="40" height="40" alt="Telegram" title="Telegram"></td>
+    <td align="center" width="72"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/integrations/webhook-white.svg"><img src="core-api/public/images/integrations/webhook.svg" width="40" height="40" alt="Webhook" title="Webhook"></picture></td>
+    <td align="center" width="72"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/integrations/aws-white.svg"><img src="core-api/public/images/integrations/aws.svg" width="40" height="40" alt="AWS" title="AWS"></picture></td>
+    <td align="center" width="72"><img src="core-api/public/images/integrations/cloudflare.svg" width="40" height="40" alt="Cloudflare" title="Cloudflare"></td>
+    <td align="center" width="72"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/integrations/vercel-white.svg"><img src="core-api/public/images/integrations/vercel.svg" width="40" height="40" alt="Vercel" title="Vercel"></picture></td>
+    <td align="center" width="72"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/integrations/github-white.svg"><img src="core-api/public/images/integrations/github.svg" width="40" height="40" alt="GitHub" title="GitHub"></picture></td>
+    <td align="center" width="72"><img src="core-api/public/images/integrations/gitlab.svg" width="40" height="40" alt="GitLab" title="GitLab"></td>
+  </tr>
+</table>
 
 ## Screenshots
 
@@ -173,13 +247,13 @@ Marketplace catalog: [oasm.dev/marketplace](https://oasm.dev/marketplace). Marke
 *Job registry — the scan pipeline per target (subdomain discovery → port scan → HTTP probe → screenshot) with per-job status, timing, and history.*
 
 ![Integrations1](docs/images/integrations_1.png)
-*Integration marketplace — connect alerting (Slack, Telegram, webhook) and cloud providers, with upcoming ticketing and cloud integrations marked.*
+*Integrations — connect alerting (Slack, Telegram, webhook) and cloud providers, with upcoming ticketing and cloud integrations marked.*
 
 ![Integrations2](docs/images/integrations_2.png)
 *Connected integrations — manage active third-party connections per workspace and their connection history.*
 
 ![Agent1](docs/images/agent_1.png)
-*AI chat — ask security questions in natural language, pick a model, and revisit recent analysis conversations.*
+*AI Studio — ask security questions in natural language, pick a model, and revisit recent analysis conversations.*
 
 ![Agent2](docs/images/agent_2.png)
 *AI analysis result — the agent plans, queries live asset data, and returns a structured report, e.g. open-port exposure with per-port notes and remediation steps.*
@@ -268,3 +342,7 @@ See [`SECURITY.md`](SECURITY.md). Short version: report sensitive vulnerabilitie
 If OASM is useful to you, please star the repo — it helps others discover the project.
 
 [![Star History Chart](https://api.star-history.com/svg?repos=oasm-platform/open-asm&type=date&legend=top-left)](https://www.star-history.com/?repos=oasm-platform%2Fopen-asm&type=date&legend=top-left)
+
+## Sponsors
+
+OASM is supported by [Anthropic](https://www.anthropic.com) through its startup program. Thank you for backing open-source security tooling.
