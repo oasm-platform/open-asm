@@ -16,7 +16,7 @@
   <a href="https://docs.oasm.io"><img src="https://img.shields.io/badge/docs-2fc414?style=flat-square&logo=gitbook&logoColor=white" alt="Documentation"></a>
 </p>
 
-OASM is a self-hostable, open-source Attack Surface Management platform. It inventories internet-facing assets, runs distributed scans through pluggable connectors, and tracks the resulting vulnerabilities in one workspace — so security teams stop stitching together spreadsheets, one-off scanners, and hosted-only tools.
+OASM is a self-hostable, open-source Attack Surface Management platform. It inventories internet-facing assets, runs distributed scans through pluggable connectors, and tracks the resulting vulnerabilities in one workspace, with an AI security agent that works directly on that data. Security teams stop stitching together spreadsheets, one-off scanners, and hosted-only tools.
 
 📖 **Documentation → [docs.oasm.io](https://docs.oasm.io)**
 
@@ -55,18 +55,19 @@ OASM implements these loops as one integrated, self-hosted stack: a web console 
 | **Vulnerability tracking** | Scan findings normalized into trackable vulnerabilities with severity, status, and evidence detail, so teams triage and follow up in one place. |
 | **Asset groups + schedules** | Bundle related assets, attach scan workflows with cron schedules (or pause with `disabled`), and trigger on-demand runs per group. |
 | **Distributed workers** | Workers join over gRPC, pull queued jobs, run each scan in an isolated container, and stream findings back. One worker per host. |
-| **Pluggable connectors** | 10 versioned scanner images maintained in a companion repo and synced locally — adding or upgrading a tool never requires an OASM release. |
+| **Pluggable connectors** | Each scanner ships as a versioned container image from a companion repo and is synced locally — adding or upgrading a tool never requires an OASM release. |
 | **Workflows** | Cron-scheduled or event-triggered scan workflows with a job graph, so recurring coverage runs without manual kicks. |
 | **Notifications** | In-app notifications plus Slack, Telegram (webhook with polling fallback), and generic webhooks for alert delivery. |
 | **Cloud asset sync** | Scheduled pull of assets from AWS, Cloudflare, and Vercel, keeping the inventory in sync with cloud estates. |
-| **AI access** | An MCP endpoint plus an agents module lets AI assistants query and analyze asset data in natural language. |
+| **AI security agent** | Ask in plain language and get answers grounded in your own assets and findings. In Agent mode it plans the investigation, waits for your approval, then queries the workspace, enriches CVEs from the web, and runs commands on your workers — ending with a report and clear next steps. Bring your own model: OpenAI, Anthropic, Gemini, DeepSeek, OpenRouter and more, or a custom endpoint. |
+| **MCP server** | Connect any MCP-compatible AI client to your instance with an API key and work with OASM data from the tools you already use. |
 | **Enrichment & storage** | Automatic IP geolocation plus S3-compatible storage for scan artifacts and PDF reports. |
 | **Multi-workspace & access control** | Isolated workspaces per team or project, with owner/member roles, API keys, and an audit log archived as JSONL. |
 | **API & docs** | Versioned REST API with interactive Swagger/Scalar docs, backed by a tracked OpenAPI spec the console client is generated from. |
 
 ## Architecture
 
-Four tiers: the **web console** you operate daily, the **core API** holding business logic and orchestration, an **infrastructure tier** storing and enriching data, a **distributed worker tier** executing scans, and **connector containers** running each security tool in isolation. The core API also hosts the **Security Agent** — a chat-driven runtime that plans work and calls tools against workspace data and worker nodes.
+Five tiers: the **web console** you operate daily, the **core API** holding business logic and orchestration, an **infrastructure tier** storing and enriching data, a **distributed worker tier** executing scans, and **connector containers** running each security tool in isolation. The core API also runs the **AI security agent**: it reads workspace data in place and hands any command execution to worker nodes, never the API host, with every side-effecting step gated on your approval.
 
 ```mermaid
 graph TD
@@ -118,11 +119,6 @@ graph TD
     C2 -->|Scan| Internet
     C3 -->|Scan| Internet
 ```
-
-How the agent works: chat arrives → the agent loads a specialist skill (`vulnerability-analysis`, `command-execution`, `web-research`, or a custom workspace skill) → drafts an execution plan as ordered steps → the user approves it → each step runs as **tool calls** against workspace data tools (assets, vulnerabilities, targets, ports, technologies, TLS, issues, jobs, workers, statistics), web fetch for CVE/advisory enrichment, or connected external tools. Heavy or privileged work is **delegated**: shell commands execute on connected worker nodes, never on the API host — and every side-effecting call must pass the **approvals gate** first. Findings accumulate in memory and the run ends with Summary → Analysis → Recommendations → Next steps. Two modes: **Ask** answers from data, **Agent** also acts.
-
-
-A scan's journey: **trigger** (manual, workflow, or schedule) → **waiting** in queue → **running** on a worker → **results merged** into inventory (subdomains, services, ports, vulnerabilities, screenshots) → **downstream** (findings, notifications, dashboard stats) → **finished** in the job registry.
 
 → Full diagram and scan lifecycle: [docs.oasm.io/architecture](https://docs.oasm.io/architecture)
 
