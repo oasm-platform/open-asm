@@ -52,7 +52,7 @@ export const BOT_EMAIL = 'bot@oasm.local';
 export const BOT_NAME = 'Cai';
 export const GITHUB_REPO = 'oasm-platform/open-asm';
 export const GIT_REPO_URL = `https://github.com/${GITHUB_REPO}`;
-export const DOCS_URL = 'https://docs.oasm.dev';
+export const DOCS_URL = 'https://docs.oasm.io';
 export const HOME_PAGE_URL = 'https://oasm.dev';
 export const DEFAULT_ENCRYPTION_KEY = 'OASM_DEFAULT_ENCRYPTION_KEY';
 
