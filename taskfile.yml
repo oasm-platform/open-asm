@@ -66,13 +66,16 @@ tasks:
     cmds:
       - cd console && task gen-api
 
-  # Docker Compose orchestration
-  # Starts all services using docker compose with environment variables
-  # Builds and recreates the full stack with a single worker instance.
-  # NOTE: the compose service key is `oasm-worker` (not `worker`). The worker
-  # publishes the fixed connector port 26276 that spawned containers dial back
-  # on, so only ONE worker can run per host — do not add `--scale`.
+  # Start the UI/API and their dependencies; scanning is explicitly opt-in.
+  # Target console even when COMPOSE_PROFILES includes scan in the caller's shell.
   docker-compose:
+    desc: Start the app without starting scanning workers
+    cmds:
+      - docker compose --env-file ./core-api/.env up -d --build console
+
+  # The worker publishes fixed callback port 26276: one worker per host, no --scale.
+  docker-scan:
+    desc: Start the app and one scanning worker
     cmds:
       - |
         # The worker mounts /var/run/docker.sock, owned root:docker (0660) on
@@ -87,7 +90,27 @@ tasks:
         fi
         export WORKER_DOCKER_GID
         echo "Docker socket group gid for worker: ${WORKER_DOCKER_GID}"
-        docker compose --env-file ./core-api/.env up -d --build --force-recreate
+        docker compose --env-file ./core-api/.env --profile scan up -d --build console oasm-worker
+
+  docker-stop:
+    desc: Stop this Compose project's services while retaining containers and volumes
+    cmds:
+      - docker compose --env-file ./core-api/.env --profile scan stop --timeout 30
+
+  docker-status:
+    desc: Show all services, including stopped scanning workers
+    cmds:
+      - docker compose --env-file ./core-api/.env --profile scan ps --all
+
+  docker-config-check:
+    desc: Validate all Compose services without starting containers
+    cmds:
+      - docker compose --env-file ./core-api/.env --profile scan config --quiet
+
+  docker-test:
+    desc: Check service selection and task commands without starting containers
+    cmds:
+      - node --test scripts/docker-tasks.test.mjs
 
   proto:
     cmds:
@@ -114,7 +137,7 @@ tasks:
         pnpm --version > /dev/null 2>&1 ||
           corepack prepare pnpm@latest --activate 2>/dev/null || true
       - node -e "const fs=require('fs'); ['core-api','console'].forEach(d=>{const s=d+'/example.env',t=d+'/.env';if(!fs.existsSync(t))fs.copyFileSync(s,t)})"
-      - docker compose up -d postgres redis geo-ip rustfs --force-recreate
+      - docker compose up -d postgres redis geo-ip rustfs
     deps:
       - install
 
