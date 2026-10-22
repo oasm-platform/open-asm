@@ -13,12 +13,12 @@
   <a href="https://discord.gg/fWqbNHXR8H"><img src="https://img.shields.io/badge/discord-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"></a>
   <a href="https://www.linkedin.com/company/oasm-platform"><img src="https://img.shields.io/badge/linkedin-0A66C2?style=flat-square&logo=linkedin&logoColor=white" alt="LinkedIn"></a>
   <a href="https://x.com/OasmPlatform"><img src="https://img.shields.io/badge/x-000000?style=flat-square&logo=x&logoColor=white" alt="X"></a>
-  <a href="https://docs.oasm.dev"><img src="https://img.shields.io/badge/docs-2fc414?style=flat-square&logo=gitbook&logoColor=white" alt="Documentation"></a>
+  <a href="https://docs.oasm.io"><img src="https://img.shields.io/badge/docs-2fc414?style=flat-square&logo=gitbook&logoColor=white" alt="Documentation"></a>
 </p>
 
 OASM is a self-hostable, open-source Attack Surface Management platform. It inventories internet-facing assets, runs distributed scans through pluggable connectors, and tracks the resulting vulnerabilities in one workspace — so security teams stop stitching together spreadsheets, one-off scanners, and hosted-only tools.
 
-📖 **Documentation → [docs.oasm.dev](https://docs.oasm.dev)**
+📖 **Documentation → [docs.oasm.io](https://docs.oasm.io)**
 
 ## Table of Contents
 
@@ -124,7 +124,7 @@ How the agent works: chat arrives → the agent loads a specialist skill (`vulne
 
 A scan's journey: **trigger** (manual, workflow, or schedule) → **waiting** in queue → **running** on a worker → **results merged** into inventory (subdomains, services, ports, vulnerabilities, screenshots) → **downstream** (findings, notifications, dashboard stats) → **finished** in the job registry.
 
-→ Full diagram and scan lifecycle: [docs.oasm.dev/architecture](https://docs.oasm.dev/architecture)
+→ Full diagram and scan lifecycle: [docs.oasm.io/architecture](https://docs.oasm.io/architecture)
 
 ## Connectors
 
@@ -222,7 +222,7 @@ Notes:
 - On native Linux the worker needs the Docker socket group: `task docker-compose` detects `WORKER_DOCKER_GID` automatically. Raw `docker compose up` needs `WORKER_DOCKER_GID=$(stat -c '%g' /var/run/docker.sock) docker compose up -d --build`.
 - The socket mount is root-equivalent — only run trusted connector images.
 - Pre-built images: `oasm/oasm-console`, `oasm/oasm-api`, `oasm/oasm-worker` on Docker Hub.
-- Production deploy: [oasm-docker](https://github.com/oasm-platform/oasm-docker) — see [docs.oasm.dev/deployment](https://docs.oasm.dev/deployment).
+- Production deploy: [oasm-docker](https://github.com/oasm-platform/oasm-docker) — see [docs.oasm.io/deployment](https://docs.oasm.io/deployment).
 
 ## Development
 
@@ -238,7 +238,7 @@ Key commands: `task build`, `task lint` (API then console, sequential — never 
 
 Layout: `core-api/` (NestJS, `src/modules/*`, `src/mcp/`, `src/proto/`), `console/` (React 19 + Vite + TanStack Router/Query, `src/routes/`, orval client in `src/services/apis/gen/`), `worker/` (Go, `internal/*`, entries `cmd/cli` + `cmd/app`).
 
-→ Full setup, conventions, and CI: [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) · [docs.oasm.dev/developer-guide](https://docs.oasm.dev/developer-guide)
+→ Full setup, conventions, and CI: [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) · [docs.oasm.io/developer-guide](https://docs.oasm.io/developer-guide)
 
 ## Contributing
 
@@ -258,7 +258,7 @@ See [`SECURITY.md`](SECURITY.md). Short version: report sensitive vulnerabilitie
 - Repository: [github.com/oasm-platform/open-asm](https://github.com/oasm-platform/open-asm)
 - Issues: [open-asm/issues](https://github.com/oasm-platform/open-asm/issues) (bug-report + feature-request templates)
 - Releases: [open-asm/releases](https://github.com/oasm-platform/open-asm/releases)
-- Docs: [docs.oasm.dev](https://docs.oasm.dev)
+- Docs: [docs.oasm.io](https://docs.oasm.io)
 - Connectors repo: [oasm-platform/oasm-connectors](https://github.com/oasm-platform/oasm-connectors)
 - Marketplace: [oasm.dev/marketplace](https://oasm.dev/marketplace)
 - Discord / LinkedIn / X: see badges at the top.
