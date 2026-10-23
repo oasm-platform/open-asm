@@ -47,7 +47,7 @@ export class TargetsController {
   @Doc({
     summary: 'Create multiple targets in bulk',
     description:
-      'Creates multiple security testing targets in a single request, skipping any duplicates that already exist in the workspace. Supports both DOMAIN (root domain) and CIDR (/24 range only) types. Returns detailed results including created targets and skipped values.',
+      'Creates multiple security testing targets in a single request, skipping any duplicates that already exist in the workspace. Supports both DOMAIN (root domain) and CIDR (/24 to /32 range) types. Returns detailed results including created targets and skipped values.',
     response: {
       serialization: BulkTargetResultDto,
     },

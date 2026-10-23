@@ -450,7 +450,7 @@ export type CreateTargetDto = {
 };
 
 export type CreateMultipleTargetsDto = {
-  /** Array of target values to create. Supports DOMAIN (root domain), CIDR (/24 range only), and IP (single IP address) types. */
+  /** Array of target values to create. Supports DOMAIN (root domain), CIDR (/24 to /32 range, must not overlap another CIDR target), and IP (single IP address) types. */
   targets: CreateTargetDto[];
 };
 
@@ -10444,7 +10444,7 @@ export const useIntegrationsControllerDisconnectTelegramConnect = <
 };
 
 /**
- * Creates multiple security testing targets in a single request, skipping any duplicates that already exist in the workspace. Supports both DOMAIN (root domain) and CIDR (/24 range only) types. Returns detailed results including created targets and skipped values.
+ * Creates multiple security testing targets in a single request, skipping any duplicates that already exist in the workspace. Supports both DOMAIN (root domain) and CIDR (/24 to /32 range) types. Returns detailed results including created targets and skipped values.
  * @summary Create multiple targets in bulk
  */
 export const targetsControllerCreateMultipleTargets = (

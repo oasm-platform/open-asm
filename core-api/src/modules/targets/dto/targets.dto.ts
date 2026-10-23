@@ -78,7 +78,7 @@ export class CreateTargetDto {
 export class CreateMultipleTargetsDto {
   @ApiProperty({
     description:
-      'Array of target values to create. Supports DOMAIN (root domain), CIDR (/24 range only), and IP (single IP address) types.',
+      'Array of target values to create. Supports DOMAIN (root domain), CIDR (/24 to /32 range, must not overlap another CIDR target), and IP (single IP address) types.',
     type: [CreateTargetDto],
     example: [
       { value: 'example.com', type: 'DOMAIN' },

@@ -143,23 +143,32 @@ describe('TargetsService', () => {
     // Helper to create mock EntityManager
     const createMockEntityManager = (options: {
       existingTargets?: string[];
+      existingCidrTargets?: string[];
       insertResult?: { identifiers: Array<{ id: string }> };
       createdTargets?: Target[];
     }) => {
       const {
         existingTargets = [],
+        existingCidrTargets = [],
         insertResult,
         createdTargets = [],
       } = options;
 
-      // Mock query builder for duplicate check on Target
+      // Mock query builder for Target reads: the duplicate check first, then
+      // the CIDR overlap check.
       const duplicateCheckQB = {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
-        getRawMany: jest.fn().mockResolvedValue(
-          existingTargets.map((value) => ({ value, internalNetworkId: null })),
-        ),
+        getRawMany: jest
+          .fn()
+          .mockResolvedValueOnce(
+            existingTargets.map((value) => ({
+              value,
+              internalNetworkId: null,
+            })),
+          )
+          .mockResolvedValue(existingCidrTargets.map((value) => ({ value }))),
       };
 
       const mockTargetRepo: Record<string, jest.Mock> = {
@@ -497,7 +506,7 @@ describe('TargetsService', () => {
       await expect(
         service.createMultipleTargets(dto, workspaceId, userContext),
       ).rejects.toThrow(
-        'Invalid CIDR: "192.168.1.0/16" must use /24 prefix. Only /24 CIDR ranges are supported.',
+        'Invalid CIDR: "192.168.1.0/16" must use a prefix between /24 and /32.',
       );
     });
 
@@ -820,7 +829,7 @@ describe('TargetsService', () => {
       await expect(
         service.createMultipleTargets(dto, workspaceId, userContext),
       ).rejects.toThrow(
-        'Invalid CIDR: "10.0.0.0/16" must use /24 prefix. Only /24 CIDR ranges are supported.',
+        'Invalid CIDR: "10.0.0.0/16" must use a prefix between /24 and /32.',
       );
     });
 
@@ -861,6 +870,176 @@ describe('TargetsService', () => {
       expect((service as any).expandCIDRToIPs('10.0.0.0/16')).toHaveLength(
         65536,
       );
+    });
+
+    describe('custom CIDR ranges', () => {
+      const asCreated = (values: string[]) =>
+        values.map((value) => ({
+          id: randomUUID(),
+          value,
+          type: TargetType.CIDR,
+          scanSchedule: 'DISABLED',
+        })) as unknown as Target[];
+
+      const cidrDto = (...values: string[]) => ({
+        targets: values.map((value) => ({ value, type: TargetType.CIDR })),
+      });
+
+      const useManager = (
+        options: Parameters<typeof createMockEntityManager>[0],
+      ) => {
+        const mockManager = createMockEntityManager(options);
+        (mockTargetRepository.manager as EntityManager).transaction = jest
+          .fn()
+          .mockImplementation(
+            (callback: (manager: EntityManager) => Promise<unknown>) =>
+              callback(mockManager),
+          );
+        return mockManager as unknown as {
+          createQueryBuilder: () => { values: jest.Mock };
+        };
+      };
+
+      it('accepts /26, /28 and /32 and creates one asset per IP', async () => {
+        const values = ['203.0.113.0/26', '198.51.100.16/28', '8.8.8.8/32'];
+        const manager = useManager({ createdTargets: asCreated(values) });
+
+        const result = await service.createMultipleTargets(
+          cidrDto(...values),
+          workspaceId,
+          userContext,
+        );
+
+        expect(result.totalCreated).toBe(3);
+        const assetRows = manager
+          .createQueryBuilder()
+          .values.mock.calls.slice(1)
+          .flatMap((call: unknown[]) => call[0] as unknown[]);
+        expect(assetRows).toHaveLength(64 + 16 + 1);
+      });
+
+      it('stores a manual CIDR by its network address', async () => {
+        const manager = useManager({
+          createdTargets: asCreated(['203.0.113.16/28']),
+        });
+
+        await service.createMultipleTargets(
+          cidrDto('203.0.113.17/28'),
+          workspaceId,
+          userContext,
+        );
+
+        const targetRows = manager.createQueryBuilder().values.mock
+          .calls[0][0] as Array<Record<string, unknown>>;
+        expect(targetRows[0]).toMatchObject({ value: '203.0.113.16/28' });
+      });
+
+      it('rejects a CIDR inside an existing wider CIDR target', async () => {
+        useManager({ existingCidrTargets: ['203.0.113.0/24'] });
+
+        await expect(
+          service.createMultipleTargets(
+            cidrDto('203.0.113.16/28'),
+            workspaceId,
+            userContext,
+          ),
+        ).rejects.toThrow(
+          'Overlapping CIDR ranges: "203.0.113.16/28" overlaps "203.0.113.0/24"',
+        );
+      });
+
+      it('rejects a CIDR that contains an existing narrower CIDR target', async () => {
+        useManager({ existingCidrTargets: ['203.0.113.16/28'] });
+
+        await expect(
+          service.createMultipleTargets(
+            cidrDto('203.0.113.0/24'),
+            workspaceId,
+            userContext,
+          ),
+        ).rejects.toThrow(
+          'Overlapping CIDR ranges: "203.0.113.0/24" overlaps "203.0.113.16/28"',
+        );
+      });
+
+      it('catches an existing CIDR stored with host bits', async () => {
+        useManager({ existingCidrTargets: ['8.8.8.5/24'] });
+
+        await expect(
+          service.createMultipleTargets(
+            cidrDto('8.8.8.0/24'),
+            workspaceId,
+            userContext,
+          ),
+        ).rejects.toThrow(
+          'Overlapping CIDR ranges: "8.8.8.0/24" overlaps "8.8.8.5/24"',
+        );
+      });
+
+      it('rejects overlapping CIDRs within the same request', async () => {
+        useManager({});
+
+        await expect(
+          service.createMultipleTargets(
+            cidrDto('203.0.113.0/24', '203.0.113.64/26'),
+            workspaceId,
+            userContext,
+          ),
+        ).rejects.toThrow(
+          'Overlapping CIDR ranges: "203.0.113.64/26" overlaps "203.0.113.0/24"',
+        );
+      });
+
+      it('accepts a CIDR adjacent to an existing one', async () => {
+        useManager({
+          existingCidrTargets: ['203.0.113.0/28'],
+          createdTargets: asCreated(['203.0.113.16/28']),
+        });
+
+        const result = await service.createMultipleTargets(
+          cidrDto('203.0.113.16/28'),
+          workspaceId,
+          userContext,
+        );
+
+        expect(result.totalCreated).toBe(1);
+      });
+
+      it('does not check overlap for AWS CIDRs (VPCs contain their subnets)', async () => {
+        useManager({
+          existingCidrTargets: ['10.0.0.0/16'],
+          createdTargets: asCreated(['10.0.1.0/24']),
+        });
+
+        const result = await service.createMultipleTargets(
+          cidrDto('10.0.1.0/24'),
+          workspaceId,
+          userContext,
+          undefined,
+          TargetSource.AWS,
+        );
+
+        expect(result.totalCreated).toBe(1);
+      });
+
+      it('keeps internal-network CIDRs as sent and skips the overlap check', async () => {
+        const manager = useManager({
+          existingCidrTargets: ['10.0.0.0/16'],
+          createdTargets: asCreated(['10.0.0.5/24']),
+        });
+
+        await service.createMultipleTargets(
+          cidrDto('10.0.0.5/24'),
+          workspaceId,
+          userContext,
+          randomUUID(),
+          TargetSource.INTERNAL_NETWORK,
+        );
+
+        const targetRows = manager.createQueryBuilder().values.mock
+          .calls[0][0] as Array<Record<string, unknown>>;
+        expect(targetRows[0]).toMatchObject({ value: '10.0.0.5/24' });
+      });
     });
 
     it('should default to DOMAIN type when type is not specified', async () => {
