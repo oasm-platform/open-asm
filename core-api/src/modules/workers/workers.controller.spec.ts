@@ -3,9 +3,12 @@ import {
   WORKER_TOKEN_HEADER,
 } from '@/common/constants/app.constants';
 import { WorkspacePermissions } from '@/common/decorators/workspace-permissions.decorator';
-import { WorkerScope, WorkerType } from '@/common/enums/enum';
+import { Role, WorkerScope, WorkerType } from '@/common/enums/enum';
+import type { UserContextPayload } from '@/common/interfaces/app.interface';
 import { Metadata } from '@grpc/grpc-js';
+import { ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import type { GetManyWorkersDto } from './dto/workers.dto';
 import { RemoteExecuteSubscribeService } from './remote-execute-subscribe.service';
 import { WorkersController } from './workers.controller';
 
@@ -25,6 +28,92 @@ describe('WorkersController workspace permission guards', () => {
       WorkersController,
     ]);
     expect(required).toEqual(keys);
+  });
+});
+
+describe('WorkersController global worker access', () => {
+  const workspaceId = '22222222-2222-4222-8222-222222222222';
+  const query = { page: 1, limit: 10 } as GetManyWorkersDto;
+  const admin = { role: Role.ADMIN } as UserContextPayload;
+  const member = { role: Role.USER } as UserContextPayload;
+
+  const setup = () => {
+    const workersService = {
+      getWorkerList: jest.fn().mockResolvedValue({ data: [] }),
+      getWorkerById: jest.fn().mockResolvedValue({}),
+    };
+    const controller = new WorkersController(
+      workersService as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    return { controller, workersService };
+  };
+
+  it('rejects a non-admin asking for global workers', () => {
+    const { controller, workersService } = setup();
+
+    expect(() =>
+      controller.getWorkers(
+        { ...query, scope: WorkerScope.CLOUD },
+        workspaceId,
+        member,
+      ),
+    ).toThrow(ForbiddenException);
+    expect(workersService.getWorkerList).not.toHaveBeenCalled();
+  });
+
+  it("pins a non-admin's list to their own workspace", async () => {
+    const { controller, workersService } = setup();
+
+    await controller.getWorkers(
+      {
+        ...query,
+        workspaceId: '33333333-3333-4333-8333-333333333333',
+        enabledAgentMode: true,
+      },
+      workspaceId,
+      member,
+    );
+
+    expect(workersService.getWorkerList).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId,
+        scope: WorkerScope.WORKSPACE,
+      }),
+    );
+  });
+
+  it('lets an admin list global workers', async () => {
+    const { controller, workersService } = setup();
+
+    await controller.getWorkers(
+      { ...query, scope: WorkerScope.CLOUD },
+      workspaceId,
+      admin,
+    );
+
+    expect(workersService.getWorkerList).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: WorkerScope.CLOUD }),
+    );
+  });
+
+  it.each([
+    [admin, true],
+    [member, false],
+  ])('reads a worker with canReadGlobal for %j', async (user, expected) => {
+    const { controller, workersService } = setup();
+
+    await controller.getWorkerById('w-1', workspaceId, user);
+
+    expect(workersService.getWorkerById).toHaveBeenCalledWith(
+      'w-1',
+      workspaceId,
+      expected,
+    );
   });
 });
 

@@ -506,16 +506,19 @@ export class WorkersService {
    * The tool list mirrors the `toolsCount` rule used by {@link getWorkers}:
    * node-mode workers run built-in tools plus Docker connectors, while
    * cli/legacy workers only run built-in tools. Cloud workers have a null
-   * `workspaceId` and stay readable from any workspace.
+   * `workspaceId` and run every workspace's jobs, so only callers with
+   * `canReadGlobal` (admins) may read them.
    *
    * @param workerId - The worker's unique identifier.
    * @param workspaceId - The caller's workspace, used for scoping.
+   * @param canReadGlobal - Whether the caller may read cloud workers.
    * @returns The worker detail, or throws NotFoundException (never 403, so
    *          worker existence is not leaked across workspaces).
    */
   public async getWorkerById(
     workerId: string,
     workspaceId?: string,
+    canReadGlobal = false,
   ): Promise<GetWorkerResponseDto> {
     const worker = await this.repo.findOne({
       where: { id: workerId },
@@ -526,8 +529,11 @@ export class WorkersService {
       throw new NotFoundException('Worker not found');
     }
 
-    // Cloud workers are shared (workspaceId === null) and must remain readable.
-    if (worker.workspaceId !== null && worker.workspaceId !== workspaceId) {
+    const isVisible =
+      worker.workspaceId === null
+        ? canReadGlobal
+        : worker.workspaceId === workspaceId;
+    if (!isVisible) {
       throw new NotFoundException('Worker not found');
     }
 
