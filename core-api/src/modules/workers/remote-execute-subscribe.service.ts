@@ -50,7 +50,19 @@ export interface RegisterWorkerOptions {
    * (it subscribed with AGENT_SANDBOX_HEADER).
    */
   sandboxed?: boolean;
+  /**
+   * The worker understands PING events (it subscribed with
+   * REMOTE_EXECUTE_KEEPALIVE_HEADER): send one periodically.
+   */
+  keepalive?: boolean;
 }
+
+/**
+ * The stream is otherwise silent between agent commands; proxies cut idle
+ * streams (Cloudflare after ~100s, nginx after grpc_read_timeout).
+ */
+export const REMOTE_EXECUTE_PING_INTERVAL_MS = 30_000;
+const REMOTE_EXECUTE_EVENT_PING = 5; // REMOTE_EXECUTE_SUBSCRIBE_EVENT_PING
 
 /** What the subscribe service knows about a connected worker. */
 interface ConnectedWorker {
@@ -170,7 +182,26 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
       }
     };
 
-    const observable = subject.asObservable().pipe(finalize(cleanup));
+    const ping = options.keepalive
+      ? setInterval(
+          () =>
+            subject.next({
+              id: '',
+              workerId: '',
+              type: REMOTE_EXECUTE_EVENT_PING,
+              sessionId: '',
+              command: '',
+            }),
+          REMOTE_EXECUTE_PING_INTERVAL_MS,
+        )
+      : undefined;
+
+    const observable = subject.asObservable().pipe(
+      finalize(() => {
+        clearInterval(ping);
+        cleanup();
+      }),
+    );
 
     return { subject, observable };
   }

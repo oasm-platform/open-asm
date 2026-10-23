@@ -17,6 +17,9 @@
 .PARAMETER GrpcPort
     gRPC server port. Default: 16276
 
+.PARAMETER GrpcTls
+    Connect over TLS (required for cloud.oasm.io on port 443).
+
 .PARAMETER MaxConcurrency
     Maximum number of concurrent tasks. Default: 10
 
@@ -37,6 +40,9 @@
 
 .EXAMPLE
     .\install.ps1 -ApiKey "oasm_xxx" -GrpcHost "my-server.com" -GrpcPort 16276 -Run
+
+.EXAMPLE
+    .\install.ps1 -ApiKey "oasm_xxx" -GrpcHost "cloud.oasm.io" -GrpcPort 443 -GrpcTls -Run
 #>
 param(
     [Parameter(Mandatory = $true)]
@@ -47,6 +53,9 @@ param(
 
     [Parameter(Mandatory = $false)]
     [int]$GrpcPort = 16276,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$GrpcTls,
 
     [Parameter(Mandatory = $false)]
     [int]$MaxConcurrency = 10,
@@ -239,6 +248,10 @@ function Start-Worker {
         "--grpc-port", $Config.GrpcPort.ToString()
     )
 
+    if ($Config.GrpcTls) {
+        $args += "--grpc-tls"
+    }
+
     if ($Config.Network -and $Config.Network -ne "") {
         $args += "--network"
         $args += $Config.Network
@@ -267,11 +280,16 @@ function Get-RerunCommand {
         [string]$ApiKey,
         [string]$GrpcHost = "localhost",
         [int]$GrpcPort = 16276,
+        [bool]$GrpcTls = $false,
         [int]$MaxConcurrency = 10,
         [string]$Network = ""
     )
 
     $cmd = "`"$BinaryPath`" --api-key `"$ApiKey`" --grpc-host `"$GrpcHost`" --grpc-port $GrpcPort --max-concurrency $MaxConcurrency"
+
+    if ($GrpcTls) {
+        $cmd += " --grpc-tls"
+    }
 
     if ($Network -and $Network -ne "") {
         $cmd += " --network `"$Network`""
@@ -339,6 +357,7 @@ try {
         -ApiKey $ApiKey `
         -GrpcHost $GrpcHost `
         -GrpcPort $GrpcPort `
+        -GrpcTls $GrpcTls.IsPresent `
         -MaxConcurrency $MaxConcurrency `
         -Network $Network
 
@@ -352,6 +371,7 @@ try {
             ApiKey         = $ApiKey
             GrpcHost       = $GrpcHost
             GrpcPort       = $GrpcPort
+            GrpcTls        = $GrpcTls.IsPresent
             MaxConcurrency = $MaxConcurrency
             Network        = $Network
         }

@@ -52,6 +52,7 @@ Options:
   --api-key KEY          (Required) API key for worker authentication
   --grpc-host HOST       gRPC server host (default: $DEFAULT_GRPC_HOST)
   --grpc-port PORT       gRPC server port (default: $DEFAULT_GRPC_PORT)
+  --grpc-tls             Connect over TLS (required for cloud.oasm.io on port 443)
   --max-concurrency N    Maximum concurrent tasks (default: $DEFAULT_MAX_CONCURRENCY)
   --network NETWORK      Network ID for internal network (optional)
   --install-dir DIR      Installation directory (default: $DEFAULT_INSTALL_DIR)
@@ -62,6 +63,7 @@ Examples:
   ./install.sh --api-key "oasm_xxx"
   ./install.sh --api-key "oasm_xxx" --run
   ./install.sh --api-key "oasm_xxx" --grpc-host "my-server.com" --grpc-port 16276 --run
+  ./install.sh --api-key "oasm_xxx" --grpc-host "cloud.oasm.io" --grpc-port 443 --grpc-tls --run
 EOF
     exit 0
 }
@@ -73,6 +75,7 @@ parse_args() {
     API_KEY=""
     GRPC_HOST="$DEFAULT_GRPC_HOST"
     GRPC_PORT="$DEFAULT_GRPC_PORT"
+    GRPC_TLS=false
     MAX_CONCURRENCY="$DEFAULT_MAX_CONCURRENCY"
     NETWORK=""
     INSTALL_DIR="$DEFAULT_INSTALL_DIR"
@@ -91,6 +94,10 @@ parse_args() {
             --grpc-port)
                 GRPC_PORT="$2"
                 shift 2
+                ;;
+            --grpc-tls)
+                GRPC_TLS=true
+                shift
                 ;;
             --max-concurrency)
                 MAX_CONCURRENCY="$2"
@@ -485,6 +492,9 @@ build_rerun_command() {
 
     local cmd="\"${binary_path}\" --api-key \"${API_KEY}\" --grpc-host \"${grpc_host}\" --grpc-port ${grpc_port} --max-concurrency ${max_concurrency}"
 
+    if [[ "$GRPC_TLS" == true ]]; then
+        cmd="${cmd} --grpc-tls"
+    fi
     if [[ -n "$network" ]]; then
         cmd="${cmd} --network \"${network}\""
     fi
@@ -514,6 +524,9 @@ start_worker() {
         "--max-concurrency" "$MAX_CONCURRENCY"
     )
 
+    if [[ "$GRPC_TLS" == true ]]; then
+        args+=("--grpc-tls")
+    fi
     if [[ -n "$NETWORK" ]]; then
         args+=("--network" "$NETWORK")
     fi
