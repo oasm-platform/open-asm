@@ -6,6 +6,7 @@ import { useCallback, useState } from 'react';
 import Image from '@/components/ui/image';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ConnectForm } from './connect-form';
+import { OrcaRouterConnectForm } from './orcarouter-connect-form';
 import type { ConnectFormData } from './schema';
 
 const ALL_PROVIDERS = Object.values(
@@ -15,9 +16,11 @@ const ALL_PROVIDERS = Object.values(
 export function DialogLLMConnect({
   providersList,
   onSubmit,
+  onConnected,
 }: {
   providersList: LLMConfigWithProviderDto[];
   onSubmit: (data: ConnectFormData, providerId: string) => Promise<boolean>;
+  onConnected?: () => void;
 }) {
   const [dialogProvider, setDialogProvider] =
     useState<LLMConfigWithProviderDto | null>(null);
@@ -92,15 +95,29 @@ export function DialogLLMConnect({
           <DialogHeader>
             <DialogTitle>Connect {dialogProvider?.providerName}</DialogTitle>
           </DialogHeader>
-          {dialogProvider && (
-            <ConnectForm
-              key={dialogProvider.providerId}
-              provider={dialogProvider}
-              onSubmit={handleConnectSubmit}
-              onCancel={handleDialogClose}
-              isSubmitting={isSubmitting}
-            />
-          )}
+          {dialogProvider &&
+            (dialogProvider.providerId ===
+            LLMConfigWithProviderDtoProviderId.orcarouter ? (
+              <OrcaRouterConnectForm
+                key={dialogProvider.providerId}
+                provider={dialogProvider}
+                onSubmit={handleConnectSubmit}
+                onCancel={handleDialogClose}
+                isSubmitting={isSubmitting}
+                onConnected={() => {
+                  onConnected?.();
+                  handleDialogClose();
+                }}
+              />
+            ) : (
+              <ConnectForm
+                key={dialogProvider.providerId}
+                provider={dialogProvider}
+                onSubmit={handleConnectSubmit}
+                onCancel={handleDialogClose}
+                isSubmitting={isSubmitting}
+              />
+            ))}
         </DialogContent>
       </Dialog>
     </>

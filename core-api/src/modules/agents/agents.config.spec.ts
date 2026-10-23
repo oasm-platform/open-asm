@@ -12,6 +12,7 @@ import {
 import { AgentConfig } from './entities/agent-config.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { LLMProvider, SearchProvider } from './enums/agent.enums';
+import { OrcaRouterCredentialService } from './orcarouter/orcarouter-credential.service';
 
 jest.mock('@/common/utils/workspace-encryption.util', () => ({
   decryptWithDEK: (text: string) => text.replace(/^enc\((.*)\)$/, '$1'),
@@ -71,6 +72,12 @@ describe('AgentsConfigService', () => {
               Promise.resolve(`enc(${text})`),
             ),
             getDEK: jest.fn().mockResolvedValue(null),
+          },
+        },
+        {
+          provide: OrcaRouterCredentialService,
+          useValue: {
+            reportUnauthorized: jest.fn().mockResolvedValue(true),
           },
         },
       ],

@@ -20,6 +20,8 @@ import { AgentsModelsCatalogService } from './agents.models-catalog';
 import { AgentsStreamBufferService } from './agents.stream-buffer';
 import { AgentsSubagentsService } from './agents.subagents';
 import { AgentsUsageService } from './agents.usage';
+import { OrcaRouterCredentialService } from './orcarouter/orcarouter-credential.service';
+import { OrcaRouterPkceService } from './orcarouter/orcarouter-pkce.service';
 import { AgentsService } from './agents.service';
 import { AgentTool } from './agents.tools';
 import { AgentsMcpService } from './agents.mcp';
@@ -76,6 +78,8 @@ import { HttpModule } from '@nestjs/axios';
     AgentsDefinitionsService,
     AgentsStreamBufferService,
     AgentsUsageService,
+    OrcaRouterPkceService,
+    OrcaRouterCredentialService,
   ],
   exports: [
     AgentsService,
@@ -88,6 +92,7 @@ import { HttpModule } from '@nestjs/axios';
     AgentsModelsCatalogService,
     AgentsSubagentsService,
     AgentsDefinitionsService,
+    OrcaRouterCredentialService,
   ],
 })
 export class AgentsModule {}

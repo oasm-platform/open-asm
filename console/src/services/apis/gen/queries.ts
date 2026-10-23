@@ -2810,6 +2810,7 @@ export const LLMConfigResponseDtoProvider = {
   anthropic: 'anthropic',
   gemini: 'gemini',
   openrouter: 'openrouter',
+  orcarouter: 'orcarouter',
   vercel: 'vercel',
   deepseek: 'deepseek',
   kilo_code: 'kilo_code',
@@ -2843,6 +2844,8 @@ export type LLMConfigResponseDto = {
   isPreferred: boolean;
   /** Masked API key showing only its final characters */
   apiKeyMasked: string;
+  /** True when the provider rejected this credential and the user must reconnect */
+  needsReauth?: boolean;
   /** Timestamp when the configuration was created */
   createdAt: string;
   /** Timestamp when the configuration was last updated */
@@ -2860,6 +2863,7 @@ export const CreateLLMConfigDtoProvider = {
   anthropic: 'anthropic',
   gemini: 'gemini',
   openrouter: 'openrouter',
+  orcarouter: 'orcarouter',
   vercel: 'vercel',
   deepseek: 'deepseek',
   kilo_code: 'kilo_code',
@@ -2889,6 +2893,29 @@ export type CreateLLMConfigDto = {
   apiUrl?: string;
 };
 
+export type StartOrcaRouterConnectResponseDto = {
+  /** Opaque id of this authorization attempt */
+  attemptId: string;
+  /** Consent URL to open in the user’s browser */
+  authorizeUrl: string;
+  /** When this attempt stops being redeemable */
+  expiresAt: string;
+};
+
+export type CompleteOrcaRouterConnectDto = {
+  /** Attempt id returned by the start endpoint */
+  attemptId: string;
+  /** Code displayed on the OrcaRouter consent screen */
+  code: string;
+  /** Echoed state value, when the deployment returns one */
+  state?: string;
+  /**
+   * User-defined label for the resulting configuration
+   * @maxLength 255
+   */
+  name?: string;
+};
+
 /**
  * Stable provider identifier
  */
@@ -2900,6 +2927,7 @@ export const LLMProviderSupportedDtoId = {
   anthropic: 'anthropic',
   gemini: 'gemini',
   openrouter: 'openrouter',
+  orcarouter: 'orcarouter',
   vercel: 'vercel',
   deepseek: 'deepseek',
   kilo_code: 'kilo_code',
@@ -2929,6 +2957,7 @@ export const LLMConfigWithProviderDtoProviderId = {
   anthropic: 'anthropic',
   gemini: 'gemini',
   openrouter: 'openrouter',
+  orcarouter: 'orcarouter',
   vercel: 'vercel',
   deepseek: 'deepseek',
   kilo_code: 'kilo_code',
@@ -2959,6 +2988,8 @@ export type LLMConfigWithProviderDto = {
   isPreferred?: boolean;
   /** Masked provider API key */
   apiKeyMasked?: string;
+  /** True when the provider rejected this credential and the user must reconnect */
+  needsReauth?: boolean;
   /** Timestamp when the configuration was created */
   createdAt?: string;
   /** Timestamp when the configuration was last updated */
@@ -2970,6 +3001,14 @@ export type ProviderModelDto = {
   id: string;
   /** Human-readable model name */
   name: string;
+  /** Model context window in tokens, when the source declares it */
+  contextLength?: number;
+  /** Input modalities declared by the catalog */
+  inputModalities?: string[];
+  /** Verified reasoning-effort levels for this model */
+  reasoningEfforts?: string[];
+  /** True when this entry comes from the verified offline seed because live discovery failed */
+  isFallback?: boolean;
 };
 
 /**
@@ -2983,6 +3022,7 @@ export const UpdateLLMConfigDtoProvider = {
   anthropic: 'anthropic',
   gemini: 'gemini',
   openrouter: 'openrouter',
+  orcarouter: 'orcarouter',
   vercel: 'vercel',
   deepseek: 'deepseek',
   kilo_code: 'kilo_code',
@@ -3510,6 +3550,7 @@ export const SendMessageDtoProvider = {
   anthropic: 'anthropic',
   gemini: 'gemini',
   openrouter: 'openrouter',
+  orcarouter: 'orcarouter',
   vercel: 'vercel',
   deepseek: 'deepseek',
   kilo_code: 'kilo_code',
@@ -31721,6 +31762,283 @@ export const useAgentsControllerCreateLLMConfig = <
 > => {
   return useMutation(
     getAgentsControllerCreateLLMConfigMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Start the OAuth 2.0 + PKCE (out-of-band code) authorization for the OrcaRouter provider
+ * @summary Start OrcaRouter connect
+ */
+export const agentsControllerStartOrcaRouterConnect = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<StartOrcaRouterConnectResponseDto>(
+    {
+      url: `/api/agents/llm-configs/orcarouter/connect/start`,
+      method: 'POST',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAgentsControllerStartOrcaRouterConnectMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerStartOrcaRouterConnect>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerStartOrcaRouterConnect>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ['agentsControllerStartOrcaRouterConnect'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerStartOrcaRouterConnect>>,
+    void
+  > = () => {
+    return agentsControllerStartOrcaRouterConnect(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerStartOrcaRouterConnectMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerStartOrcaRouterConnect>>
+>;
+
+export type AgentsControllerStartOrcaRouterConnectMutationError = unknown;
+
+/**
+ * @summary Start OrcaRouter connect
+ */
+export const useAgentsControllerStartOrcaRouterConnect = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerStartOrcaRouterConnect>>,
+      TError,
+      void,
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerStartOrcaRouterConnect>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerStartOrcaRouterConnectMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Exchange the code shown on the OrcaRouter consent screen and store the issued API key
+ * @summary Complete OrcaRouter connect
+ */
+export const agentsControllerCompleteOrcaRouterConnect = (
+  completeOrcaRouterConnectDto: CompleteOrcaRouterConnectDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<LLMConfigResponseDto>(
+    {
+      url: `/api/agents/llm-configs/orcarouter/connect/complete`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: completeOrcaRouterConnectDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAgentsControllerCompleteOrcaRouterConnectMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerCompleteOrcaRouterConnect>>,
+    TError,
+    { data: CompleteOrcaRouterConnectDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerCompleteOrcaRouterConnect>>,
+  TError,
+  { data: CompleteOrcaRouterConnectDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerCompleteOrcaRouterConnect'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerCompleteOrcaRouterConnect>>,
+    { data: CompleteOrcaRouterConnectDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return agentsControllerCompleteOrcaRouterConnect(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerCompleteOrcaRouterConnectMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof agentsControllerCompleteOrcaRouterConnect>>
+  >;
+export type AgentsControllerCompleteOrcaRouterConnectMutationBody =
+  CompleteOrcaRouterConnectDto;
+export type AgentsControllerCompleteOrcaRouterConnectMutationError = unknown;
+
+/**
+ * @summary Complete OrcaRouter connect
+ */
+export const useAgentsControllerCompleteOrcaRouterConnect = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerCompleteOrcaRouterConnect>>,
+      TError,
+      { data: CompleteOrcaRouterConnectDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerCompleteOrcaRouterConnect>>,
+  TError,
+  { data: CompleteOrcaRouterConnectDto },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerCompleteOrcaRouterConnectMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Discard an abandoned OrcaRouter authorization attempt
+ * @summary Cancel OrcaRouter connect
+ */
+export const agentsControllerCancelOrcaRouterConnect = (
+  attemptId: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    {
+      url: `/api/agents/llm-configs/orcarouter/connect/${attemptId}/cancel`,
+      method: 'POST',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAgentsControllerCancelOrcaRouterConnectMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerCancelOrcaRouterConnect>>,
+    TError,
+    { attemptId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerCancelOrcaRouterConnect>>,
+  TError,
+  { attemptId: string },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerCancelOrcaRouterConnect'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerCancelOrcaRouterConnect>>,
+    { attemptId: string }
+  > = (props) => {
+    const { attemptId } = props ?? {};
+
+    return agentsControllerCancelOrcaRouterConnect(attemptId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerCancelOrcaRouterConnectMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerCancelOrcaRouterConnect>>
+>;
+
+export type AgentsControllerCancelOrcaRouterConnectMutationError = unknown;
+
+/**
+ * @summary Cancel OrcaRouter connect
+ */
+export const useAgentsControllerCancelOrcaRouterConnect = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerCancelOrcaRouterConnect>>,
+      TError,
+      { attemptId: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerCancelOrcaRouterConnect>>,
+  TError,
+  { attemptId: string },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerCancelOrcaRouterConnectMutationOptions(options),
     queryClient,
   );
 };
