@@ -7,6 +7,7 @@ import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator'
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
+import { Role, WorkerScope } from '@/common/enums/enum';
 import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
 import { GrpcWorkerTokenGuard } from '@/common/guards/grpc-worker-token.guard';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
@@ -16,6 +17,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Logger,
   Param,
@@ -187,8 +189,22 @@ export class WorkersController {
   })
   @WorkspaceAccess('worker.read')
   @Get()
-  getWorkers(@Query() query: GetManyWorkersDto) {
-    return this.workersService.getWorkerList(query);
+  getWorkers(
+    @Query() query: GetManyWorkersDto,
+    @WorkspaceId() workspaceId: string,
+    @UserContext() user: UserContextPayload,
+  ) {
+    // Global workers run every workspace's jobs, so only admins may list
+    // them; everyone else only sees their own workspace's workers.
+    const isAdmin = user.role === Role.ADMIN;
+    if (query.scope === WorkerScope.CLOUD && !isAdmin) {
+      throw new ForbiddenException('Only admins can view global workers');
+    }
+    return this.workersService.getWorkerList({
+      ...query,
+      workspaceId,
+      scope: isAdmin ? query.scope : WorkerScope.WORKSPACE,
+    });
   }
 
   @Doc({
@@ -207,8 +223,13 @@ export class WorkersController {
   getWorkerById(
     @Param('id', ParseUUIDPipe) id: string,
     @WorkspaceId() workspaceId: string,
+    @UserContext() user: UserContextPayload,
   ): Promise<GetWorkerResponseDto> {
-    return this.workersService.getWorkerById(id, workspaceId);
+    return this.workersService.getWorkerById(
+      id,
+      workspaceId,
+      user.role === Role.ADMIN,
+    );
   }
 
   @GrpcMethod('WorkersService', 'GetManifest')
