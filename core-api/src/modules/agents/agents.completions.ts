@@ -1850,6 +1850,16 @@ export class AgentsCompletionsService {
       // Instead, emit the error so it propagates to the frontend as a stream event.
       onError: ({ error }) => {
         this.logger.error('[Agent] Stream error during execution', error);
+        // A 401 is terminal for the exact credential generation that made the
+        // request; fire-and-forget so it never blocks error propagation.
+        void this.agentsConfig
+          .reportProviderAuthError(llmConfig, error)
+          .catch((reportError: unknown) =>
+            this.logger.error(
+              'Failed to record provider authentication failure',
+              reportError,
+            ),
+          );
         // Extract the most informative message from the error
         let errorMessage: string;
         if (error instanceof Error) {

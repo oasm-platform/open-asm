@@ -46,11 +46,13 @@ import {
 } from './dto/conversation.dto';
 import {
   CreateLLMConfigDto,
+  CompleteOrcaRouterConnectDto,
   LLMConfigResponseDto,
   LLMConfigWithProviderDto,
   LLMProviderStatusDto,
   LLMProviderSupportedDto,
   ProviderModelDto,
+  StartOrcaRouterConnectResponseDto,
   UpdateLLMConfigDto,
 } from './dto/llm-config.dto';
 import {
@@ -71,6 +73,10 @@ import {
   getLLMProviderConfig,
   llmProviderSupported,
 } from './llm-provider-supported';
+import { ORCAROUTER_DEFAULT_MODEL } from './orcarouter/orcarouter.constants';
+import { OrcaRouterCredentialService } from './orcarouter/orcarouter-credential.service';
+import { OrcaRouterPkceService } from './orcarouter/orcarouter-pkce.service';
+import { LLMProvider } from './enums/agent.enums';
 
 @Injectable()
 export class AgentsService {
@@ -99,6 +105,8 @@ export class AgentsService {
     private readonly agentsConfig: AgentsConfigService,
     private readonly modelsCatalog: AgentsModelsCatalogService,
     private readonly subagents: AgentsSubagentsService,
+    private readonly orcaRouterPkce: OrcaRouterPkceService,
+    private readonly orcaRouterCredentials: OrcaRouterCredentialService,
   ) {}
 
   private async getDefaultLLMConfigId(
@@ -168,6 +176,7 @@ export class AgentsService {
     config: AgentLLMConfig,
     dek: Buffer | null,
     defaultLLMConfigId: string | undefined,
+    needsReauth = false,
   ): LLMConfigResponseDto {
     const apiKeyMasked = config.apiKey
       ? maskApiKey(decryptWithDEK(config.apiKey, dek))
@@ -180,9 +189,16 @@ export class AgentsService {
       apiUrl: config.apiUrl,
       isPreferred: config.id === defaultLLMConfigId,
       apiKeyMasked,
+      needsReauth,
       createdAt: config.createdAt,
       updatedAt: config.updatedAt,
     };
+  }
+
+  /** Reauthentication state only exists for the OrcaRouter provider. */
+  private async needsReauthFor(config: AgentLLMConfig): Promise<boolean> {
+    if (config.provider !== LLMProvider.ORCAROUTER) return false;
+    return this.orcaRouterCredentials.isNeedsReauth(config.id);
   }
 
   async createLLMConfig(
@@ -206,9 +222,15 @@ export class AgentsService {
       );
     }
 
-    // Use first model from the list as default
-    const defaultModel = models[0].id;
+    // Use first model from the list as default; OrcaRouter always starts on its
+    // default routing model when the workspace can call it.
+    const defaultModel =
+      dto.provider === LLMProvider.ORCAROUTER &&
+      models.some((model) => model.id === ORCAROUTER_DEFAULT_MODEL)
+        ? ORCAROUTER_DEFAULT_MODEL
+        : models[0].id;
 
+    const plaintextApiKey = dto.apiKey;
     if (!dto.apiKey) {
       dto.apiKey = 'not_set';
     }
@@ -228,6 +250,14 @@ export class AgentsService {
     });
 
     const saved = await this.llmConfigRepository.save(config);
+    if (saved.provider === LLMProvider.ORCAROUTER && plaintextApiKey) {
+      // Remember which credential generation this row holds, so a late 401
+      // from an older request cannot mark a newer credential as broken.
+      await this.orcaRouterCredentials.recordCredential(
+        saved.id,
+        plaintextApiKey,
+      );
+    }
     // The first connection becomes the default model
     let defaultLLMConfigId = await this.getDefaultLLMConfigId(
       workspaceId,
@@ -245,6 +275,55 @@ export class AgentsService {
     return this.toLLMConfigResponse(saved, dek, defaultLLMConfigId);
   }
 
+  /**
+   * Starts the "Connect with OrcaRouter" flow (OAuth 2.0 + PKCE, Flow B).
+   * The verifier stays server-side; the console only receives the consent URL.
+   */
+  async startOrcaRouterConnect(
+    workspaceId: string,
+    userId: string,
+  ): Promise<StartOrcaRouterConnectResponseDto> {
+    return this.orcaRouterPkce.start(workspaceId, userId);
+  }
+
+  /**
+   * Redeems the code shown on the consent screen. The PKCE adapter returns the
+   * same credential shape as the API-key adapter, and the resulting key is
+   * persisted through exactly the same path as a pasted key.
+   */
+  async completeOrcaRouterConnect(
+    dto: CompleteOrcaRouterConnectDto,
+    workspaceId: string,
+    userId: string,
+  ): Promise<LLMConfigResponseDto> {
+    const credential = await this.orcaRouterCredentials.fromPkce({
+      attemptId: dto.attemptId,
+      code: dto.code,
+      workspaceId,
+      userId,
+      state: dto.state,
+    });
+
+    const config = await this.createLLMConfig(
+      {
+        provider: LLMProvider.ORCAROUTER,
+        apiKey: credential.apiKey,
+        name: dto.name ?? 'OrcaRouter account',
+      },
+      workspaceId,
+      userId,
+    );
+    this.logger.log(
+      `OrcaRouter configuration ${config.id} connected via ${credential.source}`,
+    );
+    return config;
+  }
+
+  /** Discards an abandoned connect attempt. */
+  async cancelOrcaRouterConnect(attemptId: string): Promise<void> {
+    await this.orcaRouterPkce.cancel(attemptId);
+  }
+
   async getLLMProvidersStatus(
     workspaceId: string,
     userId: string,
@@ -259,10 +338,20 @@ export class AgentsService {
       userId,
     );
     const configMap = new Map(
-      configs.map((c) => [
-        c.provider,
-        this.toLLMConfigResponse(c, dek, defaultLLMConfigId),
-      ]),
+      await Promise.all(
+        configs.map(
+          async (c) =>
+            [
+              c.provider,
+              this.toLLMConfigResponse(
+                c,
+                dek,
+                defaultLLMConfigId,
+                await this.needsReauthFor(c),
+              ),
+            ] as const,
+        ),
+      ),
     );
 
     return llmProviderSupported.map((provider) => ({
@@ -298,28 +387,31 @@ export class AgentsService {
       userId,
     );
 
-    return configs.map((config) => {
-      const providerMeta = llmProviderSupported.find(
-        (p) => p.id === config.provider,
-      );
-      const apiKey = config.apiKey ? decryptWithDEK(config.apiKey, dek) : '';
-      const apiKeyMasked = config.apiKey ? maskApiKey(apiKey) : '****';
-      return {
-        providerId: config.provider,
-        providerName: providerMeta?.name ?? config.provider,
-        logo: providerMeta?.logo,
-        isConnected: true,
-        configId: config.id,
-        name: config.name,
-        model: config.model,
-        apiUrl: config.apiUrl,
-        isPreferred: config.id === defaultLLMConfigId,
-        apiKeyMasked,
-        createdAt: config.createdAt,
-        updatedAt: config.updatedAt,
-        isAcceptCustomApiUrl: providerMeta?.isAcceptCustomApiUrl ?? false,
-      };
-    });
+    return Promise.all(
+      configs.map(async (config) => {
+        const providerMeta = llmProviderSupported.find(
+          (p) => p.id === config.provider,
+        );
+        const apiKey = config.apiKey ? decryptWithDEK(config.apiKey, dek) : '';
+        const apiKeyMasked = config.apiKey ? maskApiKey(apiKey) : '****';
+        return {
+          providerId: config.provider,
+          providerName: providerMeta?.name ?? config.provider,
+          logo: providerMeta?.logo,
+          isConnected: true,
+          configId: config.id,
+          name: config.name,
+          model: config.model,
+          apiUrl: config.apiUrl,
+          isPreferred: config.id === defaultLLMConfigId,
+          apiKeyMasked,
+          needsReauth: await this.needsReauthFor(config),
+          createdAt: config.createdAt,
+          updatedAt: config.updatedAt,
+          isAcceptCustomApiUrl: providerMeta?.isAcceptCustomApiUrl ?? false,
+        };
+      }),
+    );
   }
 
   async updateLLMConfig(
@@ -347,6 +439,11 @@ export class AgentsService {
     if (dto.apiUrl !== undefined) config.apiUrl = dto.apiUrl;
 
     const saved = await this.llmConfigRepository.save(config);
+    if (dto.apiKey && saved.provider === LLMProvider.ORCAROUTER) {
+      // A replacement key is a new credential generation: it clears any
+      // needsReauth marker and invalidates late failures from the old key.
+      await this.orcaRouterCredentials.recordCredential(saved.id, dto.apiKey);
+    }
     // Picking a model on the default connection changes the default model
     let defaultLLMConfigId = await this.getDefaultLLMConfigId(
       workspaceId,

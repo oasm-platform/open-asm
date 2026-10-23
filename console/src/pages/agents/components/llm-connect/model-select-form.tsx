@@ -63,7 +63,11 @@ export function ModelSelectForm({
               <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
             </button>
           </PopoverTrigger>
-          <PopoverContent className="p-0" align="start" sideOffset={4}>
+          <PopoverContent
+            className="p-0 w-[var(--radix-popover-trigger-width)]"
+            align="start"
+            sideOffset={4}
+          >
             <Command>
               <CommandInput placeholder="Search models..." />
               <CommandList className="max-h-[320px]">
@@ -87,6 +91,12 @@ export function ModelSelectForm({
             </Command>
           </PopoverContent>
         </Popover>
+        {modelList.length > 0 && modelList.every((model) => model.isFallback) && (
+          <p className="text-xs text-muted-foreground">
+            The live catalog could not be reached — showing the verified
+            offline list.
+          </p>
+        )}
       </div>
 
       <div className="flex justify-end gap-2">

@@ -34,6 +34,14 @@ export const ConnectedConfigRow = memo(function ConnectedConfigRow({
               <span className="font-medium text-foreground">
                 {item.providerName}
               </span>
+              {item.needsReauth && (
+                <span
+                  className="text-[10px] px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive font-medium leading-none"
+                  title="OrcaRouter rejected this key. Reconnect to issue a new one; the stored configuration is kept until then."
+                >
+                  reconnect required
+                </span>
+              )}
               {item.isPreferred && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 font-medium leading-none">
                   default

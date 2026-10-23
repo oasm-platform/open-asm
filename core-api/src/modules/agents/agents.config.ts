@@ -18,6 +18,10 @@ import {
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { LLMProvider, SearchProvider } from './enums/agent.enums';
 import { getLLMProviderConfig } from './llm-provider-supported';
+import {
+  isUnauthorizedError,
+  OrcaRouterCredentialService,
+} from './orcarouter/orcarouter-credential.service';
 import { currentToolName } from './tools/helpers';
 
 export function maskApiKey(apiKey: string): string {
@@ -125,7 +129,27 @@ export class AgentsConfigService {
     @InjectRepository(AgentLLMConfig)
     private readonly llmConfigRepository: Repository<AgentLLMConfig>,
     private readonly workspaceEncryption: WorkspaceEncryptionService,
+    private readonly orcaRouterCredentials: OrcaRouterCredentialService,
   ) {}
+
+  /**
+   * Terminal authentication failure from the provider: mark the exact
+   * credential generation as needing reauthentication. There is no refresh
+   * grant for an OrcaRouter key and nothing is deleted here — the user must
+   * reconnect (or paste a new key) before the connection is usable again.
+   */
+  async reportProviderAuthError(
+    config: AgentLLMConfig,
+    error: unknown,
+  ): Promise<void> {
+    if (config.provider !== LLMProvider.ORCAROUTER) return;
+    if (!isUnauthorizedError(error) || !config.apiKey) return;
+    const apiKey = await this.workspaceEncryption.decrypt(
+      config.workspaceId,
+      config.apiKey,
+    );
+    await this.orcaRouterCredentials.reportUnauthorized(config.id, apiKey);
+  }
 
   find(workspaceId: string, userId: string): Promise<AgentConfig | null> {
     return this.configRepository.findOne({ where: { workspaceId, userId } });
