@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 import { WorkerScope, WorkerType } from '@/common/enums/enum';
-import { RemoteExecuteSubscribeService } from './remote-execute-subscribe.service';
+import {
+  REMOTE_EXECUTE_PING_INTERVAL_MS,
+  RemoteExecuteSubscribeService,
+} from './remote-execute-subscribe.service';
 
 const worker = (
   id: string,
@@ -399,6 +402,37 @@ describe('RemoteExecuteSubscribeService — agent worker scoping', () => {
       service.pushCommand('w-b', 's1', 'id');
       expect(service.isResultFromAssignedWorker('s1', 'w-a')).toBe(false);
       expect(service.isResultFromAssignedWorker('s1', 'w-b')).toBe(true);
+    });
+  });
+
+  describe('keepalive', () => {
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+
+    const pings = (events: any[]) => events.filter((e) => e.type === 5);
+
+    it('pings a worker that asked for keepalive until its stream ends', () => {
+      const reg = service.registerWorker(
+        worker('w-own', 'ws-1', WorkerScope.WORKSPACE),
+        { keepalive: true },
+      );
+      const seen: any[] = [];
+      const sub = reg.observable.subscribe((e) => seen.push(e));
+
+      jest.advanceTimersByTime(REMOTE_EXECUTE_PING_INTERVAL_MS * 2);
+      expect(pings(seen)).toHaveLength(2);
+
+      sub.unsubscribe();
+      jest.advanceTimersByTime(REMOTE_EXECUTE_PING_INTERVAL_MS * 2);
+      expect(pings(seen)).toHaveLength(2);
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    it('never pings a worker that did not ask for it', () => {
+      const seen = connect(worker('w-old', 'ws-1', WorkerScope.WORKSPACE));
+
+      jest.advanceTimersByTime(REMOTE_EXECUTE_PING_INTERVAL_MS * 3);
+      expect(pings(seen)).toHaveLength(0);
     });
   });
 });
