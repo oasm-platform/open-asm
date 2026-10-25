@@ -1,3 +1,4 @@
+import { parseTrustedProxies } from '@/common/config/trusted-proxies';
 import { AUTH_IGNORE_ROUTERS } from '@/common/constants/app.constants';
 import { Role } from '@/common/enums/enum';
 import { databaseConnectionConfig } from '@/database/database-config';
@@ -23,6 +24,12 @@ export const auth: unknown = betterAuth({
   advanced: {
     database: {
       generateId: () => randomUUID(),
+    },
+    // Behind several proxies X-Forwarded-For has more than one hop; without
+    // trusted proxies Better Auth cannot resolve the client and rate-limits
+    // every user in one shared bucket.
+    ipAddress: {
+      trustedProxies: parseTrustedProxies(process.env.TRUSTED_PROXIES),
     },
     cookies: {
       session_token: {

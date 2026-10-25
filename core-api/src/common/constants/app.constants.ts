@@ -32,6 +32,12 @@ export const WORKER_TOKEN_HEADER = 'worker-token';
  */
 export const AGENT_SANDBOX_HEADER = 'x-agent-sandbox';
 /**
+ * gRPC metadata a worker sends on RemoteExecuteSubscribe ("1") when it
+ * understands REMOTE_EXECUTE_SUBSCRIBE_EVENT_PING. Only those workers get
+ * keepalive pings, so older ones never log an unknown event type.
+ */
+export const REMOTE_EXECUTE_KEEPALIVE_HEADER = 'x-remote-execute-keepalive';
+/**
  * Controller paths (under API_GLOBAL_PREFIX) that authenticate with
  * MCP_API_KEY_HEADER via McpGuard instead of a browser session.
  *

@@ -334,6 +334,9 @@ func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Clien
 					log.Info("Agent tool run cancelled: %s", resp.SessionId)
 				}
 
+			case pb.RemoteExecuteSubscribeEventType_REMOTE_EXECUTE_SUBSCRIBE_EVENT_PING:
+				// Keepalive only: core sends it so proxies do not cut the idle stream.
+
 			default:
 				log.Warning("Unknown remote execute event type: %v", resp.Type)
 			}

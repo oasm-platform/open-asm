@@ -1,6 +1,7 @@
 package grpcclient
 
 import (
+	"crypto/tls"
 	"fmt"
 	"os"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"oasm-worker/internal/config"
 	jobRegistryPb "oasm-worker/internal/gen/jobs_registry"
@@ -59,6 +61,13 @@ type Client struct {
 	// agentSandbox is advertised on RemoteExecuteSubscribe (x-agent-sandbox)
 	// when agent shell commands run in a per-session sandbox container.
 	agentSandbox atomic.Bool
+}
+
+// WithTLS makes NewClient dial core-api over TLS, verified against the system
+// CA pool (e.g. Cloudflare's edge certificate on :443). It overrides the
+// default plaintext credentials because later dial options win.
+func WithTLS() grpc.DialOption {
+	return grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12}))
 }
 
 // NewClient validates the required configuration and creates a lazily-dialing

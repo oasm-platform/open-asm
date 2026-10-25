@@ -132,7 +132,7 @@ The worker runs in one of two modes, reported to core-api when it joins:
   node  Headless worker node for Docker / production deployments. Launch with
         '--mode node' and configure via the flags below or WORKER_* environment
         variables (WORKER_API_KEY, WORKER_MAX_CONCURRENCY, WORKER_GRPC_HOST,
-        WORKER_GRPC_PORT, WORKER_TOOL_PATH, WORKER_NETWORK,
+        WORKER_GRPC_PORT, WORKER_TLS_ENABLED, WORKER_TOOL_PATH, WORKER_NETWORK,
         WORKER_CONNECTOR_ADDR). WORKER_CONNECTOR_ADDR overrides the address
         connector containers dial back on (default port 26276); when unset the
         worker auto-derives host.docker.internal and adds a host-gateway
@@ -168,6 +168,9 @@ The worker runs in one of two modes, reported to core-api when it joins:
 
 	rootCmd.Flags().Int("grpc-port", 16276, "gRPC server port")
 	viper.BindPFlag("grpc_port", rootCmd.Flags().Lookup("grpc-port"))
+
+	rootCmd.Flags().Bool("grpc-tls", false, "Connect to the gRPC server over TLS (e.g. cloud.oasm.io:443 behind Cloudflare); overridable with WORKER_TLS_ENABLED")
+	viper.BindPFlag("tls_enabled", rootCmd.Flags().Lookup("grpc-tls"))
 
 	rootCmd.Flags().String("tool-path", config.DataPath("oasm-tools"), "Tool path")
 	viper.BindPFlag("tool_path", rootCmd.Flags().Lookup("tool-path"))
