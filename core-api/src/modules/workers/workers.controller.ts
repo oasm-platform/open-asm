@@ -1,5 +1,10 @@
 import {
+  parseTrustedProxies,
+  resolveClientIp,
+} from '@/common/config/trusted-proxies';
+import {
   AGENT_SANDBOX_HEADER,
+  REMOTE_EXECUTE_KEEPALIVE_HEADER,
   WORKER_TOKEN_HEADER,
 } from '@/common/constants/app.constants';
 import { Public, UserContext } from '@/common/decorators/app.decorator';
@@ -7,6 +12,7 @@ import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator'
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
+import { Role, WorkerScope } from '@/common/enums/enum';
 import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
 import { GrpcWorkerTokenGuard } from '@/common/guards/grpc-worker-token.guard';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
@@ -16,6 +22,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Logger,
   Param,
@@ -54,6 +61,15 @@ import type {
 
 interface GrpcCall {
   getPeer?(): string | undefined;
+}
+
+/** grpc-js peers are "host:port" or "[ipv6]:port". */
+function peerIp(peer: string | undefined): string | undefined {
+  if (!peer) return undefined;
+  const bracketed = /^\[(.+)\]:\d+$/.exec(peer);
+  if (bracketed) return bracketed[1];
+  const colon = peer.lastIndexOf(':');
+  return colon === -1 ? peer : peer.slice(0, colon);
 }
 
 interface GrpcTimestamp {
@@ -187,8 +203,22 @@ export class WorkersController {
   })
   @WorkspaceAccess('worker.read')
   @Get()
-  getWorkers(@Query() query: GetManyWorkersDto) {
-    return this.workersService.getWorkerList(query);
+  getWorkers(
+    @Query() query: GetManyWorkersDto,
+    @WorkspaceId() workspaceId: string,
+    @UserContext() user: UserContextPayload,
+  ) {
+    // Global workers run every workspace's jobs, so only admins may list
+    // them; everyone else only sees their own workspace's workers.
+    const isAdmin = user.role === Role.ADMIN;
+    if (query.scope === WorkerScope.CLOUD && !isAdmin) {
+      throw new ForbiddenException('Only admins can view global workers');
+    }
+    return this.workersService.getWorkerList({
+      ...query,
+      workspaceId,
+      scope: isAdmin ? query.scope : WorkerScope.WORKSPACE,
+    });
   }
 
   @Doc({
@@ -207,8 +237,13 @@ export class WorkersController {
   getWorkerById(
     @Param('id', ParseUUIDPipe) id: string,
     @WorkspaceId() workspaceId: string,
+    @UserContext() user: UserContextPayload,
   ): Promise<GetWorkerResponseDto> {
-    return this.workersService.getWorkerById(id, workspaceId);
+    return this.workersService.getWorkerById(
+      id,
+      workspaceId,
+      user.role === Role.ADMIN,
+    );
   }
 
   @GrpcMethod('WorkersService', 'GetManifest')
@@ -251,10 +286,15 @@ export class WorkersController {
       token?: string;
       metadata?: { name?: string; os?: string; mode?: number | string };
     },
+    grpcMetadata: Metadata,
     call: GrpcCall,
   ): Promise<{ workerId: string; workerToken: string }> {
-    const peer = call?.getPeer?.();
-    const ipAddress = typeof peer === 'string' ? peer.split(':')[0] : undefined;
+    const forwardedFor = grpcMetadata?.get('x-forwarded-for')?.[0];
+    const ipAddress = resolveClientIp(
+      peerIp(call?.getPeer?.()),
+      typeof forwardedFor === 'string' ? forwardedFor : undefined,
+      parseTrustedProxies(process.env.TRUSTED_PROXIES),
+    );
 
     const worker = await this.workersService.join({
       apiKey: requests.apiKey,
@@ -401,9 +441,14 @@ export class WorkersController {
     // "1" = the worker runs agent shell commands in a per-session sandbox
     const sandboxed =
       String(metadata.get(AGENT_SANDBOX_HEADER)?.[0] ?? '') === '1';
+    const keepalive =
+      String(metadata.get(REMOTE_EXECUTE_KEEPALIVE_HEADER)?.[0] ?? '') === '1';
 
     const { subject, observable } =
-      this.remoteExecuteSubscribeService.registerWorker(worker, { sandboxed });
+      this.remoteExecuteSubscribeService.registerWorker(worker, {
+        sandboxed,
+        keepalive,
+      });
 
     subject.next({
       id: '',

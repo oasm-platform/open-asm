@@ -16,6 +16,7 @@ import (
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
+	"google.golang.org/grpc"
 	pb "oasm-worker/internal/gen/jobs_registry"
 	"oasm-worker/internal/gen/workers"
 
@@ -64,7 +65,11 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 	log := NewTuiLogger(events, "System")
 	screenshotLog = NewTuiLogger(events, "Screenshot")
 
-	grpcClient, err := grpcclient.NewClient(cfg.ApiKey, fmt.Sprintf("%s:%d", cfg.GrpcHost, cfg.GrpcPort), cfg.ToolPath, log)
+	var dialOpts []grpc.DialOption
+	if cfg.TLS.Enabled {
+		dialOpts = append(dialOpts, grpcclient.WithTLS())
+	}
+	grpcClient, err := grpcclient.NewClient(cfg.ApiKey, fmt.Sprintf("%s:%d", cfg.GrpcHost, cfg.GrpcPort), cfg.ToolPath, log, dialOpts...)
 	if err != nil {
 		log.ErrorE("Failed to create OASM client", err)
 		return
