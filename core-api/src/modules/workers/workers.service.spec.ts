@@ -1066,6 +1066,7 @@ describe('WorkersService', () => {
       connectors: Record<string, unknown>[] = [],
       runningJobRows: Record<string, unknown>[] = [],
       telemetry?: Record<string, unknown> | null,
+      canReadGlobal = false,
     ) => {
       (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue(
         worker,
@@ -1087,7 +1088,7 @@ describe('WorkersService', () => {
           telemetry,
         );
       }
-      return service.getWorkerById(workerId, workspaceId);
+      return service.getWorkerById(workerId, workspaceId, canReadGlobal);
     };
 
     const containerTelemetry = (tools: string[]) => ({
@@ -1272,18 +1273,33 @@ describe('WorkersService', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('does not throw for a cloud worker that has no workspace', async () => {
+    const cloudWorker = {
+      id: workerId,
+      workspaceId: null,
+      scope: WorkerScope.CLOUD,
+      runMode: 'cli',
+    };
+
+    it('returns a cloud worker to a caller allowed to read global workers', async () => {
       const result = await runGetWorkerById(
-        {
-          id: workerId,
-          workspaceId: null,
-          scope: WorkerScope.CLOUD,
-          runMode: 'cli',
-        },
+        cloudWorker,
         builtInToolFixtures,
+        [],
+        [],
+        undefined,
+        true,
       );
 
       expect(result.id).toBe(workerId);
+    });
+
+    it('hides a cloud worker, and the jobs of other workspaces on it, from other callers', async () => {
+      await expect(
+        runGetWorkerById(cloudWorker, builtInToolFixtures),
+      ).rejects.toThrow(NotFoundException);
+      expect(
+        (mockJobsRegistryService.repo as any).createQueryBuilder,
+      ).not.toHaveBeenCalled();
     });
 
     it('includes the Redis telemetry snapshot without persisting it on the entity', async () => {
