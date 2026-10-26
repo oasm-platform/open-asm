@@ -50,6 +50,15 @@ describe('AgentsModelsCatalogService', () => {
     ).toMatchObject({ source: 'catalog', estimated: false });
   });
 
+  it('resolves Opper pool names and pinned routes through models.dev', () => {
+    expect(
+      service.resolveWindow(cfg(LLMProvider.OPPER, 'anthropic/claude-sonnet-4-6')),
+    ).toMatchObject({ source: 'catalog', estimated: false });
+    expect(
+      service.resolveWindow(cfg(LLMProvider.OPPER, 'claude-sonnet-4-6')),
+    ).toMatchObject({ source: 'catalog' });
+  });
+
   it('prices hosted models but not self-hosted ones', () => {
     expect(service.costOf(LLMProvider.ANTHROPIC, 'claude-sonnet-4-5')).toMatchObject({
       input: expect.any(Number),

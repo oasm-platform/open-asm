@@ -118,6 +118,29 @@ const fetchOrcaRouterModels: LLMModelsFetcher = async (apiKey) => {
     : [];
 };
 
+const fetchOpperModels: LLMModelsFetcher = async (apiKey) => {
+  const json = await fetchJson<{
+    data: Array<{
+      id: string;
+      opper?: { type?: string; capabilities?: string[] };
+    }>;
+  }>('https://api.opper.ai/v3/compat/models', {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  // The list also carries embedding models; keep the chat models that can call tools
+  return json
+    ? sorted(
+        json.data
+          .filter(
+            (m) =>
+              m.opper?.type === 'llm' &&
+              m.opper?.capabilities?.includes('tools'),
+          )
+          .map((m) => ({ id: m.id, name: m.id })),
+      )
+    : [];
+};
+
 const fetchGeminiModels: LLMModelsFetcher = async (apiKey) => {
   const json = await fetchJson<{
     models: Array<{ name: string; displayName?: string }>;
@@ -275,6 +298,16 @@ export const llmProviderSupported: LLMProviderSupported[] = [
         model,
       ),
     fetchModels: fetchOrcaRouterModels,
+  },
+  {
+    id: LLMProvider.OPPER,
+    name: 'Opper',
+    logo: '/static/images/opper.svg',
+    handler: (apiKey, model) =>
+      createOpenAI({ apiKey, baseURL: 'https://api.opper.ai/v3/compat' }).chat(
+        model,
+      ),
+    fetchModels: fetchOpperModels,
   },
   {
     id: LLMProvider.OPENAI,
