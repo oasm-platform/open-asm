@@ -97,6 +97,27 @@ const fetchOpenRouterModels: LLMModelsFetcher = async () => {
     : [];
 };
 
+const fetchOrcaRouterModels: LLMModelsFetcher = async (apiKey) => {
+  const json = await fetchJson<{
+    data: Array<{
+      id: string;
+      name?: string;
+      supported_endpoint_types?: string[];
+    }>;
+  }>('https://api.orcarouter.ai/v1/models?capability=chat', {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  // Requests go through OpenAI chat completions, so models served only over
+  // another wire format (Anthropic, Gemini, Responses) would always fail
+  return json
+    ? sorted(
+        json.data
+          .filter((m) => m.supported_endpoint_types?.includes('openai'))
+          .map((m) => ({ id: m.id, name: m.name ?? m.id })),
+      )
+    : [];
+};
+
 const fetchGeminiModels: LLMModelsFetcher = async (apiKey) => {
   const json = await fetchJson<{
     models: Array<{ name: string; displayName?: string }>;
@@ -246,6 +267,16 @@ export const llmProviderSupported: LLMProviderSupported[] = [
     fetchModels: fetchOpenRouterModels,
   },
   {
+    id: LLMProvider.ORCAROUTER,
+    name: 'OrcaRouter',
+    logo: '/static/images/orcarouter.png',
+    handler: (apiKey, model) =>
+      createOpenAI({ apiKey, baseURL: 'https://api.orcarouter.ai/v1' }).chat(
+        model,
+      ),
+    fetchModels: fetchOrcaRouterModels,
+  },
+  {
     id: LLMProvider.OPENAI,
     name: 'OpenAI',
     logo: '/static/images/openai.svg',
@@ -351,6 +382,9 @@ const REASONING_OPTIONS: Partial<Record<LLMProvider, ProviderReasoningOptions>> 
     openai: { reasoningEffort: 'high', reasoningSummary: 'auto' },
   },
   [LLMProvider.OPENROUTER]: {
+    openai: { reasoningEffort: 'high', reasoningSummary: 'auto' },
+  },
+  [LLMProvider.ORCAROUTER]: {
     openai: { reasoningEffort: 'high', reasoningSummary: 'auto' },
   },
   [LLMProvider.DEEPSEEK]: {

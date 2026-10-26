@@ -58,6 +58,8 @@ export const PROVIDER_MAP: Record<LLMProvider, string[]> = {
   [LLMProvider.VERCEL]: ['vercel'],
   [LLMProvider.KILO_CODE]: ['kilo', 'openrouter'],
   [LLMProvider.OPENCODE_GO]: ['opencode-go', 'opencode'],
+  // Not on models.dev; vendor ids (`openai/…`) resolve by id
+  [LLMProvider.ORCAROUTER]: [],
   [LLMProvider.CUSTOM]: [],
 };
 

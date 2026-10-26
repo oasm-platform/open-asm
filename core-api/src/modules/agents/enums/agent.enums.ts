@@ -15,6 +15,7 @@ export enum LLMProvider {
   ANTHROPIC = 'anthropic',
   GEMINI = 'gemini',
   OPENROUTER = 'openrouter',
+  ORCAROUTER = 'orcarouter',
   VERCEL = 'vercel',
   DEEPSEEK = 'deepseek',
   KILO_CODE = 'kilo_code',
