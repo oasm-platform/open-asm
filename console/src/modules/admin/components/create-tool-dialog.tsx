@@ -23,7 +23,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { ToolCategory, useToolsControllerCreateTool } from '@/services/apis/gen/queries';
+import { ToolCategory, useAdminControllerCreateTool } from '@/services/apis/gen/queries';
 import { zodResolver } from '@hookform/resolvers/zod';
 import React from 'react';
 import { useForm } from 'react-hook-form';
@@ -54,7 +54,7 @@ export function CreateToolDialog({ providerId, children }: CreateToolDialogProps
         },
     });
 
-    const { mutate: createTool, isPending } = useToolsControllerCreateTool();
+    const { mutate: createTool, isPending } = useAdminControllerCreateTool();
 
     const onSubmit = (values: z.infer<typeof formSchema>) => {
         createTool(

@@ -1,5 +1,5 @@
 import Page from '@/components/common/page';
-import GetAboutProject from './components/get-about-project';
+import GetAboutProject from '../components/get-about-project';
 
 export default function About() {
   return (

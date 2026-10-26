@@ -3,20 +3,15 @@ import {
   GIT_REPO_URL,
   HOME_PAGE_URL,
 } from '@/common/constants/app.constants';
-import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { Role } from '@/common/enums/enum';
 import { ReleaseVersion } from '@/common/interfaces/app.interface';
 import { RedisService } from '@/services/redis/redis.service';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SystemConfigsService } from '../system-configs/system-configs.service';
+import { SystemConfigsService } from '../admin/system-configs/system-configs.service';
 import { StorageService } from '../storage/storage.service';
 import { UsersService } from '../users/users.service';
-import {
-  CreateFirstAdminDto,
-  GetMetadataDto,
-  GetVersionDto,
-} from './dto/root.dto';
+import { GetMetadataDto, GetVersionDto } from './dto/root.dto';
 
 @Injectable()
 export class RootService {
@@ -30,21 +25,6 @@ export class RootService {
 
   public getHealth(): string {
     return 'OK';
-  }
-
-  /**
-   * Creates the first admin user in the system.
-   * @param dto The data transfer object containing the email and password for the admin user.
-   * @returns A promise that resolves to a default message response dto.
-   */
-  public async createFirstAdmin(
-    dto: CreateFirstAdminDto,
-  ): Promise<DefaultMessageResponseDto> {
-    const { email, password } = dto;
-    await this.usersService.createFirstAdmin(email, password);
-    return {
-      message: 'Admin user created successfully',
-    };
   }
 
   /**

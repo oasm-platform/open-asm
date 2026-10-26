@@ -13,7 +13,9 @@ import { ProvidersModule } from './providers/providers.module';
 import { RootModule } from './root/root.module';
 import { SearchModule } from './search/search.module';
 import { StatisticModule } from './statistic/statistic.module';
-import { SystemConfigsModule } from './system-configs/system-configs.module';
+// Keep below JobsRegistryModule: AdminModule pulls in ToolsService, and loading
+// it first trips the tools <-> workers <-> jobs-registry import cycle.
+import { AdminModule } from './admin/admin.module';
 import { TargetsModule } from './targets/targets.module';
 import { TechnologyModule } from './technology/technology.module';
 import { TemplatesModule } from './templates/templates.module';
@@ -52,7 +54,7 @@ import { ReportsModule } from './reports/reports.module';
     TemplatesModule,
     AssetGroupModule,
     IssuesModule,
-    SystemConfigsModule,
+    AdminModule,
     InternalNetworksModule,
     AgentsModule,
     RemoteExecuteModule,

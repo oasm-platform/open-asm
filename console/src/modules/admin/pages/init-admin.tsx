@@ -11,7 +11,7 @@ import {
 import { Input } from '@/components/ui/input';
 import {
   getRootControllerGetMetadataQueryKey,
-  useRootControllerCreateFirstAdmin,
+  useAdminControllerCreateFirstAdmin,
   type CreateFirstAdminDto,
 } from '@/services/apis/gen/queries';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -35,7 +35,7 @@ const formSchema = z
     path: ['confirmPassword'],
   });
 
-export default function Register() {
+export default function InitAdmin() {
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -45,7 +45,7 @@ export default function Register() {
     },
   });
 
-  const { mutate } = useRootControllerCreateFirstAdmin();
+  const { mutate } = useAdminControllerCreateFirstAdmin();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);

@@ -15,6 +15,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { useBugReportUrl } from '@/hooks/use-bug-report-url';
+import { isAdminUser } from '@/modules/admin/utils';
 import { useRootControllerGetMetadata } from '@/services/apis/gen/queries';
 import {
   authClient,
@@ -115,7 +116,7 @@ export function NavUser({ isOnlyAvatar = false, dropdownSide }: NavUserProps) {
                 <Settings />
                 Settings
               </DropdownMenuItem>
-              {(user as User).role === 'admin' && (
+              {isAdminUser(user as User) && (
                 <DropdownMenuItem onClick={() => navigate({ to: '/admin' })}>
                   <ShieldUser />
                   Admin

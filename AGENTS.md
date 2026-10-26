@@ -160,6 +160,7 @@ Migration location: `core-api/src/database/migrations/` (58 files, newest last).
 - Entities in module folders or `src/common/entity/`; `dataSourceOptions.entities` globs `**/*.entity{.ts,.js}`.
 - **User data responses expose only `id`, `name`, `image`** — enforce in services, not controllers.
 - `@getWorkspaceId: true` on controllers that need tenant context; workspace scoping is not optional.
+- **Admin-only endpoints live in `src/modules/admin/`** and are served under `/admin/*` with class-level `@Roles(Role.ADMIN)` (system configs + logo upload, tool creation, public `POST /admin/init`). Put new platform-admin endpoints there, not in the domain module.
 - gRPC server `:16276`, protos in `src/proto/`, Go stubs generated into `worker/internal/gen/` (there is **no** `grpc-client/` directory anymore — older docs are stale).
 - BullMQ for async jobs; queue payloads are slim and tenant-scoped.
 - MCP is an **in-process controller** (`src/mcp/mcp.controller.ts`, `GET /mcp` + `POST /mcp/message`, guarded by `McpGuard`) — not a separate server, no `ASSISTANT_HOST`/`SEARXNG_URL`.
@@ -174,6 +175,7 @@ Migration location: `core-api/src/database/migrations/` (58 files, newest last).
 
 ### console
 - `components/{ui,common,<feature>}/` for shared/primitive/feature components, `pages/<page>/components/` for page-local logic.
+- The admin area lives in `src/modules/admin/{pages,components,layout}` (the `/admin/*` pages, `/init-admin`, admin-only dialogs); `src/routes/admin*` files stay thin and import from there. Check the role with `isAdminUser()` from `@/modules/admin/utils`, not `role === 'admin'`.
 - API hooks are orval-generated TanStack Query hooks (`use<OperationId>`) with the custom axios mutator at `src/services/apis/axios-client.ts`.
 - Routes are file-based under `src/routes/` (`_authed.tsx` = authenticated layout, `__root.tsx` = root).
 - `no-console` equivalent is enforced by lint; skeletons/empty states are expected on every data card (recent commits standardised this).

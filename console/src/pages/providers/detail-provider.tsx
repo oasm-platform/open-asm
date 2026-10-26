@@ -1,5 +1,5 @@
 import Page from '@/components/common/page';
-import { CreateToolDialog } from '@/components/tools/create-tool-dialog';
+import { CreateToolDialog } from '@/modules/admin/components/create-tool-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';

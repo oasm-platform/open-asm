@@ -3,7 +3,7 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
-import { StorageService } from '../storage/storage.service';
+import { StorageService } from '@/modules/storage/storage.service';
 import { SystemConfig } from './entities/system-config.entity';
 import { SystemConfigsService } from './system-configs.service';
 

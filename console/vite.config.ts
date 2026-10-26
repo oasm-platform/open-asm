@@ -85,11 +85,6 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           logLevel: 'silent',
         },
-        '/api/storage/logo': {
-          target: env.VITE_API_URL,
-          changeOrigin: true,
-          logLevel: 'silent',
-        },
         '/api/storage': {
           // Must be reachable at Host == the RUSTFS_ENDPOINT the API signed against
           // (SigV4 signs `host`), hence changeOrigin. Default matches dev RUSTFS_ENDPOINT.

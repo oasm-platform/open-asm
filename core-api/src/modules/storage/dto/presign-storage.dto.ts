@@ -1,4 +1,4 @@
-import { ApiProperty, OmitType } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class PresignUploadRequestDto {
@@ -35,24 +35,6 @@ export class PresignUploadResponseDto {
 
   @ApiProperty({ example: 172800, description: 'Lifetime of the presigned URL in seconds' })
   expiresIn: number;
-}
-
-export class LogoPresignRequestDto extends OmitType(PresignUploadRequestDto, [
-  'bucket',
-] as const) {}
-
-export class LogoPresignResponseDto extends OmitType(PresignUploadResponseDto, [
-  'contentType',
-] as const) {}
-
-export class ConfirmLogoRequestDto {
-  @ApiProperty({
-    example: 'logo-1a2b3c.png',
-    description: 'Object key returned by the logo presign endpoint',
-  })
-  @IsString()
-  @IsNotEmpty()
-  key: string;
 }
 
 export class PresignDownloadQueryDto {

@@ -1,6 +1,5 @@
-import { Roles, WorkspaceId } from '@/common/decorators/app.decorator';
+import { WorkspaceId } from '@/common/decorators/app.decorator';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
-import { Role } from '@/common/enums/enum';
 import { Doc } from '@/common/doc/doc.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
@@ -19,7 +18,6 @@ import { DefaultMessageResponseDto } from '@/common/dtos/default-message-respons
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { ConnectorDto } from './dto/connector.dto';
 import { connectorCategories } from './tool-categories';
-import { CreateToolDto } from './dto/create-tool.dto';
 import { GetConnectorBySlugDto } from './dto/get-connector-by-slug.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
 import { GetToolByIdDto } from './dto/get-tool-by-id.dto';
@@ -37,20 +35,6 @@ export class ToolsController {
     private readonly toolsService: ToolsService,
     private readonly connectorRegistryService: ConnectorRegistryService,
   ) {}
-
-  @Doc({
-    summary: 'Create a new tool',
-    description:
-      'Registers a new security assessment tool in the system with specified configuration and capabilities.',
-    response: {
-      serialization: Tool,
-    },
-  })
-  @Roles(Role.ADMIN)
-  @Post()
-  createTool(@Body() dto: CreateToolDto) {
-    return this.toolsService.createTool(dto);
-  }
 
   // @Doc({
   //   summary: 'Run a tool',

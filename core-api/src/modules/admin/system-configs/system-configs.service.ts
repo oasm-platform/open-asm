@@ -7,7 +7,7 @@ import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import axios from 'axios';
 import { Repository } from 'typeorm';
-import { StorageService } from '../storage/storage.service';
+import { StorageService } from '@/modules/storage/storage.service';
 import {
   SystemConfigResponseDto,
   UpdateSystemConfigDto,
