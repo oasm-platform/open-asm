@@ -654,7 +654,7 @@ export class ToolsService {
     const enrichedTools = combinedTools.map((tool) => {
       const agentTool = this.isAgentTool(tool);
       if (tool.type === WorkerType.BUILT_IN) {
-        return { ...tool, isReady: true, agentTool };
+        return { ...tool, isInstalled: true, isReady: true, agentTool };
       }
       const hasConfigProfile = workspaceId
         ? profileToolIds.has(tool.id!)
@@ -664,6 +664,7 @@ export class ToolsService {
         this.connectorRegistry.getConnectorSchema(tool.name) !== null;
       return {
         ...tool,
+        isInstalled: true,
         hasConfigProfile,
         isReady: needsConfig ? hasConfigProfile : true,
         agentTool,

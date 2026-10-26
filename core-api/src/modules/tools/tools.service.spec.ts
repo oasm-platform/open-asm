@@ -529,6 +529,22 @@ describe('ToolsService — readiness flags', () => {
   });
 
   describe('getInstalledTools — hasConfigProfile and isReady', () => {
+    it('marks every returned tool as installed for the console actions', async () => {
+      const builtInTool = makeTool({
+        id: 'tool-3', name: 'subfinder', type: WorkerType.BUILT_IN, isBuiltIn: true,
+      });
+      const connectorTool = makeTool({
+        id: 'tool-1', name: 'nuclei', type: WorkerType.CONNECTOR,
+      });
+      toolsRepo.find.mockResolvedValueOnce([builtInTool]);
+      workspaceToolRepo.find.mockResolvedValueOnce([{ tool: connectorTool }]);
+      connectorRegistry.getConnectorSchema.mockReturnValue(null);
+
+      const result = await service.getInstalledTools({}, 'ws-001');
+
+      expect(result.data.map((tool) => tool.isInstalled)).toEqual([true, true]);
+    });
+
     it('should always include isReady=true for built-in tools', async () => {
       const builtInTool = makeTool({
         id: 'tool-3', name: 'subfinder', type: WorkerType.BUILT_IN, isBuiltIn: true,
