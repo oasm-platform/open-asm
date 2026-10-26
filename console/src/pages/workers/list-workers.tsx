@@ -15,6 +15,7 @@ import { useLiveEvents } from '@/hooks/use-live-events';
 import { useNavigateWithParams } from '@/hooks/useNavigateWithParams';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useWorkersControllerGetWorkers } from '@/services/apis/gen/queries';
+import { useSession, type User } from '@/utils/authClient';
 import type {
   WorkerListItemDto,
   WorkersControllerGetWorkersParams,
@@ -51,10 +52,14 @@ const ListWorkers = () => {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
   const navigateWithParams = useNavigateWithParams();
+  const { data: session } = useSession();
+  // Global workers run every workspace's jobs, so the API serves them to
+  // admins only.
+  const isAdmin = (session?.user as User | undefined)?.role === 'admin';
   const [activeTab, setActiveTab] = useQueryTab({
     tabParam: 'tab',
     defaultValue: 'workspace',
-    validValues: [...VALID_TABS],
+    validValues: isAdmin ? [...VALID_TABS] : ['workspace'],
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [surface, setSurface] = useState<WorkerSurface>('ALL');
@@ -276,7 +281,7 @@ const ListWorkers = () => {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full gap-4">
         <TabsList>
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
-          <TabsTrigger value="global">Global</TabsTrigger>
+          {isAdmin && <TabsTrigger value="global">Global</TabsTrigger>}
         </TabsList>
         {/* Same toolbar as DataTable (targets page): search and filters on
             the left, actions on the right from md up; stacked below md */}
