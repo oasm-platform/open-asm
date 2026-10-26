@@ -26,6 +26,10 @@ type RemoteExecuteHandler struct {
 // Core only lets a shared (global) worker serve agents when it is present.
 const AgentSandboxHeader = "x-agent-sandbox"
 
+// RemoteExecuteKeepaliveHeader tells core-api this worker understands PING
+// events, so core keeps the otherwise idle stream alive through proxies.
+const RemoteExecuteKeepaliveHeader = "x-remote-execute-keepalive"
+
 // SetAgentSandbox records whether agent commands run sandboxed. Set it only
 // once the sandbox is actually usable: the header is a security claim core
 // relies on to route other workspaces' agents here.
@@ -33,6 +37,7 @@ func (c *Client) SetAgentSandbox(enabled bool) { c.agentSandbox.Store(enabled) }
 
 // RemoteExecuteSubscribe opens the remote-execute event stream to core-api.
 func (c *Client) RemoteExecuteSubscribe(ctx context.Context) (*RemoteExecuteHandler, error) {
+	ctx = metadata.AppendToOutgoingContext(ctx, RemoteExecuteKeepaliveHeader, "1")
 	if c.agentSandbox.Load() {
 		ctx = metadata.AppendToOutgoingContext(ctx, AgentSandboxHeader, "1")
 	}

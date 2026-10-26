@@ -96,6 +96,9 @@ enum RemoteExecuteSubscribeEventType {
   // Core stopped waiting on a RUN_TOOL (user cancel or timeout): the worker
   // kills the run of that session_id.
   REMOTE_EXECUTE_SUBSCRIBE_EVENT_CANCEL_TOOL   = 4;
+  // Keepalive so proxies do not cut the idle stream. Sent only to workers
+  // that subscribed with x-remote-execute-keepalive: "1"; nothing to do.
+  REMOTE_EXECUTE_SUBSCRIBE_EVENT_PING          = 5;
 }
 
 message ToolRun {

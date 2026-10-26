@@ -1,5 +1,6 @@
 import {
   AGENT_SANDBOX_HEADER,
+  REMOTE_EXECUTE_KEEPALIVE_HEADER,
   WORKER_TOKEN_HEADER,
 } from '@/common/constants/app.constants';
 import { WorkspacePermissions } from '@/common/decorators/workspace-permissions.decorator';
@@ -233,24 +234,33 @@ describe('WorkersController remote execute', () => {
     exitCode: 0,
   });
 
-  it('registers the subscribing worker with its agent sandbox header', () => {
+  it('registers the subscribing worker with its sandbox and keepalive headers', () => {
     const { controller, subscribeService } = build();
     const register = jest.spyOn(subscribeService, 'registerWorker');
 
-    controller
+    const own = controller
       .grpcRemoteExecuteSubscribe(
         {},
-        metadataFor(ownWorker.token, { [AGENT_SANDBOX_HEADER]: '1' }),
+        metadataFor(ownWorker.token, {
+          [AGENT_SANDBOX_HEADER]: '1',
+          [REMOTE_EXECUTE_KEEPALIVE_HEADER]: '1',
+        }),
       )
       .subscribe();
     controller
       .grpcRemoteExecuteSubscribe({}, metadataFor(otherWorker.token))
       .subscribe();
 
-    expect(register).toHaveBeenNthCalledWith(1, ownWorker, { sandboxed: true });
+    expect(register).toHaveBeenNthCalledWith(1, ownWorker, {
+      sandboxed: true,
+      keepalive: true,
+    });
     expect(register).toHaveBeenNthCalledWith(2, otherWorker, {
       sandboxed: false,
+      keepalive: false,
     });
+    // stops the keepalive interval
+    own.unsubscribe();
   });
 
   it('drops a result from a worker the session was not assigned to', async () => {
@@ -287,5 +297,55 @@ describe('WorkersController remote execute', () => {
       ),
     ).resolves.toMatchObject({ success: true });
     expect(workersService.handleRemoteExecuteResult).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('WorkersController.grpcJoin', () => {
+  const originalTrustedProxies = process.env.TRUSTED_PROXIES;
+  afterEach(() => {
+    if (originalTrustedProxies === undefined) delete process.env.TRUSTED_PROXIES;
+    else process.env.TRUSTED_PROXIES = originalTrustedProxies;
+  });
+
+  const join = async (peer: string, forwardedFor?: string) => {
+    const workersService = {
+      join: jest.fn().mockResolvedValue({ id: 'w-1', token: 't-1' }),
+    };
+    const controller = new WorkersController(
+      workersService as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    const metadata = new Metadata();
+    if (forwardedFor) metadata.set('x-forwarded-for', forwardedFor);
+
+    await controller.grpcJoin({ apiKey: 'key' }, metadata, {
+      getPeer: () => peer,
+    });
+    return (workersService.join.mock.calls[0][0] as { ipAddress?: string })
+      .ipAddress;
+  };
+
+  it('stores the direct peer address without its port', async () => {
+    delete process.env.TRUSTED_PROXIES;
+    await expect(join('203.0.113.7:51234')).resolves.toBe('203.0.113.7');
+    await expect(join('[2001:db8::1]:51234')).resolves.toBe('2001:db8::1');
+  });
+
+  it('ignores X-Forwarded-For unless the peer is a trusted proxy', async () => {
+    delete process.env.TRUSTED_PROXIES;
+    await expect(join('172.19.0.5:443', '203.0.113.7')).resolves.toBe(
+      '172.19.0.5',
+    );
+  });
+
+  it('takes the worker address forwarded by a trusted proxy', async () => {
+    process.env.TRUSTED_PROXIES = '172.16.0.0/12';
+    await expect(
+      join('172.19.0.5:443', '203.0.113.7, 172.19.0.7'),
+    ).resolves.toBe('203.0.113.7');
   });
 });

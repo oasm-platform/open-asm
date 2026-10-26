@@ -1,5 +1,10 @@
 import {
+  parseTrustedProxies,
+  resolveClientIp,
+} from '@/common/config/trusted-proxies';
+import {
   AGENT_SANDBOX_HEADER,
+  REMOTE_EXECUTE_KEEPALIVE_HEADER,
   WORKER_TOKEN_HEADER,
 } from '@/common/constants/app.constants';
 import { Public, UserContext } from '@/common/decorators/app.decorator';
@@ -56,6 +61,15 @@ import type {
 
 interface GrpcCall {
   getPeer?(): string | undefined;
+}
+
+/** grpc-js peers are "host:port" or "[ipv6]:port". */
+function peerIp(peer: string | undefined): string | undefined {
+  if (!peer) return undefined;
+  const bracketed = /^\[(.+)\]:\d+$/.exec(peer);
+  if (bracketed) return bracketed[1];
+  const colon = peer.lastIndexOf(':');
+  return colon === -1 ? peer : peer.slice(0, colon);
 }
 
 interface GrpcTimestamp {
@@ -272,10 +286,15 @@ export class WorkersController {
       token?: string;
       metadata?: { name?: string; os?: string; mode?: number | string };
     },
+    grpcMetadata: Metadata,
     call: GrpcCall,
   ): Promise<{ workerId: string; workerToken: string }> {
-    const peer = call?.getPeer?.();
-    const ipAddress = typeof peer === 'string' ? peer.split(':')[0] : undefined;
+    const forwardedFor = grpcMetadata?.get('x-forwarded-for')?.[0];
+    const ipAddress = resolveClientIp(
+      peerIp(call?.getPeer?.()),
+      typeof forwardedFor === 'string' ? forwardedFor : undefined,
+      parseTrustedProxies(process.env.TRUSTED_PROXIES),
+    );
 
     const worker = await this.workersService.join({
       apiKey: requests.apiKey,
@@ -422,9 +441,14 @@ export class WorkersController {
     // "1" = the worker runs agent shell commands in a per-session sandbox
     const sandboxed =
       String(metadata.get(AGENT_SANDBOX_HEADER)?.[0] ?? '') === '1';
+    const keepalive =
+      String(metadata.get(REMOTE_EXECUTE_KEEPALIVE_HEADER)?.[0] ?? '') === '1';
 
     const { subject, observable } =
-      this.remoteExecuteSubscribeService.registerWorker(worker, { sandboxed });
+      this.remoteExecuteSubscribeService.registerWorker(worker, {
+        sandboxed,
+        keepalive,
+      });
 
     subject.next({
       id: '',
