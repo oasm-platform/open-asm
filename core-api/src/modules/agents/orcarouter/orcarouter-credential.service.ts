@@ -15,27 +15,41 @@ export interface OrcaRouterCredential {
   source: OrcaRouterCredentialSource;
 }
 
-const GENERATION = 'orcarouter:cred:generation:';
-const REAUTH = 'orcarouter:cred:needs-reauth:';
+/** Set of fingerprints of the keys the gateway rejected, per connection. */
+const REJECTED = 'orcarouter:cred:rejected:';
 
-/** Detects a 401 from AI SDK / fetch style errors, without logging the error. */
-export function isUnauthorizedError(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false;
-  const candidate = error as {
-    statusCode?: unknown;
-    status?: unknown;
-    cause?: unknown;
-    message?: unknown;
-  };
-  if ((candidate.statusCode ?? candidate.status) === 401) return true;
-  if (candidate.cause && candidate.cause !== error) {
-    if (isUnauthorizedError(candidate.cause)) return true;
-  }
+interface ErrorLike {
+  statusCode?: unknown;
+  status?: unknown;
+  cause?: unknown;
+  lastError?: unknown;
+  message?: unknown;
+}
+
+/** HTTP status of an error, looking through `RetryError` and `cause` wrappers. */
+function httpStatusOf(error: unknown, depth = 0): number | undefined {
+  if (depth > 5 || typeof error !== 'object' || error === null) return undefined;
+  const candidate = error as ErrorLike;
+  const status = candidate.statusCode ?? candidate.status;
+  if (typeof status === 'number') return status;
   return (
-    typeof candidate.message === 'string' &&
-    /\b(401|unauthorized|invalid api key|invalid_api_key)\b/i.test(
-      candidate.message,
-    )
+    httpStatusOf(candidate.lastError, depth + 1) ??
+    httpStatusOf(candidate.cause, depth + 1)
+  );
+}
+
+/**
+ * Detects a 401 from AI SDK / fetch style errors, without logging the error.
+ * A status code, when present, is authoritative: a 403 policy denial whose
+ * message reads "Unauthorized" is not a credential failure.
+ */
+export function isUnauthorizedError(error: unknown): boolean {
+  const status = httpStatusOf(error);
+  if (status !== undefined) return status === 401;
+  const message = (error as ErrorLike | null)?.message;
+  return (
+    typeof message === 'string' &&
+    /\b(401|invalid api key|invalid_api_key)\b/i.test(message)
   );
 }
 
@@ -56,7 +70,7 @@ export class OrcaRouterCredentialService {
         'Paste an OrcaRouter API key (sk-orca-…) or use "Connect with OrcaRouter".',
       );
     }
-    // Format check only; validity is established by the first real request.
+    // Format check only; validity is established by the live model catalog.
     if (!key.startsWith('sk-orca-')) {
       throw new BadRequestException(
         'That does not look like an OrcaRouter API key. Keys start with "sk-orca-".',
@@ -77,41 +91,83 @@ export class OrcaRouterCredentialService {
     return { apiKey: grant.apiKey, scope: grant.scope, source: 'pkce' };
   }
 
-  /** Opaque, non-reversible credential generation identifier. */
+  /** Opaque, non-reversible credential identifier. */
   fingerprint(apiKey: string): string {
     return createHash('sha256').update(apiKey).digest('hex').slice(0, 32);
   }
 
-  /** Records the generation now in use and clears any stale reauth marker. */
+  /**
+   * A key was stored on the connection. Saving a key again is the explicit way
+   * to trust it again, so any earlier rejection of that exact key is dropped.
+   */
   async recordCredential(configId: string, apiKey: string): Promise<void> {
-    await this.redisService.setex(
-      `${GENERATION}${configId}`,
-      60 * 60 * 24 * 30,
-      this.fingerprint(apiKey),
+    await this.bestEffort('record', () =>
+      this.redisService.client.srem(
+        `${REJECTED}${configId}`,
+        this.fingerprint(apiKey),
+      ),
     );
-    await this.redisService.del(`${REAUTH}${configId}`);
   }
 
   /**
-   * Marks the exact generation that was rejected. Never refreshes and never
-   * deletes the stored key — a PKCE key is durable, not a refresh token.
-   * Returns false for a stale report from an older key.
+   * Marks the exact key that was rejected. Never refreshes and never deletes
+   * the stored key — a PKCE key is durable, not a refresh token. State is
+   * keyed by key fingerprint, so a late 401 from a replaced key can never flag
+   * its replacement, and a single SADD leaves no read-then-write race.
+   * Returns true when the key is newly flagged.
    */
   async reportUnauthorized(
     configId: string,
     rejectedApiKey: string,
   ): Promise<boolean> {
-    const current = await this.redisService.get(`${GENERATION}${configId}`);
-    if (current && current !== this.fingerprint(rejectedApiKey)) return false;
-
-    await this.redisService.setex(`${REAUTH}${configId}`, 60 * 60 * 24 * 7, '1');
+    const added = await this.bestEffort('report', () =>
+      this.redisService.client.sadd(
+        `${REJECTED}${configId}`,
+        this.fingerprint(rejectedApiKey),
+      ),
+    );
+    if (!added) return false;
     this.logger.warn(
       `OrcaRouter credential ${configId} rejected by the gateway; reauthentication required`,
     );
     return true;
   }
 
-  async isNeedsReauth(configId: string): Promise<boolean> {
-    return (await this.redisService.get(`${REAUTH}${configId}`)) === '1';
+  /** True when the key currently stored on the connection was rejected. */
+  async isNeedsReauth(configId: string, apiKey: string): Promise<boolean> {
+    const member = await this.bestEffort('read', () =>
+      this.redisService.client.sismember(
+        `${REJECTED}${configId}`,
+        this.fingerprint(apiKey),
+      ),
+    );
+    return member === 1;
+  }
+
+  /** Drops the state of a deleted connection. */
+  async forget(configId: string): Promise<void> {
+    await this.bestEffort('forget', () =>
+      this.redisService.client.del(`${REJECTED}${configId}`),
+    );
+  }
+
+  /**
+   * Reauth state is advisory: a Redis failure must never fail creating,
+   * updating or listing LLM connections.
+   */
+  private async bestEffort<T>(
+    action: string,
+    run: () => Promise<T>,
+  ): Promise<T | undefined> {
+    try {
+      return await run();
+    } catch (error) {
+      this.logger.warn(
+        `OrcaRouter credential state unavailable (${action}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return undefined;
+    }
   }
 }

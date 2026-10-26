@@ -33,12 +33,16 @@ console.
 
 The model list comes from
 `GET https://api.orcarouter.ai/v1/models?capability=chat` using the workspace
-key. Only models whose `supported_endpoint_types` declare a chat-capable wire
-format (OpenAI, Anthropic, Gemini or OpenAI responses) are shown; image,
-embedding, rerank and video routes are filtered out, and a model without
-capability metadata is not guessed. If the catalog is unreachable a small
-verified seed is shown and flagged as an offline list; live results are never
-merged with it.
+key. OASM calls OrcaRouter through OpenAI chat completions, so only models
+whose `supported_endpoint_types` include `openai` are shown; models reachable
+only through another wire format, and image, embedding, rerank and video
+routes, are filtered out, and a model without capability metadata is not
+guessed. If the catalog is unreachable a small verified seed is shown and
+flagged as an offline list; live results are never merged with it, and the
+offline list is not cached.
+
+A pasted key is saved only once the live catalog accepts it. A key issued by
+"Connect with OrcaRouter" is saved even while the catalog is unreachable.
 
 The selector lists the tiers in a fixed order:
 
@@ -67,7 +71,10 @@ HTTPS is required except for loopback hosts during development.
 
 ## Revoked keys
 
-When the gateway rejects a stored key with `401`, the connection is marked
-**reconnect required** for that exact credential generation. The stored key is
-not deleted; reconnecting writes a replacement. A late `401` from a key that has
-already been replaced never marks the new connection.
+When the gateway rejects a stored key with `401` (on any request: chat,
+subagents, asset tagging or the model list), the connection is marked
+**reconnect required** for that exact key. A `403`, such as a model that needs
+a business-verified account, does not mark it. The stored key is not deleted:
+connecting OrcaRouter again, or pasting a new key, replaces the key on the
+marked connection and keeps its model and default status. A late `401` from a
+key that has already been replaced never marks the new one.

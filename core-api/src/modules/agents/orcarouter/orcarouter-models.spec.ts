@@ -2,7 +2,9 @@
 import {
   fetchOrcaRouterModels,
   isChatCapableModel,
+  isOrcaRouterRoute,
   ORCAROUTER_VERIFIED_SEED,
+  orcaRouterRouteWindow,
   parseOrcaRouterCatalog,
 } from './orcarouter-models';
 import { resolveOrcaRouterOrigins } from './orcarouter.constants';
@@ -39,16 +41,27 @@ describe('resolveOrcaRouterOrigins', () => {
     expect(resolveOrcaRouterOrigins({ ORCA_API_BASE_URL: 'http://127.0.0.1:8080/v1' }).apiBaseUrl)
       .toBe('http://127.0.0.1:8080/v1');
     expect(() => resolveOrcaRouterOrigins({ ORCA_AUTH_BASE_URL: 'http://orca.example' })).toThrow(/HTTPS/);
+    // Hosts that only start like loopback are remote.
+    expect(() =>
+      resolveOrcaRouterOrigins({ ORCA_API_BASE_URL: 'http://localhost.relay.example/v1' }),
+    ).toThrow(/HTTPS/);
+    expect(() =>
+      resolveOrcaRouterOrigins({ ORCA_API_BASE_URL: 'http://127.0.0.1.nip.io/v1' }),
+    ).toThrow(/HTTPS/);
     expect(() => resolveOrcaRouterOrigins({ ORCA_BASE_URL: 'https://u:p@orca.example' })).toThrow(/credentials/);
   });
 });
 
 describe('parseOrcaRouterCatalog', () => {
-  it('keeps only models that explicitly speak a chat endpoint type', () => {
+  it('keeps only models reachable through OpenAI chat completions', () => {
     const models = parseOrcaRouterCatalog({
       data: [
         { id: 'openai/gpt-5.5', name: 'GPT-5.5', supported_endpoint_types: ['openai'], context_length: 400000 },
-        { id: 'anthropic/claude-opus-4.8', name: 'Claude Opus 4.8', supported_endpoint_types: ['anthropic'] },
+        { id: 'anthropic/claude-opus-4.8', name: 'Claude Opus 4.8', supported_endpoint_types: ['anthropic', 'openai'] },
+        // Listed, but the handler could never call them.
+        { id: 'anthropic/messages-only', supported_endpoint_types: ['anthropic'] },
+        { id: 'google/gemini-only', supported_endpoint_types: ['gemini'] },
+        { id: 'openai/responses-only', supported_endpoint_types: ['openai-response'] },
         { id: 'a/image', supported_endpoint_types: ['image-generation'] },
         { id: 'a/video', supported_endpoint_types: ['openai-video'] },
         { id: 'a/rerank', supported_endpoint_types: ['jina-rerank'] },
@@ -97,6 +110,17 @@ describe('parseOrcaRouterCatalog', () => {
       'orcarouter/fusion',
       'other/model',
     ]);
+  });
+});
+
+describe('OrcaRouter routes', () => {
+  it('knows the window of its own routes and leaves vendor ids to models.dev', () => {
+    expect(isOrcaRouterRoute('orcarouter/auto')).toBe(true);
+    expect(isOrcaRouterRoute('orca/orcacyber-ultra-1.0')).toBe(true);
+    expect(isOrcaRouterRoute('openai/gpt-5.5')).toBe(false);
+    expect(orcaRouterRouteWindow('orcarouter/auto')).toBe(200_000);
+    expect(orcaRouterRouteWindow('orca/orcacyber-ultra-1.0')).toBe(1_048_576);
+    expect(orcaRouterRouteWindow('orcarouter/unknown')).toBeUndefined();
   });
 });
 

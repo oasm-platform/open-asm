@@ -72,12 +72,21 @@ export function OrcaRouterConnectForm({
     [cancelAttempt],
   );
 
+  // Leaving the PKCE choice also invalidates a pending start, whose late
+  // result is then released instead of opening a consent tab.
   useEffect(() => {
-    if (method === 'api_key' && attempt) {
-      discard(attempt.attemptId);
-      clearAttempt();
-    }
+    if (method !== 'api_key') return;
+    if (attempt) discard(attempt.attemptId);
+    clearAttempt();
   }, [method, attempt, discard, clearAttempt]);
+
+  // After unmount a pending start must not open a consent tab either.
+  useEffect(
+    () => () => {
+      generation.current += 1;
+    },
+    [],
+  );
 
   const activeAttemptId = attempt?.attemptId ?? null;
 
@@ -140,7 +149,9 @@ export function OrcaRouterConnectForm({
       onConnected();
     } catch (err) {
       if (gen !== generation.current) return;
-      setBusy(false);
+      // The server consumes the attempt before the exchange, so a retry needs
+      // a fresh authorization: go back to the start button.
+      clearAttempt();
       setError(errorMessage(err));
     }
   }, [attempt, code, complete, clearAttempt, onConnected]);

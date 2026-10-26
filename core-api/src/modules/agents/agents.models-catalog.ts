@@ -3,6 +3,10 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { ResolvedLLMConfig } from './agents.config';
 import { LLMProvider } from './enums/agent.enums';
+import {
+  isOrcaRouterRoute,
+  orcaRouterRouteWindow,
+} from './orcarouter/orcarouter-models';
 import type { ContextWindowSource } from './shared/conversation-metadata';
 import {
   type CatalogLookupResult,
@@ -70,13 +74,23 @@ export class AgentsModelsCatalogService implements OnModuleInit {
     if (cfg.contextWindow && cfg.contextWindow > 0) {
       return { tokens: cfg.contextWindow, source: 'manual', estimated: false };
     }
-    const hit = this.lookup(cfg.provider, cfg.model);
-    if (hit && hit.entry.limit.context > 0) {
-      return {
-        tokens: hit.entry.limit.context,
-        source: 'catalog',
-        estimated: hit.estimated,
-      };
+    if (
+      cfg.provider === LLMProvider.ORCAROUTER &&
+      isOrcaRouterRoute(cfg.model)
+    ) {
+      // Not on models.dev: a bare-id guess would borrow another host's window
+      // (`orcarouter/auto` -> `openrouter/auto`, 2M tokens).
+      const tokens = orcaRouterRouteWindow(cfg.model);
+      if (tokens) return { tokens, source: 'catalog', estimated: false };
+    } else {
+      const hit = this.lookup(cfg.provider, cfg.model);
+      if (hit && hit.entry.limit.context > 0) {
+        return {
+          tokens: hit.entry.limit.context,
+          source: 'catalog',
+          estimated: hit.estimated,
+        };
+      }
     }
     return {
       tokens: AgentsModelsCatalogService.DEFAULT_CONTEXT_WINDOW,

@@ -21,6 +21,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { firstValueFrom } from 'rxjs';
@@ -74,6 +75,7 @@ import {
   llmProviderSupported,
 } from './llm-provider-supported';
 import { ORCAROUTER_DEFAULT_MODEL } from './orcarouter/orcarouter.constants';
+import { ORCAROUTER_VERIFIED_SEED } from './orcarouter/orcarouter-models';
 import { OrcaRouterCredentialService } from './orcarouter/orcarouter-credential.service';
 import { OrcaRouterPkceService } from './orcarouter/orcarouter-pkce.service';
 import { LLMProvider } from './enums/agent.enums';
@@ -196,15 +198,70 @@ export class AgentsService {
   }
 
   /** Reauthentication state only exists for the OrcaRouter provider. */
-  private async needsReauthFor(config: AgentLLMConfig): Promise<boolean> {
-    if (config.provider !== LLMProvider.ORCAROUTER) return false;
-    return this.orcaRouterCredentials.isNeedsReauth(config.id);
+  private async needsReauthFor(
+    config: AgentLLMConfig,
+    dek: Buffer | null,
+  ): Promise<boolean> {
+    if (config.provider !== LLMProvider.ORCAROUTER || !config.apiKey) {
+      return false;
+    }
+    return this.orcaRouterCredentials.isNeedsReauth(
+      config.id,
+      decryptWithDEK(config.apiKey, dek),
+    );
+  }
+
+  /**
+   * The OrcaRouter fetcher answers with its offline seed whenever the live
+   * catalog is unreachable, so a seed-only list proves nothing about a key.
+   * A pasted key must be confirmed by the live catalog. A key OrcaRouter has
+   * just issued is stored even if the catalog does not accept it yet, rather
+   * than being dropped while it exists in the user's account.
+   */
+  private verifyOrcaRouterCatalog(
+    models: ProviderModelDto[],
+    issuedKey: boolean,
+  ): ProviderModelDto[] {
+    if (models.some((model) => !model.isFallback)) return models;
+    if (issuedKey) return ORCAROUTER_VERIFIED_SEED;
+    if (models.length === 0) return models;
+    throw new ServiceUnavailableException(
+      'Could not verify the key: the OrcaRouter model catalog is unreachable right now. Please try again shortly.',
+    );
+  }
+
+  /**
+   * The connection a new OrcaRouter key replaces: one whose stored key was
+   * rejected, the default connection first. Connecting again is how a user
+   * fixes a "reconnect required" connection.
+   */
+  private async findRejectedOrcaRouterConfig(
+    workspaceId: string,
+    userId: string,
+  ): Promise<AgentLLMConfig | null> {
+    const configs = await this.llmConfigRepository.find({
+      where: { workspaceId, userId, provider: LLMProvider.ORCAROUTER },
+      order: { createdAt: 'ASC' },
+    });
+    if (configs.length === 0) return null;
+    const dek = await this.workspaceEncryption.getDEK(workspaceId);
+    const defaultId = await this.getDefaultLLMConfigId(workspaceId, userId);
+    const ordered = [
+      ...configs.filter((config) => config.id === defaultId),
+      ...configs.filter((config) => config.id !== defaultId),
+    ];
+    for (const config of ordered) {
+      if (await this.needsReauthFor(config, dek)) return config;
+    }
+    return null;
   }
 
   async createLLMConfig(
     dto: CreateLLMConfigDto,
     workspaceId: string,
     userId: string,
+    /** The key was just issued by the provider itself (OrcaRouter PKCE). */
+    issuedKey = false,
   ): Promise<LLMConfigResponseDto> {
     // Validate API key by fetching models
     const provider = getLLMProviderConfig(dto.provider);
@@ -214,12 +271,38 @@ export class AgentsService {
       );
     }
 
-    const models = await provider.fetchModels(dto.apiKey, dto.apiUrl);
+    const isOrcaRouter = dto.provider === LLMProvider.ORCAROUTER;
+    if (isOrcaRouter) {
+      dto.apiKey = this.orcaRouterCredentials.fromApiKey(
+        dto.apiKey ?? '',
+      ).apiKey;
+    }
+
+    let models = await provider.fetchModels(dto.apiKey, dto.apiUrl);
+    if (isOrcaRouter) models = this.verifyOrcaRouterCatalog(models, issuedKey);
 
     if (models.length === 0) {
       throw new BadRequestException(
         `Cannot connect to ${provider.name}: invalid API key or unable to reach the provider. Please double-check your API key and try again.`,
       );
+    }
+
+    if (isOrcaRouter && dto.apiKey) {
+      const rejected = await this.findRejectedOrcaRouterConfig(
+        workspaceId,
+        userId,
+      );
+      if (rejected) {
+        this.logger.log(
+          `OrcaRouter configuration ${rejected.id} received a replacement key`,
+        );
+        return this.updateLLMConfig(
+          rejected.id,
+          { apiKey: dto.apiKey },
+          workspaceId,
+          userId,
+        );
+      }
     }
 
     // Use first model from the list as default; OrcaRouter always starts on its
@@ -230,7 +313,6 @@ export class AgentsService {
         ? ORCAROUTER_DEFAULT_MODEL
         : models[0].id;
 
-    const plaintextApiKey = dto.apiKey;
     if (!dto.apiKey) {
       dto.apiKey = 'not_set';
     }
@@ -250,14 +332,6 @@ export class AgentsService {
     });
 
     const saved = await this.llmConfigRepository.save(config);
-    if (saved.provider === LLMProvider.ORCAROUTER && plaintextApiKey) {
-      // Remember which credential generation this row holds, so a late 401
-      // from an older request cannot mark a newer credential as broken.
-      await this.orcaRouterCredentials.recordCredential(
-        saved.id,
-        plaintextApiKey,
-      );
-    }
     // The first connection becomes the default model
     let defaultLLMConfigId = await this.getDefaultLLMConfigId(
       workspaceId,
@@ -312,6 +386,7 @@ export class AgentsService {
       },
       workspaceId,
       userId,
+      true,
     );
     this.logger.log(
       `OrcaRouter configuration ${config.id} connected via ${credential.source}`,
@@ -319,9 +394,13 @@ export class AgentsService {
     return config;
   }
 
-  /** Discards an abandoned connect attempt. */
-  async cancelOrcaRouterConnect(attemptId: string): Promise<void> {
-    await this.orcaRouterPkce.cancel(attemptId);
+  /** Discards an abandoned connect attempt of the caller's own session. */
+  async cancelOrcaRouterConnect(
+    attemptId: string,
+    workspaceId: string,
+    userId: string,
+  ): Promise<void> {
+    await this.orcaRouterPkce.cancel({ attemptId, workspaceId, userId });
   }
 
   async getLLMProvidersStatus(
@@ -347,7 +426,7 @@ export class AgentsService {
                 c,
                 dek,
                 defaultLLMConfigId,
-                await this.needsReauthFor(c),
+                await this.needsReauthFor(c, dek),
               ),
             ] as const,
         ),
@@ -405,7 +484,7 @@ export class AgentsService {
           apiUrl: config.apiUrl,
           isPreferred: config.id === defaultLLMConfigId,
           apiKeyMasked,
-          needsReauth: await this.needsReauthFor(config),
+          needsReauth: await this.needsReauthFor(config, dek),
           createdAt: config.createdAt,
           updatedAt: config.updatedAt,
           isAcceptCustomApiUrl: providerMeta?.isAcceptCustomApiUrl ?? false,
@@ -440,8 +519,8 @@ export class AgentsService {
 
     const saved = await this.llmConfigRepository.save(config);
     if (dto.apiKey && saved.provider === LLMProvider.ORCAROUTER) {
-      // A replacement key is a new credential generation: it clears any
-      // needsReauth marker and invalidates late failures from the old key.
+      // Rejections are tracked per key: a different key starts clean, and
+      // saving the same key again explicitly trusts it again.
       await this.orcaRouterCredentials.recordCredential(saved.id, dto.apiKey);
     }
     // Picking a model on the default connection changes the default model
@@ -479,6 +558,9 @@ export class AgentsService {
 
     await this.llmConfigRepository.remove(config);
     await this.agentsConfig.removeLLMConfigRefs(workspaceId, userId, id);
+    if (config.provider === LLMProvider.ORCAROUTER) {
+      await this.orcaRouterCredentials.forget(id);
+    }
   }
 
   async setPreferredLLMConfig(
@@ -540,7 +622,16 @@ export class AgentsService {
     );
     const models = await provider.fetchModels(apiKey, config.apiUrl);
 
-    // Cache the result for 1 hour (3600 seconds)
+    if (config.provider === LLMProvider.ORCAROUTER && models.length === 0) {
+      // The catalog only answers with nothing for a key it refuses (401/403)
+      await this.orcaRouterCredentials.reportUnauthorized(config.id, apiKey);
+    }
+
+    // Cache the result for 1 hour (3600 seconds). An empty or offline-seed
+    // list is a failed lookup: it is not cached, so the next open retries.
+    if (models.length === 0 || models.some((model) => model.isFallback)) {
+      return models;
+    }
     try {
       await this.redisService.setex(cacheKey, 3600, JSON.stringify(models));
     } catch (error) {

@@ -144,11 +144,31 @@ describe('OrcaRouterPkceService.complete', () => {
     await expect(transport.complete((await transport.start()).attemptId)).rejects.toMatchObject({ status: 503 });
   });
 
-  it('rejects a foreign key shape and discards an attempt on cancel', async () => {
-    const { redis, service, start, complete } = build();
+  it('keeps the attempt when the submitted code is empty', async () => {
+    const { start, complete } = build();
+    const { attemptId } = await start();
+    mockFetch(() => json(200, { key: 'sk-orca-issued', scope: 'api' }));
+    await expect(complete(attemptId, { code: '   ' })).rejects.toThrow(/Paste the code/);
+    await expect(complete(attemptId)).resolves.toMatchObject({ apiKey: 'sk-orca-issued' });
+  });
+
+  it('rejects a foreign key shape', async () => {
+    const { start, complete } = build();
     mockFetch(() => json(200, { key: 'sk-live-something', scope: 'api' }));
     await expect(complete((await start()).attemptId)).rejects.toThrow(/did not return a usable API key/);
-    await service.cancel((await start()).attemptId);
+  });
+});
+
+describe('OrcaRouterPkceService.cancel', () => {
+  it('discards the attempt of its own session only', async () => {
+    const { redis, service, start } = build();
+    const { attemptId } = await start();
+
+    await service.cancel({ attemptId, workspaceId: 'other', userId: USER });
+    await service.cancel({ attemptId, workspaceId: WS, userId: 'someone-else' });
+    expect(redis.store.size).toBe(1);
+
+    await service.cancel({ attemptId, workspaceId: WS, userId: USER });
     expect(redis.store.size).toBe(0);
   });
 });

@@ -1,8 +1,9 @@
 import { decryptWithDEK } from '@/common/utils/workspace-encryption.util';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import type { LanguageModel } from 'ai';
+import { type LanguageModel, wrapLanguageModel } from 'ai';
 import { In, Repository } from 'typeorm';
 import {
   AgentConfigResponseDto,
@@ -23,6 +24,17 @@ import {
   OrcaRouterCredentialService,
 } from './orcarouter/orcarouter-credential.service';
 import { currentToolName } from './tools/helpers';
+
+/**
+ * Emitted by LLM calls made outside the agents module (asset tagging) when a
+ * request fails, so a rejected credential is flagged there too.
+ */
+export const LLM_REQUEST_FAILED_EVENT = 'agents.llm-request.failed';
+
+export interface LLMRequestFailedEvent {
+  config: AgentLLMConfig;
+  error: unknown;
+}
 
 export function maskApiKey(apiKey: string): string {
   if (apiKey.length <= 4) return '****';
@@ -123,6 +135,8 @@ export async function findDefaultLLMConfig(
 
 @Injectable()
 export class AgentsConfigService {
+  private readonly logger = new Logger(AgentsConfigService.name);
+
   constructor(
     @InjectRepository(AgentConfig)
     private readonly configRepository: Repository<AgentConfig>,
@@ -149,6 +163,60 @@ export class AgentsConfigService {
       config.apiKey,
     );
     await this.orcaRouterCredentials.reportUnauthorized(config.id, apiKey);
+  }
+
+  @OnEvent(LLM_REQUEST_FAILED_EVENT)
+  async onLLMRequestFailed({ config, error }: LLMRequestFailedEvent) {
+    await this.reportProviderAuthErrorSafely(config, error);
+  }
+
+  /** Fire-and-forget variant: never delays or replaces the original error. */
+  private async reportProviderAuthErrorSafely(
+    config: AgentLLMConfig,
+    error: unknown,
+  ): Promise<void> {
+    try {
+      await this.reportProviderAuthError(config, error);
+    } catch (reportError) {
+      this.logger.error(
+        'Failed to record provider authentication failure',
+        reportError,
+      );
+    }
+  }
+
+  /**
+   * Every request made with the model (chat, titles, summaries, subagents)
+   * reports a rejected key, not only the main chat stream.
+   */
+  private withAuthErrorReporting(
+    model: LanguageModel,
+    config: AgentLLMConfig,
+  ): LanguageModel {
+    if (typeof model === 'string') return model;
+    const report = (error: unknown) =>
+      void this.reportProviderAuthErrorSafely(config, error);
+    return wrapLanguageModel({
+      model,
+      middleware: {
+        wrapGenerate: async ({ doGenerate }) => {
+          try {
+            return await doGenerate();
+          } catch (error) {
+            report(error);
+            throw error;
+          }
+        },
+        wrapStream: async ({ doStream }) => {
+          try {
+            return await doStream();
+          } catch (error) {
+            report(error);
+            throw error;
+          }
+        },
+      },
+    });
   }
 
   find(workspaceId: string, userId: string): Promise<AgentConfig | null> {
@@ -194,7 +262,10 @@ export class AgentsConfigService {
     const baseURL =
       config.provider === LLMProvider.CUSTOM ? config.apiUrl : undefined;
 
-    return providerConfig.handler(apiKey, config.model, baseURL);
+    const model = providerConfig.handler(apiKey, config.model, baseURL);
+    return config.provider === LLMProvider.ORCAROUTER
+      ? this.withAuthErrorReporting(model, config)
+      : model;
   }
 
   /**

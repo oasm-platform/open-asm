@@ -179,8 +179,11 @@ describe('OrcaRouterConnectForm completion', () => {
     await waitFor(() => expect(onConnected).toHaveBeenCalledTimes(1));
   });
 
-  it('keeps the attempt usable when the exchange is rejected', async () => {
-    mocks.start.mockResolvedValue(attempt('retry'));
+  it('offers a fresh authorization after the exchange is rejected', async () => {
+    // The server consumes the attempt before exchanging, so it cannot be retried.
+    mocks.start
+      .mockResolvedValueOnce(attempt('rejected'))
+      .mockResolvedValueOnce(attempt('fresh'));
     mocks.complete.mockRejectedValue({
       response: { data: { message: 'The code is unknown or expired.' } },
     });
@@ -194,6 +197,54 @@ describe('OrcaRouterConnectForm completion', () => {
       'The code is unknown or expired.',
     );
     expect(onConnected).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Finish connection' })).toBeEnabled();
+    expect(screen.queryByLabelText('Authorization code')).not.toBeInTheDocument();
+
+    await userEvent.click(connectButton());
+    expect(mocks.start).toHaveBeenCalledTimes(2);
+    expect(screen.getByText(url('fresh'))).toBeInTheDocument();
+  });
+});
+
+describe('OrcaRouterConnectForm pending start', () => {
+  const pendingStart = () => {
+    let resolveStart!: (value: ReturnType<typeof attempt>) => void;
+    mocks.start.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveStart = resolve;
+      }),
+    );
+    return (value: ReturnType<typeof attempt>) => resolveStart(value);
+  };
+
+  it('releases a start that resolves after the dialog closed', async () => {
+    const resolveStart = pendingStart();
+    const { unmount } = renderForm();
+    await startPkce();
+
+    unmount();
+    resolveStart(attempt('orphan'));
+
+    await waitFor(() =>
+      expect(mocks.cancel).toHaveBeenCalledWith({ attemptId: 'orphan' }),
+    );
+    expect(window.open).not.toHaveBeenCalled();
+  });
+
+  it('releases a start that resolves after switching to the API key choice', async () => {
+    const resolveStart = pendingStart();
+    renderForm();
+    await startPkce();
+
+    await userEvent.click(screen.getByRole('tab', { name: 'API Key' }));
+    resolveStart(attempt('switched'));
+
+    await waitFor(() =>
+      expect(mocks.cancel).toHaveBeenCalledWith({ attemptId: 'switched' }),
+    );
+    expect(window.open).not.toHaveBeenCalled();
+
+    // Coming back is not stuck on "Starting…".
+    await userEvent.click(screen.getByRole('tab', { name: 'Connect with OrcaRouter' }));
+    expect(connectButton()).toBeEnabled();
   });
 });

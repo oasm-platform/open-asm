@@ -37,7 +37,7 @@ export const ConnectedConfigRow = memo(function ConnectedConfigRow({
               {item.needsReauth && (
                 <span
                   className="text-[10px] px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive font-medium leading-none"
-                  title="OrcaRouter rejected this key. Reconnect to issue a new one; the stored configuration is kept until then."
+                  title="OrcaRouter rejected this key. Connect OrcaRouter again (or paste a new key) to replace it; the stored configuration is kept until then."
                 >
                   reconnect required
                 </span>

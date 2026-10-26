@@ -293,8 +293,14 @@ export class AgentsController {
   })
   async cancelOrcaRouterConnect(
     @Param('attemptId') attemptId: string,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
   ): Promise<{ message: string }> {
-    await this.agentsService.cancelOrcaRouterConnect(attemptId);
+    await this.agentsService.cancelOrcaRouterConnect(
+      attemptId,
+      workspaceId,
+      userId,
+    );
     return { message: 'Connect attempt discarded' };
   }
 

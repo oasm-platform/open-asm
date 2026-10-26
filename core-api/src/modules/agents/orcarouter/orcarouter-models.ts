@@ -10,8 +10,12 @@ const TIMEOUT_MS = 10_000;
 const MAX_BYTES = 512 * 1024;
 const MAX_ITEMS = 500;
 
-/** Wire formats this client can actually speak. */
-const CHAT_TYPES = new Set(['openai', 'anthropic', 'gemini', 'openai-response']);
+/**
+ * Wire formats this client can actually speak: the provider handler always
+ * calls OpenAI chat completions, so an Anthropic-, Gemini- or Responses-only
+ * model would be listed but fail on every request.
+ */
+const CHAT_TYPES = new Set(['openai']);
 /** Non-text routes that must never appear in a chat selector. */
 const NON_TEXT_TYPES = new Set([
   'image-generation',
@@ -55,6 +59,15 @@ export const ORCAROUTER_VERIFIED_SEED: ProviderModelDto[] = [
     reasoningEfforts: ['low', 'medium', 'high', 'xhigh'],
   }),
 ];
+
+/** OrcaRouter's own routes (`orcarouter/…`, `orca/…`), which models.dev does not list. */
+export const isOrcaRouterRoute = (modelId: string): boolean =>
+  /^(orcarouter|orca)\//i.test(modelId.trim());
+
+/** Context window of an OrcaRouter route, from the verified seed. */
+export const orcaRouterRouteWindow = (modelId: string): number | undefined =>
+  ORCAROUTER_VERIFIED_SEED.find((model) => model.id === modelId.trim())
+    ?.contextLength;
 
 /** Selector order: default routing, cyber tiers, general fallback, rest. */
 const PREFERRED = [

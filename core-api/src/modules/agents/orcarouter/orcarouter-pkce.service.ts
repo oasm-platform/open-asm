@@ -124,19 +124,34 @@ export class OrcaRouterPkceService {
         `The OrcaRouter authorization response did not match this attempt. ${RETRY}`,
       );
     }
-    // Single use: consume before the network call, so a code cannot be replayed.
-    await this.redisService.del(key);
+    // An empty submission is a typo, not a redemption: keep the attempt.
     const code = args.code.trim();
     if (!code) {
       throw new BadRequestException(
         'Paste the code shown on the OrcaRouter consent screen.',
       );
     }
+    // Single use: consume before the network call, so a code cannot be replayed.
+    await this.redisService.del(key);
     return this.exchange(code, attempt.verifier);
   }
 
-  async cancel(attemptId: string): Promise<void> {
-    await this.redisService.del(`${PREFIX}${attemptId}`);
+  /** Discards an attempt; only its own session may do so. */
+  async cancel(args: {
+    attemptId: string;
+    workspaceId: string;
+    userId: string;
+  }): Promise<void> {
+    const key = `${PREFIX}${args.attemptId}`;
+    const attempt = this.parse(await this.redisService.get(key));
+    if (
+      !attempt ||
+      attempt.workspaceId !== args.workspaceId ||
+      attempt.userId !== args.userId
+    ) {
+      return;
+    }
+    await this.redisService.del(key);
   }
 
   private parse(raw: string | null): StoredAttempt | null {

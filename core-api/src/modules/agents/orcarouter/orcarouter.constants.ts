@@ -32,7 +32,13 @@ export function normalizeOrcaRouterOrigin(raw: string, name: string): string {
   } catch {
     throw new Error(`${name} is not a valid URL`);
   }
-  const loopback = /^(localhost|127\.|\[::1\]|::1)/i.test(url.hostname);
+  // Whole-hostname match: `localhost.example.com` or `127.0.0.1.nip.io` are
+  // remote hosts and must not get the plain-HTTP exemption.
+  const host = url.hostname.toLowerCase();
+  const loopback =
+    host === 'localhost' ||
+    host === '[::1]' ||
+    /^127(?:\.\d{1,3}){3}$/.test(host);
   if (url.protocol !== 'https:' && !(url.protocol === 'http:' && loopback)) {
     throw new Error(`${name} must use HTTPS unless it points at loopback`);
   }
