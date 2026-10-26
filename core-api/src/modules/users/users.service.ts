@@ -1,17 +1,15 @@
 import { BOT_EMAIL, BOT_ID, BOT_NAME } from '@/common/constants/app.constants';
 import { Role } from '@/common/enums/enum';
-import { ForbiddenException, Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../auth/entities/user.entity';
-import { AuthService } from './../auth/auth.service';
 
 @Injectable()
 export class UsersService implements OnModuleInit {
   constructor(
     @InjectRepository(User)
     public usersRepository: Repository<User>,
-    private authService: AuthService,
   ) {}
 
   async onModuleInit() {
@@ -31,40 +29,5 @@ export class UsersService implements OnModuleInit {
       });
       await this.usersRepository.save(bot);
     }
-  }
-  /**
-   * Creates the first admin user in the system.
-   * @param email The email address to use for the admin user.
-   * @param password The password to use for the admin user.
-   * @returns The newly created user object.
-   */
-  public async createFirstAdmin(email: string, password: string) {
-    if (
-      (await this.usersRepository.count({
-        where: { role: Role.ADMIN },
-      })) > 0
-    ) {
-      throw new ForbiddenException();
-    }
-
-    const result = await this.authService.api.signUpEmail({
-      body: {
-        name: 'Admin',
-        email,
-        password,
-      },
-    });
-
-    await this.usersRepository.update(result.user.id, {
-      role: Role.ADMIN,
-      emailVerified: true,
-    });
-
-    return this.authService.api.signInEmail({
-      body: {
-        email,
-        password,
-      },
-    });
   }
 }

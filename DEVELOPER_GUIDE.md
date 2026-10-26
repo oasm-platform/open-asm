@@ -403,8 +403,8 @@ directly, so upload and download traffic bypasses the API process.
 | --- | --- | --- |
 | `/api/storage/presign/upload` | POST | Presigned `PUT` into any non-private bucket. `@Roles(Role.ADMIN)`. |
 | `/api/storage/presign/download` | GET | Presigned `GET`; optional `fileName` becomes `Content-Disposition`. Gated by `authorizeRead` (see Read authorization below), so a URL for another workspace's screenshot or template is refused with 403 before signing. |
-| `/api/storage/logo/presign` | POST | Presigned `PUT` for the app logo: `system` bucket, `logo-` prefix, image extensions only. `@Roles(Role.ADMIN)`. |
-| `/api/storage/logo/confirm` | POST | `HeadObject` on the uploaded key, validates content type and size, then activates the logo. `@Roles(Role.ADMIN)`. |
+| `/api/admin/system-configs/logo/presign` | POST | Presigned `PUT` for the app logo: `system` bucket, `logo-` prefix, image extensions only. `@Roles(Role.ADMIN)`. |
+| `/api/admin/system-configs/logo/confirm` | POST | `HeadObject` on the uploaded key, validates content type and size, then activates the logo. `@Roles(Role.ADMIN)`. |
 | `/api/templates/:templateId/presign` | POST | Presigned `PUT` for a template YAML. Requires workspace permission `template.write`. |
 
 Buckets come from `StorageService.buckets`; `privateBuckets = ['reports',
@@ -412,7 +412,7 @@ Buckets come from `StorageService.buckets`; `privateBuckets = ['reports',
 
 `logo/confirm` is the only server-side check in the flow. It heads the object
 and rejects non-images and anything above `LOGO_MAX_SIZE_BYTES` (5 MB,
-`storage.controller.ts:37`), and it runs *after* the bytes are already in
+`admin/system-configs/system-configs.controller.ts:26`), and it runs *after* the bytes are already in
 storage.
 
 ### Public-read vs presigned
@@ -456,7 +456,7 @@ Required IAM: `s3:PutBucketPolicy` (+ `s3:PutBucketPublicAccessBlock` when the
 account enforces Block Public Access).
 
 Consumers: system-configs `getConfig` resolves the raw logo path to `{ url }`
-(`core-api/src/modules/system-configs/system-configs.service.ts:49`) and
+(`core-api/src/modules/admin/system-configs/system-configs.service.ts:49`) and
 deletes by the raw path from `getRawLogoPath`, never by splitting a signed
 URL; assets list/detail resolve `screenshotPath` the same way
 (`core-api/src/modules/assets/assets.service.ts:354,495`); the
@@ -465,8 +465,8 @@ and emits the resolved `iconUrl`
 (`core-api/src/modules/technology/technology-forwarder.service.ts:577,593`).
 The login page reads the presign TTL from
 `GetMetadataDto.storagePresignTtlSeconds`
-(`core-api/src/modules/root/dto/root.dto.ts:36`, served by
-`core-api/src/modules/root/root.service.ts:82`) and the console bounds its
+(`core-api/src/modules/root/dto/root.dto.ts:23`, served by
+`core-api/src/modules/root/root.service.ts:64`) and the console bounds its
 signed-screenshot query cache with `deriveScreenshotStaleTime`
 (`min(60s, ttl * 0.8)`); public `logoPath`/`iconUrl` queries are
 deliberately uncached by TTL.

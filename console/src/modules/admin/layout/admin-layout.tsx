@@ -1,8 +1,8 @@
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { Info, Palette, User } from 'lucide-react';
 import type { JSX, ReactNode } from 'react';
-import { HeaderBar } from './header-bar';
-import { AppSidebar, type NavGroup } from './menu-bar';
+import { HeaderBar } from '@/components/common/layout/header-bar';
+import { AppSidebar, type NavGroup } from '@/components/common/layout/menu-bar';
 
 interface AdminLayoutProps {
   children: ReactNode;

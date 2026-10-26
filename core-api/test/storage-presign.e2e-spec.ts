@@ -73,7 +73,7 @@ describe('Presigned storage access (e2e)', () => {
 
     // `POST /api/auth/admin/set-role` (better-auth's admin plugin) requires an
     // admin that a throwaway test DB has no reason to have, so this performs the
-    // same grant `POST /api/init-admin` performs internally. `AuthGuard` reads
+    // same grant `POST /api/admin/init` performs internally. `AuthGuard` reads
     // the user row through `getSession` on every request, so no re-login is
     // needed — and the upload assertion below failing with 403 would mean the
     // grant did not take, rather than passing silently as a non-admin.

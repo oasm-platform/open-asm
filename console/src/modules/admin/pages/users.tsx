@@ -1,5 +1,5 @@
 import Page from '@/components/common/page';
-import { ListUsers } from './list-users';
+import { ListUsers } from '../components/list-users';
 
 export default function Users() {
   return (

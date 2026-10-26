@@ -942,11 +942,6 @@ export type UpdateWorkflowDto = {
   filePath?: string;
 };
 
-export type CreateFirstAdminDto = {
-  email: string;
-  password: string;
-};
-
 /**
  * Current system version
  */
@@ -1027,6 +1022,25 @@ export type UpdateSystemConfigDto = {
   name?: string;
   /** Path to system logo */
   logoPath?: UpdateSystemConfigDtoLogoPath;
+};
+
+export type LogoPresignRequestDto = {
+  /** Original file name of the object */
+  fileName: string;
+  contentType?: string;
+};
+
+export type LogoPresignResponseDto = {
+  uploadUrl: string;
+  key: string;
+  path: string;
+  /** Lifetime of the presigned URL in seconds */
+  expiresIn: number;
+};
+
+export type ConfirmLogoRequestDto = {
+  /** Object key returned by the logo presign endpoint */
+  key: string;
 };
 
 export type JobListItemToolDto = {
@@ -2315,17 +2329,6 @@ export type GetWorkerResponseDto = {
    */
   tool?: GetWorkerResponseDtoTool;
   tools: WorkerToolDto[];
-};
-
-export type CreateToolDto = {
-  name: string;
-  description: string;
-  version: string;
-  /** @nullable */
-  logoUrl?: string | null;
-  categories: ToolCategory[];
-  /** The ID of the provider */
-  providerId: string;
 };
 
 export type WorkspaceTool = {
@@ -4409,6 +4412,22 @@ export type UpdateAssetGroupWorkflowDto = {
   schedule: string;
 };
 
+export type CreateFirstAdminDto = {
+  email: string;
+  password: string;
+};
+
+export type CreateToolDto = {
+  name: string;
+  description: string;
+  version: string;
+  /** @nullable */
+  logoUrl?: string | null;
+  categories: ToolCategory[];
+  /** The ID of the provider */
+  providerId: string;
+};
+
 export type GetManyInternalNetworksResponseDtoDataItem = {
   [key: string]: unknown;
 };
@@ -4529,25 +4548,6 @@ export type GenerateVulReportBodyDto = {
   vulnIds?: string[];
   /** Minimum severity level (CRITICAL, HIGH, MEDIUM, LOW, INFO) */
   minSeverity?: GenerateVulReportBodyDtoMinSeverity;
-};
-
-export type LogoPresignRequestDto = {
-  /** Original file name of the object */
-  fileName: string;
-  contentType?: string;
-};
-
-export type LogoPresignResponseDto = {
-  uploadUrl: string;
-  key: string;
-  path: string;
-  /** Lifetime of the presigned URL in seconds */
-  expiresIn: number;
-};
-
-export type ConfirmLogoRequestDto = {
-  /** Object key returned by the logo presign endpoint */
-  key: string;
 };
 
 export type PresignUploadRequestDto = {
@@ -16239,100 +16239,6 @@ export function useRootControllerGetHealth<
 }
 
 /**
- * Creates the first admin user in the system.
- * @summary Creates the first admin user in the system.
- */
-export const rootControllerCreateFirstAdmin = (
-  createFirstAdminDto: CreateFirstAdminDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<DefaultMessageResponseDto>(
-    {
-      url: `/api/init-admin`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: createFirstAdminDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getRootControllerCreateFirstAdminMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>,
-    TError,
-    { data: CreateFirstAdminDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>,
-  TError,
-  { data: CreateFirstAdminDto },
-  TContext
-> => {
-  const mutationKey = ['rootControllerCreateFirstAdmin'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>,
-    { data: CreateFirstAdminDto }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return rootControllerCreateFirstAdmin(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type RootControllerCreateFirstAdminMutationResult = NonNullable<
-  Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>
->;
-export type RootControllerCreateFirstAdminMutationBody = CreateFirstAdminDto;
-export type RootControllerCreateFirstAdminMutationError = unknown;
-
-/**
- * @summary Creates the first admin user in the system.
- */
-export const useRootControllerCreateFirstAdmin = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>,
-      TError,
-      { data: CreateFirstAdminDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof rootControllerCreateFirstAdmin>>,
-  TError,
-  { data: CreateFirstAdminDto },
-  TContext
-> => {
-  return useMutation(
-    getRootControllerCreateFirstAdminMutationOptions(options),
-    queryClient,
-  );
-};
-
-/**
  * Returns metadata about the system state, like whether it has been initialized.
  * @summary Get system metadata.
  */
@@ -16649,13 +16555,13 @@ export const systemConfigsControllerGetConfig = (
   signal?: AbortSignal,
 ) => {
   return orvalClient<SystemConfigResponseDto>(
-    { url: `/api/system-configs`, method: 'GET', signal },
+    { url: `/api/admin/system-configs`, method: 'GET', signal },
     options,
   );
 };
 
 export const getSystemConfigsControllerGetConfigQueryKey = () => {
-  return [`/api/system-configs`] as const;
+  return [`/api/admin/system-configs`] as const;
 };
 
 export const getSystemConfigsControllerGetConfigQueryOptions = <
@@ -16805,7 +16711,7 @@ export const systemConfigsControllerUpdateConfig = (
 ) => {
   return orvalClient<DefaultMessageResponseDto>(
     {
-      url: `/api/system-configs`,
+      url: `/api/admin/system-configs`,
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       data: updateSystemConfigDto,
@@ -16898,7 +16804,7 @@ export const systemConfigsControllerRemoveLogo = (
   signal?: AbortSignal,
 ) => {
   return orvalClient<DefaultMessageResponseDto>(
-    { url: `/api/system-configs/logo`, method: 'DELETE', signal },
+    { url: `/api/admin/system-configs/logo`, method: 'DELETE', signal },
     options,
   );
 };
@@ -16970,6 +16876,196 @@ export const useSystemConfigsControllerRemoveLogo = <
 > => {
   return useMutation(
     getSystemConfigsControllerRemoveLogoMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * @summary Create a presigned URL for direct app-logo upload
+ */
+export const systemConfigsControllerPresignLogoUpload = (
+  logoPresignRequestDto: LogoPresignRequestDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<LogoPresignResponseDto>(
+    {
+      url: `/api/admin/system-configs/logo/presign`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: logoPresignRequestDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getSystemConfigsControllerPresignLogoUploadMutationOptions = <
+  TError = void,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof systemConfigsControllerPresignLogoUpload>>,
+    TError,
+    { data: LogoPresignRequestDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof systemConfigsControllerPresignLogoUpload>>,
+  TError,
+  { data: LogoPresignRequestDto },
+  TContext
+> => {
+  const mutationKey = ['systemConfigsControllerPresignLogoUpload'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof systemConfigsControllerPresignLogoUpload>>,
+    { data: LogoPresignRequestDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return systemConfigsControllerPresignLogoUpload(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SystemConfigsControllerPresignLogoUploadMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof systemConfigsControllerPresignLogoUpload>>
+  >;
+export type SystemConfigsControllerPresignLogoUploadMutationBody =
+  LogoPresignRequestDto;
+export type SystemConfigsControllerPresignLogoUploadMutationError = void;
+
+/**
+ * @summary Create a presigned URL for direct app-logo upload
+ */
+export const useSystemConfigsControllerPresignLogoUpload = <
+  TError = void,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof systemConfigsControllerPresignLogoUpload>>,
+      TError,
+      { data: LogoPresignRequestDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof systemConfigsControllerPresignLogoUpload>>,
+  TError,
+  { data: LogoPresignRequestDto },
+  TContext
+> => {
+  return useMutation(
+    getSystemConfigsControllerPresignLogoUploadMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * @summary Confirm a directly-uploaded app logo and activate it
+ */
+export const systemConfigsControllerConfirmLogoUpload = (
+  confirmLogoRequestDto: ConfirmLogoRequestDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/admin/system-configs/logo/confirm`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: confirmLogoRequestDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getSystemConfigsControllerConfirmLogoUploadMutationOptions = <
+  TError = void,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof systemConfigsControllerConfirmLogoUpload>>,
+    TError,
+    { data: ConfirmLogoRequestDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof systemConfigsControllerConfirmLogoUpload>>,
+  TError,
+  { data: ConfirmLogoRequestDto },
+  TContext
+> => {
+  const mutationKey = ['systemConfigsControllerConfirmLogoUpload'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof systemConfigsControllerConfirmLogoUpload>>,
+    { data: ConfirmLogoRequestDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return systemConfigsControllerConfirmLogoUpload(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SystemConfigsControllerConfirmLogoUploadMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof systemConfigsControllerConfirmLogoUpload>>
+  >;
+export type SystemConfigsControllerConfirmLogoUploadMutationBody =
+  ConfirmLogoRequestDto;
+export type SystemConfigsControllerConfirmLogoUploadMutationError = void;
+
+/**
+ * @summary Confirm a directly-uploaded app logo and activate it
+ */
+export const useSystemConfigsControllerConfirmLogoUpload = <
+  TError = void,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof systemConfigsControllerConfirmLogoUpload>>,
+      TError,
+      { data: ConfirmLogoRequestDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof systemConfigsControllerConfirmLogoUpload>>,
+  TError,
+  { data: ConfirmLogoRequestDto },
+  TContext
+> => {
+  return useMutation(
+    getSystemConfigsControllerConfirmLogoUploadMutationOptions(options),
     queryClient,
   );
 };
@@ -24804,459 +24900,6 @@ export function useWorkersControllerGetWorkerById<
 }
 
 /**
- * Registers a new security assessment tool in the system with specified configuration and capabilities.
- * @summary Create a new tool
- */
-export const toolsControllerCreateTool = (
-  createToolDto: CreateToolDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<Tool>(
-    {
-      url: `/api/tools`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: createToolDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getToolsControllerCreateToolMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof toolsControllerCreateTool>>,
-    TError,
-    { data: CreateToolDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof toolsControllerCreateTool>>,
-  TError,
-  { data: CreateToolDto },
-  TContext
-> => {
-  const mutationKey = ['toolsControllerCreateTool'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof toolsControllerCreateTool>>,
-    { data: CreateToolDto }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return toolsControllerCreateTool(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type ToolsControllerCreateToolMutationResult = NonNullable<
-  Awaited<ReturnType<typeof toolsControllerCreateTool>>
->;
-export type ToolsControllerCreateToolMutationBody = CreateToolDto;
-export type ToolsControllerCreateToolMutationError = unknown;
-
-/**
- * @summary Create a new tool
- */
-export const useToolsControllerCreateTool = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof toolsControllerCreateTool>>,
-      TError,
-      { data: CreateToolDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof toolsControllerCreateTool>>,
-  TError,
-  { data: CreateToolDto },
-  TContext
-> => {
-  return useMutation(
-    getToolsControllerCreateToolMutationOptions(options),
-    queryClient,
-  );
-};
-
-/**
- * Fetches a paginated list of available security assessment tools in the system.
- * @summary Get tools
- */
-export const toolsControllerGetManyTools = (
-  params?: ToolsControllerGetManyToolsParams,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<GetManyToolDto>(
-    { url: `/api/tools`, method: 'GET', params, signal },
-    options,
-  );
-};
-
-export const getToolsControllerGetManyToolsInfiniteQueryKey = (
-  params?: ToolsControllerGetManyToolsParams,
-) => {
-  return ['infinite', `/api/tools`, ...(params ? [params] : [])] as const;
-};
-
-export const getToolsControllerGetManyToolsQueryKey = (
-  params?: ToolsControllerGetManyToolsParams,
-) => {
-  return [`/api/tools`, ...(params ? [params] : [])] as const;
-};
-
-export const getToolsControllerGetManyToolsInfiniteQueryOptions = <
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-    ToolsControllerGetManyToolsParams['page']
-  >,
-  TError = unknown,
->(
-  params?: ToolsControllerGetManyToolsParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-        TError,
-        TData,
-        QueryKey,
-        ToolsControllerGetManyToolsParams['page']
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getToolsControllerGetManyToolsInfiniteQueryKey(params);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-    QueryKey,
-    ToolsControllerGetManyToolsParams['page']
-  > = ({ signal, pageParam }) =>
-    toolsControllerGetManyTools(
-      { ...params, page: pageParam ?? params?.['page'] },
-      requestOptions,
-      signal,
-    );
-
-  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-    TError,
-    TData,
-    QueryKey,
-    ToolsControllerGetManyToolsParams['page']
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type ToolsControllerGetManyToolsInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof toolsControllerGetManyTools>>
->;
-export type ToolsControllerGetManyToolsInfiniteQueryError = unknown;
-
-export function useToolsControllerGetManyToolsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-    ToolsControllerGetManyToolsParams['page']
-  >,
-  TError = unknown,
->(
-  params: undefined | ToolsControllerGetManyToolsParams,
-  options: {
-    query: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-        TError,
-        TData,
-        QueryKey,
-        ToolsControllerGetManyToolsParams['page']
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useToolsControllerGetManyToolsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-    ToolsControllerGetManyToolsParams['page']
-  >,
-  TError = unknown,
->(
-  params?: ToolsControllerGetManyToolsParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-        TError,
-        TData,
-        QueryKey,
-        ToolsControllerGetManyToolsParams['page']
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-          QueryKey
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useToolsControllerGetManyToolsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-    ToolsControllerGetManyToolsParams['page']
-  >,
-  TError = unknown,
->(
-  params?: ToolsControllerGetManyToolsParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-        TError,
-        TData,
-        QueryKey,
-        ToolsControllerGetManyToolsParams['page']
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get tools
- */
-
-export function useToolsControllerGetManyToolsInfinite<
-  TData = InfiniteData<
-    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-    ToolsControllerGetManyToolsParams['page']
-  >,
-  TError = unknown,
->(
-  params?: ToolsControllerGetManyToolsParams,
-  options?: {
-    query?: Partial<
-      UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-        TError,
-        TData,
-        QueryKey,
-        ToolsControllerGetManyToolsParams['page']
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseInfiniteQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getToolsControllerGetManyToolsInfiniteQueryOptions(
-    params,
-    options,
-  );
-
-  const query = useInfiniteQuery(
-    queryOptions,
-    queryClient,
-  ) as UseInfiniteQueryResult<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>;
-  };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-export const getToolsControllerGetManyToolsQueryOptions = <
-  TData = Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-  TError = unknown,
->(
-  params?: ToolsControllerGetManyToolsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getToolsControllerGetManyToolsQueryKey(params);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof toolsControllerGetManyTools>>
-  > = ({ signal }) =>
-    toolsControllerGetManyTools(params, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type ToolsControllerGetManyToolsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof toolsControllerGetManyTools>>
->;
-export type ToolsControllerGetManyToolsQueryError = unknown;
-
-export function useToolsControllerGetManyTools<
-  TData = Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-  TError = unknown,
->(
-  params: undefined | ToolsControllerGetManyToolsParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useToolsControllerGetManyTools<
-  TData = Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-  TError = unknown,
->(
-  params?: ToolsControllerGetManyToolsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-          TError,
-          Awaited<ReturnType<typeof toolsControllerGetManyTools>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useToolsControllerGetManyTools<
-  TData = Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-  TError = unknown,
->(
-  params?: ToolsControllerGetManyToolsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get tools
- */
-
-export function useToolsControllerGetManyTools<
-  TData = Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-  TError = unknown,
->(
-  params?: ToolsControllerGetManyToolsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getToolsControllerGetManyToolsQueryOptions(
-    params,
-    options,
-  );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-/**
  * Associates an existing security tool with a specific workspace for targeted assessments.
  * @summary Add tool to workspace
  */
@@ -25685,6 +25328,365 @@ export function useToolsControllerGetBuiltInTools<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions = getToolsControllerGetBuiltInToolsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Fetches a paginated list of available security assessment tools in the system.
+ * @summary Get tools
+ */
+export const toolsControllerGetManyTools = (
+  params?: ToolsControllerGetManyToolsParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyToolDto>(
+    { url: `/api/tools`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getToolsControllerGetManyToolsInfiniteQueryKey = (
+  params?: ToolsControllerGetManyToolsParams,
+) => {
+  return ['infinite', `/api/tools`, ...(params ? [params] : [])] as const;
+};
+
+export const getToolsControllerGetManyToolsQueryKey = (
+  params?: ToolsControllerGetManyToolsParams,
+) => {
+  return [`/api/tools`, ...(params ? [params] : [])] as const;
+};
+
+export const getToolsControllerGetManyToolsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+    ToolsControllerGetManyToolsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: ToolsControllerGetManyToolsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        TError,
+        TData,
+        QueryKey,
+        ToolsControllerGetManyToolsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getToolsControllerGetManyToolsInfiniteQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+    QueryKey,
+    ToolsControllerGetManyToolsParams['page']
+  > = ({ signal, pageParam }) =>
+    toolsControllerGetManyTools(
+      { ...params, page: pageParam ?? params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+    TError,
+    TData,
+    QueryKey,
+    ToolsControllerGetManyToolsParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ToolsControllerGetManyToolsInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof toolsControllerGetManyTools>>
+>;
+export type ToolsControllerGetManyToolsInfiniteQueryError = unknown;
+
+export function useToolsControllerGetManyToolsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+    ToolsControllerGetManyToolsParams['page']
+  >,
+  TError = unknown,
+>(
+  params: undefined | ToolsControllerGetManyToolsParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        TError,
+        TData,
+        QueryKey,
+        ToolsControllerGetManyToolsParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetManyToolsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+    ToolsControllerGetManyToolsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: ToolsControllerGetManyToolsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        TError,
+        TData,
+        QueryKey,
+        ToolsControllerGetManyToolsParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetManyToolsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+    ToolsControllerGetManyToolsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: ToolsControllerGetManyToolsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        TError,
+        TData,
+        QueryKey,
+        ToolsControllerGetManyToolsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get tools
+ */
+
+export function useToolsControllerGetManyToolsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+    ToolsControllerGetManyToolsParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: ToolsControllerGetManyToolsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        TError,
+        TData,
+        QueryKey,
+        ToolsControllerGetManyToolsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getToolsControllerGetManyToolsInfiniteQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getToolsControllerGetManyToolsQueryOptions = <
+  TData = Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+  TError = unknown,
+>(
+  params?: ToolsControllerGetManyToolsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getToolsControllerGetManyToolsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof toolsControllerGetManyTools>>
+  > = ({ signal }) =>
+    toolsControllerGetManyTools(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ToolsControllerGetManyToolsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof toolsControllerGetManyTools>>
+>;
+export type ToolsControllerGetManyToolsQueryError = unknown;
+
+export function useToolsControllerGetManyTools<
+  TData = Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+  TError = unknown,
+>(
+  params: undefined | ToolsControllerGetManyToolsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetManyTools>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetManyTools<
+  TData = Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+  TError = unknown,
+>(
+  params?: ToolsControllerGetManyToolsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+          TError,
+          Awaited<ReturnType<typeof toolsControllerGetManyTools>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useToolsControllerGetManyTools<
+  TData = Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+  TError = unknown,
+>(
+  params?: ToolsControllerGetManyToolsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get tools
+ */
+
+export function useToolsControllerGetManyTools<
+  TData = Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+  TError = unknown,
+>(
+  params?: ToolsControllerGetManyToolsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof toolsControllerGetManyTools>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getToolsControllerGetManyToolsQueryOptions(
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -42076,6 +42078,194 @@ export const useAssetGroupControllerRunGroupWorkflowScheduler = <
 };
 
 /**
+ * Creates the first admin user in the system. Refused once an admin exists.
+ * @summary Creates the first admin user in the system.
+ */
+export const adminControllerCreateFirstAdmin = (
+  createFirstAdminDto: CreateFirstAdminDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/admin/init`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createFirstAdminDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAdminControllerCreateFirstAdminMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminControllerCreateFirstAdmin>>,
+    TError,
+    { data: CreateFirstAdminDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof adminControllerCreateFirstAdmin>>,
+  TError,
+  { data: CreateFirstAdminDto },
+  TContext
+> => {
+  const mutationKey = ['adminControllerCreateFirstAdmin'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof adminControllerCreateFirstAdmin>>,
+    { data: CreateFirstAdminDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return adminControllerCreateFirstAdmin(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AdminControllerCreateFirstAdminMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminControllerCreateFirstAdmin>>
+>;
+export type AdminControllerCreateFirstAdminMutationBody = CreateFirstAdminDto;
+export type AdminControllerCreateFirstAdminMutationError = unknown;
+
+/**
+ * @summary Creates the first admin user in the system.
+ */
+export const useAdminControllerCreateFirstAdmin = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof adminControllerCreateFirstAdmin>>,
+      TError,
+      { data: CreateFirstAdminDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof adminControllerCreateFirstAdmin>>,
+  TError,
+  { data: CreateFirstAdminDto },
+  TContext
+> => {
+  return useMutation(
+    getAdminControllerCreateFirstAdminMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Registers a new security assessment tool in the system with specified configuration and capabilities.
+ * @summary Create a new tool
+ */
+export const adminControllerCreateTool = (
+  createToolDto: CreateToolDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<Tool>(
+    {
+      url: `/api/admin/tools`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createToolDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAdminControllerCreateToolMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminControllerCreateTool>>,
+    TError,
+    { data: CreateToolDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof adminControllerCreateTool>>,
+  TError,
+  { data: CreateToolDto },
+  TContext
+> => {
+  const mutationKey = ['adminControllerCreateTool'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof adminControllerCreateTool>>,
+    { data: CreateToolDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return adminControllerCreateTool(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AdminControllerCreateToolMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminControllerCreateTool>>
+>;
+export type AdminControllerCreateToolMutationBody = CreateToolDto;
+export type AdminControllerCreateToolMutationError = unknown;
+
+/**
+ * @summary Create a new tool
+ */
+export const useAdminControllerCreateTool = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof adminControllerCreateTool>>,
+      TError,
+      { data: CreateToolDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof adminControllerCreateTool>>,
+  TError,
+  { data: CreateToolDto },
+  TContext
+> => {
+  return useMutation(
+    getAdminControllerCreateToolMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
  * Retrieves a paginated list of internal networks for the specified workspace.
  * @summary Get many internal networks
  */
@@ -44781,194 +44971,6 @@ export function useEventsControllerStream<
 
   return withQueryKey(query, queryOptions.queryKey);
 }
-
-/**
- * @summary Create a presigned URL for direct app-logo upload
- */
-export const storageControllerPresignLogoUpload = (
-  logoPresignRequestDto: LogoPresignRequestDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<LogoPresignResponseDto>(
-    {
-      url: `/api/storage/logo/presign`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: logoPresignRequestDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getStorageControllerPresignLogoUploadMutationOptions = <
-  TError = void,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof storageControllerPresignLogoUpload>>,
-    TError,
-    { data: LogoPresignRequestDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof storageControllerPresignLogoUpload>>,
-  TError,
-  { data: LogoPresignRequestDto },
-  TContext
-> => {
-  const mutationKey = ['storageControllerPresignLogoUpload'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof storageControllerPresignLogoUpload>>,
-    { data: LogoPresignRequestDto }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return storageControllerPresignLogoUpload(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type StorageControllerPresignLogoUploadMutationResult = NonNullable<
-  Awaited<ReturnType<typeof storageControllerPresignLogoUpload>>
->;
-export type StorageControllerPresignLogoUploadMutationBody =
-  LogoPresignRequestDto;
-export type StorageControllerPresignLogoUploadMutationError = void;
-
-/**
- * @summary Create a presigned URL for direct app-logo upload
- */
-export const useStorageControllerPresignLogoUpload = <
-  TError = void,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof storageControllerPresignLogoUpload>>,
-      TError,
-      { data: LogoPresignRequestDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof storageControllerPresignLogoUpload>>,
-  TError,
-  { data: LogoPresignRequestDto },
-  TContext
-> => {
-  return useMutation(
-    getStorageControllerPresignLogoUploadMutationOptions(options),
-    queryClient,
-  );
-};
-
-/**
- * @summary Confirm a directly-uploaded app logo and activate it
- */
-export const storageControllerConfirmLogoUpload = (
-  confirmLogoRequestDto: ConfirmLogoRequestDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<DefaultMessageResponseDto>(
-    {
-      url: `/api/storage/logo/confirm`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: confirmLogoRequestDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getStorageControllerConfirmLogoUploadMutationOptions = <
-  TError = void,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof storageControllerConfirmLogoUpload>>,
-    TError,
-    { data: ConfirmLogoRequestDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof storageControllerConfirmLogoUpload>>,
-  TError,
-  { data: ConfirmLogoRequestDto },
-  TContext
-> => {
-  const mutationKey = ['storageControllerConfirmLogoUpload'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof storageControllerConfirmLogoUpload>>,
-    { data: ConfirmLogoRequestDto }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return storageControllerConfirmLogoUpload(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type StorageControllerConfirmLogoUploadMutationResult = NonNullable<
-  Awaited<ReturnType<typeof storageControllerConfirmLogoUpload>>
->;
-export type StorageControllerConfirmLogoUploadMutationBody =
-  ConfirmLogoRequestDto;
-export type StorageControllerConfirmLogoUploadMutationError = void;
-
-/**
- * @summary Confirm a directly-uploaded app logo and activate it
- */
-export const useStorageControllerConfirmLogoUpload = <
-  TError = void,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof storageControllerConfirmLogoUpload>>,
-      TError,
-      { data: ConfirmLogoRequestDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof storageControllerConfirmLogoUpload>>,
-  TError,
-  { data: ConfirmLogoRequestDto },
-  TContext
-> => {
-  return useMutation(
-    getStorageControllerConfirmLogoUploadMutationOptions(options),
-    queryClient,
-  );
-};
 
 /**
  * @summary Create a presigned URL for direct-to-storage upload

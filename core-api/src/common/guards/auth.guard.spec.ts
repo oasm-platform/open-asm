@@ -49,7 +49,7 @@ describe('AuthGuard', () => {
 
   beforeEach(() => {
     getSession = jest.fn().mockResolvedValue(null);
-    request = { path: '/api/system-configs', headers: {}, params: {} };
+    request = { path: '/api/admin/system-configs', headers: {}, params: {} };
     handlerFn = function handler(): void {};
     classRef = class Controller {};
 

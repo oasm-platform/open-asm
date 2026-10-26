@@ -1,5 +1,5 @@
 import Page from '@/components/common/page';
-import BrandNameAndLogoSettings from './components/brand-name-and-logo';
+import BrandNameAndLogoSettings from '../components/brand-name-and-logo';
 
 export default function Brand() {
   return (

@@ -13,8 +13,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   getRootControllerGetMetadataQueryKey,
   getSystemConfigsControllerGetConfigQueryKey,
-  useStorageControllerConfirmLogoUpload,
-  useStorageControllerPresignLogoUpload,
+  useSystemConfigsControllerConfirmLogoUpload,
+  useSystemConfigsControllerPresignLogoUpload,
   useSystemConfigsControllerGetConfig,
   useSystemConfigsControllerRemoveLogo,
   useSystemConfigsControllerUpdateConfig,
@@ -63,8 +63,8 @@ export default function BrandNameAndLogoSettings() {
   const queryClient = useQueryClient();
   const { data: config, isLoading } = useSystemConfigsControllerGetConfig();
   const updateConfig = useSystemConfigsControllerUpdateConfig();
-  const presignLogo = useStorageControllerPresignLogoUpload();
-  const confirmLogo = useStorageControllerConfirmLogoUpload();
+  const presignLogo = useSystemConfigsControllerPresignLogoUpload();
+  const confirmLogo = useSystemConfigsControllerConfirmLogoUpload();
   const removeLogo = useSystemConfigsControllerRemoveLogo();
 
   const [pendingLogo, setPendingLogo] = useState<PendingLogo | null>(null);

@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { StorageService } from '../storage/storage.service';
-import { SystemConfigsService } from '../system-configs/system-configs.service';
+import { SystemConfigsService } from '../admin/system-configs/system-configs.service';
 import { UsersService } from '../users/users.service';
 import { RootService } from './root.service';
 
@@ -18,7 +18,6 @@ describe('RootService', () => {
         {
           provide: UsersService,
           useValue: {
-            createFirstAdmin: jest.fn(),
             usersRepository: {
               count: jest.fn(),
               exists: jest.fn().mockResolvedValue(true),

@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger, useQueryTab } from '@/compone
 import { useLiveEvents } from '@/hooks/use-live-events';
 import { useNavigateWithParams } from '@/hooks/useNavigateWithParams';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import { isAdminUser } from '@/modules/admin/utils';
 import { useWorkersControllerGetWorkers } from '@/services/apis/gen/queries';
 import { useSession, type User } from '@/utils/authClient';
 import type {
@@ -55,7 +56,7 @@ const ListWorkers = () => {
   const { data: session } = useSession();
   // Global workers run every workspace's jobs, so the API serves them to
   // admins only.
-  const isAdmin = (session?.user as User | undefined)?.role === 'admin';
+  const isAdmin = isAdminUser(session?.user as User | undefined);
   const [activeTab, setActiveTab] = useQueryTab({
     tabParam: 'tab',
     defaultValue: 'workspace',
