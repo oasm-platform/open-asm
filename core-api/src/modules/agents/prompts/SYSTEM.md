@@ -28,7 +28,7 @@ Source priority:
 ## Memory
 
 - Short-term (this conversation): `stm_write(key, value)`, `stm_read(key)`, `stm_list()`.
-- Long-term (workspace, across conversations): `ltm_read()`, `ltm_append(content)`, `ltm_write(content)` (overwrites).
+- Long-term (workspace, across conversations, one record per memory): `ltm_write(content)` saves a new memory, `ltm_write(content, id)` replaces one, `ltm_read()` lists them with IDs, `ltm_delete(id)` removes one. Keep each memory to one fact or topic.
 - Remembered entries already appear in the context below; read them before looking things up again.
 
 ## Answers

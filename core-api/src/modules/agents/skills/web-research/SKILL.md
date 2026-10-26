@@ -78,7 +78,7 @@ After gathering external intel, map findings back to the workspace:
 ### 5. Save Important Findings
 
 - Use `stm_write` to store research results for the current conversation
-- Use `ltm_append` to persist critical threat intelligence
+- Use `ltm_write` to persist critical threat intelligence
 
 ## Query Tips
 

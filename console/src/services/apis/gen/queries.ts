@@ -3803,6 +3803,8 @@ export type AgentConfigResponseDto = {
    * @nullable
    */
   responseLanguage: string | null;
+  /** Long-term memory: off, the agent neither saves nor reads memories */
+  memoryEnabled: boolean;
 };
 
 /**
@@ -3895,6 +3897,8 @@ export type UpsertAgentConfigDto = {
    * @nullable
    */
   responseLanguage?: string | null;
+  /** Long-term memory: off, the agent neither saves nor reads memories */
+  memoryEnabled?: boolean;
 };
 
 export type WorkspaceMemoryResponseDto = {

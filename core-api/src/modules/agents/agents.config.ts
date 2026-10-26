@@ -41,6 +41,9 @@ export function formatUserInstructions(config: AgentConfig | null): string {
     config?.responseLanguage
       ? `Always answer in this language: ${config.responseLanguage}`
       : '',
+    config?.memoryEnabled
+      ? ''
+      : 'Long-term memory is turned off by the user: the ltm_* tools are unavailable and nothing is kept across conversations.',
   ].filter(Boolean);
   return parts.join('\n\n');
 }
@@ -51,9 +54,12 @@ export function withoutDisabledTools<T extends Record<string, unknown>>(
   config: AgentConfig | null,
 ): T {
   const disabled = new Set((config?.disabledTools ?? []).map(currentToolName));
-  if (disabled.size === 0) return tools;
+  const memoryOff = !config?.memoryEnabled;
+  if (disabled.size === 0 && !memoryOff) return tools;
   return Object.fromEntries(
-    Object.entries(tools).filter(([name]) => !disabled.has(name)),
+    Object.entries(tools).filter(
+      ([name]) => !disabled.has(name) && !(memoryOff && name.startsWith('ltm_')),
+    ),
   ) as T;
 }
 
@@ -251,6 +257,9 @@ export class AgentsConfigService {
     if (dto.responseLanguage !== undefined) {
       config.responseLanguage = dto.responseLanguage || null;
     }
+    if (dto.memoryEnabled !== undefined) {
+      config.memoryEnabled = dto.memoryEnabled;
+    }
 
     const saved = await this.configRepository.save(config);
     return this.toResponse(saved, workspaceId);
@@ -406,6 +415,7 @@ export class AgentsConfigService {
       defaultApprovalMode: config?.defaultApprovalMode ?? null,
       disabledTools: (config?.disabledTools ?? []).map(currentToolName),
       responseLanguage: config?.responseLanguage ?? null,
+      memoryEnabled: config?.memoryEnabled ?? false,
     };
   }
 }

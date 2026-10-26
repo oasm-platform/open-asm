@@ -93,6 +93,8 @@ export function stableStringify(value: unknown): string {
 /** Renamed tools: saved settings and agent definitions may use the old name. */
 const RENAMED_TOOLS: Readonly<Record<string, string>> = {
   run_tool: 'run_tool_connector',
+  // ltm_write saves a new record each call, which is what append was for
+  ltm_append: 'ltm_write',
 };
 
 export const currentToolName = (name: string): string =>

@@ -62,7 +62,7 @@ Every tool from `display_available_tools` has a `type`, and the two types run th
 - Inside the current step, run independent tool calls in parallel instead of one at a time.
 - Keep going until every step is done; do not stop to ask again unless a decision is really theirs (scope change, risky action).
 - Keep text between tool calls to one short sentence at most.
-- Save findings you will need later with `stm_write`; persist workspace-level knowledge with `ltm_append`.
+- Save findings you will need later with `stm_write`; persist workspace-level knowledge with `ltm_write`.
 
 ## Delegate to subagents
 
