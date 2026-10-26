@@ -1338,7 +1338,8 @@ export class AgentsCompletionsService {
       userContext,
       opts.staticContext,
       summaryContext,
-      ltmContext,
+      // Memory off (the default): saved memories stay stored but out of the prompt
+      agentConfig?.memoryEnabled ? ltmContext : '',
       stmContext,
       todosContext,
       planContext,

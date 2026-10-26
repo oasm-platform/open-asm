@@ -77,4 +77,8 @@ export class AgentConfig extends BaseEntity {
   /** Language the agent answers in, e.g. "vi" */
   @Column({ type: 'varchar', length: 16, nullable: true })
   responseLanguage?: string | null;
+
+  /** Off (the default): the agent neither saves nor reads long-term memories */
+  @Column({ type: 'boolean', default: false })
+  memoryEnabled: boolean;
 }

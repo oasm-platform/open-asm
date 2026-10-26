@@ -948,12 +948,13 @@ describe('AgentsCompletionsService plan mode prompt', () => {
     todos: TodoStatus[] = [],
     agentConfig: unknown = null,
     goal?: string,
+    ltm = '',
   ) => {
     const service: any = Object.create(AgentsCompletionsService.prototype);
     service.getPrompt = jest.fn((name: string) => `prompt:${name}`);
     service.agentsMemories = {
       stmFormatForPrompt: jest.fn(() => Promise.resolve('')),
-      ltmFormatForPrompt: jest.fn(() => Promise.resolve('')),
+      ltmFormatForPrompt: jest.fn(() => Promise.resolve(ltm)),
     };
     service.agentsConfig = {
       find: jest.fn(() => Promise.resolve(agentConfig)),
@@ -978,12 +979,23 @@ describe('AgentsCompletionsService plan mode prompt', () => {
   it("puts the user's instructions right after the shared system prompt", async () => {
     const parts = await build(AgentMode.ASK, AgentApprovalMode.MANUAL, [], {
       instruction: 'Report in tables.',
+      memoryEnabled: true,
     });
     expect(parts.slice(0, 3)).toEqual([
       'prompt:ASK.md',
       'prompt:SYSTEM.md',
       '## User instructions\nReport in tables.',
     ]);
+  });
+
+  it('puts saved memories in the prompt only while memory is on', async () => {
+    const ltm = '[Long-Term Memory]\n- fact';
+    const withConfig = (config: unknown) =>
+      build(AgentMode.ASK, AgentApprovalMode.MANUAL, [], config, undefined, ltm);
+    expect(await withConfig({ memoryEnabled: true })).toContain(ltm);
+    expect(await withConfig({ memoryEnabled: false })).not.toContain(ltm);
+    // No config yet: memory is off by default
+    expect(await withConfig(null)).not.toContain(ltm);
   });
 
   it.each([AgentMode.AGENT, AgentMode.ASK])(
