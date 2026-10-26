@@ -34,27 +34,20 @@ describe('AgentsModelsCatalogService', () => {
     ).toBeGreaterThan(128_000);
   });
 
-  it('uses OrcaRouter route windows instead of a bare-id guess', () => {
+  it('falls back to 128k for unknown models', () => {
+    expect(
+      service.resolveWindow(cfg(LLMProvider.OPENAI, 'no-such-model-xyz')),
+    ).toEqual({ tokens: 128_000, source: 'default', estimated: true });
+  });
+
+  it('does not guess the window of OrcaRouter routes from another host', () => {
     expect(
       service.resolveWindow(cfg(LLMProvider.ORCAROUTER, 'orcarouter/auto')),
-    ).toEqual({ tokens: 200_000, source: 'catalog', estimated: false });
-    expect(
-      service.resolveWindow(cfg(LLMProvider.ORCAROUTER, 'orca/orcacyber-ultra-1.0'))
-        .tokens,
-    ).toBe(1_048_576);
-    expect(
-      service.resolveWindow(cfg(LLMProvider.ORCAROUTER, 'orcarouter/new-route')),
     ).toEqual({ tokens: 128_000, source: 'default', estimated: true });
     // Vendor ids still resolve through models.dev
     expect(
       service.resolveWindow(cfg(LLMProvider.ORCAROUTER, 'openai/gpt-5')),
     ).toMatchObject({ source: 'catalog', estimated: false });
-  });
-
-  it('falls back to 128k for unknown models', () => {
-    expect(
-      service.resolveWindow(cfg(LLMProvider.OPENAI, 'no-such-model-xyz')),
-    ).toEqual({ tokens: 128_000, source: 'default', estimated: true });
   });
 
   it('prices hosted models but not self-hosted ones', () => {

@@ -60,13 +60,11 @@ import {
   UpdateConversationDto,
 } from './dto/conversation.dto';
 import {
-  CompleteOrcaRouterConnectDto,
   CreateLLMConfigDto,
   LLMConfigResponseDto,
   LLMConfigWithProviderDto,
   LLMProviderSupportedDto,
   ProviderModelDto,
-  StartOrcaRouterConnectResponseDto,
   UpdateLLMConfigDto,
 } from './dto/llm-config.dto';
 import {
@@ -242,66 +240,6 @@ export class AgentsController {
     @UserId() userId: string,
   ): Promise<LLMConfigResponseDto> {
     return this.agentsService.createLLMConfig(dto, workspaceId, userId);
-  }
-
-  @WorkspaceAccess('agent.write')
-  @Post('llm-configs/orcarouter/connect/start')
-  @Doc({
-    summary: 'Start OrcaRouter connect',
-    description:
-      'Start the OAuth 2.0 + PKCE (out-of-band code) authorization for the OrcaRouter provider',
-    request: { getWorkspaceId: true },
-    response: { serialization: StartOrcaRouterConnectResponseDto },
-  })
-  startOrcaRouterConnect(
-    @WorkspaceId() workspaceId: string,
-    @UserId() userId: string,
-  ): Promise<StartOrcaRouterConnectResponseDto> {
-    return this.agentsService.startOrcaRouterConnect(workspaceId, userId);
-  }
-
-  @WorkspaceAccess('agent.write')
-  @Post('llm-configs/orcarouter/connect/complete')
-  @Doc({
-    summary: 'Complete OrcaRouter connect',
-    description:
-      'Exchange the code shown on the OrcaRouter consent screen and store the issued API key',
-    request: { getWorkspaceId: true },
-    response: { serialization: LLMConfigResponseDto },
-  })
-  completeOrcaRouterConnect(
-    @Body() dto: CompleteOrcaRouterConnectDto,
-    @WorkspaceId() workspaceId: string,
-    @UserId() userId: string,
-  ): Promise<LLMConfigResponseDto> {
-    return this.agentsService.completeOrcaRouterConnect(
-      dto,
-      workspaceId,
-      userId,
-    );
-  }
-
-  @WorkspaceAccess('agent.write')
-  @Post('llm-configs/orcarouter/connect/:attemptId/cancel')
-  @Doc({
-    summary: 'Cancel OrcaRouter connect',
-    description: 'Discard an abandoned OrcaRouter authorization attempt',
-    request: {
-      getWorkspaceId: true,
-      params: [{ name: 'attemptId', description: 'Connect attempt ID' }],
-    },
-  })
-  async cancelOrcaRouterConnect(
-    @Param('attemptId') attemptId: string,
-    @WorkspaceId() workspaceId: string,
-    @UserId() userId: string,
-  ): Promise<{ message: string }> {
-    await this.agentsService.cancelOrcaRouterConnect(
-      attemptId,
-      workspaceId,
-      userId,
-    );
-    return { message: 'Connect attempt discarded' };
   }
 
   @WorkspaceAccess('agent.read')

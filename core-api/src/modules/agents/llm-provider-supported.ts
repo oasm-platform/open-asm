@@ -4,11 +4,6 @@ import { createOpenAI } from '@ai-sdk/openai';
 import type { LanguageModel } from 'ai';
 import type { ProviderModelDto } from './dto/llm-config.dto';
 import { LLMProvider } from './enums/agent.enums';
-import {
-  ORCAROUTER_PROVIDER_NAME,
-  resolveOrcaRouterOrigins,
-} from './orcarouter/orcarouter.constants';
-import { fetchOrcaRouterModels } from './orcarouter/orcarouter-models';
 
 export type LLMHandler = (
   apiKey: string,
@@ -97,6 +92,27 @@ const fetchOpenRouterModels: LLMModelsFetcher = async () => {
     ? sorted(
         json.data
           .filter((m) => m.supported_parameters?.includes('tools'))
+          .map((m) => ({ id: m.id, name: m.name ?? m.id })),
+      )
+    : [];
+};
+
+const fetchOrcaRouterModels: LLMModelsFetcher = async (apiKey) => {
+  const json = await fetchJson<{
+    data: Array<{
+      id: string;
+      name?: string;
+      supported_endpoint_types?: string[];
+    }>;
+  }>('https://api.orcarouter.ai/v1/models?capability=chat', {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  // Requests go through OpenAI chat completions, so models served only over
+  // another wire format (Anthropic, Gemini, Responses) would always fail
+  return json
+    ? sorted(
+        json.data
+          .filter((m) => m.supported_endpoint_types?.includes('openai'))
           .map((m) => ({ id: m.id, name: m.name ?? m.id })),
       )
     : [];
@@ -241,19 +257,6 @@ const fetchCustomProviderModels: LLMModelsFetcher = async (apiKey, baseURL) => {
 
 export const llmProviderSupported: LLMProviderSupported[] = [
   {
-    // OrcaRouter Cyber Inference: a named provider for security teams running
-    // authorized, scoped red/blue work. Inference and the model catalog are on
-    // the API origin; credentials are acquired on the auth origin.
-    id: LLMProvider.ORCAROUTER,
-    name: ORCAROUTER_PROVIDER_NAME,
-    logo: '/static/images/orcarouter.png',
-    handler: (apiKey, model) => {
-      const { apiBaseUrl } = resolveOrcaRouterOrigins();
-      return createOpenAI({ apiKey, baseURL: apiBaseUrl }).chat(model);
-    },
-    fetchModels: fetchOrcaRouterModels,
-  },
-  {
     id: LLMProvider.OPENROUTER,
     name: 'Open Router',
     logo: '/static/images/openrouter.svg',
@@ -262,6 +265,16 @@ export const llmProviderSupported: LLMProviderSupported[] = [
         model,
       ),
     fetchModels: fetchOpenRouterModels,
+  },
+  {
+    id: LLMProvider.ORCAROUTER,
+    name: 'OrcaRouter',
+    logo: '/static/images/orcarouter.png',
+    handler: (apiKey, model) =>
+      createOpenAI({ apiKey, baseURL: 'https://api.orcarouter.ai/v1' }).chat(
+        model,
+      ),
+    fetchModels: fetchOrcaRouterModels,
   },
   {
     id: LLMProvider.OPENAI,

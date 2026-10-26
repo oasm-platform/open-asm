@@ -5,7 +5,6 @@ import {
   IsDate,
   IsEnum,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsString,
   IsUrl,
@@ -155,67 +154,6 @@ export class UpdateLLMConfigDto extends PartialType(CreateLLMConfigDto) {
   isPreferred?: boolean;
 }
 
-export class StartOrcaRouterConnectResponseDto {
-  @ApiProperty({
-    description: 'Opaque id of this authorization attempt',
-    example: 'Q2hhbmdlVGhpc1ZhbHVl',
-  })
-  @IsString()
-  attemptId: string;
-
-  @ApiProperty({
-    description: 'Consent URL to open in the user’s browser',
-    example: 'https://www.orcarouter.ai/auth?callback_url=oob&...',
-  })
-  @IsString()
-  authorizeUrl: string;
-
-  @ApiProperty({
-    description: 'When this attempt stops being redeemable',
-    example: '2025-01-01T00:10:00.000Z',
-  })
-  @IsDate()
-  expiresAt: Date;
-}
-
-export class CompleteOrcaRouterConnectDto {
-  @ApiProperty({
-    description: 'Attempt id returned by the start endpoint',
-    example: 'Q2hhbmdlVGhpc1ZhbHVl',
-  })
-  @IsString()
-  @IsNotEmpty()
-  attemptId: string;
-
-  @ApiProperty({
-    description: 'Code displayed on the OrcaRouter consent screen',
-    example: 'ABCD-EFGH',
-    writeOnly: true,
-  })
-  @IsString()
-  @IsNotEmpty()
-  code: string;
-
-  @ApiPropertyOptional({
-    description: 'Echoed state value, when the deployment returns one',
-    writeOnly: true,
-  })
-  @IsOptional()
-  @IsString()
-  state?: string;
-
-  @ApiPropertyOptional({
-    description: 'User-defined label for the resulting configuration',
-    example: 'OrcaRouter account',
-    maxLength: 255,
-  })
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(255)
-  name?: string;
-}
-
 export class LLMConfigResponseDto {
   @ApiProperty({
     description: 'Unique LLM configuration identifier',
@@ -280,15 +218,6 @@ export class LLMConfigResponseDto {
   @IsString()
   apiKeyMasked: string;
 
-  @ApiPropertyOptional({
-    description:
-      'True when the provider rejected this credential and the user must reconnect',
-    example: false,
-  })
-  @IsOptional()
-  @IsBoolean()
-  needsReauth?: boolean;
-
   @ApiProperty({
     description: 'Timestamp when the configuration was created',
     example: '2025-01-01T00:00:00.000Z',
@@ -320,41 +249,6 @@ export class ProviderModelDto {
   @IsString()
   @IsNotEmpty()
   name: string;
-
-  @ApiPropertyOptional({
-    description: 'Model context window in tokens, when the source declares it',
-    example: 400000,
-  })
-  @IsOptional()
-  @IsNumber()
-  contextLength?: number;
-
-  @ApiPropertyOptional({
-    description: 'Input modalities declared by the catalog',
-    example: ['text', 'image'],
-    type: [String],
-  })
-  @IsOptional()
-  @IsString({ each: true })
-  inputModalities?: string[];
-
-  @ApiPropertyOptional({
-    description: 'Verified reasoning-effort levels for this model',
-    example: ['low', 'medium', 'high', 'xhigh'],
-    type: [String],
-  })
-  @IsOptional()
-  @IsString({ each: true })
-  reasoningEfforts?: string[];
-
-  @ApiPropertyOptional({
-    description:
-      'True when this entry comes from the verified offline seed because live discovery failed',
-    example: false,
-  })
-  @IsOptional()
-  @IsBoolean()
-  isFallback?: boolean;
 }
 
 export class LLMConfigWithProviderDto {
@@ -443,15 +337,6 @@ export class LLMConfigWithProviderDto {
   @IsOptional()
   @IsString()
   apiKeyMasked?: string;
-
-  @ApiPropertyOptional({
-    description:
-      'True when the provider rejected this credential and the user must reconnect',
-    example: false,
-  })
-  @IsOptional()
-  @IsBoolean()
-  needsReauth?: boolean;
 
   @ApiPropertyOptional({
     description: 'Timestamp when the configuration was created',

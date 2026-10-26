@@ -2,7 +2,6 @@ import { WorkspaceEncryptionService } from '@/services/workspace-encryption/work
 import { BadRequestException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { generateText } from 'ai';
 import {
   AgentsConfigService,
   findDefaultLLMConfig,
@@ -13,7 +12,6 @@ import {
 import { AgentConfig } from './entities/agent-config.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { LLMProvider, SearchProvider } from './enums/agent.enums';
-import { OrcaRouterCredentialService } from './orcarouter/orcarouter-credential.service';
 
 jest.mock('@/common/utils/workspace-encryption.util', () => ({
   decryptWithDEK: (text: string) => text.replace(/^enc\((.*)\)$/, '$1'),
@@ -73,12 +71,6 @@ describe('AgentsConfigService', () => {
               Promise.resolve(`enc(${text})`),
             ),
             getDEK: jest.fn().mockResolvedValue(null),
-          },
-        },
-        {
-          provide: OrcaRouterCredentialService,
-          useValue: {
-            reportUnauthorized: jest.fn().mockResolvedValue(true),
           },
         },
       ],
@@ -368,71 +360,5 @@ describe('formatUserInstructions', () => {
     ).toBe(
       '## User instructions\nUse tables.\n\nAlways answer in this language: vi',
     );
-  });
-});
-
-describe('AgentsConfigService provider auth failures', () => {
-  const orca = {
-    id: 'cfg-1',
-    workspaceId: WS,
-    provider: LLMProvider.ORCAROUTER,
-    model: 'orcarouter/auto',
-    apiKey: 'sk-orca-key',
-  } as AgentLLMConfig;
-
-  const build = () => {
-    const reportUnauthorized = jest.fn().mockResolvedValue(true);
-    const service = new AgentsConfigService(
-      {} as never,
-      {} as never,
-      {
-        decrypt: jest.fn((_ws: string, text: string) => Promise.resolve(text)),
-      } as unknown as WorkspaceEncryptionService,
-      { reportUnauthorized } as unknown as OrcaRouterCredentialService,
-    );
-    return { service, reportUnauthorized };
-  };
-
-  const failWith = (status: number) =>
-    jest.spyOn(global, 'fetch').mockResolvedValue(
-      new Response(
-        JSON.stringify({ error: { message: 'Unauthorized: denied' } }),
-        { status, headers: { 'content-type': 'application/json' } },
-      ),
-    );
-  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
-
-  afterEach(() => jest.restoreAllMocks());
-
-  it('reports a 401 from any request made with an OrcaRouter model', async () => {
-    const { service, reportUnauthorized } = build();
-    failWith(401);
-    const model = await service.createLanguageModel(orca, WS);
-
-    await expect(
-      generateText({ model, prompt: 'hi', maxRetries: 0 }),
-    ).rejects.toMatchObject({ statusCode: 401 });
-    await flush();
-
-    expect(reportUnauthorized).toHaveBeenCalledWith('cfg-1', 'sk-orca-key');
-  });
-
-  it('does not treat a 403 policy denial as a rejected key', async () => {
-    const { service, reportUnauthorized } = build();
-    failWith(403);
-    const model = await service.createLanguageModel(orca, WS);
-
-    await expect(
-      generateText({ model, prompt: 'hi', maxRetries: 0 }),
-    ).rejects.toMatchObject({ statusCode: 403 });
-    await flush();
-
-    expect(reportUnauthorized).not.toHaveBeenCalled();
-  });
-
-  it('reports failures emitted by other modules', async () => {
-    const { service, reportUnauthorized } = build();
-    await service.onLLMRequestFailed({ config: orca, error: { statusCode: 401 } });
-    expect(reportUnauthorized).toHaveBeenCalledWith('cfg-1', 'sk-orca-key');
   });
 });

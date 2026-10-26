@@ -17,11 +17,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { DataSource, In, Repository } from 'typeorm';
-import {
-  findDefaultLLMConfig,
-  LLM_REQUEST_FAILED_EVENT,
-  type LLMRequestFailedEvent,
-} from '../agents/agents.config';
+import { findDefaultLLMConfig } from '../agents/agents.config';
 import { AgentConfig } from '../agents/entities/agent-config.entity';
 import { AgentLLMConfig } from '../agents/entities/agent-llm-config.entity';
 import { LLMProvider } from '../agents/enums/agent.enums';
@@ -208,11 +204,6 @@ export class AssetsService {
     const result = await generateText({
       model,
       messages: [{ role: 'user', content: prompt }],
-    }).catch((error: unknown) => {
-      // Lets the agents module flag a rejected provider credential
-      const event: LLMRequestFailedEvent = { config: llmConfig, error };
-      this.eventEmitter.emit(LLM_REQUEST_FAILED_EVENT, event);
-      throw error;
     });
 
     let textContent = '';

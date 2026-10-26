@@ -120,13 +120,6 @@ export default function LlmConnect() {
     [createConfig, invalidate],
   );
 
-  const handleOrcaRouterConnected = useCallback(() => {
-    // The PKCE exchange already created the config server-side, so the list
-    // only needs to be refreshed.
-    invalidate();
-    toast.success('Provider connected successfully');
-  }, [invalidate]);
-
   const handleDelete = useCallback(
     async (configId: string) => {
       addPending(configId);
@@ -188,7 +181,6 @@ export default function LlmConnect() {
       <DialogLLMConnect
         providersList={providers}
         onSubmit={handleConnect}
-        onConnected={handleOrcaRouterConnected}
       />
     </div>
   );

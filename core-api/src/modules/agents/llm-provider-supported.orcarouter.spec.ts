@@ -1,57 +1,46 @@
- 
 import { LLMProvider } from './enums/agent.enums';
-import type * as ProviderModule from './llm-provider-supported';
+import { getLLMProviderConfig } from './llm-provider-supported';
 
-const createOpenAI = jest.fn((_options: unknown) => ({
-  chat: (model: string) => ({ modelId: model }),
-}));
+const provider = getLLMProviderConfig(LLMProvider.ORCAROUTER)!;
 
-jest.mock('@ai-sdk/openai', () => ({
-  createOpenAI: (options: unknown) => createOpenAI(options) as never,
-}));
+const respond = (status: number, body: unknown = {}) =>
+  jest.spyOn(global, 'fetch').mockResolvedValue(
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { 'content-type': 'application/json' },
+    }),
+  );
 
-const load = () =>
-  jest.requireActual<typeof ProviderModule>('./llm-provider-supported');
+afterEach(() => jest.restoreAllMocks());
 
-describe('OrcaRouter provider registration', () => {
-  beforeEach(() => createOpenAI.mockClear());
-
-  it('is a first-class named provider, not a custom-endpoint passthrough', () => {
-    const { llmProviderSupported, getLLMProviderConfig } = load();
-    const provider = getLLMProviderConfig(LLMProvider.ORCAROUTER);
-    expect(provider?.name).toBe('OrcaRouter Cyber Inference');
-    expect(provider?.logo).toBe('/static/images/orcarouter.png');
-    expect(provider?.isAcceptCustomApiUrl).toBeFalsy();
-    expect(
-      llmProviderSupported.filter((entry) => entry.id === LLMProvider.ORCAROUTER),
-    ).toHaveLength(1);
-  });
-
-  it('routes inference to the API origin, with an explicit self-hosted override', () => {
-    const { getLLMProviderConfig } = load();
-    delete process.env.ORCA_API_BASE_URL;
-    delete process.env.ORCA_BASE_URL;
-    getLLMProviderConfig(LLMProvider.ORCAROUTER)?.handler(
-      'sk-orca-key',
-      'orcarouter/auto',
-    );
-    expect(createOpenAI).toHaveBeenCalledWith({
-      apiKey: 'sk-orca-key',
-      baseURL: 'https://api.orcarouter.ai/v1',
+describe('OrcaRouter provider', () => {
+  it('lists only models served over OpenAI chat completions', async () => {
+    const fetchMock = respond(200, {
+      data: [
+        { id: 'orcarouter/auto', name: 'Auto', supported_endpoint_types: ['openai'] },
+        { id: 'a/both', supported_endpoint_types: ['anthropic', 'openai'] },
+        { id: 'a/messages-only', supported_endpoint_types: ['anthropic'] },
+        { id: 'a/image', supported_endpoint_types: ['image-generation'] },
+        { id: 'a/no-metadata' },
+      ],
     });
 
-    process.env.ORCA_API_BASE_URL = 'https://relay.example/v1';
-    try {
-      getLLMProviderConfig(LLMProvider.ORCAROUTER)?.handler(
-        'sk-orca-key',
-        'orcarouter/auto',
-      );
-      expect(createOpenAI).toHaveBeenLastCalledWith({
-        apiKey: 'sk-orca-key',
-        baseURL: 'https://relay.example/v1',
-      });
-    } finally {
-      delete process.env.ORCA_API_BASE_URL;
-    }
+    const models = await provider.fetchModels('sk-orca-key');
+
+    expect(models).toEqual([
+      { id: 'a/both', name: 'a/both' },
+      { id: 'orcarouter/auto', name: 'Auto' },
+    ]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.orcarouter.ai/v1/models?capability=chat',
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer sk-orca-key' },
+      }),
+    );
+  });
+
+  it('returns no models for a rejected key, so the key is not saved', async () => {
+    respond(401);
+    await expect(provider.fetchModels('sk-orca-bad')).resolves.toEqual([]);
   });
 });
