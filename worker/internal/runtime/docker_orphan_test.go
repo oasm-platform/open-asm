@@ -7,18 +7,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 )
 
 // managed builds a seeded engine-list entry the way DockerRuntime.Create
 // stamps containers: oasm-managed always, oasm.worker_id only when the
 // owner is known.
-func managed(id, state, owner string) types.Container {
+func managed(id, state, owner string) container.Summary {
 	labels := map[string]string{"oasm-managed": "true"}
 	if owner != "" {
 		labels["oasm.worker_id"] = owner
 	}
-	return types.Container{ID: id, State: state, Labels: labels}
+	return container.Summary{ID: id, State: state, Labels: labels}
 }
 
 // applyLabelFilter mimics the daemon's `label` filter over the seeded list,
@@ -28,7 +28,7 @@ func managed(id, state, owner string) types.Container {
 // legacy list form {"label":["k=v"]}. Parse whichever arrives; unparseable
 // input fails open (no filtering), matching the daemon's permissive stance
 // only for genuinely malformed input — which the SDK never sends.
-func applyLabelFilter(items []types.Container, raw string) []types.Container {
+func applyLabelFilter(items []container.Summary, raw string) []container.Summary {
 	if raw == "" {
 		return items
 	}
@@ -45,7 +45,7 @@ func applyLabelFilter(items []types.Container, raw string) []types.Container {
 	default:
 		return items
 	}
-	out := make([]types.Container, 0, len(items))
+	out := make([]container.Summary, 0, len(items))
 	for _, it := range items {
 		if matchLabelExprs(it.Labels, exprs) {
 			out = append(out, it)
@@ -109,7 +109,7 @@ func TestCreateOmitsEmptyWorkerIDLabel(t *testing.T) {
 // SDK exits once its stream dies).
 func TestReconcileRemovesStoppedManaged(t *testing.T) {
 	engine := newFakeDockerEngine()
-	engine.list = []types.Container{
+	engine.list = []container.Summary{
 		managed("exited-1", "exited", "other-owner"),
 		managed("exited-2", "exited", ""), // legacy container without owner label
 	}
@@ -133,7 +133,7 @@ func TestReconcileRemovesStoppedManaged(t *testing.T) {
 // so adoption is impossible and it must be force-removed.
 func TestReconcileRemovesOwnRunningOrphan(t *testing.T) {
 	engine := newFakeDockerEngine()
-	engine.list = []types.Container{
+	engine.list = []container.Summary{
 		managed("own-1", "running", "mine"),
 	}
 	r := newFakeDockerRuntime(t, engine, &captureLogger{})
@@ -153,7 +153,7 @@ func TestReconcileRemovesOwnRunningOrphan(t *testing.T) {
 // worker's warm container. Never touch it.
 func TestReconcileKeepsForeignRunning(t *testing.T) {
 	engine := newFakeDockerEngine()
-	engine.list = []types.Container{
+	engine.list = []container.Summary{
 		managed("sib-1", "running", "other-worker"),
 		managed("sib-2", "running", ""), // running, owner unknown → not provably ours
 		{ID: "unmanaged-1", State: "running", Labels: map[string]string{"app": "redis"}},
@@ -174,7 +174,7 @@ func TestReconcileKeepsForeignRunning(t *testing.T) {
 // only — without ownership proof, nothing running may be deleted.
 func TestReconcileEmptyOwnerOnlyRemovesStopped(t *testing.T) {
 	engine := newFakeDockerEngine()
-	engine.list = []types.Container{
+	engine.list = []container.Summary{
 		managed("run-1", "running", "anyone"),
 		managed("exit-1", "exited", "anyone"),
 	}
@@ -195,7 +195,7 @@ func TestReconcileEmptyOwnerOnlyRemovesStopped(t *testing.T) {
 func TestReconcileContinuesAfterRemoveError(t *testing.T) {
 	engine := newFakeDockerEngine()
 	engine.removeErr = errors.New("engine says no")
-	engine.list = []types.Container{
+	engine.list = []container.Summary{
 		managed("a-1", "exited", "x"),
 		managed("b-1", "exited", "y"),
 	}
@@ -219,7 +219,7 @@ func TestReconcileContinuesAfterRemoveError(t *testing.T) {
 // our containers, never a full-engine sweep.
 func TestReconcileListsManagedOnly(t *testing.T) {
 	engine := newFakeDockerEngine()
-	engine.list = []types.Container{managed("exited-1", "exited", "x")}
+	engine.list = []container.Summary{managed("exited-1", "exited", "x")}
 	r := newFakeDockerRuntime(t, engine, &captureLogger{})
 
 	r.ReconcileOrphans(context.Background(), "mine")
@@ -234,7 +234,7 @@ func TestReconcileListsManagedOnly(t *testing.T) {
 
 func TestReconcileLogSummary(t *testing.T) {
 	engine := newFakeDockerEngine()
-	engine.list = []types.Container{
+	engine.list = []container.Summary{
 		managed("exit-1", "exited", "x"),
 		managed("run-1", "running", "other"),
 	}
