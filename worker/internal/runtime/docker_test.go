@@ -1431,7 +1431,7 @@ func TestCreateRetriesOn409NameConflict(t *testing.T) {
 // daemon call, so this works without a Docker engine.
 func TestConnectorAddrOverridePlumbing(t *testing.T) {
 	t.Setenv("WORKER_CONNECTOR_ADDR", "") // isolate the explicit-arg path
-	d, err := NewDockerRuntime("", "10.0.0.9:9999", 50051, "tok")
+	d, err := NewDockerRuntime("", "10.0.0.9:9999", 50051, "tok", "")
 	if err != nil {
 		t.Fatalf("NewDockerRuntime: %v", err)
 	}
@@ -1444,7 +1444,7 @@ func TestConnectorAddrOverridePlumbing(t *testing.T) {
 // env (standalone runtime users). Config arg > env > auto-derive.
 func TestConnectorAddrEnvFallbackWhenArgEmpty(t *testing.T) {
 	t.Setenv("WORKER_CONNECTOR_ADDR", "192.168.1.50:50051")
-	d, err := NewDockerRuntime("", "", 50051, "tok")
+	d, err := NewDockerRuntime("", "", 50051, "tok", "")
 	if err != nil {
 		t.Fatalf("NewDockerRuntime: %v", err)
 	}
@@ -1460,7 +1460,7 @@ func TestConnectorAddrEnvFallbackWhenArgEmpty(t *testing.T) {
 func TestNewDockerRuntimeRequiresConnectorAddr(t *testing.T) {
 	t.Setenv("WORKER_CONNECTOR_ADDR", "")
 	t.Setenv("WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT", "")
-	_, err := NewDockerRuntime("", "", 50051, "tok")
+	_, err := NewDockerRuntime("", "", 50051, "tok", "")
 	if err == nil {
 		t.Fatal("expected error when WORKER_CONNECTOR_ADDR is empty and autodetect is not opted in")
 	}
@@ -1478,7 +1478,7 @@ func TestNewDockerRuntimeRequiresConnectorAddr(t *testing.T) {
 func TestNewDockerRuntimeOverrideUsedWithoutGuessing(t *testing.T) {
 	t.Setenv("WORKER_CONNECTOR_ADDR", "")
 	t.Setenv("WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT", "1")
-	d, err := NewDockerRuntime("", "10.0.0.9:9999", 50051, "tok")
+	d, err := NewDockerRuntime("", "10.0.0.9:9999", 50051, "tok", "")
 	if err != nil {
 		t.Fatalf("NewDockerRuntime with explicit override: %v", err)
 	}
@@ -1487,12 +1487,49 @@ func TestNewDockerRuntimeOverrideUsedWithoutGuessing(t *testing.T) {
 	}
 }
 
+// A port-less override is completed with the connector listen port, so a
+// worker on an OS-assigned port (WORKER_CONNECTOR_PORT=0) stays reachable.
+func TestNewDockerRuntimePortlessOverrideGetsListenPort(t *testing.T) {
+	t.Setenv("WORKER_CONNECTOR_ADDR", "")
+	t.Setenv("WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT", "")
+	d, err := NewDockerRuntime("", "host.docker.internal", 41234, "tok", "")
+	if err != nil {
+		t.Fatalf("NewDockerRuntime with port-less override: %v", err)
+	}
+	if d.connectorAddr != "host.docker.internal:41234" {
+		t.Fatalf("connectorAddr = %q, want %q", d.connectorAddr, "host.docker.internal:41234")
+	}
+}
+
+func TestWithListenPort(t *testing.T) {
+	cases := []struct {
+		name string
+		addr string
+		want string
+	}{
+		{"empty stays empty", "", ""},
+		{"hostname gets port", "host.docker.internal", "host.docker.internal:41234"},
+		{"IPv4 gets port", "192.168.1.50", "192.168.1.50:41234"},
+		{"bare IPv6 gets bracketed", "fdc4:f303:9324::254", "[fdc4:f303:9324::254]:41234"},
+		{"bracketed IPv6 gets port", "[fdc4:f303:9324::254]", "[fdc4:f303:9324::254]:41234"},
+		{"explicit port kept verbatim", "host.docker.internal:26276", "host.docker.internal:26276"},
+		{"explicit IPv6 port kept verbatim", "[fdc4::1]:50051", "[fdc4::1]:50051"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := withListenPort(tc.addr, 41234); got != tc.want {
+				t.Fatalf("withListenPort(%q) = %q, want %q", tc.addr, got, tc.want)
+			}
+		})
+	}
+}
+
 // The legacy auto-derive chain still works, but only under the explicit
 // WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT=1 opt-in (which logs a warning).
 func TestNewDockerRuntimeAutodetectOptInResolves(t *testing.T) {
 	t.Setenv("WORKER_CONNECTOR_ADDR", "")
 	t.Setenv("WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT", "1")
-	d, err := NewDockerRuntime("", "", 50051, "tok")
+	d, err := NewDockerRuntime("", "", 50051, "tok", "")
 	if err != nil {
 		t.Fatalf("NewDockerRuntime with autodetect opt-in: %v", err)
 	}

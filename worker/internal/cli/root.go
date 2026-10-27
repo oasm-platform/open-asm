@@ -136,7 +136,10 @@ The worker runs in one of two modes, reported to core-api when it joins:
         WORKER_CONNECTOR_ADDR). WORKER_CONNECTOR_ADDR overrides the address
         connector containers dial back on (default port 26276); when unset the
         worker auto-derives host.docker.internal and adds a host-gateway
-        mapping to each container. Note: the connector gRPC port (26276) must
+        mapping to each container. To run several workers on one host, set
+        WORKER_CONNECTOR_PORT=0 (the OS picks a free port) and give
+        WORKER_CONNECTOR_ADDR without a port — the worker appends the port it
+        listens on. Note: the connector gRPC port (26276) must
         be open to Docker containers in the host firewall (linux: allow from
         the docker bridge; Windows/macOS: allow the Docker Desktop VM).`,
 		RunE: func(cmd *cobra.Command, args []string) error {

@@ -36,6 +36,9 @@ type DockerRuntime struct {
 	host           string // e.g. unix:///var/run/docker.sock (from WORKER_DOCKER_HOST)
 	connectorAddr  string // resolved dial address containers use to reach the worker's connector gRPC server
 	connectorToken string // shared secret for connector authentication
+	// connectorNetwork, when set, replaces the default bridge for connector
+	// containers (WORKER_CONNECTOR_NETWORK); empty keeps the bridge.
+	connectorNetwork string
 	// cpuQuotaUnsupported is set when the daemon lacks CPU CFS quota support;
 	// such daemons reject any NanoCPUs value at container create (#734).
 	cpuQuotaUnsupported bool
@@ -259,9 +262,14 @@ func envTruthy(key string) bool {
 // containers may not be able to dial. The legacy auto-derive chain
 // (resolveConnectorAddr) only runs under the explicit
 // WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT=1 opt-in, which logs a warning so the
-// fallback is never silent. connectorPort is the listen port of the worker's
-// connector gRPC server.
-func NewDockerRuntime(host string, connectorAddr string, connectorPort int, connectorToken string) (*DockerRuntime, error) {
+// fallback is never silent. connectorPort is the port the worker's connector
+// gRPC server actually listens on; it completes a port-less connectorAddr (see
+// withListenPort) and the auto-derived address. connectorNetwork, when set,
+// attaches connector containers to that Docker network and — absent an
+// explicit connectorAddr — has them dial this worker container's own IP on it
+// (resolveSelfNetworkAddr): no published host port, so replicas of a scaled
+// worker never collide.
+func NewDockerRuntime(host string, connectorAddr string, connectorPort int, connectorToken string, connectorNetwork string) (*DockerRuntime, error) {
 	host = resolveHost(host, os.Getenv("DOCKER_HOST"), os.Getenv("WORKER_DOCKER_HOST"), runtime.GOOS)
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithHost(host), client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -274,13 +282,21 @@ func NewDockerRuntime(host string, connectorAddr string, connectorPort int, conn
 	if override == "" {
 		override = os.Getenv("WORKER_CONNECTOR_ADDR")
 	}
-	if override == "" && !envTruthy("WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT") {
+	hostname, _ := os.Hostname()
+	addr := withListenPort(override, connectorPort)
+	if addr == "" && connectorNetwork != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		addr, err = resolveSelfNetworkAddr(ctx, cli, hostname, connectorNetwork, connectorPort)
+		cancel()
+		if err != nil {
+			return nil, err
+		}
+	}
+	if addr == "" && !envTruthy("WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT") {
 		return nil, fmt.Errorf(
-			"WORKER_CONNECTOR_ADDR is required: set it to a host or IP connector containers can dial back to — the worker's LAN IP (e.g. 192.168.1.50:%d), a DNS name containers resolve, or host.docker.internal:%d when the worker runs on the Docker host. Do NOT use 0.0.0.0: the connector may bind there, but containers cannot dial it. To keep the legacy auto-detect chain (self-IP → host.docker.internal → bridge gateway → 172.17.0.1) set WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT=1",
+			"WORKER_CONNECTOR_ADDR is required: set it to a host or IP connector containers can dial back to — the worker's LAN IP (e.g. 192.168.1.50:%d), a DNS name containers resolve, or host.docker.internal:%d when the worker runs on the Docker host. The port may be omitted: the worker appends the one it listens on (required with WORKER_CONNECTOR_PORT=0). Do NOT use 0.0.0.0: the connector may bind there, but containers cannot dial it. A containerized worker can instead set WORKER_CONNECTOR_NETWORK to a Docker network it is attached to. To keep the legacy auto-detect chain (self-IP → host.docker.internal → bridge gateway → 172.17.0.1) set WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT=1",
 			connectorPort, connectorPort)
 	}
-	hostname, _ := os.Hostname()
-	addr := override
 	if addr == "" {
 		fmt.Fprintf(os.Stderr, "WARNING: WORKER_CONNECTOR_ADDR is empty; WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT=1 opted into the legacy auto-detect chain (self-IP → host.docker.internal → bridge gateway → 172.17.0.1). Prefer an explicit address connector containers can dial back to.\n")
 		addr, err = resolveConnectorAddr(context.Background(), cli, hostname, "", connectorPort, runtime.GOOS)
@@ -297,8 +313,29 @@ func NewDockerRuntime(host string, connectorAddr string, connectorPort int, conn
 		host:                host,
 		connectorAddr:       addr,
 		connectorToken:      connectorToken,
+		connectorNetwork:    connectorNetwork,
 		cpuQuotaUnsupported: cpuQuotaUnsupported,
 	}, nil
+}
+
+// resolveSelfNetworkAddr returns this worker container's IPv4 on network,
+// joined with port: the address connector containers attached to the same
+// network dial. Each replica has its own IP, so they all keep the default
+// listen port without publishing it. Fails when the worker is not a container
+// on that network (a host process, or a compose service missing the network).
+func resolveSelfNetworkAddr(ctx context.Context, di dockerInspector, hostname, network string, port int) (string, error) {
+	j, err := di.ContainerInspect(ctx, hostname)
+	if err != nil {
+		return "", fmt.Errorf("WORKER_CONNECTOR_NETWORK=%s: inspect own container %q: %w (the worker must run as a container attached to that network)", network, hostname, err)
+	}
+	if j.NetworkSettings != nil {
+		if ep, ok := j.NetworkSettings.Networks[network]; ok && ep != nil {
+			if ip := net.ParseIP(ep.IPAddress); ip != nil && ip.To4() != nil {
+				return net.JoinHostPort(ep.IPAddress, strconv.Itoa(port)), nil
+			}
+		}
+	}
+	return "", fmt.Errorf("WORKER_CONNECTOR_NETWORK=%s: worker container %q has no IPv4 address on that network — attach the worker to it", network, hostname)
 }
 
 // systemInfoer is the Docker Engine API subset needed to probe host
@@ -392,6 +429,22 @@ func resolveConnectorAddr(ctx context.Context, di dockerInspector, hostname, ove
 	}
 
 	return net.JoinHostPort("172.17.0.1", portStr), nil
+}
+
+// withListenPort completes a port-less dial address (e.g.
+// WORKER_CONNECTOR_ADDR=host.docker.internal or a bare IPv6 literal) with the
+// port the connector server listens on — the only way containers can reach a
+// worker started on an OS-assigned port (WORKER_CONNECTOR_PORT=0). An address
+// that already carries a port is returned verbatim: it may be a published or
+// NAT-mapped port that differs from the listen port.
+func withListenPort(addr string, port int) string {
+	if addr == "" {
+		return ""
+	}
+	if _, _, err := net.SplitHostPort(addr); err == nil {
+		return addr
+	}
+	return net.JoinHostPort(strings.Trim(addr, "[]"), strconv.Itoa(port))
 }
 
 // supportsHostGateway reports whether the engine resolves the special
@@ -742,6 +795,9 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 		},
 	}
 	applyDefaultIsolation(hostConfig)
+	if d.connectorNetwork != "" {
+		hostConfig.NetworkMode = container.NetworkMode(d.connectorNetwork)
+	}
 
 	// Container name: oasm-<tool-slug>-<registry-slug>-<rand4>. An idle warm
 	// container is reused by the next execution of the same image (Phase 2);

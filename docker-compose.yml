@@ -93,13 +93,13 @@ services:
       # worker. Required for a global worker to serve agents of every
       # workspace; fails closed (commands error) if Docker is unreachable.
       - WORKER_AGENT_SANDBOX=true
-      # WORKER_CONNECTOR_ADDR: optional override for the address connector
-      # containers dial back on (auto-derived when unset — host.docker.internal
-      # on any OS via a host-gateway ExtraHosts mapping the worker adds on
-      # Linux; IPv4 bridge gateway fallback on engines < Docker Engine 20.10).
-      - WORKER_CONNECTOR_ADDR=host.docker.internal:26276
-      # Firewall: the connector port (26276) must accept inbound from spawned
-      # containers (docker bridge, or the compose network when pinned above).
+      # Connector containers join the oasm-connectors network and dial this
+      # replica directly on its own IP there (:26276). No host port is
+      # published, so the service scales: `--scale oasm-worker=3`. Connectors
+      # are NOT on the oasm network, so they cannot reach postgres/redis.
+      - WORKER_CONNECTOR_NETWORK=oasm-connectors
+      # Replicas share worker-state: each one locks its own token slot
+      # (.worker-token, .worker-token.1, ...) and keeps a distinct identity.
     logging:
       driver: json-file
       options:
@@ -126,14 +126,9 @@ services:
     #   WORKER_DOCKER_GID=$(stat -c '%g' /var/run/docker.sock) docker compose up -d
     group_add:
       - "${WORKER_DOCKER_GID:-0}"
-    ports:
-      # Connector gRPC listen port. Spawned connector containers run on the host
-      # daemon (default bridge), so they must dial back through the host via
-      # WORKER_CONNECTOR_ADDR=host.docker.internal:26276 — which requires this
-      # port published on the host.
-      - '26276:26276'
     networks:
       - oasm
+      - oasm-connectors
     restart: 'always'
     depends_on:
       core-api:
@@ -271,4 +266,9 @@ volumes:
 
 networks:
   oasm:
+    driver: bridge
+  # Fixed name (no project prefix): the worker attaches connector containers it
+  # spawns through the Engine API by this exact name.
+  oasm-connectors:
+    name: oasm-connectors
     driver: bridge
