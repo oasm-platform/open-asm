@@ -95,7 +95,12 @@ task migration:run
 task migration:revert
 
 # Docker
-task docker-compose    # build+recreate full stack (single worker instance)
+task docker-compose    # app and dependencies; no scanning worker
+task docker-scan       # opt in to one scanning worker (fixed port, no scaling)
+task docker-status     # inspect running and stopped services
+task docker-stop       # stop project services; preserve containers and volumes
+task docker-config-check # validate Compose config without starting containers
+task docker-test       # test selection and task commands without starting containers
 ```
 
 Missing entries: `console:test:coverage`, `console:e2e`, `api:test:watch`, `api:test:cov` exist as package scripts but have **no** task entry — add one instead of calling the script.
@@ -196,7 +201,20 @@ Migration location: `core-api/src/database/migrations/` (58 files, newest last).
 
 ## Docker
 
-`task docker-compose` = `docker compose --env-file ./core-api/.env up -d --build --force-recreate`.
+`task docker-compose` starts `console` and its dependencies. The `scan` profile
+keeps `oasm-worker` opt-in; `task docker-scan` starts one worker and detects the
+Docker socket group. Startup builds only the selected app images using Docker's
+build cache and reuses unchanged containers. It does not force recreation.
+`task init` also reuses existing infrastructure.
+
+Before starting services, inspect `task docker-status` and choose only what the
+task needs. Documentation, static edits and unit tests do not need the full stack.
+Use the intended Docker context (`DOCKER_CONTEXT` is supported), record who owns
+services you start, and stop temporary services when finished. `task docker-compose`
+does not stop an existing worker. Check active/queued scans before `task docker-stop`;
+it stops this Compose project's services, retaining containers and volumes.
+Services use `unless-stopped` so a deliberate stop survives an engine restart.
+Do not stop unrelated projects or prune volumes as routine cleanup.
 
 Services: `console` (`:3000`), `core-api` (`:6276` + `:16276`, healthcheck `/api/health`), `oasm-worker` (socket-mounted, `:26276` published), `postgres` (pg17+pgvector), `redis`, `geo-ip` (`:4360`), `rustfs` (`:9000`/`:9001`), and a one-shot `migration` service that gates `core-api` startup (`service_completed_successfully`).
 

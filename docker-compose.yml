@@ -11,7 +11,7 @@ services:
       - ./console/.env
     ports:
       - '3000:80'
-    restart: 'always'
+    restart: 'unless-stopped'
     logging:
       driver: json-file
       options:
@@ -46,13 +46,15 @@ services:
       - GEO_IP_URL=geo-ip:4360
       - OASM_CLOUD_APIKEY=change_me
       - RUSTFS_ENDPOINT=http://rustfs:9000
-    restart: 'always'
+    restart: 'unless-stopped'
     logging:
       driver: json-file
       options:
         max-size: 10m
         max-file: '3'
     depends_on:
+      geo-ip:
+        condition: service_started
       migration:
         condition: service_completed_successfully
       postgres:
@@ -70,6 +72,7 @@ services:
       retries: 10
 
   oasm-worker:
+    profiles: [scan]
     image: oasm/oasm-worker:latest
     build:
       context: ./worker
@@ -121,9 +124,9 @@ services:
     # The socket group's gid is host-specific: 0 on Docker Desktop (root:root)
     # and the host's `docker` group gid on native Linux (commonly 999/986/968 —
     # check with `stat -c '%g' /var/run/docker.sock`, or `stat -f '%g'` on
-    # macOS). `task docker-compose` detects it automatically; for a raw
-    # `docker compose up` set it explicitly, e.g.
-    #   WORKER_DOCKER_GID=$(stat -c '%g' /var/run/docker.sock) docker compose up -d
+    # macOS). `task docker-scan` detects it automatically; for a raw
+    # `docker compose --profile scan up` set it explicitly, e.g.
+    #   WORKER_DOCKER_GID=$(stat -c '%g' /var/run/docker.sock) docker compose --profile scan up -d
     group_add:
       - "${WORKER_DOCKER_GID:-0}"
     ports:
@@ -134,7 +137,7 @@ services:
       - '26276:26276'
     networks:
       - oasm
-    restart: 'always'
+    restart: 'unless-stopped'
     depends_on:
       core-api:
         condition: service_healthy
@@ -142,7 +145,7 @@ services:
   postgres:
     container_name: oasm-postgres
     image: pgvector/pgvector:pg17
-    restart: always
+    restart: unless-stopped
     env_file:
       - ./core-api/.env
     environment:
@@ -174,7 +177,7 @@ services:
   redis:
     container_name: oasm-redis
     image: redis:alpine
-    restart: always
+    restart: unless-stopped
     # Loopback only: it carries every workspace's remote-execute results.
     ports:
       - '127.0.0.1:6379:6379'
@@ -210,7 +213,7 @@ services:
       - oasm
     ports:
       - '127.0.0.1:4360:4360'
-    restart: 'always'
+    restart: 'unless-stopped'
     volumes:
       - geoip-data:/app/data:rw
 
@@ -227,7 +230,7 @@ services:
       - RUSTFS_SECRET_KEY=rustfssecret
     volumes:
       - rustfs-data:/data:rw
-    restart: 'always'
+    restart: 'unless-stopped'
     logging:
       driver: json-file
       options:

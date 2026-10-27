@@ -274,7 +274,20 @@ task sync-connectors
 task docker-compose
 ```
 
-This builds and starts console, core API, worker, Postgres, Redis, Geo-IP proxy, and RustFS, running pending migrations first via the one-shot `migration` service. Console: `http://localhost:3000`.
+This starts console, core API, Postgres, Redis, Geo-IP proxy, and RustFS, running pending migrations first via the one-shot `migration` service. Console: `http://localhost:3000`. Scanning workers are opt-in:
+
+```bash
+task docker-scan         # start the app and one scanning worker when scans are needed
+task docker-status       # inspect running and stopped services
+task docker-stop         # stop this project's services, retaining containers and volumes
+```
+
+Startup builds only the selected app images using Docker's build cache and reuses
+unchanged containers. `task docker-compose` does not build or start the worker,
+and does not stop a worker that is already running; inspect `task docker-status` and finish
+or cancel scanning work before stopping it. Manually stopped services stay stopped
+after Docker restarts (`unless-stopped`). Choose the Docker engine with your normal
+Docker context or `DOCKER_CONTEXT`; these tasks do not switch contexts.
 
 | Service | Address |
 |---------|---------|
@@ -289,7 +302,7 @@ This builds and starts console, core API, worker, Postgres, Redis, Geo-IP proxy,
 Notes:
 
 - Set `WORKER_API_KEY` in `worker/.env` to the key the API expects.
-- On native Linux the worker needs the Docker socket group: `task docker-compose` detects `WORKER_DOCKER_GID` automatically. Raw `docker compose up` needs `WORKER_DOCKER_GID=$(stat -c '%g' /var/run/docker.sock) docker compose up -d --build`.
+- On native Linux the worker needs the Docker socket group: `task docker-scan` detects `WORKER_DOCKER_GID` automatically. Raw `docker compose --profile scan up` needs `WORKER_DOCKER_GID=$(stat -c '%g' /var/run/docker.sock) docker compose --profile scan up -d`.
 - The socket mount is root-equivalent — only run trusted connector images.
 - Pre-built images: `oasm/oasm-console`, `oasm/oasm-api`, `oasm/oasm-worker` on Docker Hub.
 - Production deploy: [oasm-docker](https://github.com/oasm-platform/oasm-docker) — see [docs.oasm.io/deployment](https://docs.oasm.io/deployment).
