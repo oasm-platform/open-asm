@@ -17,6 +17,7 @@ import { HttpResponseTechnology } from './entities/http-response-technology.enti
 import { HttpStatusCode } from './entities/http-status-code.entity';
 import { IpObservation } from './entities/ip-observation.entity';
 import { TlsCertificate } from './entities/tls-certificate.entity';
+import { UrlDiscoveryService } from './url-discovery.service';
 
 @Global()
 @Module({
@@ -40,7 +41,7 @@ import { TlsCertificate } from './entities/tls-certificate.entity';
     WorkspacesModule,
   ],
   controllers: [AssetsController],
-  providers: [AssetsService],
+  providers: [AssetsService, UrlDiscoveryService],
   exports: [AssetsService],
 })
 export class AssetsModule {}

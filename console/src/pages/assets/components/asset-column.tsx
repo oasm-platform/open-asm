@@ -9,6 +9,7 @@ import dayjs from 'dayjs';
 import { BriefcaseBusiness, Globe, Network } from 'lucide-react';
 import AssetValue from './asset-value';
 import BadgeList from './badge-list';
+import { NewBadge } from './new-badge';
 import ScreenshotCell from './screenshot-cell';
 import HTTPXStatusCode from './status-code';
 import { TechnologyTooltip } from './technology-tooltip';
@@ -31,6 +32,7 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
         <div className="flex flex-col gap-2 py-2 justify-center items-start max-w-125">
           <div className="flex items-center gap-2 w-full">
             <AssetValue httpResponse={httpResponse} value={data.value} />
+            <NewBadge isNew={data.isNew} />
             <HTTPXStatusCode httpResponse={httpResponse} />
           </div>
           {httpResponse?.title && (

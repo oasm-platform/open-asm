@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import { FindOperator, type DataSource, type Repository } from 'typeorm';
 import { TargetType, ToolCategory, WorkerType } from '@/common/enums/enum';
-import type { RedisLockService } from '@/services/redis/distributed-lock.service';
+import { RedisLockService } from '@/services/redis/distributed-lock.service';
 import type { StorageService } from '../storage/storage.service';
 import type { Tool } from './entities/tools.entity';
 import type { WorkspaceTool } from './entities/workspace_tools.entity';
@@ -132,6 +132,9 @@ const createHarness = (): Harness => {
   const redisLockService = {
     withLock: jest.fn((_key: string, _ttl: number, fn: () => Promise<unknown>) => fn()),
   };
+  jest
+    .spyOn(RedisLockService, 'current', 'get')
+    .mockReturnValue(redisLockService as unknown as RedisLockService);
 
   const uploadFile = jest.fn(() => Promise.resolve({ path: 'system/connectors/x.png' }));
   const deleteFile = jest.fn(() => Promise.resolve());
@@ -142,7 +145,6 @@ const createHarness = (): Harness => {
   const service = new ToolSyncService(
     toolsRepository as unknown as Repository<Tool>,
     workspaceToolRepository as unknown as Repository<WorkspaceTool>,
-    redisLockService as unknown as RedisLockService,
     storageService as unknown as StorageService,
     dataSource as unknown as DataSource,
   );

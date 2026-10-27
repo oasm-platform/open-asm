@@ -31,6 +31,9 @@ describe('JobResultCleanupService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    jest
+      .spyOn(RedisLockService, 'current', 'get')
+      .mockReturnValue(mockRedisLockService as unknown as RedisLockService);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -38,10 +41,6 @@ describe('JobResultCleanupService', () => {
         {
           provide: StorageService,
           useValue: mockStorageService,
-        },
-        {
-          provide: RedisLockService,
-          useValue: mockRedisLockService,
         },
       ],
     }).compile();

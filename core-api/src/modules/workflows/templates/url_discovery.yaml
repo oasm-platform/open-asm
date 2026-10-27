@@ -1,0 +1,16 @@
+name: url_discovery
+
+# No `on:` trigger: started on demand from the Assets URLs tab
+# (POST /assets/url/discover). URL discovery jobs only run on hosts httpx
+# confirmed live, one job per host.
+jobs:
+  historical_urls:
+    name: Historical URLs
+    run: gau
+    # Inline config: a connector with a configSchema needs either a default
+    # profile in the workspace or a config here.
+    config:
+      providers: [wayback, commoncrawl, otx, urlscan]
+      # Every subdomain is its own asset and gets its own job; --subs on the
+      # root would fetch the same URLs again.
+      subs: false

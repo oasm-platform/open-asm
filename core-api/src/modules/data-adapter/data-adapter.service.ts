@@ -418,6 +418,8 @@ export class DataAdapterService {
     await this.upsertAssetsByTargetId(
       job.asset.target.id,
       data as Array<{ value: string; dnsRecords: Record<string, string[]> }>,
+      undefined,
+      { jobHistoryId: job.jobHistory?.id },
     );
   }
 
@@ -444,13 +446,16 @@ export class DataAdapterService {
    *   to `.orUpdate(['dnsRecords'], ['value', 'targetId'])`, so re-syncs
    *   remove records that disappeared upstream. Never overwrites isEnabled.
    *   Omitted → merge + orIgnore (scanner subdomains() path unchanged).
+   *   jobHistoryId: the run that found the batch. Stamped on the rows this
+   *   call creates only: neither the ignore nor the dnsRecords update touches
+   *   an existing row's run.
    * @returns The number of asset rows actually inserted.
    */
   public async upsertAssetsByTargetId(
     targetId: string,
     assets: Array<{ value: string; dnsRecords: Record<string, string[]> }>,
     isEnabled?: boolean,
-    opts?: { replaceDnsRecords?: boolean },
+    opts?: { replaceDnsRecords?: boolean; jobHistoryId?: string },
   ): Promise<number> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -528,6 +533,7 @@ export class DataAdapterService {
             value: asset.value,
             dnsRecords: asset.dnsRecords,
             target: { id: targetId },
+            jobHistoryId: opts?.jobHistoryId ?? null,
             isEnabled:
               isEnabled ?? workspaceConfigs.isAutoEnableAssetAfterDiscovered,
           })),
@@ -874,6 +880,9 @@ export class DataAdapterService {
           value: `${job.asset.value}:${port}`,
           port: port,
           assetId: job.asset.id,
+          // Kept on conflict: the upsert only overwrites `value`, so a
+          // service keeps the run that first found it.
+          jobHistoryId: job.jobHistory.id,
         }));
 
         await queryRunner.manager

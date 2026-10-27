@@ -1,5 +1,5 @@
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
-import { Info, Palette, User } from 'lucide-react';
+import { Briefcase, Info, Palette, User } from 'lucide-react';
 import type { JSX, ReactNode } from 'react';
 import { HeaderBar } from '@/components/common/layout/header-bar';
 import { AppSidebar, type NavGroup } from '@/components/common/layout/menu-bar';
@@ -18,6 +18,11 @@ const adminMenu: NavGroup[] = [
         title: 'Users',
         icon: <User />,
         url: '/admin/users',
+      },
+      {
+        title: 'Workspaces',
+        icon: <Briefcase />,
+        url: '/admin/workspaces',
       },
     ],
   },

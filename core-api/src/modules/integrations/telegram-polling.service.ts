@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { RedisLockService } from '@/services/redis/distributed-lock.service';
+import { Lock } from '@/services/redis/lock.decorator';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { decryptSensitiveConfigFields } from './validators/integration.validator';
 import { Integration } from './entities/integration.entity';
@@ -13,7 +13,7 @@ const LOCK_TTL_MS = 35_000; // 35 seconds — must be > POLL_TIMEOUT * 1000
 
 /**
  * Fallback long-polling service for local/dev environments where BASE_URL
- * is not set (no public webhook endpoint). Uses RedisLockService so only
+ * is not set (no public webhook endpoint). Uses a Redis lock (@Lock) so only
  * one worker instance polls each bot in a cluster.
  */
 @Injectable()
@@ -25,7 +25,6 @@ export class TelegramPollingService implements OnApplicationBootstrap {
   constructor(
     @InjectRepository(Integration)
     private readonly integrationRepo: Repository<Integration>,
-    private readonly redisLockService: RedisLockService,
     private readonly telegramWebhookService: TelegramWebhookService,
     private readonly workspaceEncryption: WorkspaceEncryptionService,
   ) {}
@@ -86,15 +85,13 @@ export class TelegramPollingService implements OnApplicationBootstrap {
     });
 
     await Promise.allSettled(
-      integrations.map((integration) =>
-        this.redisLockService.withLock(
-          `telegram:poll:${integration.id}`,
-          LOCK_TTL_MS,
-          () => this.pollBot(integration),
-        ),
-      ),
+      integrations.map((integration) => this.pollBot(integration)),
     );
   }
+
+  @Lock((integration: Integration) => `telegram:poll:${integration.id}`, {
+    ttl: LOCK_TTL_MS,
+  })
   private async pollBot(integration: Integration): Promise<void> {
     try {
       const dek = await this.workspaceEncryption.getDEK(integration.workspaceId);

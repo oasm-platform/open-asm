@@ -21,7 +21,6 @@ import { Route as AuthedSearchRouteImport } from './routes/_authed/search'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminAboutRouteImport } from './routes/admin/about'
 import { Route as AdminBrandRouteImport } from './routes/admin/brand'
-import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as InviteTokenRouteImport } from './routes/invite/$token'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as SettingsTabRouteImport } from './routes/settings/$tab'
@@ -51,6 +50,10 @@ import { Route as AuthedWorkersIndexRouteImport } from './routes/_authed/workers
 import { Route as AuthedWorkersIdRouteImport } from './routes/_authed/workers/$id'
 import { Route as AuthedWorkspacesIndexRouteImport } from './routes/_authed/workspaces/index'
 import { Route as AuthedWorkspacesCreateRouteImport } from './routes/_authed/workspaces/create'
+import { Route as AdminUsersIndexRouteImport } from './routes/admin/users/index'
+import { Route as AdminUsersIdRouteImport } from './routes/admin/users/$id'
+import { Route as AdminWorkspacesIndexRouteImport } from './routes/admin/workspaces/index'
+import { Route as AdminWorkspacesIdRouteImport } from './routes/admin/workspaces/$id'
 import { Route as AuthedAgentsIdIndexRouteImport } from './routes/_authed/agents/$id/index'
 import { Route as AuthedAgentsIdEditRouteImport } from './routes/_authed/agents/$id/edit'
 import { Route as AuthedAgentsProvidersConnectRouteImport } from './routes/_authed/agents/providers/connect'
@@ -122,11 +125,6 @@ const AdminAboutRoute = AdminAboutRouteImport.update({
 const AdminBrandRoute = AdminBrandRouteImport.update({
   id: '/brand',
   path: '/brand',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminUsersRoute = AdminUsersRouteImport.update({
-  id: '/users',
-  path: '/users',
   getParentRoute: () => AdminRoute,
 } as any)
 const InviteTokenRoute = InviteTokenRouteImport.update({
@@ -280,6 +278,26 @@ const AuthedWorkspacesCreateRoute = AuthedWorkspacesCreateRouteImport.update({
   path: '/workspaces/create',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AdminUsersIndexRoute = AdminUsersIndexRouteImport.update({
+  id: '/users/',
+  path: '/users/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminUsersIdRoute = AdminUsersIdRouteImport.update({
+  id: '/users/$id',
+  path: '/users/$id',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminWorkspacesIndexRoute = AdminWorkspacesIndexRouteImport.update({
+  id: '/workspaces/',
+  path: '/workspaces/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminWorkspacesIdRoute = AdminWorkspacesIdRouteImport.update({
+  id: '/workspaces/$id',
+  path: '/workspaces/$id',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AuthedAgentsIdIndexRoute = AuthedAgentsIdIndexRouteImport.update({
   id: '/agents/$id/',
   path: '/agents/$id/',
@@ -362,7 +380,6 @@ export interface FileRoutesByFullPath {
   '/search': typeof AuthedSearchRoute
   '/admin/about': typeof AdminAboutRoute
   '/admin/brand': typeof AdminBrandRoute
-  '/admin/users': typeof AdminUsersRoute
   '/invite/$token': typeof InviteTokenRoute
   '/settings/$tab': typeof SettingsTabRoute
   '/admin/': typeof AdminIndexRoute
@@ -381,6 +398,8 @@ export interface FileRoutesByFullPath {
   '/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
   '/workers/$id': typeof AuthedWorkersIdRoute
   '/workspaces/create': typeof AuthedWorkspacesCreateRoute
+  '/admin/users/$id': typeof AdminUsersIdRoute
+  '/admin/workspaces/$id': typeof AdminWorkspacesIdRoute
   '/aistudio/': typeof AuthedAistudioIndexRoute
   '/assets/': typeof AuthedAssetsIndexRoute
   '/groups/': typeof AuthedGroupsIndexRoute
@@ -393,6 +412,8 @@ export interface FileRoutesByFullPath {
   '/vulnerabilities/': typeof AuthedVulnerabilitiesIndexRoute
   '/workers/': typeof AuthedWorkersIndexRoute
   '/workspaces/': typeof AuthedWorkspacesIndexRoute
+  '/admin/users/': typeof AdminUsersIndexRoute
+  '/admin/workspaces/': typeof AdminWorkspacesIndexRoute
   '/agents/$id/edit': typeof AuthedAgentsIdEditRoute
   '/agents/providers/connect': typeof AuthedAgentsProvidersConnectRoute
   '/aistudio/conversations/$conversationId': typeof AuthedAistudioConversationsConversationIdRoute
@@ -415,7 +436,6 @@ export interface FileRoutesByTo {
   '/search': typeof AuthedSearchRoute
   '/admin/about': typeof AdminAboutRoute
   '/admin/brand': typeof AdminBrandRoute
-  '/admin/users': typeof AdminUsersRoute
   '/invite/$token': typeof InviteTokenRoute
   '/settings/$tab': typeof SettingsTabRoute
   '/': typeof AuthedIndexRoute
@@ -435,6 +455,8 @@ export interface FileRoutesByTo {
   '/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
   '/workers/$id': typeof AuthedWorkersIdRoute
   '/workspaces/create': typeof AuthedWorkspacesCreateRoute
+  '/admin/users/$id': typeof AdminUsersIdRoute
+  '/admin/workspaces/$id': typeof AdminWorkspacesIdRoute
   '/aistudio': typeof AuthedAistudioIndexRoute
   '/assets': typeof AuthedAssetsIndexRoute
   '/groups': typeof AuthedGroupsIndexRoute
@@ -447,6 +469,8 @@ export interface FileRoutesByTo {
   '/vulnerabilities': typeof AuthedVulnerabilitiesIndexRoute
   '/workers': typeof AuthedWorkersIndexRoute
   '/workspaces': typeof AuthedWorkspacesIndexRoute
+  '/admin/users': typeof AdminUsersIndexRoute
+  '/admin/workspaces': typeof AdminWorkspacesIndexRoute
   '/agents/$id/edit': typeof AuthedAgentsIdEditRoute
   '/agents/providers/connect': typeof AuthedAgentsProvidersConnectRoute
   '/aistudio/conversations/$conversationId': typeof AuthedAistudioConversationsConversationIdRoute
@@ -473,7 +497,6 @@ export interface FileRoutesById {
   '/_authed/search': typeof AuthedSearchRoute
   '/admin/about': typeof AdminAboutRoute
   '/admin/brand': typeof AdminBrandRoute
-  '/admin/users': typeof AdminUsersRoute
   '/invite/$token': typeof InviteTokenRoute
   '/settings/$tab': typeof SettingsTabRoute
   '/_authed/': typeof AuthedIndexRoute
@@ -493,6 +516,8 @@ export interface FileRoutesById {
   '/_authed/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
   '/_authed/workers/$id': typeof AuthedWorkersIdRoute
   '/_authed/workspaces/create': typeof AuthedWorkspacesCreateRoute
+  '/admin/users/$id': typeof AdminUsersIdRoute
+  '/admin/workspaces/$id': typeof AdminWorkspacesIdRoute
   '/_authed/aistudio/': typeof AuthedAistudioIndexRoute
   '/_authed/assets/': typeof AuthedAssetsIndexRoute
   '/_authed/groups/': typeof AuthedGroupsIndexRoute
@@ -505,6 +530,8 @@ export interface FileRoutesById {
   '/_authed/vulnerabilities/': typeof AuthedVulnerabilitiesIndexRoute
   '/_authed/workers/': typeof AuthedWorkersIndexRoute
   '/_authed/workspaces/': typeof AuthedWorkspacesIndexRoute
+  '/admin/users/': typeof AdminUsersIndexRoute
+  '/admin/workspaces/': typeof AdminWorkspacesIndexRoute
   '/_authed/agents/$id/edit': typeof AuthedAgentsIdEditRoute
   '/_authed/agents/providers/connect': typeof AuthedAgentsProvidersConnectRoute
   '/_authed/aistudio/conversations/$conversationId': typeof AuthedAistudioConversationsConversationIdRoute
@@ -532,7 +559,6 @@ export interface FileRouteTypes {
     | '/search'
     | '/admin/about'
     | '/admin/brand'
-    | '/admin/users'
     | '/invite/$token'
     | '/settings/$tab'
     | '/admin/'
@@ -551,6 +577,8 @@ export interface FileRouteTypes {
     | '/vulnerabilities/$id'
     | '/workers/$id'
     | '/workspaces/create'
+    | '/admin/users/$id'
+    | '/admin/workspaces/$id'
     | '/aistudio/'
     | '/assets/'
     | '/groups/'
@@ -563,6 +591,8 @@ export interface FileRouteTypes {
     | '/vulnerabilities/'
     | '/workers/'
     | '/workspaces/'
+    | '/admin/users/'
+    | '/admin/workspaces/'
     | '/agents/$id/edit'
     | '/agents/providers/connect'
     | '/aistudio/conversations/$conversationId'
@@ -585,7 +615,6 @@ export interface FileRouteTypes {
     | '/search'
     | '/admin/about'
     | '/admin/brand'
-    | '/admin/users'
     | '/invite/$token'
     | '/settings/$tab'
     | '/'
@@ -605,6 +634,8 @@ export interface FileRouteTypes {
     | '/vulnerabilities/$id'
     | '/workers/$id'
     | '/workspaces/create'
+    | '/admin/users/$id'
+    | '/admin/workspaces/$id'
     | '/aistudio'
     | '/assets'
     | '/groups'
@@ -617,6 +648,8 @@ export interface FileRouteTypes {
     | '/vulnerabilities'
     | '/workers'
     | '/workspaces'
+    | '/admin/users'
+    | '/admin/workspaces'
     | '/agents/$id/edit'
     | '/agents/providers/connect'
     | '/aistudio/conversations/$conversationId'
@@ -642,7 +675,6 @@ export interface FileRouteTypes {
     | '/_authed/search'
     | '/admin/about'
     | '/admin/brand'
-    | '/admin/users'
     | '/invite/$token'
     | '/settings/$tab'
     | '/_authed/'
@@ -662,6 +694,8 @@ export interface FileRouteTypes {
     | '/_authed/vulnerabilities/$id'
     | '/_authed/workers/$id'
     | '/_authed/workspaces/create'
+    | '/admin/users/$id'
+    | '/admin/workspaces/$id'
     | '/_authed/aistudio/'
     | '/_authed/assets/'
     | '/_authed/groups/'
@@ -674,6 +708,8 @@ export interface FileRouteTypes {
     | '/_authed/vulnerabilities/'
     | '/_authed/workers/'
     | '/_authed/workspaces/'
+    | '/admin/users/'
+    | '/admin/workspaces/'
     | '/_authed/agents/$id/edit'
     | '/_authed/agents/providers/connect'
     | '/_authed/aistudio/conversations/$conversationId'
@@ -783,13 +819,6 @@ declare module '@tanstack/react-router' {
       path: '/brand'
       fullPath: '/admin/brand'
       preLoaderRoute: typeof AdminBrandRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/users': {
-      id: '/admin/users'
-      path: '/users'
-      fullPath: '/admin/users'
-      preLoaderRoute: typeof AdminUsersRouteImport
       parentRoute: typeof AdminRoute
     }
     '/invite/$token': {
@@ -995,6 +1024,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedWorkspacesCreateRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/admin/users/': {
+      id: '/admin/users/'
+      path: '/users'
+      fullPath: '/admin/users/'
+      preLoaderRoute: typeof AdminUsersIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/users/$id': {
+      id: '/admin/users/$id'
+      path: '/users/$id'
+      fullPath: '/admin/users/$id'
+      preLoaderRoute: typeof AdminUsersIdRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/workspaces/': {
+      id: '/admin/workspaces/'
+      path: '/workspaces'
+      fullPath: '/admin/workspaces/'
+      preLoaderRoute: typeof AdminWorkspacesIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/workspaces/$id': {
+      id: '/admin/workspaces/$id'
+      path: '/workspaces/$id'
+      fullPath: '/admin/workspaces/$id'
+      preLoaderRoute: typeof AdminWorkspacesIdRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/_authed/agents/$id/': {
       id: '/_authed/agents/$id/'
       path: '/agents/$id'
@@ -1182,15 +1239,21 @@ const AuthedRouteWithChildren =
 interface AdminRouteChildren {
   AdminAboutRoute: typeof AdminAboutRoute
   AdminBrandRoute: typeof AdminBrandRoute
-  AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  AdminUsersIdRoute: typeof AdminUsersIdRoute
+  AdminWorkspacesIdRoute: typeof AdminWorkspacesIdRoute
+  AdminUsersIndexRoute: typeof AdminUsersIndexRoute
+  AdminWorkspacesIndexRoute: typeof AdminWorkspacesIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAboutRoute: AdminAboutRoute,
   AdminBrandRoute: AdminBrandRoute,
-  AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
+  AdminUsersIdRoute: AdminUsersIdRoute,
+  AdminWorkspacesIdRoute: AdminWorkspacesIdRoute,
+  AdminUsersIndexRoute: AdminUsersIndexRoute,
+  AdminWorkspacesIndexRoute: AdminWorkspacesIndexRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)

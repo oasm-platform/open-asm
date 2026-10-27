@@ -72,6 +72,9 @@ interface StatisticSnapshot {
   techs: number;
 }
 
+/** How many of a run's new hosts the run-completed event names. */
+const NEW_HOSTS_PREVIEW = 10;
+
 @Injectable()
 export class StatisticService {
   constructor(
@@ -1465,6 +1468,37 @@ export class StatisticService {
     return { hosts, ports, services, techs };
   }
 
+  /**
+   * Hosts a run found first on a target, counted the way the snapshot counts
+   * hosts (only those exposing a service), with a sorted preview of their
+   * names. Empty for a run without an id or one that predates provenance.
+   */
+  async newHostsOfRun(
+    jobHistoryId: string | undefined,
+    targetId: string,
+  ): Promise<{ total: number; sample: string[] }> {
+    if (!jobHistoryId) return { total: 0, sample: [] };
+
+    const query = this.dataSource
+      .getRepository(Asset)
+      .createQueryBuilder('asset')
+      .where('asset.jobHistoryId = :jobHistoryId', { jobHistoryId })
+      .andWhere('asset.targetId = :targetId', { targetId })
+      .andWhere(
+        'EXISTS (SELECT 1 FROM asset_services s WHERE s."assetId" = asset.id)',
+      );
+    const [total, sample] = await Promise.all([
+      query.getCount(),
+      query
+        .clone()
+        .select('asset.value', 'value')
+        .orderBy('asset.value', 'ASC')
+        .limit(NEW_HOSTS_PREVIEW)
+        .getRawMany<{ value: string }>(),
+    ]);
+    return { total, sample: sample.map((row) => row.value) };
+  }
+
   @OnEvent(EventTriggerType.WORKFLOW_START)
   async handleWorkflowStart(job: CreateJobs) {
     if (
@@ -1565,6 +1599,10 @@ export class StatisticService {
       if (members.length === 0) return;
 
       const workspaceId = members[0].workspace.id;
+      const newHosts = await this.newHostsOfRun(
+        job.jobHistory?.id,
+        job.asset.target.id,
+      );
 
       // Publish the run's OUTCOME, not a notification decision. Who gets told
       // what — and in which words — is the consumers' call; this service only
@@ -1592,6 +1630,8 @@ export class StatisticService {
             failedSteps,
             blockedSteps,
             cancelledSteps,
+            newHosts: newHosts.sample,
+            newHostsTotal: newHosts.total,
           } satisfies WorkflowRunCompletedPayload,
         },
         { subject: `workspace:${workspaceId}/workflow_run:${job.id}` },

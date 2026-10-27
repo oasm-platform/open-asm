@@ -4,7 +4,7 @@ import type { WrapperType } from '@/common/types/app.types';
 import { DataAdapterService } from '@/modules/data-adapter/data-adapter.service';
 import { TargetsService } from '@/modules/targets/targets.service';
 import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
-import { RedisLockService } from '@/services/redis/distributed-lock.service';
+import { Lock } from '@/services/redis/lock.decorator';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import {
@@ -25,7 +25,10 @@ import type {
 } from './connectors/connector.abstract';
 import { hasCapability } from './capabilities';
 import { AwsSsoService } from './connectors/aws/aws-sso.service';
-import { runConnector } from './connectors/connector.factory';
+import {
+  type ConnectorTestResult,
+  runConnector,
+} from './connectors/connector.factory';
 import { Integration } from './entities/integration.entity';
 import { IntegrationsService } from './integrations.service';
 import {
@@ -62,7 +65,6 @@ export class IntegrationSyncService implements OnModuleInit {
     private readonly workspacesService: WorkspacesService,
     private readonly awsSsoService: AwsSsoService,
     private readonly workspaceEncryption: WorkspaceEncryptionService,
-    private readonly redisLockService: RedisLockService,
   ) {}
 
   /**
@@ -283,30 +285,13 @@ export class IntegrationSyncService implements OnModuleInit {
     // instances. A held lock is reported as zero (non-dry-run) so the scheduler
     // keeps moving, but a dry run must FAIL — otherwise testIntegration would
     // report success:true for a sync that never ran.
-    const result = await this.redisLockService.withLock(
-      'integration-sync:' + integrationId,
-      MAX_SYNC_DURATION_MS,
-      async () => {
-        const connectorResult = await runConnector(
-          integration.appType,
-          IntegrationType.CLOUD_PROVIDER,
-          config,
-        );
-
-        if (!connectorResult.success) {
-          // BadRequestException (not a plain Error) so callers can distinguish a
-          // failed connector run (e.g. dry-run test → success:false result) from
-          // a programming error, and the HTTP layer maps it to a 400.
-          throw new BadRequestException(
-            connectorResult.error ?? connectorResult.message,
-          );
-        }
-
-        return connectorResult;
-      },
+    const result = await this.runCloudConnector(
+      integrationId,
+      integration.appType,
+      config,
     );
 
-    if (result === null) {
+    if (result === undefined) {
       if (opts?.dryRun) {
         throw new BadRequestException('integration sync already in progress');
       }
@@ -324,6 +309,37 @@ export class IntegrationSyncService implements OnModuleInit {
     // The connector stashes its counts on the config (config.__syncResult)
     // before returning, so they flow back to the API response.
     return config.__syncResult ?? { targetsCreated: 0, assetsUpserted: 0 };
+  }
+
+  /**
+   * Runs the cloud connector under the per-integration overlap lock (see
+   * runSync). Resolves undefined, without running, while another instance
+   * syncs the same integration.
+   */
+  @Lock((integrationId: string) => `integration-sync:${integrationId}`, {
+    ttl: MAX_SYNC_DURATION_MS,
+  })
+  private async runCloudConnector(
+    integrationId: string,
+    appType: string,
+    config: CloudProviderSyncConfig,
+  ): Promise<ConnectorTestResult | undefined> {
+    const connectorResult = await runConnector(
+      appType,
+      IntegrationType.CLOUD_PROVIDER,
+      config,
+    );
+
+    if (!connectorResult.success) {
+      // BadRequestException (not a plain Error) so callers can distinguish a
+      // failed connector run (e.g. dry-run test → success:false result) from
+      // a programming error, and the HTTP layer maps it to a 400.
+      throw new BadRequestException(
+        connectorResult.error ?? connectorResult.message,
+      );
+    }
+
+    return connectorResult;
   }
 
   /**

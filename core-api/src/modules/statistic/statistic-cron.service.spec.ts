@@ -27,16 +27,16 @@ describe('StatisticCronService', () => {
   };
 
   beforeEach(async () => {
+    jest
+      .spyOn(RedisLockService, 'current', 'get')
+      .mockReturnValue(mockRedisLockService as unknown as RedisLockService);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         StatisticCronService,
         {
           provide: StatisticService,
           useValue: mockStatisticService,
-        },
-        {
-          provide: RedisLockService,
-          useValue: mockRedisLockService,
         },
       ],
     }).compile();

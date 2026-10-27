@@ -92,6 +92,23 @@ export const NOTIFICATION_RULES: Partial<Record<EventName, NotificationRule[]>> 
         },
       },
     ],
+    // New URLs stored by a URL discovery run: one note per target, never one
+    // per URL. The producer only publishes when there is at least one.
+    'asset.url.discovered': [
+      {
+        type: NotificationType.NEW_URL_FOUND,
+        scope: NotificationScope.GROUP,
+        audience: 'workspace-members',
+        metadata: (event) => {
+          const p = readPayload('asset.url.discovered', event);
+          return {
+            count: String(p.count ?? 0),
+            targetValue: p.targetValue ?? '',
+            targetId: p.targetId ?? '',
+          };
+        },
+      },
+    ],
     // Addressed to the one user who requested the analysis — notifying the
     // whole workspace about one person's AI run would be wrong, not merely
     // noisy.
