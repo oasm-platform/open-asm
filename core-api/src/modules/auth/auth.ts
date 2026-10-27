@@ -64,9 +64,13 @@ export const auth: unknown = betterAuth({
   // through `workspaces.ownerId` (ON DELETE CASCADE) and would wipe every
   // workspace they own along with all scan data. Admins ban instead.
   // `/delete-user*` (self-service) is blocked too, for the same reason.
+  // `/admin/list-users` and `/admin/get-user` are replaced by GET /api/admin/users
+  // and GET /api/admin/users/:id.
   disabledPaths: [
     ...AUTH_IGNORE_ROUTERS,
     '/admin/remove-user',
+    '/admin/list-users',
+    '/admin/get-user',
     '/delete-user',
     '/delete-user/callback',
   ],

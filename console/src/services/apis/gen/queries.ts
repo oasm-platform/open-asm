@@ -4428,6 +4428,87 @@ export type CreateToolDto = {
   providerId: string;
 };
 
+export type AdminUserDtoRole =
+  (typeof AdminUserDtoRole)[keyof typeof AdminUserDtoRole];
+
+export const AdminUserDtoRole = {
+  admin: 'admin',
+  user: 'user',
+  bot: 'bot',
+} as const;
+
+export type AdminUserDto = {
+  id: string;
+  name: string;
+  email: string;
+  emailVerified: boolean;
+  /** @nullable */
+  image?: string | null;
+  role: AdminUserDtoRole;
+  /** @nullable */
+  banned?: boolean | null;
+  /** @nullable */
+  banReason?: string | null;
+  /** @nullable */
+  banExpires?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GetManyAdminUserDtoDto = {
+  data: AdminUserDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type AdminWorkspaceUserDto = {
+  id: string;
+  name: string;
+  email: string;
+  /** @nullable */
+  image?: string | null;
+};
+
+export type AdminWorkspaceDto = {
+  id: string;
+  name: string;
+  /** @nullable */
+  description?: string | null;
+  /**
+   * Null only if the owner row is missing
+   * @nullable
+   */
+  owner: AdminWorkspaceUserDto | null;
+  isAssetsDiscovery: boolean;
+  isAutoEnableAssetAfterDiscovered: boolean;
+  targetCount: number;
+  memberCount: number;
+  /** @nullable */
+  archivedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GetManyAdminWorkspaceDtoDto = {
+  data: AdminWorkspaceDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type UpdateAdminWorkspaceDto = {
+  name?: string;
+  /** @nullable */
+  description?: string | null;
+  isAssetsDiscovery?: boolean;
+  isAutoEnableAssetAfterDiscovered?: boolean;
+};
+
 export type GetManyInternalNetworksResponseDtoDataItem = {
   [key: string]: unknown;
 };
@@ -5376,6 +5457,30 @@ export type AssetGroupControllerGetAssetsNotInAssetGroupParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
+};
+
+export type AdminUsersControllerGetUsersParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  /**
+   * Only users who are members of this workspace
+   */
+  workspaceId?: string;
+};
+
+export type AdminWorkspacesControllerGetWorkspacesParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  /**
+   * true = archived only, false = active only, omit = both
+   */
+  isArchived?: boolean;
 };
 
 export type InternalNetworksControllerGetManyInternalNetworksParams = {
@@ -42261,6 +42366,1265 @@ export const useAdminControllerCreateTool = <
 > => {
   return useMutation(
     getAdminControllerCreateToolMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Lists every user account on the platform, excluding bot identities. `search` matches name or email.
+ * @summary List users
+ */
+export const adminUsersControllerGetUsers = (
+  params?: AdminUsersControllerGetUsersParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyAdminUserDtoDto>(
+    { url: `/api/admin/users`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getAdminUsersControllerGetUsersInfiniteQueryKey = (
+  params?: AdminUsersControllerGetUsersParams,
+) => {
+  return ['infinite', `/api/admin/users`, ...(params ? [params] : [])] as const;
+};
+
+export const getAdminUsersControllerGetUsersQueryKey = (
+  params?: AdminUsersControllerGetUsersParams,
+) => {
+  return [`/api/admin/users`, ...(params ? [params] : [])] as const;
+};
+
+export const getAdminUsersControllerGetUsersInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+    AdminUsersControllerGetUsersParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AdminUsersControllerGetUsersParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+        TError,
+        TData,
+        QueryKey,
+        AdminUsersControllerGetUsersParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAdminUsersControllerGetUsersInfiniteQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+    QueryKey,
+    AdminUsersControllerGetUsersParams['page']
+  > = ({ signal, pageParam }) =>
+    adminUsersControllerGetUsers(
+      { ...params, page: pageParam ?? params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+    TError,
+    TData,
+    QueryKey,
+    AdminUsersControllerGetUsersParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AdminUsersControllerGetUsersInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminUsersControllerGetUsers>>
+>;
+export type AdminUsersControllerGetUsersInfiniteQueryError = unknown;
+
+export function useAdminUsersControllerGetUsersInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+    AdminUsersControllerGetUsersParams['page']
+  >,
+  TError = unknown,
+>(
+  params: undefined | AdminUsersControllerGetUsersParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+        TError,
+        TData,
+        QueryKey,
+        AdminUsersControllerGetUsersParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+          TError,
+          Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAdminUsersControllerGetUsersInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+    AdminUsersControllerGetUsersParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AdminUsersControllerGetUsersParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+        TError,
+        TData,
+        QueryKey,
+        AdminUsersControllerGetUsersParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+          TError,
+          Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAdminUsersControllerGetUsersInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+    AdminUsersControllerGetUsersParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AdminUsersControllerGetUsersParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+        TError,
+        TData,
+        QueryKey,
+        AdminUsersControllerGetUsersParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List users
+ */
+
+export function useAdminUsersControllerGetUsersInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+    AdminUsersControllerGetUsersParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AdminUsersControllerGetUsersParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+        TError,
+        TData,
+        QueryKey,
+        AdminUsersControllerGetUsersParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAdminUsersControllerGetUsersInfiniteQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getAdminUsersControllerGetUsersQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+  TError = unknown,
+>(
+  params?: AdminUsersControllerGetUsersParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAdminUsersControllerGetUsersQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof adminUsersControllerGetUsers>>
+  > = ({ signal }) =>
+    adminUsersControllerGetUsers(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AdminUsersControllerGetUsersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminUsersControllerGetUsers>>
+>;
+export type AdminUsersControllerGetUsersQueryError = unknown;
+
+export function useAdminUsersControllerGetUsers<
+  TData = Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+  TError = unknown,
+>(
+  params: undefined | AdminUsersControllerGetUsersParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+          TError,
+          Awaited<ReturnType<typeof adminUsersControllerGetUsers>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAdminUsersControllerGetUsers<
+  TData = Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+  TError = unknown,
+>(
+  params?: AdminUsersControllerGetUsersParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+          TError,
+          Awaited<ReturnType<typeof adminUsersControllerGetUsers>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAdminUsersControllerGetUsers<
+  TData = Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+  TError = unknown,
+>(
+  params?: AdminUsersControllerGetUsersParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List users
+ */
+
+export function useAdminUsersControllerGetUsers<
+  TData = Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+  TError = unknown,
+>(
+  params?: AdminUsersControllerGetUsersParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminUsersControllerGetUsers>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAdminUsersControllerGetUsersQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Returns a single user account.
+ * @summary Get user by ID
+ */
+export const adminUsersControllerGetUser = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AdminUserDto>(
+    { url: `/api/admin/users/${id}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAdminUsersControllerGetUserQueryKey = (id: string) => {
+  return [`/api/admin/users/${id}`] as const;
+};
+
+export const getAdminUsersControllerGetUserQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminUsersControllerGetUser>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminUsersControllerGetUser>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAdminUsersControllerGetUserQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof adminUsersControllerGetUser>>
+  > = ({ signal }) => adminUsersControllerGetUser(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof adminUsersControllerGetUser>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AdminUsersControllerGetUserQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminUsersControllerGetUser>>
+>;
+export type AdminUsersControllerGetUserQueryError = unknown;
+
+export function useAdminUsersControllerGetUser<
+  TData = Awaited<ReturnType<typeof adminUsersControllerGetUser>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminUsersControllerGetUser>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminUsersControllerGetUser>>,
+          TError,
+          Awaited<ReturnType<typeof adminUsersControllerGetUser>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAdminUsersControllerGetUser<
+  TData = Awaited<ReturnType<typeof adminUsersControllerGetUser>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminUsersControllerGetUser>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminUsersControllerGetUser>>,
+          TError,
+          Awaited<ReturnType<typeof adminUsersControllerGetUser>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAdminUsersControllerGetUser<
+  TData = Awaited<ReturnType<typeof adminUsersControllerGetUser>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminUsersControllerGetUser>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get user by ID
+ */
+
+export function useAdminUsersControllerGetUser<
+  TData = Awaited<ReturnType<typeof adminUsersControllerGetUser>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminUsersControllerGetUser>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAdminUsersControllerGetUserQueryOptions(id, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Lists every workspace on the platform with its owner, target count and member count. `search` matches the workspace name or the owner name/email.
+ * @summary List workspaces
+ */
+export const adminWorkspacesControllerGetWorkspaces = (
+  params?: AdminWorkspacesControllerGetWorkspacesParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyAdminWorkspaceDtoDto>(
+    { url: `/api/admin/workspaces`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getAdminWorkspacesControllerGetWorkspacesInfiniteQueryKey = (
+  params?: AdminWorkspacesControllerGetWorkspacesParams,
+) => {
+  return [
+    'infinite',
+    `/api/admin/workspaces`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getAdminWorkspacesControllerGetWorkspacesQueryKey = (
+  params?: AdminWorkspacesControllerGetWorkspacesParams,
+) => {
+  return [`/api/admin/workspaces`, ...(params ? [params] : [])] as const;
+};
+
+export const getAdminWorkspacesControllerGetWorkspacesInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+    AdminWorkspacesControllerGetWorkspacesParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AdminWorkspacesControllerGetWorkspacesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+        TError,
+        TData,
+        QueryKey,
+        AdminWorkspacesControllerGetWorkspacesParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAdminWorkspacesControllerGetWorkspacesInfiniteQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+    QueryKey,
+    AdminWorkspacesControllerGetWorkspacesParams['page']
+  > = ({ signal, pageParam }) =>
+    adminWorkspacesControllerGetWorkspaces(
+      { ...params, page: pageParam ?? params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+    TError,
+    TData,
+    QueryKey,
+    AdminWorkspacesControllerGetWorkspacesParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AdminWorkspacesControllerGetWorkspacesInfiniteQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>
+  >;
+export type AdminWorkspacesControllerGetWorkspacesInfiniteQueryError = unknown;
+
+export function useAdminWorkspacesControllerGetWorkspacesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+    AdminWorkspacesControllerGetWorkspacesParams['page']
+  >,
+  TError = unknown,
+>(
+  params: undefined | AdminWorkspacesControllerGetWorkspacesParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+        TError,
+        TData,
+        QueryKey,
+        AdminWorkspacesControllerGetWorkspacesParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+          TError,
+          Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAdminWorkspacesControllerGetWorkspacesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+    AdminWorkspacesControllerGetWorkspacesParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AdminWorkspacesControllerGetWorkspacesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+        TError,
+        TData,
+        QueryKey,
+        AdminWorkspacesControllerGetWorkspacesParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+          TError,
+          Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAdminWorkspacesControllerGetWorkspacesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+    AdminWorkspacesControllerGetWorkspacesParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AdminWorkspacesControllerGetWorkspacesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+        TError,
+        TData,
+        QueryKey,
+        AdminWorkspacesControllerGetWorkspacesParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List workspaces
+ */
+
+export function useAdminWorkspacesControllerGetWorkspacesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+    AdminWorkspacesControllerGetWorkspacesParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: AdminWorkspacesControllerGetWorkspacesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+        TError,
+        TData,
+        QueryKey,
+        AdminWorkspacesControllerGetWorkspacesParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAdminWorkspacesControllerGetWorkspacesInfiniteQueryOptions(
+      params,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getAdminWorkspacesControllerGetWorkspacesQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+  TError = unknown,
+>(
+  params?: AdminWorkspacesControllerGetWorkspacesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAdminWorkspacesControllerGetWorkspacesQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>
+  > = ({ signal }) =>
+    adminWorkspacesControllerGetWorkspaces(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AdminWorkspacesControllerGetWorkspacesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>
+>;
+export type AdminWorkspacesControllerGetWorkspacesQueryError = unknown;
+
+export function useAdminWorkspacesControllerGetWorkspaces<
+  TData = Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+  TError = unknown,
+>(
+  params: undefined | AdminWorkspacesControllerGetWorkspacesParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+          TError,
+          Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAdminWorkspacesControllerGetWorkspaces<
+  TData = Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+  TError = unknown,
+>(
+  params?: AdminWorkspacesControllerGetWorkspacesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+          TError,
+          Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAdminWorkspacesControllerGetWorkspaces<
+  TData = Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+  TError = unknown,
+>(
+  params?: AdminWorkspacesControllerGetWorkspacesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List workspaces
+ */
+
+export function useAdminWorkspacesControllerGetWorkspaces<
+  TData = Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+  TError = unknown,
+>(
+  params?: AdminWorkspacesControllerGetWorkspacesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspaces>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAdminWorkspacesControllerGetWorkspacesQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Returns a single workspace with its owner, target count and member count. List its members with GET /admin/users?workspaceId=.
+ * @summary Get workspace by ID
+ */
+export const adminWorkspacesControllerGetWorkspace = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AdminWorkspaceDto>(
+    { url: `/api/admin/workspaces/${id}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAdminWorkspacesControllerGetWorkspaceQueryKey = (
+  id: string,
+) => {
+  return [`/api/admin/workspaces/${id}`] as const;
+};
+
+export const getAdminWorkspacesControllerGetWorkspaceQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspace>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspace>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAdminWorkspacesControllerGetWorkspaceQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspace>>
+  > = ({ signal }) =>
+    adminWorkspacesControllerGetWorkspace(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspace>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AdminWorkspacesControllerGetWorkspaceQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspace>>
+>;
+export type AdminWorkspacesControllerGetWorkspaceQueryError = unknown;
+
+export function useAdminWorkspacesControllerGetWorkspace<
+  TData = Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspace>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspace>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspace>>,
+          TError,
+          Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspace>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAdminWorkspacesControllerGetWorkspace<
+  TData = Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspace>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspace>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspace>>,
+          TError,
+          Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspace>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAdminWorkspacesControllerGetWorkspace<
+  TData = Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspace>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspace>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get workspace by ID
+ */
+
+export function useAdminWorkspacesControllerGetWorkspace<
+  TData = Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspace>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof adminWorkspacesControllerGetWorkspace>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAdminWorkspacesControllerGetWorkspaceQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Changes the name, description or discovery settings of any workspace. Omitted fields are left unchanged.
+ * @summary Update workspace
+ */
+export const adminWorkspacesControllerUpdateWorkspace = (
+  id: string,
+  updateAdminWorkspaceDto: UpdateAdminWorkspaceDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AdminWorkspaceDto>(
+    {
+      url: `/api/admin/workspaces/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateAdminWorkspaceDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAdminWorkspacesControllerUpdateWorkspaceMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminWorkspacesControllerUpdateWorkspace>>,
+    TError,
+    { id: string; data: UpdateAdminWorkspaceDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof adminWorkspacesControllerUpdateWorkspace>>,
+  TError,
+  { id: string; data: UpdateAdminWorkspaceDto },
+  TContext
+> => {
+  const mutationKey = ['adminWorkspacesControllerUpdateWorkspace'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof adminWorkspacesControllerUpdateWorkspace>>,
+    { id: string; data: UpdateAdminWorkspaceDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return adminWorkspacesControllerUpdateWorkspace(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AdminWorkspacesControllerUpdateWorkspaceMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof adminWorkspacesControllerUpdateWorkspace>>
+  >;
+export type AdminWorkspacesControllerUpdateWorkspaceMutationBody =
+  UpdateAdminWorkspaceDto;
+export type AdminWorkspacesControllerUpdateWorkspaceMutationError = unknown;
+
+/**
+ * @summary Update workspace
+ */
+export const useAdminWorkspacesControllerUpdateWorkspace = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof adminWorkspacesControllerUpdateWorkspace>>,
+      TError,
+      { id: string; data: UpdateAdminWorkspaceDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof adminWorkspacesControllerUpdateWorkspace>>,
+  TError,
+  { id: string; data: UpdateAdminWorkspaceDto },
+  TContext
+> => {
+  return useMutation(
+    getAdminWorkspacesControllerUpdateWorkspaceMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Archives (deactivates) a workspace or restores it. Archived workspaces drop out of their members' workspace list; data is kept.
+ * @summary Archive or restore workspace
+ */
+export const adminWorkspacesControllerSetArchived = (
+  id: string,
+  archiveWorkspaceDto: ArchiveWorkspaceDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AdminWorkspaceDto>(
+    {
+      url: `/api/admin/workspaces/${id}/archived`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: archiveWorkspaceDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAdminWorkspacesControllerSetArchivedMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminWorkspacesControllerSetArchived>>,
+    TError,
+    { id: string; data: ArchiveWorkspaceDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof adminWorkspacesControllerSetArchived>>,
+  TError,
+  { id: string; data: ArchiveWorkspaceDto },
+  TContext
+> => {
+  const mutationKey = ['adminWorkspacesControllerSetArchived'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof adminWorkspacesControllerSetArchived>>,
+    { id: string; data: ArchiveWorkspaceDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return adminWorkspacesControllerSetArchived(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AdminWorkspacesControllerSetArchivedMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminWorkspacesControllerSetArchived>>
+>;
+export type AdminWorkspacesControllerSetArchivedMutationBody =
+  ArchiveWorkspaceDto;
+export type AdminWorkspacesControllerSetArchivedMutationError = unknown;
+
+/**
+ * @summary Archive or restore workspace
+ */
+export const useAdminWorkspacesControllerSetArchived = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof adminWorkspacesControllerSetArchived>>,
+      TError,
+      { id: string; data: ArchiveWorkspaceDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof adminWorkspacesControllerSetArchived>>,
+  TError,
+  { id: string; data: ArchiveWorkspaceDto },
+  TContext
+> => {
+  return useMutation(
+    getAdminWorkspacesControllerSetArchivedMutationOptions(options),
     queryClient,
   );
 };
