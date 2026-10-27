@@ -148,6 +148,8 @@ func TestJoin_Restart_LoadsPersistedToken_ReusesWorkerID(t *testing.T) {
 	if got := readFile(t, tokenFile); got != "tok-1" {
 		t.Fatalf("expected token file to contain tok-1 after run A, got %q", got)
 	}
+	// Run A's process exits: its token slot lock is released.
+	_ = srvA.client.Close()
 
 	// Run B: a brand-new Client in the same process, simulating a restart.
 	srvB := newTestServer(t)

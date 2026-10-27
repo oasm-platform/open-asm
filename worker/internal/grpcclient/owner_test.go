@@ -73,7 +73,9 @@ func TestOwnerIDRefreshedAfterJoin(t *testing.T) {
 		t.Fatal("OwnerID() after join must be derived from the issued token")
 	}
 
-	// Simulated restart: a new client resumes the persisted token file.
+	// Simulated restart: the first process exits (releasing its token slot)
+	// and a new client resumes the persisted token file.
+	_ = srv.client.Close()
 	srv2 := newTestServer(t)
 	if got := srv2.client.OwnerID(); got != joined {
 		t.Fatalf("restarted OwnerID() = %q, want %q (must match pre-crash stamps)", got, joined)
