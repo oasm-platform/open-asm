@@ -5,6 +5,7 @@ import { IsAssetFilter, parseFilterParam } from '../asset-filter';
 import type { AssetFilter } from '../asset-filter';
 import { Transform } from 'class-transformer';
 import {
+  IsBoolean,
   IsDateString,
   IsIP,
   IsOptional,
@@ -52,6 +53,12 @@ export class GetAssetsResponseDto {
   isEnabled?: boolean;
   @ApiProperty({ required: false })
   screenshotPath?: string | null;
+  @ApiProperty({
+    required: false,
+    description:
+      'Found by the latest finished scan of its kind on this target (badged as new)',
+  })
+  isNew?: boolean;
 }
 
 export class GetAssetsQueryDto extends GetManyBaseQueryParams {
@@ -161,4 +168,16 @@ export class GetAssetsQueryDto extends GetManyBaseQueryParams {
   @IsOptional()
   @IsDateString()
   endDate?: string;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Only rows the latest finished scan of their target found (the ones badged as new)',
+  })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    value === undefined ? undefined : value === true || value === 'true',
+  )
+  @IsBoolean()
+  isNew?: boolean;
 }

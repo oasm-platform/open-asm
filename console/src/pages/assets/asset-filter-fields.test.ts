@@ -7,7 +7,7 @@ describe('ASSET_FILTER_FIELDS validation', () => {
     conditionError({ field, op: op as never, value }, ASSET_FILTER_FIELDS);
   it('mirrors the server operator matrix', () => {
     expect(ASSET_FILTER_FIELDS.map((f) => f.key)).toEqual(
-      ['host', 'port', 'ip', 'tech', 'url', 'statusCode', 'tlsHost', 'tag', 'assetGroup']);
+      ['host', 'port', 'ip', 'tech', 'url', 'statusCode', 'tlsHost', 'tag', 'isNew', 'assetGroup']);
     expect(err('port', 'contains', '80')).toBe('Operator not supported');
   });
   it('validates ip, cidr, port and status code values', () => {
@@ -25,5 +25,11 @@ describe('ASSET_FILTER_FIELDS validation', () => {
     expect(err('url', 'notIn', ['https://a/x'])).toBeNull();
     expect(err('assetGroup', 'eq', 'my group')).toBe('Pick a group from the list');
     expect(err('assetGroup', 'eq', '123e4567-e89b-12d3-a456-426614174000')).toBeNull();
+  });
+  it('offers New as a true/false equality only', () => {
+    expect(err('isNew', 'eq', 'true')).toBeNull();
+    expect(err('isNew', 'eq', 'false')).toBeNull();
+    expect(err('isNew', 'eq', 'yes')).toMatch(/true or false/);
+    expect(err('isNew', 'in', ['true'])).toBe('Operator not supported');
   });
 });

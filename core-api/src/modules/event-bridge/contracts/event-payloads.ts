@@ -57,6 +57,13 @@ export interface WorkflowRunCompletedPayload {
   blockedSteps: string[];
   /** Step ids skipped because the run was cancelled. */
   cancelledSteps: string[];
+  /**
+   * Hosts this run found first (and that expose at least one service), sorted,
+   * capped at a preview. Absent on events published before runs were recorded.
+   */
+  newHosts?: string[];
+  /** How many hosts this run found first; `newHosts` holds the first ones. */
+  newHostsTotal?: number;
 }
 
 /** True when the run did not execute its whole graph. */

@@ -32,6 +32,10 @@ const toOptions = (values: Array<string | number | undefined | null>): FilterSug
   [...new Set(values.filter((v) => v !== undefined && v !== null && v !== '').map(String))].map((v) => ({ value: v, label: v }));
 
 const wrap = (r: { data?: FilterSuggestion[]; isFetching: boolean }) => ({ options: r.data ?? [], isFetching: r.isFetching });
+const NEW_OPTIONS: FilterSuggestion[] = [
+  { value: 'true', label: 'true' },
+  { value: 'false', label: 'false' },
+];
 
 export const ASSET_FILTER_FIELDS: FilterFieldConfig[] = [
   { key: 'host', label: 'Host', operators: ['eq', 'neq', 'contains', 'notContains', 'in', 'notIn'],
@@ -56,6 +60,11 @@ export const ASSET_FILTER_FIELDS: FilterFieldConfig[] = [
     } },
   { key: 'tag', label: 'Tag', operators: ['eq', 'neq', 'contains', 'in', 'notIn'],
     useSuggestions: (s, on) => wrap(useAssetsControllerGetTagAssets({ ...useScope(s), sortBy: 'assetCount', sortOrder: 'DESC' }, opts(on, (d: GetManyGetTagAssetsDTODto) => toOptions(d.data.map((e) => e.tag))))) },
+  // What the latest finished scan found; each tab judges its own rows (host,
+  // service or URL). `?isNew=true` links (notifications) migrate to this.
+  { key: 'isNew', label: 'New', operators: ['eq'],
+    useSuggestions: () => ({ options: NEW_OPTIONS, isFetching: false }),
+    validate: (v) => (v === 'true' || v === 'false' ? null : 'Pick true or false') },
   { key: 'assetGroup', label: 'Asset group', operators: ['eq', 'neq', 'in', 'notIn'],
     validate: (v) => (UUID.test(v) ? null : 'Pick a group from the list'),
     useSuggestions: (s, on) => {

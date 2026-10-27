@@ -2,6 +2,7 @@ import { type GetHostAssetsDTO } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
 import { CloudCheck } from 'lucide-react';
 import BadgeList from './badge-list';
+import { NewBadge } from './new-badge';
 import SwitchEnableAsset from './switch-enable-asset';
 
 export const hostAssetsColumn: ColumnDef<GetHostAssetsDTO>[] = [
@@ -13,8 +14,9 @@ export const hostAssetsColumn: ColumnDef<GetHostAssetsDTO>[] = [
     cell: ({ row }) => {
       const data = row.original;
       return (
-        <div className="flex flex-col gap-2 py-2 justify-center items-start max-w-[500px]">
+        <div className="flex items-center gap-2 py-2 max-w-[500px]">
           <BadgeList list={[data.host]} Icon={CloudCheck} />
+          <NewBadge isNew={data.isNew} />
         </div>
       );
     },

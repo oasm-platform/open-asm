@@ -9,6 +9,15 @@ describe('splitNotificationUrl', () => {
     });
   });
 
+  it('parses values like the address bar, so isNew=true is a boolean', () => {
+    expect(
+      splitNotificationUrl('/targets/t-1/inventory?tab=urls&isNew=true'),
+    ).toEqual({
+      to: '/targets/t-1/inventory',
+      search: { tab: 'urls', isNew: true },
+    });
+  });
+
   it('leaves a plain path alone', () => {
     expect(splitNotificationUrl('/targets/t-1/vulnerabilities')).toEqual({
       to: '/targets/t-1/vulnerabilities',
