@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 
 import { StorageService } from '@/modules/storage/storage.service';
-import { RedisLockService } from '@/services/redis/distributed-lock.service';
+import { Lock } from '@/services/redis/lock.decorator';
 
 /** Bucket where worker job results are temporarily staged. */
 export const JOB_RESULTS_BUCKET = 'job-results';
@@ -24,49 +24,38 @@ export const MAX_RESULT_FILE_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 export class JobResultCleanupService {
   private readonly logger = new Logger(JobResultCleanupService.name);
 
-  constructor(
-    private readonly storageService: StorageService,
-    private readonly redisLockService: RedisLockService,
-  ) {}
+  constructor(private readonly storageService: StorageService) {}
 
   @Cron('0 3 * * *')
+  @Lock('cron:job-results-cleanup', { ttl: 30 * 60 * 1000 })
   async cleanupExpiredResultFiles(): Promise<void> {
-    await this.redisLockService.withLock(
-      'cron:job-results-cleanup',
-      30 * 60 * 1000,
-      async () => {
-        const cutoff = new Date(Date.now() - MAX_RESULT_FILE_AGE_MS);
-        const files = await this.storageService.listFiles(JOB_RESULTS_BUCKET);
+    const cutoff = new Date(Date.now() - MAX_RESULT_FILE_AGE_MS);
+    const files = await this.storageService.listFiles(JOB_RESULTS_BUCKET);
 
-        let deleted = 0;
-        let failed = 0;
-        for (const file of files) {
-          // Keep files without a known age — never delete what we can't date.
-          if (!file.lastModified || file.lastModified >= cutoff) {
-            continue;
-          }
-          try {
-            await this.storageService.deleteFile(
-              file.key,
-              JOB_RESULTS_BUCKET,
-            );
-            deleted += 1;
-          } catch (error) {
-            failed += 1;
-            this.logger.error(
-              `Failed to delete expired result file ${file.key}:`,
-              error,
-            );
-          }
-        }
+    let deleted = 0;
+    let failed = 0;
+    for (const file of files) {
+      // Keep files without a known age — never delete what we can't date.
+      if (!file.lastModified || file.lastModified >= cutoff) {
+        continue;
+      }
+      try {
+        await this.storageService.deleteFile(file.key, JOB_RESULTS_BUCKET);
+        deleted += 1;
+      } catch (error) {
+        failed += 1;
+        this.logger.error(
+          `Failed to delete expired result file ${file.key}:`,
+          error,
+        );
+      }
+    }
 
-        if (deleted > 0 || failed > 0) {
-          this.logger.log(
-            `Job-results cleanup: ${deleted} expired file(s) deleted, ` +
-              `${failed} failed out of ${files.length} scanned`,
-          );
-        }
-      },
-    );
+    if (deleted > 0 || failed > 0) {
+      this.logger.log(
+        `Job-results cleanup: ${deleted} expired file(s) deleted, ` +
+          `${failed} failed out of ${files.length} scanned`,
+      );
+    }
   }
 }
