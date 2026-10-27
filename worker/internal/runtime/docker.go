@@ -20,6 +20,8 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/system"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
@@ -320,8 +322,8 @@ func detectCPUQuotaUnsupported(ctx context.Context, c systemInfoer) bool {
 // dockerInspector is the Docker Engine API subset needed to auto-derive the
 // connector address. Satisfied by *client.Client.
 type dockerInspector interface {
-	ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error)
-	NetworkInspect(ctx context.Context, networkID string, options types.NetworkInspectOptions) (types.NetworkResource, error)
+	ContainerInspect(ctx context.Context, containerID string) (container.InspectResponse, error)
+	NetworkInspect(ctx context.Context, networkID string, options network.InspectOptions) (network.Inspect, error)
 	ServerVersion(ctx context.Context) (types.Version, error)
 }
 
@@ -376,7 +378,7 @@ func resolveConnectorAddr(ctx context.Context, di dockerInspector, hostname, ove
 	}
 
 	if di != nil {
-		if nr, err := di.NetworkInspect(ctx, "bridge", types.NetworkInspectOptions{}); err == nil {
+		if nr, err := di.NetworkInspect(ctx, "bridge", network.InspectOptions{}); err == nil {
 			for _, cfg := range nr.IPAM.Config {
 				if cfg.Gateway == "" {
 					continue
@@ -692,9 +694,9 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	}
 	config.Labels = labels
 
-	inspect, _, inspectErr := d.cli.ImageInspectWithRaw(ctx, spec.Image)
+	inspect, inspectErr := d.cli.ImageInspect(ctx, spec.Image)
 	if !imageIsCached(inspectErr) {
-		pullReader, err := d.cli.ImagePull(ctx, spec.Image, types.ImagePullOptions{})
+		pullReader, err := d.cli.ImagePull(ctx, spec.Image, image.PullOptions{})
 		if err != nil {
 			return Handle{}, fmt.Errorf("image pull %s: %w", spec.Image, err)
 		}
@@ -706,7 +708,7 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 		d.consumePull(ctx, pullReader, spec)
 		pullReader.Close()
 		d.logInfo("docker: image pull done: %s", spec.Image)
-		inspect, _, _ = d.cli.ImageInspectWithRaw(ctx, spec.Image)
+		inspect, _ = d.cli.ImageInspect(ctx, spec.Image)
 	} else {
 		d.logInfo("docker: image pull skipped (cached): %s", spec.Image)
 	}
@@ -868,7 +870,7 @@ func (d *DockerRuntime) Logs(ctx context.Context, h Handle) (<-chan []byte, erro
 	if d.cli == nil {
 		return nil, fmt.Errorf("docker client not initialized")
 	}
-	rc, err := d.cli.ContainerLogs(ctx, h.ID, types.ContainerLogsOptions{
+	rc, err := d.cli.ContainerLogs(ctx, h.ID, container.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     true,

@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 )
@@ -145,9 +144,9 @@ func TestBuildAgentSandboxConfig_OnlyReadOnlyToolsMount(t *testing.T) {
 	}
 }
 
-func selfContainer(image string, mounts ...types.MountPoint) *types.ContainerJSON {
-	return &types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{Image: image},
+func selfContainer(image string, mounts ...container.MountPoint) *container.InspectResponse {
+	return &container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{Image: image},
 		Config:            &container.Config{Image: "oasm/oasm-worker:latest"},
 		Mounts:            mounts,
 	}
@@ -159,7 +158,7 @@ func TestResolveSandboxToolsMount(t *testing.T) {
 		name     string
 		override string
 		toolPath string
-		self     *types.ContainerJSON
+		self     *container.InspectResponse
 		want     *mount.Mount // nil = no mount
 	}{
 		{
@@ -182,8 +181,8 @@ func TestResolveSandboxToolsMount(t *testing.T) {
 			name:     "containerized: volume at tool path",
 			toolPath: tp,
 			self: selfContainer("sha256:x",
-				types.MountPoint{Type: mount.TypeVolume, Name: "open-asm_worker-state", Source: "/var/lib/docker/volumes/s/_data", Destination: "/app/state"},
-				types.MountPoint{Type: mount.TypeVolume, Name: "open-asm_worker-tools-cache", Source: "/var/lib/docker/volumes/t/_data", Destination: tp},
+				container.MountPoint{Type: mount.TypeVolume, Name: "open-asm_worker-state", Source: "/var/lib/docker/volumes/s/_data", Destination: "/app/state"},
+				container.MountPoint{Type: mount.TypeVolume, Name: "open-asm_worker-tools-cache", Source: "/var/lib/docker/volumes/t/_data", Destination: tp},
 			),
 			want: &mount.Mount{Type: mount.TypeVolume, Source: "open-asm_worker-tools-cache"},
 		},
@@ -191,8 +190,8 @@ func TestResolveSandboxToolsMount(t *testing.T) {
 			name:     "containerized: bind at tool path",
 			toolPath: tp,
 			self: selfContainer("sha256:x",
-				types.MountPoint{Type: mount.TypeBind, Source: "/var/run/docker.sock", Destination: "/var/run/docker.sock"},
-				types.MountPoint{Type: mount.TypeBind, Source: "/home/u/tools", Destination: tp},
+				container.MountPoint{Type: mount.TypeBind, Source: "/var/run/docker.sock", Destination: "/var/run/docker.sock"},
+				container.MountPoint{Type: mount.TypeBind, Source: "/home/u/tools", Destination: tp},
 			),
 			want: &mount.Mount{Type: mount.TypeBind, Source: "/home/u/tools"},
 		},
@@ -202,7 +201,7 @@ func TestResolveSandboxToolsMount(t *testing.T) {
 			name:     "containerized: nothing at tool path",
 			toolPath: tp,
 			self: selfContainer("sha256:x",
-				types.MountPoint{Type: mount.TypeBind, Source: "/var/run/docker.sock", Destination: "/var/run/docker.sock"},
+				container.MountPoint{Type: mount.TypeBind, Source: "/var/run/docker.sock", Destination: "/var/run/docker.sock"},
 			),
 			want: nil,
 		},

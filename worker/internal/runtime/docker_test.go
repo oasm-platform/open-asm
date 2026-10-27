@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 )
@@ -410,21 +411,21 @@ func TestBuildContainerEnvNoInputs(t *testing.T) {
 // Unconfigured handlers report an error, so tests can assert a code path was
 // NOT taken by registering handlers that t.Fatal on invocation.
 type stubInspector struct {
-	containerInspect func(ctx context.Context, id string) (types.ContainerJSON, error)
-	networkInspect   func(ctx context.Context, id string, opts types.NetworkInspectOptions) (types.NetworkResource, error)
+	containerInspect func(ctx context.Context, id string) (container.InspectResponse, error)
+	networkInspect   func(ctx context.Context, id string, opts network.InspectOptions) (network.Inspect, error)
 	serverVersion    func(ctx context.Context) (types.Version, error)
 }
 
-func (s *stubInspector) ContainerInspect(ctx context.Context, id string) (types.ContainerJSON, error) {
+func (s *stubInspector) ContainerInspect(ctx context.Context, id string) (container.InspectResponse, error) {
 	if s.containerInspect == nil {
-		return types.ContainerJSON{}, errors.New("stub: ContainerInspect not configured")
+		return container.InspectResponse{}, errors.New("stub: ContainerInspect not configured")
 	}
 	return s.containerInspect(ctx, id)
 }
 
-func (s *stubInspector) NetworkInspect(ctx context.Context, id string, opts types.NetworkInspectOptions) (types.NetworkResource, error) {
+func (s *stubInspector) NetworkInspect(ctx context.Context, id string, opts network.InspectOptions) (network.Inspect, error) {
 	if s.networkInspect == nil {
-		return types.NetworkResource{}, errors.New("stub: NetworkInspect not configured")
+		return network.Inspect{}, errors.New("stub: NetworkInspect not configured")
 	}
 	return s.networkInspect(ctx, id, opts)
 }
@@ -449,13 +450,13 @@ func mustResolveConnectorAddr(t *testing.T, di dockerInspector, hostname, overri
 // containers, and 0.0.0.0 from inside a container resolves to its own loopback.
 func TestResolveConnectorAddrExplicitOverride(t *testing.T) {
 	di := &stubInspector{
-		containerInspect: func(ctx context.Context, id string) (types.ContainerJSON, error) {
+		containerInspect: func(ctx context.Context, id string) (container.InspectResponse, error) {
 			t.Fatal("override must win: ContainerInspect must not be called")
-			return types.ContainerJSON{}, nil
+			return container.InspectResponse{}, nil
 		},
-		networkInspect: func(ctx context.Context, id string, opts types.NetworkInspectOptions) (types.NetworkResource, error) {
+		networkInspect: func(ctx context.Context, id string, opts network.InspectOptions) (network.Inspect, error) {
 			t.Fatal("override must win: NetworkInspect must not be called")
-			return types.NetworkResource{}, nil
+			return network.Inspect{}, nil
 		},
 	}
 	got := mustResolveConnectorAddr(t, di, "deadbeef", "10.0.0.9:9999", 50051, "linux")
@@ -469,21 +470,21 @@ func TestResolveConnectorAddrExplicitOverride(t *testing.T) {
 // default bridge) via its bridge IP.
 func TestResolveConnectorAddrSelfContainer(t *testing.T) {
 	di := &stubInspector{
-		containerInspect: func(ctx context.Context, id string) (types.ContainerJSON, error) {
+		containerInspect: func(ctx context.Context, id string) (container.InspectResponse, error) {
 			if id != "worker-container-id" {
 				t.Fatalf("ContainerInspect(%q), want hostname %q", id, "worker-container-id")
 			}
-			return types.ContainerJSON{
-				NetworkSettings: &types.NetworkSettings{
+			return container.InspectResponse{
+				NetworkSettings: &container.NetworkSettings{
 					Networks: map[string]*network.EndpointSettings{
 						"bridge": {IPAddress: "172.18.0.3"},
 					},
 				},
 			}, nil
 		},
-		networkInspect: func(ctx context.Context, id string, opts types.NetworkInspectOptions) (types.NetworkResource, error) {
+		networkInspect: func(ctx context.Context, id string, opts network.InspectOptions) (network.Inspect, error) {
 			t.Fatal("self IP found: NetworkInspect must not be called")
-			return types.NetworkResource{}, nil
+			return network.Inspect{}, nil
 		},
 	}
 	got := mustResolveConnectorAddr(t, di, "worker-container-id", "", 50051, "linux")
@@ -498,8 +499,8 @@ func TestResolveConnectorAddrSelfContainer(t *testing.T) {
 func TestResolveConnectorAddrDockerDesktop(t *testing.T) {
 	for _, goos := range []string{"windows", "darwin"} {
 		di := &stubInspector{
-			containerInspect: func(ctx context.Context, id string) (types.ContainerJSON, error) {
-				return types.ContainerJSON{}, errors.New("hostname is not a container")
+			containerInspect: func(ctx context.Context, id string) (container.InspectResponse, error) {
+				return container.InspectResponse{}, errors.New("hostname is not a container")
 			},
 			serverVersion: func(ctx context.Context) (types.Version, error) {
 				t.Fatal("desktop host.docker.internal is built-in: ServerVersion must not be called")
@@ -519,14 +520,14 @@ func TestResolveConnectorAddrDockerDesktop(t *testing.T) {
 // from them.
 func TestResolveConnectorAddrLinuxBridgeGateway(t *testing.T) {
 	di := &stubInspector{
-		containerInspect: func(ctx context.Context, id string) (types.ContainerJSON, error) {
-			return types.ContainerJSON{}, errors.New("hostname is not a container")
+		containerInspect: func(ctx context.Context, id string) (container.InspectResponse, error) {
+			return container.InspectResponse{}, errors.New("hostname is not a container")
 		},
-		networkInspect: func(ctx context.Context, id string, opts types.NetworkInspectOptions) (types.NetworkResource, error) {
+		networkInspect: func(ctx context.Context, id string, opts network.InspectOptions) (network.Inspect, error) {
 			if id != "bridge" {
 				t.Fatalf("NetworkInspect(%q), want %q", id, "bridge")
 			}
-			return types.NetworkResource{
+			return network.Inspect{
 				IPAM: network.IPAM{Config: []network.IPAMConfig{{Gateway: "172.18.0.1"}}},
 			}, nil
 		},
@@ -544,11 +545,11 @@ func TestResolveConnectorAddrLinuxBridgeGateway(t *testing.T) {
 // gateway fallback (host-gateway support cannot be assumed).
 func TestResolveConnectorAddrLinuxFallback(t *testing.T) {
 	di := &stubInspector{
-		containerInspect: func(ctx context.Context, id string) (types.ContainerJSON, error) {
-			return types.ContainerJSON{}, errors.New("hostname is not a container")
+		containerInspect: func(ctx context.Context, id string) (container.InspectResponse, error) {
+			return container.InspectResponse{}, errors.New("hostname is not a container")
 		},
-		networkInspect: func(ctx context.Context, id string, opts types.NetworkInspectOptions) (types.NetworkResource, error) {
-			return types.NetworkResource{}, errors.New("bridge network not found")
+		networkInspect: func(ctx context.Context, id string, opts network.InspectOptions) (network.Inspect, error) {
+			return network.Inspect{}, errors.New("bridge network not found")
 		},
 	}
 	got := mustResolveConnectorAddr(t, di, "my-server", "", 50051, "linux")
@@ -644,24 +645,24 @@ type fakeDockerEngine struct {
 	removeErr      error
 	running        bool // container state as the engine sees it
 	createBody     string
-	createName     string            // name of the most recent create attempt
-	createNames    []string          // every create attempt name, in order
-	createConflict bool              // fail the next create with HTTP 409, then clear
-	health         string            // State.Health.Status, "" = no healthcheck
-	status         string            // State.Status
-	exitCode       int               // State.ExitCode
-	oomKilled      bool              // State.OOMKilled
-	startedAt      string            // State.StartedAt (RFC3339)
-	finishedAt     string            // State.FinishedAt (RFC3339)
-	logOutput      string            // payload for the container logs stream
-	logRaw         []byte            // verbatim bytes for the logs stream (raw/TTY); when set, served without a multiplex header
-	labels         map[string]string // Config.Labels of the created container
-	exists         bool              // a container currently exists in the engine (inspect/list 404 when false)
-	imageLabels    map[string]string // Config.Labels returned by ImageInspectWithRaw; nil = 404 (image absent)
-	list           []types.Container // seeded GET /containers/json response (orphan reconcile)
-	listCalls      int               // ContainerList requests served
-	listFilters    string            // filters query param of the last list request
-	removeIDs      []string          // container IDs from DELETE requests, in order
+	createName     string              // name of the most recent create attempt
+	createNames    []string            // every create attempt name, in order
+	createConflict bool                // fail the next create with HTTP 409, then clear
+	health         string              // State.Health.Status, "" = no healthcheck
+	status         string              // State.Status
+	exitCode       int                 // State.ExitCode
+	oomKilled      bool                // State.OOMKilled
+	startedAt      string              // State.StartedAt (RFC3339)
+	finishedAt     string              // State.FinishedAt (RFC3339)
+	logOutput      string              // payload for the container logs stream
+	logRaw         []byte              // verbatim bytes for the logs stream (raw/TTY); when set, served without a multiplex header
+	labels         map[string]string   // Config.Labels of the created container
+	exists         bool                // a container currently exists in the engine (inspect/list 404 when false)
+	imageLabels    map[string]string   // Config.Labels returned by ImageInspect; nil = 404 (image absent)
+	list           []container.Summary // seeded GET /containers/json response (orphan reconcile)
+	listCalls      int                 // ContainerList requests served
+	listFilters    string              // filters query param of the last list request
+	removeIDs      []string            // container IDs from DELETE requests, in order
 }
 
 func newFakeDockerEngine() *fakeDockerEngine {
@@ -734,7 +735,7 @@ func (f *fakeDockerEngine) handler() http.HandlerFunc {
 			f.mu.Unlock()
 			items := applyLabelFilter(seeded, f.listFilters)
 			if items == nil {
-				items = []types.Container{}
+				items = []container.Summary{}
 			}
 			b, mErr := json.Marshal(items)
 			if mErr != nil {
@@ -805,7 +806,7 @@ func (f *fakeDockerEngine) handler() http.HandlerFunc {
 			}
 			w.WriteHeader(http.StatusNoContent)
 		case r.Method == http.MethodGet && strings.HasPrefix(path, "/images/") && strings.HasSuffix(path, "/json"):
-			// ImageInspectWithRaw — only returns labels when imageLabels is set;
+			// ImageInspect — only returns labels when imageLabels is set;
 			// nil means image absent (404), keeping existing test behaviour.
 			f.mu.Lock()
 			labels := f.imageLabels
@@ -1178,11 +1179,11 @@ var dockerNameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
 // the IPv4 gateway even when IPv6 entries sort first in IPAM.Config.
 func TestResolvePrefersIPv4Gateway(t *testing.T) {
 	di := &stubInspector{
-		containerInspect: func(ctx context.Context, id string) (types.ContainerJSON, error) {
-			return types.ContainerJSON{}, errors.New("hostname is not a container")
+		containerInspect: func(ctx context.Context, id string) (container.InspectResponse, error) {
+			return container.InspectResponse{}, errors.New("hostname is not a container")
 		},
-		networkInspect: func(ctx context.Context, id string, opts types.NetworkInspectOptions) (types.NetworkResource, error) {
-			return types.NetworkResource{
+		networkInspect: func(ctx context.Context, id string, opts network.InspectOptions) (network.Inspect, error) {
+			return network.Inspect{
 				IPAM: network.IPAM{Config: []network.IPAMConfig{
 					{Gateway: "fdc4:f303:9324::254"}, // IPv6 ULA — first, unreachable from containers
 					{Gateway: "172.18.0.1"},
@@ -1206,11 +1207,11 @@ func TestResolvePrefersIPv4Gateway(t *testing.T) {
 // chain is what resolves.
 func TestResolveSkipsIPv6UnlessExplicitOverride(t *testing.T) {
 	di6 := &stubInspector{
-		containerInspect: func(ctx context.Context, id string) (types.ContainerJSON, error) {
-			return types.ContainerJSON{}, errors.New("hostname is not a container")
+		containerInspect: func(ctx context.Context, id string) (container.InspectResponse, error) {
+			return container.InspectResponse{}, errors.New("hostname is not a container")
 		},
-		networkInspect: func(ctx context.Context, id string, opts types.NetworkInspectOptions) (types.NetworkResource, error) {
-			return types.NetworkResource{
+		networkInspect: func(ctx context.Context, id string, opts network.InspectOptions) (network.Inspect, error) {
+			return network.Inspect{
 				IPAM: network.IPAM{Config: []network.IPAMConfig{{Gateway: "fdc4:f303:9324::254"}}},
 			}, nil
 		},
@@ -1259,12 +1260,12 @@ func TestSupportsHostGateway(t *testing.T) {
 // no bridge inspection is needed.
 func TestResolveConnectorAddrLinuxHostTerminalUsesHostGateway(t *testing.T) {
 	di := &stubInspector{
-		containerInspect: func(ctx context.Context, id string) (types.ContainerJSON, error) {
-			return types.ContainerJSON{}, errors.New("hostname is not a container")
+		containerInspect: func(ctx context.Context, id string) (container.InspectResponse, error) {
+			return container.InspectResponse{}, errors.New("hostname is not a container")
 		},
-		networkInspect: func(ctx context.Context, id string, opts types.NetworkInspectOptions) (types.NetworkResource, error) {
+		networkInspect: func(ctx context.Context, id string, opts network.InspectOptions) (network.Inspect, error) {
 			t.Fatal("host.docker.internal wins: NetworkInspect must not be called")
-			return types.NetworkResource{}, nil
+			return network.Inspect{}, nil
 		},
 		serverVersion: func(ctx context.Context) (types.Version, error) {
 			return types.Version{APIVersion: "1.41"}, nil
