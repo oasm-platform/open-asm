@@ -16,6 +16,7 @@ import {
   Relation,
   Unique,
 } from 'typeorm';
+import { ArtifactFolder } from './artifact-folder.entity';
 import { ArtifactShare } from './artifact-share.entity';
 import { bigintTransformer } from './bigint.transformer';
 
@@ -24,6 +25,7 @@ import { bigintTransformer } from './bigint.transformer';
 @Unique('UQ_artifacts_bucket_objectKey', ['bucket', 'objectKey'])
 @Index('IDX_artifacts_workspace_created', ['workspaceId', 'createdAt'])
 @Index('IDX_artifacts_creator', ['createdByUserId'])
+@Index('IDX_artifacts_workspace_folder', ['workspaceId', 'parentFolderId'])
 @Index('IDX_artifacts_status_expires', ['status', 'expiresAt'])
 export class Artifact extends BaseEntity {
   @Column({ type: 'uuid' })
@@ -32,6 +34,14 @@ export class Artifact extends BaseEntity {
   @ManyToOne(() => Workspace, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'workspaceId' })
   workspace: Relation<Workspace>;
+
+  /** Containing folder; null means the workspace root. */
+  @Column({ type: 'uuid', nullable: true })
+  parentFolderId: string | null;
+
+  @ManyToOne(() => ArtifactFolder, { nullable: true })
+  @JoinColumn({ name: 'parentFolderId' })
+  parentFolder: Relation<ArtifactFolder> | null;
 
   @Column({ type: 'uuid', nullable: true })
   createdByUserId: string | null;
