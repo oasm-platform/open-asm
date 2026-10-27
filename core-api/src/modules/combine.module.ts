@@ -29,6 +29,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
 import { AgentsModule } from './agents/agents.module';
 import { RemoteExecuteModule } from './remote-execute/remote-execute.module';
 import { ReportsModule } from './reports/reports.module';
+import { ArtifactsModule } from './artifacts/artifacts.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { ReportsModule } from './reports/reports.module';
     AgentsModule,
     RemoteExecuteModule,
     ReportsModule,
+    ArtifactsModule,
     IntegrationsModule,
     ConnectorsModule,
     EventsModule,

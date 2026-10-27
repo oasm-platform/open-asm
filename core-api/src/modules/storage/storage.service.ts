@@ -12,6 +12,7 @@ import {
   PutPublicAccessBlockCommand,
   S3ServiceException,
 } from '@aws-sdk/client-s3';
+import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
   BadRequestException,
@@ -45,6 +46,7 @@ const BUCKET_ACCESS = {
   'job-results': 'private',
   'cached-static': 'authenticated',
   reports: 'private',
+  artifacts: 'private',
   default: 'blocked',
 } as const satisfies Record<string, BucketAccess>;
 
@@ -65,6 +67,20 @@ export function getHourBucketedSigningDate(now: Date = new Date()): Date {
   const bucketed = new Date(now);
   bucketed.setUTCMinutes(0, 0, 0);
   return bucketed;
+}
+
+/**
+ * `Content-Disposition: attachment` for a user-supplied file name (RFC 6266):
+ * an ASCII-safe `filename` fallback plus the exact name as RFC 5987
+ * `filename*`, so quotes or CR/LF in the name cannot break the header.
+ */
+export function attachmentDisposition(fileName: string): string {
+  const fallback = fileName.replace(/[^\x20-\x7e]|["\\]/g, '_');
+  const encoded = encodeURIComponent(fileName).replace(
+    /['()*]/g,
+    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
 }
 
 /** Minimum clamped TTL that may use the hour-bucketed signing date (2h). */
@@ -474,14 +490,7 @@ export class StorageService implements OnModuleInit {
     );
   }
 
-  public async getPresignedUploadUrl(opts: {
-    bucket: string;
-    key: string;
-    contentType?: string;
-    expiresIn?: number;
-  }): Promise<{ url: string; key: string; path: string; expiresIn: number }> {
-    const { bucket, key, contentType, expiresIn } = opts;
-
+  private assertValidLocation(bucket: string, key: string): void {
     if (!bucket || bucket.trim() === '') {
       throw new BadRequestException('bucket is required');
     }
@@ -495,6 +504,17 @@ export class StorageService implements OnModuleInit {
     ) {
       throw new BadRequestException('Invalid key');
     }
+  }
+
+  public async getPresignedUploadUrl(opts: {
+    bucket: string;
+    key: string;
+    contentType?: string;
+    expiresIn?: number;
+  }): Promise<{ url: string; key: string; path: string; expiresIn: number }> {
+    const { bucket, key, contentType, expiresIn } = opts;
+
+    this.assertValidLocation(bucket, key);
 
     const clampedTtl = this.clampPresignTtl(
       expiresIn ?? this.storageConfig.presignTtlSeconds,
@@ -529,19 +549,7 @@ export class StorageService implements OnModuleInit {
   }): Promise<{ url: string; expiresIn: number }> {
     const { bucket, key, expiresIn, fileName, contentType } = opts;
 
-    if (!bucket || bucket.trim() === '') {
-      throw new BadRequestException('bucket is required');
-    }
-    if (
-      !key ||
-      key.trim() === '' ||
-      key.startsWith('/') ||
-      key.startsWith('.') ||
-      key.startsWith(' ') ||
-      key.includes('..')
-    ) {
-      throw new BadRequestException('Invalid key');
-    }
+    this.assertValidLocation(bucket, key);
 
     const clampedTtl = this.clampPresignTtl(
       expiresIn ?? this.storageConfig.presignTtlSeconds,
@@ -551,7 +559,7 @@ export class StorageService implements OnModuleInit {
       Bucket: bucket,
       Key: key,
       ResponseContentDisposition: fileName
-        ? 'attachment; filename="' + fileName + '"'
+        ? attachmentDisposition(fileName)
         : undefined,
       ResponseContentType: contentType || undefined,
     });
@@ -559,6 +567,48 @@ export class StorageService implements OnModuleInit {
     const url = await this.signCommand(command, clampedTtl);
 
     return { url: this.toBrowserUrl(url), expiresIn: clampedTtl };
+  }
+
+  /**
+   * Presigned POST whose policy pins the exact key, content type and byte
+   * size, so the storage server itself rejects any other upload (a presigned
+   * PUT cannot bound the body size). Needs RustFS >= 1.0.0-alpha.83, which
+   * fixed policy enforcement (CVE-2026-27607).
+   */
+  public async getPresignedPost(opts: {
+    bucket: string;
+    key: string;
+    contentType: string;
+    sizeBytes: number;
+    expiresIn?: number;
+  }): Promise<{ url: string; fields: Record<string, string>; expiresAt: Date }> {
+    const { bucket, key, contentType, sizeBytes, expiresIn } = opts;
+    this.assertValidLocation(bucket, key);
+
+    const clampedTtl = this.clampPresignTtl(
+      expiresIn ?? this.storageConfig.presignTtlSeconds,
+    );
+
+    // Same mismatched @smithy/types cast as signCommand.
+    const { url, fields } = await createPresignedPost(
+      this.rustFsClient.getPresignClient(),
+      {
+        Bucket: bucket,
+        Key: key,
+        Conditions: [
+          ['content-length-range', sizeBytes, sizeBytes],
+          ['eq', '$Content-Type', contentType],
+        ],
+        Fields: { 'Content-Type': contentType },
+        Expires: clampedTtl,
+      },
+    );
+
+    return {
+      url: this.toBrowserUrl(url),
+      fields,
+      expiresAt: new Date(Date.now() + clampedTtl * 1000),
+    };
   }
 
   public resolveMimeType(extension?: string): string | undefined {

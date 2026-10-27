@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   fetchPresignedText,
+  uploadToPresignedPost,
   uploadToPresignedUrl,
 } from './storage';
 
@@ -93,5 +94,38 @@ describe('fetchPresignedText', () => {
     await expect(fetchPresignedText('https://s3.test/get?sig=1')).rejects.toThrow(
       /404.*NoSuchKey/s,
     );
+  });
+});
+
+describe('uploadToPresignedPost', () => {
+  it('POSTs the policy fields first and the file last', async () => {
+    const fetchMock = mockFetch(new Response(null, { status: 204 }));
+    const file = new Blob(['hello'], { type: 'text/plain' });
+
+    await uploadToPresignedPost(
+      '/api/storage/artifacts',
+      { key: 'workspaces/w/a/f.txt', Policy: 'p', 'Content-Type': 'text/plain' },
+      file,
+    );
+
+    const [url, init] = callOf(fetchMock);
+    expect(url).toBe('/api/storage/artifacts');
+    expect(init.method).toBe('POST');
+    const form = init.body as FormData;
+    expect([...form.keys()]).toEqual(['key', 'Policy', 'Content-Type', 'file']);
+    expect(form.get('key')).toBe('workspaces/w/a/f.txt');
+  });
+
+  it('throws with the storage error body when the policy rejects the file', async () => {
+    mockFetch(
+      new Response('<Code>EntityTooLarge</Code>', {
+        status: 400,
+        statusText: 'Bad Request',
+      }),
+    );
+
+    await expect(
+      uploadToPresignedPost('/api/storage/artifacts', {}, new Blob(['x'])),
+    ).rejects.toThrow('Upload failed: 400 Bad Request - <Code>EntityTooLarge</Code>');
   });
 });

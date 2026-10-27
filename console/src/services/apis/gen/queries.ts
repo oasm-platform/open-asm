@@ -4128,6 +4128,147 @@ export type ToggleSkillDto = {
   isEnabled: boolean;
 };
 
+export type ArtifactUserDto = {
+  id: string;
+  name: string;
+  /** @nullable */
+  image: string | null;
+};
+
+export type ArtifactDtoSource =
+  (typeof ArtifactDtoSource)[keyof typeof ArtifactDtoSource];
+
+export const ArtifactDtoSource = {
+  upload: 'upload',
+  agent: 'agent',
+} as const;
+
+export type ArtifactDtoShareType =
+  (typeof ArtifactDtoShareType)[keyof typeof ArtifactDtoShareType];
+
+export const ArtifactDtoShareType = {
+  private: 'private',
+  shared: 'shared',
+  public: 'public',
+} as const;
+
+export type ArtifactDtoStatus =
+  (typeof ArtifactDtoStatus)[keyof typeof ArtifactDtoStatus];
+
+export const ArtifactDtoStatus = {
+  pending: 'pending',
+  ready: 'ready',
+  deleted: 'deleted',
+} as const;
+
+export type ArtifactDto = {
+  id: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+  source: ArtifactDtoSource;
+  shareType: ArtifactDtoShareType;
+  status: ArtifactDtoStatus;
+  /** @nullable */
+  createdBy: ArtifactUserDto | null;
+  /** Whether the current user created the file */
+  isOwner: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/**
+ * Form fields to send before the `file` field
+ */
+export type ArtifactUploadDtoFields = { [key: string]: string };
+
+export type ArtifactUploadDto = {
+  /** POST target for the multipart form upload */
+  url: string;
+  /** Form fields to send before the `file` field */
+  fields: ArtifactUploadDtoFields;
+  expiresAt: string;
+};
+
+export type PresignArtifactResponseDto = {
+  artifact: ArtifactDto;
+  upload: ArtifactUploadDto;
+};
+
+export type PresignArtifactDto = {
+  fileName: string;
+  /** Exact file size in bytes */
+  sizeBytes: number;
+  contentType: string;
+};
+
+export type GetManyArtifactDtoDto = {
+  data: ArtifactDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type ArtifactUsageBySourceDtoSource =
+  (typeof ArtifactUsageBySourceDtoSource)[keyof typeof ArtifactUsageBySourceDtoSource];
+
+export const ArtifactUsageBySourceDtoSource = {
+  upload: 'upload',
+  agent: 'agent',
+} as const;
+
+export type ArtifactUsageBySourceDto = {
+  source: ArtifactUsageBySourceDtoSource;
+  bytes: number;
+};
+
+export type ArtifactUsageByUserDto = {
+  /** @nullable */
+  user: ArtifactUserDto | null;
+  bytes: number;
+};
+
+export type ArtifactUsageDto = {
+  quotaBytes: number;
+  usedBytes: number;
+  reservedBytes: number;
+  maxFileBytes: number;
+  bySource: ArtifactUsageBySourceDto[];
+  byUser: ArtifactUsageByUserDto[];
+};
+
+export type ArtifactDownloadDto = {
+  url: string;
+  expiresIn: number;
+};
+
+export type UpdateArtifactDtoShareType =
+  (typeof UpdateArtifactDtoShareType)[keyof typeof UpdateArtifactDtoShareType];
+
+export const UpdateArtifactDtoShareType = {
+  private: 'private',
+  shared: 'shared',
+  public: 'public',
+} as const;
+
+export type UpdateArtifactDto = {
+  name?: string;
+  shareType?: UpdateArtifactDtoShareType;
+};
+
+export type ShareArtifactResponseDto = {
+  /** Workspace members the request shared the file with */
+  shared: number;
+  /** Emails ignored: not a workspace member, or the owner */
+  skipped: number;
+};
+
+export type ShareArtifactDto = {
+  emails: string[];
+};
+
 export type NotificationResponseDtoStatus =
   (typeof NotificationResponseDtoStatus)[keyof typeof NotificationResponseDtoStatus];
 
@@ -4426,6 +4567,23 @@ export type CreateToolDto = {
   categories: ToolCategory[];
   /** The ID of the provider */
   providerId: string;
+};
+
+export type WorkspaceStorageQuotaDto = {
+  workspaceId: string;
+  /**
+   * Override in bytes; null means the server default applies
+   * @nullable
+   */
+  quotaBytes: number | null;
+};
+
+export type UpdateStorageQuotaDto = {
+  /**
+   * Quota in bytes; null resets to the server default
+   * @nullable
+   */
+  quotaBytes: number | null;
 };
 
 export type GetManyInternalNetworksResponseDtoDataItem = {
@@ -5311,6 +5469,24 @@ export type AgentsControllerGetWorkspaceMemoryParams = {
   sortBy?: string;
   sortOrder?: string;
 };
+
+export type ArtifactsControllerGetManyParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  scope?: ArtifactsControllerGetManyScope;
+};
+
+export type ArtifactsControllerGetManyScope =
+  (typeof ArtifactsControllerGetManyScope)[keyof typeof ArtifactsControllerGetManyScope];
+
+export const ArtifactsControllerGetManyScope = {
+  mine: 'mine',
+  shared: 'shared',
+  all: 'all',
+} as const;
 
 export type NotificationsControllerGetNotificationsParams = {
   search?: string;
@@ -36935,6 +37111,1736 @@ export const useAgentsControllerToggleSkill = <
 };
 
 /**
+ * Reserves workspace quota for a pending file and returns a presigned POST whose policy pins the exact size and content type. Returns 409 STORAGE_QUOTA_EXCEEDED when the workspace is full.
+ * @summary Start a file upload
+ */
+export const artifactsControllerPresign = (
+  presignArtifactDto: PresignArtifactDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<PresignArtifactResponseDto>(
+    {
+      url: `/api/artifacts/presign`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: presignArtifactDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getArtifactsControllerPresignMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof artifactsControllerPresign>>,
+    TError,
+    { data: PresignArtifactDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof artifactsControllerPresign>>,
+  TError,
+  { data: PresignArtifactDto },
+  TContext
+> => {
+  const mutationKey = ['artifactsControllerPresign'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof artifactsControllerPresign>>,
+    { data: PresignArtifactDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return artifactsControllerPresign(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ArtifactsControllerPresignMutationResult = NonNullable<
+  Awaited<ReturnType<typeof artifactsControllerPresign>>
+>;
+export type ArtifactsControllerPresignMutationBody = PresignArtifactDto;
+export type ArtifactsControllerPresignMutationError = unknown;
+
+/**
+ * @summary Start a file upload
+ */
+export const useArtifactsControllerPresign = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof artifactsControllerPresign>>,
+      TError,
+      { data: PresignArtifactDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof artifactsControllerPresign>>,
+  TError,
+  { data: PresignArtifactDto },
+  TContext
+> => {
+  return useMutation(
+    getArtifactsControllerPresignMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Checks the uploaded object against the declared size and marks the file ready. Creator only.
+ * @summary Finish a file upload
+ */
+export const artifactsControllerComplete = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ArtifactDto>(
+    { url: `/api/artifacts/${id}/complete`, method: 'POST', signal },
+    options,
+  );
+};
+
+export const getArtifactsControllerCompleteMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof artifactsControllerComplete>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof artifactsControllerComplete>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['artifactsControllerComplete'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof artifactsControllerComplete>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return artifactsControllerComplete(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ArtifactsControllerCompleteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof artifactsControllerComplete>>
+>;
+
+export type ArtifactsControllerCompleteMutationError = unknown;
+
+/**
+ * @summary Finish a file upload
+ */
+export const useArtifactsControllerComplete = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof artifactsControllerComplete>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof artifactsControllerComplete>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getArtifactsControllerCompleteMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Lists ready files: `mine` (default), `shared` with me, or `all` (requires artifact.manage).
+ * @summary List files
+ */
+export const artifactsControllerGetMany = (
+  params?: ArtifactsControllerGetManyParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyArtifactDtoDto>(
+    { url: `/api/artifacts`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getArtifactsControllerGetManyInfiniteQueryKey = (
+  params?: ArtifactsControllerGetManyParams,
+) => {
+  return ['infinite', `/api/artifacts`, ...(params ? [params] : [])] as const;
+};
+
+export const getArtifactsControllerGetManyQueryKey = (
+  params?: ArtifactsControllerGetManyParams,
+) => {
+  return [`/api/artifacts`, ...(params ? [params] : [])] as const;
+};
+
+export const getArtifactsControllerGetManyInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+    ArtifactsControllerGetManyParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: ArtifactsControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+        TError,
+        TData,
+        QueryKey,
+        ArtifactsControllerGetManyParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getArtifactsControllerGetManyInfiniteQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+    QueryKey,
+    ArtifactsControllerGetManyParams['page']
+  > = ({ signal, pageParam }) =>
+    artifactsControllerGetMany(
+      { ...params, page: pageParam ?? params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+    TError,
+    TData,
+    QueryKey,
+    ArtifactsControllerGetManyParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ArtifactsControllerGetManyInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof artifactsControllerGetMany>>
+>;
+export type ArtifactsControllerGetManyInfiniteQueryError = unknown;
+
+export function useArtifactsControllerGetManyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+    ArtifactsControllerGetManyParams['page']
+  >,
+  TError = unknown,
+>(
+  params: undefined | ArtifactsControllerGetManyParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+        TError,
+        TData,
+        QueryKey,
+        ArtifactsControllerGetManyParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+          TError,
+          Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useArtifactsControllerGetManyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+    ArtifactsControllerGetManyParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: ArtifactsControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+        TError,
+        TData,
+        QueryKey,
+        ArtifactsControllerGetManyParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+          TError,
+          Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useArtifactsControllerGetManyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+    ArtifactsControllerGetManyParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: ArtifactsControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+        TError,
+        TData,
+        QueryKey,
+        ArtifactsControllerGetManyParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List files
+ */
+
+export function useArtifactsControllerGetManyInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+    ArtifactsControllerGetManyParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: ArtifactsControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+        TError,
+        TData,
+        QueryKey,
+        ArtifactsControllerGetManyParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getArtifactsControllerGetManyInfiniteQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getArtifactsControllerGetManyQueryOptions = <
+  TData = Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+  TError = unknown,
+>(
+  params?: ArtifactsControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getArtifactsControllerGetManyQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof artifactsControllerGetMany>>
+  > = ({ signal }) =>
+    artifactsControllerGetMany(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ArtifactsControllerGetManyQueryResult = NonNullable<
+  Awaited<ReturnType<typeof artifactsControllerGetMany>>
+>;
+export type ArtifactsControllerGetManyQueryError = unknown;
+
+export function useArtifactsControllerGetMany<
+  TData = Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+  TError = unknown,
+>(
+  params: undefined | ArtifactsControllerGetManyParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+          TError,
+          Awaited<ReturnType<typeof artifactsControllerGetMany>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useArtifactsControllerGetMany<
+  TData = Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+  TError = unknown,
+>(
+  params?: ArtifactsControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+          TError,
+          Awaited<ReturnType<typeof artifactsControllerGetMany>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useArtifactsControllerGetMany<
+  TData = Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+  TError = unknown,
+>(
+  params?: ArtifactsControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List files
+ */
+
+export function useArtifactsControllerGetMany<
+  TData = Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+  TError = unknown,
+>(
+  params?: ArtifactsControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerGetMany>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getArtifactsControllerGetManyQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Quota, used and reserved bytes, the per-file limit, and usage by source and by creator.
+ * @summary Get workspace storage usage
+ */
+export const artifactsControllerGetUsage = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ArtifactUsageDto>(
+    { url: `/api/artifacts/usage`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getArtifactsControllerGetUsageQueryKey = () => {
+  return [`/api/artifacts/usage`] as const;
+};
+
+export const getArtifactsControllerGetUsageQueryOptions = <
+  TData = Awaited<ReturnType<typeof artifactsControllerGetUsage>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof artifactsControllerGetUsage>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getArtifactsControllerGetUsageQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof artifactsControllerGetUsage>>
+  > = ({ signal }) => artifactsControllerGetUsage(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof artifactsControllerGetUsage>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ArtifactsControllerGetUsageQueryResult = NonNullable<
+  Awaited<ReturnType<typeof artifactsControllerGetUsage>>
+>;
+export type ArtifactsControllerGetUsageQueryError = unknown;
+
+export function useArtifactsControllerGetUsage<
+  TData = Awaited<ReturnType<typeof artifactsControllerGetUsage>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerGetUsage>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof artifactsControllerGetUsage>>,
+          TError,
+          Awaited<ReturnType<typeof artifactsControllerGetUsage>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useArtifactsControllerGetUsage<
+  TData = Awaited<ReturnType<typeof artifactsControllerGetUsage>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerGetUsage>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof artifactsControllerGetUsage>>,
+          TError,
+          Awaited<ReturnType<typeof artifactsControllerGetUsage>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useArtifactsControllerGetUsage<
+  TData = Awaited<ReturnType<typeof artifactsControllerGetUsage>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerGetUsage>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get workspace storage usage
+ */
+
+export function useArtifactsControllerGetUsage<
+  TData = Awaited<ReturnType<typeof artifactsControllerGetUsage>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerGetUsage>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getArtifactsControllerGetUsageQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * @summary Get a file
+ */
+export const artifactsControllerGetById = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ArtifactDto>(
+    { url: `/api/artifacts/${id}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getArtifactsControllerGetByIdQueryKey = (id: string) => {
+  return [`/api/artifacts/${id}`] as const;
+};
+
+export const getArtifactsControllerGetByIdQueryOptions = <
+  TData = Awaited<ReturnType<typeof artifactsControllerGetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerGetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getArtifactsControllerGetByIdQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof artifactsControllerGetById>>
+  > = ({ signal }) => artifactsControllerGetById(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof artifactsControllerGetById>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ArtifactsControllerGetByIdQueryResult = NonNullable<
+  Awaited<ReturnType<typeof artifactsControllerGetById>>
+>;
+export type ArtifactsControllerGetByIdQueryError = unknown;
+
+export function useArtifactsControllerGetById<
+  TData = Awaited<ReturnType<typeof artifactsControllerGetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerGetById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof artifactsControllerGetById>>,
+          TError,
+          Awaited<ReturnType<typeof artifactsControllerGetById>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useArtifactsControllerGetById<
+  TData = Awaited<ReturnType<typeof artifactsControllerGetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerGetById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof artifactsControllerGetById>>,
+          TError,
+          Awaited<ReturnType<typeof artifactsControllerGetById>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useArtifactsControllerGetById<
+  TData = Awaited<ReturnType<typeof artifactsControllerGetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerGetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get a file
+ */
+
+export function useArtifactsControllerGetById<
+  TData = Awaited<ReturnType<typeof artifactsControllerGetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerGetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getArtifactsControllerGetByIdQueryOptions(id, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * @summary Rename a file or change its access
+ */
+export const artifactsControllerUpdate = (
+  id: string,
+  updateArtifactDto: UpdateArtifactDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ArtifactDto>(
+    {
+      url: `/api/artifacts/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateArtifactDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getArtifactsControllerUpdateMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof artifactsControllerUpdate>>,
+    TError,
+    { id: string; data: UpdateArtifactDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof artifactsControllerUpdate>>,
+  TError,
+  { id: string; data: UpdateArtifactDto },
+  TContext
+> => {
+  const mutationKey = ['artifactsControllerUpdate'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof artifactsControllerUpdate>>,
+    { id: string; data: UpdateArtifactDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return artifactsControllerUpdate(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ArtifactsControllerUpdateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof artifactsControllerUpdate>>
+>;
+export type ArtifactsControllerUpdateMutationBody = UpdateArtifactDto;
+export type ArtifactsControllerUpdateMutationError = unknown;
+
+/**
+ * @summary Rename a file or change its access
+ */
+export const useArtifactsControllerUpdate = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof artifactsControllerUpdate>>,
+      TError,
+      { id: string; data: UpdateArtifactDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof artifactsControllerUpdate>>,
+  TError,
+  { id: string; data: UpdateArtifactDto },
+  TContext
+> => {
+  return useMutation(
+    getArtifactsControllerUpdateMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Deletes the file and releases its storage. Allowed for the creator and artifact.manage holders.
+ * @summary Delete a file
+ */
+export const artifactsControllerRemove = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/artifacts/${id}`, method: 'DELETE', signal },
+    options,
+  );
+};
+
+export const getArtifactsControllerRemoveMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof artifactsControllerRemove>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof artifactsControllerRemove>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['artifactsControllerRemove'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof artifactsControllerRemove>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return artifactsControllerRemove(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ArtifactsControllerRemoveMutationResult = NonNullable<
+  Awaited<ReturnType<typeof artifactsControllerRemove>>
+>;
+
+export type ArtifactsControllerRemoveMutationError = unknown;
+
+/**
+ * @summary Delete a file
+ */
+export const useArtifactsControllerRemove = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof artifactsControllerRemove>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof artifactsControllerRemove>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getArtifactsControllerRemoveMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Returns a short-lived presigned URL that downloads the file as an attachment.
+ * @summary Get a download URL
+ */
+export const artifactsControllerDownload = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ArtifactDownloadDto>(
+    { url: `/api/artifacts/${id}/download`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getArtifactsControllerDownloadQueryKey = (id: string) => {
+  return [`/api/artifacts/${id}/download`] as const;
+};
+
+export const getArtifactsControllerDownloadQueryOptions = <
+  TData = Awaited<ReturnType<typeof artifactsControllerDownload>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerDownload>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getArtifactsControllerDownloadQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof artifactsControllerDownload>>
+  > = ({ signal }) => artifactsControllerDownload(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof artifactsControllerDownload>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ArtifactsControllerDownloadQueryResult = NonNullable<
+  Awaited<ReturnType<typeof artifactsControllerDownload>>
+>;
+export type ArtifactsControllerDownloadQueryError = unknown;
+
+export function useArtifactsControllerDownload<
+  TData = Awaited<ReturnType<typeof artifactsControllerDownload>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerDownload>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof artifactsControllerDownload>>,
+          TError,
+          Awaited<ReturnType<typeof artifactsControllerDownload>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useArtifactsControllerDownload<
+  TData = Awaited<ReturnType<typeof artifactsControllerDownload>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerDownload>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof artifactsControllerDownload>>,
+          TError,
+          Awaited<ReturnType<typeof artifactsControllerDownload>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useArtifactsControllerDownload<
+  TData = Awaited<ReturnType<typeof artifactsControllerDownload>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerDownload>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get a download URL
+ */
+
+export function useArtifactsControllerDownload<
+  TData = Awaited<ReturnType<typeof artifactsControllerDownload>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerDownload>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getArtifactsControllerDownloadQueryOptions(id, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * @summary List the members a file is shared with
+ */
+export const artifactsControllerGetShares = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ArtifactUserDto[]>(
+    { url: `/api/artifacts/${id}/shares`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getArtifactsControllerGetSharesQueryKey = (id: string) => {
+  return [`/api/artifacts/${id}/shares`] as const;
+};
+
+export const getArtifactsControllerGetSharesQueryOptions = <
+  TData = Awaited<ReturnType<typeof artifactsControllerGetShares>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerGetShares>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getArtifactsControllerGetSharesQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof artifactsControllerGetShares>>
+  > = ({ signal }) => artifactsControllerGetShares(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof artifactsControllerGetShares>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ArtifactsControllerGetSharesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof artifactsControllerGetShares>>
+>;
+export type ArtifactsControllerGetSharesQueryError = unknown;
+
+export function useArtifactsControllerGetShares<
+  TData = Awaited<ReturnType<typeof artifactsControllerGetShares>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerGetShares>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof artifactsControllerGetShares>>,
+          TError,
+          Awaited<ReturnType<typeof artifactsControllerGetShares>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useArtifactsControllerGetShares<
+  TData = Awaited<ReturnType<typeof artifactsControllerGetShares>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerGetShares>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof artifactsControllerGetShares>>,
+          TError,
+          Awaited<ReturnType<typeof artifactsControllerGetShares>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useArtifactsControllerGetShares<
+  TData = Awaited<ReturnType<typeof artifactsControllerGetShares>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerGetShares>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List the members a file is shared with
+ */
+
+export function useArtifactsControllerGetShares<
+  TData = Awaited<ReturnType<typeof artifactsControllerGetShares>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactsControllerGetShares>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getArtifactsControllerGetSharesQueryOptions(id, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Adds workspace members to the share list. Emails that are not members of this workspace (or the owner) are skipped.
+ * @summary Share a file with workspace members by email
+ */
+export const artifactsControllerAddShares = (
+  id: string,
+  shareArtifactDto: ShareArtifactDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ShareArtifactResponseDto>(
+    {
+      url: `/api/artifacts/${id}/shares`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: shareArtifactDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getArtifactsControllerAddSharesMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof artifactsControllerAddShares>>,
+    TError,
+    { id: string; data: ShareArtifactDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof artifactsControllerAddShares>>,
+  TError,
+  { id: string; data: ShareArtifactDto },
+  TContext
+> => {
+  const mutationKey = ['artifactsControllerAddShares'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof artifactsControllerAddShares>>,
+    { id: string; data: ShareArtifactDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return artifactsControllerAddShares(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ArtifactsControllerAddSharesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof artifactsControllerAddShares>>
+>;
+export type ArtifactsControllerAddSharesMutationBody = ShareArtifactDto;
+export type ArtifactsControllerAddSharesMutationError = unknown;
+
+/**
+ * @summary Share a file with workspace members by email
+ */
+export const useArtifactsControllerAddShares = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof artifactsControllerAddShares>>,
+      TError,
+      { id: string; data: ShareArtifactDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof artifactsControllerAddShares>>,
+  TError,
+  { id: string; data: ShareArtifactDto },
+  TContext
+> => {
+  return useMutation(
+    getArtifactsControllerAddSharesMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * @summary Stop sharing a file with a member
+ */
+export const artifactsControllerRemoveShare = (
+  id: string,
+  userId: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/artifacts/${id}/shares/${userId}`, method: 'DELETE', signal },
+    options,
+  );
+};
+
+export const getArtifactsControllerRemoveShareMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof artifactsControllerRemoveShare>>,
+    TError,
+    { id: string; userId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof artifactsControllerRemoveShare>>,
+  TError,
+  { id: string; userId: string },
+  TContext
+> => {
+  const mutationKey = ['artifactsControllerRemoveShare'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof artifactsControllerRemoveShare>>,
+    { id: string; userId: string }
+  > = (props) => {
+    const { id, userId } = props ?? {};
+
+    return artifactsControllerRemoveShare(id, userId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ArtifactsControllerRemoveShareMutationResult = NonNullable<
+  Awaited<ReturnType<typeof artifactsControllerRemoveShare>>
+>;
+
+export type ArtifactsControllerRemoveShareMutationError = unknown;
+
+/**
+ * @summary Stop sharing a file with a member
+ */
+export const useArtifactsControllerRemoveShare = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof artifactsControllerRemoveShare>>,
+      TError,
+      { id: string; userId: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof artifactsControllerRemoveShare>>,
+  TError,
+  { id: string; userId: string },
+  TContext
+> => {
+  return useMutation(
+    getArtifactsControllerRemoveShareMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Redirects to a short-lived download URL. 404 when the file does not exist or is not public.
+ * @summary Download a public file
+ */
+export const publicArtifactsControllerDownload = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<void>(
+    { url: `/api/public/artifacts/${id}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getPublicArtifactsControllerDownloadQueryKey = (id: string) => {
+  return [`/api/public/artifacts/${id}`] as const;
+};
+
+export const getPublicArtifactsControllerDownloadQueryOptions = <
+  TData = Awaited<ReturnType<typeof publicArtifactsControllerDownload>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof publicArtifactsControllerDownload>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getPublicArtifactsControllerDownloadQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof publicArtifactsControllerDownload>>
+  > = ({ signal }) =>
+    publicArtifactsControllerDownload(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof publicArtifactsControllerDownload>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type PublicArtifactsControllerDownloadQueryResult = NonNullable<
+  Awaited<ReturnType<typeof publicArtifactsControllerDownload>>
+>;
+export type PublicArtifactsControllerDownloadQueryError = unknown;
+
+export function usePublicArtifactsControllerDownload<
+  TData = Awaited<ReturnType<typeof publicArtifactsControllerDownload>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof publicArtifactsControllerDownload>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof publicArtifactsControllerDownload>>,
+          TError,
+          Awaited<ReturnType<typeof publicArtifactsControllerDownload>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function usePublicArtifactsControllerDownload<
+  TData = Awaited<ReturnType<typeof publicArtifactsControllerDownload>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof publicArtifactsControllerDownload>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof publicArtifactsControllerDownload>>,
+          TError,
+          Awaited<ReturnType<typeof publicArtifactsControllerDownload>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function usePublicArtifactsControllerDownload<
+  TData = Awaited<ReturnType<typeof publicArtifactsControllerDownload>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof publicArtifactsControllerDownload>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Download a public file
+ */
+
+export function usePublicArtifactsControllerDownload<
+  TData = Awaited<ReturnType<typeof publicArtifactsControllerDownload>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof publicArtifactsControllerDownload>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getPublicArtifactsControllerDownloadQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
  * Retrieve a paginated list of notifications for the current user
  * @summary Get all notifications
  */
@@ -42261,6 +44167,103 @@ export const useAdminControllerCreateTool = <
 > => {
   return useMutation(
     getAdminControllerCreateToolMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Overrides the storage quota of one workspace. `null` resets it to the server default (ARTIFACT_WORKSPACE_QUOTA_BYTES).
+ * @summary Set a workspace storage quota
+ */
+export const adminControllerUpdateWorkspaceStorageQuota = (
+  id: string,
+  updateStorageQuotaDto: UpdateStorageQuotaDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<WorkspaceStorageQuotaDto>(
+    {
+      url: `/api/admin/workspaces/${id}/storage-quota`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateStorageQuotaDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAdminControllerUpdateWorkspaceStorageQuotaMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminControllerUpdateWorkspaceStorageQuota>>,
+    TError,
+    { id: string; data: UpdateStorageQuotaDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof adminControllerUpdateWorkspaceStorageQuota>>,
+  TError,
+  { id: string; data: UpdateStorageQuotaDto },
+  TContext
+> => {
+  const mutationKey = ['adminControllerUpdateWorkspaceStorageQuota'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof adminControllerUpdateWorkspaceStorageQuota>>,
+    { id: string; data: UpdateStorageQuotaDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return adminControllerUpdateWorkspaceStorageQuota(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AdminControllerUpdateWorkspaceStorageQuotaMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof adminControllerUpdateWorkspaceStorageQuota>>
+  >;
+export type AdminControllerUpdateWorkspaceStorageQuotaMutationBody =
+  UpdateStorageQuotaDto;
+export type AdminControllerUpdateWorkspaceStorageQuotaMutationError = unknown;
+
+/**
+ * @summary Set a workspace storage quota
+ */
+export const useAdminControllerUpdateWorkspaceStorageQuota = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof adminControllerUpdateWorkspaceStorageQuota>>,
+      TError,
+      { id: string; data: UpdateStorageQuotaDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof adminControllerUpdateWorkspaceStorageQuota>>,
+  TError,
+  { id: string; data: UpdateStorageQuotaDto },
+  TContext
+> => {
+  return useMutation(
+    getAdminControllerUpdateWorkspaceStorageQuotaMutationOptions(options),
     queryClient,
   );
 };

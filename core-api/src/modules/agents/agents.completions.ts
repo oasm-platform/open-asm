@@ -2873,6 +2873,11 @@ export class AgentsCompletionsService {
         userId,
         conversation.id,
       ) as ToolSet),
+      ...(this.agentTool.getArtifactTools(
+        workspaceId,
+        userId,
+        conversation.id,
+      ) as ToolSet),
     };
 
     // Step 12: Build the combined stream with auto-continuation

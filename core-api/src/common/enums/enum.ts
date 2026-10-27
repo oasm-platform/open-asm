@@ -325,3 +325,26 @@ export enum AgentCommandApprovalStatus {
   APPROVED = 'approved',
   REJECTED = 'rejected',
 }
+
+export enum ArtifactSource {
+  UPLOAD = 'upload',
+  AGENT = 'agent',
+}
+
+export enum ArtifactShareType {
+  PRIVATE = 'private',
+  SHARED = 'shared',
+  PUBLIC = 'public',
+}
+
+export enum ArtifactStatus {
+  PENDING = 'pending',
+  READY = 'ready',
+  DELETED = 'deleted',
+}
+
+export enum ArtifactListScope {
+  MINE = 'mine',
+  SHARED = 'shared',
+  ALL = 'all',
+}

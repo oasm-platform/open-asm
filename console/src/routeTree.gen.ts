@@ -31,6 +31,7 @@ import { Route as AuthedAistudioAgentsRouteImport } from './routes/_authed/aistu
 import { Route as AuthedAistudioConnectorsRouteImport } from './routes/_authed/aistudio/connectors'
 import { Route as AuthedAistudioUsageRouteImport } from './routes/_authed/aistudio/usage'
 import { Route as AuthedAssetsIndexRouteImport } from './routes/_authed/assets/index'
+import { Route as AuthedFilesIndexRouteImport } from './routes/_authed/files/index'
 import { Route as AuthedGroupsIndexRouteImport } from './routes/_authed/groups/index'
 import { Route as AuthedGroupsIdRouteImport } from './routes/_authed/groups/$id'
 import { Route as AuthedGroupsCreateRouteImport } from './routes/_authed/groups/create'
@@ -173,6 +174,11 @@ const AuthedAistudioUsageRoute = AuthedAistudioUsageRouteImport.update({
 const AuthedAssetsIndexRoute = AuthedAssetsIndexRouteImport.update({
   id: '/assets/',
   path: '/assets/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedFilesIndexRoute = AuthedFilesIndexRouteImport.update({
+  id: '/files/',
+  path: '/files/',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedGroupsIndexRoute = AuthedGroupsIndexRouteImport.update({
@@ -383,6 +389,7 @@ export interface FileRoutesByFullPath {
   '/workspaces/create': typeof AuthedWorkspacesCreateRoute
   '/aistudio/': typeof AuthedAistudioIndexRoute
   '/assets/': typeof AuthedAssetsIndexRoute
+  '/files/': typeof AuthedFilesIndexRoute
   '/groups/': typeof AuthedGroupsIndexRoute
   '/integrations/': typeof AuthedIntegrationsIndexRoute
   '/internal-networks/': typeof AuthedInternalNetworksIndexRoute
@@ -437,6 +444,7 @@ export interface FileRoutesByTo {
   '/workspaces/create': typeof AuthedWorkspacesCreateRoute
   '/aistudio': typeof AuthedAistudioIndexRoute
   '/assets': typeof AuthedAssetsIndexRoute
+  '/files': typeof AuthedFilesIndexRoute
   '/groups': typeof AuthedGroupsIndexRoute
   '/integrations': typeof AuthedIntegrationsIndexRoute
   '/internal-networks': typeof AuthedInternalNetworksIndexRoute
@@ -495,6 +503,7 @@ export interface FileRoutesById {
   '/_authed/workspaces/create': typeof AuthedWorkspacesCreateRoute
   '/_authed/aistudio/': typeof AuthedAistudioIndexRoute
   '/_authed/assets/': typeof AuthedAssetsIndexRoute
+  '/_authed/files/': typeof AuthedFilesIndexRoute
   '/_authed/groups/': typeof AuthedGroupsIndexRoute
   '/_authed/integrations/': typeof AuthedIntegrationsIndexRoute
   '/_authed/internal-networks/': typeof AuthedInternalNetworksIndexRoute
@@ -553,6 +562,7 @@ export interface FileRouteTypes {
     | '/workspaces/create'
     | '/aistudio/'
     | '/assets/'
+    | '/files/'
     | '/groups/'
     | '/integrations/'
     | '/internal-networks/'
@@ -607,6 +617,7 @@ export interface FileRouteTypes {
     | '/workspaces/create'
     | '/aistudio'
     | '/assets'
+    | '/files'
     | '/groups'
     | '/integrations'
     | '/internal-networks'
@@ -664,6 +675,7 @@ export interface FileRouteTypes {
     | '/_authed/workspaces/create'
     | '/_authed/aistudio/'
     | '/_authed/assets/'
+    | '/_authed/files/'
     | '/_authed/groups/'
     | '/_authed/integrations/'
     | '/_authed/internal-networks/'
@@ -853,6 +865,13 @@ declare module '@tanstack/react-router' {
       path: '/assets'
       fullPath: '/assets/'
       preLoaderRoute: typeof AuthedAssetsIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/files/': {
+      id: '/_authed/files/'
+      path: '/files'
+      fullPath: '/files/'
+      preLoaderRoute: typeof AuthedFilesIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/groups/': {
@@ -1109,6 +1128,7 @@ interface AuthedRouteChildren {
   AuthedWorkspacesCreateRoute: typeof AuthedWorkspacesCreateRoute
   AuthedAistudioIndexRoute: typeof AuthedAistudioIndexRoute
   AuthedAssetsIndexRoute: typeof AuthedAssetsIndexRoute
+  AuthedFilesIndexRoute: typeof AuthedFilesIndexRoute
   AuthedGroupsIndexRoute: typeof AuthedGroupsIndexRoute
   AuthedIntegrationsIndexRoute: typeof AuthedIntegrationsIndexRoute
   AuthedInternalNetworksIndexRoute: typeof AuthedInternalNetworksIndexRoute
@@ -1152,6 +1172,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedWorkspacesCreateRoute: AuthedWorkspacesCreateRoute,
   AuthedAistudioIndexRoute: AuthedAistudioIndexRoute,
   AuthedAssetsIndexRoute: AuthedAssetsIndexRoute,
+  AuthedFilesIndexRoute: AuthedFilesIndexRoute,
   AuthedGroupsIndexRoute: AuthedGroupsIndexRoute,
   AuthedIntegrationsIndexRoute: AuthedIntegrationsIndexRoute,
   AuthedInternalNetworksIndexRoute: AuthedInternalNetworksIndexRoute,

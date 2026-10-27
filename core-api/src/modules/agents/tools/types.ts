@@ -1,6 +1,7 @@
 import type { Repository } from 'typeorm';
 
 import type { WrapperType } from '@/common/types/app.types';
+import type { ArtifactsService } from '@/modules/artifacts/artifacts.service';
 import type { AssetsService } from '@/modules/assets/assets.service';
 import type { ConnectorRegistryService } from '@/modules/connectors/connector-registry.service';
 import type { IssuesService } from '@/modules/issues/issues.service';
@@ -47,6 +48,7 @@ export interface AgentToolDeps {
   toolConfigProfiles: ToolConfigProfilesService;
   remoteExecuteSubscribe: RemoteExecuteSubscribeService;
   redisService: RedisService;
+  artifactsService: ArtifactsService;
 }
 
 export type Deps<K extends keyof AgentToolDeps> = Pick<AgentToolDeps, K>;

@@ -55,6 +55,8 @@ const CONTROLLER_FILES: Record<string, string> = {
   IntegrationsController: '@/modules/integrations/integrations.controller',
   ApiKeysController: '@/modules/apikeys/apikeys.controller',
   AuditEventsController: '@/modules/audit/audit-events.controller',
+  ArtifactsController: '@/modules/artifacts/artifacts.controller',
+  AdminController: '@/modules/admin/admin.controller',
 };
 
 /**

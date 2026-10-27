@@ -115,6 +115,14 @@
     ]
   },
   {
+    "resource": "artifact",
+    "actions": [
+      { "action": "read", "description": "View files shared with you and storage usage" },
+      { "action": "write", "description": "Upload, share and delete your own files" },
+      { "action": "manage", "description": "See and delete any file in the workspace (no content access)" }
+    ]
+  },
+  {
     "resource": "audit",
     "actions": [
       { "action": "read", "description": "View and export the workspace audit log" }

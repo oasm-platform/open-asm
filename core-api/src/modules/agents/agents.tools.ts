@@ -5,6 +5,7 @@ import type { Tool } from 'ai';
 import type { EventEmitter } from 'node:events';
 import { Repository } from 'typeorm';
 
+import { ArtifactsService } from '@/modules/artifacts/artifacts.service';
 import { AssetsService } from '@/modules/assets/assets.service';
 import { ConnectorRegistryService } from '@/modules/connectors/connector-registry.service';
 import { IssuesService } from '@/modules/issues/issues.service';
@@ -28,6 +29,7 @@ import {
 import { AgentsMemoriesService } from './agents.memories';
 import { AgentConversationTodo } from './entities/agent-conversation-todo.entity';
 import { AgentConversation } from './entities/agent-conversation.entity';
+import { artifactTools } from './tools/artifact.tools';
 import { readToolOutputTool, runConnectorTool } from './tools/connector.tools';
 import { deniedMessage, stableStringify } from './tools/helpers';
 import { memoryTools } from './tools/memory.tools';
@@ -175,6 +177,7 @@ export class AgentTool {
     private readonly toolConfigProfiles: ToolConfigProfilesService,
     private readonly remoteExecuteSubscribe: RemoteExecuteSubscribeService,
     private readonly redisService: RedisService,
+    private readonly artifactsService: ArtifactsService,
   ) {}
 
   private get deps(): AgentToolDeps {
@@ -196,6 +199,7 @@ export class AgentTool {
       toolConfigProfiles: this.toolConfigProfiles,
       remoteExecuteSubscribe: this.remoteExecuteSubscribe,
       redisService: this.redisService,
+      artifactsService: this.artifactsService,
     };
   }
 
@@ -214,6 +218,15 @@ export class AgentTool {
     conversationId: string,
   ): Record<string, ToolType> {
     return memoryTools(this.deps, workspaceId, userId, conversationId);
+  }
+
+  /** save_file: writes into the user's own private workspace files. */
+  getArtifactTools(
+    workspaceId: string,
+    userId: string,
+    conversationId: string,
+  ): Record<string, ToolType> {
+    return artifactTools(this.deps, workspaceId, userId, conversationId);
   }
 
   /**
