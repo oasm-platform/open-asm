@@ -30,6 +30,7 @@ import type {
   ShareArtifactResponseDto,
   UpdateArtifactDto,
 } from './dto/artifacts.dto';
+import { ArtifactFolder } from './entities/artifact-folder.entity';
 import { ArtifactShare } from './entities/artifact-share.entity';
 import { Artifact } from './entities/artifact.entity';
 
@@ -71,6 +72,8 @@ export class ArtifactsService {
     private readonly artifactRepo: Repository<Artifact>,
     @InjectRepository(ArtifactShare)
     private readonly shareRepo: Repository<ArtifactShare>,
+    @InjectRepository(ArtifactFolder)
+    private readonly folderRepo: Repository<ArtifactFolder>,
     private readonly dataSource: DataSource,
     private readonly storageService: StorageService,
     private readonly quota: ArtifactQuotaService,
@@ -82,6 +85,9 @@ export class ArtifactsService {
     userId: string,
     dto: PresignArtifactDto,
   ): Promise<PresignArtifactResponseDto> {
+    if (dto.parentFolderId) {
+      await this.findOwnedFolder(workspaceId, userId, dto.parentFolderId);
+    }
     const artifact = await this.createPending({
       workspaceId,
       userId,
@@ -89,6 +95,7 @@ export class ArtifactsService {
       name: dto.fileName,
       mimeType: dto.contentType,
       sizeBytes: dto.sizeBytes,
+      parentFolderId: dto.parentFolderId ?? null,
     });
 
     const upload = await this.storageService.getPresignedPost({
@@ -204,6 +211,15 @@ export class ArtifactsService {
       );
     } else {
       qb.andWhere('artifact.createdByUserId = :userId', { userId });
+      // Browsing one folder (root when unset); a search spans all of them.
+      if (!search) {
+        qb.andWhere(
+          query.parentFolderId
+            ? 'artifact.parentFolderId = :parentFolderId'
+            : 'artifact.parentFolderId IS NULL',
+          { parentFolderId: query.parentFolderId },
+        );
+      }
     }
 
     if (search) {
@@ -263,9 +279,16 @@ export class ArtifactsService {
     dto: UpdateArtifactDto,
   ): Promise<ArtifactDto> {
     const artifact = await this.findOwned(workspaceId, userId, id);
+    if (dto.parentFolderId) {
+      await this.findOwnedFolder(workspaceId, userId, dto.parentFolderId);
+    }
     await this.artifactRepo.update(artifact.id, {
       ...(dto.name !== undefined ? { name: dto.name } : {}),
       ...(dto.shareType !== undefined ? { shareType: dto.shareType } : {}),
+      // null moves the file to the root
+      ...(dto.parentFolderId !== undefined
+        ? { parentFolderId: dto.parentFolderId }
+        : {}),
     });
     return this.getById(workspaceId, userId, id, []);
   }
@@ -363,6 +386,23 @@ export class ArtifactsService {
     return { message: 'Share removed' };
   }
 
+  /** Folders are personal: 404 unless the caller created it in this workspace. */
+  async findOwnedFolder(
+    workspaceId: string,
+    userId: string,
+    id: string,
+  ): Promise<ArtifactFolder> {
+    const folder = await this.folderRepo.findOneBy({
+      id,
+      workspaceId,
+      createdByUserId: userId,
+    });
+    if (!folder) {
+      throw new NotFoundException('Folder not found');
+    }
+    return folder;
+  }
+
   /** Purges expired pending uploads and deleted rows whose object delete failed. */
   async purgeStale(): Promise<number> {
     const rows = await this.artifactRepo
@@ -430,6 +470,7 @@ export class ArtifactsService {
     mimeType: string;
     sizeBytes: number;
     metadata?: Record<string, unknown>;
+    parentFolderId?: string | null;
   }): Promise<Artifact> {
     this.quota.assertFileSize(input.sizeBytes);
     const id = randomUUID();
@@ -448,6 +489,7 @@ export class ArtifactsService {
           mimeType: input.mimeType,
           sizeBytes: input.sizeBytes,
           metadata: input.metadata ?? {},
+          parentFolderId: input.parentFolderId ?? null,
           status: ArtifactStatus.PENDING,
           expiresAt: new Date(Date.now() + PENDING_UPLOAD_TTL_SECONDS * 1000),
         }),
@@ -531,6 +573,7 @@ export class ArtifactsService {
       shareType: artifact.shareType,
       status: artifact.status,
       createdBy: artifact.createdBy ? this.toUserDto(artifact.createdBy) : null,
+      parentFolderId: artifact.parentFolderId ?? null,
       isOwner: artifact.createdByUserId === userId,
       createdAt: artifact.createdAt,
       updatedAt: artifact.updatedAt,

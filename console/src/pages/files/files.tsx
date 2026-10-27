@@ -3,6 +3,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DataTable } from '@/components/ui/data-table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Tabs, TabsList, TabsTrigger, useQueryTab } from '@/components/ui/tabs';
 import { usePermission } from '@/hooks/usePermission';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
@@ -12,10 +18,15 @@ import {
   artifactsControllerComplete,
   artifactsControllerDownload,
   artifactsControllerPresign,
+  useArtifactFoldersControllerCreate,
+  useArtifactFoldersControllerRemove,
+  useArtifactFoldersControllerUpdate,
   useArtifactsControllerGetMany,
   useArtifactsControllerGetUsage,
   useArtifactsControllerRemove,
+  useArtifactsControllerUpdate,
   type ArtifactDto,
+  type ArtifactFolderDto,
   type ArtifactsControllerGetManyScope,
 } from '@/services/apis/gen/queries';
 import { uploadToPresignedPost } from '@/services/storage';
@@ -28,6 +39,10 @@ import {
   Bot,
   Download,
   FileText,
+  Folder,
+  FolderInput,
+  FolderPlus,
+  MoreVertical,
   Pencil,
   Share2,
   Trash2,
@@ -35,9 +50,12 @@ import {
 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { RenameFileDialog } from './components/rename-file-dialog';
+import { FolderBreadcrumb } from './components/folder-breadcrumb';
+import { MoveDialog } from './components/move-dialog';
+import { NameDialog } from './components/name-dialog';
 import { ShareFileDialog } from './components/share-file-dialog';
 import { StorageUsage } from './components/storage-usage';
+import { useFolderPath, useFolders } from './components/use-folders';
 
 dayjs.extend(relativeTime);
 
@@ -48,6 +66,15 @@ const ACCESS_LABEL: Record<ArtifactDto['shareType'], string> = {
   shared: 'Shared',
   public: 'Public',
 };
+
+type NamePrompt =
+  | { kind: 'new-folder' }
+  | { kind: 'rename-file'; file: ArtifactDto }
+  | { kind: 'rename-folder'; folder: ArtifactFolderDto };
+
+type MoveTarget =
+  | { kind: 'file'; file: ArtifactDto }
+  | { kind: 'folder'; folder: ArtifactFolderDto };
 
 export function Files() {
   const { hasPermission } = usePermission();
@@ -68,8 +95,19 @@ export function Files() {
   const queryClient = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [folderId, setFolderId] = useState<string | null>(null);
   const [sharing, setSharing] = useState<ArtifactDto | null>(null);
-  const [renaming, setRenaming] = useState<ArtifactDto | null>(null);
+  const [namePrompt, setNamePrompt] = useState<NamePrompt | null>(null);
+  const [moving, setMoving] = useState<MoveTarget | null>(null);
+  const [deletingFolder, setDeletingFolder] =
+    useState<ArtifactFolderDto | null>(null);
+
+  // Folders only exist in "My files"; a search there spans all of them.
+  const inMine = scope === 'mine';
+  const currentFolderId = inMine ? folderId : null;
+  const showFolders = inMine && !filter;
+  const folders = useFolders(currentFolderId, showFolders);
+  const path = useFolderPath(currentFolderId);
 
   const { data, isLoading } = useArtifactsControllerGetMany(
     {
@@ -79,6 +117,7 @@ export function Files() {
       sortOrder,
       search: filter,
       scope: scope as ArtifactsControllerGetManyScope,
+      parentFolderId: currentFolderId ?? undefined,
     },
     {
       query: {
@@ -86,6 +125,7 @@ export function Files() {
           'artifacts',
           selectedWorkspaceId,
           scope,
+          currentFolderId,
           pageSize,
           page,
           sortBy,
@@ -100,16 +140,39 @@ export function Files() {
   });
   const refresh = () =>
     void queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+  const done = (message: string) => () => {
+    toast.success(message);
+    setNamePrompt(null);
+    setMoving(null);
+    refresh();
+  };
 
-  const removeMutation = useArtifactsControllerRemove({
+  const removeFile = useArtifactsControllerRemove({
+    mutation: { onSuccess: done('File deleted'), onError: handleServerError },
+  });
+  const updateFile = useArtifactsControllerUpdate({
+    mutation: { onSuccess: done('File updated'), onError: handleServerError },
+  });
+  const createFolder = useArtifactFoldersControllerCreate({
+    mutation: { onSuccess: done('Folder created'), onError: handleServerError },
+  });
+  const updateFolder = useArtifactFoldersControllerUpdate({
+    mutation: { onSuccess: done('Folder updated'), onError: handleServerError },
+  });
+  const removeFolder = useArtifactFoldersControllerRemove({
     mutation: {
       onSuccess: () => {
-        toast.success('File deleted');
-        refresh();
+        setDeletingFolder(null);
+        done('Folder deleted')();
       },
       onError: handleServerError,
     },
   });
+
+  const openFolder = (id: string | null) => {
+    setFolderId(id);
+    setPage(1);
+  };
 
   const uploadFiles = async (files: File[]) => {
     setUploading(true);
@@ -128,6 +191,7 @@ export function Files() {
           fileName: file.name,
           sizeBytes: file.size,
           contentType,
+          parentFolderId: currentFolderId ?? undefined,
         });
         await uploadToPresignedPost(upload.url, upload.fields, file);
         await artifactsControllerComplete(artifact.id);
@@ -147,6 +211,27 @@ export function Files() {
       window.location.assign(url);
     } catch (error) {
       handleServerError(error);
+    }
+  };
+
+  const submitName = (name: string) => {
+    if (!namePrompt) return;
+    if (namePrompt.kind === 'new-folder') {
+      createFolder.mutate({
+        data: { name, parentFolderId: currentFolderId ?? undefined },
+      });
+    } else if (namePrompt.kind === 'rename-file') {
+      updateFile.mutate({ id: namePrompt.file.id, data: { name } });
+    } else {
+      updateFolder.mutate({ id: namePrompt.folder.id, data: { name } });
+    }
+  };
+
+  const moveTo = (parentFolderId: string | null) => {
+    if (moving?.kind === 'file') {
+      updateFile.mutate({ id: moving.file.id, data: { parentFolderId } });
+    } else if (moving) {
+      updateFolder.mutate({ id: moving.folder.id, data: { parentFolderId } });
     }
   };
 
@@ -233,9 +318,17 @@ export function Files() {
                   variant="ghost"
                   size="sm"
                   aria-label={`Rename ${file.name}`}
-                  onClick={() => setRenaming(file)}
+                  onClick={() => setNamePrompt({ kind: 'rename-file', file })}
                 >
                   <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`Move ${file.name}`}
+                  onClick={() => setMoving({ kind: 'file', file })}
+                >
+                  <FolderInput className="h-4 w-4" />
                 </Button>
               </>
             )}
@@ -244,8 +337,8 @@ export function Files() {
                 title="Delete file"
                 description={`Delete "${file.name}"? This cannot be undone.`}
                 confirmText="Delete"
-                disabled={removeMutation.isPending}
-                onConfirm={() => removeMutation.mutate({ id: file.id })}
+                disabled={removeFile.isPending}
+                onConfirm={() => removeFile.mutate({ id: file.id })}
                 trigger={
                   <Button
                     variant="ghost"
@@ -284,6 +377,62 @@ export function Files() {
           {canManage && <TabsTrigger value="all">All files</TabsTrigger>}
         </TabsList>
       </Tabs>
+      {inMine && <FolderBreadcrumb path={path} onNavigate={openFolder} />}
+      {showFolders && !!folders.data?.length && (
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {folders.data.map((folder) => (
+            <div
+              key={folder.id}
+              className="flex items-center gap-1 rounded-lg border pl-3 hover:bg-muted/50"
+            >
+              <button
+                type="button"
+                className="flex min-w-0 flex-1 items-center gap-2 py-2 text-left text-sm font-medium"
+                onClick={() => openFolder(folder.id)}
+              >
+                <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="truncate">{folder.name}</span>
+              </button>
+              {canWrite && (
+                <DropdownMenu modal={false}>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Actions for ${folder.name}`}
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onSelect={() =>
+                        setNamePrompt({ kind: 'rename-folder', folder })
+                      }
+                    >
+                      <Pencil className="h-4 w-4" />
+                      Rename
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() => setMoving({ kind: 'folder', folder })}
+                    >
+                      <FolderInput className="h-4 w-4" />
+                      Move
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-red-500"
+                      onSelect={() => setDeletingFolder(folder)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
       <input
         ref={inputRef}
         type="file"
@@ -312,6 +461,18 @@ export function Files() {
         toolbarComponents={
           canWrite
             ? [
+                ...(inMine
+                  ? [
+                      <Button
+                        key="new-folder"
+                        variant="outline"
+                        onClick={() => setNamePrompt({ kind: 'new-folder' })}
+                      >
+                        <FolderPlus />
+                        New folder
+                      </Button>,
+                    ]
+                  : []),
                 <Button
                   key="upload"
                   variant="outline"
@@ -325,7 +486,11 @@ export function Files() {
             : []
         }
         emptyMessage={
-          scope === 'shared' ? 'Nothing has been shared with you' : 'No files yet'
+          scope === 'shared'
+            ? 'Nothing has been shared with you'
+            : currentFolderId
+              ? 'No files in this folder'
+              : 'No files yet'
         }
         filterColumnKey="name"
         filterValue={filter}
@@ -338,13 +503,57 @@ export function Files() {
           onChanged={refresh}
         />
       )}
-      {renaming && (
-        <RenameFileDialog
-          file={renaming}
-          onOpenChange={(open) => !open && setRenaming(null)}
-          onChanged={refresh}
+      {namePrompt && (
+        <NameDialog
+          title={
+            namePrompt.kind === 'new-folder'
+              ? 'New folder'
+              : namePrompt.kind === 'rename-file'
+                ? 'Rename file'
+                : 'Rename folder'
+          }
+          initialName={
+            namePrompt.kind === 'rename-file'
+              ? namePrompt.file.name
+              : namePrompt.kind === 'rename-folder'
+                ? namePrompt.folder.name
+                : ''
+          }
+          submitLabel={namePrompt.kind === 'new-folder' ? 'Create' : 'Save'}
+          pending={
+            createFolder.isPending ||
+            updateFile.isPending ||
+            updateFolder.isPending
+          }
+          onSubmit={submitName}
+          onOpenChange={(open) => !open && setNamePrompt(null)}
         />
       )}
+      {moving && (
+        <MoveDialog
+          title={`Move "${moving.kind === 'file' ? moving.file.name : moving.folder.name}"`}
+          currentParentId={
+            moving.kind === 'file'
+              ? moving.file.parentFolderId
+              : moving.folder.parentFolderId
+          }
+          excludeFolderId={moving.kind === 'folder' ? moving.folder.id : undefined}
+          pending={updateFile.isPending || updateFolder.isPending}
+          onMove={moveTo}
+          onOpenChange={(open) => !open && setMoving(null)}
+        />
+      )}
+      <ConfirmDialog
+        open={!!deletingFolder}
+        onOpenChange={(open) => !open && setDeletingFolder(null)}
+        title="Delete folder"
+        description={`Delete "${deletingFolder?.name}" and everything in it? This cannot be undone.`}
+        confirmText="Delete"
+        disabled={removeFolder.isPending}
+        onConfirm={() =>
+          deletingFolder && removeFolder.mutate({ id: deletingFolder.id })
+        }
+      />
     </Page>
   );
 }

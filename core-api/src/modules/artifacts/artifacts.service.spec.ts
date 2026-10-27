@@ -19,6 +19,7 @@ import {
   PENDING_UPLOAD_TTL_SECONDS,
   toObjectKey,
 } from './artifacts.service';
+import type { ArtifactFolder } from './entities/artifact-folder.entity';
 import type { ArtifactShare } from './entities/artifact-share.entity';
 import type { Artifact } from './entities/artifact.entity';
 
@@ -53,6 +54,7 @@ describe('ArtifactsService', () => {
   let artifactRepo: Record<string, jest.Mock>;
   let shareRepo: Record<string, jest.Mock>;
   let shareInsert: Record<string, jest.Mock>;
+  let folderRepo: { findOneBy: jest.Mock };
   let membersRepo: { find: jest.Mock };
   let storage: Record<string, jest.Mock>;
   let quota: Record<string, jest.Mock>;
@@ -84,6 +86,7 @@ describe('ArtifactsService', () => {
       createQueryBuilder: jest.fn(() => shareInsert),
     };
     membersRepo = { find: jest.fn() };
+    folderRepo = { findOneBy: jest.fn() };
     storage = {
       getPresignedPost: jest.fn().mockResolvedValue({
         url: '/api/storage/artifacts',
@@ -112,6 +115,7 @@ describe('ArtifactsService', () => {
     service = new ArtifactsService(
       artifactRepo as unknown as Repository<Artifact>,
       shareRepo as unknown as Repository<ArtifactShare>,
+      folderRepo as unknown as Repository<ArtifactFolder>,
       dataSource as unknown as DataSource,
       storage as unknown as StorageService,
       quota as unknown as ArtifactQuotaService,
@@ -151,6 +155,30 @@ describe('ArtifactsService', () => {
         expiresIn: PENDING_UPLOAD_TTL_SECONDS,
       });
       expect(result.artifact).toMatchObject({ isOwner: true, status: 'pending' });
+    });
+
+    it('uploads into an owned folder and rejects anyone else\'s', async () => {
+      folderRepo.findOneBy.mockResolvedValueOnce({ id: 'folder-1' });
+      await service.presignUpload(WS, OWNER, {
+        fileName: 'a.txt',
+        sizeBytes: 1,
+        contentType: 'text/plain',
+        parentFolderId: 'folder-1',
+      });
+      expect((manager.save.mock.calls[0][0] as Artifact).parentFolderId).toBe(
+        'folder-1',
+      );
+
+      folderRepo.findOneBy.mockResolvedValueOnce(null);
+      await expect(
+        service.presignUpload(WS, OWNER, {
+          fileName: 'a.txt',
+          sizeBytes: 1,
+          contentType: 'text/plain',
+          parentFolderId: 'folder-x',
+        }),
+      ).rejects.toThrow(NotFoundException);
+      expect(quota.reserve).toHaveBeenCalledTimes(1);
     });
 
     it('rejects files over the per-file limit before reserving', async () => {
@@ -290,6 +318,36 @@ describe('ArtifactsService', () => {
       await expect(
         service.update(WS, OTHER, 'artifact-1', { shareType: ArtifactShareType.PRIVATE }),
       ).rejects.toThrow(ForbiddenException);
+      expect(artifactRepo.update).not.toHaveBeenCalled();
+    });
+
+    it('moves a file into one of the owner\'s folders, or back to the root', async () => {
+      artifactRepo.findOne.mockResolvedValue(makeArtifact());
+      folderRepo.findOneBy.mockResolvedValue({ id: 'folder-1' });
+
+      await service.update(WS, OWNER, 'artifact-1', { parentFolderId: 'folder-1' });
+      expect(folderRepo.findOneBy).toHaveBeenCalledWith({
+        id: 'folder-1',
+        workspaceId: WS,
+        createdByUserId: OWNER,
+      });
+      expect(artifactRepo.update).toHaveBeenLastCalledWith('artifact-1', {
+        parentFolderId: 'folder-1',
+      });
+
+      await service.update(WS, OWNER, 'artifact-1', { parentFolderId: null });
+      expect(artifactRepo.update).toHaveBeenLastCalledWith('artifact-1', {
+        parentFolderId: null,
+      });
+    });
+
+    it('refuses to move a file into a folder the caller does not own', async () => {
+      artifactRepo.findOne.mockResolvedValue(makeArtifact());
+      folderRepo.findOneBy.mockResolvedValue(null);
+
+      await expect(
+        service.update(WS, OWNER, 'artifact-1', { parentFolderId: 'folder-x' }),
+      ).rejects.toThrow(NotFoundException);
       expect(artifactRepo.update).not.toHaveBeenCalled();
     });
   });

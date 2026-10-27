@@ -8,36 +8,27 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { handleServerError } from '@/lib/handle-server-error';
-import {
-  useArtifactsControllerUpdate,
-  type ArtifactDto,
-} from '@/services/apis/gen/queries';
 import { useState } from 'react';
-import { toast } from 'sonner';
 
-interface RenameFileDialogProps {
-  file: ArtifactDto;
+interface NameDialogProps {
+  title: string;
+  initialName?: string;
+  submitLabel: string;
+  pending: boolean;
+  onSubmit: (name: string) => void;
   onOpenChange: (open: boolean) => void;
-  onChanged: () => void;
 }
 
-export function RenameFileDialog({
-  file,
+/** Single-field name prompt shared by "New folder" and the rename actions. */
+export function NameDialog({
+  title,
+  initialName = '',
+  submitLabel,
+  pending,
+  onSubmit,
   onOpenChange,
-  onChanged,
-}: RenameFileDialogProps) {
-  const [name, setName] = useState(file.name);
-  const update = useArtifactsControllerUpdate({
-    mutation: {
-      onSuccess: () => {
-        toast.success('File renamed');
-        onChanged();
-        onOpenChange(false);
-      },
-      onError: handleServerError,
-    },
-  });
+}: NameDialogProps) {
+  const [name, setName] = useState(initialName);
   const trimmed = name.trim();
 
   return (
@@ -47,16 +38,16 @@ export function RenameFileDialog({
           className="space-y-4"
           onSubmit={(e) => {
             e.preventDefault();
-            update.mutate({ id: file.id, data: { name: trimmed } });
+            onSubmit(trimmed);
           }}
         >
           <DialogHeader>
-            <DialogTitle>Rename file</DialogTitle>
+            <DialogTitle>{title}</DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
-            <Label htmlFor="file-name">Name</Label>
+            <Label htmlFor="item-name">Name</Label>
             <Input
-              id="file-name"
+              id="item-name"
               value={name}
               maxLength={255}
               autoFocus
@@ -73,9 +64,9 @@ export function RenameFileDialog({
             </Button>
             <Button
               type="submit"
-              disabled={!trimmed || trimmed === file.name || update.isPending}
+              disabled={!trimmed || trimmed === initialName || pending}
             >
-              Save
+              {submitLabel}
             </Button>
           </DialogFooter>
         </form>

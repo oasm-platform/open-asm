@@ -77,13 +77,16 @@ export const AUDIT_ACTION_CATALOG = [
   { action: 'api_key.revoked', label: 'Revoked API key', controller: 'ApiKeysController', method: 'revoke' },
   // audit (35)
   { action: 'audit.exported', label: 'Exported audit log', controller: 'AuditEventsController', method: 'exportAuditEvents' },
-  // artifacts / storage (36–42)
+  // artifacts / storage (36–45)
   { action: 'artifact.created', label: 'Started file upload', controller: 'ArtifactsController', method: 'presign' },
   { action: 'artifact.upload.completed', label: 'Uploaded file', controller: 'ArtifactsController', method: 'complete' },
   { action: 'artifact.downloaded', label: 'Downloaded file', controller: 'ArtifactsController', method: 'download' },
   { action: 'artifact.updated', label: 'Updated file', controller: 'ArtifactsController', method: 'update' },
   { action: 'artifact.shared', label: 'Shared file', controller: 'ArtifactsController', method: 'addShares' },
   { action: 'artifact.deleted', label: 'Deleted file', controller: 'ArtifactsController', method: 'remove' },
+  { action: 'artifact.folder.created', label: 'Created folder', controller: 'ArtifactFoldersController', method: 'create' },
+  { action: 'artifact.folder.updated', label: 'Updated folder', controller: 'ArtifactFoldersController', method: 'update' },
+  { action: 'artifact.folder.deleted', label: 'Deleted folder', controller: 'ArtifactFoldersController', method: 'remove' },
   { action: 'storage.quota.updated', label: 'Changed storage quota', controller: 'AdminWorkspacesController', method: 'updateStorageQuota' },
 ] as const satisfies readonly AuditActionEntry[];
 

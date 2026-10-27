@@ -4171,6 +4171,8 @@ export type ArtifactDto = {
   status: ArtifactDtoStatus;
   /** @nullable */
   createdBy: ArtifactUserDto | null;
+  /** @nullable */
+  parentFolderId: string | null;
   /** Whether the current user created the file */
   isOwner: boolean;
   createdAt: string;
@@ -4200,6 +4202,8 @@ export type PresignArtifactDto = {
   /** Exact file size in bytes */
   sizeBytes: number;
   contentType: string;
+  /** Target folder; root when omitted */
+  parentFolderId?: string;
 };
 
 export type GetManyArtifactDtoDto = {
@@ -4256,6 +4260,11 @@ export const UpdateArtifactDtoShareType = {
 export type UpdateArtifactDto = {
   name?: string;
   shareType?: UpdateArtifactDtoShareType;
+  /**
+   * Move into this folder; null moves to the root
+   * @nullable
+   */
+  parentFolderId?: string | null;
 };
 
 export type ShareArtifactResponseDto = {
@@ -4267,6 +4276,46 @@ export type ShareArtifactResponseDto = {
 
 export type ShareArtifactDto = {
   emails: string[];
+};
+
+export type ArtifactFolderDto = {
+  id: string;
+  name: string;
+  /** @nullable */
+  parentFolderId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ArtifactFolderPathItemDto = {
+  id: string;
+  name: string;
+};
+
+export type ArtifactFolderDetailDto = {
+  id: string;
+  name: string;
+  /** @nullable */
+  parentFolderId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** Breadcrumb from the top-level folder down to this one */
+  path: ArtifactFolderPathItemDto[];
+};
+
+export type CreateArtifactFolderDto = {
+  name: string;
+  /** Parent folder; root when omitted */
+  parentFolderId?: string;
+};
+
+export type UpdateArtifactFolderDto = {
+  name?: string;
+  /**
+   * Move under this folder; null moves to the root
+   * @nullable
+   */
+  parentFolderId?: string | null;
 };
 
 export type NotificationResponseDtoStatus =
@@ -5558,6 +5607,10 @@ export type ArtifactsControllerGetManyParams = {
   sortBy?: string;
   sortOrder?: string;
   scope?: ArtifactsControllerGetManyScope;
+  /**
+   * Folder to browse in `mine` (root when omitted; ignored while searching)
+   */
+  parentFolderId?: string;
 };
 
 export type ArtifactsControllerGetManyScope =
@@ -5568,6 +5621,13 @@ export const ArtifactsControllerGetManyScope = {
   shared: 'shared',
   all: 'all',
 } as const;
+
+export type ArtifactFoldersControllerGetManyParams = {
+  /**
+   * Parent folder; root when omitted
+   */
+  parentFolderId?: string;
+};
 
 export type NotificationsControllerGetNotificationsParams = {
   search?: string;
@@ -38770,6 +38830,623 @@ export const useArtifactsControllerRemoveShare = <
 > => {
   return useMutation(
     getArtifactsControllerRemoveShareMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Lists your folders directly under `parentFolderId` (the root when omitted).
+ * @summary List folders
+ */
+export const artifactFoldersControllerGetMany = (
+  params?: ArtifactFoldersControllerGetManyParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ArtifactFolderDto[]>(
+    { url: `/api/artifact-folders`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getArtifactFoldersControllerGetManyQueryKey = (
+  params?: ArtifactFoldersControllerGetManyParams,
+) => {
+  return [`/api/artifact-folders`, ...(params ? [params] : [])] as const;
+};
+
+export const getArtifactFoldersControllerGetManyQueryOptions = <
+  TData = Awaited<ReturnType<typeof artifactFoldersControllerGetMany>>,
+  TError = unknown,
+>(
+  params?: ArtifactFoldersControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactFoldersControllerGetMany>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getArtifactFoldersControllerGetManyQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof artifactFoldersControllerGetMany>>
+  > = ({ signal }) =>
+    artifactFoldersControllerGetMany(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof artifactFoldersControllerGetMany>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ArtifactFoldersControllerGetManyQueryResult = NonNullable<
+  Awaited<ReturnType<typeof artifactFoldersControllerGetMany>>
+>;
+export type ArtifactFoldersControllerGetManyQueryError = unknown;
+
+export function useArtifactFoldersControllerGetMany<
+  TData = Awaited<ReturnType<typeof artifactFoldersControllerGetMany>>,
+  TError = unknown,
+>(
+  params: undefined | ArtifactFoldersControllerGetManyParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactFoldersControllerGetMany>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof artifactFoldersControllerGetMany>>,
+          TError,
+          Awaited<ReturnType<typeof artifactFoldersControllerGetMany>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useArtifactFoldersControllerGetMany<
+  TData = Awaited<ReturnType<typeof artifactFoldersControllerGetMany>>,
+  TError = unknown,
+>(
+  params?: ArtifactFoldersControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactFoldersControllerGetMany>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof artifactFoldersControllerGetMany>>,
+          TError,
+          Awaited<ReturnType<typeof artifactFoldersControllerGetMany>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useArtifactFoldersControllerGetMany<
+  TData = Awaited<ReturnType<typeof artifactFoldersControllerGetMany>>,
+  TError = unknown,
+>(
+  params?: ArtifactFoldersControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactFoldersControllerGetMany>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List folders
+ */
+
+export function useArtifactFoldersControllerGetMany<
+  TData = Awaited<ReturnType<typeof artifactFoldersControllerGetMany>>,
+  TError = unknown,
+>(
+  params?: ArtifactFoldersControllerGetManyParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactFoldersControllerGetMany>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getArtifactFoldersControllerGetManyQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * @summary Create a folder
+ */
+export const artifactFoldersControllerCreate = (
+  createArtifactFolderDto: CreateArtifactFolderDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ArtifactFolderDto>(
+    {
+      url: `/api/artifact-folders`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createArtifactFolderDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getArtifactFoldersControllerCreateMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof artifactFoldersControllerCreate>>,
+    TError,
+    { data: CreateArtifactFolderDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof artifactFoldersControllerCreate>>,
+  TError,
+  { data: CreateArtifactFolderDto },
+  TContext
+> => {
+  const mutationKey = ['artifactFoldersControllerCreate'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof artifactFoldersControllerCreate>>,
+    { data: CreateArtifactFolderDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return artifactFoldersControllerCreate(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ArtifactFoldersControllerCreateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof artifactFoldersControllerCreate>>
+>;
+export type ArtifactFoldersControllerCreateMutationBody =
+  CreateArtifactFolderDto;
+export type ArtifactFoldersControllerCreateMutationError = unknown;
+
+/**
+ * @summary Create a folder
+ */
+export const useArtifactFoldersControllerCreate = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof artifactFoldersControllerCreate>>,
+      TError,
+      { data: CreateArtifactFolderDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof artifactFoldersControllerCreate>>,
+  TError,
+  { data: CreateArtifactFolderDto },
+  TContext
+> => {
+  return useMutation(
+    getArtifactFoldersControllerCreateMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Returns the folder with its breadcrumb path.
+ * @summary Get a folder
+ */
+export const artifactFoldersControllerGetById = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ArtifactFolderDetailDto>(
+    { url: `/api/artifact-folders/${id}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getArtifactFoldersControllerGetByIdQueryKey = (id: string) => {
+  return [`/api/artifact-folders/${id}`] as const;
+};
+
+export const getArtifactFoldersControllerGetByIdQueryOptions = <
+  TData = Awaited<ReturnType<typeof artifactFoldersControllerGetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactFoldersControllerGetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getArtifactFoldersControllerGetByIdQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof artifactFoldersControllerGetById>>
+  > = ({ signal }) =>
+    artifactFoldersControllerGetById(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof artifactFoldersControllerGetById>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ArtifactFoldersControllerGetByIdQueryResult = NonNullable<
+  Awaited<ReturnType<typeof artifactFoldersControllerGetById>>
+>;
+export type ArtifactFoldersControllerGetByIdQueryError = unknown;
+
+export function useArtifactFoldersControllerGetById<
+  TData = Awaited<ReturnType<typeof artifactFoldersControllerGetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactFoldersControllerGetById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof artifactFoldersControllerGetById>>,
+          TError,
+          Awaited<ReturnType<typeof artifactFoldersControllerGetById>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useArtifactFoldersControllerGetById<
+  TData = Awaited<ReturnType<typeof artifactFoldersControllerGetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactFoldersControllerGetById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof artifactFoldersControllerGetById>>,
+          TError,
+          Awaited<ReturnType<typeof artifactFoldersControllerGetById>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useArtifactFoldersControllerGetById<
+  TData = Awaited<ReturnType<typeof artifactFoldersControllerGetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactFoldersControllerGetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get a folder
+ */
+
+export function useArtifactFoldersControllerGetById<
+  TData = Awaited<ReturnType<typeof artifactFoldersControllerGetById>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof artifactFoldersControllerGetById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getArtifactFoldersControllerGetByIdQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * @summary Rename or move a folder
+ */
+export const artifactFoldersControllerUpdate = (
+  id: string,
+  updateArtifactFolderDto: UpdateArtifactFolderDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ArtifactFolderDto>(
+    {
+      url: `/api/artifact-folders/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateArtifactFolderDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getArtifactFoldersControllerUpdateMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof artifactFoldersControllerUpdate>>,
+    TError,
+    { id: string; data: UpdateArtifactFolderDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof artifactFoldersControllerUpdate>>,
+  TError,
+  { id: string; data: UpdateArtifactFolderDto },
+  TContext
+> => {
+  const mutationKey = ['artifactFoldersControllerUpdate'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof artifactFoldersControllerUpdate>>,
+    { id: string; data: UpdateArtifactFolderDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return artifactFoldersControllerUpdate(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ArtifactFoldersControllerUpdateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof artifactFoldersControllerUpdate>>
+>;
+export type ArtifactFoldersControllerUpdateMutationBody =
+  UpdateArtifactFolderDto;
+export type ArtifactFoldersControllerUpdateMutationError = unknown;
+
+/**
+ * @summary Rename or move a folder
+ */
+export const useArtifactFoldersControllerUpdate = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof artifactFoldersControllerUpdate>>,
+      TError,
+      { id: string; data: UpdateArtifactFolderDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof artifactFoldersControllerUpdate>>,
+  TError,
+  { id: string; data: UpdateArtifactFolderDto },
+  TContext
+> => {
+  return useMutation(
+    getArtifactFoldersControllerUpdateMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Deletes the folder, its subfolders and every file in them, and releases their storage.
+ * @summary Delete a folder
+ */
+export const artifactFoldersControllerRemove = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/artifact-folders/${id}`, method: 'DELETE', signal },
+    options,
+  );
+};
+
+export const getArtifactFoldersControllerRemoveMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof artifactFoldersControllerRemove>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof artifactFoldersControllerRemove>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['artifactFoldersControllerRemove'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof artifactFoldersControllerRemove>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return artifactFoldersControllerRemove(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ArtifactFoldersControllerRemoveMutationResult = NonNullable<
+  Awaited<ReturnType<typeof artifactFoldersControllerRemove>>
+>;
+
+export type ArtifactFoldersControllerRemoveMutationError = unknown;
+
+/**
+ * @summary Delete a folder
+ */
+export const useArtifactFoldersControllerRemove = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof artifactFoldersControllerRemove>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof artifactFoldersControllerRemove>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getArtifactFoldersControllerRemoveMutationOptions(options),
     queryClient,
   );
 };

@@ -25,7 +25,7 @@
  * it stays compatible with the existing `EventEmitter2` convention that
  * `TriggerWorkflowService` parses by splitting on the first dot.
  *
- * The 42 audit-mirrored entries deliberately redeclare the audit action names
+ * The 45 audit-mirrored entries deliberately redeclare the audit action names
  * instead of importing `AUDIT_ACTION_CATALOG`: the bridge must not take a
  * compile-time dependency on the audit module. `event.spec.ts` asserts the two
  * stay in lockstep, so drift fails CI rather than production.
@@ -75,7 +75,7 @@ export interface EventDefinition {
  * derived from the keys; `satisfies` type-checks the tree's shape.
  */
 export const EVENT_CATALOG = {
-  // ─── Audit trail (42) ───────────────────────────────────────────────────
+  // ─── Audit trail (45) ───────────────────────────────────────────────────
   // Mirrors AUDIT_ACTION_CATALOG one-for-one. Emitted from the existing
   // @AuditLog decorator + global AuditInterceptor, so hooking the bridge into
   // AuditService costs zero controller changes.
@@ -423,6 +423,17 @@ export const EVENT_CATALOG = {
     updated: { name: 'artifact.updated', summary: 'File renamed or access changed' },
     shared: { name: 'artifact.shared', summary: 'File shared with members' },
     deleted: { name: 'artifact.deleted', summary: 'File deleted' },
+    folder: {
+      created: { name: 'artifact.folder.created', summary: 'Folder created' },
+      updated: {
+        name: 'artifact.folder.updated',
+        summary: 'Folder renamed or moved',
+      },
+      deleted: {
+        name: 'artifact.folder.deleted',
+        summary: 'Folder and its contents deleted',
+      },
+    },
   },
   storage: {
     object: {

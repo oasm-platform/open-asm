@@ -16,6 +16,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   MaxLength,
   Min,
@@ -42,6 +43,11 @@ export class PresignArtifactDto {
   @Matches(/^[\w.+-]+\/[\w.+-]+$/, { message: 'contentType must be a MIME type' })
   @MaxLength(255)
   contentType: string;
+
+  @ApiProperty({ required: false, description: 'Target folder; root when omitted' })
+  @IsOptional()
+  @IsUUID()
+  parentFolderId?: string;
 }
 
 export class UpdateArtifactDto {
@@ -57,6 +63,16 @@ export class UpdateArtifactDto {
   @IsOptional()
   @IsEnum(ArtifactShareType)
   shareType?: ArtifactShareType;
+
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    type: String,
+    description: 'Move into this folder; null moves to the root',
+  })
+  @IsOptional()
+  @IsUUID()
+  parentFolderId?: string | null;
 }
 
 export class ShareArtifactDto {
@@ -76,6 +92,55 @@ export class GetArtifactsQueryDto extends GetManyBaseQueryParams {
   @IsOptional()
   @IsEnum(ArtifactListScope)
   scope: ArtifactListScope = ArtifactListScope.MINE;
+
+  @ApiProperty({
+    required: false,
+    description: 'Folder to browse in `mine` (root when omitted; ignored while searching)',
+  })
+  @IsOptional()
+  @IsUUID()
+  parentFolderId?: string;
+}
+
+export class CreateArtifactFolderDto {
+  @ApiProperty({ example: 'Reports' })
+  @Transform(trim)
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  name: string;
+
+  @ApiProperty({ required: false, description: 'Parent folder; root when omitted' })
+  @IsOptional()
+  @IsUUID()
+  parentFolderId?: string;
+}
+
+export class UpdateArtifactFolderDto {
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  name?: string;
+
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    type: String,
+    description: 'Move under this folder; null moves to the root',
+  })
+  @IsOptional()
+  @IsUUID()
+  parentFolderId?: string | null;
+}
+
+export class GetArtifactFoldersQueryDto {
+  @ApiProperty({ required: false, description: 'Parent folder; root when omitted' })
+  @IsOptional()
+  @IsUUID()
+  parentFolderId?: string;
 }
 
 export class UpdateStorageQuotaDto {
@@ -125,6 +190,9 @@ export class ArtifactDto {
 
   @ApiProperty({ type: ArtifactUserDto, nullable: true })
   createdBy: ArtifactUserDto | null;
+
+  @ApiProperty({ nullable: true, type: String })
+  parentFolderId: string | null;
 
   @ApiProperty({ description: 'Whether the current user created the file' })
   isOwner: boolean;
@@ -223,4 +291,37 @@ export class WorkspaceStorageQuotaDto {
     description: 'Override in bytes; null means the server default applies',
   })
   quotaBytes: number | null;
+}
+
+export class ArtifactFolderDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty({ nullable: true, type: String })
+  parentFolderId: string | null;
+
+  @ApiProperty()
+  createdAt: Date;
+
+  @ApiProperty()
+  updatedAt: Date;
+}
+
+export class ArtifactFolderPathItemDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  name: string;
+}
+
+export class ArtifactFolderDetailDto extends ArtifactFolderDto {
+  @ApiProperty({
+    type: [ArtifactFolderPathItemDto],
+    description: 'Breadcrumb from the top-level folder down to this one',
+  })
+  path: ArtifactFolderPathItemDto[];
 }

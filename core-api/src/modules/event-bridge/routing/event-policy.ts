@@ -27,14 +27,14 @@ export interface EventPolicy {
  * One entry per catalog leaf. `Record<EventName, …>` is the exhaustiveness
  * check — a new catalog leaf without a policy here fails `task api:build`.
  *
- * `persist` mirrors the audit trail the app had before the event bus: the 42
+ * `persist` mirrors the audit trail the app had before the event bus: the 45
  * `AUDIT_ACTION_CATALOG` names are `true`, and the runtime-only leaves
  * (`scan.*`, `issue.*`, `worker.*`, `notification.*`, `statistics.aggregated`,
  * `system_config.cleaned`, `storage.object.deleted`) are `false` because they
  * are operational signals rather than user-attributable actions.
  */
 export const EVENT_POLICY: Record<EventName, EventPolicy> = {
-  // ─── Audit trail (42, mirrors AUDIT_ACTION_CATALOG one-for-one) ───────────
+  // ─── Audit trail (45, mirrors AUDIT_ACTION_CATALOG one-for-one) ───────────
   'workspace.created': { persist: true, severity: 'important' },
   'workspace.updated': { persist: true, severity: 'normal' },
   'workspace.deleted': { persist: true, severity: 'critical' },
@@ -76,10 +76,13 @@ export const EVENT_POLICY: Record<EventName, EventPolicy> = {
   'artifact.updated': { persist: true, severity: 'important' },
   'artifact.shared': { persist: true, severity: 'important' },
   'artifact.deleted': { persist: true, severity: 'important' },
+  'artifact.folder.created': { persist: true, severity: 'normal' },
+  'artifact.folder.updated': { persist: true, severity: 'normal' },
+  'artifact.folder.deleted': { persist: true, severity: 'important' },
   'storage.quota.updated': { persist: true, severity: 'important' },
 
   // ─── Runtime events ──────────────────────────────────────────────────────
-  // `persist: false` on all of them: they are operational signals, not the 42
+  // `persist: false` on all of them: they are operational signals, not the 45
   // user-attributable actions the audit trail declared. A workflow run closing
   // is visible through `job.completed`/`job.failed` already.
   'workflow.run.started': { persist: false, severity: 'normal' },
