@@ -101,12 +101,23 @@ function toToolCallState(item: ToolItem): ToolCallState {
 function ToolCallItem({
   item,
   remoteExecuteEvents,
+  selectedToolCallId,
 }: {
   item: ToolItem;
   remoteExecuteEvents?: Map<string, RemoteExecuteStreamEvent[]>;
+  selectedToolCallId?: string | null;
 }) {
   return (
-    <div id={`tool-call-${item.toolCallId}`}>
+    // Picked in the side panel: briefly tinted so it stands out once
+    // scrolled to (a tint, not a ring, which a folded group's overflow
+    // would clip)
+    <div
+      id={`tool-call-${item.toolCallId}`}
+      className={cn(
+        '-ml-1.5 rounded-md pl-1.5 transition-colors duration-700',
+        selectedToolCallId === item.toolCallId && 'bg-primary/10',
+      )}
+    >
       <ToolCallDisplay
         toolCall={toToolCallState(item)}
         streamEvents={remoteExecuteEvents?.get(item.toolCallId)}
@@ -142,24 +153,29 @@ function ToolCallGroup({
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="flex w-full min-w-0 items-center gap-2 text-left text-muted-foreground hover:text-foreground">
+      <CollapsibleTrigger className="flex max-w-full min-w-0 items-center gap-2 rounded-md text-left text-muted-foreground transition-colors hover:text-foreground cursor-pointer">
         <ToolCallLabel toolCall={toToolCallState(latest)} />
-        <span className="shrink-0 text-xs">{tools.length} tool calls</span>
+        <span className="shrink-0 rounded-full bg-muted px-1.5 py-px text-[11px] font-medium tabular-nums">
+          {tools.length} tool calls
+        </span>
         <ChevronRightIcon
           className={cn(
-            'size-3.5 shrink-0 transition-transform',
+            'size-3.5 shrink-0 transition-transform duration-200',
             open && 'rotate-90',
           )}
         />
       </CollapsibleTrigger>
-      <CollapsibleContent className="mt-1.5 flex flex-col gap-1.5 border-l pl-3">
-        {tools.map((item) => (
-          <ToolCallItem
-            key={item.toolCallId}
-            item={item}
-            remoteExecuteEvents={remoteExecuteEvents}
-          />
-        ))}
+      <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+        <div className="mt-2 ml-1.5 flex flex-col gap-2 border-l pl-3.5">
+          {tools.map((item) => (
+            <ToolCallItem
+              key={item.toolCallId}
+              item={item}
+              remoteExecuteEvents={remoteExecuteEvents}
+              selectedToolCallId={selectedToolCallId}
+            />
+          ))}
+        </div>
       </CollapsibleContent>
     </Collapsible>
   );
@@ -274,9 +290,13 @@ export const ChatMessage = memo(function ChatMessage({
   }, [parts, isReasoningStreaming, showGenerating, showInitialThinking]);
 
   return (
-    <Message from={message.role}>
+    // Fades up into place once, when it first renders
+    <Message
+      from={message.role}
+      className="animate-in fade-in-0 slide-in-from-bottom-1 duration-300"
+    >
       <MessageContent expandable={message.role === 'user'}>
-        <div className="flex flex-col w-full gap-1.5">
+        <div className="flex flex-col w-full gap-2.5">
           {renderItems.map((item, i) => {
             switch (item.kind) {
               case 'reasoning':
@@ -291,7 +311,9 @@ export const ChatMessage = memo(function ChatMessage({
                         <ThinkingLabel isStreaming={s} duration={d} />
                       )}
                     />
-                    <ReasoningContent>{item.text}</ReasoningContent>
+                    <ReasoningContent className="mt-2 border-l-2 pl-3.5">
+                      {item.text}
+                    </ReasoningContent>
                   </Reasoning>
                 );
               case 'tool':
@@ -300,6 +322,7 @@ export const ChatMessage = memo(function ChatMessage({
                     key={item.toolCallId}
                     item={item}
                     remoteExecuteEvents={remoteExecuteEvents}
+                    selectedToolCallId={selectedToolCallId}
                   />
                 );
               case 'tool-group':
@@ -359,9 +382,16 @@ export const ChatMessage = memo(function ChatMessage({
         </div>
       </MessageContent>
 
-      {/* Copy button — only appears after streaming finishes */}
+      {/* Copy button — only appears after streaming finishes. Older answers
+          show it on hover (always on touch screens), the latest one always */}
       {message.role === 'assistant' && hasContent && !isStreamingActive && (
-        <MessageActions>
+        <MessageActions
+          className={cn(
+            'mt-0 px-2 transition-opacity duration-200',
+            !isLastAssistant &&
+              'md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100',
+          )}
+        >
           <CopyButton text={textContent} />
         </MessageActions>
       )}

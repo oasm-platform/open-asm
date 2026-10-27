@@ -70,7 +70,12 @@ export class AgentsModelsCatalogService implements OnModuleInit {
     if (cfg.contextWindow && cfg.contextWindow > 0) {
       return { tokens: cfg.contextWindow, source: 'manual', estimated: false };
     }
-    const hit = this.lookup(cfg.provider, cfg.model);
+    // OrcaRouter's own routes are not on models.dev: a bare-id guess would
+    // borrow another host's window (`orcarouter/auto` -> openrouter/auto, 2M)
+    const ownRoute =
+      cfg.provider === LLMProvider.ORCAROUTER &&
+      /^(orcarouter|orca)\//i.test(cfg.model);
+    const hit = ownRoute ? null : this.lookup(cfg.provider, cfg.model);
     if (hit && hit.entry.limit.context > 0) {
       return {
         tokens: hit.entry.limit.context,

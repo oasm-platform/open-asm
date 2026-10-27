@@ -4,10 +4,8 @@ import { useNavigate, useParams } from '@tanstack/react-router';
 import { useEffect, useMemo, type JSX } from 'react';
 import {
   Building2,
-  Info,
   KeyRound,
   Loader2,
-  Palette,
   Plug,
   ScrollText,
   ShieldCheck,
@@ -16,8 +14,6 @@ import {
 } from 'lucide-react';
 import ApiKeysSettings from './components/api-keys-settings';
 import AuditLogSettings from './components/audit-log-settings';
-import BrandNameAndLogoSettings from './components/brand-name-and-logo';
-import GetAboutProject from './components/get-about-project';
 import McpConnect from './components/mcp-connect';
 import MembersSettings from './components/members-settings';
 import Preferences from './components/preferences';
@@ -75,8 +71,9 @@ export const settingsTabGroups: SettingsTabGroup[] = [
         path: '/settings/apikeys',
         icon: <KeyRound />,
         content: {
-          title: 'API Keys',
-          description: 'Manage your workspace API keys',
+          title: 'Workspace API key',
+          description:
+            'Use this key to authenticate requests to the OASM API from scripts, CI pipelines and integrations.',
         },
         component: <ApiKeysSettings />,
         permission: 'workspace.apikey',
@@ -150,36 +147,6 @@ export const settingsTabGroups: SettingsTabGroup[] = [
         },
         component: <McpConnect />,
         permission: 'workspace.apikey',
-      },
-    ],
-  },
-  // Group: System
-  {
-    name: 'System',
-    roles: ['admin'],
-    tabs: [
-      {
-        id: 'brand',
-        label: 'Brand name and logo',
-        path: '/settings/brand',
-        icon: <Palette />,
-        content: {
-          title: 'Brand name and logo',
-          description: 'Customize your brand name and logo',
-        },
-        component: <BrandNameAndLogoSettings />,
-      },
-      {
-        id: 'about',
-        label: 'About',
-        path: '/settings/about',
-        icon: <Info />,
-        content: {
-          title: 'About',
-          description:
-            'Open-source platform for cybersecurity Attack Surface Management.',
-        },
-        component: <GetAboutProject />,
       },
     ],
   },

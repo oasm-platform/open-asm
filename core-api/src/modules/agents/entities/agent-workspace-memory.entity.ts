@@ -5,7 +5,7 @@ import { IsString, IsUUID } from 'class-validator';
 import { Column, Entity, Index, JoinColumn, ManyToOne, Relation } from 'typeorm';
 
 @Entity('agent_workspace_memories')
-@Index(['workspaceId', 'userId'], { unique: true })
+@Index(['workspaceId', 'userId'])
 export class AgentWorkspaceMemory extends BaseEntity {
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
   @IsUUID()

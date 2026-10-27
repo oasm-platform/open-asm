@@ -1,6 +1,7 @@
 import { UserId, WorkspaceId } from '@/common/decorators/app.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
   Body,
@@ -34,11 +35,16 @@ import {
 } from './dto/generate-service-tags.dto';
 import { GetHostAssetsDTO } from './dto/get-host-assets.dto';
 import { GetTagAssetsDTO } from './dto/get-tag-assets.dto';
+import { DiscoverUrlsDto } from './dto/discover-urls.dto';
+import { UrlDiscoveryService } from './url-discovery.service';
 
 @ApiTags('Assets')
 @Controller('assets')
 export class AssetsController {
-  constructor(private readonly assetsService: AssetsService) {}
+  constructor(
+    private readonly assetsService: AssetsService,
+    private readonly urlDiscoveryService: UrlDiscoveryService,
+  ) {}
 
   @Doc({
     summary: 'Get assets in target',
@@ -134,6 +140,26 @@ export class AssetsController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.assetsService.getUrlAssets(query, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Discover urls',
+    description:
+      'Runs the url_discovery workflow (gau) on one or more domain targets. URLs are collected from the live HTTP services of each target.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('asset.write')
+  @Post('/url/discover')
+  discoverUrls(
+    @Body() dto: DiscoverUrlsDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.urlDiscoveryService.discover(dto.targetIds, workspaceId);
   }
 
   @Doc({

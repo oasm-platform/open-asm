@@ -1,21 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsString } from 'class-validator';
-
-export class CreateFirstAdminDto {
-  @ApiProperty()
-  @IsEmail()
-  email: string;
-  @IsString()
-  @ApiProperty()
-  password: string;
-}
 
 export class GetMetadataDto {
   @ApiProperty()
   isInit: boolean;
-
-  @ApiProperty()
-  isAssistant: boolean;
 
   @ApiProperty({ description: 'System name' })
   name: string;
@@ -34,6 +21,15 @@ export class GetMetadataDto {
     description: 'TTL in seconds for storage presigned URLs',
   })
   storagePresignTtlSeconds: number;
+
+  @ApiProperty({ description: 'Source code repository URL' })
+  gitRepoUrl: string;
+
+  @ApiProperty({ description: 'Documentation URL' })
+  docsUrl: string;
+
+  @ApiProperty({ description: 'Project home page URL' })
+  homePageUrl: string;
 }
 
 export class GetVersionDto {

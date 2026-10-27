@@ -1,10 +1,10 @@
 import { AgentModeToggle } from '@/components/ui/agent-mode-toggle';
 import LogoFrame from '@/components/ui/logo-frame';
 import ToolLogo from '@/components/ui/tool-logo';
-import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { cn } from '@/lib/utils';
 import { useToolsControllerGetManyTools } from '@/services/apis/gen/queries';
+import { Link } from '@tanstack/react-router';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Box } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -15,7 +15,7 @@ const VISIBLE_LOGOS = 5;
 const ROTATE_INTERVAL_MS = 1000;
 /** Steps the window rotates before settling on the "Connectors" label. */
 const ROTATION_STEPS = 10;
-/** Same query as the Connectors tab, so both share one cached request. */
+/** Same query as the Connectors page, so both share one cached request. */
 const AGENT_TOOLS_LIMIT = 100;
 
 /** "subfinder" → "Subfinder"; the rest of the name is kept as is. */
@@ -32,8 +32,8 @@ interface AgentToolsTrayProps {
 
 /**
  * Strip tucked under the prompt input: on the left the logos of the tools the
- * agent can use (built-in tools + agent connectors) — a button to the
- * Connectors tab of the agent settings — and the Agent mode toggle on the right.
+ * agent can use (built-in tools + agent connectors) — a link to the AI Studio
+ * Connectors page — and the Agent mode toggle on the right.
  * The logos rotate one step per second (1 2 3 4 5 → 2 3 4 5 6 → … → 7 1 2 3 4),
  * next to the name of the first one. After ROTATION_STEPS steps the rotation
  * stops and the button settles on a sky-blue Box icon + "Connectors", with one blink.
@@ -52,7 +52,6 @@ export function AgentToolsTray({
     { query: { enabled: Boolean(selectedWorkspaceId) } },
   );
   const tools = data?.data ?? [];
-  const { open: openSettings } = useAgentSettingsDialog();
   const reduceMotion = useReducedMotion();
 
   // Ever-increasing step: it keys the logos, so each step one logo leaves at
@@ -82,10 +81,9 @@ export function AgentToolsTray({
       )}
     >
       {first && (
-        <button
-          type="button"
+        <Link
+          to="/aistudio/connectors"
           aria-label="Agent tools"
-          onClick={() => openSettings('connectors')}
           className="relative flex min-w-0 items-center overflow-hidden rounded-md p-1 pr-2 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
         >
           {/* popLayout: the outgoing view leaves the flow at once, so the
@@ -173,7 +171,7 @@ export function AgentToolsTray({
               className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-foreground/15 to-transparent"
             />
           )}
-        </button>
+        </Link>
       )}
       {/* ml-auto keeps the toggle on the right even with no tools to show */}
       <div className="ml-auto">

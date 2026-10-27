@@ -11,6 +11,7 @@ import { ShieldAlert } from 'lucide-react';
 import type { RemoteExecuteStreamEvent } from '@/hooks/use-remote-execute-stream';
 import type { UIMessage } from 'ai';
 import { motion } from 'framer-motion';
+import type { StickToBottomContext } from 'use-stick-to-bottom';
 import {
   useCallback,
   useEffect,
@@ -54,10 +55,11 @@ interface ChatConversationProps {
   agentMode?: string;
   /** Inline permission prompt shown right above the input */
   approvalPrompt?: ReactNode;
-  onAgentModeChange?: (mode: string) => void;
   selectedWorkerId?: string | null;
   onWorkerSelect?: (workerId: string | null) => void;
   todos?: AgentTodoItem[];
+  /** Goal of the plan, pinned in the todo panel */
+  goal?: string | null;
   showTodoAboveInput?: boolean;
   selectedToolCallId?: string | null;
   remoteExecuteEvents?: Map<string, RemoteExecuteStreamEvent[]>;
@@ -86,10 +88,10 @@ export const ChatConversation = ({
   isLoadingMoreMessages = false,
   agentMode = 'false',
   approvalPrompt,
-  onAgentModeChange,
   selectedWorkerId,
   onWorkerSelect,
   todos,
+  goal,
   showTodoAboveInput = true,
   selectedToolCallId,
   remoteExecuteEvents,
@@ -171,11 +173,17 @@ export const ChatConversation = ({
     prevMessageCountRef.current = messages.length;
   }, [messages]);
 
+  const stickToBottomRef = useRef<StickToBottomContext>(null);
+
   // Scroll to tool call in conversation when selected from sidebar
   useEffect(() => {
     if (!selectedToolCallId) return;
     const el = document.getElementById(`tool-call-${selectedToolCallId}`);
     if (!el) return;
+
+    // Leave the stick-to-bottom lock first: a folded tool group opening
+    // around the call grows the chat, which would pull it back to the end
+    stickToBottomRef.current?.stopScroll();
 
     let scrollContainer: HTMLElement | null = el.parentElement;
     while (scrollContainer) {
@@ -190,9 +198,7 @@ export const ChatConversation = ({
       const relativeTop =
         elementRect.top - containerRect.top + scrollContainer.scrollTop;
       const targetScrollTop =
-        relativeTop -
-        scrollContainer.clientHeight / 2 +
-        el.offsetHeight / 2;
+        relativeTop - scrollContainer.clientHeight / 2 + el.offsetHeight / 2;
 
       scrollContainer.scrollTo({
         top: Math.max(0, targetScrollTop),
@@ -233,8 +239,10 @@ export const ChatConversation = ({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <Conversation className="flex-1">
-        <ConversationContent className="max-w-3xl mx-auto w-full p-1 gap-6">
+      <Conversation className="flex-1" contextRef={stickToBottomRef}>
+        {/* pt-16 starts the messages below the page's floating header,
+            which they scroll under */}
+        <ConversationContent className="max-w-3xl mx-auto w-full gap-7 px-1.5 pt-16 pb-6 sm:px-4">
           {isLoadingHistory ? (
             <LoadingSkeleton />
           ) : isEmpty ? (
@@ -244,9 +252,14 @@ export const ChatConversation = ({
               transition={{ duration: 0.4, ease: 'easeOut' }}
             >
               <ConversationEmptyState
-                icon={<ShieldAlert className="size-12" />}
+                icon={
+                  <div className="rounded-2xl bg-muted p-4 ring-1 ring-border">
+                    <ShieldAlert className="size-8" />
+                  </div>
+                }
                 title="Security AI ready"
                 description="Ask anything about vulnerabilities, secure coding, and best practices."
+                className="py-24"
               />
             </motion.div>
           ) : (
@@ -320,15 +333,23 @@ export const ChatConversation = ({
             />
           )}
         </ConversationContent>
-        <ConversationScrollButton />
+        {/* Messages fade out above the input rather than end on a hard edge */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-background to-transparent"
+        />
+        <ConversationScrollButton className="z-10 shadow-sm" />
       </Conversation>
 
-      <div className="shrink-0 bg-background/90 backdrop-blur-sm px-4 pb-4">
+      <div className="shrink-0 px-4 pb-4">
         <div className="max-w-3xl mx-auto w-full flex flex-col">
-          {showTodoAboveInput && todos && todos.length > 0 && (
+          {/* Starts folded on small screens: the input keeps the room */}
+          {showTodoAboveInput && ((todos && todos.length > 0) || goal) && (
             <AgentTodoPanel
               todos={todos}
-              className="rounded-b-none border-b-0 mx-2"
+              goal={goal}
+              defaultOpen={false}
+              className="rounded-b-none border-b-0 mx-3"
             />
           )}
 
@@ -350,7 +371,6 @@ export const ChatConversation = ({
               }
               onSelectModel={onSelectModel}
               agentMode={agentMode}
-              onAgentModeChange={onAgentModeChange}
               selectedWorkerId={selectedWorkerId}
               onWorkerSelect={onWorkerSelect}
               showSettingsButton={false}
@@ -359,6 +379,8 @@ export const ChatConversation = ({
                   ? 'Waiting for response…'
                   : 'Ask anything about security…'
               }
+              // Same rounder box and round send button as the landing input
+              className="[&_[data-slot=input-group]]:rounded-2xl [&_[data-slot=input-group]]:bg-card [&_[data-slot=input-group]]:shadow-sm [&_[data-slot=input-group]]:dark:bg-card [&_button[type=submit]]:rounded-full"
             />
           )}
         </div>

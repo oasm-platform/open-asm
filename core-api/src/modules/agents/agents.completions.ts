@@ -12,7 +12,7 @@ import type {
   ToolSet,
   UIMessageChunk,
 } from 'ai';
-import { isStepCount, streamText, toUIMessageStream } from 'ai';
+import { streamText, toUIMessageStream } from 'ai';
 import * as fs from 'fs';
 import * as Mustache from 'mustache';
 import { EventEmitter } from 'node:events';
@@ -50,6 +50,7 @@ import type { AgentTodoItem } from './agents.todo';
 import { formatTodosToPrompt } from './agents.todo';
 import { AgentTool } from './agents.tools';
 import { SendMessageDto } from './dto/message.dto';
+import type { AgentConfig } from './entities/agent-config.entity';
 import { AgentConversation } from './entities/agent-conversation.entity';
 import { AgentConversationTodo } from './entities/agent-conversation-todo.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
@@ -63,6 +64,7 @@ import {
   type TurnStats,
   updateConversationMetadata,
 } from './shared/conversation-metadata';
+import { DEFAULT_MAX_STEPS, stepLimit } from './shared/step-limit';
 import { TokenCounter } from './shared/token-counter';
 import {
   addSteps,
@@ -74,17 +76,21 @@ import {
 } from './shared/turn-stats';
 
 /**
- * Whether this run may plan. Only PLAN mode makes plans (`create`). After a
- * plan is approved the conversation runs in AUTO or MANUAL, which never plan,
- * but may still have to `finish` the steps that plan left; otherwise `off`.
+ * Whether this run may plan. PLAN mode makes plans the user approves
+ * (`create`). Agent mode otherwise keeps its own todo list (`track`): it must
+ * write a goal and steps before running any tool, without review. After a
+ * plan is approved, AUTO or MANUAL outside Agent mode never plan, but may
+ * still have to `finish` the steps that plan left; otherwise `off`.
  */
-export type PlanningState = 'create' | 'finish' | 'off';
+export type PlanningState = 'create' | 'track' | 'finish' | 'off';
 
 export function planningState(
   mode: AgentApprovalMode,
   todos: Pick<AgentTodoItem, 'status'>[],
+  agentMode?: AgentMode,
 ): PlanningState {
   if (mode === AgentApprovalMode.PLAN) return 'create';
+  if (agentMode === AgentMode.AGENT) return 'track';
   const unfinished = todos.some(
     (t) => t.status === 'pending' || t.status === 'in_progress',
   );
@@ -101,6 +107,14 @@ const PLAN_MODE_CONTEXT =
   'The user reviews and approves the plan (choosing whether it runs automatically or asks per command) before any other tool can run; ' +
   'tool calls made before that are refused. Put data gathering into the plan steps instead of doing it first. ' +
   'Only a question you can fully answer from general knowledge, with no tool at all, needs no plan.';
+
+const TRACK_PLAN_CONTEXT =
+  '# AGENT MODE: GOAL AND TODO FIRST (enforced by the system)\n' +
+  'Before any tool call that does work (workspace lookups, commands, connectors, subagents, MCP tools), ' +
+  'call formulate_plan with the goal of the request and the steps that reach it, then transition_step the first step to in_progress. ' +
+  'Tool calls made while no step is in progress are refused. Memory tools and load_skill work at any time. ' +
+  'The goal stays pinned above the plan until every step is completed or failed; check each step against it. ' +
+  'No user review: start step 1 right after formulate_plan. Use append_step for work you discover on the way, and scrap_plan if the user changes the task.';
 
 const FINISH_PLAN_CONTEXT =
   '# AN APPROVED PLAN IS UNFINISHED\n' +
@@ -127,6 +141,12 @@ interface StreamCreationParams {
    * already gave it its final state; resolves once that state is written
    */
   settle: (status: 'aborted' | 'error') => Promise<IterationOutcome>;
+  /**
+   * The finishReason of the model's last step once the run ended, or undefined
+   * if it was stopped/failed before a natural end. `'tool-calls'` means the step
+   * cap cut the model off while it still wanted to call tools.
+   */
+  getFinishReason: () => string | undefined;
 }
 
 /**
@@ -158,6 +178,12 @@ interface StreamTextOptions {
   approvalMode?: AgentApprovalMode;
   /** Whether this run may make (or must finish) a plan */
   planning?: PlanningState;
+  /**
+   * When the step cap is hit, force the model to summarize on the last step
+   * (default true). The continuation loop passes false for ongoing iterations
+   * so it can detect the cut-off and continue, and true only for the final one.
+   */
+  forceSummaryOnLimit?: boolean;
   /** Receives the token/timing stats of this streamText call (also on abort) */
   onStats?: (stats: StatsAccumulator) => void;
 }
@@ -166,10 +192,7 @@ interface StreamTextOptions {
 export type PartsStep = Pick<StepResult<ToolSet>, 'content'>;
 
 type ToolPartState =
-  | 'input-streaming'
-  | 'input-available'
-  | 'output-available'
-  | 'output-error';
+  'input-streaming' | 'input-available' | 'output-available' | 'output-error';
 
 /** One block of the step still streaming, in the order it arrived */
 export type LiveSegment =
@@ -339,6 +362,13 @@ export class AgentsCompletionsService {
     const controller = this.activeRuns.get(conversationId);
     if (!controller || controller.signal.aborted) return false;
     controller.abort();
+    // A user stop leaves no step running: reset the in_progress step back to
+    // pending so the todo list stops spinning (the live stream is closing, so
+    // the client reflects this optimistically / on its next load). Matches the
+    // error path, and lets a later message resume the step.
+    this.resetTodosOnError(conversationId).catch((err) =>
+      this.logger.error('Failed to reset todos on stop', err),
+    );
     return true;
   }
 
@@ -349,6 +379,13 @@ export class AgentsCompletionsService {
   isRunActive(conversationId: string): boolean {
     return this.activeRuns.has(conversationId);
   }
+
+  /** Conversations whose title is being generated */
+  private readonly titling = new Set<string>();
+  /** Conversations whose goal is being generated */
+  private readonly goaling = new Set<string>();
+  /** Compaction in progress by conversation id: a second trigger joins it */
+  private readonly compactions = new Map<string, Promise<void>>();
 
   private readonly prompts = new Map<string, string>();
   private static readonly PROMPTS_DIR = 'prompts';
@@ -527,7 +564,9 @@ export class AgentsCompletionsService {
     prompt: string,
     provider?: LLMProvider,
   ): Promise<string> {
-    const options = provider ? getReasoningProviderOptions(provider) : undefined;
+    const options = provider
+      ? getReasoningProviderOptions(provider)
+      : undefined;
     const result = streamText({
       model,
       messages: [{ role: 'user', content: prompt }],
@@ -537,18 +576,37 @@ export class AgentsCompletionsService {
     return (await result.text).trim();
   }
 
+  /**
+   * Titles the conversation once, while its title is still the placeholder
+   * (the first question) set at creation. A titled or renamed conversation
+   * keeps its title, so later turns and iterations cost no LLM call.
+   */
   private async generateTitle(
     conversationId: string,
     llmConfig: ResolvedLLMConfig,
   ): Promise<void> {
+    // Iterations of one run finish before the title is written
+    if (this.titling.has(conversationId)) return;
+    this.titling.add(conversationId);
     try {
-      const messages = await this.messageRepository.find({
-        where: { conversationId },
-        order: { createdAt: 'ASC' },
-        take: 2,
-      });
+      const [conversation, messages] = await Promise.all([
+        this.conversationRepository.findOne({
+          where: { id: conversationId },
+          select: ['id', 'title'],
+        }),
+        this.messageRepository.find({
+          where: { conversationId },
+          order: { createdAt: 'ASC' },
+          take: 2,
+          select: ['id', 'role', 'content'],
+        }),
+      ]);
 
       if (messages.length < 2) {
+        return;
+      }
+      const question = messages.find((m) => m.role === MessageRole.USER);
+      if (!question || conversation?.title !== question.content.slice(0, 500)) {
         return;
       }
 
@@ -581,6 +639,62 @@ export class AgentsCompletionsService {
       }
     } catch (error) {
       this.logger.error('Failed to generate title', error);
+    } finally {
+      this.titling.delete(conversationId);
+    }
+  }
+
+  /**
+   * Generates the goal of an Agent-mode turn from the user's question and
+   * streams it to the client right away (like the title), so the pinned goal
+   * appears before the agent has built its plan. Writes it to the
+   * conversation metadata, where the pinned-goal prompt and later turns read
+   * it; the agent's `formulate_plan` can still refine it. Fire-and-forget:
+   * never blocks the run, and only one generation per conversation at a time.
+   */
+  private async generateGoal(
+    conversationId: string,
+    llmConfig: ResolvedLLMConfig,
+    question: string,
+    emitter: EventEmitter,
+  ): Promise<void> {
+    if (this.goaling.has(conversationId)) return;
+    this.goaling.add(conversationId);
+    try {
+      const prompt = this.getPrompt('GOAL_GENERATE.md', {
+        QUESTION: question.slice(0, 2000),
+      });
+      const model = await this.createLanguageModel(
+        llmConfig,
+        llmConfig.workspaceId,
+      );
+      const text = await this.completeText(model, prompt, llmConfig.provider);
+      // One line, no stray quotes, bounded like the stored column
+      const goal = text
+        .split('\n')[0]
+        .trim()
+        .replace(/^["']|["']$/g, '')
+        .trim()
+        .slice(0, 500);
+      if (!goal) return;
+
+      // A plan the agent started meanwhile owns the goal: don't clobber it
+      const active = await this.todoRepository.exists({
+        where: { conversationId, status: 'in_progress' },
+      });
+      if (active) return;
+
+      await updateConversationMetadata(
+        this.conversationRepository.manager,
+        conversationId,
+        { goal },
+      );
+      const todos = await this.loadTodoItems(conversationId);
+      emitter.emit('todos-updated', todos, goal);
+    } catch (error) {
+      this.logger.error('Failed to generate goal', error);
+    } finally {
+      this.goaling.delete(conversationId);
     }
   }
 
@@ -605,23 +719,11 @@ export class AgentsCompletionsService {
           },
         },
       );
-      const allMessages = await this.messageRepository.find({
-        where: { conversationId },
-        order: { createdAt: 'ASC' },
-      });
-      if (allMessages.length >= 2) {
-        const hasCompletedAssistant = allMessages.some(
-          (msg) =>
-            msg.role === MessageRole.ASSISTANT &&
-            msg.metadata?.['status'] === 'completed',
-        );
-        if (hasCompletedAssistant) {
-          // Fire-and-forget: title generation should not block stream closure
-          this.generateTitle(conversationId, llmConfig).catch((err) =>
-            this.logger.error('Error generating title', err),
-          );
-        }
-      }
+      // An answer just completed. Fire-and-forget: title generation should
+      // not block stream closure, and it skips an already titled conversation
+      this.generateTitle(conversationId, llmConfig).catch((err) =>
+        this.logger.error('Error generating title', err),
+      );
     } catch (error) {
       this.logger.error('Failed to complete stream finish tasks', error);
     }
@@ -725,7 +827,7 @@ export class AgentsCompletionsService {
         model,
         messages: [{ role: 'user', content: prompt }],
         tools,
-        stopWhen: isStepCount(20),
+        ...stepLimit(20),
         ...(() => {
           const opts = getReasoningProviderOptions(llmConfig.provider);
           return opts ? { providerOptions: opts } : {};
@@ -871,6 +973,7 @@ export class AgentsCompletionsService {
     dto: SendMessageDto,
     workspaceId: string,
     userId: string,
+    loadedAgentConfig?: AgentConfig | null,
   ): Promise<ResolvedLLMConfig> {
     // Get the base config from the conversation
     let llmConfig = await this.llmConfigRepository.findOne({
@@ -894,7 +997,10 @@ export class AgentsCompletionsService {
     // If user changed model within the same provider, override in memory only
     // (Avoids writing to DB which would affect other conversations).
     // Otherwise the default connection runs the agent's default model.
-    const agentConfig = await this.agentsConfig.find(workspaceId, userId);
+    const agentConfig =
+      loadedAgentConfig !== undefined
+        ? loadedAgentConfig
+        : await this.agentsConfig.find(workspaceId, userId);
     const defaultRef = agentConfig?.modelsConfig.default;
     const model =
       dto.model && dto.provider === llmConfig.provider
@@ -1025,64 +1131,6 @@ export class AgentsCompletionsService {
   }
 
   /**
-   * Generates a comprehensive summary of the entire conversation after all
-   * continuation iterations complete. This provides a final overview of
-   * what was accomplished, key findings, and recommendations.
-   *
-   * @param conversationId - Current conversation ID
-   * @param llmConfig - LLM configuration for generation
-   */
-  private async generateEndOfConversationReport(
-    conversationId: string,
-    llmConfig: ResolvedLLMConfig,
-  ): Promise<void> {
-    try {
-      const messages = await this.messageRepository.find({
-        where: { conversationId },
-        order: { createdAt: 'ASC' },
-      });
-
-      if (messages.length < 2) {
-        return;
-      }
-
-      const conversationContent = messages
-        .map((msg) => `${msg.role}: ${msg.content}`)
-        .join('\n\n');
-
-      const prompt = this.getPrompt('SUMMARY_GENERATE.md', {
-        CONVERSATION_CONTENT: conversationContent,
-      });
-
-      const model = await this.createLanguageModel(
-        llmConfig,
-        llmConfig.workspaceId,
-      );
-
-      const cleanedSummary = await this.completeText(
-        model,
-        prompt,
-        llmConfig.provider,
-      );
-
-      if (cleanedSummary) {
-        await this.conversationRepository.update(
-          { id: conversationId },
-          { summary: cleanedSummary },
-        );
-        this.logger.log(
-          `[EndOfConversation] Report generated for ${conversationId}`,
-        );
-      }
-    } catch (error) {
-      this.logger.error(
-        `[EndOfConversation] Failed to generate report for ${conversationId}`,
-        error,
-      );
-    }
-  }
-
-  /**
    * Creates and saves a placeholder message for the assistant (streaming).
    * Marked with status='streaming' so the frontend knows chunks are incoming.
    */
@@ -1171,8 +1219,9 @@ export class AgentsCompletionsService {
   }
 
   /**
-   * Plan tools for this run: none when planning is off, and only the tools
-   * that finish or drop an approved plan when one is left over.
+   * Plan tools for this run: none when planning is off, all of them (without
+   * review) for Agent mode's own todo list, and only the tools that finish or
+   * drop an approved plan when one is left over.
    */
   private getPlanTools(
     planning: PlanningState,
@@ -1181,12 +1230,11 @@ export class AgentsCompletionsService {
     plan: { workspaceId: string; approval: ApprovalSettings },
   ): ToolSet {
     if (planning === 'off') return {};
-    const tools = this.agentTool.getTodoTools(
-      conversationId,
-      emitter,
-      plan,
-    ) as ToolSet;
-    if (planning === 'create') return tools;
+    const tools = this.agentTool.getTodoTools(conversationId, emitter, {
+      ...plan,
+      selfManaged: planning === 'track',
+    }) as ToolSet;
+    if (planning === 'create' || planning === 'track') return tools;
     return Object.fromEntries(
       Object.entries(tools).filter(([name]) => FINISH_PLAN_TOOLS.has(name)),
     );
@@ -1216,12 +1264,22 @@ export class AgentsCompletionsService {
    * - Workspace long-term memory (LTM)
    * - Conversation short-term memory (STM)
    * - Current todo list
+   *
+   * Parts that stay the same across turns come first and those that change
+   * per request (the time above all) last, so providers that cache the
+   * prompt prefix can reuse it.
    */
   private async buildSystemContext(
     conversation: AgentConversation,
     workspaceId: string,
     agentMode: AgentMode,
     userId?: string,
+    opts: {
+      /** Already loaded for this turn; fetched when left out */
+      agentConfig?: AgentConfig | null;
+      /** Skills and subagents prompts: fixed for the turn */
+      staticContext?: string;
+    } = {},
   ): Promise<string[]> {
     // Fetch prompt for the current mode (e.g. ASK.md, AGENT.md)
     const modePrompt = this.getPrompt(`${agentMode.toUpperCase()}.md`);
@@ -1238,24 +1296,34 @@ export class AgentsCompletionsService {
       userId
         ? this.agentsMemories.ltmFormatForPrompt(workspaceId, userId)
         : Promise.resolve(''),
-      userId
-        ? this.agentsConfig.find(workspaceId, userId)
-        : Promise.resolve(null),
+      opts.agentConfig !== undefined
+        ? Promise.resolve(opts.agentConfig)
+        : userId
+          ? this.agentsConfig.find(workspaceId, userId)
+          : Promise.resolve(null),
     ]);
     const userContext = formatUserInstructions(agentConfig);
 
     const todos = await this.loadTodoItems(conversation.id);
-    const planning = planningState(conversation.approvalMode, todos);
-    // AUTO and MANUAL never plan, so they get no plan prompt and no old plan.
-    // Plan mode applies in every agent mode: it overrides ASK.md's "answer
-    // directly", since the user explicitly asked to see a plan first
-    const todosContext = planning === 'off' ? '' : formatTodosToPrompt(todos);
+    const planning = planningState(conversation.approvalMode, todos, agentMode);
+    // AUTO and MANUAL outside Agent mode never plan, so they get no plan
+    // prompt and no old plan. Plan mode applies in every agent mode: it
+    // overrides ASK.md's "answer directly", since the user explicitly asked
+    // to see a plan first
+    const todosContext =
+      planning === 'off'
+        ? ''
+        : formatTodosToPrompt(todos, conversation.metadata?.goal);
     const planContext =
       planning === 'off'
         ? ''
         : [
             this.getPrompt('PLAN.md'),
-            planning === 'create' ? PLAN_MODE_CONTEXT : FINISH_PLAN_CONTEXT,
+            {
+              create: PLAN_MODE_CONTEXT,
+              track: TRACK_PLAN_CONTEXT,
+              finish: FINISH_PLAN_CONTEXT,
+            }[planning],
           ].join('\n\n');
 
     // Inject conversation summary if available (from auto-compaction)
@@ -1268,13 +1336,15 @@ export class AgentsCompletionsService {
       modePrompt,
       systemPrompt,
       userContext,
+      opts.staticContext,
       summaryContext,
-      currentTimeContext,
-      ltmContext,
+      // Memory off (the default): saved memories stay stored but out of the prompt
+      agentConfig?.memoryEnabled ? ltmContext : '',
       stmContext,
       todosContext,
       planContext,
-    ].filter(Boolean);
+      currentTimeContext,
+    ].filter((part): part is string => !!part);
   }
 
   /**
@@ -1378,19 +1448,41 @@ export class AgentsCompletionsService {
 
   /**
    * Generates a summary of the conversation history and saves it to the
-   * conversation's `summary` field. Runs asynchronously after stream completion.
+   * conversation's `summary` field. A compaction already running for the
+   * conversation (post-stream and mid-loop can both trigger one) is joined
+   * rather than started again.
    */
-  private async compactConversation(
+  private compactConversation(
+    conversationId: string,
+    llmConfig: ResolvedLLMConfig,
+  ): Promise<void> {
+    const running = this.compactions.get(conversationId);
+    if (running) return running;
+    const job = this.runCompaction(conversationId, llmConfig).finally(() =>
+      this.compactions.delete(conversationId),
+    );
+    this.compactions.set(conversationId, job);
+    return job;
+  }
+
+  private async runCompaction(
     conversationId: string,
     llmConfig: ResolvedLLMConfig,
   ): Promise<void> {
     try {
-      // Fetch recent messages for summarization
-      const messages = await this.messageRepository.find({
-        where: { conversationId },
-        order: { createdAt: 'DESC' } as const,
-        take: 20,
-      });
+      // Fetch recent messages for summarization, and the summary they extend
+      const [messages, conversation] = await Promise.all([
+        this.messageRepository.find({
+          where: { conversationId },
+          order: { createdAt: 'DESC' } as const,
+          take: 20,
+          select: ['id', 'role', 'content'],
+        }),
+        this.conversationRepository.findOne({
+          where: { id: conversationId },
+          select: ['id', 'summary'],
+        }),
+      ]);
 
       if (messages.length < 2) {
         return; // Not enough messages to summarize
@@ -1402,9 +1494,11 @@ export class AgentsCompletionsService {
         .map((msg) => `${msg.role}: ${msg.content}`)
         .join('\n\n');
 
-      // Get the summarization prompt
+      // Get the summarization prompt. The previous summary is merged in, so
+      // what it covered is not lost when older messages leave the window
       const prompt = this.getPrompt('SUMMARY_GENERATE.md', {
         CONVERSATION_CONTENT: conversationContent,
+        PREVIOUS_SUMMARY: conversation?.summary ?? '',
       });
 
       // Create a model instance for summarization
@@ -1541,6 +1635,9 @@ export class AgentsCompletionsService {
     let finalWrite: Promise<void> | undefined;
     // Token stats are reported once, by whichever path ends the iteration
     let statsReported = false;
+    // Set by onEnd: lets the continuation loop tell a natural finish from a
+    // step-cap cut-off ('tool-calls'), so it can keep going when work remains
+    let lastFinishReason: string | undefined;
     /** Saves the answer so far as stopped or failed: unfinished tools end as errors */
     const saveStopped = async (status: 'aborted' | 'error'): Promise<void> => {
       for (const segment of live.segments) {
@@ -1611,6 +1708,7 @@ export class AgentsCompletionsService {
           await this.settleStreamingMessage(assistantMessageId, status);
           return 'none';
         },
+        getFinishReason: () => undefined,
       };
     }
 
@@ -1667,7 +1765,9 @@ export class AgentsCompletionsService {
       ...(tools
         ? {
             tools,
-            stopWhen: isStepCount(llmConfig.maxSteps ?? 20),
+            ...stepLimit(llmConfig.maxSteps ?? DEFAULT_MAX_STEPS, {
+              forceSummary: options.forceSummaryOnLimit ?? true,
+            }),
           }
         : {}),
       // Enable reasoning/thinking via provider-specific options
@@ -1793,6 +1893,7 @@ export class AgentsCompletionsService {
       // auto-complete stuck todos, and trigger compaction check
       onEnd: (event) => {
         const isAborted = () => abortSignal?.aborted ?? false;
+        lastFinishReason = event.finishReason;
 
         this.logger.log(
           `[Agent] Stream ${conversationId} finished: ` +
@@ -1945,6 +2046,7 @@ export class AgentsCompletionsService {
         await writeStopped(status);
         return completedSteps.length > 0 ? 'partial' : 'none';
       },
+      getFinishReason: () => lastFinishReason,
     };
   }
 
@@ -1959,7 +2061,6 @@ export class AgentsCompletionsService {
    * The loop uses budget-based termination:
    * - Continues while there are pending/in_progress todos AND context budget allows
    * - Triggers mid-loop compaction when token budget is exceeded
-   * - Generates a comprehensive end-of-conversation report when done
    * - Safety net of 50 iterations prevents infinite loops
    *
    * Each iteration creates its own assistant message in DB.
@@ -1969,6 +2070,8 @@ export class AgentsCompletionsService {
     options: StreamTextOptions & {
       workspaceId: string;
       userId?: string;
+      /** The user's agent config, loaded once for the turn */
+      agentConfig?: AgentConfig | null;
       skillsContext?: string;
       /** Subagent results injected into the first prompt (released if it fails) */
       deliveredSubagentIds?: string[];
@@ -2011,22 +2114,20 @@ export class AgentsCompletionsService {
     const rebuildContext = async (
       conversation: AgentConversation,
     ): Promise<string[]> => {
-      const parts = await this.buildSystemContext(
+      return this.buildSystemContext(
         conversation,
         workspaceId,
         agentMode || AgentMode.ASK,
         userId,
+        { agentConfig: options.agentConfig, staticContext: skillsContext },
       );
-      if (skillsContext) parts.push(skillsContext);
-      return parts;
     };
 
     let currentModelMessages = [...options.modelMessages];
     let currentAssistantMessageId = options.assistantMessageId;
     // Settles the iteration in progress if the loop ends inside it
     let settleIteration:
-      | ((status: 'aborted' | 'error') => Promise<IterationOutcome>)
-      | undefined;
+      ((status: 'aborted' | 'error') => Promise<IterationOutcome>) | undefined;
     let currentAssistantMetadata = options.assistantMessageMetadata;
     let currentContextParts = [...options.contextParts];
 
@@ -2132,11 +2233,18 @@ export class AgentsCompletionsService {
       }
 
       // Subscribe to todos-updated events from the initial emitter
-      const onTodosUpdated = (updatedTodos: AgentTodoItem[]) => {
+      // The goal rides along only when the plan tools changed it
+      const onTodosUpdated = (
+        updatedTodos: AgentTodoItem[],
+        goal?: string | null,
+      ) => {
         if (controllerClosed) return;
         controller.enqueue({
           type: 'data-todos-updated',
-          data: { todos: updatedTodos },
+          data:
+            goal === undefined
+              ? { todos: updatedTodos }
+              : { todos: updatedTodos, goal },
         } as unknown as UIMessageChunk);
       };
       todosEmitter.on('todos-updated', onTodosUpdated);
@@ -2159,6 +2267,22 @@ export class AgentsCompletionsService {
         } as unknown as UIMessageChunk);
       };
       todosEmitter.on('remote-execute-output', onRemoteExecuteOutput);
+
+      // The page after each browser command, for the live Browser panel.
+      // Transient: never part of the saved message.
+      const onBrowserScreenshot = (data: {
+        toolCallId: string;
+        command: string;
+        image: string;
+      }) => {
+        if (controllerClosed) return;
+        controller.enqueue({
+          type: 'data-browser-screenshot',
+          data,
+          transient: true,
+        } as unknown as UIMessageChunk);
+      };
+      todosEmitter.on('browser-screenshot', onBrowserScreenshot);
 
       // Subscribe to approval-required events (human-in-the-loop dialog)
       const onApprovalRequired = (data: ApprovalRequestEvent) => {
@@ -2256,25 +2380,33 @@ export class AgentsCompletionsService {
             }
           }
 
+          // Set once the iteration ends: true when the step cap cut the model
+          // off while it still wanted tools, so the loop continues the work.
+          let hitStepLimit = false;
           try {
             // Execute a single streamText iteration
-            const { aiStream, finishPromise, settle } = this.executeStreamText({
-              llmConfig,
-              model,
-              modelMessages: currentModelMessages,
-              contextParts: currentContextParts,
-              assistantMessageId: currentAssistantMessageId,
-              conversationId,
-              assistantMessageMetadata: currentAssistantMetadata,
-              tools: options.tools,
-              todosEmitter,
-              abortSignal,
-              agentMode,
-              approvalMode: options.approvalMode,
-              onStats: (stats) => {
-                turnAcc = mergeStats(turnAcc, stats);
-              },
-            });
+            const { aiStream, finishPromise, settle, getFinishReason } =
+              this.executeStreamText({
+                llmConfig,
+                model,
+                modelMessages: currentModelMessages,
+                contextParts: currentContextParts,
+                assistantMessageId: currentAssistantMessageId,
+                conversationId,
+                assistantMessageMetadata: currentAssistantMetadata,
+                tools: options.tools,
+                todosEmitter,
+                abortSignal,
+                agentMode,
+                approvalMode: options.approvalMode,
+                // Let an ongoing iteration be cut off cleanly so the loop can
+                // continue; force a wrap-up only on the last allowed pass.
+                forceSummaryOnLimit:
+                  !continuesPlan || iteration === MAX_SAFETY_ITERATIONS - 1,
+                onStats: (stats) => {
+                  turnAcc = mergeStats(turnAcc, stats);
+                },
+              });
             settleIteration = settle;
 
             // Pump chunks from this iteration's stream
@@ -2309,6 +2441,7 @@ export class AgentsCompletionsService {
               // their tools again, so keep the partial answer and stop
               if (outcome === 'partial') break;
             }
+            hitStepLimit = getFinishReason() === 'tool-calls';
             consecutiveErrors = 0;
           } catch (iterationError) {
             this.logger.error(
@@ -2354,9 +2487,21 @@ export class AgentsCompletionsService {
           let newResults: string | undefined;
           if (pendingSteps.length === 0) {
             const delivered = await awaitSubagents();
-            if (!delivered) break;
-            newResults = delivered.message;
-            pendingDeliveryIds = delivered.ids;
+            if (delivered) {
+              newResults = delivered.message;
+              pendingDeliveryIds = delivered.ids;
+            } else if (continuesPlan && hitStepLimit) {
+              // The step cap cut the model off mid-work and there is no pending
+              // plan step to drive a follow-up: tell it to carry on so the task
+              // actually finishes. Bounded by MAX_SAFETY_ITERATIONS, mid-loop
+              // compaction, and the forced summary on the final pass.
+              followUp =
+                'You stopped at the step limit while still working, not because the task was done. ' +
+                'Continue from where you left off. When everything is complete, give the final result; ' +
+                'if you truly cannot finish, say what remains and why.';
+            } else {
+              break;
+            }
           } else {
             // Stop when the plan stops moving: the model is waiting on the
             // user, keeps failing, or ignores the plan. Without this a stuck
@@ -2388,11 +2533,10 @@ export class AgentsCompletionsService {
                 .join('\n');
               followUp =
                 `Continue executing the pending plan steps. Here are the remaining steps:\n${pendingList}\n\n` +
-                'Start with the FIRST pending step. Do NOT create new steps. Do NOT skip steps. Execute them in order until all are done.';
+                'Start with the FIRST pending step. Do NOT create new steps. Do NOT skip steps. Execute them in order until all are done, keeping every step aimed at the PINNED GOAL in your context.';
               // Hand back subagents that finished meanwhile, without waiting
-              const ready = await this.subagents.takeUndelivered(
-                conversationId,
-              );
+              const ready =
+                await this.subagents.takeUndelivered(conversationId);
               if (ready.length > 0) {
                 newResults = this.subagents.formatResultsMessage(ready);
                 pendingDeliveryIds = ready.map((r) => r.id);
@@ -2419,8 +2563,7 @@ export class AgentsCompletionsService {
             !!conversation?.summary,
             contextWindow,
           );
-          currentModelMessages =
-            this.mapHistoryToModelMessages(prunedMessages);
+          currentModelMessages = this.mapHistoryToModelMessages(prunedMessages);
           currentModelMessages.push({
             role: 'user' as const,
             content: [...deliveredResults, newResults, followUp]
@@ -2463,6 +2606,7 @@ export class AgentsCompletionsService {
         }
         todosEmitter.off('todos-updated', onTodosUpdated);
         todosEmitter.off('remote-execute-output', onRemoteExecuteOutput);
+        todosEmitter.off('browser-screenshot', onBrowserScreenshot);
         todosEmitter.off('approval-required', onApprovalRequired);
         todosEmitter.off('approval-resolved', onApprovalResolved);
         todosEmitter.off('approval-mode-changed', onApprovalModeChanged);
@@ -2476,17 +2620,6 @@ export class AgentsCompletionsService {
         if (continuesPlan && !abortSignal?.aborted) {
           this.autoCompleteStuckTodos(conversationId).catch((err) =>
             this.logger.error('Error in autoCompleteStuckTodos', err),
-          );
-
-          // Fire-and-forget: report generation should not block stream closure
-          this.generateEndOfConversationReport(
-            conversationId,
-            llmConfig,
-          ).catch((err) =>
-            this.logger.error(
-              'Error in generateEndOfConversationReport',
-              err,
-            ),
           );
         }
       }
@@ -2574,12 +2707,13 @@ export class AgentsCompletionsService {
     // Step 2: Save the user's message to DB
     await this.saveUserMessage(conversation.id, dto.question);
 
-    // Step 3: Fetch conversation history
+    // Step 3: Fetch conversation history, and the user's agent config (read
+    // once for the whole turn)
     // When summary exists, only recent messages needed (old context is in summary)
-    const historyMessages = await this.getConversationHistory(
-      conversation.id,
-      !!conversation.summary,
-    );
+    const [historyMessages, agentConfig] = await Promise.all([
+      this.getConversationHistory(conversation.id, !!conversation.summary),
+      this.agentsConfig.find(workspaceId, userId),
+    ]);
 
     // Step 4: Resolve the final LLM config with user overrides
     const llmConfig = await this.resolveLLMConfigWithOverrides(
@@ -2587,6 +2721,7 @@ export class AgentsCompletionsService {
       dto,
       workspaceId,
       userId,
+      agentConfig,
     );
 
     // Show the model and its context window right away (before the turn ends)
@@ -2626,53 +2761,61 @@ export class AgentsCompletionsService {
     // Step 8: Determine agent mode (a new conversation got the user's default)
     const agentMode = dto.agentMode || conversation.agentMode || AgentMode.ASK;
 
-    // Step 9: Create a placeholder message for the assistant (marks streaming)
+    // Step 9: Independent inputs of the run, loaded concurrently: skills,
+    // background subagents the agent can delegate to, the plan and the
+    // external MCP tools
+    const [skillsPrompt, subagentsPrompt, todoItems, mcpTools] =
+      await Promise.all([
+        this.agentsSkillsService.buildSkillsPrompt(workspaceId),
+        this.getSubagentsPrompt(agentMode, workspaceId, userId),
+        this.loadTodoItems(conversation.id),
+        this.agentsMcpService.getTools(workspaceId),
+      ]);
+    const loadSkillTool = skillsPrompt
+      ? this.agentsSkillsService.createLoadSkillTool(workspaceId)
+      : undefined;
+    // Fixed for the whole turn: rebuildContext re-adds it between iterations
+    const skillsContext =
+      [skillsPrompt, subagentsPrompt].filter(Boolean).join('\n\n') || undefined;
+
+    // Step 10: Create a placeholder message for the assistant (marks streaming)
     const assistantMessage = await this.saveAssistantMessage(
       conversation.id,
       llmConfig,
     );
 
-    // Step 10: Build the system context
+    // Step 10.5: Build the system context
     const contextParts = await this.buildSystemContext(
       conversation,
       workspaceId,
       agentMode,
       userId,
+      { agentConfig, staticContext: skillsContext },
     );
-
-    // Step 10.5: Add skills context and loadSkill tool
-    let skillsContext: string | undefined;
-    const skillsPrompt =
-      await this.agentsSkillsService.buildSkillsPrompt(workspaceId);
-    let loadSkillTool:
-      ReturnType<AgentsSkillsService['createLoadSkillTool']> | undefined;
-    if (skillsPrompt) {
-      contextParts.push(skillsPrompt);
-      skillsContext = skillsPrompt;
-      loadSkillTool = this.agentsSkillsService.createLoadSkillTool(workspaceId);
-    }
-
-    // Step 10.6: Background subagents the agent can delegate to
-    const subagentsPrompt = await this.getSubagentsPrompt(
-      agentMode,
-      workspaceId,
-      userId,
-    );
-    if (subagentsPrompt) {
-      contextParts.push(subagentsPrompt);
-      // rebuildContext only re-adds skillsContext between iterations
-      skillsContext = [skillsContext, subagentsPrompt]
-        .filter(Boolean)
-        .join('\n\n');
-    }
 
     // Step 11: Create a shared event emitter for broadcasting todo updates to the stream
     const todosEmitter = new EventEmitter();
 
     const planning = planningState(
       conversation.approvalMode,
-      await this.loadTodoItems(conversation.id),
+      todoItems,
+      agentMode,
     );
+
+    // Agent mode: derive this objective's goal from the question and stream it
+    // to the UI right away (like the title), unless a plan is still running.
+    // Fire-and-forget; the agent's formulate_plan may refine it afterwards.
+    const hasActivePlan = todoItems.some(
+      (t) => t.status === 'pending' || t.status === 'in_progress',
+    );
+    if (agentMode === AgentMode.AGENT && !hasActivePlan) {
+      void this.generateGoal(
+        conversation.id,
+        llmConfig,
+        dto.question,
+        todosEmitter,
+      );
+    }
 
     // Shared by every tool of this run: approving a plan switches its mode
     const approval: ApprovalSettings = {
@@ -2680,10 +2823,17 @@ export class AgentsCompletionsService {
       mode: conversation.approvalMode,
       // In PLAN mode nothing runs before the user has seen and approved a plan
       planFirst: true,
+      // In Agent mode nothing runs before the agent has started its todo list
+      ...(planning === 'track' && {
+        needsTodo: async () =>
+          !(await this.todoRepository.exists({
+            where: { conversationId: conversation.id, status: 'in_progress' },
+          })),
+      }),
     };
 
     const externalMcpTools = this.agentTool.wrapExternalToolsWithApproval(
-      (await this.agentsMcpService.getTools(workspaceId)) as ToolSet,
+      mcpTools as ToolSet,
       workspaceId,
       conversation.id,
       approval,
@@ -2726,10 +2876,7 @@ export class AgentsCompletionsService {
     };
 
     // Step 12: Build the combined stream with auto-continuation
-    const enabledTools = withoutDisabledTools(
-      tools,
-      await this.agentsConfig.find(workspaceId, userId),
-    );
+    const enabledTools = withoutDisabledTools(tools, agentConfig);
     const toolSetArg: ToolSet | undefined =
       Object.keys(enabledTools).length > 0 ? enabledTools : undefined;
 
@@ -2768,6 +2915,7 @@ export class AgentsCompletionsService {
       planning,
       workspaceId,
       userId,
+      agentConfig,
       skillsContext,
       deliveredSubagentIds: undelivered.map((r) => r.id),
       deliveredSubagentResults: deliveredResults,

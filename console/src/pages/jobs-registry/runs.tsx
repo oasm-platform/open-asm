@@ -26,6 +26,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import ToolLogo from '@/components/ui/tool-logo';
 import RunWorkflowGraph from './components/run-workflow-graph';
+import { useBugReportUrl } from '@/hooks/use-bug-report-url';
 import { usePermission } from '@/hooks/usePermission';
 import { useRunWorkflow } from '@/hooks/use-run-workflow';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
@@ -42,11 +43,13 @@ import {
   useJobsRegistryControllerGetJobHistoryDetail,
   useJobsRegistryControllerGetManyJobs,
 } from '@/services/apis/gen/queries';
+import type { BugReport } from '@/utils/bug-report-url';
 import { useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import {
   ArrowRight,
   Ban,
+  Bug,
   Calendar,
   ChevronRight,
   Clock,
@@ -104,6 +107,27 @@ const getTitle = (row: JobListItemDto) =>
 const stripTrailingNewline = (value: unknown) =>
   String(value ?? '').replace(/\n$/, '');
 
+/** Bug report prefill for a job's error logs. Leaves out the asset, command
+ * and config: they name the user's targets and may carry secrets. */
+const buildJobBugReport = (job: JobListItemDto): BugReport => {
+  const toolName = job.tool?.name || 'Unknown tool';
+  return {
+    title: `Bug: ${toolName} job failed`,
+    whatHappened: [
+      `The ${toolName} job reported errors.`,
+      '',
+      `Job ID: ${job.id}`,
+      `Category: ${job.category}`,
+      `Status: ${job.status}`,
+      `Retries: ${job.retryCount ?? 0}`,
+    ].join('\n'),
+    component: 'Job Management',
+    logs: job.errorLogs
+      .map((errorLog) => stripTrailingNewline(errorLog.logMessage))
+      .join('\n\n'),
+  };
+};
+
 function Field({
   label,
   children,
@@ -130,6 +154,9 @@ const JobDetailPanel = memo(function JobDetailPanel({
 }) {
   const duration = formatDuration(job);
   const hasConfig = !!job.config && Object.keys(job.config).length > 0;
+  const bugReportUrl = useBugReportUrl(
+    job.errorLogs?.length ? buildJobBugReport(job) : undefined,
+  );
 
   return (
     <div className="space-y-5 border-l-2 border-primary/40 bg-muted/30 px-4 py-4">
@@ -191,10 +218,24 @@ const JobDetailPanel = memo(function JobDetailPanel({
 
       {!!job.errorLogs?.length && (
         <div className="space-y-2">
-          <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-destructive">
-            <TriangleAlert className="h-3.5 w-3.5" />
-            Error logs ({job.errorLogs.length})
-          </span>
+          <div className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-destructive">
+              <TriangleAlert className="h-3.5 w-3.5" />
+              Error logs ({job.errorLogs.length})
+            </span>
+            {bugReportUrl && (
+              <Button asChild size="sm" variant="outline">
+                <a
+                  href={bugReportUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                >
+                  <Bug />
+                  Report bug
+                </a>
+              </Button>
+            )}
+          </div>
           {job.errorLogs.map((errorLog, index) => (
             <div
               key={errorLog.id ?? index}
@@ -521,7 +562,11 @@ export default function Runs() {
                 </SheetContent>
               </Sheet>
             </div>
-            <RunWorkflowGraph steps={steps} />
+            <RunWorkflowGraph
+              steps={steps}
+              trigger={jobHistoryDetail?.jobRunType}
+              startedAt={jobHistoryDetail?.createdAt}
+            />
           </CardContent>
         </Card>
       ) : (

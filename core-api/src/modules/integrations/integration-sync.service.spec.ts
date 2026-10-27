@@ -9,7 +9,7 @@ import type { DataAdapterService } from '@/modules/data-adapter/data-adapter.ser
 import type { WorkspacesService } from '@/modules/workspaces/workspaces.service';
 import type { AwsSsoService } from './connectors/aws/aws-sso.service';
 import type { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
-import type { RedisLockService } from '@/services/redis/distributed-lock.service';
+import { RedisLockService } from '@/services/redis/distributed-lock.service';
 import {
   decryptSensitiveConfigFields,
   encryptSensitiveConfigFields,
@@ -93,6 +93,9 @@ describe('IntegrationSyncService', () => {
             action(),
         ),
     };
+    jest
+      .spyOn(RedisLockService, 'current', 'get')
+      .mockReturnValue(redisLockServiceMock as unknown as RedisLockService);
 
     service = new IntegrationSyncService(
       queueMock as unknown as Queue,
@@ -103,7 +106,6 @@ describe('IntegrationSyncService', () => {
       workspacesServiceMock as unknown as WorkspacesService,
       awsSsoServiceMock,
       workspaceEncryptionMock as unknown as WorkspaceEncryptionService,
-      redisLockServiceMock as unknown as RedisLockService,
     );
   });
 
@@ -716,7 +718,6 @@ describe('IntegrationSyncService', () => {
       expect(names[5]).toBe('WorkspacesService');
       expect(names[6]).toBe('AwsSsoService');
       expect(names[7]).toBe('WorkspaceEncryptionService');
-      expect(names[8]).toBe('RedisLockService');
     });
 
     it('injects IntegrationsService via a forwardRef token (circular pair)', () => {

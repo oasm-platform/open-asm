@@ -99,8 +99,12 @@ describe('TriggerWorkflowService', () => {
   });
 
   /** Helper: invoke handler and flush microtasks so the void promise chain completes */
-  async function invokeHandler(event: string, payload: Target) {
-    capturedHandler(event, payload);
+  async function invokeHandler(
+    event: string,
+    payload: Target,
+    ...rest: unknown[]
+  ) {
+    capturedHandler(event, payload, ...rest);
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
 
@@ -124,6 +128,28 @@ describe('TriggerWorkflowService', () => {
         jobRunType: JobRunType.MANUAL,
         targetIds: ['target-uuid'],
       });
+    });
+
+    it('records a run as scheduled when the event says the schedule started it', async () => {
+      service.onModuleInit();
+      await invokeHandler('target.domain.re-scan', mockTarget, {
+        jobRunType: JobRunType.SCHEDULED,
+      });
+
+      expect(mockWorkflowRunner.startRun).toHaveBeenCalledWith(
+        expect.objectContaining({ jobRunType: JobRunType.SCHEDULED }),
+      );
+    });
+
+    it('treats any other third event argument as a manual run', async () => {
+      service.onModuleInit();
+      await invokeHandler('target.domain.re-scan', mockTarget, {
+        jobRunType: 'nightly',
+      });
+
+      expect(mockWorkflowRunner.startRun).toHaveBeenCalledWith(
+        expect.objectContaining({ jobRunType: JobRunType.MANUAL }),
+      );
     });
 
     it('does not start a run when no workflow matches the event', async () => {

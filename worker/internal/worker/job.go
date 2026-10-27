@@ -12,9 +12,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-rod/rod"
 	connectorpb "oasm-worker/internal/gen/connector"
 	pb "oasm-worker/internal/gen/jobs_registry"
+
+	"github.com/go-rod/rod"
 
 	"oasm-worker/internal/connector"
 	"oasm-worker/internal/execution"
@@ -81,6 +82,35 @@ func newDetachedCleanupContext() (context.Context, context.CancelFunc) {
 // healthPollInterval is how often the connector-job drain polls container
 // health. A var (not const) so tests can shrink it.
 var healthPollInterval = 5 * time.Second
+
+// poolWaitBudget is how long a job queued on a full container pool may wait
+// without the pool freeing a single slot before it is reported back to Core.
+const poolWaitBudget = 10 * time.Minute
+
+// poolWaitDeadline bounds a job's wait for a container slot by pool progress,
+// not total time: a fixed total budget equal to a connector's own timeout
+// (nuclei: 600s) failed every job queued behind one full-length scan (#717).
+// Each freed slot restarts the budget, so a draining queue of any depth keeps
+// waiting while a pool wedged for the whole budget still fails the job.
+type poolWaitDeadline struct {
+	budget time.Duration
+	until  time.Time
+	freed  uint64
+}
+
+func newPoolWaitDeadline(now time.Time, budget time.Duration) *poolWaitDeadline {
+	return &poolWaitDeadline{budget: budget, until: now.Add(budget)}
+}
+
+// expired reports whether the budget ran out, given the pool's current
+// freed-slot count. A changed count restarts the budget.
+func (d *poolWaitDeadline) expired(now time.Time, freed uint64) bool {
+	if freed != d.freed {
+		d.freed = freed
+		d.until = now.Add(d.budget)
+	}
+	return now.After(d.until)
+}
 
 // imageBackoffWaitBudget caps how long a single job waits out an image's
 // backoff window before failing once. A var (not const) so tests can shrink it.
@@ -607,14 +637,11 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 	// poolRetryDelay is how often a queued job re-asks for a container slot.
 	const poolRetryDelay = 2 * time.Second
 
-	// poolWaitBudget caps how long one job waits for a free container slot of its
-	// image before it is reported back to Core. Queue pressure is normal, but a slot
-	// held by a wedged container must not hold a worker concurrency slot forever.
-	// The deadline is armed once per job — re-arming it per submit attempt would
-	// double the real bound (attempt 0 could burn the whole budget, then attempt 1
-	// would start a fresh one).
-	var poolWaitBudget = 10 * time.Minute
-	poolWaitUntil := time.Now().Add(poolWaitBudget)
+	// The pool wait deadline is armed once per job — re-arming it per submit
+	// attempt would double the real bound (attempt 0 could burn the whole
+	// budget, then attempt 1 would start a fresh one). It restarts only when the
+	// pool frees a slot (see poolWaitDeadline).
+	poolWait := newPoolWaitDeadline(time.Now(), poolWaitBudget)
 
 	// The ExecuteJob payload is identical across retries, so build it once.
 	inputs := make(map[string]string, len(spec.Inputs))
@@ -644,14 +671,22 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 	for attempt := 0; attempt < 2; attempt++ {
 		execID, err = mgr.Submit(ctx, spec)
 		for err != nil && errors.Is(err, execution.ErrPoolExhausted) {
-			if time.Now().After(poolWaitUntil) {
+			// A per-image cap drains only when this image frees a slot; the node
+			// budget drains when any image does.
+			imageFreed, nodeFreed := mgr.FreedSlots(spec)
+			freed := imageFreed
+			if errors.Is(err, execution.ErrNodeBudgetExhausted) {
+				freed = nodeFreed
+			}
+			if poolWait.expired(time.Now(), freed) {
 				// Local scheduling gave up on this job: report it so Core can
 				// requeue it, and leave the image alone (a full pool is not an
 				// image defect).
 				msg := fmt.Sprintf(
-					"Submit failed: no free container slot for %s after %s",
+					"Submit failed: no free container slot for %s: none freed in %s (%v)",
 					spec.Image,
 					poolWaitBudget,
+					err,
 				)
 				log.ErrorE(fmt.Sprintf("[%s] %s", job.Id, msg), err)
 				Emit(events, TuiEvent{

@@ -23,6 +23,9 @@ vi.mock('@/hooks/use-live-events', () => ({
 }));
 
 vi.mock('@/services/apis/gen/queries', () => ({
+  useRootControllerGetMetadata: vi.fn(() => ({
+    data: { homePageUrl: 'https://oasm.dev' },
+  })),
   workersControllerCreateJoinKey: vi.fn(),
   workersControllerRotateJoinKey: vi.fn(),
   workersControllerRevokeJoinKey: vi.fn(),
@@ -53,6 +56,14 @@ const joinKey = (id: string, apiKey: string, expiresInSeconds = 300) => ({
   expiresInSeconds,
   expiresAt: new Date(Date.now() + expiresInSeconds * 1000).toISOString(),
 });
+
+// The command masks the key as <api_key>; reveal it, then wait for it.
+const revealKey = async (key: RegExp) => {
+  fireEvent.click(
+    await screen.findByRole('button', { name: /show sensitive values/i }),
+  );
+  return screen.findByText(key);
+};
 
 describe('ConnectWorkerDialog', () => {
   const mockCloseDialog = vi.fn();
@@ -93,9 +104,10 @@ describe('ConnectWorkerDialog', () => {
     setOpen(true);
     renderWithProviders(<ConnectWorkerDialog />);
 
-    await waitFor(() => {
-      expect(screen.getByText(/test-api-key-123/)).toBeInTheDocument();
-    });
+    // The key is masked in the command until revealed.
+    await screen.findByText(/<api_key>/);
+    expect(screen.queryByText(/test-api-key-123/)).not.toBeInTheDocument();
+    await revealKey(/test-api-key-123/);
     expect(mockCreate).toHaveBeenCalledTimes(1);
     expect(screen.getByText(/expires in/i)).toBeInTheDocument();
     expect(screen.getByText(/0[45]:\d\d/)).toBeInTheDocument();
@@ -130,7 +142,7 @@ describe('ConnectWorkerDialog', () => {
   it('rotates the current key and shows the new one', async () => {
     setOpen(true);
     renderWithProviders(<ConnectWorkerDialog />);
-    await screen.findByText(/test-api-key-123/);
+    await revealKey(/test-api-key-123/);
 
     fireEvent.click(screen.getByRole('button', { name: /rotate api key/i }));
 
@@ -143,7 +155,7 @@ describe('ConnectWorkerDialog', () => {
     mockCreate.mockResolvedValue(joinKey('jk-1', 'short-lived-key', 1));
     setOpen(true);
     renderWithProviders(<ConnectWorkerDialog />);
-    await screen.findByText(/short-lived-key/);
+    await revealKey(/short-lived-key/);
 
     await waitFor(() => expect(mockRotate).toHaveBeenCalledWith('jk-1'), {
       timeout: 3000,
@@ -154,7 +166,7 @@ describe('ConnectWorkerDialog', () => {
   it('swaps the commands for the success check, then closes itself', async () => {
     setOpen(true);
     renderWithProviders(<ConnectWorkerDialog />);
-    await screen.findByText(/test-api-key-123/);
+    await revealKey(/test-api-key-123/);
 
     act(() => {
       liveHandler?.({ id: 'e1', type: 'worker.joined', joinKeyId: 'jk-1' });
@@ -178,7 +190,7 @@ describe('ConnectWorkerDialog', () => {
   it('also closes when a known worker resumes with its key (rejoined)', async () => {
     setOpen(true);
     renderWithProviders(<ConnectWorkerDialog />);
-    await screen.findByText(/test-api-key-123/);
+    await revealKey(/test-api-key-123/);
 
     act(() => {
       liveHandler?.({
@@ -202,7 +214,7 @@ describe('ConnectWorkerDialog', () => {
       closeDialog: mockCloseDialog,
     });
     renderWithProviders(<ConnectWorkerDialog />);
-    await screen.findByText(/test-api-key-123/);
+    await revealKey(/test-api-key-123/);
 
     act(() => {
       liveHandler?.({
@@ -221,7 +233,7 @@ describe('ConnectWorkerDialog', () => {
   it('ignores workers joined with another key', async () => {
     setOpen(true);
     renderWithProviders(<ConnectWorkerDialog />);
-    await screen.findByText(/test-api-key-123/);
+    await revealKey(/test-api-key-123/);
 
     act(() => {
       liveHandler?.({ id: 'e1', type: 'worker.joined', joinKeyId: 'jk-other' });
@@ -237,7 +249,7 @@ describe('ConnectWorkerDialog', () => {
   it('revokes the key when the dialog goes away', async () => {
     setOpen(true);
     const { unmount } = renderWithProviders(<ConnectWorkerDialog />);
-    await screen.findByText(/test-api-key-123/);
+    await revealKey(/test-api-key-123/);
 
     unmount();
 
@@ -247,7 +259,7 @@ describe('ConnectWorkerDialog', () => {
   it('does not revoke a key that a worker already consumed', async () => {
     setOpen(true);
     const { unmount } = renderWithProviders(<ConnectWorkerDialog />);
-    await screen.findByText(/test-api-key-123/);
+    await revealKey(/test-api-key-123/);
 
     act(() => {
       liveHandler?.({ id: 'e1', type: 'worker.joined', joinKeyId: 'jk-1' });

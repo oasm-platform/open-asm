@@ -6,7 +6,7 @@ import type { TargetsService } from '@/modules/targets/targets.service';
 import type { DataAdapterService } from '@/modules/data-adapter/data-adapter.service';
 import type { WorkspacesService } from '@/modules/workspaces/workspaces.service';
 import type { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
-import type { RedisLockService } from '@/services/redis/distributed-lock.service';
+import { RedisLockService } from '@/services/redis/distributed-lock.service';
 import { TargetSource } from '@/modules/targets/entities/target.entity';
 import {
   IntegrationSyncService,
@@ -151,6 +151,9 @@ describe('Vercel integration — mocked end-to-end through IntegrationSyncServic
             action(),
         ),
     };
+    jest
+      .spyOn(RedisLockService, 'current', 'get')
+      .mockReturnValue(redisLockServiceMock as unknown as RedisLockService);
 
     service = new IntegrationSyncService(
       queueMock as unknown as Queue,
@@ -163,7 +166,6 @@ describe('Vercel integration — mocked end-to-end through IntegrationSyncServic
       {
         getDEK: jest.fn().mockResolvedValue(Buffer.alloc(32, 1)),
       } as unknown as WorkspaceEncryptionService,
-      redisLockServiceMock as unknown as RedisLockService,
     );
   });
 

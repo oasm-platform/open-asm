@@ -15,6 +15,8 @@ export class AgentsMemoriesService {
   private readonly logger = new Logger(AgentsMemoriesService.name);
   private static readonly STM_PREFIX = 'agents:stm';
   private static readonly STM_TTL_SECONDS = 24 * 60 * 60; // 24 hours
+  /** Most LTM records put into the system prompt; ltm_read lists the rest */
+  private static readonly LTM_PROMPT_LIMIT = 50;
 
   constructor(
     private readonly redisService: RedisService,
@@ -104,11 +106,15 @@ export class AgentsMemoriesService {
   }
 
   /**
-   * Returns the LTM record for the user in a workspace, or null if none exists.
-   * Does NOT auto-create empty records — callers must use ltmSet to create.
+   * One LTM record of the user in a workspace, or null when there is none
+   * with that ID.
    */
-  async ltmGet(workspaceId: string, userId: string): Promise<AgentWorkspaceMemory | null> {
-    return this.ltmRepository.findOne({ where: { workspaceId, userId } });
+  async ltmGetById(
+    id: string,
+    workspaceId: string,
+    userId: string,
+  ): Promise<AgentWorkspaceMemory | null> {
+    return this.ltmRepository.findOne({ where: { id, workspaceId, userId } });
   }
 
   async ltmGetAll(workspaceId: string, userId: string): Promise<AgentWorkspaceMemory[]> {
@@ -141,36 +147,40 @@ export class AgentsMemoriesService {
   }
 
   /**
-   * Overwrites the LTM content for the user in a workspace.
-   * Rejects empty or whitespace-only content to prevent noise records.
+   * Saves a new LTM record for the user in a workspace: every memory is its
+   * own record. Rejects empty or whitespace-only content to prevent noise records.
    */
-  async ltmSet(
+  async ltmCreate(
     workspaceId: string,
     userId: string,
     content: string,
   ): Promise<AgentWorkspaceMemory> {
-    if (!content?.trim()) {
-      throw new Error('Cannot save empty content to long-term memory');
-    }
+    assertLtmContent(content);
+    return this.ltmRepository.save(
+      this.ltmRepository.create({ workspaceId, userId, content }),
+    );
+  }
 
-    let record = await this.ltmRepository.findOne({ where: { workspaceId, userId } });
+  /**
+   * Replaces the content of one LTM record of the user in a workspace.
+   */
+  async ltmUpdate(
+    id: string,
+    workspaceId: string,
+    userId: string,
+    content: string,
+  ): Promise<AgentWorkspaceMemory> {
+    assertLtmContent(content);
+    const record = await this.ltmGetById(id, workspaceId, userId);
     if (!record) {
-      record = this.ltmRepository.create({ workspaceId, userId, content });
-    } else {
-      record.content = content;
+      throw new NotFoundException('Memory record not found');
     }
+    record.content = content;
     return this.ltmRepository.save(record);
   }
 
   /**
-   * Clears the LTM content for the user in a workspace.
-   */
-  async ltmClear(workspaceId: string, userId: string): Promise<void> {
-    await this.ltmRepository.update({ workspaceId, userId }, { content: '' });
-  }
-
-  /**
-   * Deletes the LTM record for the user in a workspace.
+   * Deletes every LTM record of the user in a workspace.
    */
   async ltmDelete(workspaceId: string, userId: string): Promise<void> {
     await this.ltmRepository.delete({ workspaceId, userId });
@@ -180,7 +190,7 @@ export class AgentsMemoriesService {
    * Deletes a specific LTM record by ID if it belongs to the user in the workspace.
    */
   async ltmDeleteById(id: string, workspaceId: string, userId: string): Promise<void> {
-    const record = await this.ltmRepository.findOne({ where: { id, workspaceId, userId } });
+    const record = await this.ltmGetById(id, workspaceId, userId);
     if (!record) {
       throw new NotFoundException('Memory record not found');
     }
@@ -188,12 +198,31 @@ export class AgentsMemoriesService {
   }
 
   /**
-   * Returns LTM as a prompt context block.
-   * Returns empty string if content is empty.
+   * Returns LTM as a prompt context block: the most recently updated records,
+   * one bullet each. Returns empty string if there are none.
    */
   async ltmFormatForPrompt(workspaceId: string, userId: string): Promise<string> {
-    const record = await this.ltmRepository.findOne({ where: { workspaceId, userId } });
-    if (!record?.content?.trim()) return '';
-    return `[Long-Term Memory]\n${record.content}`;
+    const [records, total] = await this.ltmRepository.findAndCount({
+      where: { workspaceId, userId },
+      order: { updatedAt: 'DESC' },
+      take: AgentsMemoriesService.LTM_PROMPT_LIMIT,
+    });
+    const lines = records
+      .filter((r) => r.content?.trim())
+      .map((r) => `- ${r.content.trim().replace(/\n/g, '\n  ')}`);
+    if (lines.length === 0) return '';
+    const hidden = total - records.length;
+    if (hidden > 0) {
+      lines.push(
+        `(${hidden} older memories not shown here; ltm_read lists them all.)`,
+      );
+    }
+    return `[Long-Term Memory]\n${lines.join('\n')}`;
+  }
+}
+
+function assertLtmContent(content: string): void {
+  if (!content?.trim()) {
+    throw new Error('Cannot save empty content to long-term memory');
   }
 }

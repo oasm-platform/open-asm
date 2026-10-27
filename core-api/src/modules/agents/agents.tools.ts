@@ -12,12 +12,12 @@ import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.servi
 import { RemoteExecuteService } from '@/modules/remote-execute/remote-execute.service';
 import { StatisticService } from '@/modules/statistic/statistic.service';
 import { TargetsService } from '@/modules/targets/targets.service';
-import { RedisService } from '@/services/redis/redis.service';
 import { ToolConfigProfilesService } from '@/modules/tools/tool-config-profiles.service';
 import { ToolsService } from '@/modules/tools/tools.service';
 import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilities.service';
 import { RemoteExecuteSubscribeService } from '@/modules/workers/remote-execute-subscribe.service';
 import { WorkersService } from '@/modules/workers/workers.service';
+import { RedisService } from '@/services/redis/redis.service';
 
 import { AgentMode } from '@/common/enums/enum';
 import {
@@ -47,9 +47,9 @@ import {
   getTlsTool,
   getVulnerabilitiesTool,
   listAssetsInTargetTool,
+  listConnectorsTool,
   listIssuesTool,
   listJobsTool,
-  listToolsTool,
   listWorkersTool,
 } from './tools/workspace.tools';
 
@@ -71,7 +71,7 @@ const WORKSPACE_TOOLS: Record<
   retrieve_web_page: webFetchTool,
   enumerate_open_issues: listIssuesTool,
   inspect_issue: detailIssueTool,
-  display_available_tools: listToolsTool,
+  display_available_tools: listConnectorsTool,
   list_active_workers: listWorkersTool,
   review_jobs: listJobsTool,
 };
@@ -203,7 +203,7 @@ export class AgentTool {
   getTodoTools(
     conversationId: string,
     emitter?: EventEmitter,
-    plan?: { workspaceId: string; approval: ApprovalSettings },
+    plan?: Parameters<typeof planTools>[3],
   ): Record<string, ToolType> {
     return planTools(this.deps, conversationId, emitter, plan);
   }
@@ -253,10 +253,11 @@ export class AgentTool {
         emitter,
         approval,
       );
+      // Pages the long outputs of execute_remote_command and run_tool_connector
+      tools.read_tool_output = readToolOutputTool(deps, conversation);
       const runTool = runConnectorTool(deps, workspaceId, conversation);
       if (runTool) {
         tools.run_tool_connector = runTool;
-        tools.read_tool_output = readToolOutputTool(deps, conversation);
       }
     }
 

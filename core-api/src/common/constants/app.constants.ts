@@ -32,6 +32,12 @@ export const WORKER_TOKEN_HEADER = 'worker-token';
  */
 export const AGENT_SANDBOX_HEADER = 'x-agent-sandbox';
 /**
+ * gRPC metadata a worker sends on RemoteExecuteSubscribe ("1") when it
+ * understands REMOTE_EXECUTE_SUBSCRIBE_EVENT_PING. Only those workers get
+ * keepalive pings, so older ones never log an unknown event type.
+ */
+export const REMOTE_EXECUTE_KEEPALIVE_HEADER = 'x-remote-execute-keepalive';
+/**
  * Controller paths (under API_GLOBAL_PREFIX) that authenticate with
  * MCP_API_KEY_HEADER via McpGuard instead of a browser session.
  *
@@ -51,6 +57,9 @@ export const BOT_ID = '019b3ae4-189e-7dfe-b10e-20d847717733';
 export const BOT_EMAIL = 'bot@oasm.local';
 export const BOT_NAME = 'Cai';
 export const GITHUB_REPO = 'oasm-platform/open-asm';
+export const GIT_REPO_URL = `https://github.com/${GITHUB_REPO}`;
+export const DOCS_URL = 'https://docs.oasm.io';
+export const HOME_PAGE_URL = 'https://oasm.dev';
 export const DEFAULT_ENCRYPTION_KEY = 'OASM_DEFAULT_ENCRYPTION_KEY';
 
 // --- Jobs registry ---------------------------------------------------------

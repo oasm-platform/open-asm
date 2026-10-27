@@ -1,9 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import {
+  BarChart3,
   Bot,
   Loader2,
-  MessageSquare,
   MoreHorizontal,
   Pencil,
   Plug,
@@ -40,12 +40,14 @@ import {
   useAgentsControllerUpdateConversation,
 } from '@/services/apis/gen/queries';
 import { AppSidebar } from './menu-bar';
+import {
+  sidebarGroupLabelClassName,
+  sidebarItemClassName,
+  sidebarMenuClassName,
+} from './sidebar-styles';
 
 const CONVERSATION_PATH_PREFIX = '/aistudio/conversations/';
 const UNTITLED = 'New conversation';
-
-const itemClassName =
-  'h-8 rounded-lg text-[13px] font-medium hover:cursor-pointer data-[active=true]:bg-muted data-[active=true]:text-foreground data-[active=true]:font-semibold';
 
 interface ConversationItemProps {
   conversation: { id: string; title?: string | null };
@@ -88,8 +90,7 @@ function ConversationItem({
   if (editing) {
     return (
       <SidebarMenuItem>
-        <div className="flex h-8 items-center gap-2 px-2">
-          <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
+        <div className="flex h-9 items-center px-1">
           <SidebarInput
             ref={inputRef}
             aria-label="Conversation title"
@@ -110,13 +111,13 @@ function ConversationItem({
 
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton asChild isActive={isActive} className={itemClassName}>
+      <SidebarMenuButton asChild isActive={isActive} className={sidebarItemClassName}>
         <Link
           to="/aistudio/conversations/$conversationId"
           params={{ conversationId: conversation.id }}
           onClick={onOpen}
         >
-          <MessageSquare />
+          {/* No icon: the same one on every chat is noise; the title is the cue */}
           <span className="truncate">{title}</span>
         </Link>
       </SidebarMenuButton>
@@ -124,7 +125,8 @@ function ConversationItem({
         <DropdownMenuTrigger asChild>
           <SidebarMenuAction
             aria-label="Conversation actions"
-            className="text-muted-foreground hover:cursor-pointer peer-data-[size=default]/menu-button:top-2"
+            showOnHover
+            className="text-muted-foreground transition-opacity hover:cursor-pointer peer-data-[size=default]/menu-button:top-2"
           >
             <MoreHorizontal />
           </SidebarMenuAction>
@@ -247,18 +249,19 @@ export function AiStudioSidebar() {
     <AppSidebar
       groups={[]}
       primary={false}
-      title="AI Studio"
+      isBack={false}
+      title="OASM AI Studio"
       showSwitchWorkspace={false}
     >
       <SidebarGroup className="p-0">
         <SidebarGroupContent>
-          <SidebarMenu className="gap-px">
+          <SidebarMenu className={sidebarMenuClassName}>
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
                 isActive={pathname === '/aistudio' || pathname === '/aistudio/'}
                 tooltip="New Chat"
-                className={itemClassName}
+                className={sidebarItemClassName}
               >
                 <Link to="/aistudio" onClick={() => setOpenMobile(false)}>
                   <SquarePen />
@@ -271,7 +274,7 @@ export function AiStudioSidebar() {
                 asChild
                 isActive={pathname === '/aistudio/agents'}
                 tooltip="Agents"
-                className={itemClassName}
+                className={sidebarItemClassName}
               >
                 <Link to="/aistudio/agents" onClick={() => setOpenMobile(false)}>
                   <Bot />
@@ -281,21 +284,37 @@ export function AiStudioSidebar() {
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton
-                tooltip="Connectors"
-                className={itemClassName}
-                onClick={() => {
-                  setOpenMobile(false);
-                  openSettings('connectors');
-                }}
+                asChild
+                isActive={pathname === '/aistudio/usage'}
+                tooltip="Usage"
+                className={sidebarItemClassName}
               >
-                <Plug />
-                <span className="truncate">Connectors</span>
+                <Link to="/aistudio/usage" onClick={() => setOpenMobile(false)}>
+                  <BarChart3 />
+                  <span className="truncate">Usage</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={pathname === '/aistudio/connectors'}
+                tooltip="Connectors"
+                className={sidebarItemClassName}
+              >
+                <Link
+                  to="/aistudio/connectors"
+                  onClick={() => setOpenMobile(false)}
+                >
+                  <Plug />
+                  <span className="truncate">Connectors</span>
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton
                 tooltip="Settings"
-                className={itemClassName}
+                className={sidebarItemClassName}
                 onClick={() => {
                   setOpenMobile(false);
                   openSettings();
@@ -312,7 +331,7 @@ export function AiStudioSidebar() {
       <SidebarGroup className="p-0 group-data-[collapsible=icon]:hidden">
         <SidebarGroupContent>
           <div className="flex items-center justify-between pr-1">
-            <SidebarGroupLabel className="h-6 px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
+            <SidebarGroupLabel className={sidebarGroupLabelClassName}>
               Chats
             </SidebarGroupLabel>
             {conversations.length > 0 && (
@@ -344,14 +363,14 @@ export function AiStudioSidebar() {
               </DropdownMenu>
             )}
           </div>
-          <SidebarMenu className="gap-px">
+          <SidebarMenu className={sidebarMenuClassName}>
             {isLoading && (
               <div className="flex justify-center py-3">
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               </div>
             )}
             {!isLoading && conversations.length === 0 && (
-              <p className="px-2 py-1 text-xs text-muted-foreground">
+              <p className="px-2.5 py-1 text-xs text-muted-foreground">
                 No conversations yet
               </p>
             )}
@@ -372,7 +391,7 @@ export function AiStudioSidebar() {
                 <SidebarMenuButton
                   onClick={() => void fetchNextPage()}
                   disabled={isFetchingNextPage}
-                  className="h-8 justify-center text-xs text-muted-foreground hover:cursor-pointer"
+                  className="h-9 justify-center text-xs text-muted-foreground hover:cursor-pointer"
                 >
                   {isFetchingNextPage ? (
                     <Loader2 className="animate-spin" />

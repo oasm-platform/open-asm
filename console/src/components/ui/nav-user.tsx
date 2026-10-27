@@ -14,10 +14,17 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { authClient, markVoluntaryLogout } from '@/utils/authClient';
+import { useBugReportUrl } from '@/hooks/use-bug-report-url';
+import { isAdminUser } from '@/modules/admin/utils';
+import { useRootControllerGetMetadata } from '@/services/apis/gen/queries';
+import {
+  authClient,
+  markVoluntaryLogout,
+  type User,
+} from '@/utils/authClient';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { LogOut, Settings } from 'lucide-react';
+import { BookOpen, Bug, LogOut, Settings, ShieldUser } from 'lucide-react';
 
 interface NavUserProps {
   isOnlyAvatar?: boolean;
@@ -30,6 +37,8 @@ export function NavUser({ isOnlyAvatar = false, dropdownSide }: NavUserProps) {
   const { useSession, signOut } = authClient;
   const navigate = useNavigate();
   const { data: session } = useSession();
+  const { data: metadata } = useRootControllerGetMetadata();
+  const bugReportUrl = useBugReportUrl();
   const user = session?.user;
   if (!user) {
     return <></>;
@@ -107,7 +116,44 @@ export function NavUser({ isOnlyAvatar = false, dropdownSide }: NavUserProps) {
                 <Settings />
                 Settings
               </DropdownMenuItem>
+              {isAdminUser(user as User) && (
+                <DropdownMenuItem onClick={() => navigate({ to: '/admin' })}>
+                  <ShieldUser />
+                  Admin
+                </DropdownMenuItem>
+              )}
             </DropdownMenuGroup>
+            {(metadata?.docsUrl || bugReportUrl) && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  {metadata?.docsUrl && (
+                    <DropdownMenuItem asChild>
+                      <a
+                        href={metadata.docsUrl}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                      >
+                        <BookOpen />
+                        Docs
+                      </a>
+                    </DropdownMenuItem>
+                  )}
+                  {bugReportUrl && (
+                    <DropdownMenuItem asChild>
+                      <a
+                        href={bugReportUrl}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                      >
+                        <Bug />
+                        Report an issue
+                      </a>
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuGroup>
+              </>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>
               <LogOut />

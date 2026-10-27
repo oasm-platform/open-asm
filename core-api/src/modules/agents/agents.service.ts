@@ -36,6 +36,7 @@ import { AgentsModelsCatalogService } from './agents.models-catalog';
 import { AgentsSubagentsService } from './agents.subagents';
 import type {
   ConversationMetadataDto,
+  SubagentDetailResponseDto,
   SubagentResponseDto,
 } from './dto/conversation-stats.dto';
 import { AgentModeDto, GetAgentModesResponseDto } from './dto/agent-mode.dto';
@@ -543,6 +544,26 @@ export class AgentsService {
       throw new NotFoundException('Conversation not found');
     }
     return this.subagents.listForConversation(id);
+  }
+
+  async getConversationSubagent(
+    id: string,
+    subagentId: string,
+    workspaceId: string,
+    userId: string,
+  ): Promise<SubagentDetailResponseDto> {
+    const conversation = await this.conversationRepository.findOne({
+      where: { id, workspaceId, createdBy: userId },
+      select: ['id'],
+    });
+    if (!conversation) {
+      throw new NotFoundException('Conversation not found');
+    }
+    const detail = await this.subagents.getDetail(id, subagentId);
+    if (!detail) {
+      throw new NotFoundException('Subagent not found');
+    }
+    return detail;
   }
 
   async getConversations(

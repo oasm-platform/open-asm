@@ -41,9 +41,12 @@ class FakeRedis {
     this.subs.get(channel)!.add(cb);
   });
 
-  unsubscribe = jest.fn(async (channel: string) => {
-    this.subs.delete(channel);
-  });
+  unsubscribe = jest.fn(
+    async (channel: string, cb?: (c: string, m: string) => void) => {
+      if (cb) this.subs.get(channel)?.delete(cb);
+      else this.subs.delete(channel);
+    },
+  );
 
   hasSubscribers(channel: string): boolean {
     return (this.subs.get(channel)?.size ?? 0) > 0;
@@ -146,6 +149,54 @@ describe('AgentsStreamBufferService', () => {
     expect((await reader.read()).value).toBe('{"n":2}');
 
     // The run ends: the done marker closes the stream and unsubscribes
+    await service.finish('c1');
+    await tick();
+    expect((await reader.read()).done).toBe(true);
+    expect(redis.hasSubscribers('agent:stream:chan:c1')).toBe(false);
+  });
+
+  it('passes a live-only chunk to resumers without recording it', async () => {
+    const { redis, service } = build();
+    await service.append('c1', '{"n":1}');
+
+    const stream = await service.createResumeStream('c1', () => true);
+    const reader = stream!.getReader();
+    expect((await reader.read()).value).toBe('{"n":1}');
+
+    await service.publishLive('c1', '{"type":"data-browser-screenshot"}');
+    await service.append('c1', '{"n":2}');
+    await tick();
+    expect((await reader.read()).value).toBe(
+      '{"type":"data-browser-screenshot"}',
+    );
+    expect((await reader.read()).value).toBe('{"n":2}');
+
+    // Never replayed to a later resumer
+    expect(redis.entries.map((e) => e.fields.chunk)).toEqual([
+      '{"n":1}',
+      '{"n":2}',
+    ]);
+    await reader.cancel();
+  });
+
+  it('keeps tailing for one resumer when another of the run leaves', async () => {
+    // The client that left (a closed tab, or the one that switched away and
+    // came back) must not cut the live chunks of the one still reading
+    const { redis, service } = build();
+    await service.append('c1', '{"n":1}');
+
+    const left = await service.createResumeStream('c1', () => true);
+    const stays = await service.createResumeStream('c1', () => true);
+    const leftReader = left!.getReader();
+    const reader = stays!.getReader();
+    expect((await leftReader.read()).value).toBe('{"n":1}');
+    expect((await reader.read()).value).toBe('{"n":1}');
+
+    await leftReader.cancel();
+    await service.append('c1', '{"n":2}');
+    await tick();
+    expect((await reader.read()).value).toBe('{"n":2}');
+
     await service.finish('c1');
     await tick();
     expect((await reader.read()).done).toBe(true);

@@ -393,6 +393,35 @@ describe('DataAdapterService', () => {
       expect(result).toBeUndefined();
     });
 
+    it('stamps the run on the assets it inserts', async () => {
+      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+      mockQueryRunner.manager
+        .createQueryBuilder()
+        .execute.mockResolvedValueOnce({ identifiers: [] });
+      mockWorkspacesService.getWorkspaceIdByTargetId.mockResolvedValue(
+        'workspace-id',
+      );
+      mockWorkspacesService.getWorkspaceConfigValue.mockResolvedValue({
+        isAutoEnableAssetAfterDiscovered: true,
+      });
+
+      await service.subdomains({ data: mockAssets, job: mockJob });
+
+      const qb = mockQueryRunner.manager.createQueryBuilder();
+      expect(qb.values).toHaveBeenCalledWith([
+        expect.objectContaining({
+          value: 'sub1.example.com',
+          jobHistoryId: 'history-id',
+        }),
+        expect.objectContaining({
+          value: 'sub2.example.com',
+          jobHistoryId: 'history-id',
+        }),
+      ]);
+      // Re-found assets are ignored, so the first run is never overwritten.
+      expect(qb.orIgnore).toHaveBeenCalled();
+    });
+
     it('should rollback transaction on error', async () => {
       mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
       // No apex entry in the batch → the primary refresh update is skipped,
@@ -1400,6 +1429,25 @@ describe('DataAdapterService', () => {
           ports: mockPorts,
         }),
       );
+    });
+
+    it('stamps the run on new services without overwriting it on conflict', async () => {
+      mockDataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+      mockQueryRunner.manager
+        .createQueryBuilder()
+        .execute.mockResolvedValue(undefined);
+
+      await service.portsScanner({ data: [80, 443], job: mockJob });
+
+      const qb = mockQueryRunner.manager.createQueryBuilder();
+      expect(qb.values).toHaveBeenCalledWith([
+        expect.objectContaining({ port: 80, jobHistoryId: 'history-id' }),
+        expect.objectContaining({ port: 443, jobHistoryId: 'history-id' }),
+      ]);
+      expect(qb.orUpdate).toHaveBeenCalledWith({
+        conflict_target: ['assetId', 'port'],
+        overwrite: ['value'],
+      });
     });
 
     it('should rollback transaction on error', async () => {

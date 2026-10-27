@@ -16,7 +16,8 @@ import { toast } from 'sonner';
 import { GitOrgPicker } from './components/git-org-picker';
 
 const domainRegex = /^(?!:\/\/)([a-zA-Z0-9-_]+\.)+[a-zA-Z]{2,}$/;
-const cidr24Regex = /^(\d{1,3}\.){3}\d{1,3}\/24$/;
+// /24 (256 IPs) down to /32 — the widest range the API accepts.
+const cidrRegex = /^(\d{1,3}\.){3}\d{1,3}\/(2[4-9]|3[0-2])$/;
 const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
 
 const targetTypeColor: Record<string, string> = {
@@ -103,7 +104,7 @@ const validateDomains = (input: string): string | true => {
 };
 
 /**
- * Validate multiple CIDR /24 ranges
+ * Validate multiple CIDR ranges (/24 to /32)
  */
 const validateCidr = (input: string): string | true => {
   const targets = parseTargetsInput(input);
@@ -113,8 +114,8 @@ const validateCidr = (input: string): string | true => {
   }
 
   for (const target of targets) {
-    if (!cidr24Regex.test(target)) {
-      return `"${target}" is not a valid CIDR /24 range (e.g. 192.168.1.0/24).`;
+    if (!cidrRegex.test(target)) {
+      return `"${target}" is not a valid CIDR range from /24 to /32 (e.g. 203.0.113.0/24, 203.0.113.16/28).`;
     }
   }
 
@@ -227,7 +228,12 @@ export default function StartDiscovery() {
   }
 
   return (
-    <Page title="Start discovery" isShowButtonGoBack permission="target.write">
+    <Page
+      title="Start discovery"
+      description="Add a target and scan it to discover its assets"
+      isShowButtonGoBack
+      permission="target.write"
+    >
       <div className="max-w-4xl mx-auto py-6">
         <div className={`bg-card rounded-lg border ${targetTypeBg[targetType]} p-4`}>
           <div className="mb-6">
@@ -276,7 +282,7 @@ export default function StartDiscovery() {
                     className={targetTypeColor.CIDR}
                   />
                   <span className={`${targetType === 'CIDR' ? 'font-bold' : 'font-normal'} ${targetTypeColor.CIDR}`}>
-                    CIDR /24
+                    CIDR range
                   </span>
                 </Label>
                 <Label htmlFor="type-git-org" className="flex items-center gap-2 cursor-pointer">
@@ -306,7 +312,7 @@ export default function StartDiscovery() {
                     ? 'e.g. example.com, test.com, demo.org'
                     : targetType === 'IP'
                       ? 'e.g. 8.8.8.8, 1.1.1.1'
-                      : 'e.g. 203.0.113.0/24, 198.51.100.0/24'
+                      : 'e.g. 203.0.113.0/24, 198.51.100.16/28 (/24 to /32)'
                 }
                 autoComplete="off"
                 {...register('value', {

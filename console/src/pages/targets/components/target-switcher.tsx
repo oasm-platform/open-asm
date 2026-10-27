@@ -13,15 +13,18 @@ import {
   useTargetsControllerGetTargetsInWorkspace,
   type GetManyTargetResponseDto,
 } from '@/services/apis/gen/queries';
+import { TargetLogo } from './target-logo';
 
 interface TargetSwitcherProps {
   currentTargetId: string;
   currentTargetValue: string;
+  currentTargetLogo?: string | null;
 }
 
 export function TargetSwitcher({
   currentTargetId,
   currentTargetValue,
+  currentTargetLogo,
 }: TargetSwitcherProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -69,9 +72,10 @@ export function TargetSwitcher({
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <button
-          className="flex items-center gap-1.5 rounded-md px-1 py-0.5 hover:bg-accent transition-colors"
+          className="flex items-center gap-2 rounded-md px-1 py-0.5 hover:bg-accent transition-colors"
           aria-label="Switch target"
         >
+          <TargetLogo url={currentTargetLogo} className="size-7" />
           <span className="truncate max-w-[300px]">{currentTargetValue}</span>
           <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
         </button>
@@ -97,6 +101,7 @@ export function TargetSwitcher({
                   onSelect={() => handleSelect(target.id)}
                   className="flex items-center gap-2"
                 >
+                  <TargetLogo url={target.logo} className="size-5" />
                   <span className="truncate flex-1">{target.value}</span>
                   {target.id === currentTargetId && (
                     <Check className="h-4 w-4 shrink-0 text-primary" />

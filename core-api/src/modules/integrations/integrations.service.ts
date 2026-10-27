@@ -473,11 +473,17 @@ export class IntegrationsService {
     }
 
     // Merge stored config with a test message text
+    const text =
+      dto?.text ??
+      `🧪 OpenASM test notification — sent at ${new Date().toISOString()}`;
     const testConfig: Record<string, unknown> = {
       ...decryptedConfig,
-      text:
-        dto?.text ??
-        `🧪 OpenASM test notification — sent at ${new Date().toISOString()}`,
+      text,
+      // Event fields for structured receivers (webhook); chat connectors
+      // only read `text`.
+      type: 'integration.test',
+      workspaceId,
+      payload: { message: text },
       integrationId: integration.id,
     };
 
@@ -807,6 +813,10 @@ export class IntegrationsService {
       {
         ...config,
         text,
+        // Event fields for structured receivers (webhook).
+        type: 'integration.connected',
+        workspaceId: integration.workspaceId,
+        payload: { message: text },
         integrationId: integration.id,
       },
     );

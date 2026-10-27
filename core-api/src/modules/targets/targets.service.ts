@@ -20,7 +20,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Job, Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
-import { In, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { AssetsService } from '../assets/assets.service';
 import { hasCapability } from '../integrations/capabilities';
 import { Integration } from '../integrations/entities/integration.entity';
@@ -39,10 +39,24 @@ import {
   UpdateTargetDto,
 } from './dto/targets.dto';
 import { Target, TargetSource, TargetType } from './entities/target.entity';
+import {
+  type Cidr,
+  cidrsOverlap,
+  formatCidr,
+  formatIPv4,
+  parseCidr,
+} from './cidr';
+import { resolveTargetLogo } from './target-logo';
 import { TargetSourceDto, toTargetSourceDto } from './target-source.dto';
 
 /** Rows per INSERT — 4 bind params each, well under PostgreSQL's 65535 limit. */
 export const ASSET_INSERT_CHUNK = 1000;
+
+/**
+ * Widest CIDR an untrusted source may add. Every IP becomes an asset and a
+ * scan job per tool, so /24 (256 IPs) caps the scan load of one target.
+ */
+const MIN_CIDR_PREFIX = 24;
 
 /**
  * GIT_ORG value: `<host>[:port]/<owner>[/<subgroup>…]`, lower-case — e.g.
@@ -86,7 +100,7 @@ export class TargetsService implements OnModuleInit {
   /**
    * Validates a target value based on its type.
    * For DOMAIN: Must be a valid root domain (not an IP address).
-   * For CIDR: Must be a valid CIDR notation with /24 prefix only and public IP —
+   * For CIDR: Must be a valid CIDR notation with a /24../32 prefix and public IP —
    *   EXCEPT for AWS-sourced CIDRs (`isTrustedCidrSource`), where private
    *   ranges and any prefix 1..32 are allowed (VPC/subnet CIDRs are private).
    * For IP: Must be a valid public IPv4 address.
@@ -154,11 +168,11 @@ export class TargetsService implements OnModuleInit {
         }
       }
 
-      // Validate prefix is exactly /24, unless the source is trusted (AWS).
+      // Validate prefix is /24../32, unless the source is trusted (AWS).
       const prefix = parseInt(match[5]);
-      if (!isTrustedCidrSource && prefix !== 24) {
+      if (!isTrustedCidrSource && (prefix < MIN_CIDR_PREFIX || prefix > 32)) {
         throw new BadRequestException(
-          `Invalid CIDR: "${value}" must use /24 prefix. Only /24 CIDR ranges are supported.`,
+          `Invalid CIDR: "${value}" must use a prefix between /${MIN_CIDR_PREFIX} and /32.`,
         );
       }
       if (isTrustedCidrSource && (prefix < 1 || prefix > 32)) {
@@ -259,36 +273,63 @@ export class TargetsService implements OnModuleInit {
    * @returns Array of IP addresses in the range
    */
   private expandCIDRToIPs(cidr: string): string[] {
-    const match = cidr.match(
-      /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/,
-    );
-    if (!match) {
+    const parsed = parseCidr(cidr);
+    if (!parsed) {
       throw new BadRequestException(`Invalid CIDR format: ${cidr}`);
     }
 
-    const o0 = parseInt(match[1]);
-    const o1 = parseInt(match[2]);
-    const o2 = parseInt(match[3]);
-    const o3 = parseInt(match[4]);
-    const prefix = parseInt(match[5]);
-    if (prefix < 0 || prefix > 32) {
-      throw new BadRequestException(`Invalid CIDR format: ${cidr}`);
-    }
-
-    const base = ((o0 << 24) | (o1 << 16) | (o2 << 8) | o3) >>> 0;
-    const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
-    const network = (base & mask) >>> 0;
-    const count = 2 ** (32 - prefix);
-
+    const count = 2 ** (32 - parsed.prefix);
     const ips: string[] = [];
     for (let i = 0; i < count; i++) {
-      const n = (network + i) >>> 0;
-      ips.push(
-        `${(n >>> 24) & 255}.${(n >>> 16) & 255}.${(n >>> 8) & 255}.${n & 255}`,
-      );
+      ips.push(formatIPv4((parsed.network + i) >>> 0));
     }
 
     return ips;
+  }
+
+  /**
+   * Rejects CIDRs that overlap another CIDR: an external CIDR target of the
+   * workspace, or another CIDR in the same request. Overlapping blocks would
+   * put the same IPs under two targets and scan them twice. This covers both
+   * directions: a new block inside a wider one, and a new block that
+   * contains a narrower one.
+   */
+  private async assertNoCidrOverlap(
+    manager: EntityManager,
+    workspaceId: string,
+    targets: CreateTargetDto[],
+  ): Promise<void> {
+    const incoming = targets.filter((t) => t.type === TargetType.CIDR);
+    if (incoming.length === 0) return;
+
+    const existing = await manager
+      .getRepository(Target)
+      .createQueryBuilder('target')
+      .where('target.workspaceId = :workspaceId', { workspaceId })
+      .andWhere('target.type = :type', { type: TargetType.CIDR })
+      .andWhere('target.internalNetworkId IS NULL')
+      .select('target.value AS value')
+      .getRawMany<{ value: string }>();
+
+    const known: Array<{ value: string; cidr: Cidr }> = [];
+    for (const { value } of existing) {
+      const cidr = parseCidr(value);
+      if (cidr) known.push({ value, cidr });
+    }
+
+    const conflicts: string[] = [];
+    for (const target of incoming) {
+      const cidr = parseCidr(target.value)!;
+      const hit = known.find((k) => cidrsOverlap(k.cidr, cidr));
+      if (hit) conflicts.push(`"${target.value}" overlaps "${hit.value}"`);
+      known.push({ value: target.value, cidr });
+    }
+
+    if (conflicts.length > 0) {
+      throw new BadRequestException(
+        `Overlapping CIDR ranges: ${conflicts.join(', ')}`,
+      );
+    }
   }
 
   /**
@@ -330,6 +371,17 @@ export class TargetsService implements OnModuleInit {
       )
       .getRawOne()) as Target;
 
+    if (result) {
+      const favicons =
+        result.type === TargetType.GIT_ORG
+          ? new Map<string, string>()
+          : await this.getTargetFavicons([result.id]);
+      result.logo = resolveTargetLogo(
+        { type: result.type, value: result.value, source: String(result.source) },
+        favicons.get(result.id),
+      );
+    }
+
     return result;
   }
 
@@ -369,6 +421,20 @@ export class TargetsService implements OnModuleInit {
         !!internalNetworkId,
         trustedCidrSource,
       );
+    }
+
+    // Manual CIDRs are stored by network address (203.0.113.17/28 →
+    // 203.0.113.16/28) and must not overlap another CIDR. Internal-network
+    // CIDRs keep the worker's spelling, which the interface list matches by
+    // exact value. AWS is exempt: it imports VPCs together with the subnets
+    // inside them.
+    const isManualCidrSource = !internalNetworkId && !trustedCidrSource;
+    if (isManualCidrSource) {
+      for (const target of targets) {
+        if (target.type === TargetType.CIDR) {
+          target.value = formatCidr(parseCidr(target.value)!);
+        }
+      }
     }
 
     // Check if the workspace exists and the user is the owner
@@ -430,6 +496,14 @@ export class TargetsService implements OnModuleInit {
         if (duplicateValues.length > 0) {
           throw new BadRequestException(
             `Target already exists: ${duplicateValues.join(', ')}`,
+          );
+        }
+
+        if (isManualCidrSource) {
+          await this.assertNoCidrOverlap(
+            transactionalEntityManager,
+            workspaceId,
+            newTargets,
           );
         }
 
@@ -657,6 +731,7 @@ export class TargetsService implements OnModuleInit {
         totalAssetServices: number;
         status: string;
         duration: number;
+        logo: string | null;
       }
     >
   > {
@@ -741,19 +816,59 @@ export class TargetsService implements OnModuleInit {
 
     const total = await queryBuilder.getCount();
 
-    const targets = await queryBuilder.limit(limit).offset(offset).getRawMany();
+    const targets: (Omit<Target, 'source'> & {
+      source: unknown;
+      duration: number;
+    })[] = await queryBuilder.limit(limit).offset(offset).getRawMany();
 
-    // Enrich each raw source value into its display DTO (label + icon).
-    const data = targets.map(
-      (
-        row: Omit<Target, 'source'> & { source: unknown; duration: number },
-      ) => ({
-        ...row,
-        source: toTargetSourceDto(String(row.source)),
-      }),
+    const favicons = await this.getTargetFavicons(
+      targets
+        .filter((row) => row.type !== TargetType.GIT_ORG)
+        .map((row) => row.id),
     );
 
+    // Enrich each raw source value into its display DTO (label + icon).
+    const data = targets.map((row) => ({
+      ...row,
+      source: toTargetSourceDto(String(row.source)),
+      logo: resolveTargetLogo(
+        { type: row.type, value: row.value, source: String(row.source) },
+        favicons.get(row.id),
+      ),
+    }));
+
     return getManyResponse({ query, data, total });
+  }
+
+  /**
+   * Favicon of the asset whose value equals its target's value, per target —
+   * an https one first (no mixed content in the console), then the newest.
+   * One query for the whole page, kept out of the aggregated list query so it
+   * cannot skew its counts.
+   */
+  private async getTargetFavicons(
+    targetIds: string[],
+  ): Promise<Map<string, string>> {
+    if (targetIds.length === 0) return new Map();
+    const rows: { targetId: string; faviconUrl: string }[] =
+      await this.repo.query(
+        `SELECT DISTINCT ON (asset."targetId")
+           asset."targetId" AS "targetId",
+           hr.favicon_url AS "faviconUrl"
+         FROM assets asset
+         INNER JOIN targets target ON target.id = asset."targetId"
+           AND target.value = asset.value
+         INNER JOIN asset_services service ON service."assetId" = asset.id
+         INNER JOIN http_responses hr ON hr."assetServiceId" = service.id
+         WHERE asset."targetId" = ANY($1)
+           AND hr.favicon_url IS NOT NULL
+           AND hr.favicon_url <> ''
+         ORDER BY asset."targetId",
+           (hr.favicon_url LIKE 'https://%') DESC,
+           hr."createdAt" DESC`,
+        [targetIds],
+      );
+    return new Map(rows.map((row) => [row.targetId, row.faviconUrl]));
   }
 
   /**

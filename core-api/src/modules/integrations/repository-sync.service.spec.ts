@@ -1,7 +1,7 @@
 import { IntegrationType, TargetType } from '@/common/enums/enum';
 import type { Asset } from '@/modules/assets/entities/assets.entity';
 import type { Target } from '@/modules/targets/entities/target.entity';
-import type { RedisLockService } from '@/services/redis/distributed-lock.service';
+import { RedisLockService } from '@/services/redis/distributed-lock.service';
 import { NotFoundException } from '@nestjs/common';
 import type { EventEmitter2 } from '@nestjs/event-emitter';
 import type { Queue } from 'bullmq';
@@ -85,6 +85,9 @@ describe('RepositorySyncService', () => {
     redisLockService = {
       withLock: jest.fn((_key: string, _ttl: number, fn: () => Promise<unknown>) => fn()),
     };
+    jest
+      .spyOn(RedisLockService, 'current', 'get')
+      .mockReturnValue(redisLockService as unknown as RedisLockService);
     eventEmitter = { emit: jest.fn() };
     queue = { add: jest.fn() };
     listRepositories = jest.fn().mockResolvedValue({
@@ -99,7 +102,6 @@ describe('RepositorySyncService', () => {
       targetRepository as unknown as Repository<Target>,
       assetRepository as unknown as Repository<Asset>,
       integrationsService as unknown as IntegrationsService,
-      redisLockService as unknown as RedisLockService,
       eventEmitter as unknown as EventEmitter2,
       queue as unknown as Queue<RepositorySyncJob>,
     );

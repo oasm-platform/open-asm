@@ -11,7 +11,7 @@ import {
   wrapDEK,
 } from '@/common/utils/workspace-encryption.util';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
-import { RedisLockService } from '@/services/redis/distributed-lock.service';
+import { Lock } from '@/services/redis/lock.decorator';
 
 // ponytail: encryptCache / decryptCache removed — caching ciphertext breaks
 // AES-CBC randomized IV; caching plaintext leaks memory. Add back only if
@@ -44,29 +44,19 @@ export class WorkspaceEncryptionService implements OnModuleInit {
   constructor(
     @InjectRepository(Workspace)
     private readonly workspaceRepo: Repository<Workspace>,
-    private readonly redisLockService: RedisLockService,
   ) {}
 
   async onModuleInit() {
-    const lockKey = 'workspace-dek-backfill';
-    // TTL generous enough for backfill; withLock releases promptly on completion.
-    const lockTTL = 60_000;
-
-    const ran = await this.redisLockService.withLock(
-      lockKey,
-      lockTTL,
-      async () => this.backfillMissingDEKs(),
-    );
-
-    if (ran === null) {
-      this.logger.log('Another instance holds the DEK backfill lock, skipping');
-    }
+    await this.backfillMissingDEKs();
   }
 
   /**
    * Backfill DEK for all workspaces missing one (pre-envelope-encryption).
-   * Protected by distributed lock — only one instance executes this at a time.
+   * Protected by distributed lock — only one instance executes this at a time;
+   * the others skip it. The TTL is generous enough for the backfill, and the
+   * lock is released promptly on completion.
    */
+  @Lock('workspace-dek-backfill', { ttl: 60_000 })
   private async backfillMissingDEKs(): Promise<void> {
     const workspaces = await this.workspaceRepo.find({
       where: { dek: IsNull() },

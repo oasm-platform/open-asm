@@ -14,7 +14,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger, useQueryTab } from '@/compone
 import { useLiveEvents } from '@/hooks/use-live-events';
 import { useNavigateWithParams } from '@/hooks/useNavigateWithParams';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import { isAdminUser } from '@/modules/admin/utils';
 import { useWorkersControllerGetWorkers } from '@/services/apis/gen/queries';
+import { useSession, type User } from '@/utils/authClient';
 import type {
   WorkerListItemDto,
   WorkersControllerGetWorkersParams,
@@ -51,10 +53,14 @@ const ListWorkers = () => {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
   const navigateWithParams = useNavigateWithParams();
+  const { data: session } = useSession();
+  // Global workers run every workspace's jobs, so the API serves them to
+  // admins only.
+  const isAdmin = isAdminUser(session?.user as User | undefined);
   const [activeTab, setActiveTab] = useQueryTab({
     tabParam: 'tab',
     defaultValue: 'workspace',
-    validValues: [...VALID_TABS],
+    validValues: isAdmin ? [...VALID_TABS] : ['workspace'],
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [surface, setSurface] = useState<WorkerSurface>('ALL');
@@ -188,7 +194,7 @@ const ListWorkers = () => {
         // the internal-network badge can sit beside it instead of nested inside
         <div
           key={worker.id}
-          className={`relative flex h-full flex-col items-start gap-2 rounded-lg border p-5 text-left transition-colors hover:border-primary hover:bg-accent/50 ${isWorkerOnline(worker) ? '' : 'opacity-50'}`}
+          className={`relative flex h-full flex-col items-start gap-2 rounded-lg border p-5 text-left transition-colors hover:bg-accent/70 ${isWorkerOnline(worker) ? '' : 'opacity-50'}`}
         >
           <button
             type="button"
@@ -276,7 +282,7 @@ const ListWorkers = () => {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full gap-4">
         <TabsList>
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
-          <TabsTrigger value="global">Global</TabsTrigger>
+          {isAdmin && <TabsTrigger value="global">Global</TabsTrigger>}
         </TabsList>
         {/* Same toolbar as DataTable (targets page): search and filters on
             the left, actions on the right from md up; stacked below md */}

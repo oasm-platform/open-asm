@@ -1,12 +1,20 @@
 import type { Tool } from 'ai';
 import { z } from 'zod';
 
-import { defineTool, failSoft } from './helpers';
+import type { AgentWorkspaceMemory } from '../entities/agent-workspace-memory.entity';
+import { defineTool, failSoft, pageOf } from './helpers';
 import type { Deps } from './types';
+
+const toMemory = (r: AgentWorkspaceMemory) => ({
+  id: r.id,
+  content: r.content,
+  updatedAt: r.updatedAt,
+});
 
 /**
  * Short-term memory (stm_*) lives with the conversation; long-term memory
- * (ltm_*) with the user in the workspace, across conversations.
+ * (ltm_*) with the user in the workspace, across conversations, one record
+ * per memory.
  */
 export function memoryTools(
   deps: Deps<'agentsMemories'>,
@@ -81,48 +89,82 @@ export function memoryTools(
 
   const ltmWrite = defineTool({
     description:
-      'Save important information to long-term memory (workspace scope, persists across conversations). ' +
-      'Use this for persistent knowledge like target profiles, known vulnerabilities, organizational policies.',
+      'Save one piece of knowledge to long-term memory (workspace scope, persists across conversations) as its own record; earlier memories are kept. ' +
+      'Use this for persistent knowledge like target profiles, known vulnerabilities, organizational policies. ' +
+      'Pass id (from ltm_read) to replace that memory instead, e.g. when it is outdated.',
     inputSchema: z.object({
       content: z
         .string()
         .min(1)
         .describe('Content to store in long-term memory'),
-    }),
-    execute: (params: { content: string }) =>
-      failSoft('save LTM', async () => {
-        await memories.ltmSet(workspaceId, userId, params.content);
-        return { success: true, message: 'Saved to long-term memory.' };
-      }),
-  });
-
-  const ltmAppend = defineTool({
-    description:
-      'Append information to existing long-term memory (keeps previous content).',
-    inputSchema: z.object({
-      content: z
+      id: z
         .string()
-        .min(1)
-        .describe('Content to append to existing long-term memory'),
+        .uuid()
+        .optional()
+        .describe('ID of the memory to replace; omit to save a new one'),
     }),
-    execute: (params: { content: string }) =>
-      failSoft('append LTM', async () => {
-        const existing = await memories.ltmGet(workspaceId, userId);
-        const newContent = existing?.content
-          ? `${existing.content}\n\n${params.content}`
-          : params.content;
-        await memories.ltmSet(workspaceId, userId, newContent);
-        return { success: true, message: 'Appended to long-term memory.' };
+    execute: (params: { content: string; id?: string }) =>
+      failSoft('save LTM', async () => {
+        const record = params.id
+          ? await memories.ltmUpdate(
+              params.id,
+              workspaceId,
+              userId,
+              params.content,
+            )
+          : await memories.ltmCreate(workspaceId, userId, params.content);
+        return {
+          success: true,
+          id: record.id,
+          message: params.id
+            ? 'Updated long-term memory.'
+            : 'Saved to long-term memory.',
+        };
       }),
   });
 
   const ltmRead = defineTool({
-    description: 'Read the current long-term memory content.',
-    inputSchema: z.object({}),
-    execute: () =>
+    description:
+      'List long-term memories with their IDs, newest first (100 per page), or read one by id.',
+    inputSchema: z.object({
+      id: z.string().uuid().optional().describe('Memory ID; omit to list'),
+      page: z.number().int().min(1).optional().describe('Page of the list'),
+    }),
+    execute: (params: { id?: string; page?: number }) =>
       failSoft('read LTM', async () => {
-        const record = await memories.ltmGet(workspaceId, userId);
-        return { content: record?.content || '(empty)' };
+        if (params.id) {
+          const record = await memories.ltmGetById(
+            params.id,
+            workspaceId,
+            userId,
+          );
+          if (!record) {
+            return {
+              found: false,
+              message: `No memory found with id "${params.id}".`,
+            };
+          }
+          return { found: true, ...toMemory(record) };
+        }
+        const { data, total } = await memories.ltmGetAllPaginated(
+          workspaceId,
+          userId,
+          pageOf(params),
+        );
+        return { total, memories: data.map(toMemory) };
+      }),
+  });
+
+  const ltmDelete = defineTool({
+    description:
+      'Delete one long-term memory by id (from ltm_read), e.g. when it is wrong or no longer relevant.',
+    inputSchema: z.object({
+      id: z.string().uuid().describe('Memory ID to delete'),
+    }),
+    execute: (params: { id: string }) =>
+      failSoft('delete LTM', async () => {
+        await memories.ltmDeleteById(params.id, workspaceId, userId);
+        return { success: true, message: 'Deleted from long-term memory.' };
       }),
   });
 
@@ -131,7 +173,7 @@ export function memoryTools(
     stm_read: stmRead,
     stm_list: stmList,
     ltm_write: ltmWrite,
-    ltm_append: ltmAppend,
     ltm_read: ltmRead,
+    ltm_delete: ltmDelete,
   };
 }

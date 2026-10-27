@@ -765,7 +765,10 @@ describe('WorkersService', () => {
       expect((mockJobsRegistryService.repo as any).execute).toHaveBeenCalled();
       expect(mockEventBridge.publishSafely).toHaveBeenCalledWith(
         EVENT_CATALOG.worker.disconnected,
-        expect.objectContaining({ workspaceId: 'ws-1', resourceId: 'worker-1' }),
+        expect.objectContaining({
+          workspaceId: 'ws-1',
+          resourceId: 'worker-1',
+        }),
         expect.anything(),
       );
     });
@@ -796,7 +799,10 @@ describe('WorkersService', () => {
 
       expect(mockEventBridge.publishSafely).toHaveBeenCalledWith(
         EVENT_CATALOG.worker.rejoined,
-        expect.objectContaining({ workspaceId: 'ws-1', resourceId: 'w-existing' }),
+        expect.objectContaining({
+          workspaceId: 'ws-1',
+          resourceId: 'w-existing',
+        }),
         expect.anything(),
       );
     });
@@ -996,9 +1002,12 @@ describe('WorkersService', () => {
       expect(
         (mockJobsRegistryService.repo as any).createQueryBuilder,
       ).toHaveBeenCalledTimes(1);
-      expect(jobQb.where).toHaveBeenCalledWith('j.workerId IN (:...workerIds)', {
-        workerIds: ['w-1', 'w-2'],
-      });
+      expect(jobQb.where).toHaveBeenCalledWith(
+        'j.workerId IN (:...workerIds)',
+        {
+          workerIds: ['w-1', 'w-2'],
+        },
+      );
       expect(result.data.map((w) => w.currentJobsCount)).toEqual([0, 3]);
     });
 
@@ -1057,6 +1066,7 @@ describe('WorkersService', () => {
       connectors: Record<string, unknown>[] = [],
       runningJobRows: Record<string, unknown>[] = [],
       telemetry?: Record<string, unknown> | null,
+      canReadGlobal = false,
     ) => {
       (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue(
         worker,
@@ -1078,7 +1088,7 @@ describe('WorkersService', () => {
           telemetry,
         );
       }
-      return service.getWorkerById(workerId, workspaceId);
+      return service.getWorkerById(workerId, workspaceId, canReadGlobal);
     };
 
     const containerTelemetry = (tools: string[]) => ({
@@ -1263,18 +1273,33 @@ describe('WorkersService', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('does not throw for a cloud worker that has no workspace', async () => {
+    const cloudWorker = {
+      id: workerId,
+      workspaceId: null,
+      scope: WorkerScope.CLOUD,
+      runMode: 'cli',
+    };
+
+    it('returns a cloud worker to a caller allowed to read global workers', async () => {
       const result = await runGetWorkerById(
-        {
-          id: workerId,
-          workspaceId: null,
-          scope: WorkerScope.CLOUD,
-          runMode: 'cli',
-        },
+        cloudWorker,
         builtInToolFixtures,
+        [],
+        [],
+        undefined,
+        true,
       );
 
       expect(result.id).toBe(workerId);
+    });
+
+    it('hides a cloud worker, and the jobs of other workspaces on it, from other callers', async () => {
+      await expect(
+        runGetWorkerById(cloudWorker, builtInToolFixtures),
+      ).rejects.toThrow(NotFoundException);
+      expect(
+        (mockJobsRegistryService.repo as any).createQueryBuilder,
+      ).not.toHaveBeenCalled();
     });
 
     it('includes the Redis telemetry snapshot without persisting it on the entity', async () => {
@@ -1368,6 +1393,40 @@ describe('WorkersService', () => {
       expect(mockWorkerInstanceRepository.update).toHaveBeenCalledWith('w2', {
         enabledAgentMode: true,
       });
+    });
+  });
+
+  describe('handleRemoteExecuteResult', () => {
+    const published = () =>
+      JSON.parse(
+        (mockRedisService.publish as jest.Mock).mock.calls[0][1] as string,
+      ) as { type: unknown; data: string };
+
+    it('publishes output as text', async () => {
+      await service.handleRemoteExecuteResult({
+        id: 'c1',
+        sessionId: 's1',
+        type: 'REMOTE_EXECUTE_RESULT_STDOUT' as never,
+        data: Buffer.from('héllo\n'),
+        exitCode: 0,
+      });
+      expect(mockRedisService.publish).toHaveBeenCalledWith(
+        'remote-execute:results:s1',
+        expect.any(String),
+      );
+      expect(published().data).toBe('héllo\n');
+    });
+
+    it('publishes a screenshot as base64, which survives JSON', async () => {
+      const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x80, 0xfe]);
+      await service.handleRemoteExecuteResult({
+        id: 'c1',
+        sessionId: 's1',
+        type: 'REMOTE_EXECUTE_RESULT_IMAGE' as never,
+        data: jpeg,
+        exitCode: 0,
+      });
+      expect(Buffer.from(published().data, 'base64')).toEqual(jpeg);
     });
   });
 

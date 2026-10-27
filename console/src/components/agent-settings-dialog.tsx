@@ -1,6 +1,5 @@
 import LlmConnect from '@/pages/agents/components/llm-connect';
 import { AgentsManager } from '@/components/agents-manager';
-import { ConnectorsManager } from '@/components/connectors-manager';
 import { InstructionManager } from '@/components/instruction-manager';
 import { MemoryManager } from '@/components/memory-manager';
 import { ModelsManager } from '@/components/models-manager';
@@ -30,7 +29,6 @@ import {
   Cpu,
   Globe,
   KeyRound,
-  Plug,
   ScrollText,
   X,
 } from 'lucide-react';
@@ -91,13 +89,6 @@ const tabs: TabConfig[] = [
     description: 'Specialized instructions the agent can use to perform tasks',
     icon: BookOpen,
     component: SkillsManager,
-  },
-  {
-    value: 'connectors',
-    label: 'Connectors',
-    description: 'Tools the agent can use in this workspace',
-    icon: Plug,
-    component: ConnectorsManager,
   },
   {
     value: 'memory',

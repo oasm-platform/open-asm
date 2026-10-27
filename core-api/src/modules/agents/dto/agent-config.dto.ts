@@ -245,6 +245,15 @@ export class UpsertAgentConfigDto {
   @IsString()
   @MaxLength(16)
   responseLanguage?: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Long-term memory: off, the agent neither saves nor reads memories',
+    type: Boolean,
+  })
+  @IsOptional()
+  @IsBoolean()
+  memoryEnabled?: boolean;
 }
 
 export class AgentConfigResponseDto {
@@ -316,4 +325,11 @@ export class AgentConfigResponseDto {
   @IsOptional()
   @IsString()
   responseLanguage: string | null;
+
+  @ApiProperty({
+    description:
+      'Long-term memory: off, the agent neither saves nor reads memories',
+  })
+  @IsBoolean()
+  memoryEnabled: boolean;
 }

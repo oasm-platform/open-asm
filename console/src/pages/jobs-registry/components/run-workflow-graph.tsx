@@ -22,17 +22,23 @@ import {
   type NodeTypes,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import dayjs from 'dayjs';
 import {
+  CalendarClock,
   CircleAlert,
   CircleCheck,
   CircleDashed,
+  Clock,
   Loader2,
   MinusCircle,
+  MousePointerClick,
 } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import {
   buildWorkflowGraphLayout,
+  type RunTrigger,
   type StepNodeData,
+  type TriggerNodeData,
 } from './run-workflow-graph-layout';
 import { formatCategory } from '@/pages/tools/components/format-category';
 
@@ -58,31 +64,38 @@ const STATUS_META: Record<
 > = {
   pending: {
     label: 'waiting',
-    icon: <CircleDashed className="size-3.5" />,
+    icon: <CircleDashed className="size-5" />,
     text: 'text-yellow-600 dark:text-yellow-500',
     border: 'border-border',
   },
+  // Jobs created, none picked up by a worker yet.
+  queued: {
+    label: 'queued',
+    icon: <Clock className="size-5" />,
+    text: 'text-yellow-600 dark:text-yellow-500',
+    border: 'border-yellow-500/50',
+  },
   dispatched: {
     label: 'running',
-    icon: <Loader2 className="size-3.5 animate-spin" />,
+    icon: <Loader2 className="size-5 animate-spin" />,
     text: 'text-purple-600 dark:text-purple-400',
     border: 'border-purple-500/60',
   },
   done: {
     label: 'done',
-    icon: <CircleCheck className="size-3.5" />,
+    icon: <CircleCheck className="size-5" />,
     text: 'text-green-600 dark:text-green-500',
     border: 'border-green-500/40',
   },
   failed: {
     label: 'failed',
-    icon: <CircleAlert className="size-3.5" />,
+    icon: <CircleAlert className="size-5" />,
     text: 'text-red-600 dark:text-red-500',
     border: 'border-red-500/60',
   },
   skipped: {
     label: 'skipped',
-    icon: <MinusCircle className="size-3.5" />,
+    icon: <MinusCircle className="size-5" />,
     text: 'text-muted-foreground',
     border: 'border-border',
   },
@@ -100,8 +113,19 @@ function statusMeta(status: string) {
 }
 
 function WorkflowStepNode({ data }: NodeProps) {
-  const { id, label, run, category, status, needs, jobs, failed, reason, logoUrl } =
-    data as StepNodeData;
+  const {
+    id,
+    label,
+    run,
+    category,
+    status,
+    needs,
+    jobs,
+    failed,
+    running,
+    reason,
+    logoUrl,
+  } = data as StepNodeData;
   const meta = statusMeta(status);
   const skipped = status === 'skipped';
   const skipReason = reason ? (SKIP_REASON_LABEL[reason] ?? reason) : undefined;
@@ -115,7 +139,7 @@ function WorkflowStepNode({ data }: NodeProps) {
             // reachable by keyboard, not just by hover.
             tabIndex={0}
             className={cn(
-              'flex h-full items-center rounded-lg border bg-card px-2.5 py-1.5 text-left shadow-sm',
+              'flex h-full items-center rounded-xl border-2 bg-card px-3.5 py-2.5 text-left shadow-sm',
               meta.border,
               skipped && 'opacity-60',
             )}
@@ -130,27 +154,22 @@ function WorkflowStepNode({ data }: NodeProps) {
               isConnectable={false}
               className="invisible !size-0 !min-h-0 !min-w-0 !border-0 !bg-transparent"
             />
-            {/* Logo left, step name over tool name in the middle, status on the
-                far right and vertically centred. */}
-            <div className="flex h-full w-full items-center justify-between gap-2">
+            {/* Logo left; step name, then status and job counts, then the tool
+                in the middle; status icon on the far right, vertically centred. */}
+            <div className="flex h-full w-full items-center justify-between gap-3">
               {logoUrl && (
                 <ToolLogo
                   name={run}
                   logoUrl={logoUrl}
-                  size={28}
+                  size={40}
                   className="shrink-0 rounded-full border"
                 />
               )}
-              <div className="flex min-w-0 flex-1 flex-col gap-0.5 pl-1">
-                <span className="truncate text-sm font-medium">{label}</span>
-                <div className="flex items-center gap-1.5 text-xs">
-                  <span className={cn('font-medium', meta.text)}>
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="truncate text-base font-semibold">{label}</span>
+                <div className="flex items-center gap-1.5 text-sm">
+                  <span className={cn('shrink-0 font-medium', meta.text)}>
                     {meta.label}
-                  </span>
-                  <span className="text-muted-foreground">·</span>
-                  <span className="truncate font-mono text-muted-foreground">
-                    {run}
-                    {category ? ` · ${formatCategory(category)}` : ''}
                   </span>
                   {jobs > 0 && (
                     <span className="shrink-0 text-muted-foreground">
@@ -168,6 +187,10 @@ function WorkflowStepNode({ data }: NodeProps) {
                     </span>
                   )}
                 </div>
+                <span className="truncate font-mono text-xs text-muted-foreground">
+                  {run}
+                  {category ? ` · ${formatCategory(category)}` : ''}
+                </span>
               </div>
               <span className={cn('flex shrink-0 items-center', meta.text)}>
                 {meta.icon}
@@ -183,9 +206,15 @@ function WorkflowStepNode({ data }: NodeProps) {
         </TooltipTrigger>
         <TooltipContent className="max-w-72">
           <p className="font-medium">
-            {label} · {status}
+            {label} · {meta.label}
           </p>
           <p className="text-muted-foreground">job id: {id}</p>
+          {status === 'queued' && <p>Waiting for a worker to pick up its jobs</p>}
+          {!!running && running > 0 && (
+            <p>
+              {running} of {jobs} job(s) running
+            </p>
+          )}
           {needs.length > 0 && <p>Waits for: {needs.join(', ')}</p>}
           {!!failed && failed > 0 && (
             <p className="text-destructive">{failed} job(s) failed</p>
@@ -197,8 +226,49 @@ function WorkflowStepNode({ data }: NodeProps) {
   );
 }
 
+const TRIGGER_META: Record<
+  RunTrigger,
+  { label: string; icon: React.ReactNode }
+> = {
+  manual: { label: 'Manual', icon: <MousePointerClick className="size-5" /> },
+  scheduled: { label: 'Schedule', icon: <CalendarClock className="size-5" /> },
+};
+
+/** First node of every run: how it was started. Every root step hangs off it. */
+function WorkflowTriggerNode({ data }: NodeProps) {
+  const { trigger, startedAt } = data as TriggerNodeData;
+  const meta = TRIGGER_META[trigger] ?? TRIGGER_META.manual;
+
+  return (
+    <div className="flex h-full items-center gap-3 rounded-xl border-2 border-primary/40 bg-card px-3.5 py-2.5 text-left shadow-sm">
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+        {meta.icon}
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Trigger
+        </span>
+        <span className="truncate text-base font-semibold">{meta.label}</span>
+        {startedAt && (
+          <span className="truncate font-mono text-xs text-muted-foreground">
+            {dayjs(startedAt).format('YYYY-MM-DD HH:mm')}
+          </span>
+        )}
+      </div>
+      {/* Source only: nothing comes before the trigger. */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        isConnectable={false}
+        className="invisible !size-0 !min-h-0 !min-w-0 !border-0 !bg-transparent"
+      />
+    </div>
+  );
+}
+
 const nodeTypes = {
   workflowStep: WorkflowStepNode,
+  workflowTrigger: WorkflowTriggerNode,
 } satisfies NodeTypes;
 
 /**
@@ -261,6 +331,10 @@ const edgeTypes = {
 
 interface RunWorkflowGraphProps {
   steps: WorkflowStepStatusDto[];
+  /** How the run was started: the first node, feeding every root step. */
+  trigger?: RunTrigger;
+  /** When the run was created, shown on the trigger node. */
+  startedAt?: string;
 }
 
 /** Floor for the canvas height. The DAG is the page's main event — a run with a
@@ -281,11 +355,13 @@ const MAX_CANVAS_HEIGHT = 720;
 // changes when `steps` does.
 const RunWorkflowGraph = memo(function RunWorkflowGraph({
   steps,
+  trigger = 'manual',
+  startedAt,
 }: RunWorkflowGraphProps) {
   const { resolvedTheme } = useTheme();
   const { nodes, edges, contentHeight } = useMemo(
-    () => buildWorkflowGraphLayout(steps),
-    [steps],
+    () => buildWorkflowGraphLayout(steps, { trigger, startedAt }),
+    [steps, trigger, startedAt],
   );
 
   const height = Math.min(
@@ -302,7 +378,7 @@ const RunWorkflowGraph = memo(function RunWorkflowGraph({
         edgeTypes={edgeTypes}
         colorMode={resolvedTheme}
         fitView
-        fitViewOptions={{ padding: 0.15, maxZoom: 1 }}
+        fitViewOptions={{ padding: 0.1, maxZoom: 1 }}
         minZoom={0.35}
         maxZoom={1.5}
         nodesDraggable={false}

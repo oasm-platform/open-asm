@@ -40,6 +40,16 @@ describe('AgentsModelsCatalogService', () => {
     ).toEqual({ tokens: 128_000, source: 'default', estimated: true });
   });
 
+  it('does not guess the window of OrcaRouter routes from another host', () => {
+    expect(
+      service.resolveWindow(cfg(LLMProvider.ORCAROUTER, 'orcarouter/auto')),
+    ).toEqual({ tokens: 128_000, source: 'default', estimated: true });
+    // Vendor ids still resolve through models.dev
+    expect(
+      service.resolveWindow(cfg(LLMProvider.ORCAROUTER, 'openai/gpt-5')),
+    ).toMatchObject({ source: 'catalog', estimated: false });
+  });
+
   it('prices hosted models but not self-hosted ones', () => {
     expect(service.costOf(LLMProvider.ANTHROPIC, 'claude-sonnet-4-5')).toMatchObject({
       input: expect.any(Number),

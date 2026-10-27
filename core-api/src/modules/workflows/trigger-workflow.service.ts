@@ -14,6 +14,11 @@ export interface TriggerWorkflowResult {
   error?: string;
 }
 
+/** Optional third argument of a target event (e.g. `target.domain.re-scan`). */
+export interface TriggerOptions {
+  jobRunType?: JobRunType;
+}
+
 @Injectable()
 export class TriggerWorkflowService implements OnModuleInit {
   private readonly logger = new Logger(TriggerWorkflowService.name);
@@ -28,11 +33,19 @@ export class TriggerWorkflowService implements OnModuleInit {
     // Listen all events with wildcard. Fire-and-forget: trigger() already
     // captures its result ({ success, error }) and warn-logs failures, so
     // the handler itself only guards against unexpected rejections.
-    this.eventEmitter.onAny((event: string, payload: Target) => {
-      void this.trigger(event, payload).catch((error) => {
-        Logger.error('Error in onModuleInit:', error);
-      });
-    });
+    this.eventEmitter.onAny(
+      (event: string, payload: Target, options?: TriggerOptions) => {
+        // Every event lands here, so the third argument is not trusted to be
+        // a TriggerOptions: anything but SCHEDULED is a manual run.
+        const jobRunType =
+          options?.jobRunType === JobRunType.SCHEDULED
+            ? JobRunType.SCHEDULED
+            : JobRunType.MANUAL;
+        void this.trigger(event, payload, jobRunType).catch((error) => {
+          Logger.error('Error in onModuleInit:', error);
+        });
+      },
+    );
   }
 
   /**
@@ -46,7 +59,11 @@ export class TriggerWorkflowService implements OnModuleInit {
    * Returns { success, error } instead of swallowing failures — callers
    * (scheduler, webhook) persist the result to the job log.
    */
-  async trigger(event: string, payload: Target): Promise<TriggerWorkflowResult> {
+  async trigger(
+    event: string,
+    payload: Target,
+    jobRunType: JobRunType = JobRunType.MANUAL,
+  ): Promise<TriggerWorkflowResult> {
     const workflow = await this.getWorkflowByEvent(event, payload);
     if (!workflow) {
       return { workflowId: '', success: true };
@@ -68,7 +85,7 @@ export class TriggerWorkflowService implements OnModuleInit {
         workflow,
         workspaceId: workflow.workspace.id,
         jobName: `${workflow.name} - ${payload.value}`,
-        jobRunType: JobRunType.MANUAL,
+        jobRunType,
         targetIds: [payload.id],
       });
 

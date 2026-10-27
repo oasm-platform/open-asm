@@ -1,3 +1,4 @@
+import { parseTrustedProxies } from '@/common/config/trusted-proxies';
 import { AUTH_IGNORE_ROUTERS } from '@/common/constants/app.constants';
 import { Role } from '@/common/enums/enum';
 import { databaseConnectionConfig } from '@/database/database-config';
@@ -23,6 +24,12 @@ export const auth: unknown = betterAuth({
   advanced: {
     database: {
       generateId: () => randomUUID(),
+    },
+    // Behind several proxies X-Forwarded-For has more than one hop; without
+    // trusted proxies Better Auth cannot resolve the client and rate-limits
+    // every user in one shared bucket.
+    ipAddress: {
+      trustedProxies: parseTrustedProxies(process.env.TRUSTED_PROXIES),
     },
     cookies: {
       session_token: {
@@ -57,9 +64,13 @@ export const auth: unknown = betterAuth({
   // through `workspaces.ownerId` (ON DELETE CASCADE) and would wipe every
   // workspace they own along with all scan data. Admins ban instead.
   // `/delete-user*` (self-service) is blocked too, for the same reason.
+  // `/admin/list-users` and `/admin/get-user` are replaced by GET /api/admin/users
+  // and GET /api/admin/users/:id.
   disabledPaths: [
     ...AUTH_IGNORE_ROUTERS,
     '/admin/remove-user',
+    '/admin/list-users',
+    '/admin/get-user',
     '/delete-user',
     '/delete-user/callback',
   ],

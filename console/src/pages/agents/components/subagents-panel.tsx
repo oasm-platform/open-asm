@@ -17,7 +17,9 @@ import {
   XCircle,
 } from 'lucide-react';
 import { memo, useEffect, useState } from 'react';
-import { formatDuration, formatTokens } from './turn-stats-panel';
+import { SIDE_PANEL_INDENT, SIDE_PANEL_ROW } from './side-panel-layout';
+import { SubagentTranscript } from './subagent-transcript';
+import { formatDuration } from './turn-stats-panel';
 
 /** How often the run time of running subagents ticks (local clock only). */
 export const SUBAGENTS_TICK_MS = 1_000;
@@ -26,10 +28,13 @@ export const isSubagentActive = (s: SubagentResponseDto) =>
   s.status === SubagentResponseDtoStatus.pending ||
   s.status === SubagentResponseDtoStatus.in_progress;
 
-const STATUS: Record<
-  SubagentResponseDto['status'],
-  { label: string; icon: typeof Clock; className: string }
-> = {
+export interface SubagentStatusView {
+  label: string;
+  icon: typeof Clock;
+  className: string;
+}
+
+const STATUS: Record<SubagentResponseDto['status'], SubagentStatusView> = {
   pending: { label: 'Queued', icon: Clock, className: 'text-muted-foreground' },
   in_progress: {
     label: 'Running',
@@ -51,24 +56,41 @@ function elapsed(s: SubagentResponseDto, now: number): number | null {
   return Math.max(0, end - new Date(s.startedAt).getTime());
 }
 
+/** One subagent; opens in place to its transcript once it can load one. */
 function SubagentRow({
   subagent,
   now,
+  conversationId,
+  embedded,
 }: {
   subagent: SubagentResponseDto;
   now: number;
+  conversationId?: string;
+  /** Side panel row: text-sm name and a size-4 icon, like the other tabs */
+  embedded: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const status = STATUS[subagent.status];
   const Icon = status.icon;
   const time = elapsed(subagent, now);
-  const output = subagent.error ?? subagent.result;
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="flex w-full items-start gap-2 rounded-md px-1 py-1 text-left hover:bg-muted/50 cursor-pointer">
+      <CollapsibleTrigger
+        disabled={!conversationId}
+        className={cn(
+          'w-full text-left transition-colors hover:bg-muted/60 cursor-pointer disabled:cursor-default',
+          embedded
+            ? SIDE_PANEL_ROW
+            : 'flex items-start gap-2 rounded-lg px-2 py-1.5',
+        )}
+      >
         <Icon
-          className={cn('mt-0.5 size-3.5 shrink-0', status.className)}
+          className={cn(
+            'mt-0.5 shrink-0',
+            embedded ? 'size-4' : 'size-3.5',
+            status.className,
+          )}
           aria-label={status.label}
         />
         <div className="min-w-0 flex-1">
@@ -76,34 +98,39 @@ function SubagentRow({
             <span className="truncate font-medium text-foreground">
               @{subagent.name}
             </span>
-            <span className="ml-auto shrink-0 tabular-nums text-muted-foreground">
+            <span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">
               {time === null ? status.label : formatDuration(time)}
             </span>
+            {conversationId && (
+              <ChevronDown
+                className={cn(
+                  'size-4 shrink-0 text-muted-foreground transition-transform duration-200',
+                  !open && '-rotate-90',
+                )}
+              />
+            )}
           </div>
-          <p className={cn('text-muted-foreground', !open && 'line-clamp-2')}>
+          <p className="line-clamp-2 text-xs text-muted-foreground">
             {subagent.task}
           </p>
         </div>
       </CollapsibleTrigger>
-      <CollapsibleContent className="space-y-1 pb-1 pl-6 pr-1">
-        {subagent.stats && (
-          <p className="tabular-nums text-muted-foreground">
-            {subagent.stats.steps} steps ·{' '}
-            {formatTokens(subagent.stats.inputTokens)} ↑ ·{' '}
-            {formatTokens(subagent.stats.outputTokens)} ↓
-          </p>
-        )}
-        {output && (
-          <pre
+      {conversationId && (
+        <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+          {/* Lined up with the row's text, past its status icon */}
+          <div
             className={cn(
-              'max-h-48 overflow-auto whitespace-pre-wrap rounded bg-muted/50 p-2 font-sans',
-              subagent.error && 'text-destructive',
+              'pt-2 pr-2 pb-4',
+              embedded ? SIDE_PANEL_INDENT : 'pl-7.5',
             )}
           >
-            {output}
-          </pre>
-        )}
-      </CollapsibleContent>
+            <SubagentTranscript
+              subagent={subagent}
+              conversationId={conversationId}
+            />
+          </div>
+        </CollapsibleContent>
+      )}
     </Collapsible>
   );
 }
@@ -111,11 +138,22 @@ function SubagentRow({
 interface SubagentsPanelProps {
   /** From the conversation detail, kept current by the chat stream */
   subagents: SubagentResponseDto[];
+  /** Lets a picked subagent load its transcript */
+  conversationId?: string;
+  /**
+   * False lays it out for a side panel tab, which already names it: no card
+   * and no header to fold it, just the rows, uncapped. Default true
+   */
+  collapsible?: boolean;
+  className?: string;
 }
 
-/** Background subagents of the conversation. */
+/** Background subagents of the conversation; each opens in place. */
 export const SubagentsPanel = memo(function SubagentsPanel({
   subagents,
+  conversationId,
+  collapsible = true,
+  className,
 }: SubagentsPanelProps) {
   const [open, setOpen] = useState(true);
   const [now, setNow] = useState(() => Date.now());
@@ -130,28 +168,63 @@ export const SubagentsPanel = memo(function SubagentsPanel({
 
   if (subagents.length === 0) return null;
 
+  const list = (
+    <div
+      className={cn(
+        'space-y-0.5',
+        collapsible && 'max-h-72 overflow-y-auto px-1.5 pb-1.5',
+      )}
+    >
+      {subagents.map((s) => (
+        <SubagentRow
+          key={s.id}
+          subagent={s}
+          now={now}
+          conversationId={conversationId}
+          embedded={!collapsible}
+        />
+      ))}
+    </div>
+  );
+
   return (
-    <div className="shrink-0 border-b px-3 py-2 text-xs">
-      <Collapsible open={open} onOpenChange={setOpen}>
-        <CollapsibleTrigger className="flex w-full items-center gap-2 py-1 text-sm font-medium text-foreground cursor-pointer">
-          <Network className="size-4" />
-          <span>Subagents</span>
-          <ChevronDown
-            className={cn(
-              'size-3.5 text-muted-foreground transition-transform',
-              !open && '-rotate-90',
-            )}
-          />
-          <span className="ml-auto text-xs font-normal tabular-nums text-muted-foreground">
-            {running > 0 ? `${running} running` : `${subagents.length} done`}
-          </span>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="max-h-72 space-y-0.5 overflow-y-auto pt-1">
-          {subagents.map((s) => (
-            <SubagentRow key={s.id} subagent={s} now={now} />
-          ))}
-        </CollapsibleContent>
-      </Collapsible>
+    // Inside a tab the tab is the frame: no card around the list
+    <div
+      className={cn(
+        collapsible &&
+          'shrink-0 overflow-hidden rounded-xl border bg-card text-xs shadow-xs',
+        className,
+      )}
+    >
+      {collapsible ? (
+        <Collapsible open={open} onOpenChange={setOpen}>
+          <CollapsibleTrigger className="flex w-full items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground cursor-pointer">
+            <Network className="size-4 text-muted-foreground" />
+            <span>Subagents</span>
+            <ChevronDown
+              className={cn(
+                'size-3.5 text-muted-foreground transition-transform',
+                !open && '-rotate-90',
+              )}
+            />
+            <span
+              className={cn(
+                'ml-auto rounded-full px-2 py-0.5 text-xs font-medium tabular-nums',
+                running > 0
+                  ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
+                  : 'bg-muted text-muted-foreground',
+              )}
+            >
+              {running > 0 ? `${running} running` : `${subagents.length} done`}
+            </span>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+            {list}
+          </CollapsibleContent>
+        </Collapsible>
+      ) : (
+        list
+      )}
     </div>
   );
 });

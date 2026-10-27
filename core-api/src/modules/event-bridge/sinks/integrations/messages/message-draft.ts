@@ -23,4 +23,4 @@ export interface MessageDraft {
 }
 
 /** Markup dialect of the receiving channel. */
-export type MessageFormat = 'telegram' | 'slack' | 'plain';
+export type MessageFormat = 'telegram' | 'slack' | 'discord' | 'plain';

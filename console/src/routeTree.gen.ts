@@ -11,19 +11,24 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as AuthedRouteImport } from './routes/_authed'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as InitAdminRouteImport } from './routes/init-admin'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as AuthedReportsRouteImport } from './routes/_authed/reports'
 import { Route as AuthedSearchRouteImport } from './routes/_authed/search'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AdminAboutRouteImport } from './routes/admin/about'
+import { Route as AdminBrandRouteImport } from './routes/admin/brand'
 import { Route as InviteTokenRouteImport } from './routes/invite/$token'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as SettingsTabRouteImport } from './routes/settings/$tab'
-import { Route as AuthedAdminUsersRouteImport } from './routes/_authed/admin/users'
 import { Route as AuthedAgentsCreateRouteImport } from './routes/_authed/agents/create'
 import { Route as AuthedAistudioIndexRouteImport } from './routes/_authed/aistudio/index'
 import { Route as AuthedAistudioAgentsRouteImport } from './routes/_authed/aistudio/agents'
+import { Route as AuthedAistudioConnectorsRouteImport } from './routes/_authed/aistudio/connectors'
+import { Route as AuthedAistudioUsageRouteImport } from './routes/_authed/aistudio/usage'
 import { Route as AuthedAssetsIndexRouteImport } from './routes/_authed/assets/index'
 import { Route as AuthedGroupsIndexRouteImport } from './routes/_authed/groups/index'
 import { Route as AuthedGroupsIdRouteImport } from './routes/_authed/groups/$id'
@@ -45,6 +50,10 @@ import { Route as AuthedWorkersIndexRouteImport } from './routes/_authed/workers
 import { Route as AuthedWorkersIdRouteImport } from './routes/_authed/workers/$id'
 import { Route as AuthedWorkspacesIndexRouteImport } from './routes/_authed/workspaces/index'
 import { Route as AuthedWorkspacesCreateRouteImport } from './routes/_authed/workspaces/create'
+import { Route as AdminUsersIndexRouteImport } from './routes/admin/users/index'
+import { Route as AdminUsersIdRouteImport } from './routes/admin/users/$id'
+import { Route as AdminWorkspacesIndexRouteImport } from './routes/admin/workspaces/index'
+import { Route as AdminWorkspacesIdRouteImport } from './routes/admin/workspaces/$id'
 import { Route as AuthedAgentsIdIndexRouteImport } from './routes/_authed/agents/$id/index'
 import { Route as AuthedAgentsIdEditRouteImport } from './routes/_authed/agents/$id/edit'
 import { Route as AuthedAgentsProvidersConnectRouteImport } from './routes/_authed/agents/providers/connect'
@@ -66,6 +75,11 @@ const SplatRoute = SplatRouteImport.update({
 } as any)
 const AuthedRoute = AuthedRouteImport.update({
   id: '/_authed',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InitAdminRoute = InitAdminRouteImport.update({
@@ -98,6 +112,21 @@ const AuthedSearchRoute = AuthedSearchRouteImport.update({
   path: '/search',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAboutRoute = AdminAboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminBrandRoute = AdminBrandRouteImport.update({
+  id: '/brand',
+  path: '/brand',
+  getParentRoute: () => AdminRoute,
+} as any)
 const InviteTokenRoute = InviteTokenRouteImport.update({
   id: '/invite/$token',
   path: '/invite/$token',
@@ -113,11 +142,6 @@ const SettingsTabRoute = SettingsTabRouteImport.update({
   path: '/$tab',
   getParentRoute: () => SettingsRoute,
 } as any)
-const AuthedAdminUsersRoute = AuthedAdminUsersRouteImport.update({
-  id: '/admin/users',
-  path: '/admin/users',
-  getParentRoute: () => AuthedRoute,
-} as any)
 const AuthedAgentsCreateRoute = AuthedAgentsCreateRouteImport.update({
   id: '/agents/create',
   path: '/agents/create',
@@ -131,6 +155,17 @@ const AuthedAistudioIndexRoute = AuthedAistudioIndexRouteImport.update({
 const AuthedAistudioAgentsRoute = AuthedAistudioAgentsRouteImport.update({
   id: '/aistudio/agents',
   path: '/aistudio/agents',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedAistudioConnectorsRoute =
+  AuthedAistudioConnectorsRouteImport.update({
+    id: '/aistudio/connectors',
+    path: '/aistudio/connectors',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedAistudioUsageRoute = AuthedAistudioUsageRouteImport.update({
+  id: '/aistudio/usage',
+  path: '/aistudio/usage',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedAssetsIndexRoute = AuthedAssetsIndexRouteImport.update({
@@ -243,6 +278,26 @@ const AuthedWorkspacesCreateRoute = AuthedWorkspacesCreateRouteImport.update({
   path: '/workspaces/create',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AdminUsersIndexRoute = AdminUsersIndexRouteImport.update({
+  id: '/users/',
+  path: '/users/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminUsersIdRoute = AdminUsersIdRouteImport.update({
+  id: '/users/$id',
+  path: '/users/$id',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminWorkspacesIndexRoute = AdminWorkspacesIndexRouteImport.update({
+  id: '/workspaces/',
+  path: '/workspaces/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminWorkspacesIdRoute = AdminWorkspacesIdRouteImport.update({
+  id: '/workspaces/$id',
+  path: '/workspaces/$id',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AuthedAgentsIdIndexRoute = AuthedAgentsIdIndexRouteImport.update({
   id: '/agents/$id/',
   path: '/agents/$id/',
@@ -317,17 +372,22 @@ const SettingsMembersPermissionGroupsNewRoute =
 export interface FileRoutesByFullPath {
   '/$': typeof SplatRoute
   '/': typeof AuthedIndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/init-admin': typeof InitAdminRoute
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRouteWithChildren
   '/reports': typeof AuthedReportsRoute
   '/search': typeof AuthedSearchRoute
+  '/admin/about': typeof AdminAboutRoute
+  '/admin/brand': typeof AdminBrandRoute
   '/invite/$token': typeof InviteTokenRoute
   '/settings/$tab': typeof SettingsTabRoute
+  '/admin/': typeof AdminIndexRoute
   '/settings/': typeof SettingsIndexRoute
-  '/admin/users': typeof AuthedAdminUsersRoute
   '/agents/create': typeof AuthedAgentsCreateRoute
   '/aistudio/agents': typeof AuthedAistudioAgentsRoute
+  '/aistudio/connectors': typeof AuthedAistudioConnectorsRoute
+  '/aistudio/usage': typeof AuthedAistudioUsageRoute
   '/groups/$id': typeof AuthedGroupsIdRoute
   '/groups/create': typeof AuthedGroupsCreateRoute
   '/internal-networks/$id': typeof AuthedInternalNetworksIdRoute
@@ -338,6 +398,8 @@ export interface FileRoutesByFullPath {
   '/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
   '/workers/$id': typeof AuthedWorkersIdRoute
   '/workspaces/create': typeof AuthedWorkspacesCreateRoute
+  '/admin/users/$id': typeof AdminUsersIdRoute
+  '/admin/workspaces/$id': typeof AdminWorkspacesIdRoute
   '/aistudio/': typeof AuthedAistudioIndexRoute
   '/assets/': typeof AuthedAssetsIndexRoute
   '/groups/': typeof AuthedGroupsIndexRoute
@@ -350,6 +412,8 @@ export interface FileRoutesByFullPath {
   '/vulnerabilities/': typeof AuthedVulnerabilitiesIndexRoute
   '/workers/': typeof AuthedWorkersIndexRoute
   '/workspaces/': typeof AuthedWorkspacesIndexRoute
+  '/admin/users/': typeof AdminUsersIndexRoute
+  '/admin/workspaces/': typeof AdminWorkspacesIndexRoute
   '/agents/$id/edit': typeof AuthedAgentsIdEditRoute
   '/agents/providers/connect': typeof AuthedAgentsProvidersConnectRoute
   '/aistudio/conversations/$conversationId': typeof AuthedAistudioConversationsConversationIdRoute
@@ -370,13 +434,17 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/reports': typeof AuthedReportsRoute
   '/search': typeof AuthedSearchRoute
+  '/admin/about': typeof AdminAboutRoute
+  '/admin/brand': typeof AdminBrandRoute
   '/invite/$token': typeof InviteTokenRoute
   '/settings/$tab': typeof SettingsTabRoute
   '/': typeof AuthedIndexRoute
+  '/admin': typeof AdminIndexRoute
   '/settings': typeof SettingsIndexRoute
-  '/admin/users': typeof AuthedAdminUsersRoute
   '/agents/create': typeof AuthedAgentsCreateRoute
   '/aistudio/agents': typeof AuthedAistudioAgentsRoute
+  '/aistudio/connectors': typeof AuthedAistudioConnectorsRoute
+  '/aistudio/usage': typeof AuthedAistudioUsageRoute
   '/groups/$id': typeof AuthedGroupsIdRoute
   '/groups/create': typeof AuthedGroupsCreateRoute
   '/internal-networks/$id': typeof AuthedInternalNetworksIdRoute
@@ -387,6 +455,8 @@ export interface FileRoutesByTo {
   '/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
   '/workers/$id': typeof AuthedWorkersIdRoute
   '/workspaces/create': typeof AuthedWorkspacesCreateRoute
+  '/admin/users/$id': typeof AdminUsersIdRoute
+  '/admin/workspaces/$id': typeof AdminWorkspacesIdRoute
   '/aistudio': typeof AuthedAistudioIndexRoute
   '/assets': typeof AuthedAssetsIndexRoute
   '/groups': typeof AuthedGroupsIndexRoute
@@ -399,6 +469,8 @@ export interface FileRoutesByTo {
   '/vulnerabilities': typeof AuthedVulnerabilitiesIndexRoute
   '/workers': typeof AuthedWorkersIndexRoute
   '/workspaces': typeof AuthedWorkspacesIndexRoute
+  '/admin/users': typeof AdminUsersIndexRoute
+  '/admin/workspaces': typeof AdminWorkspacesIndexRoute
   '/agents/$id/edit': typeof AuthedAgentsIdEditRoute
   '/agents/providers/connect': typeof AuthedAgentsProvidersConnectRoute
   '/aistudio/conversations/$conversationId': typeof AuthedAistudioConversationsConversationIdRoute
@@ -417,18 +489,23 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/$': typeof SplatRoute
   '/_authed': typeof AuthedRouteWithChildren
+  '/admin': typeof AdminRouteWithChildren
   '/init-admin': typeof InitAdminRoute
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRouteWithChildren
   '/_authed/reports': typeof AuthedReportsRoute
   '/_authed/search': typeof AuthedSearchRoute
+  '/admin/about': typeof AdminAboutRoute
+  '/admin/brand': typeof AdminBrandRoute
   '/invite/$token': typeof InviteTokenRoute
   '/settings/$tab': typeof SettingsTabRoute
   '/_authed/': typeof AuthedIndexRoute
+  '/admin/': typeof AdminIndexRoute
   '/settings/': typeof SettingsIndexRoute
-  '/_authed/admin/users': typeof AuthedAdminUsersRoute
   '/_authed/agents/create': typeof AuthedAgentsCreateRoute
   '/_authed/aistudio/agents': typeof AuthedAistudioAgentsRoute
+  '/_authed/aistudio/connectors': typeof AuthedAistudioConnectorsRoute
+  '/_authed/aistudio/usage': typeof AuthedAistudioUsageRoute
   '/_authed/groups/$id': typeof AuthedGroupsIdRoute
   '/_authed/groups/create': typeof AuthedGroupsCreateRoute
   '/_authed/internal-networks/$id': typeof AuthedInternalNetworksIdRoute
@@ -439,6 +516,8 @@ export interface FileRoutesById {
   '/_authed/vulnerabilities/$id': typeof AuthedVulnerabilitiesIdRoute
   '/_authed/workers/$id': typeof AuthedWorkersIdRoute
   '/_authed/workspaces/create': typeof AuthedWorkspacesCreateRoute
+  '/admin/users/$id': typeof AdminUsersIdRoute
+  '/admin/workspaces/$id': typeof AdminWorkspacesIdRoute
   '/_authed/aistudio/': typeof AuthedAistudioIndexRoute
   '/_authed/assets/': typeof AuthedAssetsIndexRoute
   '/_authed/groups/': typeof AuthedGroupsIndexRoute
@@ -451,6 +530,8 @@ export interface FileRoutesById {
   '/_authed/vulnerabilities/': typeof AuthedVulnerabilitiesIndexRoute
   '/_authed/workers/': typeof AuthedWorkersIndexRoute
   '/_authed/workspaces/': typeof AuthedWorkspacesIndexRoute
+  '/admin/users/': typeof AdminUsersIndexRoute
+  '/admin/workspaces/': typeof AdminWorkspacesIndexRoute
   '/_authed/agents/$id/edit': typeof AuthedAgentsIdEditRoute
   '/_authed/agents/providers/connect': typeof AuthedAgentsProvidersConnectRoute
   '/_authed/aistudio/conversations/$conversationId': typeof AuthedAistudioConversationsConversationIdRoute
@@ -470,17 +551,22 @@ export interface FileRouteTypes {
   fullPaths:
     | '/$'
     | '/'
+    | '/admin'
     | '/init-admin'
     | '/login'
     | '/settings'
     | '/reports'
     | '/search'
+    | '/admin/about'
+    | '/admin/brand'
     | '/invite/$token'
     | '/settings/$tab'
+    | '/admin/'
     | '/settings/'
-    | '/admin/users'
     | '/agents/create'
     | '/aistudio/agents'
+    | '/aistudio/connectors'
+    | '/aistudio/usage'
     | '/groups/$id'
     | '/groups/create'
     | '/internal-networks/$id'
@@ -491,6 +577,8 @@ export interface FileRouteTypes {
     | '/vulnerabilities/$id'
     | '/workers/$id'
     | '/workspaces/create'
+    | '/admin/users/$id'
+    | '/admin/workspaces/$id'
     | '/aistudio/'
     | '/assets/'
     | '/groups/'
@@ -503,6 +591,8 @@ export interface FileRouteTypes {
     | '/vulnerabilities/'
     | '/workers/'
     | '/workspaces/'
+    | '/admin/users/'
+    | '/admin/workspaces/'
     | '/agents/$id/edit'
     | '/agents/providers/connect'
     | '/aistudio/conversations/$conversationId'
@@ -523,13 +613,17 @@ export interface FileRouteTypes {
     | '/login'
     | '/reports'
     | '/search'
+    | '/admin/about'
+    | '/admin/brand'
     | '/invite/$token'
     | '/settings/$tab'
     | '/'
+    | '/admin'
     | '/settings'
-    | '/admin/users'
     | '/agents/create'
     | '/aistudio/agents'
+    | '/aistudio/connectors'
+    | '/aistudio/usage'
     | '/groups/$id'
     | '/groups/create'
     | '/internal-networks/$id'
@@ -540,6 +634,8 @@ export interface FileRouteTypes {
     | '/vulnerabilities/$id'
     | '/workers/$id'
     | '/workspaces/create'
+    | '/admin/users/$id'
+    | '/admin/workspaces/$id'
     | '/aistudio'
     | '/assets'
     | '/groups'
@@ -552,6 +648,8 @@ export interface FileRouteTypes {
     | '/vulnerabilities'
     | '/workers'
     | '/workspaces'
+    | '/admin/users'
+    | '/admin/workspaces'
     | '/agents/$id/edit'
     | '/agents/providers/connect'
     | '/aistudio/conversations/$conversationId'
@@ -569,18 +667,23 @@ export interface FileRouteTypes {
     | '__root__'
     | '/$'
     | '/_authed'
+    | '/admin'
     | '/init-admin'
     | '/login'
     | '/settings'
     | '/_authed/reports'
     | '/_authed/search'
+    | '/admin/about'
+    | '/admin/brand'
     | '/invite/$token'
     | '/settings/$tab'
     | '/_authed/'
+    | '/admin/'
     | '/settings/'
-    | '/_authed/admin/users'
     | '/_authed/agents/create'
     | '/_authed/aistudio/agents'
+    | '/_authed/aistudio/connectors'
+    | '/_authed/aistudio/usage'
     | '/_authed/groups/$id'
     | '/_authed/groups/create'
     | '/_authed/internal-networks/$id'
@@ -591,6 +694,8 @@ export interface FileRouteTypes {
     | '/_authed/vulnerabilities/$id'
     | '/_authed/workers/$id'
     | '/_authed/workspaces/create'
+    | '/admin/users/$id'
+    | '/admin/workspaces/$id'
     | '/_authed/aistudio/'
     | '/_authed/assets/'
     | '/_authed/groups/'
@@ -603,6 +708,8 @@ export interface FileRouteTypes {
     | '/_authed/vulnerabilities/'
     | '/_authed/workers/'
     | '/_authed/workspaces/'
+    | '/admin/users/'
+    | '/admin/workspaces/'
     | '/_authed/agents/$id/edit'
     | '/_authed/agents/providers/connect'
     | '/_authed/aistudio/conversations/$conversationId'
@@ -621,6 +728,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   SplatRoute: typeof SplatRoute
   AuthedRoute: typeof AuthedRouteWithChildren
+  AdminRoute: typeof AdminRouteWithChildren
   InitAdminRoute: typeof InitAdminRoute
   LoginRoute: typeof LoginRoute
   SettingsRoute: typeof SettingsRouteWithChildren
@@ -641,6 +749,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AuthedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/init-admin': {
@@ -685,6 +800,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedSearchRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/about': {
+      id: '/admin/about'
+      path: '/about'
+      fullPath: '/admin/about'
+      preLoaderRoute: typeof AdminAboutRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/brand': {
+      id: '/admin/brand'
+      path: '/brand'
+      fullPath: '/admin/brand'
+      preLoaderRoute: typeof AdminBrandRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/invite/$token': {
       id: '/invite/$token'
       path: '/invite/$token'
@@ -706,13 +842,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsTabRouteImport
       parentRoute: typeof SettingsRoute
     }
-    '/_authed/admin/users': {
-      id: '/_authed/admin/users'
-      path: '/admin/users'
-      fullPath: '/admin/users'
-      preLoaderRoute: typeof AuthedAdminUsersRouteImport
-      parentRoute: typeof AuthedRoute
-    }
     '/_authed/agents/create': {
       id: '/_authed/agents/create'
       path: '/agents/create'
@@ -732,6 +861,20 @@ declare module '@tanstack/react-router' {
       path: '/aistudio/agents'
       fullPath: '/aistudio/agents'
       preLoaderRoute: typeof AuthedAistudioAgentsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/aistudio/connectors': {
+      id: '/_authed/aistudio/connectors'
+      path: '/aistudio/connectors'
+      fullPath: '/aistudio/connectors'
+      preLoaderRoute: typeof AuthedAistudioConnectorsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/aistudio/usage': {
+      id: '/_authed/aistudio/usage'
+      path: '/aistudio/usage'
+      fullPath: '/aistudio/usage'
+      preLoaderRoute: typeof AuthedAistudioUsageRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/assets/': {
@@ -881,6 +1024,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedWorkspacesCreateRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/admin/users/': {
+      id: '/admin/users/'
+      path: '/users'
+      fullPath: '/admin/users/'
+      preLoaderRoute: typeof AdminUsersIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/users/$id': {
+      id: '/admin/users/$id'
+      path: '/users/$id'
+      fullPath: '/admin/users/$id'
+      preLoaderRoute: typeof AdminUsersIdRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/workspaces/': {
+      id: '/admin/workspaces/'
+      path: '/workspaces'
+      fullPath: '/admin/workspaces/'
+      preLoaderRoute: typeof AdminWorkspacesIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/workspaces/$id': {
+      id: '/admin/workspaces/$id'
+      path: '/workspaces/$id'
+      fullPath: '/admin/workspaces/$id'
+      preLoaderRoute: typeof AdminWorkspacesIdRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/_authed/agents/$id/': {
       id: '/_authed/agents/$id/'
       path: '/agents/$id'
@@ -979,9 +1150,10 @@ interface AuthedRouteChildren {
   AuthedReportsRoute: typeof AuthedReportsRoute
   AuthedSearchRoute: typeof AuthedSearchRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
-  AuthedAdminUsersRoute: typeof AuthedAdminUsersRoute
   AuthedAgentsCreateRoute: typeof AuthedAgentsCreateRoute
   AuthedAistudioAgentsRoute: typeof AuthedAistudioAgentsRoute
+  AuthedAistudioConnectorsRoute: typeof AuthedAistudioConnectorsRoute
+  AuthedAistudioUsageRoute: typeof AuthedAistudioUsageRoute
   AuthedGroupsIdRoute: typeof AuthedGroupsIdRoute
   AuthedGroupsCreateRoute: typeof AuthedGroupsCreateRoute
   AuthedInternalNetworksIdRoute: typeof AuthedInternalNetworksIdRoute
@@ -1021,9 +1193,10 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedReportsRoute: AuthedReportsRoute,
   AuthedSearchRoute: AuthedSearchRoute,
   AuthedIndexRoute: AuthedIndexRoute,
-  AuthedAdminUsersRoute: AuthedAdminUsersRoute,
   AuthedAgentsCreateRoute: AuthedAgentsCreateRoute,
   AuthedAistudioAgentsRoute: AuthedAistudioAgentsRoute,
+  AuthedAistudioConnectorsRoute: AuthedAistudioConnectorsRoute,
+  AuthedAistudioUsageRoute: AuthedAistudioUsageRoute,
   AuthedGroupsIdRoute: AuthedGroupsIdRoute,
   AuthedGroupsCreateRoute: AuthedGroupsCreateRoute,
   AuthedInternalNetworksIdRoute: AuthedInternalNetworksIdRoute,
@@ -1063,6 +1236,28 @@ const AuthedRouteChildren: AuthedRouteChildren = {
 const AuthedRouteWithChildren =
   AuthedRoute._addFileChildren(AuthedRouteChildren)
 
+interface AdminRouteChildren {
+  AdminAboutRoute: typeof AdminAboutRoute
+  AdminBrandRoute: typeof AdminBrandRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+  AdminUsersIdRoute: typeof AdminUsersIdRoute
+  AdminWorkspacesIdRoute: typeof AdminWorkspacesIdRoute
+  AdminUsersIndexRoute: typeof AdminUsersIndexRoute
+  AdminWorkspacesIndexRoute: typeof AdminWorkspacesIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminAboutRoute: AdminAboutRoute,
+  AdminBrandRoute: AdminBrandRoute,
+  AdminIndexRoute: AdminIndexRoute,
+  AdminUsersIdRoute: AdminUsersIdRoute,
+  AdminWorkspacesIdRoute: AdminWorkspacesIdRoute,
+  AdminUsersIndexRoute: AdminUsersIndexRoute,
+  AdminWorkspacesIndexRoute: AdminWorkspacesIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 interface SettingsRouteChildren {
   SettingsTabRoute: typeof SettingsTabRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
@@ -1086,6 +1281,7 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   SplatRoute: SplatRoute,
   AuthedRoute: AuthedRouteWithChildren,
+  AdminRoute: AdminRouteWithChildren,
   InitAdminRoute: InitAdminRoute,
   LoginRoute: LoginRoute,
   SettingsRoute: SettingsRouteWithChildren,

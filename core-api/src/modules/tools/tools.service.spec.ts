@@ -433,7 +433,118 @@ describe('ToolsService — readiness flags', () => {
 
   // ── End search tests ────────────────────────────────────────────────
 
+  describe('getAgentTools — installed agent tools only', () => {
+    beforeEach(() => {
+      connectorRegistry.getConnector.mockImplementation((name: string) =>
+        name === 'acunetix' || name === 'zap' ? { agentTool: true } : null,
+      );
+      connectorRegistry.getConnectorSchema.mockReturnValue(null);
+    });
+
+    const optionsFor = async (search?: string) => {
+      await service.getAgentTools('ws-001', search);
+      const [options] = toolsRepo.find.mock.calls[0] as [
+        { where: unknown; order: unknown; take?: number },
+      ];
+      return options;
+    };
+    const whereFor = async (search?: string) =>
+      (await optionsFor(search)).where;
+
+    it('matches built-ins OR the agent connectors enabled in the workspace', async () => {
+      workspaceToolRepo.find.mockResolvedValue([
+        { tool: makeTool({ id: 'c1', name: 'acunetix' }) },
+        { tool: makeTool({ id: 'c2', name: 'wpscan' }) }, // not an agent tool
+        { tool: makeTool({ id: 'b1', name: 'subfinder', type: WorkerType.BUILT_IN }) },
+      ]);
+
+      expect(await whereFor()).toEqual([
+        { type: WorkerType.BUILT_IN },
+        { id: In(['c1']) },
+      ]);
+      expect(workspaceToolRepo.find).toHaveBeenCalledWith({
+        where: { workspace: { id: 'ws-001' }, isEnabled: true },
+        relations: ['tool'],
+      });
+    });
+
+    it('leaves only built-ins when no agent connector is installed', async () => {
+      workspaceToolRepo.find.mockResolvedValue([]);
+
+      expect(await whereFor()).toEqual([
+        { type: WorkerType.BUILT_IN },
+        { id: In([]) },
+      ]);
+    });
+
+    it('combines with search on name or description', async () => {
+      workspaceToolRepo.find.mockResolvedValue([
+        { tool: makeTool({ id: 'c1', name: 'acunetix' }) },
+      ]);
+
+      expect(await whereFor('scan')).toEqual([
+        { type: WorkerType.BUILT_IN, name: ILike('%scan%') },
+        { type: WorkerType.BUILT_IN, description: ILike('%scan%') },
+        { id: In(['c1']), name: ILike('%scan%') },
+        { id: In(['c1']), description: ILike('%scan%') },
+      ]);
+    });
+
+    it('returns every match sorted by name, without paging', async () => {
+      const options = await optionsFor();
+
+      expect(options.order).toEqual({ name: 'ASC' });
+      expect(options.take).toBeUndefined();
+      expect(toolsRepo.findAndCount).not.toHaveBeenCalled();
+    });
+
+    it('returns a plain array flagged installed and agentTool, with config readiness', async () => {
+      toolsRepo.find.mockResolvedValue([
+        makeTool({ id: 'b1', name: 'subfinder', type: WorkerType.BUILT_IN }),
+        makeTool({ id: 'c1', name: 'acunetix' }),
+        makeTool({ id: 'c2', name: 'zap' }),
+      ]);
+      // acunetix needs config but has no profile; zap needs none.
+      connectorRegistry.getConnectorSchema.mockImplementation((name: string) =>
+        name === 'acunetix' ? { type: 'object' } : null,
+      );
+      profilesRepo.find.mockResolvedValue([]);
+
+      const result = await service.getAgentTools('ws-001');
+
+      expect(Array.isArray(result)).toBe(true);
+      expect(
+        result.map(({ name, isInstalled, agentTool, isReady }) => ({
+          name,
+          isInstalled,
+          agentTool,
+          isReady,
+        })),
+      ).toEqual([
+        { name: 'subfinder', isInstalled: true, agentTool: true, isReady: true },
+        { name: 'acunetix', isInstalled: true, agentTool: true, isReady: false },
+        { name: 'zap', isInstalled: true, agentTool: true, isReady: true },
+      ]);
+    });
+  });
+
   describe('getInstalledTools — hasConfigProfile and isReady', () => {
+    it('marks every returned tool as installed for the console actions', async () => {
+      const builtInTool = makeTool({
+        id: 'tool-3', name: 'subfinder', type: WorkerType.BUILT_IN, isBuiltIn: true,
+      });
+      const connectorTool = makeTool({
+        id: 'tool-1', name: 'nuclei', type: WorkerType.CONNECTOR,
+      });
+      toolsRepo.find.mockResolvedValueOnce([builtInTool]);
+      workspaceToolRepo.find.mockResolvedValueOnce([{ tool: connectorTool }]);
+      connectorRegistry.getConnectorSchema.mockReturnValue(null);
+
+      const result = await service.getInstalledTools({}, 'ws-001');
+
+      expect(result.data.map((tool) => tool.isInstalled)).toEqual([true, true]);
+    });
+
     it('should always include isReady=true for built-in tools', async () => {
       const builtInTool = makeTool({
         id: 'tool-3', name: 'subfinder', type: WorkerType.BUILT_IN, isBuiltIn: true,

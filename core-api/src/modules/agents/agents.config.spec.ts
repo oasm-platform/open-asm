@@ -88,6 +88,7 @@ describe('AgentsConfigService', () => {
       defaultApprovalMode: null,
       disabledTools: [],
       responseLanguage: null,
+      memoryEnabled: false,
     });
   });
 
@@ -227,6 +228,17 @@ describe('AgentsConfigService', () => {
     );
   });
 
+  it('turns long-term memory on', async () => {
+    configRepo.findOne.mockResolvedValue(agentConfig({ memoryEnabled: false }));
+
+    await expect(
+      service.upsert(WS, USER, { memoryEnabled: true }),
+    ).resolves.toEqual(expect.objectContaining({ memoryEnabled: true }));
+    expect(configRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({ memoryEnabled: true }),
+    );
+  });
+
   it('keeps the limits when the default connection only changes model', async () => {
     configRepo.findOne.mockResolvedValue(
       agentConfig({
@@ -314,7 +326,18 @@ describe('withoutDisabledTools', () => {
         agentConfig({ disabledTools: ['execute_remote_command'] }),
       ),
     ).toEqual({ a: 1, b: 3 });
-    expect(withoutDisabledTools(tools, null)).toBe(tools);
+    expect(withoutDisabledTools(tools, null)).toEqual(tools);
+  });
+
+  it('drops the long-term memory tools unless memory is turned on', () => {
+    const tools = { ltm_write: 1, ltm_read: 2, ltm_delete: 3, stm_write: 4 };
+    expect(withoutDisabledTools(tools, null)).toEqual({ stm_write: 4 });
+    expect(
+      withoutDisabledTools(tools, agentConfig({ memoryEnabled: false })),
+    ).toEqual({ stm_write: 4 });
+    expect(
+      withoutDisabledTools(tools, agentConfig({ memoryEnabled: true })),
+    ).toBe(tools);
   });
 });
 
@@ -348,17 +371,32 @@ describe('findDefaultLLMConfig', () => {
 
 describe('formatUserInstructions', () => {
   it('is empty without instructions or language', () => {
-    expect(formatUserInstructions(null)).toBe('');
-    expect(formatUserInstructions(agentConfig({ instruction: '  ' }))).toBe('');
+    expect(
+      formatUserInstructions(
+        agentConfig({ instruction: '  ', memoryEnabled: true }),
+      ),
+    ).toBe('');
   });
 
   it('adds the instructions and the answer language', () => {
     expect(
       formatUserInstructions(
-        agentConfig({ instruction: ' Use tables. ', responseLanguage: 'vi' }),
+        agentConfig({
+          instruction: ' Use tables. ',
+          responseLanguage: 'vi',
+          memoryEnabled: true,
+        }),
       ),
     ).toBe(
       '## User instructions\nUse tables.\n\nAlways answer in this language: vi',
     );
+  });
+
+  it('tells the agent when long-term memory is off, the default', () => {
+    for (const config of [null, agentConfig({ memoryEnabled: false })]) {
+      expect(formatUserInstructions(config)).toContain(
+        'Long-term memory is turned off',
+      );
+    }
   });
 });
