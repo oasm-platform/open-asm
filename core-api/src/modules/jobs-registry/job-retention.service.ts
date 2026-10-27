@@ -3,7 +3,7 @@ import {
   JOB_RETENTION_DELETE_BATCH,
 } from '@/common/constants/app.constants';
 import { JobStatus } from '@/common/enums/enum';
-import { RedisLockService } from '@/services/redis/distributed-lock.service';
+import { Lock } from '@/services/redis/lock.decorator';
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { DataSource } from 'typeorm';
@@ -49,47 +49,39 @@ const PRUNABLE_JOB_STATUSES: string[] = [
 export class JobRetentionService {
   private readonly logger = new Logger(JobRetentionService.name);
 
-  constructor(
-    private readonly dataSource: DataSource,
-    private readonly redisLockService: RedisLockService,
-  ) {}
+  constructor(private readonly dataSource: DataSource) {}
 
   @Cron('30 3 * * *')
+  @Lock('cron:jobs-retention', { ttl: 30 * 60 * 1000 })
   async pruneExpiredJobs(): Promise<void> {
-    await this.redisLockService.withLock(
-      'cron:jobs-retention',
-      30 * 60 * 1000,
-      async () => {
-        let deleted = 0;
+    let deleted = 0;
 
-        // Delete in batches so a first run on a large table never holds a long
-        // lock. Loop until a batch comes back short, which means we are done.
-        for (;;) {
-          const rows: { id: string }[] = await this.dataSource.query(
-            `WITH doomed AS (
-               SELECT id FROM jobs
-               WHERE "createdAt" < now() - make_interval(days => $1)
-                 AND status::text = ANY($2::text[])
-               LIMIT $3
-             )
-             DELETE FROM jobs j USING doomed
-             WHERE j.id = doomed.id
-             RETURNING j.id`,
-            [JOB_RETENTION_DAYS, PRUNABLE_JOB_STATUSES, JOB_RETENTION_DELETE_BATCH],
-          );
+    // Delete in batches so a first run on a large table never holds a long
+    // lock. Loop until a batch comes back short, which means we are done.
+    for (;;) {
+      const rows: { id: string }[] = await this.dataSource.query(
+        `WITH doomed AS (
+           SELECT id FROM jobs
+           WHERE "createdAt" < now() - make_interval(days => $1)
+             AND status::text = ANY($2::text[])
+           LIMIT $3
+         )
+         DELETE FROM jobs j USING doomed
+         WHERE j.id = doomed.id
+         RETURNING j.id`,
+        [JOB_RETENTION_DAYS, PRUNABLE_JOB_STATUSES, JOB_RETENTION_DELETE_BATCH],
+      );
 
-          deleted += rows.length;
-          if (rows.length < JOB_RETENTION_DELETE_BATCH) {
-            break;
-          }
-        }
+      deleted += rows.length;
+      if (rows.length < JOB_RETENTION_DELETE_BATCH) {
+        break;
+      }
+    }
 
-        if (deleted > 0) {
-          this.logger.log(
-            `Job retention: pruned ${deleted} job(s) older than ${JOB_RETENTION_DAYS} day(s)`,
-          );
-        }
-      },
-    );
+    if (deleted > 0) {
+      this.logger.log(
+        `Job retention: pruned ${deleted} job(s) older than ${JOB_RETENTION_DAYS} day(s)`,
+      );
+    }
   }
 }

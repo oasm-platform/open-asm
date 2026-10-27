@@ -1,4 +1,4 @@
-import { RedisLockService } from '@/services/redis/distributed-lock.service';
+import { Lock } from '@/services/redis/lock.decorator';
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { DataSource } from 'typeorm';
@@ -32,51 +32,45 @@ export class WorkflowRunReconcilerService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly workflowRunnerService: WorkflowRunnerService,
-    private readonly redisLockService: RedisLockService,
   ) {}
 
   @Cron('*/2 * * * *')
+  @Lock('cron:workflow-run-reconcile', { ttl: 2 * 60 * 1000 })
   async reconcileStalledRuns(): Promise<void> {
-    await this.redisLockService.withLock(
-      'cron:workflow-run-reconcile',
-      2 * 60 * 1000,
-      async () => {
-        const stalled: { id: string }[] = await this.dataSource.query(
-          `SELECT h.id
-             FROM job_histories h
-            WHERE h."isCompleted" = false
-              AND h."workflowId" IS NOT NULL
-              AND h."createdAt" > now() - make_interval(days => $1)
-              AND EXISTS (SELECT 1 FROM jobs j WHERE j."jobHistoryId" = h.id)
-              AND NOT EXISTS (
-                SELECT 1 FROM jobs j
-                 WHERE j."jobHistoryId" = h.id
-                   AND j.status IN ('pending', 'in_progress')
-              )
-            ORDER BY h."createdAt" DESC
-            LIMIT $2`,
-          [RECONCILE_LOOKBACK_DAYS, RECONCILE_BATCH],
-        );
-
-        if (stalled.length === 0) return;
-
-        this.logger.log(
-          `Reconciling ${stalled.length} workflow run(s) whose jobs all finished but whose run is not complete`,
-        );
-
-        for (const { id } of stalled) {
-          try {
-            await this.workflowRunnerService.advanceRun(id);
-          } catch (error) {
-            // One bad run must not stop the sweep.
-            this.logger.warn(
-              `Failed to reconcile run ${id}: ${
-                error instanceof Error ? error.message : String(error)
-              }`,
-            );
-          }
-        }
-      },
+    const stalled: { id: string }[] = await this.dataSource.query(
+      `SELECT h.id
+         FROM job_histories h
+        WHERE h."isCompleted" = false
+          AND h."workflowId" IS NOT NULL
+          AND h."createdAt" > now() - make_interval(days => $1)
+          AND EXISTS (SELECT 1 FROM jobs j WHERE j."jobHistoryId" = h.id)
+          AND NOT EXISTS (
+            SELECT 1 FROM jobs j
+             WHERE j."jobHistoryId" = h.id
+               AND j.status IN ('pending', 'in_progress')
+          )
+        ORDER BY h."createdAt" DESC
+        LIMIT $2`,
+      [RECONCILE_LOOKBACK_DAYS, RECONCILE_BATCH],
     );
+
+    if (stalled.length === 0) return;
+
+    this.logger.log(
+      `Reconciling ${stalled.length} workflow run(s) whose jobs all finished but whose run is not complete`,
+    );
+
+    for (const { id } of stalled) {
+      try {
+        await this.workflowRunnerService.advanceRun(id);
+      } catch (error) {
+        // One bad run must not stop the sweep.
+        this.logger.warn(
+          `Failed to reconcile run ${id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
   }
 }
