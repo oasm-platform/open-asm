@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { getAdminUsersControllerGetUsersQueryKey } from '@/services/apis/gen/queries';
 import { authClient } from '@/utils/authClient';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -68,7 +69,9 @@ export function AddUserDialog() {
       toast.success('User created successfully.');
       setOpen(false);
       form.reset();
-      return queryClient.invalidateQueries({ queryKey: ['users'] });
+      return queryClient.invalidateQueries({
+        queryKey: getAdminUsersControllerGetUsersQueryKey(),
+      });
     },
     onError: () => {
       toast.error('Failed to create user.');
