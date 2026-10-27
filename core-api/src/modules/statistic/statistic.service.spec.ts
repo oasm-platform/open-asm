@@ -244,6 +244,34 @@ describe('StatisticService', () => {
       });
     });
 
+    it('names the hosts the run found first', async () => {
+      snapshotSpy().mockResolvedValue({
+        hosts: 2,
+        ports: 0,
+        services: 2,
+        techs: 0,
+      });
+      const newHosts = jest
+        .spyOn(service, 'newHostsOfRun')
+        .mockResolvedValue({ total: 12, sample: ['a.cline.bot', 'b.cline.bot'] });
+      const job = targetJob({ port_scan: { status: 'done' } });
+      (job.jobHistory as { id?: string }).id = 'run-1';
+
+      await service.handleWorkflowEnd(job);
+
+      expect(newHosts).toHaveBeenCalledWith('run-1', 'target-1');
+      expect(publishedPayload()?.payload).toMatchObject({
+        newHosts: ['a.cline.bot', 'b.cline.bot'],
+        newHostsTotal: 12,
+      });
+    });
+
+    it('reports no new hosts for a run without an id', async () => {
+      await expect(service.newHostsOfRun(undefined, 'target-1')).resolves.toEqual(
+        { total: 0, sample: [] },
+      );
+    });
+
     it('marks a partial run as a failure outcome', async () => {
       // The run did not finish its graph, so the envelope says so — that is how
       // the `notifications` lane knows to send the "scan stopped halfway"

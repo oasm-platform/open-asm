@@ -1751,6 +1751,8 @@ export type GetAssetsResponseDto = {
   port?: number;
   isEnabled: boolean;
   screenshotPath?: GetAssetsResponseDtoScreenshotPath;
+  /** Found by the latest finished scan of its kind on this target (badged as new) */
+  isNew?: boolean;
 };
 
 export type GetManyGetAssetsResponseDtoDto = {
@@ -1808,6 +1810,8 @@ export type GetHostAssetsDTO = {
   isEnabled: boolean;
   assetCount: number;
   createdAt: string;
+  /** Found by the latest finished scan of its kind on this target (badged as new) */
+  isNew?: boolean;
 };
 
 export type GetManyGetHostAssetsDTODto = {
@@ -1822,6 +1826,10 @@ export type GetManyGetHostAssetsDTODto = {
 export type GetPortAssetsDTO = {
   port: string;
   assetCount: number;
+  /** Services on this port found by the latest finished scan of their target */
+  newCount?: number;
+  /** Every service on this port is new: the port was not open in this view before */
+  isNew?: boolean;
 };
 
 export type GetManyGetPortAssetsDTODto = {
@@ -1836,6 +1844,8 @@ export type GetManyGetPortAssetsDTODto = {
 export type GetUrlAssetsDTO = {
   url: string;
   assetCount: number;
+  /** Found on any of its services by the latest finished URL discovery (badged as new) */
+  isNew?: boolean;
 };
 
 export type GetManyGetUrlAssetsDTODto = {
@@ -4933,6 +4943,10 @@ export type AssetsControllerGetAssetsInWorkspaceParams = {
    * Filter assets created on or before this date (YYYY-MM-DD)
    */
   endDate?: string;
+  /**
+   * Only rows the latest finished scan of their target found (the ones badged as new)
+   */
+  isNew?: boolean;
 };
 
 export type AssetsControllerGetIpAssetsParams = {
@@ -4962,6 +4976,10 @@ export type AssetsControllerGetIpAssetsParams = {
    * Filter assets created on or before this date (YYYY-MM-DD)
    */
   endDate?: string;
+  /**
+   * Only rows the latest finished scan of their target found (the ones badged as new)
+   */
+  isNew?: boolean;
 };
 
 export type AssetsControllerGetHostAssetsParams = {
@@ -4991,6 +5009,10 @@ export type AssetsControllerGetHostAssetsParams = {
    * Filter assets created on or before this date (YYYY-MM-DD)
    */
   endDate?: string;
+  /**
+   * Only rows the latest finished scan of their target found (the ones badged as new)
+   */
+  isNew?: boolean;
 };
 
 export type AssetsControllerGetPortAssetsParams = {
@@ -5020,6 +5042,10 @@ export type AssetsControllerGetPortAssetsParams = {
    * Filter assets created on or before this date (YYYY-MM-DD)
    */
   endDate?: string;
+  /**
+   * Only rows the latest finished scan of their target found (the ones badged as new)
+   */
+  isNew?: boolean;
 };
 
 export type AssetsControllerGetUrlAssetsParams = {
@@ -5049,6 +5075,10 @@ export type AssetsControllerGetUrlAssetsParams = {
    * Filter assets created on or before this date (YYYY-MM-DD)
    */
   endDate?: string;
+  /**
+   * Only rows the latest finished scan of their target found (the ones badged as new)
+   */
+  isNew?: boolean;
 };
 
 export type AssetsControllerGetTechnologyAssetsParams = {
@@ -5078,6 +5108,10 @@ export type AssetsControllerGetTechnologyAssetsParams = {
    * Filter assets created on or before this date (YYYY-MM-DD)
    */
   endDate?: string;
+  /**
+   * Only rows the latest finished scan of their target found (the ones badged as new)
+   */
+  isNew?: boolean;
 };
 
 export type AssetsControllerGetStatusCodeAssetsParams = {
@@ -5107,6 +5141,10 @@ export type AssetsControllerGetStatusCodeAssetsParams = {
    * Filter assets created on or before this date (YYYY-MM-DD)
    */
   endDate?: string;
+  /**
+   * Only rows the latest finished scan of their target found (the ones badged as new)
+   */
+  isNew?: boolean;
 };
 
 export type AssetsControllerGetTlsAssetsParams = {
@@ -5158,6 +5196,10 @@ export type AssetsControllerGetTagAssetsParams = {
    * Filter assets created on or before this date (YYYY-MM-DD)
    */
   endDate?: string;
+  /**
+   * Only rows the latest finished scan of their target found (the ones badged as new)
+   */
+  isNew?: boolean;
 };
 
 export type AssetsControllerGetAssetGraphParams = {

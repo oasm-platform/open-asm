@@ -55,7 +55,12 @@ import { AssetTag } from './entities/asset-tags.entity';
 import { Asset } from './entities/assets.entity';
 import { DnsRecord } from './entities/dns-record.entity';
 import { HttpResponseTechnology } from './entities/http-response-technology.entity';
-import { compileAssetFilter, legacyParamsToFilter } from './asset-filter';
+import {
+  compileAssetFilter,
+  legacyParamsToFilter,
+  type NewRowsScope,
+} from './asset-filter';
+import { findFreshRuns, isFresh } from './fresh-runs';
 import { HttpStatusCode } from './entities/http-status-code.entity';
 import {
   IpObservation,
@@ -342,8 +347,17 @@ export class AssetsService {
     const latestIds = items
       .map((item) => item.httpResponses?.[0]?.id)
       .filter((id): id is string => !!id);
-    const { ipsByAsset, techByResponse, tlsByResponse } =
-      await this.loadFacets(assetIds, latestIds);
+    const [{ ipsByAsset, techByResponse, tlsByResponse }, fresh] =
+      await Promise.all([
+        this.loadFacets(assetIds, latestIds),
+        findFreshRuns(
+          this.dataSource,
+          items.map((item) => ({
+            jobHistoryId: item.jobHistoryId,
+            targetId: item.asset?.targetId,
+          })),
+        ),
+      ]);
     const techDetails = await this.enrichTechStrings(
       [...techByResponse.values()].flat(),
     );
@@ -379,6 +393,10 @@ export class AssetsService {
       asset.dnsRecords = item.asset?.dnsRecords;
       asset.isEnabled = item.asset?.isEnabled;
       asset.port = item.port;
+      asset.isNew = isFresh(fresh, {
+        jobHistoryId: item.jobHistoryId,
+        targetId: item.asset?.targetId,
+      });
       asset.screenshotPath =
         (item.screenshotPath &&
           (urlByRaw.get(item.screenshotPath) ?? null)) ||
@@ -418,7 +436,16 @@ export class AssetsService {
     return tlsByResponse.get(httpResponseId) ?? null;
   }
 
-  private buildBaseQuery(query: GetAssetsQueryDto, workspaceId: string) {
+  /**
+   * @param newRows - Which row an `isNew` condition (`?isNew=true` or the
+   *   filter tree) is about; see {@link NewRowsScope}. `url` requires the
+   *   caller to correlate this query with a `du` (discovered_urls) row.
+   */
+  private buildBaseQuery(
+    query: GetAssetsQueryDto,
+    workspaceId: string,
+    newRows: NewRowsScope = 'service',
+  ) {
     const queryBuilder = this.assetServiceRepo
       .createQueryBuilder('asset_service')
       .leftJoinAndSelect('asset_service.asset', 'asset')
@@ -443,7 +470,7 @@ export class AssetsService {
       [legacyParamsToFilter(query), 'lf'],
       [query.filter, 'af'],
     ] as const) {
-      const compiled = filter && compileAssetFilter(filter, prefix);
+      const compiled = filter && compileAssetFilter(filter, prefix, newRows);
       if (compiled) queryBuilder.andWhere(compiled.sql, compiled.params);
     }
 
@@ -742,13 +769,16 @@ export class AssetsService {
     };
     query.sortBy = sortColumnMap[query.sortBy] ?? '"assetCount"';
 
-    const queryBuilder = this.buildBaseQuery(query, workspaceId)
+    // New hosts, not hosts with a new port: the run-completed notification
+    // counts hosts the same way.
+    const queryBuilder = this.buildBaseQuery(query, workspaceId, 'asset')
       .select([
         'asset.id',
         'asset.value',
         'asset.targetId',
         'asset.isEnabled',
         'asset.createdAt',
+        'asset.jobHistoryId',
         'COUNT(DISTINCT asset_service.id) as "assetCount"',
       ])
       .andWhere('asset.value IS NOT NULL')
@@ -775,25 +805,37 @@ export class AssetsService {
 
     const total = totalInDb?.count ?? 0;
 
-    const data = list.map(
-      (item: {
-        asset_id: string;
-        asset_value: string;
-        asset_targetId: string;
-        asset_isEnabled: boolean;
-        asset_createdAt: string;
-        assetCount: number;
-      }) => {
-        const obj = new GetHostAssetsDTO();
-        obj.id = item.asset_id;
-        obj.host = item.asset_value;
-        obj.targetId = item.asset_targetId;
-        obj.isEnabled = item.asset_isEnabled;
-        obj.assetCount = item.assetCount;
-        obj.createdAt = new Date(item.asset_createdAt);
-        return obj;
-      },
+    type HostRow = {
+      asset_id: string;
+      asset_value: string;
+      asset_targetId: string;
+      asset_isEnabled: boolean;
+      asset_createdAt: string;
+      asset_jobHistoryId: string | null;
+      assetCount: number;
+    };
+    const fresh = await findFreshRuns(
+      this.dataSource,
+      (list as HostRow[]).map((item) => ({
+        jobHistoryId: item.asset_jobHistoryId,
+        targetId: item.asset_targetId,
+      })),
     );
+
+    const data = (list as HostRow[]).map((item) => {
+      const obj = new GetHostAssetsDTO();
+      obj.id = item.asset_id;
+      obj.host = item.asset_value;
+      obj.targetId = item.asset_targetId;
+      obj.isEnabled = item.asset_isEnabled;
+      obj.assetCount = item.assetCount;
+      obj.createdAt = new Date(item.asset_createdAt);
+      obj.isNew = isFresh(fresh, {
+        jobHistoryId: item.asset_jobHistoryId,
+        targetId: item.asset_targetId,
+      });
+      return obj;
+    });
 
     return getManyResponse({ query, data, total });
   }
@@ -883,10 +925,41 @@ export class AssetsService {
 
     const total = totalInDb?.count ?? 0;
 
-    const data = list.map((item: GetPortAssetsDTO) => {
+    // A port row is an aggregate with no run of its own: count, for the page's
+    // ports only, how many of its services the latest finished scans found.
+    const pagePorts = (list as GetPortAssetsDTO[]).map((item) => item.port);
+    const provenance = pagePorts.length
+      ? await this.buildBaseQuery(query, workspaceId)
+          .select('asset_service.port', 'port')
+          .addSelect('asset_service.jobHistoryId', 'jobHistoryId')
+          .addSelect('asset.targetId', 'targetId')
+          .addSelect('COUNT(DISTINCT asset_service.id)', 'count')
+          .andWhere('asset_service.port IN (:...pagePorts)', { pagePorts })
+          .groupBy('asset_service.port')
+          .addGroupBy('asset_service.jobHistoryId')
+          .addGroupBy('asset.targetId')
+          .getRawMany<{
+            port: number | string;
+            jobHistoryId: string | null;
+            targetId: string;
+            count: string;
+          }>()
+      : [];
+    const fresh = await findFreshRuns(this.dataSource, provenance);
+    const newCountByPort = new Map<string, number>();
+    for (const row of provenance) {
+      if (!isFresh(fresh, row)) continue;
+      const port = String(row.port);
+      newCountByPort.set(port, (newCountByPort.get(port) ?? 0) + Number(row.count));
+    }
+
+    const data = (list as GetPortAssetsDTO[]).map((item) => {
       const obj = new GetPortAssetsDTO();
       obj.port = item.port;
       obj.assetCount = item.assetCount;
+      obj.newCount = newCountByPort.get(String(item.port)) ?? 0;
+      obj.isNew =
+        obj.newCount > 0 && obj.newCount === Number(item.assetCount);
       return obj;
     });
 
@@ -916,10 +989,13 @@ export class AssetsService {
 
     // The filtered asset-service scope: reusing buildBaseQuery keeps every
     // filter (targetIds/hosts/ip/ports/techs/statusCodes/tls/dates) intact.
-    const filteredServicesQuery = this.buildBaseQuery(
-      query,
-      workspaceId,
-    ).select('asset_service.id');
+    // Correlated with the outer `du` row (EXISTS, which Postgres runs as a
+    // semi-join) so an `isNew` condition can judge the URL's own run: a URL
+    // is new when the latest URL discovery found it, whatever its service's age.
+    const filteredServicesQuery = this.buildBaseQuery(query, workspaceId, 'url')
+      .select('asset_service.id')
+      .andWhere('asset_service.id = du."assetServiceId"');
+    const inFilteredServices = `EXISTS (${filteredServicesQuery.getQuery()})`;
 
     const parameters: Record<string, unknown> = {
       ...filteredServicesQuery.getParameters(),
@@ -932,7 +1008,7 @@ export class AssetsService {
       SELECT du.url AS url, COUNT(DISTINCT du."assetServiceId") AS "assetCount"
       FROM discovered_urls du
       WHERE du.url IS NOT NULL AND du.url <> ''
-        AND du."assetServiceId" IN (${filteredServicesQuery.getQuery()})${
+        AND ${inFilteredServices}${
           query.value ? ' AND du.url ILIKE :urlValue' : ''
         }
       GROUP BY du.url
@@ -961,10 +1037,35 @@ export class AssetsService {
 
     const total = totalInDb?.count ?? 0;
 
+    // Provenance of the page's URLs only: a URL is new when any of its
+    // services got it from the latest finished URL discovery.
+    const pageUrls = list.map((item) => item.url);
+    const provenance = pageUrls.length
+      ? await this.dataSource
+          .createQueryBuilder()
+          .select('du.url', 'url')
+          .addSelect('du."jobHistoryId"', 'jobHistoryId')
+          .addSelect('a."targetId"', 'targetId')
+          .distinct(true)
+          .from('discovered_urls', 'du')
+          .innerJoin('asset_services', 's', 's.id = du."assetServiceId"')
+          .innerJoin('assets', 'a', 'a.id = s."assetId"')
+          .where(inFilteredServices)
+          .andWhere('du.url IN (:...pageUrls)')
+          .andWhere('du."jobHistoryId" IS NOT NULL')
+          .setParameters({ ...parameters, pageUrls })
+          .getRawMany<{ url: string; jobHistoryId: string; targetId: string }>()
+      : [];
+    const fresh = await findFreshRuns(this.dataSource, provenance);
+    const newUrls = new Set(
+      provenance.filter((row) => isFresh(fresh, row)).map((row) => row.url),
+    );
+
     const data = list.map((item: GetUrlAssetsDTO) => {
       const obj = new GetUrlAssetsDTO();
       obj.url = item.url;
       obj.assetCount = item.assetCount;
+      obj.isNew = newUrls.has(item.url);
       return obj;
     });
 
