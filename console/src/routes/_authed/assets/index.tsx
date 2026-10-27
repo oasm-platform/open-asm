@@ -1,18 +1,17 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, stripSearchParams } from '@tanstack/react-router';
 import { z } from 'zod';
+import { tableSearch } from '@/lib/table-search';
 import Assets from '@/pages/assets/assets';
 
 const legacyParam = z
   .union([z.string(), z.number(), z.array(z.union([z.string(), z.number()]))])
   .optional(); // the router JSON-parses `?ports=443` into a number
 
+const table = tableSearch({ sortBy: 'value', sortOrder: 'ASC' }, { tab: 'service' });
+
 const assetsSearchSchema = z.object({
   tab: z.string().default('service'),
-  page: z.number().default(1),
-  pageSize: z.number().default(10),
-  sortBy: z.string().default('value'),
-  sortOrder: z.enum(['ASC', 'DESC']).default('ASC'),
-  filter: z.string().default(''),
+  ...table.shape,
   where: z.string().optional(),
   ipAddresses: legacyParam,
   ports: legacyParam,
@@ -27,6 +26,7 @@ const assetsSearchSchema = z.object({
 
 export const Route = createFileRoute('/_authed/assets/')({
   validateSearch: assetsSearchSchema,
+  search: { middlewares: [stripSearchParams(table.defaults)] },
   component: () => (
       <Assets />
   ),
