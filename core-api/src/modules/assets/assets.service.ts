@@ -1,5 +1,6 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
+import { JobRunType } from '@/common/enums/enum';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as Mustache from 'mustache';
@@ -547,11 +548,14 @@ export class AssetsService {
    * Triggers a rescan for a specific asset by creating new jobs for relevant workers.
    *
    * @param assetId - The ID of the asset to rescan.
+   * @param jobRunType - Recorded on the run: the target's scan schedule passes
+   *   SCHEDULED, a user re-scan keeps MANUAL.
    * @throws Error if the asset is not found.
    */
   public async reScan(
     targetId: string,
     workspaceId: string,
+    jobRunType: JobRunType = JobRunType.MANUAL,
   ): Promise<DefaultMessageResponseDto> {
     // The rescan runs inside the target's own workspace — assert the caller is
     // acting in that workspace before any worker jobs are dispatched.
@@ -593,10 +597,12 @@ export class AssetsService {
 
     // The trigger name carries the target type (`ip.re-scan`, `cidr.re-scan`)
     // so the matching workflow runs — it used to be hard-coded to `domain`,
-    // which ran domain discovery on IP and CIDR targets.
+    // which ran domain discovery on IP and CIDR targets. The run type rides
+    // along so TriggerWorkflowService records a scheduled run as scheduled.
     this.eventEmitter.emit(
       `target.${target.type.toLowerCase()}.re-scan`,
       target,
+      { jobRunType },
     );
 
     return {

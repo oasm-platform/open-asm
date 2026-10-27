@@ -71,6 +71,24 @@ export function hasUnfinishedSteps(
   );
 }
 
+/**
+ * `asset.url.discovered` — the URLs one url_discovery run found on a target
+ * that no earlier run had stored. One event per target of the run.
+ */
+export interface UrlDiscoveredPayload {
+  jobHistoryId: string;
+  targetId: string;
+  targetValue: string;
+  /** How many new URLs the run stored for the target. */
+  count: number;
+  /**
+   * The first of them, alphabetically. A first discovery stores thousands of
+   * URLs, far past what one stream entry should carry, so this is the one
+   * payload that ships a preview rather than the full records.
+   */
+  urls: string[];
+}
+
 /** `vulnerability.analysis.completed` — addressed to the requesting user. */
 export interface VulnerabilityAnalysisCompletedPayload {
   userId: string;
@@ -82,6 +100,7 @@ export interface EventPayloadMap {
   'vulnerability.detected': VulnerabilityDetectedPayload;
   'workflow.run.completed': WorkflowRunCompletedPayload;
   'vulnerability.analysis.completed': VulnerabilityAnalysisCompletedPayload;
+  'asset.url.discovered': UrlDiscoveredPayload;
 }
 
 export type PayloadEventName = keyof EventPayloadMap & EventName;

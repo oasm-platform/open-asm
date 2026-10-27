@@ -1636,11 +1636,24 @@ export type WorkflowStepStatusDto = {
   jobs: number;
   /** Job rows that failed. A step is still done when it produced results (unless it sets allowFailure: false) */
   failed?: number;
+  /** Job rows a worker is executing right now; omitted when none. A dispatched step without any is still queued, waiting for a worker to pick its jobs up */
+  running?: number;
   toolId?: string;
   logoUrl?: string;
   dispatchedAt?: string;
   finishedAt?: string;
 };
+
+/**
+ * How the run was started: by a user (manual) or by a schedule
+ */
+export type JobHistoryDetailResponseDtoJobRunType =
+  (typeof JobHistoryDetailResponseDtoJobRunType)[keyof typeof JobHistoryDetailResponseDtoJobRunType];
+
+export const JobHistoryDetailResponseDtoJobRunType = {
+  manual: 'manual',
+  scheduled: 'scheduled',
+} as const;
 
 export type JobHistoryDetailResponseDto = {
   id: string;
@@ -1650,6 +1663,8 @@ export type JobHistoryDetailResponseDto = {
   steps: WorkflowStepStatusDto[];
   workflowName?: string;
   jobHistoryName: string;
+  /** How the run was started: by a user (manual) or by a schedule */
+  jobRunType?: JobHistoryDetailResponseDtoJobRunType;
   activeJobsCount: number;
 };
 
@@ -1830,6 +1845,11 @@ export type GetManyGetUrlAssetsDTODto = {
   limit: number;
   hasNextPage: boolean;
   pageCount: number;
+};
+
+export type DiscoverUrlsDto = {
+  /** IDs of the domain targets to discover URLs for */
+  targetIds: string[];
 };
 
 export type TechnologyDetailDTOJs = { [key: string]: unknown };
@@ -21645,6 +21665,100 @@ export function useAssetsControllerGetUrlAssets<
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+/**
+ * Runs the url_discovery workflow (gau) on one or more domain targets. URLs are collected from the live HTTP services of each target.
+ * @summary Discover urls
+ */
+export const assetsControllerDiscoverUrls = (
+  discoverUrlsDto: DiscoverUrlsDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/assets/url/discover`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: discoverUrlsDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAssetsControllerDiscoverUrlsMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof assetsControllerDiscoverUrls>>,
+    TError,
+    { data: DiscoverUrlsDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof assetsControllerDiscoverUrls>>,
+  TError,
+  { data: DiscoverUrlsDto },
+  TContext
+> => {
+  const mutationKey = ['assetsControllerDiscoverUrls'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof assetsControllerDiscoverUrls>>,
+    { data: DiscoverUrlsDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return assetsControllerDiscoverUrls(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AssetsControllerDiscoverUrlsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof assetsControllerDiscoverUrls>>
+>;
+export type AssetsControllerDiscoverUrlsMutationBody = DiscoverUrlsDto;
+export type AssetsControllerDiscoverUrlsMutationError = unknown;
+
+/**
+ * @summary Discover urls
+ */
+export const useAssetsControllerDiscoverUrls = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof assetsControllerDiscoverUrls>>,
+      TError,
+      { data: DiscoverUrlsDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof assetsControllerDiscoverUrls>>,
+  TError,
+  { data: DiscoverUrlsDto },
+  TContext
+> => {
+  return useMutation(
+    getAssetsControllerDiscoverUrlsMutationOptions(options),
+    queryClient,
+  );
+};
 
 /**
  * Retrieves a list of technologies with number of assets.

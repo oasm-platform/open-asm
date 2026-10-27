@@ -148,6 +148,30 @@ const JOB_HISTORY_STATUS_SQL = `CASE
           ELSE '${JobStatus.PENDING}'
         END`;
 
+/** Default HTTPS and HTTP ports win, then the lowest port. */
+const urlDiscoveryPortRank = (port: number): number =>
+  port === 443 ? -2 : port === 80 ? -1 : port;
+
+/**
+ * Keeps one service per asset. Connector inputs carry only the host
+ * (`buildConnectorInputs`), so URL_DISCOVERY jobs for two ports of the same
+ * host received identical inputs and stored the same URLs once per port.
+ */
+const oneServicePerAsset = (services: AssetService[]): AssetService[] => {
+  const byAsset = new Map<string, AssetService>();
+  for (const service of services) {
+    const assetId = service.asset?.id ?? service.assetId;
+    const kept = byAsset.get(assetId);
+    if (
+      !kept ||
+      urlDiscoveryPortRank(service.port) < urlDiscoveryPortRank(kept.port)
+    ) {
+      byAsset.set(assetId, service);
+    }
+  }
+  return [...byAsset.values()];
+};
+
 @Injectable()
 export class JobsRegistryService {
   constructor(
@@ -391,7 +415,7 @@ export class JobsRegistryService {
       const liveOnly =
         jobCategory === ToolCategory.SCREENSHOT ||
         jobCategory === ToolCategory.URL_DISCOVERY;
-      const assetServices = await this.findAssetServicesForJob(
+      const services = await this.findAssetServicesForJob(
         targetIds,
         assetIds,
         workspaceId,
@@ -399,6 +423,10 @@ export class JobsRegistryService {
         assetServiceIds,
         targetTypes,
       );
+      const assetServices =
+        jobCategory === ToolCategory.URL_DISCOVERY
+          ? oneServicePerAsset(services)
+          : services;
 
       // Step 3: iterate tools and create jobs
       const defaultCommand = builtInTools.find(
@@ -1391,6 +1419,7 @@ export class JobsRegistryService {
       updatedAt,
       workflow,
       jobHistoryName,
+      jobRunType,
     } = jobHistory;
 
     const activeJobsCount = await this.repo.count({
@@ -1406,6 +1435,7 @@ export class JobsRegistryService {
       jobHistoryName,
       createdAt,
       updatedAt,
+      jobRunType,
       tools,
       steps,
       activeJobsCount,
@@ -1456,6 +1486,25 @@ export class JobsRegistryService {
   // Build a lookup map: toolId → computed status
   const toolStatusMap = new Map<string, JobStatus>();
   rawToolStatuses.forEach((row) => toolStatusMap.set(row.toolId, row.status));
+
+  // Jobs a worker is executing, per step (tool + category). A dispatched step
+  // only has its jobs created: until a worker picks one up it is queued.
+  const rawRunning = await this.repo
+    .createQueryBuilder('job')
+    .select('job.toolId', 'toolId')
+    .addSelect('job.category', 'category')
+    .addSelect(
+      `COUNT(*) FILTER (WHERE job.status = '${JobStatus.IN_PROGRESS}')`,
+      'running',
+    )
+    .where('job.jobHistoryId = :historyId', { historyId: jobHistory.id })
+    .groupBy('job.toolId')
+    .addGroupBy('job.category')
+    .getRawMany<{ toolId: string; category: string; running: string }>();
+  const runningByStep = new Map<string, number>();
+  rawRunning.forEach((row) =>
+    runningByStep.set(`${row.toolId}:${row.category}`, Number(row.running ?? 0)),
+  );
 
   // Map tools from workflow content with their computed status.
   // Only id/name/logoUrl/status are exposed — the UI renders nothing else
@@ -1518,16 +1567,19 @@ export class JobsRegistryService {
     const tool = installedToolsByName.get(job.run);
     const state = persistedSteps[id];
     const derived = tool ? toolStatusMap.get(tool.id!) : undefined;
+    const category = this.stepCategory(tool, job.category);
+    const running = tool ? runningByStep.get(`${tool.id}:${category}`) : 0;
     return {
       id,
       name: job.name ?? id,
       run: job.run,
-      category: this.stepCategory(tool, job.category),
+      category,
       needs: normalizeNeeds(job.needs),
       status: state?.status ?? this.toRunStepStatus(derived),
       reason: state?.reason,
       jobs: state?.jobs ?? 0,
       failed: state?.failed,
+      running: running || undefined,
       toolId: tool?.id,
       logoUrl: tool?.logoUrl,
       dispatchedAt: state?.dispatchedAt

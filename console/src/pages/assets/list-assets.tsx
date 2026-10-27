@@ -13,6 +13,7 @@ import TechnologyAssetsTab from './components/technology-assets-tab';
 import TlsAssetsTab from './components/tls-assets-tab';
 import UrlAssetsTab from './components/url-assets-tab';
 import { GraphTab } from './components/graph-tab';
+import { DiscoverUrlsDialog } from './components/discover-urls-dialog';
 
 const VALID_VALUES = [
   'service',
@@ -35,9 +36,14 @@ type ExtraTab = {
 type ListAssetsProps = {
   /** Tabs inserted right after Services; they render without the asset filter bar. */
   extraTabs?: ExtraTab[];
+  /** Toolbar actions of the URLs tab; `null` shows none. */
+  urlsActions?: ReactNode;
 };
 
-export function ListAssets({ extraTabs = [] }: ListAssetsProps) {
+export function ListAssets({
+  extraTabs = [],
+  urlsActions = <DiscoverUrlsDialog />,
+}: ListAssetsProps) {
   const assetTabList = [
     {
       value: 'service',
@@ -103,9 +109,10 @@ export function ListAssets({ extraTabs = [] }: ListAssetsProps) {
         <TriggerList tabTriggerList={tabList} />
         {/* mb-2 + the Tabs gap-2 = the 16px DataTable leaves between its toolbar and table (vulns, targets). */}
         {!isExtraTab && (
-          <div className="mb-2 flex justify-between items-center">
+          <div className="mb-2 flex justify-between items-center gap-2">
             <AssetFilterBar />
             {/* <ExportDataButton api="api/assets/services/export" prefix="assets" /> */}
+            {tab === 'urls' && urlsActions}
           </div>
         )}
         {tabList.find((t) => t.value == tab)?.tab}

@@ -20,6 +20,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { memo, useCallback } from 'react';
 import { Link } from '@tanstack/react-router';
+import { splitNotificationUrl } from './notification-url';
 
 dayjs.extend(relativeTime);
 
@@ -68,6 +69,8 @@ export const NotificationItem = memo(function NotificationItem({
 
   const isUnread = notification.status === NotificationResponseDtoStatus.unread;
 
+  const { to, search } = splitNotificationUrl(notification.url);
+
   const handleClick = useCallback(() => {
     if (isUnread) {
       markAsRead.mutate({ id: notification.id });
@@ -88,7 +91,8 @@ export const NotificationItem = memo(function NotificationItem({
       )}
     >
       <Link
-        to={notification.url}
+        to={to}
+        search={search}
         onClick={handleClick}
         className="flex-1 space-y-1"
       >

@@ -4,6 +4,8 @@ import {
   buildWorkflowGraphLayout,
   computeStepWaves,
   describeStep,
+  stepDisplayStatus,
+  TRIGGER_NODE_ID,
 } from './run-workflow-graph-layout';
 
 function step(
@@ -37,6 +39,7 @@ const chain: WorkflowStepStatusDto[] = [
     needs: ['port_scan'],
     status: 'dispatched',
     jobs: 42,
+    running: 5,
     dispatchedAt: '2026-01-01T00:00:00.000Z',
   }),
   step('take_screenshot', {
@@ -169,12 +172,35 @@ describe('buildWorkflowGraphLayout', () => {
 
   it('starts the arrows from the running step into the one that needs it', () => {
     const { edges } = buildWorkflowGraphLayout([
-      step('a', { status: 'dispatched' }),
+      step('a', { status: 'dispatched', jobs: 3, running: 1 }),
       step('b', { needs: ['a'], status: 'pending' }),
     ]);
 
     expect(edges[0].data).toEqual({ active: true });
     expect(edges[0].style?.stroke).toBe('var(--primary)');
+  });
+
+  it('shows a dispatched step whose jobs no worker picked up yet as queued', () => {
+    const { nodes, edges } = buildWorkflowGraphLayout([
+      step('a', { status: 'done', jobs: 1 }),
+      step('b', { needs: ['a'], status: 'dispatched', jobs: 4 }),
+    ]);
+
+    expect(nodes[1].data.status).toBe('queued');
+    expect(nodes[1].ariaLabel).toBe('b, b, queued, 4 jobs, waits for a');
+    // Nothing is executing yet, so nothing flows along the edge.
+    expect(edges[0].data).toEqual({ active: false });
+  });
+
+  it('shows the step as running once a worker executes one of its jobs', () => {
+    const { nodes } = buildWorkflowGraphLayout([
+      step('a', { status: 'dispatched', jobs: 4, running: 1 }),
+    ]);
+
+    expect(nodes[0].data).toMatchObject({ status: 'dispatched', running: 1 });
+    expect(stepDisplayStatus(step('a', { status: 'done', running: 1 }))).toBe(
+      'done',
+    );
   });
 
   it('stops the arrows once neither endpoint is running', () => {
@@ -204,6 +230,65 @@ describe('buildWorkflowGraphLayout', () => {
 
     expect(edges[0].style?.stroke).toBe('var(--destructive)');
     expect(edges[1].style?.stroke).toBe('var(--border)');
+  });
+
+  it('starts every root step from the trigger node in its own first column', () => {
+    const { nodes, edges } = buildWorkflowGraphLayout(
+      [
+        step('subdomains'),
+        step('ports'),
+        step('probe', { needs: ['subdomains', 'ports'] }),
+      ],
+      { trigger: 'scheduled', startedAt: '2026-10-27T08:30:00.000Z' },
+    );
+
+    const trigger = nodes.find((node) => node.id === TRIGGER_NODE_ID)!;
+    expect(trigger.type).toBe('workflowTrigger');
+    expect(trigger.data).toEqual({
+      trigger: 'scheduled',
+      startedAt: '2026-10-27T08:30:00.000Z',
+    });
+    expect(trigger.ariaLabel).toBe('Started by a schedule');
+    // Left of every step.
+    const stepXs = nodes
+      .filter((node) => node.id !== TRIGGER_NODE_ID)
+      .map((node) => node.position.x);
+    expect(Math.min(...stepXs)).toBeGreaterThan(trigger.position.x);
+
+    // Both roots hang off the trigger; the step with needs does not.
+    expect(edges.map((edge) => edge.id).sort()).toEqual([
+      '__trigger__->ports',
+      '__trigger__->subdomains',
+      'ports->probe',
+      'subdomains->probe',
+    ]);
+  });
+
+  it('moves the trigger edge while the root step runs', () => {
+    const { edges } = buildWorkflowGraphLayout(
+      [step('a', { status: 'dispatched', jobs: 2, running: 1 })],
+      { trigger: 'manual' },
+    );
+
+    expect(edges).toHaveLength(1);
+    expect(edges[0].source).toBe(TRIGGER_NODE_ID);
+    expect(edges[0].data).toEqual({ active: true });
+  });
+
+  it('hangs a step whose needs all point outside the run off the trigger', () => {
+    const { edges } = buildWorkflowGraphLayout(
+      [step('a', { needs: ['ghost'] })],
+      { trigger: 'manual' },
+    );
+
+    expect(edges.map((edge) => edge.id)).toEqual(['__trigger__->a']);
+  });
+
+  it('adds no trigger to a run without steps', () => {
+    const { nodes, edges } = buildWorkflowGraphLayout([], { trigger: 'manual' });
+
+    expect(nodes).toEqual([]);
+    expect(edges).toEqual([]);
   });
 
   it('drops an edge whose source step is not part of the run', () => {
