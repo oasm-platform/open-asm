@@ -1,10 +1,20 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { AssetGroupAsset } from '@/modules/asset-group/entities/asset-groups-assets.entity';
+import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity';
 import { Job } from '@/modules/jobs-registry/entities/job.entity';
 import { Target } from '@/modules/targets/entities/target.entity';
 import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, Entity, Index, ManyToOne, OneToMany, Relation, Unique } from 'typeorm';
+import {
+  Column,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  Relation,
+  Unique,
+} from 'typeorm';
 import { AssetService } from './asset-services.entity';
 import { DnsRecord } from './dns-record.entity';
 
@@ -12,6 +22,7 @@ import { DnsRecord } from './dns-record.entity';
 @Unique(['value', 'target'])
 @Index('IDX_assets_targetId', ['targetId'])
 @Index('IDX_assets_targetId_isEnabled', ['targetId', 'isEnabled'])
+@Index('IDX_assets_jobHistoryId', ['jobHistoryId'])
 export class Asset extends BaseEntity {
   @ApiProperty()
   @Column()
@@ -26,6 +37,20 @@ export class Asset extends BaseEntity {
     onDelete: 'CASCADE',
   })
   target: Relation<Target>;
+
+  /**
+   * The run that first found this asset. Set on insert only, so a re-scan that
+   * finds it again keeps the original run. NULL for assets created outside a
+   * run (the target's primary asset, cloud integration imports) and for assets
+   * that predate this column.
+   */
+  @Column({ type: 'uuid', nullable: true })
+  jobHistoryId?: string | null;
+
+  // Provenance only: deleting the run must not delete the asset.
+  @ManyToOne(() => JobHistory, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'jobHistoryId' })
+  jobHistory?: Relation<JobHistory>;
 
   @ApiProperty()
   @Column({ default: false })

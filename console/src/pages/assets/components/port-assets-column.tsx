@@ -2,6 +2,7 @@ import { type GetPortAssetsDTO } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
 import { EthernetPort } from 'lucide-react';
 import BadgeList from './badge-list';
+import { NewBadge } from './new-badge';
 
 export const portAssetsColumn: ColumnDef<GetPortAssetsDTO>[] = [
   {
@@ -12,8 +13,9 @@ export const portAssetsColumn: ColumnDef<GetPortAssetsDTO>[] = [
     cell: ({ row }) => {
       const data = row.original;
       return (
-        <div className="flex flex-col gap-2 py-2 justify-center items-start max-w-[500px]">
+        <div className="flex items-center gap-2 py-2 max-w-[500px]">
           <BadgeList list={[data.port]} Icon={EthernetPort} />
+          <NewBadge isNew={data.isNew} count={data.newCount} />
         </div>
       );
     },

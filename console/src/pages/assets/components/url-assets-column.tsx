@@ -1,6 +1,7 @@
 import { type GetUrlAssetsDTO } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Link } from 'lucide-react';
+import { NewBadge } from './new-badge';
 
 export const urlAssetsColumn: ColumnDef<GetUrlAssetsDTO>[] = [
   {
@@ -16,6 +17,7 @@ export const urlAssetsColumn: ColumnDef<GetUrlAssetsDTO>[] = [
           <span className="truncate" title={data.url}>
             {data.url}
           </span>
+          <NewBadge isNew={data.isNew} />
         </div>
       );
     },

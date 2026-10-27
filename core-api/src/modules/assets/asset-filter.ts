@@ -12,10 +12,12 @@ import {
   type FilterTree,
 } from '@/common/utils/filter-tree';
 
+import { freshRunSql } from './fresh-runs';
+
 export { parseFilterParam } from '@/common/utils/filter-tree';
 
 export type AssetFilterField =
-  | 'host' | 'port' | 'ip' | 'tech' | 'url' | 'statusCode' | 'tlsHost' | 'tag' | 'assetGroup';
+  | 'host' | 'port' | 'ip' | 'tech' | 'url' | 'statusCode' | 'tlsHost' | 'tag' | 'assetGroup' | 'isNew';
 export type AssetFilterOp = FilterOp;
 export type AssetFilterLogic = FilterLogic;
 export type AssetFilterCondition = FilterCondition<AssetFilterField>;
@@ -39,6 +41,7 @@ const OPS: Record<AssetFilterField, readonly FilterOp[]> = {
   tlsHost: ['eq', 'neq', 'contains', 'in'],
   tag: ['eq', 'neq', 'contains', 'in', 'notIn'],
   assetGroup: ['eq', 'neq', 'in', 'notIn'],
+  isNew: ['eq'],
 };
 
 const CHECKS: Partial<Record<AssetFilterField, FilterFieldSpec['check']>> = {
@@ -46,9 +49,28 @@ const CHECKS: Partial<Record<AssetFilterField, FilterFieldSpec['check']>> = {
   port: (v) => /^\d{1,5}$/.test(v) && Number(v) <= 65535,
   statusCode: (v) => /^\d{3}$/.test(v),
   assetGroup: (v) => isUUID(v),
+  isNew: (v) => v === 'true' || v === 'false',
 };
 
-const FIELD_SQL: Record<AssetFilterField, Pick<FilterFieldSpec, 'any' | 'like' | 'subnet'>> = {
+/**
+ * Which row a list's `isNew` condition is about: the service (the default, so
+ * every service-derived tab shows what the scan added), the host itself (the
+ * Hosts tab), or the discovered URL (the URLs tab, whose service scope is
+ * correlated with its `du` row).
+ */
+export type NewRowsScope = 'service' | 'asset' | 'url';
+const NEW_ROW_RUN: Record<NewRowsScope, string> = {
+  service: 'asset_service."jobHistoryId"',
+  asset: 'asset."jobHistoryId"',
+  url: 'du."jobHistoryId"',
+};
+// `isNew = true` keeps what the latest finished scan found, `= false` the rest.
+const isNewSql = (scope: NewRowsScope): Pick<FilterFieldSpec, 'any'> => ({
+  any: (p) =>
+    `(${freshRunSql(NEW_ROW_RUN[scope], 'asset."targetId"')}) = ('true' = ANY(${p}))`,
+});
+
+const FIELD_SQL: Record<Exclude<AssetFilterField, 'isNew'>, Pick<FilterFieldSpec, 'any' | 'like' | 'subnet'>> = {
   host: {
     any: (p) => `asset.value = ANY(${p})`,
     like: (p) => `asset.value ILIKE ${p}`,
@@ -84,14 +106,28 @@ const FIELD_SQL: Record<AssetFilterField, Pick<FilterFieldSpec, 'any' | 'like' |
   },
 };
 
-export const ASSET_FILTER_SCHEMA = Object.fromEntries(
-  (Object.keys(OPS) as AssetFilterField[]).map((f) => [f, { ops: OPS[f], check: CHECKS[f], ...FIELD_SQL[f] }]),
-) as FilterSchema<AssetFilterField>;
+const schemaFor = (scope: NewRowsScope) =>
+  Object.fromEntries(
+    (Object.keys(OPS) as AssetFilterField[]).map((f) => [
+      f,
+      { ops: OPS[f], check: CHECKS[f], ...(f === 'isNew' ? isNewSql(scope) : FIELD_SQL[f]) },
+    ]),
+  ) as FilterSchema<AssetFilterField>;
+const SCHEMAS: Record<NewRowsScope, FilterSchema<AssetFilterField>> = {
+  service: schemaFor('service'),
+  asset: schemaFor('asset'),
+  url: schemaFor('url'),
+};
+
+export const ASSET_FILTER_SCHEMA = SCHEMAS.service;
 
 export const validateAssetFilter = (input: unknown) => validateFilter(ASSET_FILTER_SCHEMA, input);
 export const IsAssetFilter = () => IsFilterTree(ASSET_FILTER_SCHEMA);
-export const compileAssetFilter = (filter: AssetFilter, prefix: string) =>
-  compileFilter(ASSET_FILTER_SCHEMA, filter, prefix);
+export const compileAssetFilter = (
+  filter: AssetFilter,
+  prefix: string,
+  scope: NewRowsScope = 'service',
+) => compileFilter(SCHEMAS[scope], filter, prefix);
 
 const LEGACY_KEYS = {
   hosts: 'host',
@@ -104,10 +140,13 @@ const LEGACY_KEYS = {
 } as const satisfies Record<string, AssetFilterField>;
 
 export function legacyParamsToFilter(
-  q: Partial<Record<keyof typeof LEGACY_KEYS, string[]>>,
+  q: Partial<Record<keyof typeof LEGACY_KEYS, string[]>> & { isNew?: boolean },
 ): AssetFilter | undefined {
-  const items = Object.entries(LEGACY_KEYS)
+  const items: AssetFilterCondition[] = Object.entries(LEGACY_KEYS)
     .filter(([key]) => q[key as keyof typeof LEGACY_KEYS]?.length)
     .map(([key, field]) => ({ field, op: 'in' as const, value: q[key as keyof typeof LEGACY_KEYS]! }));
+  // `?isNew=true` (notification links, API clients) is the same condition the
+  // filter builder writes.
+  if (q.isNew) items.push({ field: 'isNew', op: 'eq', value: 'true' });
   return items.length ? { logic: 'and', items } : undefined;
 }

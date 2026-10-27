@@ -12,6 +12,7 @@ import { StorageService } from '../storage/storage.service';
 import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { AssetsService } from './assets.service';
+import { freshRunSql } from './fresh-runs';
 import { AssetService } from './entities/asset-services.entity';
 import { Asset } from './entities/assets.entity';
 import { DnsRecord } from './entities/dns-record.entity';
@@ -244,6 +245,32 @@ describe('AssetsService', () => {
         .mockReturnThis();
       (mockAssetServiceRepository as any).skip = jest.fn().mockReturnThis();
       (mockAssetServiceRepository as any).take = jest.fn().mockReturnThis();
+    });
+
+    it('isNew keeps only the services the latest finished scan found', async () => {
+      await service.getManyAsssetServices(
+        { page: 1, limit: 10, sortBy: 'createdAt', sortOrder: 'ASC', isNew: true } as any,
+        'workspace-uuid',
+      );
+
+      // `?isNew=true` becomes the filter-tree condition, judged on the service.
+      expect((mockAssetServiceRepository as any).andWhere).toHaveBeenCalledWith(
+        expect.stringContaining(
+          `(${freshRunSql('asset_service."jobHistoryId"', 'asset."targetId"')}) = ('true' = ANY(:lf0))`,
+        ),
+        { lf0: ['true'] },
+      );
+    });
+
+    it('applies no freshness predicate without isNew', async () => {
+      await service.getManyAsssetServices(
+        { page: 1, limit: 10, sortBy: 'createdAt', sortOrder: 'ASC' } as any,
+        'workspace-uuid',
+      );
+
+      const predicates = ((mockAssetServiceRepository as any).andWhere as jest.Mock)
+        .mock.calls.map(([sql]) => String(sql));
+      expect(predicates.some((sql) => sql.includes('job_histories run'))).toBe(false);
     });
 
     it('adds asset_service.id as ORDER BY tiebreaker so offset pagination stays stable when createdAt values tie', async () => {
@@ -559,6 +586,60 @@ describe('AssetsService', () => {
     });
   });
 
+  describe('getPortAssets', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      const repo = mockAssetServiceRepository as any;
+      for (const fn of ['groupBy', 'addGroupBy', 'addSelect', 'orderBy', 'limit', 'offset']) {
+        repo[fn] = jest.fn().mockReturnThis();
+      }
+      repo.getQuery = jest.fn().mockReturnValue('SELECT 1');
+      repo.getParameters = jest.fn().mockReturnValue({});
+      (mockDataSource as any).setParameters = jest.fn().mockReturnThis();
+      (mockDataSource as any).getRawOne = jest
+        .fn()
+        .mockResolvedValue({ count: '3' });
+    });
+
+    it('badges a port fully new, or counts its new services', async () => {
+      (mockAssetServiceRepository as any).getRawMany = jest
+        .fn()
+        // The page…
+        .mockResolvedValueOnce([
+          { port: 8443, assetCount: '2' },
+          { port: 443, assetCount: '5' },
+          { port: 22, assetCount: '1' },
+        ])
+        // …then where the page's services came from.
+        .mockResolvedValueOnce([
+          { port: 8443, jobHistoryId: 'run-2', targetId: 't-1', count: '2' },
+          { port: 443, jobHistoryId: 'run-2', targetId: 't-1', count: '2' },
+          { port: 443, jobHistoryId: null, targetId: 't-1', count: '3' },
+          { port: 22, jobHistoryId: 'run-1', targetId: 't-1', count: '1' },
+        ]);
+      (mockDataSource as any).query = jest
+        .fn()
+        .mockResolvedValue([{ jobHistoryId: 'run-2', targetId: 't-1' }]);
+
+      const result = await service.getPortAssets(
+        { page: 1, limit: 10, sortBy: 'assetCount', sortOrder: 'DESC' } as any,
+        'workspace-uuid',
+      );
+
+      expect(
+        result.data.map((row) => [row.port, row.isNew, row.newCount]),
+      ).toEqual([
+        [8443, true, 2],
+        [443, false, 2],
+        [22, false, 0],
+      ]);
+      expect((mockAssetServiceRepository as any).andWhere).toHaveBeenCalledWith(
+        'asset_service.port IN (:...pagePorts)',
+        { pagePorts: [8443, 443, 22] },
+      );
+    });
+  });
+
   describe('getHostAssets', () => {
     beforeEach(() => {
       jest.clearAllMocks();
@@ -583,6 +664,22 @@ describe('AssetsService', () => {
       (mockDataSource as any).getRawOne = jest
         .fn()
         .mockResolvedValue({ count: '0' });
+    });
+
+    it('isNew keeps hosts the latest finished scan found, not old hosts with a new port', async () => {
+      await service.getHostAssets(
+        { page: 1, limit: 10, sortBy: 'host', sortOrder: 'ASC', isNew: true } as any,
+        'workspace-uuid',
+      );
+
+      const predicates = ((mockAssetServiceRepository as any).andWhere as jest.Mock)
+        .mock.calls.map(([sql]) => String(sql));
+      expect(
+        predicates.some((sql) =>
+          sql.includes(freshRunSql('asset."jobHistoryId"', 'asset."targetId"')),
+        ),
+      ).toBe(true);
+      expect(predicates.some((sql) => sql.includes('asset_service."jobHistoryId"'))).toBe(false);
     });
 
     it('maps sortBy=createdAt to asset.createdAt so hosts sort by discovery time', async () => {
@@ -674,10 +771,70 @@ describe('AssetsService', () => {
       (mockDataSource as any).limit = jest.fn().mockReturnThis();
       (mockDataSource as any).offset = jest.fn().mockReturnThis();
       (mockDataSource as any).setParameters = jest.fn().mockReturnThis();
+      (mockDataSource as any).distinct = jest.fn().mockReturnThis();
+      (mockDataSource as any).innerJoin = jest.fn().mockReturnThis();
+      (mockDataSource as any).query = jest.fn().mockResolvedValue([]);
       (mockDataSource as any).getRawOne = jest
         .fn()
         .mockResolvedValue({ count: '0' });
       (mockDataSource as any).getRawMany = jest.fn().mockResolvedValue([]);
+    });
+
+    it('marks a URL new when the latest finished URL discovery found it', async () => {
+      (mockDataSource as any).getRawOne = jest
+        .fn()
+        .mockResolvedValue({ count: '2' });
+      (mockDataSource as any).getRawMany = jest
+        .fn()
+        // The page…
+        .mockResolvedValueOnce([
+          { url: 'https://a.com/admin', assetCount: '1' },
+          { url: 'https://a.com/old', assetCount: '1' },
+        ])
+        // …then where each of its URLs came from.
+        .mockResolvedValueOnce([
+          { url: 'https://a.com/admin', jobHistoryId: 'run-2', targetId: 't-1' },
+          { url: 'https://a.com/old', jobHistoryId: 'run-1', targetId: 't-1' },
+        ]);
+      (mockDataSource as any).query = jest
+        .fn()
+        .mockResolvedValue([{ jobHistoryId: 'run-2', targetId: 't-1' }]);
+
+      const result = await service.getUrlAssets(
+        { page: 1, limit: 10, sortBy: 'url', sortOrder: 'ASC' } as any,
+        'workspace-uuid',
+      );
+
+      expect(result.data.map((row) => [row.url, row.isNew])).toEqual([
+        ['https://a.com/admin', true],
+        ['https://a.com/old', false],
+      ]);
+      // The provenance lookup is bounded by the page, not the whole list.
+      expect((mockDataSource as any).setParameters).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pageUrls: ['https://a.com/admin', 'https://a.com/old'],
+        }),
+      );
+    });
+
+    it('isNew keeps URLs the latest URL discovery found, whatever their service age', async () => {
+      await service.getUrlAssets(
+        { page: 1, limit: 10, sortBy: 'url', sortOrder: 'ASC', isNew: true } as any,
+        'workspace-uuid',
+      );
+
+      // The service scope is correlated with the URL row, and the condition
+      // judges the URL's own run — not its service's.
+      expect(fromSql()).toContain('EXISTS (');
+      const predicates = ((mockAssetServiceRepository as any).andWhere as jest.Mock)
+        .mock.calls.map(([s]) => String(s));
+      expect(predicates).toContain('asset_service.id = du."assetServiceId"');
+      expect(
+        predicates.some((s) =>
+          s.includes(freshRunSql('du."jobHistoryId"', 'asset."targetId"')),
+        ),
+      ).toBe(true);
+      expect(predicates.some((s) => s.includes('asset_service."jobHistoryId"'))).toBe(false);
     });
 
     it('aggregates discovered_urls only, scoped to the filtered services', async () => {

@@ -29,6 +29,8 @@ const targetDetailSearchSchema = z.object({
   tlsHosts: legacyParam,
   startDate: z.string().optional(),
   endDate: z.string().optional(),
+  // Notification links; migrated into the filter tree on load.
+  isNew: z.union([z.boolean(), z.string()]).optional(),
 });
 
 export const Route = createFileRoute('/_authed/targets/$id/$tab')({

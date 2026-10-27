@@ -160,9 +160,19 @@ function draftWorkflowRun(event: ConsumedEvent): Body {
     fields.push({ label: 'Details', value: [clip(describeIncompleteSteps(p))] });
   }
 
+  const newHosts = (p.newHosts ?? []).slice(0, FINDINGS_PREVIEW);
+  const list: Body['list'] =
+    newHosts.length > 0
+      ? {
+          heading: 'New hosts',
+          items: newHosts.map((host): Line => [{ code: clip(host) }]),
+          more: Math.max(0, (p.newHostsTotal ?? 0) - newHosts.length),
+        }
+      : undefined;
+
   return event.outcome === AuditOutcome.Failure || incomplete
-    ? { icon: '⚠️', title: 'Scan finished incomplete', fields }
-    : { icon: '✅', title: 'Scan completed', fields };
+    ? { icon: '⚠️', title: 'Scan finished incomplete', fields, list }
+    : { icon: '✅', title: 'Scan completed', fields, list };
 }
 
 function draftUrlDiscovered(event: ConsumedEvent): Body {
