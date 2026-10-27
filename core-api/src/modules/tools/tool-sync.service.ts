@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { In, Repository } from 'typeorm';
-import { RedisLockService } from '@/services/redis/distributed-lock.service';
+import { Lock } from '@/services/redis/lock.decorator';
 import { WorkerType } from '@/common/enums/enum';
 import { JobPriority } from '@/common/enums/enum';
 import { Tool } from './entities/tools.entity';
@@ -13,6 +13,21 @@ import { StorageService } from '../storage/storage.service';
 import { DataSource } from 'typeorm';
 import { parseManifestCategories, sameCategories } from './tool-categories';
 import { builtInTools } from './tools-provider/built-in-tools';
+
+/** The manifest fields an existing tool row is overridden with. */
+type ConnectorOverride = {
+  insert: Pick<
+    Tool,
+    | 'name'
+    | 'isOfficialSupport'
+    | 'description'
+    | 'categories'
+    | 'version'
+    | 'logoUrl'
+    | 'priority'
+  >;
+  logoBase64?: string;
+};
 
 /**
  * Handles all startup synchronization of tool data:
@@ -33,8 +48,6 @@ export class ToolSyncService implements OnModuleInit {
 
     @InjectRepository(WorkspaceTool)
     private readonly workspaceToolRepository: Repository<WorkspaceTool>,
-
-    private readonly redisLockService: RedisLockService,
 
     private readonly storageService: StorageService,
 
@@ -120,11 +133,7 @@ export class ToolSyncService implements OnModuleInit {
 
     // Remove built-in tools no longer declared — wrapped in distributed
     // lock so only one replica runs cleanup across a multi-instance cluster.
-    await this.redisLockService.withLock(
-      'built-in-tools-sync',
-      10_000,
-      () => this.removeOrphanBuiltInTools(),
-    );
+    await this.removeOrphanBuiltInTools();
 
     // Sync connector tools from manifest.json (logo stored as path, upload base64 after commit)
     // This also handles legacy PROVIDER → CONNECTOR takeover and orphan cleanup.
@@ -142,25 +151,18 @@ export class ToolSyncService implements OnModuleInit {
     // Single-writer invariant: manifest read → dedup → override → upsert →
     // orphan cleanup runs under one distributed lock so concurrent replicas of
     // the API cannot interleave reads and writes of the tools table.
-    // withLock releases the lock as soon as the action completes, so the TTL
+    // @Lock releases the lock as soon as the sync completes, so the TTL
     // (120s) only matters if a replica dies mid-sync — generous headroom for
     // manifest fetch, logo uploads and the inner locks.
-    const synced = await this.redisLockService.withLock(
-      'connector-sync',
-      120_000,
-      () => this.syncConnectorToolsLocked(),
-    );
-    if (synced === null) {
-      return [];
-    }
-    return synced;
+    return (await this.syncConnectorToolsLocked()) ?? [];
   }
 
   /**
-   * Locked body of syncConnectorTools — must only run under the 'connector-sync'
-   * distributed lock acquired by the wrapper above.
+   * Locked body of syncConnectorTools. Resolves undefined, without syncing,
+   * while another replica holds the 'connector-sync' lock.
    */
-  private async syncConnectorToolsLocked(): Promise<Tool[]> {
+  @Lock('connector-sync', { ttl: 120_000 })
+  private async syncConnectorToolsLocked(): Promise<Tool[] | undefined> {
     const manifestPath = path.resolve(
       process.cwd(),
       'resources',
@@ -280,101 +282,11 @@ export class ToolSyncService implements OnModuleInit {
       existingByName.set(t.name, arr);
     }
     // Deduplicate: keep one per name (prefer CONNECTOR, else first), migrate FKs from dups
-    const existingMap = new Map<string, Tool>();
-    await this.redisLockService.withLock('connector-override-dedup', 10_000, async () => {
-      for (const [name, rows] of existingByName.entries()) {
-        if (rows.length <= 1) {
-          existingMap.set(name, rows[0]);
-          continue;
-        }
-        // Keep the row that is already CONNECTOR if exists, otherwise first
-        rows.sort((a, b) => {
-          if (a.type === WorkerType.CONNECTOR && b.type !== WorkerType.CONNECTOR) return -1;
-          if (b.type === WorkerType.CONNECTOR && a.type !== WorkerType.CONNECTOR) return 1;
-          return 0;
-        });
-        const keeper = rows[0];
-        existingMap.set(name, keeper);
-        const dups = rows.slice(1);
-        for (const dup of dups) {
-          const dupId = dup.id;
-          const keepId = keeper.id;
-          if (!dupId || !keepId) continue;
-          await this.workspaceToolRepository.manager.query(
-            `DELETE FROM workspace_tools WHERE "toolId" = $1 AND "workspaceId" IN (SELECT "workspaceId" FROM workspace_tools WHERE "toolId" = $2)`,
-            [dupId, keepId],
-          );
-          await this.workspaceToolRepository.manager.query(`UPDATE workspace_tools SET "toolId" = $1 WHERE "toolId" = $2`, [keepId, dupId]);
-          await this.dataSource.query(`UPDATE workers SET "toolId" = $1 WHERE "toolId" = $2`, [keepId, dupId]);
-          await this.workspaceToolRepository.manager.query(
-            `DELETE FROM "tool_config_profiles" WHERE "toolId" = $1 AND ("workspaceId", "name") IN (SELECT "workspaceId", "name" FROM "tool_config_profiles" WHERE "toolId" = $2)`,
-            [dupId, keepId],
-          );
-          await this.workspaceToolRepository.manager.query(`UPDATE "tool_config_profiles" SET "toolId" = $1 WHERE "toolId" = $2`, [keepId, dupId]);
-          await this.workspaceToolRepository.manager.query(`UPDATE "api_keys" SET "ref" = $1 WHERE "ref" = $2 AND "type" = 'tool'`, [String(keepId), String(dupId)]);
-          await this.workspaceToolRepository.manager.query(`UPDATE "jobs" SET "toolId" = $1 WHERE "toolId" = $2`, [keepId, dupId]);
-          await this.workspaceToolRepository.manager.query(`UPDATE "vulnerabilities" SET "toolId" = $1 WHERE "toolId" = $2`, [keepId, dupId]);
-          await this.workspaceToolRepository.manager.query(`UPDATE "asset_services_tags" SET "toolId" = $1 WHERE "toolId" = $2`, [keepId, dupId]);
-          try {
-            await this.workspaceToolRepository.manager.query(`UPDATE "asset_tags" SET "toolId" = $1 WHERE "toolId" = $2`, [keepId, dupId]);
-          } catch {
-            void 0; // ignore if asset_tags table/col not exists (legacy DB)
-          }
-          await this.toolsRepository.delete(dupId);
-        }
-      }
-    });
+    const existingMap =
+      (await this.dedupeExistingTools(existingByName)) ?? new Map<string, Tool>();
 
     // Override existing tools with connector data (priority to manifest)
-    await this.redisLockService.withLock('connector-override', 10_000, async () => {
-      for (const entry of [...connectorEntries]) {
-        const slug = entry.insert.name;
-        const existing = existingMap.get(slug);
-        if (!existing) continue;
-        const needsUpdate =
-          existing.type !== WorkerType.CONNECTOR ||
-          existing.isBuiltIn !== false ||
-          existing.isOfficialSupport !== entry.insert.isOfficialSupport ||
-          existing.description !== entry.insert.description ||
-          !sameCategories(existing.categories, entry.insert.categories) ||
-          existing.version !== entry.insert.version ||
-          existing.logoUrl !== entry.insert.logoUrl ||
-          existing.priority !== entry.insert.priority;
-        if (!needsUpdate) {
-          // Already up-to-date, just remove from insert list
-          const idx = connectorEntries.findIndex((e) => e.insert.name === slug);
-          if (idx !== -1) connectorEntries.splice(idx, 1);
-          continue;
-        }
-        existing.type = WorkerType.CONNECTOR;
-        existing.isBuiltIn = false;
-        existing.isOfficialSupport = entry.insert.isOfficialSupport;
-        existing.description = entry.insert.description;
-        existing.categories = entry.insert.categories;
-        existing.version = entry.insert.version;
-        const staleLogoUrl = existing.logoUrl;
-        existing.logoUrl = entry.insert.logoUrl;
-        existing.priority = entry.insert.priority;
-        await this.toolsRepository.save(existing);
-        // Logo removed from the manifest: purge the now-orphaned stored object.
-        // Best-effort — a storage failure must not abort the sync.
-        if (staleLogoUrl && !entry.logoBase64) {
-          await this.storageService.deleteFile(`connectors/${slug}.png`, 'system').catch(() => undefined);
-        }
-        if (entry.logoBase64) {
-          try {
-            const buffer = this.decodeLogo(entry.logoBase64);
-            if (buffer) {
-              await this.storageService.uploadFile(`connectors/${slug}.png`, buffer, 'system').catch(() => undefined);
-            }
-          } catch {
-            // ignore malformed logo payload — DB row already saved
-          }
-        }
-        const idx = connectorEntries.findIndex((e) => e.insert.name === slug);
-        if (idx !== -1) connectorEntries.splice(idx, 1);
-      }
-    });
+    await this.overrideExistingTools(connectorEntries, existingMap);
 
     const toUpsert: ToolInsert[] = [];
     const logoMap = new Map<string, string>();
@@ -389,12 +301,8 @@ export class ToolSyncService implements OnModuleInit {
 
     if (toUpsert.length === 0) {
       // Still cleanup orphans (use original manifest names to avoid false orphans after takeover splice)
-      await this.redisLockService.withLock('connector-tools-sync', 10_000, () =>
-        this.removeOrphanConnectorTools(manifestSlugs),
-      );
-      await this.redisLockService.withLock('provider-tools-sync', 10_000, () =>
-        this.removeOrphanProviderTools(manifestSlugs),
-      );
+      await this.removeOrphanConnectorTools(manifestSlugs);
+      await this.removeOrphanProviderTools(manifestSlugs);
       return [];
     }
 
@@ -436,16 +344,125 @@ export class ToolSyncService implements OnModuleInit {
     }
 
     // Cleanup connector orphans after successful sync (use original manifest names)
-    await this.redisLockService.withLock('connector-tools-sync', 10_000, () =>
-      this.removeOrphanConnectorTools(manifestSlugs),
-    );
+    await this.removeOrphanConnectorTools(manifestSlugs);
 
     // Cleanup legacy PROVIDER official-support tools no longer in manifest
-    await this.redisLockService.withLock('provider-tools-sync', 10_000, () =>
-      this.removeOrphanProviderTools(manifestSlugs),
-    );
+    await this.removeOrphanProviderTools(manifestSlugs);
 
     return committedTools;
+  }
+
+  /**
+   * Keeps one row per connector name (prefer CONNECTOR, else first) and
+   * migrates FKs from the duplicates. Resolves undefined, without touching
+   * anything, while another replica holds the lock.
+   */
+  @Lock('connector-override-dedup', { ttl: 10_000 })
+  private async dedupeExistingTools(
+    existingByName: Map<string, Tool[]>,
+  ): Promise<Map<string, Tool> | undefined> {
+    const existingMap = new Map<string, Tool>();
+    for (const [name, rows] of existingByName.entries()) {
+      if (rows.length <= 1) {
+        existingMap.set(name, rows[0]);
+        continue;
+      }
+      // Keep the row that is already CONNECTOR if exists, otherwise first
+      rows.sort((a, b) => {
+        if (a.type === WorkerType.CONNECTOR && b.type !== WorkerType.CONNECTOR) return -1;
+        if (b.type === WorkerType.CONNECTOR && a.type !== WorkerType.CONNECTOR) return 1;
+        return 0;
+      });
+      const keeper = rows[0];
+      existingMap.set(name, keeper);
+      const dups = rows.slice(1);
+      for (const dup of dups) {
+        const dupId = dup.id;
+        const keepId = keeper.id;
+        if (!dupId || !keepId) continue;
+        await this.workspaceToolRepository.manager.query(
+          `DELETE FROM workspace_tools WHERE "toolId" = $1 AND "workspaceId" IN (SELECT "workspaceId" FROM workspace_tools WHERE "toolId" = $2)`,
+          [dupId, keepId],
+        );
+        await this.workspaceToolRepository.manager.query(`UPDATE workspace_tools SET "toolId" = $1 WHERE "toolId" = $2`, [keepId, dupId]);
+        await this.dataSource.query(`UPDATE workers SET "toolId" = $1 WHERE "toolId" = $2`, [keepId, dupId]);
+        await this.workspaceToolRepository.manager.query(
+          `DELETE FROM "tool_config_profiles" WHERE "toolId" = $1 AND ("workspaceId", "name") IN (SELECT "workspaceId", "name" FROM "tool_config_profiles" WHERE "toolId" = $2)`,
+          [dupId, keepId],
+        );
+        await this.workspaceToolRepository.manager.query(`UPDATE "tool_config_profiles" SET "toolId" = $1 WHERE "toolId" = $2`, [keepId, dupId]);
+        await this.workspaceToolRepository.manager.query(`UPDATE "api_keys" SET "ref" = $1 WHERE "ref" = $2 AND "type" = 'tool'`, [String(keepId), String(dupId)]);
+        await this.workspaceToolRepository.manager.query(`UPDATE "jobs" SET "toolId" = $1 WHERE "toolId" = $2`, [keepId, dupId]);
+        await this.workspaceToolRepository.manager.query(`UPDATE "vulnerabilities" SET "toolId" = $1 WHERE "toolId" = $2`, [keepId, dupId]);
+        await this.workspaceToolRepository.manager.query(`UPDATE "asset_services_tags" SET "toolId" = $1 WHERE "toolId" = $2`, [keepId, dupId]);
+        try {
+          await this.workspaceToolRepository.manager.query(`UPDATE "asset_tags" SET "toolId" = $1 WHERE "toolId" = $2`, [keepId, dupId]);
+        } catch {
+          void 0; // ignore if asset_tags table/col not exists (legacy DB)
+        }
+        await this.toolsRepository.delete(dupId);
+      }
+    }
+    return existingMap;
+  }
+
+  /**
+   * Overrides existing tools with connector data (priority to manifest) and
+   * removes every entry it handles from `connectorEntries`, leaving only the
+   * truly new ones to insert.
+   */
+  @Lock('connector-override', { ttl: 10_000 })
+  private async overrideExistingTools(
+    connectorEntries: ConnectorOverride[],
+    existingMap: Map<string, Tool>,
+  ): Promise<void> {
+    for (const entry of [...connectorEntries]) {
+      const slug = entry.insert.name;
+      const existing = existingMap.get(slug);
+      if (!existing) continue;
+      const needsUpdate =
+        existing.type !== WorkerType.CONNECTOR ||
+        existing.isBuiltIn !== false ||
+        existing.isOfficialSupport !== entry.insert.isOfficialSupport ||
+        existing.description !== entry.insert.description ||
+        !sameCategories(existing.categories, entry.insert.categories) ||
+        existing.version !== entry.insert.version ||
+        existing.logoUrl !== entry.insert.logoUrl ||
+        existing.priority !== entry.insert.priority;
+      if (!needsUpdate) {
+        // Already up-to-date, just remove from insert list
+        const idx = connectorEntries.findIndex((e) => e.insert.name === slug);
+        if (idx !== -1) connectorEntries.splice(idx, 1);
+        continue;
+      }
+      existing.type = WorkerType.CONNECTOR;
+      existing.isBuiltIn = false;
+      existing.isOfficialSupport = entry.insert.isOfficialSupport;
+      existing.description = entry.insert.description;
+      existing.categories = entry.insert.categories;
+      existing.version = entry.insert.version;
+      const staleLogoUrl = existing.logoUrl;
+      existing.logoUrl = entry.insert.logoUrl;
+      existing.priority = entry.insert.priority;
+      await this.toolsRepository.save(existing);
+      // Logo removed from the manifest: purge the now-orphaned stored object.
+      // Best-effort — a storage failure must not abort the sync.
+      if (staleLogoUrl && !entry.logoBase64) {
+        await this.storageService.deleteFile(`connectors/${slug}.png`, 'system').catch(() => undefined);
+      }
+      if (entry.logoBase64) {
+        try {
+          const buffer = this.decodeLogo(entry.logoBase64);
+          if (buffer) {
+            await this.storageService.uploadFile(`connectors/${slug}.png`, buffer, 'system').catch(() => undefined);
+          }
+        } catch {
+          // ignore malformed logo payload — DB row already saved
+        }
+      }
+      const idx = connectorEntries.findIndex((e) => e.insert.name === slug);
+      if (idx !== -1) connectorEntries.splice(idx, 1);
+    }
   }
 
   /**
@@ -459,6 +476,7 @@ export class ToolSyncService implements OnModuleInit {
     return buffer.length > 0 ? buffer : null;
   }
 
+  @Lock('connector-tools-sync', { ttl: 10_000 })
   private async removeOrphanConnectorTools(currentNames: string[]): Promise<void> {
     const dbConnectors = await this.toolsRepository.find({
       where: { type: WorkerType.CONNECTOR },
@@ -485,8 +503,9 @@ export class ToolSyncService implements OnModuleInit {
     *
     * This is best-effort cleanup — failure should not block startup, so errors
     * are logged as warn (vs connector orphan which propagates to the outer
-    * catch). The caller already wraps this in a distributed lock.
+    * catch). Runs under a distributed lock.
     */
+  @Lock('provider-tools-sync', { ttl: 10_000 })
   private async removeOrphanProviderTools(currentConnectorNames: string[]): Promise<void> {
     const legacyProviders = await this.toolsRepository.find({
       where: {
@@ -520,6 +539,7 @@ export class ToolSyncService implements OnModuleInit {
    * in built-in-tools.ts. Deletes associated workspace_tools rows first
    * to avoid FK violations.
    */
+  @Lock('built-in-tools-sync', { ttl: 10_000 })
   private async removeOrphanBuiltInTools(): Promise<void> {
     const builtInNames = builtInTools.map((tool) => tool.name);
     const dbBuiltInTools = await this.toolsRepository.find({

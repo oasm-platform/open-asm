@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ArtifactsModule } from '../artifacts/artifacts.module';
 import { User } from '../auth/entities/user.entity';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 import { SystemConfigsModule } from './system-configs/system-configs.module';
+import { AdminUsersModule } from './users/admin-users.module';
+import { AdminWorkspacesModule } from './workspaces/admin-workspaces.module';
 
 /**
  * System administration: everything served under /admin/*.
@@ -13,7 +14,8 @@ import { SystemConfigsModule } from './system-configs/system-configs.module';
   imports: [
     TypeOrmModule.forFeature([User]),
     SystemConfigsModule,
-    ArtifactsModule,
+    AdminUsersModule,
+    AdminWorkspacesModule,
   ],
   controllers: [AdminController],
   providers: [AdminService],

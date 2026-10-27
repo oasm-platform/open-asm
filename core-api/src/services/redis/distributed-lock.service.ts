@@ -3,10 +3,30 @@ import { RedisService } from './redis.service';
 
 @Injectable()
 export class RedisLockService {
+  /**
+   * The instance `@Lock` resolves when a decorated method runs. A method
+   * decorator executes at class-definition time, before Nest builds the
+   * container, so it cannot have this service injected; the singleton
+   * registers itself here instead.
+   */
+  private static instance?: RedisLockService;
+
   private readonly logger = new Logger(RedisLockService.name);
   private readonly prefix = 'distributed-lock';
 
-  constructor(private redisService: RedisService) {}
+  constructor(private redisService: RedisService) {
+    RedisLockService.instance = this;
+  }
+
+  /** The live instance, for `@Lock`. Throws until Nest has created it. */
+  static get current(): RedisLockService {
+    if (!RedisLockService.instance) {
+      throw new Error(
+        'RedisLockService is not initialized: @Lock needs the Nest container to be built',
+      );
+    }
+    return RedisLockService.instance;
+  }
   /**
    * Acquires a lock with the given key and TTL.
    *
