@@ -124,6 +124,31 @@ describe('event drafts + render', () => {
     expect(hostile).toContain("`a'b`");
   });
 
+  it('previews the new URLs of a URL discovery run', () => {
+    const text = render('asset.url.discovered', {
+      ...base,
+      payload: {
+        targetValue: 'example.com',
+        count: 37,
+        urls: Array.from({ length: 10 }, (_, i) => `https://example.com/p${i}`),
+      },
+    });
+
+    expect(text).toContain('🔗 37 new URLs found');
+    expect(text).toContain('Target: example.com');
+    const items = text.split('\n').filter((l) => l.startsWith('• '));
+    expect(items).toHaveLength(5);
+    expect(items[0]).toContain('https://example.com/p0');
+    expect(text).toContain('…and 32 more');
+
+    const one = render('asset.url.discovered', {
+      ...base,
+      payload: { targetValue: 'example.com', count: 1, urls: ['https://example.com/'] },
+    });
+    expect(one).toContain('🔗 1 new URL found');
+    expect(one).not.toContain('more');
+  });
+
   it('describes a complete and an incomplete scan run', () => {
     const payload = {
       targetValue: 'example.com',

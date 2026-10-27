@@ -1,3 +1,4 @@
+import { JobRunType } from '@/common/enums/enum';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
@@ -948,6 +949,7 @@ describe('AssetsService', () => {
       expect(mockEventEmitter.emit).toHaveBeenCalledWith(
         'target.domain.re-scan',
         mockTarget,
+        { jobRunType: JobRunType.MANUAL },
       );
     });
 
@@ -971,6 +973,30 @@ describe('AssetsService', () => {
       expect(mockEventEmitter.emit).toHaveBeenCalledWith(
         'target.ip.re-scan',
         mockTarget,
+        { jobRunType: JobRunType.MANUAL },
+      );
+    });
+
+    it('passes the scheduled run type on to the workflow trigger', async () => {
+      const mockTarget = {
+        id: targetId,
+        reScanCount: 0,
+        type: 'DOMAIN',
+        value: 'example.com',
+      };
+      mockAssetRepository.findOne = jest
+        .fn()
+        .mockResolvedValue({ id: 'asset-uuid', isPrimary: true });
+      mockTargetRepository.findOne = jest.fn().mockResolvedValue(mockTarget);
+      mockTargetRepository.update = jest.fn().mockResolvedValue({});
+      mockEventEmitter.emit = jest.fn();
+
+      await service.reScan(targetId, 'workspace-uuid', JobRunType.SCHEDULED);
+
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        'target.domain.re-scan',
+        mockTarget,
+        { jobRunType: JobRunType.SCHEDULED },
       );
     });
 

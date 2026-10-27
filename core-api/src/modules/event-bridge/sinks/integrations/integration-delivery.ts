@@ -30,6 +30,7 @@ const PUSHABLE_EVENTS = new Set<EventName>([
   'workflow.run.failed',
   'integration.sync.failed',
   'integration.ticket.created',
+  'asset.url.discovered',
 ]);
 
 /**
@@ -112,6 +113,8 @@ export function notificationTypeFor(
         hasUnfinishedSteps(readPayload(name, event))
         ? NotificationType.SCAN_INCOMPLETE
         : NotificationType.ASSET_NEW_DETECT;
+    case 'asset.url.discovered':
+      return NotificationType.NEW_URL_FOUND;
     default:
       return undefined;
   }

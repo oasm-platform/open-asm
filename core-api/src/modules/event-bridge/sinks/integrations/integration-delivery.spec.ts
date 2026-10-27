@@ -2,6 +2,7 @@ import { AuditOutcome, NotificationType, Severity } from '@/common/enums/enum';
 import type { VulnerabilityDetectedPayload } from '../../contracts/event-payloads';
 import {
   eventForIntegration,
+  isPushable,
   isTicketable,
   notificationTypeFor,
 } from './integration-delivery';
@@ -102,5 +103,19 @@ describe('integration delivery policy', () => {
       }),
     ).toBe(NotificationType.SCAN_INCOMPLETE);
     expect(notificationTypeFor('vulnerability.status.updated', base)).toBeUndefined();
+  });
+
+  it('pushes new URLs, muted by their own notification-type toggle', () => {
+    expect(isPushable('asset.url.discovered')).toBe(true);
+    expect(isTicketable('asset.url.discovered')).toBe(false);
+    expect(notificationTypeFor('asset.url.discovered', base)).toBe(
+      NotificationType.NEW_URL_FOUND,
+    );
+    expect(eventForIntegration('asset.url.discovered', base, {})).toBe(base);
+    expect(
+      eventForIntegration('asset.url.discovered', base, {
+        [NotificationType.NEW_URL_FOUND]: false,
+      }),
+    ).toBeUndefined();
   });
 });

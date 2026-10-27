@@ -26,22 +26,22 @@ class ResizeObserverStub {
 vi.stubGlobal('ResizeObserver', ResizeObserverStub);
 Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
   configurable: true,
-  get: () => 236,
+  get: () => 280,
 });
 Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
   configurable: true,
-  get: () => 86,
+  get: () => 96,
 });
 HTMLElement.prototype.getBoundingClientRect = function () {
   return {
     x: 0,
     y: 0,
-    width: 236,
-    height: 86,
+    width: 280,
+    height: 96,
     top: 0,
     left: 0,
-    right: 236,
-    bottom: 86,
+    right: 280,
+    bottom: 96,
     toJSON: () => ({}),
   } as DOMRect;
 };
@@ -78,9 +78,9 @@ describe('RunWorkflowGraph', () => {
   it('gives every step node the handles React Flow anchors edges on', () => {
     const { container } = render(<RunWorkflowGraph steps={chainSteps} />);
 
-    // One node per step — no wave labels, no header.
+    // One node per step plus the trigger — no wave labels, no header.
     const nodes = container.querySelectorAll('.react-flow__node');
-    expect(nodes.length).toBe(3);
+    expect(nodes.length).toBe(4);
 
     const stepNodes = container.querySelectorAll(
       '.react-flow__node[data-id="port_scan"]',
@@ -90,8 +90,32 @@ describe('RunWorkflowGraph', () => {
     expect(stepNodes[0].querySelectorAll('.react-flow__handle.target').length).toBe(1);
     expect(stepNodes[0].querySelectorAll('.react-flow__handle.source').length).toBe(1);
 
-    // One target + one source per step node.
-    expect(container.querySelectorAll('.react-flow__handle').length).toBe(6);
+    // One target + one source per step node, a lone source on the trigger.
+    expect(container.querySelectorAll('.react-flow__handle').length).toBe(7);
+    const trigger = container.querySelector(
+      '.react-flow__node[data-id="__trigger__"]',
+    )!;
+    expect(trigger.querySelectorAll('.react-flow__handle.source').length).toBe(1);
+    expect(trigger.querySelectorAll('.react-flow__handle.target').length).toBe(0);
+  });
+
+  it('opens the graph with how the run was started', () => {
+    const { container, rerender } = render(<RunWorkflowGraph steps={chainSteps} />);
+    const trigger = () =>
+      container.querySelector('.react-flow__node[data-id="__trigger__"]')!;
+
+    // A run without a known type was started by hand.
+    expect(trigger().textContent).toContain('Manual');
+
+    rerender(
+      <RunWorkflowGraph
+        steps={chainSteps}
+        trigger="scheduled"
+        startedAt="2026-10-27T08:30:00.000Z"
+      />,
+    );
+    expect(trigger().textContent).toContain('Schedule');
+    expect(trigger().textContent).toMatch(/2026-10-27 \d{2}:30/);
   });
 
   it('renders the step cards without a header row', () => {
@@ -104,6 +128,25 @@ describe('RunWorkflowGraph', () => {
     expect(container.textContent).toContain('2 failed');
     expect(container.textContent).not.toContain('Wave');
     expect(container.textContent).not.toContain('waves');
+  });
+
+  it('labels a dispatched step queued until a worker runs one of its jobs', () => {
+    const { container, rerender } = render(<RunWorkflowGraph steps={chainSteps} />);
+    const portScan = () =>
+      container.querySelector('.react-flow__node[data-id="port_scan"]')!;
+
+    // Dispatched, but every job still waits for a worker.
+    expect(portScan().textContent).toContain('queued');
+    expect(portScan().textContent).not.toContain('running');
+
+    rerender(
+      <RunWorkflowGraph
+        steps={chainSteps.map((step) =>
+          step.id === 'port_scan' ? { ...step, running: 3 } : step,
+        )}
+      />,
+    );
+    expect(portScan().textContent).toContain('running');
   });
 
   it('carries the same control bar as the worker detail graph', () => {

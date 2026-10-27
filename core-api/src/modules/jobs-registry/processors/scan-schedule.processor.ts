@@ -17,7 +17,11 @@ export class AssetsDiscoveryScheduleConsumer extends WorkerHost {
     const targetId = job.data.id;
     // The scheduled job carries the target row, which owns its workspace — the
     // rescan must run as that tenant, and reScan refuses any other workspace.
-    await this.assetService.reScan(targetId, job.data.workspaceId);
+    await this.assetService.reScan(
+      targetId,
+      job.data.workspaceId,
+      JobRunType.SCHEDULED,
+    );
   }
 }
 

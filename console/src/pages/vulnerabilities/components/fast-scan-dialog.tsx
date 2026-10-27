@@ -18,6 +18,7 @@ import {
   useTargetsControllerGetTargetsInWorkspace,
   useVulnerabilitiesControllerScan,
   type GetManyTargetResponseDto,
+  type TargetType,
 } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Bug } from 'lucide-react';
@@ -108,9 +109,15 @@ interface TargetPickerProps {
   /** Selected target IDs, kept across pages and searches. */
   selected: Set<string>;
   onSelectedChange: (selected: Set<string>) => void;
+  /** Only list targets of this type. */
+  type?: TargetType;
 }
 
-function TargetPicker({ selected, onSelectedChange }: TargetPickerProps) {
+export function TargetPicker({
+  selected,
+  onSelectedChange,
+  type,
+}: TargetPickerProps) {
   const [filter, setFilter] = useState('');
   const {
     tableParams: { page, pageSize, sortBy, sortOrder },
@@ -126,6 +133,7 @@ function TargetPicker({ selected, onSelectedChange }: TargetPickerProps) {
     sortBy,
     sortOrder,
     value: filter || undefined,
+    type,
     status: JobStatus.completed,
   });
   const targets = useMemo(() => data?.data ?? [], [data?.data]);
