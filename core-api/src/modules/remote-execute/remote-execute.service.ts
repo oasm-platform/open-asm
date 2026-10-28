@@ -9,16 +9,6 @@ import {
   RemoteExecuteSubscribeService,
   type ToolRunPayload,
 } from '@/modules/workers/remote-execute-subscribe.service';
-import { UserContextPayload } from '@/common/interfaces/app.interface';
-import { Observable } from 'rxjs';
-import type { MessageEvent } from '@nestjs/common';
-
-export interface RemoteCommandPayload {
-  id: string;
-  workerId: string;
-  sessionId: string;
-  command: string;
-}
 
 export interface RemoteCommandResult {
   id: string;
@@ -109,81 +99,6 @@ export class RemoteExecuteService {
     };
 
     return map[raw] ?? null;
-  }
-
-  private static isImageMessage(raw: string): boolean {
-    try {
-      const { type } = JSON.parse(raw) as { type: string | number };
-      return (
-        RemoteExecuteService.normalizeEventType(type) === ResultEventType.IMAGE
-      );
-    } catch {
-      return false;
-    }
-  }
-
-  runCommand(
-    command: string,
-    sessionId: string,
-    workspaceId: string,
-    _user?: UserContextPayload,
-  ): RemoteCommandPayload {
-    const result = this.remoteExecuteSubscribeService.pushCommandWithSession(
-      sessionId,
-      command,
-      workspaceId,
-    );
-
-    if (!result) {
-      throw new ServiceUnavailableException(
-        'No available worker for remote execution',
-      );
-    }
-
-    return {
-      id: result.id,
-      workerId: result.workerId,
-      sessionId,
-      command,
-    };
-  }
-
-  subscribeToStream(
-    sessionId: string,
-    _user: UserContextPayload,
-  ): Observable<MessageEvent> {
-    const channel = `remote-execute:results:${sessionId}`;
-    return new Observable<MessageEvent>((observer) => {
-      let unsubscribed = false;
-
-      const handler = (ch: string, message: string) => {
-        if (ch !== channel) return;
-        // Screenshots are for agents; a terminal shows text only.
-        if (RemoteExecuteService.isImageMessage(message)) return;
-        observer.next({ data: message });
-      };
-
-      this.redisService
-        .subscribe(channel, handler)
-        .then(() => {
-          if (unsubscribed) {
-            this.redisService.unsubscribe(channel).catch((err) => {
-              this.logger.warn(`Failed to unsubscribe ${channel}: ${err}`);
-            });
-          }
-        })
-        .catch((err: unknown) => {
-          const message = err instanceof Error ? err.message : String(err);
-          observer.error(new Error(`Redis subscribe failed: ${message}`));
-        });
-
-      return () => {
-        unsubscribed = true;
-        this.redisService.unsubscribe(channel).catch((err) => {
-          this.logger.warn(`Failed to unsubscribe ${channel}: ${err}`);
-        });
-      };
-    });
   }
 
   /**
