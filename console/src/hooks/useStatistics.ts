@@ -9,17 +9,12 @@ export const useStatistics = () => {
     data: statistics,
     isLoading,
     ...rest
-  } = useStatisticControllerGetStatistics(
-    {
-      workspaceId: selectedWorkspaceId,
+  } = useStatisticControllerGetStatistics({
+    query: {
+      enabled: !!selectedWorkspaceId,
+      refetchInterval: 5000, // Auto refresh every 5 seconds
     },
-    {
-      query: {
-        enabled: !!selectedWorkspaceId,
-        refetchInterval: 5000, // Auto refresh every 5 seconds
-      },
-    },
-  );
+  });
 
   return {
     statistics,

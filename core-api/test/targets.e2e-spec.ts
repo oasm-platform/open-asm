@@ -109,7 +109,7 @@ describe('Targets bulk create and lifecycle', () => {
     const targetId = create.body.created[0].id;
 
     await request(server)
-      .delete(`/api/targets/${targetId}/workspace/${workspaceId}`)
+      .delete(`/api/targets/${targetId}`)
       .set('Cookie', cookie)
       .set('X-Workspace-Id', workspaceId)
       .expect(200);

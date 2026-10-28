@@ -424,9 +424,10 @@ export class ToolsService {
   /**
    * Retrieves a list of tools with pagination.
    * @param {ToolsQueryDto} query - The query parameters.
+   * @param {string} [workspaceId] - Workspace whose installed tools are flagged.
    * @returns {Promise<GetManyBaseResponseDto<Tool>>} The tools.
    */
-  async getManyTools(query: ToolsQueryDto) {
+  async getManyTools(query: ToolsQueryDto, workspaceId?: string) {
     const { page, limit } = query;
     const skip = (page - 1) * limit;
 
@@ -434,8 +435,7 @@ export class ToolsService {
     const order = this.buildToolsOrder(query);
 
     // If workspaceId is provided, we need to check which tools are installed
-    if (query.workspaceId) {
-      const workspaceId = query.workspaceId;
+    if (workspaceId) {
 
       const [data, total] = await this.toolsRepository.findAndCount({
         where,

@@ -30,10 +30,7 @@ import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity'
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { IssuesTimelineResponseDto } from './dto/issues-timeline.dto';
-import {
-  GetStatisticQueryDto,
-  StatisticResponseDto,
-} from './dto/statistic.dto';
+import { StatisticResponseDto } from './dto/statistic.dto';
 import { TimelineResponseDto } from './dto/timeline.dto';
 import { TopAssetVulnerabilities } from './dto/top-assets-vulnerabilities.dto';
 import { TopTagAsset } from './dto/top-tags-assets.dto';
@@ -119,33 +116,31 @@ export class StatisticService {
   /**
    * Retrieves the total count of targets in a workspace.
    *
-   * @param query - The query parameters containing workspaceId.
+   * @param workspaceId - The ID of the workspace.
    * @returns A promise that resolves to the total count of targets.
    */
-  async getTotalTargets(query: GetStatisticQueryDto): Promise<number> {
-    return this.countTargets(query.workspaceId);
+  async getTotalTargets(workspaceId: string): Promise<number> {
+    return this.countTargets(workspaceId);
   }
 
   /**
    * Retrieves the total count of assets in a workspace.
    *
-   * @param query - The query parameters containing workspaceId.
+   * @param workspaceId - The ID of the workspace.
    * @returns A promise that resolves to the total count of assets.
    */
-  async getTotalAssets(query: GetStatisticQueryDto): Promise<number> {
-    return this.countAssets(query.workspaceId);
+  async getTotalAssets(workspaceId: string): Promise<number> {
+    return this.countAssets(workspaceId);
   }
 
   /**
    * Retrieves all statistics for a workspace.
    *
-   * @param query - The query parameters containing workspaceId.
+   * @param workspaceId - The ID of the workspace.
    * @returns A promise that resolves to an object containing all statistics.
    */
-  async getStatistics(
-    query: GetStatisticQueryDto,
-  ): Promise<StatisticResponseDto> {
-    const statistics = await this.calculateStatistics([query.workspaceId]);
+  async getStatistics(workspaceId: string): Promise<StatisticResponseDto> {
+    const statistics = await this.calculateStatistics([workspaceId]);
 
     const workspaceStats = statistics[0]; // Get the first (and only) workspace statistics
 

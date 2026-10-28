@@ -11,7 +11,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import type { Target } from '@/services/apis/gen/queries';
 import {
   JobStatus,
@@ -36,9 +35,6 @@ const SettingTarget = ({
   target: Target;
   refetch: () => void;
 }) => {
-  const {
-    state: { selectedWorkspaceId },
-  } = useWorkspaceState();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -279,7 +275,6 @@ const SettingTarget = ({
                 setIsDeleting(true);
                 deleteTarget({
                   id: target.id,
-                  workspaceId: selectedWorkspaceId ?? '',
                 });
               }}
               typeToConfirm={target.value}

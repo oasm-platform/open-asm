@@ -86,7 +86,6 @@ const ListWorkers = () => {
     {
       ...COMMON_PARAMS,
       scope: 'workspace',
-      workspaceId: selectedWorkspaceId,
     } as WorkersControllerGetWorkersParams,
     { query: { enabled: isWorkspaceTab && !!selectedWorkspaceId } },
   );

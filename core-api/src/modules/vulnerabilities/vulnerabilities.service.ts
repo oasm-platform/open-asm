@@ -290,13 +290,15 @@ export class VulnerabilitiesService {
   /**
    * Retrieves statistics of vulnerabilities by severity level for a specified workspace.
    *
-   * @param query - The query parameters to filter vulnerabilities, including workspaceId and optional targetIds.
+   * @param query - The query parameters to filter vulnerabilities, with optional targetIds.
+   * @param workspaceId - The ID of the workspace.
    * @returns A promise that resolves to an array of vulnerability counts by severity level.
    */
   async getVulnerabilitiesStatistics(
     query: GetVulnerabilitiesStatisticsQueryDto,
+    workspaceId: string,
   ) {
-    const { workspaceId, targetIds } = query;
+    const { targetIds } = query;
 
     const queryBuilder = this.vulnerabilitiesRepository
       .createQueryBuilder('vulnerabilities')

@@ -82,7 +82,6 @@ export default function Search() {
   const { data, isFetching } = useSearchControllerSearchAssetsTargets(
     {
       value: searchQuery,
-      workspaceId: selectedWorkspaceId,
       page: page,
       isSaveHistory: true,
     },
