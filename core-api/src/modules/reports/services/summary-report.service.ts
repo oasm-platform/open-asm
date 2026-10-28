@@ -7,6 +7,7 @@ import { AssetService } from '@/modules/assets/entities/asset-services.entity';
 import { AssetTag } from '@/modules/assets/entities/asset-tags.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { StatisticService } from '@/modules/statistic/statistic.service';
+import { openVulnerabilityCondition } from '@/modules/vulnerabilities/open-vulnerability';
 import { Severity, VulnerabilityAnalyzeStatus, JobStatus } from '@/common/enums/enum';
 import type { TargetType } from '@/modules/targets/entities/target.entity';
 import type { ReportData } from '../types/report-data.type';
@@ -123,9 +124,9 @@ export class SummaryReportService {
     const servicesChange = currentServices - lastWeekServices;
     const vulnsChange = currentVulns - lastWeekVulns;
 
-    const securityScore = StatisticService.calculateSecurityScore(severityCounts, currentAssets);
-    const lastWeekScore = StatisticService.calculateSecurityScore(lastWeekSeverityCounts, currentAssets);
-    const lastMonthScore = StatisticService.calculateSecurityScore(lastMonthSeverityCounts, currentAssets);
+    const securityScore = StatisticService.calculateSecurityScore(severityCounts);
+    const lastWeekScore = StatisticService.calculateSecurityScore(lastWeekSeverityCounts);
+    const lastMonthScore = StatisticService.calculateSecurityScore(lastMonthSeverityCounts);
     const scoreChange = securityScore - lastWeekScore;
 
     // Build risk distribution
@@ -256,7 +257,7 @@ export class SummaryReportService {
       .leftJoin('asset.target', 'target')
       .leftJoin('target.workspace', 'workspace')
       .where('workspace.id = :workspaceId', { workspaceId })
-      .andWhere('v.isArchived = :isArchived', { isArchived: false })
+      .andWhere(openVulnerabilityCondition('v'))
       .andWhere('v.createdAt >= :startDate', { startDate })
       .andWhere('v.createdAt <= :endDate', { endDate })
       .getCount();
@@ -292,7 +293,7 @@ export class SummaryReportService {
       .leftJoin('asset.target', 'target')
       .leftJoin('target.workspace', 'workspace')
       .where('workspace.id = :workspaceId', { workspaceId })
-      .andWhere('v.isArchived = :isArchived', { isArchived: false })
+      .andWhere(openVulnerabilityCondition('v'))
       .andWhere('v.severity != :info', { info: 'info' })
       .orderBy('v.createdAt', 'DESC')
       .limit(limit);
@@ -414,7 +415,7 @@ export class SummaryReportService {
       .leftJoin('asset.vulnerabilities', 'v')
       .leftJoin('asset.jobs', 'job')
       .where('workspace.id = :workspaceId', { workspaceId })
-      .andWhere('v.isArchived = :isArchived', { isArchived: false })
+      .andWhere(openVulnerabilityCondition('v'))
       .select('t.id', 't_id')
       .addSelect('t.value', 't_value')
       .addSelect('t.type', 't_type')

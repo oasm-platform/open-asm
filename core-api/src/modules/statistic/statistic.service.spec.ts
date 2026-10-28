@@ -1,7 +1,8 @@
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
-import { DefaultWorkflow } from '@/common/enums/enum';
+import { DefaultWorkflow, Severity } from '@/common/enums/enum';
 import type { Job } from '../jobs-registry/entities/job.entity';
+import type { Statistic } from './entities/statistic.entity';
 import { StatisticService } from './statistic.service';
 import { DataSource } from 'typeorm';
 import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
@@ -351,6 +352,130 @@ describe('StatisticService', () => {
       await service.handleWorkflowEnd(targetJob({ port_scan: { status: 'done' } }));
 
       expect(mockEventBridge.publishSafely).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('calculateSecurityScore', () => {
+    const score = (counts: Partial<Record<Severity, number>>) =>
+      StatisticService.calculateSecurityScore({
+        [Severity.CRITICAL]: 0,
+        [Severity.HIGH]: 0,
+        [Severity.MEDIUM]: 0,
+        [Severity.LOW]: 0,
+        [Severity.INFO]: 0,
+        ...counts,
+      });
+
+    it('is 100 without open findings, however many Info findings there are', () => {
+      expect(score({})).toBe(100);
+      expect(score({ [Severity.INFO]: 500 })).toBe(100);
+    });
+
+    it('moves off 100 for a single low finding', () => {
+      expect(score({ [Severity.LOW]: 1 })).toBe(99);
+    });
+
+    it('caps a workspace with an open high below the A band', () => {
+      expect(score({ [Severity.HIGH]: 1 })).toBe(89);
+    });
+
+    it('caps a workspace with an open critical at the D band', () => {
+      expect(score({ [Severity.CRITICAL]: 1 })).toBe(69);
+      expect(score({ [Severity.CRITICAL]: 3 })).toBe(65);
+    });
+
+    it('bottoms out at what the severity caps leave', () => {
+      expect(
+        score({
+          [Severity.CRITICAL]: 1000,
+          [Severity.HIGH]: 1000,
+          [Severity.MEDIUM]: 1000,
+          [Severity.LOW]: 1000,
+        }),
+      ).toBe(15);
+    });
+  });
+
+  describe('toDailySeries', () => {
+    const day = (offset: number) => {
+      const date = new Date();
+      date.setUTCHours(0, 0, 0, 0);
+      date.setUTCDate(date.getUTCDate() + offset);
+      return date;
+    };
+    const stat = (createdAt: Date, counts: Partial<Statistic> = {}) =>
+      ({
+        criticalVuls: 0,
+        highVuls: 0,
+        mediumVuls: 0,
+        lowVuls: 0,
+        infoVuls: 0,
+        vuls: 0,
+        createdAt,
+        ...counts,
+      }) as Statistic;
+    const hoursInto = (date: Date, hours: number) =>
+      new Date(date.getTime() + hours * 3_600_000);
+
+    it('carries each snapshot forward one point per day and ends with the live numbers', () => {
+      const series = StatisticService.toDailySeries(
+        [
+          stat(hoursInto(day(-5), 1), { criticalVuls: 1 }),
+          stat(hoursInto(day(-3), 2), { criticalVuls: 2 }),
+        ],
+        day(-7),
+        stat(new Date(), { criticalVuls: 3 }),
+      );
+
+      // Days -7 and -6 precede the first snapshot and are left out.
+      expect(series.map((point) => point.criticalVuls)).toEqual([
+        1, 1, 2, 2, 2, 3,
+      ]);
+      expect(series.slice(0, -1).map((point) => point.createdAt)).toEqual([
+        day(-5),
+        day(-4),
+        day(-3),
+        day(-2),
+        day(-1),
+      ]);
+    });
+
+    it('counts open vulnerabilities from the severity columns, without Info', () => {
+      const [live] = StatisticService.toDailySeries(
+        [],
+        day(-1),
+        stat(new Date(), { criticalVuls: 1, highVuls: 2, infoVuls: 9, vuls: 12 }),
+      );
+
+      expect(live.vuls).toBe(3);
+    });
+  });
+
+  describe('getCountForWorkspace', () => {
+    it('sums open vulnerabilities across severities, leaving Info out', async () => {
+      mockQueryBuilder.getRawMany.mockResolvedValueOnce([
+        { workspaceId: 'workspace-1', severity: 'critical', count: '2' },
+        { workspaceId: 'workspace-1', severity: 'info', count: '40' },
+        { workspaceId: 'workspace-1', severity: 'low', count: '3' },
+      ]);
+
+      await expect(
+        service.getCountForWorkspace('vulnerabilities', 'workspace-1'),
+      ).resolves.toBe(5);
+    });
+  });
+
+  describe('getStatistics', () => {
+    it('serves the live numbers from the cache without recomputing them', async () => {
+      mockRedisService.get.mockResolvedValueOnce(
+        JSON.stringify({ assets: 7, vuls: 2, score: 89 }),
+      );
+      const calculate = jest.spyOn(service, 'calculateStatistics');
+
+      const result = await service.getStatistics('workspace-1');
+
+      expect(result).toMatchObject({ assets: 7, vuls: 2, score: 89 });
+      expect(calculate).not.toHaveBeenCalled();
     });
   });
 });

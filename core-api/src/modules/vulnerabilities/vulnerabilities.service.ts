@@ -38,6 +38,7 @@ import {
 } from './dto/get-vulnerability.dto';
 import { VulnerabilityDismissal } from './entities/vulnerability-dismissal.entity';
 import { Vulnerability } from './entities/vulnerability.entity';
+import { openVulnerabilityCondition } from './open-vulnerability';
 import { compileVulnerabilityFilter } from './vulnerability-filter';
 
 @Injectable()
@@ -208,7 +209,7 @@ export class VulnerabilitiesService {
 
     // Filter by status
     if (status === VulnerabilityStatus.OPEN) {
-      queryBuilder.andWhere('dismissal.vulnerabilityId IS NULL');
+      queryBuilder.andWhere(openVulnerabilityCondition('vulnerabilities'));
     } else if (status === VulnerabilityStatus.DISMISSED) {
       queryBuilder.andWhere('dismissal.vulnerabilityId IS NOT NULL');
     }
@@ -308,10 +309,8 @@ export class VulnerabilitiesService {
       .leftJoin('assets.target', 'targets')
       .leftJoin('targets.workspace', 'workspaces')
       .leftJoin('vulnerabilities.jobHistory', 'jobHistory')
-      .leftJoin('vulnerabilities.vulnerabilityDismissal', 'dismissal')
       .where('workspaces.id = :workspaceId', { workspaceId })
-      // Only show open vulnerabilities (not dismissed)
-      .andWhere('dismissal.vulnerabilityId IS NULL')
+      .andWhere(openVulnerabilityCondition('vulnerabilities'))
       .groupBy('vulnerabilities.severity');
 
     if (targetIds) {
