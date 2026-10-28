@@ -60,6 +60,8 @@ export const PROVIDER_MAP: Record<LLMProvider, string[]> = {
   [LLMProvider.OPENCODE_GO]: ['opencode-go', 'opencode'],
   // Not on models.dev; vendor ids (`openai/…`) resolve by id
   [LLMProvider.ORCAROUTER]: [],
+  // Pool names (`claude-sonnet-4-6`) and `vendor/model` ids resolve by id
+  [LLMProvider.OPPER]: [],
   [LLMProvider.CUSTOM]: [],
 };
 
