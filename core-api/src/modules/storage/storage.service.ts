@@ -589,7 +589,6 @@ export class StorageService implements OnModuleInit {
       expiresIn ?? this.storageConfig.presignTtlSeconds,
     );
 
-    // Same mismatched @smithy/types cast as signCommand.
     const { url, fields } = await createPresignedPost(
       this.rustFsClient.getPresignClient(),
       {

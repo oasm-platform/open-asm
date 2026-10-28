@@ -31,6 +31,7 @@ import { createHash, randomBytes, randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { DataSource, EntityManager, In, MoreThan, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
+import { ArtifactsService } from '../artifacts/artifacts.service';
 import { AuditContext, AuditService } from '../audit/audit.service';
 import { CreateNotificationDto } from '../notifications/dto/create-notification.dto';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -104,6 +105,7 @@ export class WorkspacesService implements OnModuleInit {
     private workflowTemplateService: WorkflowTemplateService,
     private workspaceEncryptionService: WorkspaceEncryptionService,
     private auditService: AuditService,
+    private artifactsService: ArtifactsService,
   ) {}
 
   async onModuleInit() {}
@@ -366,6 +368,9 @@ export class WorkspacesService implements OnModuleInit {
     // audit row must stay atomic with the workspace-row delete below).
     await this.deleteAllTargetsFromWorkspace(id);
 
+    // File rows cascade with the workspace; their objects go once it is gone.
+    const artifactKeys = await this.artifactsService.getWorkspaceObjectKeys(id);
+
     await this.dataSource.transaction(async (manager) => {
       await manager.delete(Workspace, { id });
       if (auditContext) {
@@ -381,6 +386,7 @@ export class WorkspacesService implements OnModuleInit {
         });
       }
     });
+    await this.artifactsService.deleteObjects(artifactKeys);
 
     return {
       message: 'Workspace deleted successfully',

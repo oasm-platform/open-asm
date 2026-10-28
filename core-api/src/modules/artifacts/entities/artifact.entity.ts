@@ -77,7 +77,10 @@ export class Artifact extends BaseEntity {
   @Column({ type: 'jsonb', default: () => "'{}'" })
   metadata: Record<string, unknown>;
 
-  /** Upload deadline while `pending`; the sweep purges it afterwards. */
+  /**
+   * Upload form deadline. Kept after `ready`: a `pending` or `deleted` row is
+   * only purged once it has passed, so the form cannot recreate the object.
+   */
   @Column({ type: 'timestamptz', nullable: true })
   expiresAt: Date | null;
 

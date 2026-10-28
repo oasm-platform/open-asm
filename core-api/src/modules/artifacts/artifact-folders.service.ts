@@ -1,11 +1,7 @@
 import { ArtifactStatus } from '@/common/enums/enum';
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, IsNull, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, IsNull, Repository } from 'typeorm';
 import { ArtifactsService } from './artifacts.service';
 import type {
   ArtifactFolderDetailDto,
@@ -25,8 +21,6 @@ const MAX_FOLDER_DEPTH = 100;
  */
 @Injectable()
 export class ArtifactFoldersService {
-  private readonly logger = new Logger(ArtifactFoldersService.name);
-
   constructor(
     @InjectRepository(ArtifactFolder)
     private readonly folderRepo: Repository<ArtifactFolder>,
@@ -100,23 +94,33 @@ export class ArtifactFoldersService {
     dto: UpdateArtifactFolderDto,
   ): Promise<ArtifactFolderDto> {
     const folder = await this.artifactsService.findOwnedFolder(workspaceId, userId, id);
+    const target = dto.parentFolderId;
+    if (dto.name !== undefined) folder.name = dto.name;
+    if (target !== undefined) folder.parentFolderId = target;
 
-    if (dto.parentFolderId) {
-      await this.artifactsService.findOwnedFolder(workspaceId, userId, dto.parentFolderId);
-      if ((await this.subtreeIds(id)).includes(dto.parentFolderId)) {
-        throw new BadRequestException('Cannot move a folder into itself');
-      }
+    if (!target) {
+      return this.toDto(await this.folderRepo.save(folder));
     }
 
-    if (dto.name !== undefined) folder.name = dto.name;
-    if (dto.parentFolderId !== undefined) folder.parentFolderId = dto.parentFolderId;
-    return this.toDto(await this.folderRepo.save(folder));
+    await this.artifactsService.findOwnedFolder(workspaceId, userId, target);
+    const saved = await this.dataSource.transaction(async (manager) => {
+      // One move per user at a time: concurrent moves (A into B, B into A)
+      // would each pass the subtree check and together form a cycle.
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `artifact-folders:${workspaceId}:${userId}`,
+      ]);
+      if ((await this.subtreeIds(id, manager)).includes(target)) {
+        throw new BadRequestException('Cannot move a folder into itself');
+      }
+      return manager.save(folder);
+    });
+    return this.toDto(saved);
   }
 
   /**
    * Deletes the folder, its subfolders and every file in them. Files are
-   * marked deleted and detached in one transaction, then purged so their
-   * quota is released; a failed purge is retried by the sweep.
+   * marked deleted and detached in one transaction; the sweep then purges
+   * them and releases their quota.
    */
   async remove(
     workspaceId: string,
@@ -126,11 +130,7 @@ export class ArtifactFoldersService {
     await this.artifactsService.findOwnedFolder(workspaceId, userId, id);
     const folderIds = await this.subtreeIds(id);
 
-    const fileIds = await this.dataSource.transaction(async (manager) => {
-      const files = await manager.find(Artifact, {
-        select: { id: true },
-        where: { parentFolderId: In(folderIds), status: ArtifactStatus.READY },
-      });
+    await this.dataSource.transaction(async (manager) => {
       await manager.update(
         Artifact,
         { parentFolderId: In(folderIds), status: ArtifactStatus.READY },
@@ -143,20 +143,16 @@ export class ArtifactFoldersService {
         { parentFolderId: null },
       );
       await manager.delete(ArtifactFolder, { id: In(folderIds) });
-      return files.map((file) => file.id);
     });
-
-    for (const fileId of fileIds) {
-      await this.artifactsService.purge(fileId).catch((error: unknown) =>
-        this.logger.warn(`Deferred purge of artifact ${fileId}: ${String(error)}`),
-      );
-    }
     return { message: 'Folder deleted' };
   }
 
   /** The folder and all of its descendants. */
-  private async subtreeIds(id: string): Promise<string[]> {
-    const rows = await this.dataSource.query<{ id: string }[]>(
+  private async subtreeIds(
+    id: string,
+    runner: Pick<EntityManager, 'query'> = this.dataSource,
+  ): Promise<string[]> {
+    const rows = await runner.query<{ id: string }[]>(
       `WITH RECURSIVE tree AS (
          SELECT id, 0 AS depth FROM artifact_folders WHERE id = $1
          UNION ALL

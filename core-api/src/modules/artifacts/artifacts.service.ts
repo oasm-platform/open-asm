@@ -38,7 +38,7 @@ export const ARTIFACTS_BUCKET = 'artifacts';
 export const ARTIFACT_MANAGE_PERMISSION = 'artifact.manage';
 /** Upload window for a presigned POST; the reservation lives as long. */
 export const PENDING_UPLOAD_TTL_SECONDS = 15 * 60;
-/** Extra time before the sweep purges an expired pending upload. */
+/** Extra time after `expiresAt` before the sweep purges a pending or deleted row. */
 export const PENDING_PURGE_GRACE_MS = 15 * 60 * 1000;
 const DOWNLOAD_TTL_SECONDS = 5 * 60;
 const SWEEP_BATCH_SIZE = 200;
@@ -293,7 +293,10 @@ export class ArtifactsService {
     return this.getById(workspaceId, userId, id, []);
   }
 
-  /** Soft-deletes, then purges; a failed purge is retried by the sweep. */
+  /**
+   * Soft-deletes, then purges; a purge that fails or must wait for the
+   * upload form to expire is done by the sweep.
+   */
   async remove(
     workspaceId: string,
     userId: string,
@@ -403,16 +406,18 @@ export class ArtifactsService {
     return folder;
   }
 
-  /** Purges expired pending uploads and deleted rows whose object delete failed. */
+  /** Purges expired pending uploads and deleted rows whose upload form expired. */
   async purgeStale(): Promise<number> {
     const rows = await this.artifactRepo
       .createQueryBuilder('artifact')
       .select('artifact.id')
-      .where('artifact.status = :deleted', { deleted: ArtifactStatus.DELETED })
-      .orWhere('(artifact.status = :pending AND artifact.expiresAt < :cutoff)', {
-        pending: ArtifactStatus.PENDING,
+      .where('artifact.status IN (:...statuses)', {
+        statuses: [ArtifactStatus.PENDING, ArtifactStatus.DELETED],
+      })
+      .andWhere('(artifact.expiresAt IS NULL OR artifact.expiresAt < :cutoff)', {
         cutoff: new Date(Date.now() - PENDING_PURGE_GRACE_MS),
       })
+      .orderBy('artifact.updatedAt', 'ASC')
       .limit(SWEEP_BATCH_SIZE)
       .getMany();
 
@@ -423,14 +428,43 @@ export class ArtifactsService {
         purged++;
       } catch (error) {
         this.logger.warn(`Purge of artifact ${id} failed: ${String(error)}`);
+        // Back of the queue, so rows that keep failing cannot fill every batch.
+        await this.artifactRepo.update(id, { updatedAt: () => 'now()' });
       }
     }
     return purged;
   }
 
+  /** Object keys of every file in a workspace; read before deleting it. */
+  async getWorkspaceObjectKeys(workspaceId: string): Promise<string[]> {
+    const rows = await this.artifactRepo.find({
+      select: { objectKey: true },
+      where: { workspaceId },
+    });
+    return rows.map((row) => row.objectKey);
+  }
+
+  /**
+   * Deletes objects whose rows are already gone (workspace deleted, rows
+   * cascaded). Nothing can retry them, so failures are only logged.
+   */
+  async deleteObjects(objectKeys: string[]): Promise<void> {
+    for (const key of objectKeys) {
+      await this.storageService
+        .deleteFile(key, ARTIFACTS_BUCKET)
+        .catch((error: unknown) => {
+          if (!(error instanceof NotFoundException)) {
+            this.logger.warn(`Delete of orphaned object ${key} failed: ${String(error)}`);
+          }
+        });
+    }
+  }
+
   /**
    * Deletes the object, releases its quota and drops the row, under a row
-   * lock so it cannot race `completeUpload`. A READY row is left alone.
+   * lock so it cannot race `completeUpload`. A READY row is left alone, and
+   * so is a DELETED row whose upload form is still valid: replaying the form
+   * would otherwise recreate the object with no row and no quota charged.
    */
   async purge(id: string): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
@@ -439,6 +473,13 @@ export class ArtifactsService {
         lock: { mode: 'pessimistic_write' },
       });
       if (!artifact || artifact.status === ArtifactStatus.READY) {
+        return;
+      }
+      if (
+        artifact.status === ArtifactStatus.DELETED &&
+        artifact.expiresAt &&
+        artifact.expiresAt.getTime() + PENDING_PURGE_GRACE_MS > Date.now()
+      ) {
         return;
       }
       await this.purgeLocked(manager, artifact);
@@ -499,12 +540,9 @@ export class ArtifactsService {
 
   private async markReady(manager: EntityManager, artifact: Artifact) {
     await this.quota.commit(manager, artifact.workspaceId, artifact.sizeBytes);
-    await manager.update(Artifact, artifact.id, {
-      status: ArtifactStatus.READY,
-      expiresAt: null,
-    });
+    // `expiresAt` stays: `purge` keeps a deleted row until the form expires.
+    await manager.update(Artifact, artifact.id, { status: ArtifactStatus.READY });
     artifact.status = ArtifactStatus.READY;
-    artifact.expiresAt = null;
   }
 
   private presignDownload(artifact: Artifact): Promise<ArtifactDownloadDto> {

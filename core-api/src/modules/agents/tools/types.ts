@@ -14,6 +14,7 @@ import type { ToolsService } from '@/modules/tools/tools.service';
 import type { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilities.service';
 import type { RemoteExecuteSubscribeService } from '@/modules/workers/remote-execute-subscribe.service';
 import type { WorkersService } from '@/modules/workers/workers.service';
+import type { WorkspacesService } from '@/modules/workspaces/workspaces.service';
 import type { RedisService } from '@/services/redis/redis.service';
 
 import type { AgentsApprovalsService } from '../agents.approvals';
@@ -49,6 +50,7 @@ export interface AgentToolDeps {
   remoteExecuteSubscribe: RemoteExecuteSubscribeService;
   redisService: RedisService;
   artifactsService: ArtifactsService;
+  workspacesService: WorkspacesService;
 }
 
 export type Deps<K extends keyof AgentToolDeps> = Pick<AgentToolDeps, K>;

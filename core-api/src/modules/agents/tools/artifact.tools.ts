@@ -10,7 +10,7 @@ import type { Deps } from './types';
  * the requesting user's private file and counted against the workspace quota.
  */
 export function artifactTools(
-  deps: Deps<'artifactsService'>,
+  deps: Deps<'artifactsService' | 'workspacesService'>,
   workspaceId: string,
   userId: string,
   conversationId: string,
@@ -34,6 +34,16 @@ export function artifactTools(
     }),
     execute: (params: { fileName: string; content: string; mimeType: string }) =>
       failSoft('save file', async () => {
+        // Same rule as POST /artifacts/presign; chat itself needs no permission.
+        const { permissionKeys } =
+          await deps.workspacesService.getMembershipWithPermissions(workspaceId, userId);
+        if (!permissionKeys.includes('*') && !permissionKeys.includes('artifact.write')) {
+          return {
+            success: false,
+            message:
+              'The user lacks the artifact.write permission in this workspace, so the file was not saved.',
+          };
+        }
         const file = await deps.artifactsService.createFromBuffer({
           workspaceId,
           userId,

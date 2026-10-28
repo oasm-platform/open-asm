@@ -25,7 +25,7 @@ describe('ArtifactFoldersService', () => {
   let folderRepo: Record<string, jest.Mock>;
   let manager: Record<string, jest.Mock>;
   let dataSource: { query: jest.Mock; transaction: jest.Mock };
-  let artifacts: { findOwnedFolder: jest.Mock; purge: jest.Mock };
+  let artifacts: { findOwnedFolder: jest.Mock };
 
   beforeEach(() => {
     folderRepo = {
@@ -34,7 +34,8 @@ describe('ArtifactFoldersService', () => {
       save: jest.fn((value: ArtifactFolder) => Promise.resolve({ ...folder(), ...value })),
     };
     manager = {
-      find: jest.fn().mockResolvedValue([{ id: 'a-1' }, { id: 'a-2' }]),
+      query: jest.fn(),
+      save: jest.fn((value: ArtifactFolder) => Promise.resolve(value)),
       update: jest.fn(),
       delete: jest.fn(),
     };
@@ -44,7 +45,6 @@ describe('ArtifactFoldersService', () => {
     };
     artifacts = {
       findOwnedFolder: jest.fn().mockResolvedValue(folder()),
-      purge: jest.fn().mockResolvedValue(undefined),
     };
     service = new ArtifactFoldersService(
       folderRepo as unknown as Repository<ArtifactFolder>,
@@ -86,8 +86,11 @@ describe('ArtifactFoldersService', () => {
     });
   });
 
+  const subtree = (rows: { id: string }[]) => (sql: string) =>
+    Promise.resolve(sql.includes('pg_advisory_xact_lock') ? [] : rows);
+
   it('refuses to move a folder into its own subtree', async () => {
-    dataSource.query.mockResolvedValue([{ id: 'f-1' }, { id: 'f-child' }]);
+    manager.query.mockImplementation(subtree([{ id: 'f-1' }, { id: 'f-child' }]));
 
     await expect(
       service.update(WS, OWNER, 'f-1', { parentFolderId: 'f-child' }),
@@ -96,6 +99,21 @@ describe('ArtifactFoldersService', () => {
       service.update(WS, OWNER, 'f-1', { parentFolderId: 'f-1' }),
     ).rejects.toThrow(BadRequestException);
     expect(folderRepo.save).not.toHaveBeenCalled();
+    expect(manager.save).not.toHaveBeenCalled();
+  });
+
+  it('checks and saves a move under a per-user lock', async () => {
+    manager.query.mockImplementation(subtree([{ id: 'f-1' }]));
+
+    await expect(
+      service.update(WS, OWNER, 'f-1', { parentFolderId: 'f-other' }),
+    ).resolves.toMatchObject({ parentFolderId: 'f-other' });
+    expect(manager.query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('pg_advisory_xact_lock'),
+      [`artifact-folders:${WS}:${OWNER}`],
+    );
+    expect(manager.save).toHaveBeenCalled();
   });
 
   it('renames and moves a folder to the root', async () => {
@@ -104,9 +122,8 @@ describe('ArtifactFoldersService', () => {
     ).resolves.toMatchObject({ name: 'Q4', parentFolderId: null });
   });
 
-  it('deletes the subtree, detaches files and purges them to release quota', async () => {
+  it('deletes the subtree and marks its files deleted for the sweep', async () => {
     dataSource.query.mockResolvedValue([{ id: 'f-1' }, { id: 'f-child' }]);
-    artifacts.purge.mockRejectedValueOnce(new Error('s3 down'));
 
     await expect(service.remove(WS, OWNER, 'f-1')).resolves.toEqual({
       message: 'Folder deleted',
@@ -123,8 +140,5 @@ describe('ArtifactFoldersService', () => {
       { parentFolderId: null },
     );
     expect(manager.delete).toHaveBeenCalled();
-    // A failed purge is left for the sweep and does not stop the others.
-    expect(artifacts.purge).toHaveBeenCalledWith('a-1');
-    expect(artifacts.purge).toHaveBeenCalledWith('a-2');
   });
 });

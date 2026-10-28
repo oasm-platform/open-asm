@@ -18,6 +18,7 @@ import { ToolsService } from '@/modules/tools/tools.service';
 import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilities.service';
 import { RemoteExecuteSubscribeService } from '@/modules/workers/remote-execute-subscribe.service';
 import { WorkersService } from '@/modules/workers/workers.service';
+import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
 import { RedisService } from '@/services/redis/redis.service';
 
 import { AgentMode } from '@/common/enums/enum';
@@ -178,6 +179,7 @@ export class AgentTool {
     private readonly remoteExecuteSubscribe: RemoteExecuteSubscribeService,
     private readonly redisService: RedisService,
     private readonly artifactsService: ArtifactsService,
+    private readonly workspacesService: WorkspacesService,
   ) {}
 
   private get deps(): AgentToolDeps {
@@ -200,6 +202,7 @@ export class AgentTool {
       remoteExecuteSubscribe: this.remoteExecuteSubscribe,
       redisService: this.redisService,
       artifactsService: this.artifactsService,
+      workspacesService: this.workspacesService,
     };
   }
 

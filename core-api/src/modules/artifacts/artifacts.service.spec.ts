@@ -16,6 +16,7 @@ import type { DataSource, Repository } from 'typeorm';
 import type { ArtifactQuotaService } from './artifact-quota.service';
 import {
   ArtifactsService,
+  PENDING_PURGE_GRACE_MS,
   PENDING_UPLOAD_TTL_SECONDS,
   toObjectKey,
 } from './artifacts.service';
@@ -212,7 +213,6 @@ describe('ArtifactsService', () => {
       expect(quota.commit).toHaveBeenCalledWith(manager, WS, 100);
       expect(manager.update).toHaveBeenCalledWith(expect.anything(), 'artifact-1', {
         status: ArtifactStatus.READY,
-        expiresAt: null,
       });
     });
 
@@ -407,6 +407,28 @@ describe('ArtifactsService', () => {
     });
   });
 
+  describe('purgeStale', () => {
+    it('takes the oldest rows first and moves a failing one to the back', async () => {
+      const qb: Record<string, jest.Mock> = {};
+      for (const method of ['select', 'where', 'andWhere', 'orderBy', 'limit']) {
+        qb[method] = jest.fn(() => qb);
+      }
+      qb.getMany = jest.fn().mockResolvedValue([{ id: 'bad' }, { id: 'good' }]);
+      artifactRepo.createQueryBuilder = jest.fn(() => qb);
+      manager.findOne.mockImplementation((_entity, { where }: { where: { id: string } }) =>
+        Promise.resolve(makeArtifact({ id: where.id, status: ArtifactStatus.DELETED })),
+      );
+      storage.deleteFile.mockRejectedValueOnce(new InternalServerErrorException());
+
+      await expect(service.purgeStale()).resolves.toBe(1);
+      expect(qb.orderBy).toHaveBeenCalledWith('artifact.updatedAt', 'ASC');
+      expect(artifactRepo.update).toHaveBeenCalledTimes(1);
+      expect(artifactRepo.update).toHaveBeenCalledWith('bad', {
+        updatedAt: expect.any(Function),
+      });
+    });
+  });
+
   describe('purge', () => {
     it('keeps the row and the usage when the object delete fails', async () => {
       manager.findOne.mockResolvedValue(makeArtifact({ status: ArtifactStatus.DELETED }));
@@ -427,6 +449,29 @@ describe('ArtifactsService', () => {
 
       await service.purge('artifact-1');
       expect(quota.releaseReserved).toHaveBeenCalledWith(manager, WS, 100);
+      expect(manager.delete).toHaveBeenCalled();
+    });
+
+    it('keeps a deleted row while its upload form could still recreate the object', async () => {
+      manager.findOne.mockResolvedValue(
+        makeArtifact({ status: ArtifactStatus.DELETED, expiresAt: new Date() }),
+      );
+      await service.purge('artifact-1');
+      expect(storage.deleteFile).not.toHaveBeenCalled();
+      expect(quota.releaseUsed).not.toHaveBeenCalled();
+      expect(manager.delete).not.toHaveBeenCalled();
+    });
+
+    it('purges a deleted row once its upload form has expired', async () => {
+      manager.findOne.mockResolvedValue(
+        makeArtifact({
+          status: ArtifactStatus.DELETED,
+          expiresAt: new Date(Date.now() - PENDING_PURGE_GRACE_MS - 1000),
+        }),
+      );
+      await service.purge('artifact-1');
+      expect(storage.deleteFile).toHaveBeenCalled();
+      expect(quota.releaseUsed).toHaveBeenCalledWith(manager, WS, 100);
       expect(manager.delete).toHaveBeenCalled();
     });
 
