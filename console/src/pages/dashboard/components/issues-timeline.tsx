@@ -5,7 +5,6 @@ import { format } from 'date-fns';
 import { Bug } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   ChartContainer,
@@ -15,11 +14,12 @@ import {
 } from '@/components/ui/chart';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { useStatisticControllerGetIssuesTimeline } from '@/services/apis/gen/queries';
+import { FastScanDialog } from '../../vulnerabilities/components/fast-scan-dialog';
 import { IssuesTimelineSkeleton } from './dashboard-skeleton';
 
 const chartConfig = {
   vuls: {
-    label: 'Vulnerabilities',
+    label: 'Open vulnerabilities',
   },
 } satisfies ChartConfig;
 
@@ -41,7 +41,9 @@ export default function IssuesTimeline() {
       date: item.createdAt ? format(new Date(item.createdAt), 'MMM dd') : 'N/A',
     })) || [];
 
-  const hasData = chartData.length > 0;
+  // The series always has today's point, so "no data" means nothing was
+  // open at any point of the window.
+  const hasData = chartData.some((point) => point.vuls > 0);
 
   if (isLoading) return <IssuesTimelineSkeleton />;
 
@@ -50,7 +52,7 @@ export default function IssuesTimeline() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Bug className="h-5 w-5 text-primary" />
-          Issues Timeline
+          Vulnerability trend
         </CardTitle>
       </CardHeader>
 
@@ -58,12 +60,9 @@ export default function IssuesTimeline() {
         {!hasData && !isLoading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center z-20 gap-3 bg-background/50 backdrop-blur-sm">
             <p className="text-sm text-muted-foreground">
-              No data available yet
+              No open vulnerabilities in the last 3 months
             </p>
-            <Button variant="outline" size="sm" className="gap-2 shadow-sm">
-              <Bug className="h-4 w-4" />
-              Scan Vulnerabilities
-            </Button>
+            <FastScanDialog />
           </div>
         )}
 

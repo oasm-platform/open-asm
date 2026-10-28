@@ -5,6 +5,19 @@ import { useStatisticControllerGetTopPorts } from '@/services/apis/gen/queries';
 import { ChevronRight, Radio } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 
+/**
+ * Well-known ports of services that should rarely face the internet, by what
+ * an exposure there gives away. Any other port is shown without a label.
+ */
+const RISKY_PORTS: Record<number, string> = Object.fromEntries(
+  Object.entries({
+    'Remote access': [22, 23, 3389, 5900, 5985, 5986],
+    'File sharing': [21, 139, 445, 2049],
+    Database: [1433, 1521, 3306, 5432, 5984, 6379, 9042, 9200, 11211, 27017],
+    'Container API': [2375, 2376, 6443, 10250],
+  }).flatMap(([label, ports]) => ports.map((port) => [port, label])),
+);
+
 const TopPorts = () => {
   const navigate = useNavigate();
   const {
@@ -24,11 +37,11 @@ const TopPorts = () => {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2">
             <Radio className="h-5 w-5 text-primary" />
-            Top Ports
+            Top exposed ports
           </CardTitle>
         </CardHeader>
-        <CardContent className="flex h-full items-center justify-center text-sm text-red-600">
-          Error loading data
+        <CardContent className="flex h-full items-center justify-center text-sm text-destructive">
+          Couldn&apos;t load data
         </CardContent>
       </Card>
     );
@@ -44,7 +57,7 @@ const TopPorts = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Radio className="h-5 w-5 text-primary" />
-          Top Ports
+          Top exposed ports
         </CardTitle>
       </CardHeader>
       <CardContent className="min-h-0 flex-1">
@@ -72,17 +85,16 @@ const TopPorts = () => {
                 <div className="flex items-center justify-between text-sm">
                   <span className="flex items-center gap-2">
                     <span className="font-semibold font-mono">{item.port}</span>
-                    <span
-                      className={`rounded px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide ${
-                        item.isStandard
-                          ? 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400'
-                          : 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400'
-                      }`}
-                    >
-                      {item.isStandard ? 'std' : 'non-std'}
-                    </span>
+                    {RISKY_PORTS[item.port] && (
+                      <span className="rounded px-1.5 py-0.5 text-xs font-medium bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400">
+                        {RISKY_PORTS[item.port]}
+                      </span>
+                    )}
                   </span>
-                  <span className="flex items-center gap-1 font-mono text-muted-foreground">
+                  <span
+                    className="flex items-center gap-1 font-mono text-muted-foreground"
+                    title={`${item.count} services on this port`}
+                  >
                     {item.count}
                     <ChevronRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
                   </span>
@@ -90,7 +102,7 @@ const TopPorts = () => {
                 <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
                   <div
                     className={`h-full rounded-full transition-all ${
-                      item.isStandard ? 'bg-primary' : 'bg-orange-400'
+                      RISKY_PORTS[item.port] ? 'bg-orange-400' : 'bg-primary'
                     }`}
                     style={{
                       width: `${maxCount ? (item.count / maxCount) * 100 : 0}%`,

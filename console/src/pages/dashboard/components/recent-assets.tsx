@@ -38,11 +38,11 @@ const RecentAssets = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5 text-primary" />
-            Recent Hosts
+            Newly discovered hosts
           </CardTitle>
         </CardHeader>
-        <CardContent className="flex h-full items-center justify-center text-sm text-red-600">
-          Error loading data
+        <CardContent className="flex h-full items-center justify-center text-sm text-destructive">
+          Couldn&apos;t load data
         </CardContent>
       </Card>
     );
@@ -53,13 +53,13 @@ const RecentAssets = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Clock className="h-5 w-5 text-primary" />
-          Recent Hosts
+          Newly discovered hosts
         </CardTitle>
       </CardHeader>
       <CardContent className="min-h-0 flex-1">
         {recentHosts.length === 0 ? (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            No new hosts discovered
+            No hosts discovered yet
           </div>
         ) : (
           <div className="min-h-0 h-full space-y-0.5 overflow-y-auto pr-1">
