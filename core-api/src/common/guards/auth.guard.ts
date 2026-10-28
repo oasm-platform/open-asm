@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
+import { UserPresenceService } from '@/modules/auth/user-presence.service';
 import type { getSession } from 'better-auth/api';
 import type { Auth } from 'better-auth/auth';
 import { fromNodeHeaders } from 'better-auth/node';
@@ -52,6 +53,8 @@ export class AuthGuard implements CanActivate {
     private readonly reflector: Reflector,
     @Inject(AUTH_INSTANCE_KEY)
     private readonly auth: Auth,
+    @Inject(UserPresenceService)
+    private readonly presence: UserPresenceService,
   ) {}
 
   /**
@@ -123,6 +126,15 @@ export class AuthGuard implements CanActivate {
     request.session = currentSession.session;
     if (currentSession.user) {
       request.user = currentSession.user as UserContextPayload;
+    }
+
+    // Before the role check: a forbidden request still means the user is
+    // online. An admin impersonating the user does not.
+    const { impersonatedBy } = currentSession.session as {
+      impersonatedBy?: string | null;
+    };
+    if (currentSession.user && !impersonatedBy) {
+      this.presence.touch(currentSession.user.id);
     }
 
     // getAllAndOverride, not get: class-level `@Roles(...)` lives on the

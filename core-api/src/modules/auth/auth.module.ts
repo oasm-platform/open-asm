@@ -27,6 +27,7 @@ import { APIErrorExceptionFilter } from '../../common/filters/api-error-exceptio
 import { SkipBodyParsingMiddleware } from '../../common/middlewares/skip-body-parsing.middlewares';
 import { auth } from './auth';
 import { AuthService } from './auth.service';
+import { UserPresenceService } from './user-presence.service';
 
 /**
  * Configuration options for the AuthModule
@@ -194,6 +195,7 @@ export class AuthModule implements NestModule, OnModuleInit {
         useValue: options,
       },
       AuthService,
+      UserPresenceService,
     ];
 
     if (!options.disableExceptionFilter) {
@@ -217,6 +219,7 @@ export class AuthModule implements NestModule, OnModuleInit {
           useValue: options,
         },
         AuthService,
+        UserPresenceService,
       ],
     };
   }

@@ -4480,6 +4480,11 @@ export type AdminUserDto = {
   banExpires?: string | null;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Time of the user's latest authenticated request; null when there was none in the last 30 days.
+   * @nullable
+   */
+  lastActiveAt: string | null;
 };
 
 export type GetManyAdminUserDtoDto = {

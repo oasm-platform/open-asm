@@ -12,6 +12,7 @@ jest.mock('better-auth/node', () => ({
   fromNodeHeaders: jest.fn(),
 }));
 
+import type { UserPresenceService } from '@/modules/auth/user-presence.service';
 import { Reflector } from '@nestjs/core';
 import type { Auth } from 'better-auth/auth';
 import { ROLE_METADATA_KEY } from '../constants/app.constants';
@@ -30,6 +31,7 @@ describe('AuthGuard', () => {
   let guard: AuthGuard;
   let reflector: Reflector;
   let getSession: jest.Mock;
+  let presence: { touch: jest.Mock };
   let request: {
     path: string;
     headers: Record<string, string>;
@@ -65,11 +67,17 @@ describe('AuthGuard', () => {
     handlerFn = function handler(): void {};
     classRef = class Controller {};
 
+    presence = { touch: jest.fn() };
+
     reflector = new Reflector();
-    guard = new AuthGuard(reflector, {
-      options: { disabledPaths: ['mcp'] },
-      api: { getSession },
-    } as unknown as Auth);
+    guard = new AuthGuard(
+      reflector,
+      {
+        options: { disabledPaths: ['mcp'] },
+        api: { getSession },
+      } as unknown as Auth,
+      presence as unknown as UserPresenceService,
+    );
   });
 
   describe('MCP API key bypass is scoped to /api/mcp', () => {
@@ -161,6 +169,38 @@ describe('AuthGuard', () => {
       expect(response.append).toHaveBeenCalledWith('Set-Cookie', [
         'better-auth.session=; Max-Age=0',
       ]);
+    });
+  });
+
+  describe('presence', () => {
+    it('records the signed-in user, even when the role check fails', async () => {
+      Reflect.defineMetadata(ROLE_METADATA_KEY, [Role.ADMIN], classRef);
+      signedInAs(Role.USER);
+
+      await expect(guard.canActivate(makeContext())).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(presence.touch).toHaveBeenCalledWith('u1');
+    });
+
+    it('does not record an impersonated session', async () => {
+      getSession.mockResolvedValue({
+        headers: null,
+        response: {
+          session: { id: 's1', impersonatedBy: 'admin-1' },
+          user: { id: 'u1', role: Role.USER },
+        },
+      });
+
+      await expect(guard.canActivate(makeContext())).resolves.toBe(true);
+      expect(presence.touch).not.toHaveBeenCalled();
+    });
+
+    it('does not record a rejected request', async () => {
+      await expect(guard.canActivate(makeContext())).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(presence.touch).not.toHaveBeenCalled();
     });
   });
 

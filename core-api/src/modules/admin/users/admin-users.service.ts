@@ -1,6 +1,7 @@
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { Role } from '@/common/enums/enum';
 import { User } from '@/modules/auth/entities/user.entity';
+import { UserPresenceService } from '@/modules/auth/user-presence.service';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -17,7 +18,10 @@ const SORT_COLUMNS: Record<string, string> = {
 };
 
 /** Picks the admin-visible fields; anything else on the row stays server-side. */
-export function toAdminUserDto(user: User): AdminUserDto {
+export function toAdminUserDto(
+  user: User,
+  lastActiveAt: Date | null,
+): AdminUserDto {
   return {
     id: user.id,
     name: user.name,
@@ -30,6 +34,7 @@ export function toAdminUserDto(user: User): AdminUserDto {
     banExpires: user.banExpires ?? null,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
+    lastActiveAt,
   };
 }
 
@@ -38,6 +43,7 @@ export class AdminUsersService {
   constructor(
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+    private readonly presence: UserPresenceService,
   ) {}
 
   /**
@@ -76,10 +82,15 @@ export class AdminUsersService {
     }
 
     const [users, total] = await queryBuilder.getManyAndCount();
+    const lastActive = await this.presence.lastActiveAt(
+      users.map((user) => user.id),
+    );
 
     return getManyResponse({
       query,
-      data: users.map(toAdminUserDto),
+      data: users.map((user) =>
+        toAdminUserDto(user, lastActive.get(user.id) ?? null),
+      ),
       total,
     });
   }
@@ -89,6 +100,7 @@ export class AdminUsersService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    return toAdminUserDto(user);
+    const lastActive = await this.presence.lastActiveAt([id]);
+    return toAdminUserDto(user, lastActive.get(id) ?? null);
   }
 }
