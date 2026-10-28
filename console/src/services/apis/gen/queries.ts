@@ -5212,7 +5212,6 @@ export type WorkersControllerGetWorkersParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
-  workspaceId?: string;
   scope?: WorkersControllerGetWorkersScope;
   runMode?: WorkersControllerGetWorkersRunMode;
   enabledAgentMode?: boolean;
@@ -5242,7 +5241,6 @@ export type ToolsControllerGetManyToolsParams = {
   sortOrder?: string;
   type?: ToolsControllerGetManyToolsType;
   category?: ToolsControllerGetManyToolsCategory;
-  workspaceId?: string;
   providerId?: string;
   /**
    * true → only AI agent tools (built-in tools always count), false → only the others
@@ -5294,7 +5292,6 @@ export type SearchControllerSearchAssetsTargetsParams = {
   sortBy?: string;
   sortOrder?: string;
   value: string;
-  workspaceId: string;
   isSaveHistory?: boolean;
 };
 
@@ -5304,15 +5301,7 @@ export type SearchControllerGetSearchHistoryParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
-  workspaceId: string;
   query?: string;
-};
-
-export type StatisticControllerGetStatisticsParams = {
-  /**
-   * The ID of the workspace to get statistics for
-   */
-  workspaceId: string;
 };
 
 export type VulnerabilitiesControllerGetVulnerabilitiesParams = {
@@ -5374,7 +5363,6 @@ export const VulnerabilitiesControllerGetVulnerabilitiesSeverityItem = {
 } as const;
 
 export type VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams = {
-  workspaceId: string;
   targetIds?: string[];
 };
 
@@ -11796,6 +11784,94 @@ export function useTargetsControllerGetTargetById<
 }
 
 /**
+ * Permanently deletes a security testing target and all its associated data (assets, vulnerabilities, jobs, and related records) from the specified workspace.
+ * @summary Delete a target permanently
+ */
+export const targetsControllerDeleteTarget = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/targets/${id}`, method: 'DELETE', signal },
+    options,
+  );
+};
+
+export const getTargetsControllerDeleteTargetMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof targetsControllerDeleteTarget>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof targetsControllerDeleteTarget>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['targetsControllerDeleteTarget'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof targetsControllerDeleteTarget>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return targetsControllerDeleteTarget(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TargetsControllerDeleteTargetMutationResult = NonNullable<
+  Awaited<ReturnType<typeof targetsControllerDeleteTarget>>
+>;
+
+export type TargetsControllerDeleteTargetMutationError = unknown;
+
+/**
+ * @summary Delete a target permanently
+ */
+export const useTargetsControllerDeleteTarget = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof targetsControllerDeleteTarget>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof targetsControllerDeleteTarget>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getTargetsControllerDeleteTargetMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
  * Modifies the configuration and properties of an existing security testing target, allowing for dynamic adjustments to assessment parameters.
  * @summary Update a target
  */
@@ -11886,99 +11962,6 @@ export const useTargetsControllerUpdateTarget = <
 > => {
   return useMutation(
     getTargetsControllerUpdateTargetMutationOptions(options),
-    queryClient,
-  );
-};
-
-/**
- * Permanently deletes a security testing target and all its associated data (assets, vulnerabilities, jobs, and related records) from the specified workspace.
- * @summary Delete a target permanently
- */
-export const targetsControllerDeleteTarget = (
-  id: string,
-  workspaceId: string,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<DefaultMessageResponseDto>(
-    {
-      url: `/api/targets/${id}/workspace/${workspaceId}`,
-      method: 'DELETE',
-      signal,
-    },
-    options,
-  );
-};
-
-export const getTargetsControllerDeleteTargetMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof targetsControllerDeleteTarget>>,
-    TError,
-    { id: string; workspaceId: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof targetsControllerDeleteTarget>>,
-  TError,
-  { id: string; workspaceId: string },
-  TContext
-> => {
-  const mutationKey = ['targetsControllerDeleteTarget'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof targetsControllerDeleteTarget>>,
-    { id: string; workspaceId: string }
-  > = (props) => {
-    const { id, workspaceId } = props ?? {};
-
-    return targetsControllerDeleteTarget(id, workspaceId, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type TargetsControllerDeleteTargetMutationResult = NonNullable<
-  Awaited<ReturnType<typeof targetsControllerDeleteTarget>>
->;
-
-export type TargetsControllerDeleteTargetMutationError = unknown;
-
-/**
- * @summary Delete a target permanently
- */
-export const useTargetsControllerDeleteTarget = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof targetsControllerDeleteTarget>>,
-      TError,
-      { id: string; workspaceId: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof targetsControllerDeleteTarget>>,
-  TError,
-  { id: string; workspaceId: string },
-  TContext
-> => {
-  return useMutation(
-    getTargetsControllerDeleteTargetMutationOptions(options),
     queryClient,
   );
 };
@@ -27729,7 +27712,7 @@ export function useSearchControllerSearchAssetsTargets<
  * @summary Get search history
  */
 export const searchControllerGetSearchHistory = (
-  params: SearchControllerGetSearchHistoryParams,
+  params?: SearchControllerGetSearchHistoryParams,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
@@ -27762,7 +27745,7 @@ export const getSearchControllerGetSearchHistoryInfiniteQueryOptions = <
   >,
   TError = unknown,
 >(
-  params: SearchControllerGetSearchHistoryParams,
+  params?: SearchControllerGetSearchHistoryParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -27814,7 +27797,7 @@ export function useSearchControllerGetSearchHistoryInfinite<
   >,
   TError = unknown,
 >(
-  params: SearchControllerGetSearchHistoryParams,
+  params: undefined | SearchControllerGetSearchHistoryParams,
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
@@ -27847,7 +27830,7 @@ export function useSearchControllerGetSearchHistoryInfinite<
   >,
   TError = unknown,
 >(
-  params: SearchControllerGetSearchHistoryParams,
+  params?: SearchControllerGetSearchHistoryParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -27880,7 +27863,7 @@ export function useSearchControllerGetSearchHistoryInfinite<
   >,
   TError = unknown,
 >(
-  params: SearchControllerGetSearchHistoryParams,
+  params?: SearchControllerGetSearchHistoryParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -27908,7 +27891,7 @@ export function useSearchControllerGetSearchHistoryInfinite<
   >,
   TError = unknown,
 >(
-  params: SearchControllerGetSearchHistoryParams,
+  params?: SearchControllerGetSearchHistoryParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
@@ -27944,7 +27927,7 @@ export const getSearchControllerGetSearchHistoryQueryOptions = <
   TData = Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
   TError = unknown,
 >(
-  params: SearchControllerGetSearchHistoryParams,
+  params?: SearchControllerGetSearchHistoryParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -27983,7 +27966,7 @@ export function useSearchControllerGetSearchHistory<
   TData = Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
   TError = unknown,
 >(
-  params: SearchControllerGetSearchHistoryParams,
+  params: undefined | SearchControllerGetSearchHistoryParams,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -28010,7 +27993,7 @@ export function useSearchControllerGetSearchHistory<
   TData = Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
   TError = unknown,
 >(
-  params: SearchControllerGetSearchHistoryParams,
+  params?: SearchControllerGetSearchHistoryParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -28037,7 +28020,7 @@ export function useSearchControllerGetSearchHistory<
   TData = Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
   TError = unknown,
 >(
-  params: SearchControllerGetSearchHistoryParams,
+  params?: SearchControllerGetSearchHistoryParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -28060,7 +28043,7 @@ export function useSearchControllerGetSearchHistory<
   TData = Awaited<ReturnType<typeof searchControllerGetSearchHistory>>,
   TError = unknown,
 >(
-  params: SearchControllerGetSearchHistoryParams,
+  params?: SearchControllerGetSearchHistoryParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -28267,48 +28250,40 @@ export const useSearchControllerDeleteSearchHistory = <
  * @summary Get workspace statistics
  */
 export const statisticControllerGetStatistics = (
-  params: StatisticControllerGetStatisticsParams,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
   return orvalClient<StatisticResponseDto>(
-    { url: `/api/statistic`, method: 'GET', params, signal },
+    { url: `/api/statistic`, method: 'GET', signal },
     options,
   );
 };
 
-export const getStatisticControllerGetStatisticsQueryKey = (
-  params?: StatisticControllerGetStatisticsParams,
-) => {
-  return [`/api/statistic`, ...(params ? [params] : [])] as const;
+export const getStatisticControllerGetStatisticsQueryKey = () => {
+  return [`/api/statistic`] as const;
 };
 
 export const getStatisticControllerGetStatisticsQueryOptions = <
   TData = Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
   TError = unknown,
->(
-  params: StatisticControllerGetStatisticsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ??
-    getStatisticControllerGetStatisticsQueryKey(params);
+    queryOptions?.queryKey ?? getStatisticControllerGetStatisticsQueryKey();
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof statisticControllerGetStatistics>>
-  > = ({ signal }) =>
-    statisticControllerGetStatistics(params, requestOptions, signal);
+  > = ({ signal }) => statisticControllerGetStatistics(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
@@ -28326,7 +28301,6 @@ export function useStatisticControllerGetStatistics<
   TData = Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
   TError = unknown,
 >(
-  params: StatisticControllerGetStatisticsParams,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -28353,7 +28327,6 @@ export function useStatisticControllerGetStatistics<
   TData = Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
   TError = unknown,
 >(
-  params: StatisticControllerGetStatisticsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -28380,7 +28353,6 @@ export function useStatisticControllerGetStatistics<
   TData = Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
   TError = unknown,
 >(
-  params: StatisticControllerGetStatisticsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -28403,7 +28375,6 @@ export function useStatisticControllerGetStatistics<
   TData = Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
   TError = unknown,
 >(
-  params: StatisticControllerGetStatisticsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -28418,10 +28389,7 @@ export function useStatisticControllerGetStatistics<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getStatisticControllerGetStatisticsQueryOptions(
-    params,
-    options,
-  );
+  const queryOptions = getStatisticControllerGetStatisticsQueryOptions(options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -30239,7 +30207,7 @@ export function useVulnerabilitiesControllerGetVulnerabilities<
  * @summary Get vulnerabilities statistics
  */
 export const vulnerabilitiesControllerGetVulnerabilitiesStatistics = (
-  params: VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams,
+  params?: VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
@@ -30264,7 +30232,7 @@ export const getVulnerabilitiesControllerGetVulnerabilitiesStatisticsQueryOption
     >,
     TError = unknown,
   >(
-    params: VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams,
+    params?: VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams,
     options?: {
       query?: Partial<
         UseQueryOptions<
@@ -30321,7 +30289,8 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesStatistics<
   >,
   TError = unknown,
 >(
-  params: VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams,
+  params:
+    undefined | VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -30362,7 +30331,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesStatistics<
   >,
   TError = unknown,
 >(
-  params: VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams,
+  params?: VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -30403,7 +30372,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesStatistics<
   >,
   TError = unknown,
 >(
-  params: VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams,
+  params?: VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -30432,7 +30401,7 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesStatistics<
   >,
   TError = unknown,
 >(
-  params: VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams,
+  params?: VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams,
   options?: {
     query?: Partial<
       UseQueryOptions<

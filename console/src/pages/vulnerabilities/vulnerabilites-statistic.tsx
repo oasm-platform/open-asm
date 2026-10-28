@@ -20,7 +20,6 @@ const VulnerabilitiesStatistic = ({
   const { data, isLoading } =
     useVulnerabilitiesControllerGetVulnerabilitiesStatistics(
       {
-        workspaceId: selectedWorkspace ?? '',
         ...(targetId ? { targetIds: [targetId] } : {}),
       },
       {
