@@ -14,7 +14,7 @@ import {
   Res,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Response } from 'express';
+import type { NodeResponse } from '@nestjs/platform-node';
 import { AssetsService } from './assets.service';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
 import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
@@ -378,7 +378,7 @@ export class AssetsController {
   @Get('services/export')
   async exportServicesToCSV(
     @WorkspaceId() workspaceId: string,
-    @Res() res: Response,
+    @Res() res: NodeResponse,
   ) {
     // Helper function to format date as DD-MM-YYYY
     const formatDate = (date: Date | null | undefined): string => {

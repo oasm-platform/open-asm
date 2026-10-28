@@ -1,10 +1,9 @@
 import { AppModule } from '@/app.module';
 import { BullMQName } from '@/common/enums/enum';
-import { configureApp } from '@/bootstrap/configure-app';
+import { configureApp, createHttpAdapter } from '@/bootstrap/configure-app';
 import { getQueueToken } from '@nestjs/bullmq';
 import type { INestApplication } from '@nestjs/common';
-import { ExpressAdapter } from '@nestjs/platform-express';
-import type { NestExpressApplication } from '@nestjs/platform-express';
+import type { NestNodeApplication } from '@nestjs/platform-node';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { Test } from '@nestjs/testing';
 import type { Server } from 'http';
@@ -20,9 +19,10 @@ export interface TestApp {
 /**
  * Boots `AppModule` behind the *real* HTTP pipeline.
  *
- * `configureApp` is the same function `main.ts` calls, so the prefix, the
- * `AuthGuard`, the `ValidationPipe` and the middleware order under test are
- * exactly what production runs. What is left out is process-level: no Swagger
+ * `createHttpAdapter` and `configureApp` are the same functions `main.ts`
+ * calls, so the adapter (and its query parsing), the prefix, the `AuthGuard`,
+ * the `ValidationPipe` and the middleware order under test are exactly what
+ * production runs. What is left out is process-level: no Swagger
  * document, no `.open-api/open-api.json` write (that file is generated and
  * git-tracked, so a test run must not dirty it), and no gRPC server (it binds
  * the fixed port 16276 and would collide with a locally running API).
@@ -32,8 +32,8 @@ export async function createTestApp(): Promise<TestApp> {
     imports: [AppModule],
   }).compile();
 
-  const app = moduleRef.createNestApplication<NestExpressApplication>(
-    new ExpressAdapter(),
+  const app = moduleRef.createNestApplication<NestNodeApplication>(
+    createHttpAdapter(),
     // Mirrors `main.ts`. better-auth needs the raw stream, and
     // `SkipBodyParsingMiddleware` re-enables JSON parsing for every other
     // route, so request bodies still arrive.

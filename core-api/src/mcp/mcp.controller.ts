@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import type { Request, Response } from 'express';
+import type { NodeRequest, NodeResponse } from '@nestjs/platform-node';
 import { RequestWithMetadata } from '@/common/interfaces/app.interface';
 import { McpGuard } from './mcp.guard';
 import { McpService } from './mcp.service';
@@ -12,14 +12,14 @@ export class McpController {
 
   @Get()
   @UseGuards(McpGuard)
-  async handleSSE(@Req() req: RequestWithMetadata, @Res() res: Response): Promise<void> {
+  async handleSSE(@Req() req: RequestWithMetadata, @Res() res: NodeResponse): Promise<void> {
     const workspaceId = req.workspaceId;
     await this.mcpService.handleSSEConnection(workspaceId, req, res);
   }
 
   @UseGuards(McpGuard)
   @Post('message')
-  async handleMessage(@Req() req: Request, @Res() res: Response): Promise<void> {
+  async handleMessage(@Req() req: NodeRequest, @Res() res: NodeResponse): Promise<void> {
     await this.mcpService.handleMessage(req, res);
   }
 }

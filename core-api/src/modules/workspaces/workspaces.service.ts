@@ -28,7 +28,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomBytes, randomUUID } from 'crypto';
-import { Request, Response } from 'express';
+import type { NodeRequest, NodeResponse } from '@nestjs/platform-node';
 import { DataSource, EntityManager, In, MoreThan, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { AuditContext, AuditService } from '../audit/audit.service';
@@ -195,8 +195,8 @@ export class WorkspacesService implements OnModuleInit {
   public async getWorkspaces(
     query: GetManyWorkspacesDto,
     userContextPayload: UserContextPayload,
-    req: Request,
-    res: Response,
+    req: NodeRequest,
+    res: NodeResponse,
   ) {
     const { limit, page, sortOrder, isArchived, sortBy: rawSortBy } = query;
     const { id } = userContextPayload;

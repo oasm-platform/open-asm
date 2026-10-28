@@ -17,7 +17,7 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
 import { PublishEvent } from '../event-bridge/publishing/publish-event.decorator';
-import type { Response } from 'express';
+import type { NodeResponse } from '@nestjs/platform-node';
 import {
   GenerateSummaryReportBodyDto,
   GenerateVulReportBodyDto,
@@ -58,7 +58,7 @@ export class ReportsController {
   async previewSummaryReport(
     @Query() query: PreviewSummaryQueryDto,
     @WorkspaceId() workspaceId: string,
-    @Res() res: Response,
+    @Res() res: NodeResponse,
   ) {
     const buffer = await this.reportsService.previewSummaryReport(workspaceId, {
       startDate: query.startDate,
@@ -77,7 +77,7 @@ export class ReportsController {
   async previewVulReport(
     @Query() query: PreviewVulQueryDto,
     @WorkspaceId() workspaceId: string,
-    @Res() res: Response,
+    @Res() res: NodeResponse,
   ) {
     const buffer = await this.reportsService.previewVulnerabilityReport(workspaceId, {
       startDate: query.startDate,

@@ -1,6 +1,6 @@
 import type { UserContextPayload } from '@/common/interfaces/app.interface';
 import { Reflector } from '@nestjs/core';
-import type { Request } from 'express';
+import type { NodeRequest } from '@nestjs/platform-node';
 import { WorkspacePermissions } from '@/common/decorators/workspace-permissions.decorator';
 import { PUBLISH_EVENT_KEY, type PublishEventConfig } from '../event-bridge/publishing/publish-event.decorator';
 import type { AuditContext, AuditService } from '../audit/audit.service';
@@ -123,7 +123,7 @@ describe('WorkspacesController audit context pass-through (M4.1 explicit events)
     userAgent: 'test-agent',
     requestId: 'req-1',
   };
-  const req = {} as Request;
+  const req = {} as NodeRequest;
   const user = { id: 'u-actor' } as UserContextPayload;
 
   let workspacesService: {
