@@ -44,6 +44,15 @@ export const NOTIFICATION_RULES: Partial<Record<EventName, NotificationRule[]>> 
         type: NotificationType.ASSET_NEW_DETECT,
         scope: NotificationScope.GROUP,
         audience: 'workspace-members',
+        // The producer publishes every run, including a rescan that found
+        // nothing; "New assets discovered for X: " with no counts is noise.
+        when: (event) => {
+          const p = readPayload('workflow.run.completed', event);
+          return (
+            (p.hosts ?? 0) + (p.ports ?? 0) + (p.services ?? 0) + (p.techs ?? 0) >
+            0
+          );
+        },
         metadata: (event) => {
           const p = readPayload('workflow.run.completed', event);
           return {

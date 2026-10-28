@@ -38,6 +38,15 @@ const applyAuditExportResponsePatch = (doc: any) => {
   };
 };
 
+/**
+ * Keyset-paginated lists: each page asks for the `nextCursor` of the previous
+ * one. Listed by hand because a `cursor` param alone does not make an
+ * operation a list (the audit CSV export takes one too).
+ */
+const CURSOR_PAGINATED_OPERATIONS = new Set([
+  'NotificationsController_getNotifications',
+]);
+
 const getInfiniteOverrides = () => {
   const operations: Record<string, any> = {};
   const inputPath = INPUT_SPEC_PATH;
@@ -65,6 +74,13 @@ const getInfiniteOverrides = () => {
             query: {
               useInfinite: true,
               useInfiniteQueryParam: 'page',
+            },
+          };
+        } else if (CURSOR_PAGINATED_OPERATIONS.has(operationId)) {
+          operations[operationId] = {
+            query: {
+              useInfinite: true,
+              useInfiniteQueryParam: 'cursor',
             },
           };
         }
