@@ -68,10 +68,9 @@ tasks:
 
   # Docker Compose orchestration
   # Starts all services using docker compose with environment variables
-  # Builds and recreates the full stack with a single worker instance.
-  # NOTE: the compose service key is `oasm-worker` (not `worker`). The worker
-  # publishes the fixed connector port 26276 that spawned containers dial back
-  # on, so only ONE worker can run per host — do not add `--scale`.
+  # Builds and recreates the full stack; `task docker-compose workers=3` scales
+  # the `oasm-worker` service (not `worker`). Connector containers dial each
+  # replica on its own IP over the oasm-connectors network — no host port.
   docker-compose:
     cmds:
       - |
@@ -87,7 +86,7 @@ tasks:
         fi
         export WORKER_DOCKER_GID
         echo "Docker socket group gid for worker: ${WORKER_DOCKER_GID}"
-        docker compose --env-file ./core-api/.env up -d --build --force-recreate
+        docker compose --env-file ./core-api/.env up -d --build --force-recreate --scale oasm-worker={{.workers | default 1}}
 
   proto:
     cmds:

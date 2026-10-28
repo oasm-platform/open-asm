@@ -124,6 +124,31 @@ describe('event drafts + render', () => {
     expect(hostile).toContain("`a'b`");
   });
 
+  it('previews the new URLs of a URL discovery run', () => {
+    const text = render('asset.url.discovered', {
+      ...base,
+      payload: {
+        targetValue: 'example.com',
+        count: 37,
+        urls: Array.from({ length: 10 }, (_, i) => `https://example.com/p${i}`),
+      },
+    });
+
+    expect(text).toContain('🔗 37 new URLs found');
+    expect(text).toContain('Target: example.com');
+    const items = text.split('\n').filter((l) => l.startsWith('• '));
+    expect(items).toHaveLength(5);
+    expect(items[0]).toContain('https://example.com/p0');
+    expect(text).toContain('…and 32 more');
+
+    const one = render('asset.url.discovered', {
+      ...base,
+      payload: { targetValue: 'example.com', count: 1, urls: ['https://example.com/'] },
+    });
+    expect(one).toContain('🔗 1 new URL found');
+    expect(one).not.toContain('more');
+  });
+
   it('describes a complete and an incomplete scan run', () => {
     const payload = {
       targetValue: 'example.com',
@@ -147,6 +172,35 @@ describe('event drafts + render', () => {
     });
     expect(partial).toContain('⚠️ Scan finished incomplete');
     expect(partial).toContain('Details: nuclei failed');
+  });
+
+  it('lists the hosts a scan found first', () => {
+    const text = render('workflow.run.completed', {
+      ...base,
+      payload: {
+        targetValue: 'example.com',
+        hosts: 7,
+        failedSteps: [],
+        blockedSteps: [],
+        cancelledSteps: [],
+        newHosts: ['a.example.com', 'b.example.com', 'c.example.com', 'd.example.com', 'e.example.com', 'f.example.com'],
+        newHostsTotal: 7,
+      },
+    });
+
+    expect(text).toContain('New hosts');
+    const items = text.split('\n').filter((l) => l.startsWith('• '));
+    expect(items).toHaveLength(5);
+    expect(items[0]).toContain('a.example.com');
+    expect(text).toContain('…and 2 more');
+  });
+
+  it('omits the host list for events published before runs named them', () => {
+    const text = render('workflow.run.completed', {
+      ...base,
+      payload: { targetValue: 'example.com', hosts: 3, failedSteps: [], blockedSteps: [], cancelledSteps: [] },
+    });
+    expect(text).not.toContain('New hosts');
   });
 
   it('words the unfinished steps', () => {

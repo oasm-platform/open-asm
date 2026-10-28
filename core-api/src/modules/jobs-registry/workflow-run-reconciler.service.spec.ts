@@ -22,13 +22,15 @@ describe('WorkflowRunReconcilerService', () => {
       (_key: string, _ttl: number, action: () => Promise<unknown>) =>
         action(),
     );
+    jest
+      .spyOn(RedisLockService, 'current', 'get')
+      .mockReturnValue(redisLock as unknown as RedisLockService);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         WorkflowRunReconcilerService,
         { provide: DataSource, useValue: dataSource },
         { provide: WorkflowRunnerService, useValue: workflowRunner },
-        { provide: RedisLockService, useValue: redisLock },
       ],
     }).compile();
 

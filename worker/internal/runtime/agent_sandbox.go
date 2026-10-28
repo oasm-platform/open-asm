@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
@@ -131,7 +131,7 @@ func (s *AgentSandbox) ToolsMount() *mount.Mount { return s.toolsMount }
 // one. Docker sets the hostname to the short container id; the id/hostname
 // cross-check keeps a host whose name happens to match some container from
 // adopting that container's image and mounts.
-func inspectSelfContainer(ctx context.Context, cli *client.Client) *types.ContainerJSON {
+func inspectSelfContainer(ctx context.Context, cli *client.Client) *container.InspectResponse {
 	hostname, err := os.Hostname()
 	if err != nil || hostname == "" {
 		return nil
@@ -148,7 +148,7 @@ func inspectSelfContainer(ctx context.Context, cli *client.Client) *types.Contai
 
 // resolveSandboxImage: explicit override > the worker's own image (by id, so
 // it is the exact image already present on the engine) > the default tag.
-func resolveSandboxImage(override string, self *types.ContainerJSON) string {
+func resolveSandboxImage(override string, self *container.InspectResponse) string {
 	if override != "" {
 		return override
 	}
@@ -179,7 +179,7 @@ func sandboxToolsTarget(toolPath string) string {
 //     name for volumes, Source for binds); none = tools live in the worker's
 //     image layer and cannot be shared, so no mount;
 //   - host worker: the host tool path itself.
-func resolveSandboxToolsMount(override, toolPath, target string, self *types.ContainerJSON) *mount.Mount {
+func resolveSandboxToolsMount(override, toolPath, target string, self *container.InspectResponse) *mount.Mount {
 	ro := func(t mount.Type, src string) *mount.Mount {
 		return &mount.Mount{Type: t, Source: src, Target: target, ReadOnly: true}
 	}
@@ -312,7 +312,7 @@ func (s *AgentSandbox) Exec(ctx context.Context, sessionID, command string, out 
 	if err != nil {
 		return -1, fmt.Errorf("sandbox exec create: %w", err)
 	}
-	att, err := s.cli.ContainerExecAttach(ctx, created.ID, types.ExecStartCheck{})
+	att, err := s.cli.ContainerExecAttach(ctx, created.ID, container.ExecAttachOptions{})
 	if err != nil {
 		return -1, fmt.Errorf("sandbox exec attach: %w", err)
 	}
@@ -345,8 +345,8 @@ func (s *AgentSandbox) Exec(ctx context.Context, sessionID, command string, out 
 	return s.execExitCode(ctx, created.ID)
 }
 
-func (s *AgentSandbox) execCreate(ctx context.Context, containerID, command string) (types.IDResponse, error) {
-	return s.cli.ContainerExecCreate(ctx, containerID, types.ExecConfig{
+func (s *AgentSandbox) execCreate(ctx context.Context, containerID, command string) (container.ExecCreateResponse, error) {
+	return s.cli.ContainerExecCreate(ctx, containerID, container.ExecOptions{
 		User:         agentSandboxUser,
 		WorkingDir:   agentSandboxWorkdir,
 		AttachStdout: true,
@@ -479,17 +479,17 @@ func (s *AgentSandbox) create(ctx context.Context, sessionID string) (string, er
 
 // ensureImage pulls the sandbox image only when the engine lacks it.
 func (s *AgentSandbox) ensureImage(ctx context.Context) error {
-	if _, _, err := s.cli.ImageInspectWithRaw(ctx, s.image); err == nil {
+	if _, err := s.cli.ImageInspect(ctx, s.image); err == nil {
 		return nil
 	}
 	s.logInfo("agent sandbox: pulling image %s", s.image)
-	r, err := s.cli.ImagePull(ctx, s.image, types.ImagePullOptions{})
+	r, err := s.cli.ImagePull(ctx, s.image, image.PullOptions{})
 	if err != nil {
 		return fmt.Errorf("sandbox image pull %s: %w", s.image, err)
 	}
 	_, _ = io.Copy(io.Discard, r)
 	r.Close()
-	if _, _, err := s.cli.ImageInspectWithRaw(ctx, s.image); err != nil {
+	if _, err := s.cli.ImageInspect(ctx, s.image); err != nil {
 		return fmt.Errorf("sandbox image %s unavailable after pull: %w", s.image, err)
 	}
 	return nil

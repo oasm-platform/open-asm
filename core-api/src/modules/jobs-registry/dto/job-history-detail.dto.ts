@@ -1,4 +1,4 @@
-import { JobStatus, ToolCategory } from '@/common/enums/enum';
+import { JobRunType, JobStatus, ToolCategory } from '@/common/enums/enum';
 import { Asset } from '@/modules/assets/entities/assets.entity';
 import { Target } from '@/modules/targets/entities/target.entity';
 import { Tool } from '@/modules/tools/entities/tools.entity';
@@ -117,6 +117,13 @@ export class WorkflowStepStatusDto {
   })
   failed?: number;
 
+  @ApiProperty({
+    required: false,
+    description:
+      'Job rows a worker is executing right now; omitted when none. A dispatched step without any is still queued, waiting for a worker to pick its jobs up',
+  })
+  running?: number;
+
   @ApiProperty({ required: false })
   toolId?: string;
 
@@ -151,6 +158,13 @@ export class JobHistoryDetailResponseDto {
 
   @ApiProperty()
   jobHistoryName?: string;
+
+  @ApiProperty({
+    enum: JobRunType,
+    required: false,
+    description: 'How the run was started: by a user (manual) or by a schedule',
+  })
+  jobRunType?: JobRunType;
 
   /** Jobs still pending or in progress — the ones a cancel would stop. */
   @ApiProperty()

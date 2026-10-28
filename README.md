@@ -55,7 +55,7 @@ OASM implements these loops as one integrated, self-hosted stack: a web console 
 | **Asset inventory** | One searchable inventory of domains, IPs, ports, services, technologies, discovered URLs, and TLS certificates — filter, page through large estates, view the topology graph, export CSV for reporting. |
 | **Vulnerability tracking** | Scan findings normalized into trackable vulnerabilities with severity, status, and evidence detail, so teams triage and follow up in one place. |
 | **Asset groups + schedules** | Bundle related assets, attach scan workflows with cron schedules (or pause with `disabled`), and trigger on-demand runs per group. |
-| **Distributed workers** | Workers join over gRPC, pull queued jobs, run each scan in an isolated container, and stream findings back. One worker per host. |
+| **Distributed workers** | Workers join over gRPC, pull queued jobs, run each scan in an isolated container, and stream findings back. Several workers can share one host. |
 | **Pluggable connectors** | Each scanner ships as a versioned container image from a companion repo and is synced locally — adding or upgrading a tool never requires an OASM release. |
 | **Workflows** | Cron-scheduled or event-triggered scan workflows with a job graph, so recurring coverage runs without manual kicks. |
 | **Notifications** | In-app notifications plus Slack, Discord, Telegram, and generic webhooks, filtered per integration by event type and severity. |
@@ -284,7 +284,7 @@ This builds and starts console, core API, worker, Postgres, Redis, Geo-IP proxy,
 | Redis | `localhost:6379` |
 | Geo-IP | `localhost:4360` |
 | RustFS | `localhost:9000` (admin UI `:9001`) |
-| Worker callback | `:26276` (one worker per host — do not `--scale oasm-worker`) |
+| Worker callback | `:26276` on the `oasm-connectors` network, not published (scale with `--scale oasm-worker=N`) |
 
 Notes:
 

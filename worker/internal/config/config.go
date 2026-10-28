@@ -32,6 +32,7 @@ type Config struct {
 	ConnectorPort                int    `mapstructure:"connector_port"`                  // gRPC port for connectors, default 26276
 	ConnectorAddr                string `mapstructure:"connector_addr"`                  // REQUIRED dial address (host:port) connector containers use to reach the connector server; empty fails fast at runtime init unless autodetect is opted in below
 	ConnectorAddrAllowAutodetect bool   `mapstructure:"connector_addr_allow_autodetect"` // WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT: restore the legacy auto-derive chain (self-IP → host.docker.internal → bridge gateway → 172.17.0.1) with a warning instead of failing fast
+	ConnectorNetwork             string `mapstructure:"connector_network"`               // WORKER_CONNECTOR_NETWORK: Docker network connector containers join; a containerized worker attached to it is dialed on its own IP there (no published port, so the service can be scaled)
 	ConnectorToken               string `mapstructure:"connector_token"`                 // shared secret for connector auth, empty = no auth
 	Mode                         string `mapstructure:"mode"`                            // worker run mode: "cli", "node", or "" (unknown)
 
@@ -90,6 +91,7 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("connector_port", 26276)
 	viper.SetDefault("connector_addr", "") // REQUIRED dial address for connector containers; empty fails fast unless connector_addr_allow_autodetect is set
 	viper.SetDefault("connector_addr_allow_autodetect", false)
+	viper.SetDefault("connector_network", "")
 	viper.SetDefault("connector_token", "")
 	viper.SetDefault("mode", "")
 	viper.SetDefault("pool_enabled", true)

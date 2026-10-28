@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 
-import { RedisLockService } from '@/services/redis/distributed-lock.service';
+import { Lock } from '@/services/redis/lock.decorator';
 import { StatisticService } from './statistic.service';
 
 /**
@@ -15,10 +15,7 @@ import { StatisticService } from './statistic.service';
 export class StatisticCronService {
   private readonly logger = new Logger(StatisticCronService.name);
 
-  constructor(
-    private readonly statisticService: StatisticService,
-    private readonly redisLockService: RedisLockService,
-  ) {}
+  constructor(private readonly statisticService: StatisticService) {}
 
   /**
    * Handles the cron task to calculate and store statistics.
@@ -28,13 +25,8 @@ export class StatisticCronService {
    * Returns early if another instance already holds the lock.
    */
   @Cron('0 0 * * *')
-  async handleCron() {
-    await this.redisLockService.withLock(
-      'cron:statistic-daily',
-      600_000,
-      async () => {
-        await this.statisticService.calculateAndStoreStatistics();
-      },
-    );
+  @Lock('cron:statistic-daily', { ttl: 600_000 })
+  async handleCron(): Promise<void> {
+    await this.statisticService.calculateAndStoreStatistics();
   }
 }

@@ -4,7 +4,7 @@ import {
   type RepositoryAssetMetadata,
 } from '@/modules/assets/entities/assets.entity';
 import { Target } from '@/modules/targets/entities/target.entity';
-import { RedisLockService } from '@/services/redis/distributed-lock.service';
+import { Lock } from '@/services/redis/lock.decorator';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
@@ -83,7 +83,6 @@ export class RepositorySyncService {
     @InjectRepository(Asset)
     private readonly assetRepository: Repository<Asset>,
     private readonly integrationsService: IntegrationsService,
-    private readonly redisLockService: RedisLockService,
     private readonly eventEmitter: EventEmitter2,
     @InjectQueue(BullMQName.REPOSITORY_SYNC)
     private readonly queue: Queue<RepositorySyncJob>,
@@ -155,17 +154,12 @@ export class RepositorySyncService {
       return skipped('integration has no SOURCE_CODE capability');
     }
 
-    const result = await this.redisLockService.withLock(
-      `repository-sync:${target.id}`,
-      MAX_SYNC_DURATION_MS,
-      () =>
-        this.reconcile(
-          target,
-          integration.integration.appType,
-          integration.decryptedConfig,
-        ),
+    const result = await this.reconcile(
+      target,
+      integration.integration.appType,
+      integration.decryptedConfig,
     );
-    if (result === null) {
+    if (result === undefined) {
       return skipped('sync already in progress');
     }
 
@@ -179,11 +173,15 @@ export class RepositorySyncService {
     return result;
   }
 
+  /** Resolves undefined, without syncing, while another sync holds the target. */
+  @Lock((target: Target) => `repository-sync:${target.id}`, {
+    ttl: MAX_SYNC_DURATION_MS,
+  })
   private async reconcile(
     target: Target,
     provider: string,
     config: Record<string, unknown>,
-  ): Promise<RepositorySyncResult> {
+  ): Promise<RepositorySyncResult | undefined> {
     const { repositories, complete } = await this.fetchAll(
       provider,
       config,

@@ -562,7 +562,11 @@ export default function Runs() {
                 </SheetContent>
               </Sheet>
             </div>
-            <RunWorkflowGraph steps={steps} />
+            <RunWorkflowGraph
+              steps={steps}
+              trigger={jobHistoryDetail?.jobRunType}
+              startedAt={jobHistoryDetail?.createdAt}
+            />
           </CardContent>
         </Card>
       ) : (

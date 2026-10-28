@@ -230,6 +230,33 @@ findBy = jest.fn().mockImplementation((where: { id?: { _value: string[] } }) => 
     });
   });
 
+  describe('asset.url.discovered', () => {
+    it('notifies the workspace once per target with the new URL count', async () => {
+      xreadgroup.mockResolvedValue([
+        entry('asset.url.discovered', {
+          jobHistoryId: 'run-1',
+          targetId: 't-1',
+          targetValue: 'example.com',
+          count: 37,
+          urls: ['https://example.com/a'],
+        }),
+      ]);
+      await service.runOnce();
+
+      expect(notificationSave).toHaveBeenCalledTimes(1);
+      expect(notificationSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: NotificationType.NEW_URL_FOUND,
+          metadata: {
+            count: '37',
+            targetValue: 'example.com',
+            targetId: 't-1',
+          },
+        }),
+      );
+    });
+  });
+
   describe('audience', () => {
     it('resolves recipients from workspace membership, not from the producer', async () => {
       xreadgroup.mockResolvedValue([

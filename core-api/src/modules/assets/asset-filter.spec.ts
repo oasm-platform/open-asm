@@ -20,6 +20,8 @@ describe('validateAssetFilter', () => {
     ['ip eq', root(cond('ip', 'eq', '1.2.3.4'))],
     ['statusCode neq', root(cond('statusCode', 'neq', '404'))],
     ['assetGroup in', root(cond('assetGroup', 'in', ['3f1c2a8e-6c1b-4d5e-9f00-0a1b2c3d4e5f']))],
+    ['isNew true', root(cond('isNew', 'eq', 'true'))],
+    ['isNew false', root(cond('isNew', 'eq', 'false'))],
     ['or group', root(cond('host', 'eq', 'a'), { logic: 'or', conditions: [cond('tech', 'eq', 'nginx'), cond('tag', 'contains', 'prod')] })],
   ])('accepts %s', (_, input) => {
     expect(validateAssetFilter(input)).toBeNull();
@@ -37,6 +39,8 @@ describe('validateAssetFilter', () => {
     ['empty string', root(cond('host', 'eq', ''))],
     ['too long string', root(cond('host', 'eq', 'a'.repeat(256)))],
     ['bad ip', root(cond('ip', 'eq', '999.1.1.1'))],
+    ['isNew not a boolean', root(cond('isNew', 'eq', 'yes'))],
+    ['isNew with a list op', root(cond('isNew', 'in', ['true']))],
     ['bad cidr prefix', root(cond('ip', 'inSubnet', ['10.0.0.0/33']))],
     ['cidr without prefix', root(cond('ip', 'inSubnet', ['10.0.0.0']))],
     ['ipv6 zone id', root(cond('ip', 'eq', 'fe80::1%eth0'))],
@@ -119,6 +123,15 @@ describe('compileAssetFilter', () => {
     expect(Object.keys(r?.params ?? {})).toEqual(['af0', 'af1', 'af2']);
   });
 
+  it('judges isNew on the row each list is about', () => {
+    const isNew = { logic: 'and', items: [cond('isNew', 'eq', 'true')] } as never;
+    expect(compileAssetFilter(isNew, 'af')?.sql).toContain('run.id = asset_service."jobHistoryId"');
+    expect(compileAssetFilter(isNew, 'af', 'asset')?.sql).toContain('run.id = asset."jobHistoryId"');
+    expect(compileAssetFilter(isNew, 'af', 'url')?.sql).toContain('run.id = du."jobHistoryId"');
+    // true keeps the fresh rows, false the others.
+    expect(compileAssetFilter(isNew, 'af')?.sql).toContain("= ('true' = ANY(:af0))");
+  });
+
   it('never puts values into the SQL text', () => {
     const r = compile(cond('host', 'eq', "x' OR 1=1 --"));
     expect(r?.sql).not.toContain('1=1');
@@ -134,5 +147,12 @@ describe('legacyParamsToFilter', () => {
       logic: 'and',
       items: [cond('host', 'in', ['a']), cond('port', 'in', ['80'])],
     });
+  });
+  it('maps isNew=true to the condition the filter builder writes', () => {
+    expect(legacyParamsToFilter({ isNew: true })).toEqual({
+      logic: 'and',
+      items: [cond('isNew', 'eq', 'true')],
+    });
+    expect(legacyParamsToFilter({ isNew: false })).toBeUndefined();
   });
 });

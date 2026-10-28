@@ -2,3 +2,38 @@ packages:
   - "core-api"
   - "console"
 # onlyBuiltDependencies is in root package.json — no need to duplicate here
+
+# Security: pin transitive deps to patched releases (Dependabot alerts). Unless
+# noted, the target is inside the parent's semver range; drop an entry once the
+# parent resolves the patched version on its own.
+overrides:
+  markdown-it@14: ^14.3.3
+  launch-editor: ^2.14.2
+  shell-quote: ^1.11.0
+  follow-redirects: ^1.16.1
+  hono: ^4.13.11
+  "@hono/node-server": ^1.19.15
+  dompurify: ^3.4.16
+  source-map-js: ^1.2.2
+  proxy-addr: ^2.0.8
+  piscina@4: ^4.9.4
+  ip-address: ^10.7.1
+  brace-expansion@1: ^1.1.21
+  brace-expansion@2: ^2.1.7
+  undici@7: ^7.29.1
+  fast-uri@3: ^3.1.7
+  baseline-browser-mapping: ^2.11.0
+  # orval pins js-yaml to exactly 4.3.0; keep until orval moves past it.
+  js-yaml@4: ^4.3.2
+  browserslist: ^4.28.7
+  mermaid: ^11.16.1
+  postcss: ^8.5.23
+  # Cross-major: the parent's latest release still asks for the vulnerable
+  # major. Checked against the calls the parent makes; keep the caret, since
+  # linkify-it 6 drops the default export and uuid 12+ is ESM-only.
+  linkify-it@3: ^5.0.2 # ansi-to-react@6.2.6
+  uuid@8: ^11.1.1 # cloudevents@10, which only calls v4()
+  # Not a pin: drops better-auth's optional solid-js peer (better-auth/solid is
+  # unused). auto-install-peers kept re-linking a stale solid-js@1.9.14 from
+  # the lockfile, which pulls in seroval 1.5.x.
+  "better-auth>solid-js": "-"

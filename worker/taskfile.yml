@@ -22,9 +22,11 @@ tasks:
         else
           trap 'wait; exit 0' INT TERM
           export WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT=1
+          # Replicas share the host: each binds an OS-assigned connector port.
+          export WORKER_CONNECTOR_PORT=0
           for i in $(seq 1 {{.replicas}}); do
             echo "Starting CLI worker instance $i"
-            CMD="go run ./cmd/cli --api-key {{.apiKey}}{{if .maxJobs}} --max-concurrency {{.maxJobs}}{{end}}"
+            CMD="go run ./cmd/cli --api-key {{.apiKey}} --mode node{{if .maxJobs}} --max-concurrency {{.maxJobs}}{{end}}"
             {{- if .network}}
             CMD="$CMD --network {{.network}}"
             {{- end}}
@@ -46,7 +48,7 @@ tasks:
           trap 'wait; exit 0' INT TERM
           for i in $(seq 1 {{.replicas}}); do
             echo "Starting App worker instance $i"
-            ENV_VARS="WORKER_API_KEY={{.apiKey}} WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT=1{{if .maxJobs}} WORKER_MAX_CONCURRENCY={{.maxJobs}}{{end}}"
+            ENV_VARS="WORKER_API_KEY={{.apiKey}} WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT=1 WORKER_CONNECTOR_PORT=0{{if .maxJobs}} WORKER_MAX_CONCURRENCY={{.maxJobs}}{{end}}"
             {{- if .network}}
             ENV_VARS="$ENV_VARS WORKER_NETWORK={{.network}}"
             {{- end}}

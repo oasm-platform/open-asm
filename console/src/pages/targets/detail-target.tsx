@@ -11,6 +11,7 @@ import dayjs from 'dayjs';
 import { Loader2 } from 'lucide-react';
 import { useEffect } from 'react';
 import AssetProvider from '../assets/context/asset-context';
+import { DiscoverUrlsDialog } from '../assets/components/discover-urls-dialog';
 import { ListAssets } from '../assets/list-assets';
 import { FastScanDialog } from '../vulnerabilities/components/fast-scan-dialog';
 import { ListVulnerabilities } from '../vulnerabilities/list-vulnerabilitys';
@@ -128,6 +129,15 @@ export function DetailTarget() {
         }
       >
         <ListAssets
+          urlsActions={
+            // URL discovery only accepts domain targets.
+            target.type === TargetType.DOMAIN ? (
+              <DiscoverUrlsDialog
+                target={{ id: target.id, value: target.value }}
+                disabled={target.status !== JobStatus.completed}
+              />
+            ) : null
+          }
           extraTabs={[
             {
               value: 'vulnerabilities',

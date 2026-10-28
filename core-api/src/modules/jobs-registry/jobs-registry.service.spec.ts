@@ -876,8 +876,12 @@ describe('JobsRegistryService', () => {
 
       await service.getJobHistoryDetail(mockWorkspaceId, mockHistoryId);
 
-      const selectCalls = (mockJobRepository.select).mock.calls;
-      const selectArgs = selectCalls[selectCalls.length - 1][0] as string[];
+      // The tool status query is not the only one on the job repository, so
+      // look for its CASE expression across every select call.
+      const selectArgs = (mockJobRepository.select.mock.calls as unknown[][])
+        .map(([arg]) => arg)
+        .filter((arg): arg is string[] => Array.isArray(arg))
+        .flat();
       const statusExpr = selectArgs.find((s) => s.includes('CASE'))!;
       // Regression: a tool whose jobs finished before the cancel used to keep a
       // green check, because the COMPLETED branch was reached first.
@@ -1213,6 +1217,58 @@ describe('JobsRegistryService', () => {
         ports: { run: 'nmap', category: 'ports_scanner' },
         vulns: { run: 'nmap', category: 'vulnerabilities', needs: ['ports'] },
       });
+    });
+
+    it('should count the jobs a worker is executing per step (tool + category)', async () => {
+      mockJobHistoryRepository.findOne.mockResolvedValueOnce({
+        ...mockJobHistory,
+        steps: {
+          ports: { status: 'dispatched', jobs: 3 },
+          vulns: { status: 'dispatched', jobs: 2 },
+        },
+        workflow: {
+          ...mockJobHistory.workflow,
+          content: {
+            name: 'test-workflow',
+            jobs: {
+              ports: { run: 'nmap', category: 'ports_scanner' },
+              vulns: { run: 'nmap', category: 'vulnerabilities' },
+            },
+          },
+        },
+      });
+      mockToolsService.getInstalledTools.mockResolvedValue({
+        data: [
+          {
+            id: 'tool-nmap',
+            name: 'nmap',
+            categories: [
+              { name: ToolCategory.PORTS_SCANNER, targetTypes: HOST },
+              { name: ToolCategory.VULNERABILITIES, targetTypes: HOST },
+            ],
+          },
+        ],
+      });
+      mockJobRepository.getRawMany
+        // Tool badge statuses.
+        .mockResolvedValueOnce([])
+        // In-progress jobs per step: the same tool in two categories stays apart.
+        .mockResolvedValueOnce([
+          { toolId: 'tool-nmap', category: 'ports_scanner', running: '2' },
+          { toolId: 'tool-nmap', category: 'vulnerabilities', running: '0' },
+        ]);
+
+      const result = await service.getJobHistoryWorkflow(
+        mockWorkspaceId,
+        mockHistoryId,
+      );
+
+      expect(result.steps).toEqual([
+        expect.objectContaining({ id: 'ports', status: 'dispatched', running: 2 }),
+        // Dispatched but not picked up by a worker yet: no running count.
+        expect.objectContaining({ id: 'vulns', status: 'dispatched' }),
+      ]);
+      expect(result.steps[1].running).toBeUndefined();
     });
 
     it('should include the run steps so the page can show state next to the definition', async () => {
@@ -2109,6 +2165,50 @@ describe('JobsRegistryService', () => {
         expect((job as any).jobHistory).toBeDefined();
         expect((job as any).category).toBe(ToolCategory.URL_DISCOVERY);
       }
+    });
+
+    it('S1b: URL_DISCOVERY keeps one service per asset, preferring 443 then 80', async () => {
+      const assetA = { id: 'asset-a', isPrimary: true };
+      const assetB = { id: 'asset-b', isPrimary: false };
+      mockAssetServiceQB.getMany.mockResolvedValue([
+        { id: 'a-8080', value: 'a.example.com', port: 8080, asset: assetA },
+        { id: 'a-80', value: 'a.example.com', port: 80, asset: assetA },
+        { id: 'a-443', value: 'a.example.com', port: 443, asset: assetA },
+        { id: 'b-8443', value: 'b.example.com', port: 8443, asset: assetB },
+        { id: 'b-80', value: 'b.example.com', port: 80, asset: assetB },
+      ]);
+
+      const result = await service.createNewJob({
+        tool: urlDiscoveryTool,
+        targetIds: ['target-1'],
+        workspaceId: 'ws-1',
+        workflow: { id: 'wf-1' } as any,
+      });
+
+      const serviceIds = result.map(
+        (job) => (job as unknown as { assetService: { id: string } }).assetService.id,
+      );
+      expect(serviceIds.sort()).toEqual([
+        'a-443',
+        'b-80',
+      ]);
+    });
+
+    it('S1c regression: SCREENSHOT still creates one job per live service', async () => {
+      const asset = { id: 'asset-a', isPrimary: true };
+      mockAssetServiceQB.getMany.mockResolvedValue([
+        { id: 'a-80', value: 'a.example.com', port: 80, asset },
+        { id: 'a-443', value: 'a.example.com', port: 443, asset },
+      ]);
+
+      const result = await service.createNewJob({
+        tool: screenshotTool,
+        targetIds: ['target-1'],
+        workspaceId: 'ws-1',
+        workflow: { id: 'wf-1' } as any,
+      });
+
+      expect(result).toHaveLength(2);
     });
 
     it('S2 edge: URL_DISCOVERY applies liveOnly=true (EXISTS http_responses failed=false)', async () => {
