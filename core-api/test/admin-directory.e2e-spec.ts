@@ -3,6 +3,7 @@ import type { App } from 'supertest/types';
 import type { DataSource } from 'typeorm';
 import { Role } from '../src/common/enums/enum';
 import { closeTestApp, createTestApp, type TestApp } from './helpers/app';
+import { signIn } from './helpers/auth';
 import {
   cleanupE2eData,
   createUser,
@@ -53,6 +54,9 @@ describe('Admin users and workspaces (e2e)', () => {
     // DB has no admin to call better-auth's set-role with.
     admin = await createUser(server, { name: 'E2E Directory Admin' });
     await setRole(admin.userId, Role.ADMIN);
+    // The sign-up session is cached in Redis with the pre-grant user, and the
+    // SQL grant never refreshes it; a new session carries the admin role.
+    admin.cookie = await signIn(server, admin.email, admin.password);
 
     member = await createUser(server, { name: 'E2E Directory Member' });
     workspace = await createWorkspace(server, member);

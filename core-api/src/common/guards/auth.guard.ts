@@ -10,6 +10,7 @@ import { Reflector } from '@nestjs/core';
 import type { getSession } from 'better-auth/api';
 import type { Auth } from 'better-auth/auth';
 import { fromNodeHeaders } from 'better-auth/node';
+import type { Response } from 'express';
 import {
   API_GLOBAL_PREFIX,
   AUTH_INSTANCE_KEY,
@@ -93,9 +94,23 @@ export class AuthGuard implements CanActivate {
       return true;
     }
 
-    const currentSession = await this.auth.api.getSession({
-      headers: fromNodeHeaders(request.headers),
-    });
+    const { headers: authHeaders, response: currentSession } =
+      await this.auth.api.getSession({
+        headers: fromNodeHeaders(request.headers),
+        returnHeaders: true,
+      });
+
+    // getSession extends a session last refreshed over a day ago and re-issues
+    // its cookie. An in-process call drops that Set-Cookie unless it is copied
+    // onto the response, and the browser cookie would then still expire seven
+    // days after it was issued while the session itself lives on.
+    const setCookies = authHeaders?.getSetCookie() ?? [];
+    if (setCookies.length) {
+      context
+        .switchToHttp()
+        .getResponse<Response>()
+        .append('Set-Cookie', setCookies);
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const isOptional = this.reflector.get('OPTIONAL', context.getHandler());

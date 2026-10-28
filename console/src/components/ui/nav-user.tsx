@@ -22,7 +22,6 @@ import {
   markVoluntaryLogout,
   type User,
 } from '@/utils/authClient';
-import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { BookOpen, Bug, LogOut, Settings, ShieldUser } from 'lucide-react';
 
@@ -32,7 +31,6 @@ interface NavUserProps {
 }
 
 export function NavUser({ isOnlyAvatar = false, dropdownSide }: NavUserProps) {
-  const queryClient = useQueryClient();
   const { isMobile } = useSidebar();
   const { useSession, signOut } = authClient;
   const navigate = useNavigate();
@@ -49,11 +47,9 @@ export function NavUser({ isOnlyAvatar = false, dropdownSide }: NavUserProps) {
     await signOut({
       fetchOptions: {
         onSuccess: async () => {
-          // Navigate first so _authed unmounts before we wipe the cache.
-          // This prevents the workspace selector from refetching with an
-          // empty session and briefly flashing /workspaces/create.
+          // The cache and the selected workspace are dropped by AppRouter
+          // once the session store empties, after _authed has unmounted.
           await navigate({ to: '/login' });
-          queryClient.clear();
         },
         onError: (ctx) => {
           console.error('Logout failed:', ctx.error);

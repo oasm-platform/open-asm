@@ -2,15 +2,23 @@ import { parseTrustedProxies } from '@/common/config/trusted-proxies';
 import { AUTH_IGNORE_ROUTERS } from '@/common/constants/app.constants';
 import { Role } from '@/common/enums/enum';
 import { databaseConnectionConfig } from '@/database/database-config';
-import { betterAuth } from 'better-auth';
+import { betterAuth, type Auth } from 'better-auth';
 import { admin, openAPI } from 'better-auth/plugins';
 import { randomUUID } from 'crypto';
 import 'dotenv/config';
 import { Pool } from 'pg';
+import { createSessionRedis, createSessionStorage } from './session-storage';
 
 export const auth: unknown = betterAuth({
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
   database: new Pool(databaseConnectionConfig),
+  // Sessions are resolved from Redis first; the database is only queried on a
+  // cache miss. See session-storage.ts. The connection is its own: this
+  // instance is built at import time, outside Nest DI, before RedisService.
+  secondaryStorage: createSessionStorage(
+    createSessionRedis(process.env.REDIS_URL),
+    () => (auth as Auth).$context,
+  ),
   plugins: [
     admin({
       defaultRole: Role.USER,
@@ -59,6 +67,9 @@ export const auth: unknown = betterAuth({
   session: {
     freshAge: 10,
     modelName: 'sessions',
+    // Keep writing sessions to the database alongside Redis, so the database
+    // stays the source of truth and a cache miss can fall back to it.
+    storeSessionInDatabase: true,
   },
   // Deleting users is intentionally disabled: a user row deletion cascades
   // through `workspaces.ownerId` (ON DELETE CASCADE) and would wipe every
@@ -89,5 +100,8 @@ export const auth: unknown = betterAuth({
   },
   verification: {
     modelName: 'verifications',
+    // With secondaryStorage set, Better Auth would move verifications to Redis
+    // too. The session storage ignores them, so they stay database-only.
+    storeInDatabase: true,
   },
 });

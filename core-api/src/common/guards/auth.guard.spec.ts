@@ -37,19 +37,31 @@ describe('AuthGuard', () => {
     session?: unknown;
     user?: { id: string; role: Role };
   };
+  let response: { append: jest.Mock };
   let handlerFn: () => void;
   let classRef: new () => unknown;
 
   const makeContext = () =>
     ({
-      switchToHttp: () => ({ getRequest: () => request }),
+      switchToHttp: () => ({
+        getRequest: () => request,
+        getResponse: () => response,
+      }),
       getHandler: () => handlerFn,
       getClass: () => classRef,
     }) as unknown as ExecutionContext;
 
+  const signedInAs = (role: Role, headers: Headers | null = null) =>
+    getSession.mockResolvedValue({
+      headers,
+      response: { session: { id: 's1' }, user: { id: 'u1', role } },
+    });
+
   beforeEach(() => {
-    getSession = jest.fn().mockResolvedValue(null);
-    request = { path: '/api/admin/system-configs', headers: {}, params: {} };
+    // Shape of getSession({ returnHeaders: true }).
+    getSession = jest.fn().mockResolvedValue({ headers: null, response: null });
+    response = { append: jest.fn() };
+    request ={ path: '/api/admin/system-configs', headers: {}, params: {} };
     handlerFn = function handler(): void {};
     classRef = class Controller {};
 
@@ -96,10 +108,7 @@ describe('AuthGuard', () => {
 
     it('rejects a non-admin on a class-level @Roles(Role.ADMIN) controller', async () => {
       applyClassRoles(Role.ADMIN);
-      getSession.mockResolvedValue({
-        session: { id: 's1' },
-        user: { id: 'u1', role: Role.USER },
-      });
+      signedInAs(Role.USER);
 
       await expect(guard.canActivate(makeContext())).rejects.toThrow(
         ForbiddenException,
@@ -108,21 +117,50 @@ describe('AuthGuard', () => {
 
     it('admits an admin on the same controller', async () => {
       applyClassRoles(Role.ADMIN);
-      getSession.mockResolvedValue({
-        session: { id: 's1' },
-        user: { id: 'u1', role: Role.ADMIN },
-      });
+      signedInAs(Role.ADMIN);
 
       await expect(guard.canActivate(makeContext())).resolves.toBe(true);
     });
 
     it('leaves unguarded controllers open to any authenticated user', async () => {
-      getSession.mockResolvedValue({
-        session: { id: 's1' },
-        user: { id: 'u1', role: Role.USER },
-      });
+      signedInAs(Role.USER);
 
       await expect(guard.canActivate(makeContext())).resolves.toBe(true);
+    });
+  });
+
+  describe('session refresh cookie', () => {
+    it('forwards the cookies getSession re-issued onto the response', async () => {
+      const headers = new Headers();
+      headers.append('Set-Cookie', 'better-auth.session=tok.sig; Max-Age=604800');
+      headers.append('Set-Cookie', 'other=1');
+      signedInAs(Role.USER, headers);
+
+      await expect(guard.canActivate(makeContext())).resolves.toBe(true);
+      expect(response.append).toHaveBeenCalledWith('Set-Cookie', [
+        'better-auth.session=tok.sig; Max-Age=604800',
+        'other=1',
+      ]);
+    });
+
+    it('leaves the response alone when no cookie was re-issued', async () => {
+      signedInAs(Role.USER, new Headers());
+
+      await expect(guard.canActivate(makeContext())).resolves.toBe(true);
+      expect(response.append).not.toHaveBeenCalled();
+    });
+
+    it('forwards a cleared cookie even when the session is rejected', async () => {
+      const headers = new Headers();
+      headers.append('Set-Cookie', 'better-auth.session=; Max-Age=0');
+      getSession.mockResolvedValue({ headers, response: null });
+
+      await expect(guard.canActivate(makeContext())).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(response.append).toHaveBeenCalledWith('Set-Cookie', [
+        'better-auth.session=; Max-Age=0',
+      ]);
     });
   });
 

@@ -15,7 +15,6 @@ import { TooltipProvider } from './components/ui/tooltip';
 import { router } from './router';
 import {
   getRootControllerGetMetadataQueryKey,
-  getWorkspacesControllerGetWorkspacesQueryOptions,
   useRootControllerGetMetadata,
 } from './services/apis/gen/queries';
 import './styles/index.css';
@@ -23,13 +22,18 @@ import { AxiosError } from 'axios';
 import { toast } from 'sonner';
 import { handleServerError } from './lib/handle-server-error';
 import { removeBootSplash } from '@/lib/boot-splash';
+import { getWorkspaceListQueryOptions } from './hooks/useWorkspaceSelector';
 import {
-  SESSION_QUERY_KEY,
+  refetchSession,
   useSession,
   type User,
   isVoluntaryLogout,
   resetVoluntaryLogout,
 } from './utils/authClient';
+import {
+  hashWorkspaceQueryKey,
+  setGlobalWorkspaceId,
+} from './utils/workspaceState';
 
 // Deduplicate 401 handling — multiple queries may fail at once during logout.
 let isHandling401 = false;
@@ -51,6 +55,7 @@ const queryClient = new QueryClient({
         );
       },
       refetchOnWindowFocus: import.meta.env.PROD,
+      queryKeyHashFn: hashWorkspaceQueryKey,
     },
     mutations: {
       onError: (error) => {
@@ -70,10 +75,13 @@ const queryClient = new QueryClient({
           if (isHandling401 || !sessionLoaded || isVoluntaryLogout) return;
           isHandling401 = true;
 
-          toast.error('Session expired!');
-          queryClient.removeQueries({ queryKey: SESSION_QUERY_KEY });
-          const redirect = `${router.history.location.href}`;
-          router.navigate({ to: '/login', search: { redirect } });
+          // Navigating to /login here does nothing while better-auth's store
+          // still holds the session: login.tsx:beforeLoad sees it in the
+          // router context and bounces straight back. Re-check the session
+          // instead; once the store drops it, AppRouter's effect shows the
+          // toast and navigates. isHandling401 stays set until a new session
+          // arrives, so a 401 the session survives is re-checked only once.
+          void refetchSession();
         }
       }
     },
@@ -85,17 +93,23 @@ const localStoragePersister = createSyncStoragePersister({
   key: 'rq-persist',
 });
 
+// Only what the shell renders before its first fetch. Workspace data (assets,
+// findings, members...) never lands in localStorage.
+const PERSISTED_QUERY_ROOTS = new Set([
+  'global',
+  '/api/metadata',
+  '/api/workspaces',
+  '/api/workspaces/current-permission',
+]);
+
 persistQueryClient({
   queryClient,
   persister: localStoragePersister,
   maxAge: 1000 * 60 * 5,
   dehydrateOptions: {
-    shouldDehydrateQuery: (query) => {
-      if (query.state.status === 'pending') return false;
-      const queryKey = JSON.stringify(query.queryKey);
-      const sessionKey = JSON.stringify(SESSION_QUERY_KEY);
-      return queryKey !== sessionKey;
-    },
+    shouldDehydrateQuery: (query) =>
+      query.state.status === 'success' &&
+      PERSISTED_QUERY_ROOTS.has(String(query.queryKey[0])),
   },
 });
 
@@ -143,6 +157,7 @@ function AppRouter() {
     // /login instead of letting _authed re-render and flash through
     // /workspaces/create first.
     if (prevSession && !session) {
+      if (!isVoluntaryLogout) toast.error('Session expired!');
       const currentPath = router.history.location.pathname;
       if (currentPath !== '/login') {
         router.navigate({
@@ -161,13 +176,7 @@ function AppRouter() {
       router.preloadRoute({ to: '/' }).catch(() => {});
       // Warm the workspaces query the _authed layout blocks on, so the
       // redirect to '/' doesn't stall behind the boot splash.
-      queryClient.prefetchQuery(
-        getWorkspacesControllerGetWorkspacesQueryOptions({
-          limit: 100,
-          page: 1,
-          isArchived: false,
-        }),
-      );
+      void queryClient.prefetchQuery(getWorkspaceListQueryOptions());
     }
 
     // Invalidate on any session state change (null→valid, valid→valid).
@@ -175,6 +184,15 @@ function AppRouter() {
     // current session and login.tsx:beforeLoad redirects away from /login.
     router.invalidate();
   }, [session]);
+
+  // Signed out, nothing cached may survive: not another user's cache restored
+  // on boot, not this user's after a logout or an expired session. The authed
+  // layouts render nothing without a session, so no query refetches here.
+  useEffect(() => {
+    if (isPending || session) return;
+    queryClient.clear();
+    setGlobalWorkspaceId(null);
+  }, [isPending, session]);
 
   // The HTML #boot-splash covers the screen until the app is ready:
   // - no session → login/init-admin render immediately → remove it now
