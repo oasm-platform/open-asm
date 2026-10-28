@@ -5,7 +5,6 @@ import { Test } from '@nestjs/testing';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { StatisticController } from './statistic.controller';
 import { StatisticService } from './statistic.service';
-import type { GetStatisticQueryDto } from './dto/statistic.dto';
 
 describe('StatisticController', () => {
   let controller: StatisticController;
@@ -44,13 +43,13 @@ describe('StatisticController', () => {
 
   describe('getStatistics', () => {
     it('should call statisticService.getStatistics', async () => {
-      const query: GetStatisticQueryDto = { workspaceId: '1' };
+      const workspaceId = '1';
       const expectedResult = { assets: 10, targets: 5 } as any;
       mockStatisticService.getStatistics.mockResolvedValue(expectedResult);
 
-      const result = await controller.getStatistics(query);
+      const result = await controller.getStatistics(workspaceId);
       expect(result).toBe(expectedResult);
-      expect(service.getStatistics).toHaveBeenCalledWith(query);
+      expect(service.getStatistics).toHaveBeenCalledWith(workspaceId);
     });
   });
 

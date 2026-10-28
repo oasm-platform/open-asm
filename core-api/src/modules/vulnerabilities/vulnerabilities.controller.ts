@@ -80,6 +80,9 @@ export class VulnerabilitiesController {
     response: {
       serialization: GetVulnerabilitiesStatisticsResponseDto,
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @WorkspaceAccess('vulnerability.read')
   @Get('statistics')
@@ -87,9 +90,10 @@ export class VulnerabilitiesController {
     @Query() query: GetVulnerabilitiesStatisticsQueryDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    // Override the workspaceId from the query with the one from the header (guard-validated).
-    query.workspaceId = workspaceId;
-    return this.vulnerabilitiesService.getVulnerabilitiesStatistics(query);
+    return this.vulnerabilitiesService.getVulnerabilitiesStatistics(
+      query,
+      workspaceId,
+    );
   }
 
   @Doc({

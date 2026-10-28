@@ -8,7 +8,6 @@ import {
   IsNumber,
   IsOptional,
   IsString,
-  IsUUID,
   Max,
   Min,
 } from 'class-validator';
@@ -17,10 +16,6 @@ export class SearchAssetsTargetsDto extends GetManyBaseQueryParams {
   @ApiProperty({ required: true })
   @IsString()
   value: string;
-
-  @ApiProperty()
-  @IsUUID(4)
-  workspaceId: string;
 
   @ApiProperty({ required: false, example: 10 })
   @Min(1)
@@ -65,10 +60,6 @@ export class SearchResponseDto {
 }
 
 export class GetManySearchHistoryDto extends GetManyBaseQueryParams {
-  @ApiProperty({ required: true })
-  @IsUUID(4)
-  workspaceId: string;
-
   @ApiProperty({ required: false, example: 10 })
   @Min(1)
   @Max(10)

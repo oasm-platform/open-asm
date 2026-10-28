@@ -1,15 +1,12 @@
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { ApiTags, getSchemaPath } from '@nestjs/swagger';
 import { IssuesTimelineResponseDto } from './dto/issues-timeline.dto';
 import { TopPortsResponseDto } from './dto/top-ports.dto';
 import { TopTechnologiesResponseDto } from './dto/top-technologies.dto';
-import {
-  GetStatisticQueryDto,
-  StatisticResponseDto,
-} from './dto/statistic.dto';
+import { StatisticResponseDto } from './dto/statistic.dto';
 import { TimelineResponseDto } from './dto/timeline.dto';
 import { TlsStatisticResponseDto } from './dto/tls-statistic.dto';
 import { TopAssetVulnerabilities } from './dto/top-assets-vulnerabilities.dto';
@@ -29,13 +26,16 @@ export class StatisticController {
     response: {
       serialization: StatisticResponseDto,
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   @WorkspaceAccess('workspace.read')
   @Get()
   getStatistics(
-    @Query() query: GetStatisticQueryDto,
+    @WorkspaceId() workspaceId: string,
   ): Promise<StatisticResponseDto> {
-    return this.statisticService.getStatistics(query);
+    return this.statisticService.getStatistics(workspaceId);
   }
 
   @Doc({

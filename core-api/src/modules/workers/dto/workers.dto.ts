@@ -5,7 +5,6 @@ import {
   IsBoolean,
   IsOptional,
   IsString,
-  IsUUID,
   IsObject,
   ValidateNested,
 } from 'class-validator';
@@ -92,11 +91,6 @@ export class WorkerJoinKeyResponseDto {
 }
 
 export class GetManyWorkersDto extends GetManyBaseQueryParams {
-  @ApiProperty({ required: false })
-  @IsUUID('4')
-  @IsOptional()
-  workspaceId?: string;
-
   @ApiProperty({ required: false, enum: ['cloud', 'workspace'] })
   @IsString()
   @IsOptional()
