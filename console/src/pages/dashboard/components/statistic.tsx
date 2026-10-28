@@ -2,6 +2,7 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { NumberAnimate } from '@/components/ui/number-animate';
 import { useStatistics } from '@/hooks/useStatistics';
 import {
+  TREND_WINDOW_DAYS,
   useTimelineTrend,
   type TimelineStatistic,
 } from '@/hooks/useTimelineTrend';
@@ -55,7 +56,7 @@ export default function Statistic() {
       field: 'assets',
       icon: <CloudCheck className="h-5 w-5 text-primary" />,
       value: statistics?.assets || 0,
-      path: '/assets',
+      path: '/assets?tab=host',
       trend: calculateTrend('assets'),
     },
     {
@@ -94,15 +95,12 @@ export default function Statistic() {
               <p className="text-4xl font-bold font-mono text-left">
                 <NumberAnimate value={card.value} />
               </p>
+              {/* A growing attack surface is neither good nor bad news on its
+                  own, so the change stays neutral. */}
               {card.trend && card.trend.difference !== 0 && (
                 <div
-                  className={`flex items-center text-sm ${
-                    card.trend.isIncreasing
-                      ? 'text-success'
-                      : card.trend.isDecreasing
-                        ? 'text-destructive'
-                        : 'text-muted-foreground'
-                  }`}
+                  className="flex items-center text-sm text-muted-foreground"
+                  title={`Change over the last ${TREND_WINDOW_DAYS} days`}
                 >
                   {card.trend.isIncreasing ? (
                     <TrendingUp className="h-4 w-4 mr-1" />
@@ -112,6 +110,7 @@ export default function Statistic() {
                   <span className="font-medium font-mono">
                     {Math.abs(card.trend.difference)}
                   </span>
+                  <span className="ml-1 text-xs">{TREND_WINDOW_DAYS}d</span>
                 </div>
               )}
             </div>

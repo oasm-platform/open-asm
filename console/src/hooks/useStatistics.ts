@@ -12,7 +12,9 @@ export const useStatistics = () => {
   } = useStatisticControllerGetStatistics({
     query: {
       enabled: !!selectedWorkspaceId,
-      refetchInterval: 5000, // Auto refresh every 5 seconds
+      // The server shares these numbers for a minute; polling faster only
+      // re-reads the same cached value.
+      refetchInterval: 60_000,
     },
   });
 

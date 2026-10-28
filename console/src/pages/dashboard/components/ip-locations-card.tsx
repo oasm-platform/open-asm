@@ -209,7 +209,6 @@ export default function IpLocationsCard({
             opts={{ renderer: 'canvas' }}
             notMerge
           />
-          {/* <IpLocationsLegend min={minIpCount} max={maxIpCount} /> */}
         </div>
         {data.length > 0 && (
           <div

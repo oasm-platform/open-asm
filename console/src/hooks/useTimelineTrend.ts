@@ -24,6 +24,9 @@ export type Trend = {
   isDecreasing: boolean;
 };
 
+/** How many days back the change badges compare against. */
+export const TREND_WINDOW_DAYS = 7;
+
 export const useTimelineTrend = () => {
   const {
     state: { selectedWorkspaceId },
@@ -35,28 +38,17 @@ export const useTimelineTrend = () => {
     },
   });
 
+  /** Change of `field` over the last {@link TREND_WINDOW_DAYS} days. */
   const calculateTrend = (field: keyof TimelineStatistic): Trend | null => {
-    if (!timeline?.data || timeline.data.length < 2) return null;
+    const points = timeline?.data;
+    if (!points || points.length < 2) return null;
 
-    const sortedData = [...timeline.data].sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
-
-    const latest = sortedData[0][field] as number;
-    const previousDifferent = sortedData.find(
-      (item) => (item[field] as number) !== latest,
-    );
-
-    if (!previousDifferent) {
-      return {
-        difference: 0,
-        isIncreasing: false,
-        isDecreasing: false,
-      };
-    }
-
-    const previous = previousDifferent[field] as number;
+    // One point per day, oldest first, ending with the live numbers; a
+    // shorter history compares against its first day.
+    const latest = points[points.length - 1][field] as number;
+    const previous = points[Math.max(0, points.length - 1 - TREND_WINDOW_DAYS)][
+      field
+    ] as number;
     const difference = latest - previous;
 
     return {
