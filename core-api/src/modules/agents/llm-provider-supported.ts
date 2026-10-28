@@ -118,6 +118,34 @@ const fetchOrcaRouterModels: LLMModelsFetcher = async (apiKey) => {
     : [];
 };
 
+const fetchCheaperInferenceModels: LLMModelsFetcher = async (apiKey) => {
+  // /v1/models confirms the key; the public catalog carries the model type
+  // and endpoints, so only models served over chat completions are listed
+  const auth = await fetchJson<{ data: Array<{ id: string }> }>(
+    'https://api.cheaperinference.com/v1/models',
+    { headers: { Authorization: `Bearer ${apiKey}` } },
+  );
+  if (!auth) return [];
+  const json = await fetchJson<{
+    models: Array<{
+      id: string;
+      model_type?: string;
+      supported_endpoints?: string[];
+    }>;
+  }>('https://api.cheaperinference.com/public/models');
+  return json
+    ? sorted(
+        json.models
+          .filter(
+            (m) =>
+              m.model_type === 'text' &&
+              m.supported_endpoints?.includes('/v1/chat/completions'),
+          )
+          .map((m) => ({ id: m.id, name: m.id })),
+      )
+    : [];
+};
+
 const fetchGeminiModels: LLMModelsFetcher = async (apiKey) => {
   const json = await fetchJson<{
     models: Array<{ name: string; displayName?: string }>;
@@ -277,6 +305,17 @@ export const llmProviderSupported: LLMProviderSupported[] = [
     fetchModels: fetchOrcaRouterModels,
   },
   {
+    id: LLMProvider.CHEAPER_INFERENCE,
+    name: 'Cheaper Inference',
+    logo: '/static/images/cheaperinference.svg',
+    handler: (apiKey, model) =>
+      createOpenAI({
+        apiKey,
+        baseURL: 'https://api.cheaperinference.com/v1',
+      }).chat(model),
+    fetchModels: fetchCheaperInferenceModels,
+  },
+  {
     id: LLMProvider.OPENAI,
     name: 'OpenAI',
     logo: '/static/images/openai.svg',
@@ -385,6 +424,9 @@ const REASONING_OPTIONS: Partial<Record<LLMProvider, ProviderReasoningOptions>> 
     openai: { reasoningEffort: 'high', reasoningSummary: 'auto' },
   },
   [LLMProvider.ORCAROUTER]: {
+    openai: { reasoningEffort: 'high', reasoningSummary: 'auto' },
+  },
+  [LLMProvider.CHEAPER_INFERENCE]: {
     openai: { reasoningEffort: 'high', reasoningSummary: 'auto' },
   },
   [LLMProvider.DEEPSEEK]: {

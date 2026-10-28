@@ -83,7 +83,7 @@ AI Studio is the security agent built into OASM. It works on your workspace data
 - **Memory.** Short-term notes per conversation and long-term notes shared across the workspace.
 - **Runs that outlive the tab.** Close the page and the run keeps going; come back to see its progress, or stop it at any time.
 - **Usage.** Tokens, cost, requests and sessions per day, per model and per conversation.
-- **Bring your own model.** OpenAI, Anthropic, Gemini, DeepSeek, OpenRouter, OrcaRouter and more, or a custom endpoint.
+- **Bring your own model.** OpenAI, Anthropic, Gemini, DeepSeek, OpenRouter, OrcaRouter, Cheaper Inference and more, or a custom endpoint.
 
 ## Architecture
 

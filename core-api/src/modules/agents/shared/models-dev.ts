@@ -60,6 +60,8 @@ export const PROVIDER_MAP: Record<LLMProvider, string[]> = {
   [LLMProvider.OPENCODE_GO]: ['opencode-go', 'opencode'],
   // Not on models.dev; vendor ids (`openai/…`) resolve by id
   [LLMProvider.ORCAROUTER]: [],
+  // Bare ids (`gpt-5.4-mini`) resolve by id
+  [LLMProvider.CHEAPER_INFERENCE]: [],
   [LLMProvider.CUSTOM]: [],
 };
 
