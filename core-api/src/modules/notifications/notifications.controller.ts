@@ -18,7 +18,7 @@ import { getWorkspaceIdFromRequest } from '@/common/decorators/workspace-id.deco
 import { DeleteNotificationByRefDto } from './dto/delete-notification-by-ref.dto';
 import { UserContext } from '@/common/decorators/app.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
-import type { Request } from 'express';
+import type { NodeRequest } from '@nestjs/platform-node';
 import {
   GetNotificationsQueryDto,
   NotificationListResponseDto,
@@ -44,7 +44,7 @@ export class NotificationsController {
   @Get()
   async getNotifications(
     @UserContext() user: UserContextPayload,
-    @Req() req: Request,
+    @Req() req: NodeRequest,
     @Query() query: GetNotificationsQueryDto,
     @I18nLang() lang: string,
   ) {

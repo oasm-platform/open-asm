@@ -26,7 +26,7 @@ import {
   Res,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Request, Response } from 'express';
+import type { NodeRequest, NodeResponse } from '@nestjs/platform-node';
 import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
 import { PublishEvent } from '../event-bridge/publishing/publish-event.decorator';
 import { AuditService } from '../audit/audit.service';
@@ -167,8 +167,8 @@ export class WorkspacesController {
   getWorkspaces(
     @Query() query: GetManyWorkspacesDto,
     @UserContext() userContextPayload: UserContextPayload,
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
+    @Req() req: NodeRequest,
+    @Res({ passthrough: true }) res: NodeResponse,
   ) {
     return this.workspacesService.getWorkspaces(
       query,
@@ -232,7 +232,7 @@ export class WorkspacesController {
     @Param('memberId') memberId: string,
     @Body() dto: UpdateMemberPermissionsDto,
     @UserContext() user: UserContextPayload,
-    @Req() req: Request,
+    @Req() req: NodeRequest,
   ) {
     return this.workspacesService.updateMemberPermissions(
       workspaceId,
@@ -256,7 +256,7 @@ export class WorkspacesController {
     @WorkspaceId() workspaceId: string,
     @Param('memberId') memberId: string,
     @UserContext() user: UserContextPayload,
-    @Req() req: Request,
+    @Req() req: NodeRequest,
   ) {
     return this.workspacesService.removeMember(
       workspaceId,
@@ -311,7 +311,7 @@ export class WorkspacesController {
     @WorkspaceId() workspaceId: string,
     @Body() dto: CreatePermissionGroupDto,
     @UserContext() user: UserContextPayload,
-    @Req() req: Request,
+    @Req() req: NodeRequest,
   ) {
     return this.workspacesService.createPermissionGroup(
       workspaceId,
@@ -335,7 +335,7 @@ export class WorkspacesController {
     @Param('permissionId') permissionId: string,
     @Body() dto: UpdatePermissionGroupDto,
     @UserContext() user: UserContextPayload,
-    @Req() req: Request,
+    @Req() req: NodeRequest,
   ) {
     return this.workspacesService.updatePermissionGroup(
       workspaceId,
@@ -358,7 +358,7 @@ export class WorkspacesController {
   deletePermissionGroup(
     @WorkspaceId() workspaceId: string,
     @Param('permissionId') permissionId: string,
-    @Req() req: Request,
+    @Req() req: NodeRequest,
   ) {
     return this.workspacesService.deletePermissionGroup(
       workspaceId,
@@ -487,7 +487,7 @@ export class WorkspacesController {
   async getWorkspaceById(
     @Param() { id }: IdQueryParamDto,
     @UserContext() userContext: UserContextPayload,
-    @Req() req: Request,
+    @Req() req: NodeRequest,
   ) {
     const workspace = await this.workspacesService.getWorkspaceById(
       id,
@@ -552,7 +552,7 @@ export class WorkspacesController {
   deleteWorkspace(
     @Param() { id }: IdQueryParamDto,
     @UserContext() userContext: UserContextPayload,
-    @Req() req: Request,
+    @Req() req: NodeRequest,
   ) {
     return this.workspacesService.deleteWorkspace(
       id,

@@ -23,7 +23,7 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
-import { Response } from 'express';
+import type { NodeResponse } from '@nestjs/platform-node';
 import {
   BulkTargetResultDto,
   CreateMultipleTargetsDto,
@@ -115,7 +115,7 @@ export class TargetsController {
   @Get('export')
   async exportTargetsToCSV(
     @WorkspaceId() workspaceId: string,
-    @Res() res: Response,
+    @Res() res: NodeResponse,
   ) {
     // Helper function to format date as DD-MM-YYYY
     const formatDate = (date: Date | null | undefined): string => {

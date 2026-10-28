@@ -10,7 +10,7 @@ import { Reflector } from '@nestjs/core';
 import type { getSession } from 'better-auth/api';
 import type { Auth } from 'better-auth/auth';
 import { fromNodeHeaders } from 'better-auth/node';
-import type { Response } from 'express';
+import type { NodeResponse } from '@nestjs/platform-node';
 import {
   API_GLOBAL_PREFIX,
   AUTH_INSTANCE_KEY,
@@ -108,7 +108,7 @@ export class AuthGuard implements CanActivate {
     if (setCookies.length) {
       context
         .switchToHttp()
-        .getResponse<Response>()
+        .getResponse<NodeResponse>()
         .append('Set-Cookie', setCookies);
     }
 

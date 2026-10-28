@@ -1,7 +1,7 @@
 import type { Job } from '@/modules/jobs-registry/entities/job.entity';
 import type { WorkspaceMembers } from '@/modules/workspaces/entities/workspace-members.entity';
 import { IsString } from 'class-validator';
-import type { Request } from 'express';
+import type { NodeRequest } from '@nestjs/platform-node';
 import type { DataSource } from 'typeorm';
 import type { Role } from '../enums/enum';
 
@@ -33,7 +33,7 @@ export interface ResultHandler {
   job: Job;
 }
 
-export interface RequestWithMetadata extends Request {
+export interface RequestWithMetadata extends NodeRequest {
   /** Correlation id assigned by requestIdMiddleware (X-Request-Id round-trip). */
   requestId: string;
   session: {

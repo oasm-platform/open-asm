@@ -5,7 +5,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import type { Request } from 'express';
+import type { NodeRequest } from '@nestjs/platform-node';
 import { EMPTY } from 'rxjs';
 import { EventsController } from './events.controller';
 import type { EventsService } from './events.service';
@@ -20,8 +20,8 @@ const user = { id: 'user-1' } as UserContextPayload;
 function request(
   headers: Record<string, string> = {},
   cookies: Record<string, string> = {},
-): Request {
-  return { headers, cookies } as unknown as Request;
+): NodeRequest {
+  return { headers, cookies } as unknown as NodeRequest;
 }
 
 describe('EventsController', () => {
