@@ -9,8 +9,10 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { getWorkspaceListQueryOptions } from '@/hooks/useWorkspaceSelector';
 import { authClient } from '@/utils/authClient';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQueryClient } from '@tanstack/react-query';
 import { useRouter, useSearch } from '@tanstack/react-router';
 import { Loader2Icon } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -34,6 +36,7 @@ export default function Login() {
 
   const [loading, setLoading] = useState(false);
 
+  const queryClient = useQueryClient();
   const router = useRouter();
   const { redirect } = useSearch({ strict: false });
 
@@ -66,7 +69,11 @@ export default function Login() {
         email: values.email,
         password: values.password,
       });
-      if (res.error) {
+      if (!res.error) {
+        // The session reaches the router one get-session round trip later;
+        // fetch the workspace list the authed layout waits on meanwhile.
+        void queryClient.prefetchQuery(getWorkspaceListQueryOptions());
+      } else {
         setLoading(false);
         // 401/403 mean the credentials were rejected — show it on the
         // field. Anything else (5xx, gateway errors) is a server problem.

@@ -1,117 +1,117 @@
 import { useSession } from '@/utils/authClient';
-import { useWorkspacesControllerGetWorkspaces } from '@/services/apis/gen/queries';
-import { setGlobalWorkspaceId } from '@/utils/workspaceState';
-import { getCookie, setCookie, deleteCookie } from '@/utils/cookie';
-import { useQueryClient } from '@tanstack/react-query';
+import {
+  getWorkspacesControllerGetWorkspacesQueryOptions,
+  useWorkspacesControllerGetWorkspaces,
+} from '@/services/apis/gen/queries';
+import {
+  getGlobalWorkspaceId,
+  setGlobalWorkspaceId,
+  subscribeGlobalWorkspaceId,
+} from '@/utils/workspaceState';
 import React from 'react';
-import createState from './createState'; // adjust path as needed
 
-// Define workspace state type
-interface WorkspaceState {
-  selectedWorkspaceId: string;
+/** Params of the workspace list every picker reads (and login prefetches). */
+export const WORKSPACE_LIST_PARAMS = {
+  limit: 100,
+  page: 1,
+  isArchived: false,
+};
+// The flows that change the list (create, delete, accept invite) refetch it.
+const WORKSPACE_LIST_STALE_TIME = 30_000;
+
+export const getWorkspaceListQueryOptions = () =>
+  getWorkspacesControllerGetWorkspacesQueryOptions(WORKSPACE_LIST_PARAMS, {
+    query: { staleTime: WORKSPACE_LIST_STALE_TIME },
+  });
+
+// The workspace this browser selected last, restored on reload. Not the `wid`
+// cookie: the API sets that one HttpOnly, so scripts can neither read nor
+// overwrite it.
+const LAST_WORKSPACE_KEY = 'last-workspace-id';
+
+function readLastWorkspace() {
+  try {
+    return localStorage.getItem(LAST_WORKSPACE_KEY);
+  } catch {
+    return null;
+  }
 }
 
-// Create global workspace state
-export const useWorkspaceState = createState<WorkspaceState>(
-  'workspace',
-  { selectedWorkspaceId: '' },
-  {
-    setSelectedWorkspace: (state, id) => {
-      return typeof id === 'string'
-        ? {
-            ...state,
-            selectedWorkspaceId: id,
-          }
-        : state;
+function writeLastWorkspace(id: string | null) {
+  try {
+    if (id) localStorage.setItem(LAST_WORKSPACE_KEY, id);
+    else localStorage.removeItem(LAST_WORKSPACE_KEY);
+  } catch {
+    // localStorage not available: a reload starts on the first workspace.
+  }
+}
+
+/**
+ * Switches this tab to a workspace. Workspace-scoped queries are cached per
+ * workspace (see hashWorkspaceQueryKey), so nothing needs invalidating.
+ */
+export function selectWorkspace(id: string) {
+  setGlobalWorkspaceId(id);
+  writeLastWorkspace(id);
+}
+
+const getSelectedWorkspaceId = () => getGlobalWorkspaceId() ?? '';
+
+/** The selected workspace id; '' while none is selected. */
+export function useWorkspaceState() {
+  const selectedWorkspaceId = React.useSyncExternalStore(
+    subscribeGlobalWorkspaceId,
+    getSelectedWorkspaceId,
+  );
+  return { state: { selectedWorkspaceId } };
+}
+
+function useWorkspaceList() {
+  const { data: session } = useSession();
+  return useWorkspacesControllerGetWorkspaces(WORKSPACE_LIST_PARAMS, {
+    query: {
+      enabled: Boolean(session?.user),
+      staleTime: WORKSPACE_LIST_STALE_TIME,
     },
-    clearSelectedWorkspace: (state) => ({
-      ...state,
-      selectedWorkspaceId: '',
-    }),
-  },
-);
+  });
+}
+
+/**
+ * Keeps the selection valid against the workspace list: the current one while
+ * it still exists, else the last one selected (reload), else the first.
+ * Mounted once, at the root.
+ */
+export function useWorkspaceSync() {
+  const { data: response } = useWorkspaceList();
+
+  React.useEffect(() => {
+    const workspaces = response?.data;
+    if (!workspaces) return;
+    if (workspaces.length === 0) {
+      setGlobalWorkspaceId(null);
+      writeLastWorkspace(null);
+      return;
+    }
+
+    const ids = workspaces.map((ws) => ws.id);
+    const current = getGlobalWorkspaceId();
+    if (current && ids.includes(current)) return;
+    const last = readLastWorkspace();
+    selectWorkspace(last && ids.includes(last) ? last : ids[0]);
+  }, [response]);
+}
 
 export function useWorkspaceSelector() {
-  const { data: session } = useSession();
-  const enabled = Boolean(session?.user);
+  const { data: response, isLoading, refetch } = useWorkspaceList();
   const {
-    data: response,
-    isLoading,
-    refetch,
-  } = useWorkspacesControllerGetWorkspaces(
-    {
-      limit: 100,
-      page: 1,
-      isArchived: false,
-    },
-    {
-      query: { enabled },
-    },
-  );
-
-  const { state, setSelectedWorkspace, clearSelectedWorkspace } =
-    useWorkspaceState();
-
-  const queryClient = useQueryClient();
-
-  const handleSelectWorkspace = React.useCallback(
-    (id: string) => {
-      setSelectedWorkspace(id);
-      setGlobalWorkspaceId(id);
-      setCookie('wid', id);
-      queryClient.invalidateQueries({
-        predicate: (query) => query.queryKey[0] !== 'global',
-      });
-    },
-    [queryClient, setSelectedWorkspace],
-  );
-
-  // Auto-select workspace logic — honors `wid` cookie so reload keeps user's choice
-  React.useEffect(() => {
-    if (response?.data && response.data.length > 0) {
-      const workspaceIds = response.data.map((ws) => ws.id);
-      const currentSelectedId = state.selectedWorkspaceId;
-
-      let finalSelectedId: string | null = null;
-
-      // If current selected workspace still exists, keep it
-      if (currentSelectedId && workspaceIds.includes(currentSelectedId)) {
-        finalSelectedId = currentSelectedId;
-      } else {
-        // Honor `wid` cookie before falling back to first workspace
-        const wid = getCookie('wid');
-        if (wid && workspaceIds.includes(wid)) {
-          finalSelectedId = wid;
-        } else {
-          finalSelectedId = response.data[0].id;
-        }
-      }
-
-      setGlobalWorkspaceId(finalSelectedId);
-      setCookie('wid', finalSelectedId);
-
-      // Update state only if different
-      if (state.selectedWorkspaceId !== finalSelectedId) {
-        setSelectedWorkspace(finalSelectedId);
-      }
-    } else if (response?.data && response.data.length === 0) {
-      clearSelectedWorkspace();
-      setGlobalWorkspaceId(null);
-      deleteCookie('wid');
-    }
-  }, [
-    response,
-    state.selectedWorkspaceId,
-    setSelectedWorkspace,
-    clearSelectedWorkspace,
-  ]);
+    state: { selectedWorkspaceId },
+  } = useWorkspaceState();
 
   return {
     workspaces: response?.data || [],
     isLoading,
-    selectedWorkspace: state.selectedWorkspaceId,
-    handleSelectWorkspace,
-    setSelectedWorkspaceState: setSelectedWorkspace,
+    selectedWorkspace: selectedWorkspaceId,
+    handleSelectWorkspace: selectWorkspace,
     refetch,
   };
 }

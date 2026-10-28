@@ -1,7 +1,6 @@
 import { createAuthClient } from 'better-auth/react';
 import { adminClient } from 'better-auth/client/plugins';
 import type { User as BetterAuthUser } from 'better-auth';
-import { queryOptions, type QueryClient } from '@tanstack/react-query';
 
 export const authClient = createAuthClient({
   baseURL: window.location.origin,
@@ -21,25 +20,15 @@ export const authClient = createAuthClient({
 
 export const { useSession } = authClient;
 
-export const SESSION_QUERY_KEY = ['auth', 'session'] as const;
-
-export const sessionQueryOptions = queryOptions({
-  queryKey: SESSION_QUERY_KEY,
-  queryFn: async () => {
-    const res = await authClient.getSession();
-    if (res.error) throw res.error;
-    return res.data ?? null;
-  },
-  staleTime: 5 * 60 * 1000,
-  gcTime: 10 * 60 * 1000,
-  refetchOnWindowFocus: false,
-  refetchOnReconnect: false,
-  refetchOnMount: false,
-  retry: false,
-});
-
-export const invalidateSession = (queryClient: QueryClient) =>
-  queryClient.invalidateQueries({ queryKey: SESSION_QUERY_KEY });
+/**
+ * Re-reads the session into better-auth's store, the only session the app
+ * reads (`useSession` and the router context). Resolves once the store holds
+ * the server's answer.
+ */
+export const refetchSession = (): Promise<void> =>
+  (
+    authClient.$store.atoms.session.get() as { refetch: () => Promise<void> }
+  ).refetch();
 
 export type User = BetterAuthUser & {
   role: string;
