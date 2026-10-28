@@ -1,6 +1,7 @@
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { Role } from '@/common/enums/enum';
 import { User } from '@/modules/auth/entities/user.entity';
+import { UserPresenceService } from '@/modules/auth/user-presence.service';
 import { NotFoundException } from '@nestjs/common';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
@@ -30,8 +31,10 @@ describe('AdminUsersService', () => {
   let service: AdminUsersService;
   let queryBuilder: Record<string, jest.Mock>;
   let usersRepository: { createQueryBuilder: jest.Mock; findOneBy: jest.Mock };
+  let presence: { lastActiveAt: jest.Mock };
 
   beforeEach(async () => {
+    presence = { lastActiveAt: jest.fn().mockResolvedValue(new Map()) };
     queryBuilder = {
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
@@ -49,6 +52,7 @@ describe('AdminUsersService', () => {
       providers: [
         AdminUsersService,
         { provide: getRepositoryToken(User), useValue: usersRepository },
+        { provide: UserPresenceService, useValue: presence },
       ],
     }).compile();
 
@@ -101,6 +105,21 @@ describe('AdminUsersService', () => {
       expect(queryBuilder.orderBy).toHaveBeenCalledWith('user.email', 'DESC');
     });
 
+    it('adds each user last activity, null when none is recorded', async () => {
+      const otherRow = { ...userRow, id: 'user-2' };
+      const seenAt = new Date('2026-10-28T08:00:00Z');
+      queryBuilder.getManyAndCount.mockResolvedValue([[userRow, otherRow], 2]);
+      presence.lastActiveAt.mockResolvedValue(new Map([['user-1', seenAt]]));
+
+      const result = await service.getUsers(query());
+
+      expect(presence.lastActiveAt).toHaveBeenCalledWith(['user-1', 'user-2']);
+      expect(result.data.map((user) => user.lastActiveAt)).toEqual([
+        seenAt,
+        null,
+      ]);
+    });
+
     it('falls back to createdAt for a column outside the allow-list', async () => {
       await service.getUsers(query({ sortBy: 'banReason' }));
 
@@ -112,12 +131,17 @@ describe('AdminUsersService', () => {
   });
 
   describe('getUser', () => {
-    it('returns the user', async () => {
+    it('returns the user with its last activity', async () => {
+      const seenAt = new Date('2026-10-28T08:00:00Z');
+      presence.lastActiveAt.mockResolvedValue(new Map([['user-1', seenAt]]));
+
       await expect(service.getUser('user-1')).resolves.toMatchObject({
         id: 'user-1',
         name: 'Jane',
+        lastActiveAt: seenAt,
       });
       expect(usersRepository.findOneBy).toHaveBeenCalledWith({ id: 'user-1' });
+      expect(presence.lastActiveAt).toHaveBeenCalledWith(['user-1']);
     });
 
     it('throws NotFound for an unknown id', async () => {

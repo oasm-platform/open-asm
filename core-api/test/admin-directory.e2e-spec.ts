@@ -144,6 +144,14 @@ describe('Admin users and workspaces (e2e)', () => {
       role: Role.USER,
     });
 
+    // The guard records the admin's request before the handler reads it back.
+    const self = await request(server)
+      .get(`/api/admin/users/${admin.userId}`)
+      .set('Cookie', admin.cookie)
+      .expect(200);
+    const { lastActiveAt } = self.body as { lastActiveAt: string | null };
+    expect(Date.now() - Date.parse(lastActiveAt ?? '')).toBeLessThan(60_000);
+
     await request(server)
       .get('/api/admin/users/00000000-0000-4000-8000-000000000000')
       .set('Cookie', admin.cookie)

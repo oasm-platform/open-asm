@@ -1,6 +1,7 @@
 import { API_GLOBAL_PREFIX, AUTH_INSTANCE_KEY, CACHE_STATIC_RESOURCE } from '@/common/constants/app.constants';
 import { AuthGuard } from '@/common/guards/auth.guard';
 import { requestIdMiddleware } from '@/common/middleware/request-id.middleware';
+import { UserPresenceService } from '@/modules/auth/user-presence.service';
 import { ValidationPipe } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { NodeAdapter } from '@nestjs/platform-node';
@@ -67,7 +68,13 @@ export function configureApp(app: NestNodeApplication): void {
   });
 
   // Configure global guards
-  app.useGlobalGuards(new AuthGuard(app.get(Reflector), app.get(AUTH_INSTANCE_KEY)));
+  app.useGlobalGuards(
+    new AuthGuard(
+      app.get(Reflector),
+      app.get(AUTH_INSTANCE_KEY),
+      app.get(UserPresenceService),
+    ),
+  );
 
   // Configure cookie parser
   app.use(cookieParser());

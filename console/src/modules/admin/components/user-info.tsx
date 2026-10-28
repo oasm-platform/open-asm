@@ -4,6 +4,7 @@ import {
   DetailFields,
   formatDetailDate,
 } from './detail-layout';
+import { UserPresence } from './user-presence';
 
 /** Read-only view of a user account. Changes happen in the Edit tab. */
 export function UserInfo({ user }: { user: AdminUserDto }) {
@@ -20,6 +21,9 @@ export function UserInfo({ user }: { user: AdminUserDto }) {
       <DetailField label="Joined">{formatDetailDate(user.createdAt)}</DetailField>
       <DetailField label="Last updated">
         {formatDetailDate(user.updatedAt)}
+      </DetailField>
+      <DetailField label="Last active">
+        <UserPresence lastActiveAt={user.lastActiveAt} />
       </DetailField>
       {user.banned && (
         <>

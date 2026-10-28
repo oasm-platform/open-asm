@@ -9,6 +9,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { type ColumnDef } from '@tanstack/react-table';
 import { useMemo } from 'react';
 import { AddUserDialog } from './add-user-dialog';
+import { UserPresence } from './user-presence';
 
 const buildUserColumns = (ownerId?: string): ColumnDef<AdminUserDto>[] => [
   {
@@ -47,6 +48,15 @@ const buildUserColumns = (ownerId?: string): ColumnDef<AdminUserDto>[] => [
       ) : (
         <Badge variant="secondary">Active</Badge>
       ),
+  },
+  {
+    accessorKey: 'lastActiveAt',
+    header: 'Last active',
+    // Presence lives in Redis, so the server cannot sort by it.
+    enableSorting: false,
+    cell: ({ row }) => (
+      <UserPresence lastActiveAt={row.original.lastActiveAt} />
+    ),
   },
 ];
 
