@@ -4178,13 +4178,10 @@ export type NotificationResponseDto = {
   refId?: string;
 };
 
-export type GetManyNotificationResponseDtoDto = {
+export type NotificationListResponseDto = {
   data: NotificationResponseDto[];
-  total: number;
-  page: number;
-  limit: number;
-  hasNextPage: boolean;
-  pageCount: number;
+  /** @nullable */
+  nextCursor?: string | null;
 };
 
 export type ToolProvider = {
@@ -5456,11 +5453,14 @@ export type AgentsControllerGetWorkspaceMemoryParams = {
 };
 
 export type NotificationsControllerGetNotificationsParams = {
-  search?: string;
-  page?: number;
+  /**
+   * Opaque keyset cursor; page forward with the nextCursor of the previous response
+   */
+  cursor?: string;
+  /**
+   * @maximum 100
+   */
   limit?: number;
-  sortBy?: string;
-  sortOrder?: string;
 };
 
 export type NotificationsControllerDeleteNotificationsByRefParams = {
@@ -37196,7 +37196,7 @@ export const useAgentsControllerToggleSkill = <
 };
 
 /**
- * Retrieve a paginated list of notifications for the current user
+ * Keyset-paginated notifications of the current user, newest first
  * @summary Get all notifications
  */
 export const notificationsControllerGetNotifications = (
@@ -37204,7 +37204,7 @@ export const notificationsControllerGetNotifications = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<GetManyNotificationResponseDtoDto>(
+  return orvalClient<NotificationListResponseDto>(
     { url: `/api/notifications`, method: 'GET', params, signal },
     options,
   );
@@ -37229,7 +37229,7 @@ export const getNotificationsControllerGetNotificationsQueryKey = (
 export const getNotificationsControllerGetNotificationsInfiniteQueryOptions = <
   TData = InfiniteData<
     Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
-    NotificationsControllerGetNotificationsParams['page']
+    NotificationsControllerGetNotificationsParams['cursor']
   >,
   TError = unknown,
 >(
@@ -37241,7 +37241,7 @@ export const getNotificationsControllerGetNotificationsInfiniteQueryOptions = <
         TError,
         TData,
         QueryKey,
-        NotificationsControllerGetNotificationsParams['page']
+        NotificationsControllerGetNotificationsParams['cursor']
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -37256,10 +37256,10 @@ export const getNotificationsControllerGetNotificationsInfiniteQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
     QueryKey,
-    NotificationsControllerGetNotificationsParams['page']
+    NotificationsControllerGetNotificationsParams['cursor']
   > = ({ signal, pageParam }) =>
     notificationsControllerGetNotifications(
-      { ...params, page: pageParam ?? params?.['page'] },
+      { ...params, cursor: pageParam ?? params?.['cursor'] },
       requestOptions,
       signal,
     );
@@ -37269,7 +37269,7 @@ export const getNotificationsControllerGetNotificationsInfiniteQueryOptions = <
     TError,
     TData,
     QueryKey,
-    NotificationsControllerGetNotificationsParams['page']
+    NotificationsControllerGetNotificationsParams['cursor']
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
@@ -37282,7 +37282,7 @@ export type NotificationsControllerGetNotificationsInfiniteQueryError = unknown;
 export function useNotificationsControllerGetNotificationsInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
-    NotificationsControllerGetNotificationsParams['page']
+    NotificationsControllerGetNotificationsParams['cursor']
   >,
   TError = unknown,
 >(
@@ -37294,7 +37294,7 @@ export function useNotificationsControllerGetNotificationsInfinite<
         TError,
         TData,
         QueryKey,
-        NotificationsControllerGetNotificationsParams['page']
+        NotificationsControllerGetNotificationsParams['cursor']
       >
     > &
       Pick<
@@ -37315,7 +37315,7 @@ export function useNotificationsControllerGetNotificationsInfinite<
 export function useNotificationsControllerGetNotificationsInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
-    NotificationsControllerGetNotificationsParams['page']
+    NotificationsControllerGetNotificationsParams['cursor']
   >,
   TError = unknown,
 >(
@@ -37327,7 +37327,7 @@ export function useNotificationsControllerGetNotificationsInfinite<
         TError,
         TData,
         QueryKey,
-        NotificationsControllerGetNotificationsParams['page']
+        NotificationsControllerGetNotificationsParams['cursor']
       >
     > &
       Pick<
@@ -37348,7 +37348,7 @@ export function useNotificationsControllerGetNotificationsInfinite<
 export function useNotificationsControllerGetNotificationsInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
-    NotificationsControllerGetNotificationsParams['page']
+    NotificationsControllerGetNotificationsParams['cursor']
   >,
   TError = unknown,
 >(
@@ -37360,7 +37360,7 @@ export function useNotificationsControllerGetNotificationsInfinite<
         TError,
         TData,
         QueryKey,
-        NotificationsControllerGetNotificationsParams['page']
+        NotificationsControllerGetNotificationsParams['cursor']
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -37376,7 +37376,7 @@ export function useNotificationsControllerGetNotificationsInfinite<
 export function useNotificationsControllerGetNotificationsInfinite<
   TData = InfiniteData<
     Awaited<ReturnType<typeof notificationsControllerGetNotifications>>,
-    NotificationsControllerGetNotificationsParams['page']
+    NotificationsControllerGetNotificationsParams['cursor']
   >,
   TError = unknown,
 >(
@@ -37388,7 +37388,7 @@ export function useNotificationsControllerGetNotificationsInfinite<
         TError,
         TData,
         QueryKey,
-        NotificationsControllerGetNotificationsParams['page']
+        NotificationsControllerGetNotificationsParams['cursor']
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -37972,6 +37972,94 @@ export const useNotificationsControllerMarkAsRead = <
 > => {
   return useMutation(
     getNotificationsControllerMarkAsReadMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Mark a single notification as unread by its ID
+ * @summary Mark a specific notification as unread
+ */
+export const notificationsControllerMarkAsUnread = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/notifications/${id}/unread`, method: 'PATCH', signal },
+    options,
+  );
+};
+
+export const getNotificationsControllerMarkAsUnreadMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof notificationsControllerMarkAsUnread>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof notificationsControllerMarkAsUnread>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['notificationsControllerMarkAsUnread'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof notificationsControllerMarkAsUnread>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return notificationsControllerMarkAsUnread(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type NotificationsControllerMarkAsUnreadMutationResult = NonNullable<
+  Awaited<ReturnType<typeof notificationsControllerMarkAsUnread>>
+>;
+
+export type NotificationsControllerMarkAsUnreadMutationError = unknown;
+
+/**
+ * @summary Mark a specific notification as unread
+ */
+export const useNotificationsControllerMarkAsUnread = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof notificationsControllerMarkAsUnread>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof notificationsControllerMarkAsUnread>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getNotificationsControllerMarkAsUnreadMutationOptions(options),
     queryClient,
   );
 };

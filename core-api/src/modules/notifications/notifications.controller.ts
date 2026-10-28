@@ -19,9 +19,10 @@ import { DeleteNotificationByRefDto } from './dto/delete-notification-by-ref.dto
 import { UserContext } from '@/common/decorators/app.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import type { Request } from 'express';
-import { GetManyResponseDto } from '@/utils/getManyResponse';
-import { NotificationResponseDto } from './dto/notification.dto';
-import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
+import {
+  GetNotificationsQueryDto,
+  NotificationListResponseDto,
+} from './dto/notification.dto';
 
 @ApiTags('Notifications')
 @Controller('notifications')
@@ -32,9 +33,9 @@ export class NotificationsController {
   @Doc({
     summary: 'Get all notifications',
     description:
-      'Retrieve a paginated list of notifications for the current user',
+      'Keyset-paginated notifications of the current user, newest first',
     response: {
-      serialization: GetManyResponseDto(NotificationResponseDto),
+      serialization: NotificationListResponseDto,
     },
     request: {
       getWorkspaceId: true,
@@ -44,7 +45,7 @@ export class NotificationsController {
   async getNotifications(
     @UserContext() user: UserContextPayload,
     @Req() req: Request,
-    @Query() query: GetManyBaseQueryParams,
+    @Query() query: GetNotificationsQueryDto,
     @I18nLang() lang: string,
   ) {
     const workspaceId = getWorkspaceIdFromRequest(req);
@@ -99,6 +100,18 @@ export class NotificationsController {
   @Patch(':id/read')
   markAsRead(@Param('id') id: string, @UserContext() user: UserContextPayload) {
     return this.notificationsService.markAsRead(id, user.id);
+  }
+
+  @Doc({
+    summary: 'Mark a specific notification as unread',
+    description: 'Mark a single notification as unread by its ID',
+  })
+  @Patch(':id/unread')
+  markAsUnread(
+    @Param('id') id: string,
+    @UserContext() user: UserContextPayload,
+  ) {
+    return this.notificationsService.markAsUnread(id, user.id);
   }
 
   @Doc({

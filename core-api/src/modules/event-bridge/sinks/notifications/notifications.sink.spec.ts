@@ -161,6 +161,25 @@ findBy = jest.fn().mockImplementation((where: { id?: { _value: string[] } }) => 
       );
     });
 
+    it('stays silent on a run that found nothing new', async () => {
+      // A rescan of an unchanged target still publishes the run's outcome;
+      // only the in-app "new assets" message depends on there being any.
+      xreadgroup.mockResolvedValue([
+        entry('workflow.run.completed', {
+          targetValue: 'scanme.sh',
+          targetId: 't-1',
+          hosts: 0,
+          ports: 0,
+          services: 0,
+          techs: 0,
+        }),
+      ]);
+      await service.runOnce();
+
+      expect(notificationSave).not.toHaveBeenCalled();
+      expect(xack).toHaveBeenCalled();
+    });
+
     it('sends the incomplete-run notice only when the run did NOT finish', async () => {
       // A clean run already reported its new assets; "your scan stopped
       // halfway" after a clean finish is noise.
@@ -328,6 +347,7 @@ findBy = jest.fn().mockImplementation((where: { id?: { _value: string[] } }) => 
       xreadgroup.mockResolvedValue([
         entry('workflow.run.completed', {
           targetValue: 'example.com',
+          hosts: 3,
           failedSteps: ['step-2'],
         }),
       ]);

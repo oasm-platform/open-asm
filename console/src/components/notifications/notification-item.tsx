@@ -13,9 +13,10 @@ import {
   NotificationResponseDtoStatus,
   useNotificationsControllerDeleteNotification,
   useNotificationsControllerMarkAsRead,
+  useNotificationsControllerMarkAsUnread,
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
-import { CheckCheck, MoreVertical, Trash2 } from 'lucide-react';
+import { CheckCheck, Mail, MoreVertical, Trash2 } from 'lucide-react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { memo, useCallback } from 'react';
@@ -36,38 +37,35 @@ export const NotificationItem = memo(function NotificationItem({
   onClose,
 }: NotificationItemProps) {
   const queryClient = useQueryClient();
+  const refresh = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: getNotificationsControllerGetNotificationsInfiniteQueryKey(),
+    });
+    queryClient.invalidateQueries({
+      queryKey: getNotificationsControllerGetUnreadCountQueryKey(),
+    });
+  }, [queryClient]);
+
   const markAsRead = useNotificationsControllerMarkAsRead({
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({
-          queryKey: getNotificationsControllerGetNotificationsInfiniteQueryKey({
-            limit: 10,
-          }),
-        });
-        queryClient.invalidateQueries({
-          queryKey: getNotificationsControllerGetUnreadCountQueryKey(),
-        });
-      },
-    },
+    mutation: { onSuccess: refresh },
+  });
+  const markAsUnread = useNotificationsControllerMarkAsUnread({
+    mutation: { onSuccess: refresh },
   });
 
   const deleteNotification = useNotificationsControllerDeleteNotification({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({
-          queryKey: getNotificationsControllerGetNotificationsInfiniteQueryKey({
-            limit: 10,
-          }),
-        });
-        queryClient.invalidateQueries({
-          queryKey: getNotificationsControllerGetUnreadCountQueryKey(),
-        });
+        refresh();
         onClose?.();
       },
     },
   });
 
-  const isUnread = notification.status === NotificationResponseDtoStatus.unread;
+  // `sent` (not yet seen) and `unread` (seen in the bell) both mean the user
+  // has not read it. The list can load before opening the bell flips `sent`
+  // to `unread`, and the full page never flips it at all.
+  const isUnread = notification.status !== NotificationResponseDtoStatus.read;
 
   const { to, search } = splitNotificationUrl(notification.url);
 
@@ -78,6 +76,10 @@ export const NotificationItem = memo(function NotificationItem({
     onClose?.();
     onClick?.();
   }, [isUnread, notification.id, markAsRead, onClick, onClose]);
+
+  const handleToggleRead = useCallback(() => {
+    (isUnread ? markAsRead : markAsUnread).mutate({ id: notification.id });
+  }, [isUnread, notification.id, markAsRead, markAsUnread]);
 
   const handleDelete = useCallback(() => {
     deleteNotification.mutate({ id: notification.id });
@@ -126,6 +128,14 @@ export const NotificationItem = memo(function NotificationItem({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={handleToggleRead}>
+              {isUnread ? (
+                <CheckCheck className="h-4 w-4" />
+              ) : (
+                <Mail className="h-4 w-4" />
+              )}
+              {isUnread ? 'Mark as read' : 'Mark as unread'}
+            </DropdownMenuItem>
             <ConfirmDialog
               title="Delete notification"
               description="Are you sure you want to delete this notification? This action cannot be undone."
