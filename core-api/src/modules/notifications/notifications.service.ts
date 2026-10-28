@@ -5,12 +5,19 @@ import { In, Repository } from 'typeorm';
 import { NotificationRecipient } from './entities/notification-recipient.entity';
 import { Notification } from './entities/notification.entity';
 
-import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { NotificationsSink } from '../event-bridge/sinks/notifications/notifications.sink';
-import { getManyResponse } from '@/utils/getManyResponse';
 import { I18nService } from 'nestjs-i18n';
 import { CreateNotificationDto } from './dto/create-notification.dto';
-import { NotificationResponseDto } from './dto/notification.dto';
+import {
+  GetNotificationsQueryDto,
+  NotificationListResponseDto,
+  NotificationResponseDto,
+} from './dto/notification.dto';
+import {
+  CURSOR_TS_SQL,
+  decodeNotificationCursor,
+  encodeNotificationCursor,
+} from './notification-cursor';
 
 @Injectable()
 export class NotificationsService {
@@ -51,14 +58,19 @@ export class NotificationsService {
     );
   }
 
+  /**
+   * Keyset-paginated, newest first: fetches limit + 1 to learn whether a next
+   * page exists, without counting the user's rows. The (userId, createdAt)
+   * index serves both the filter and the order.
+   */
   async getNotifications(
     userId: string,
     workspaceId: string | undefined,
-    query: GetManyBaseQueryParams,
+    query: GetNotificationsQueryDto,
     lang: string = 'en',
-  ) {
-    const offset = (query.page - 1) * query.limit;
-    const [notifications, total] = await this.notificationRecipientRepo
+  ): Promise<NotificationListResponseDto> {
+    const limit = query.limit ?? 20;
+    const qb = this.notificationRecipientRepo
       .createQueryBuilder('recipient')
       .leftJoinAndSelect('recipient.notification', 'notification')
       .where('recipient.userId = :userId', { userId })
@@ -68,7 +80,6 @@ export class NotificationsService {
           : 'notification.workspaceId IS NULL',
         { workspaceId },
       )
-      .orderBy('recipient.createdAt', 'DESC')
       .select([
         'recipient.id',
         'recipient.status',
@@ -80,9 +91,30 @@ export class NotificationsService {
         'notification.ref',
         'notification.refId',
       ])
-      .skip(offset)
-      .take(query.limit)
-      .getManyAndCount();
+      .addSelect(CURSOR_TS_SQL, 'cursor_ts')
+      .orderBy('recipient.createdAt', 'DESC')
+      .addOrderBy('recipient.id', 'DESC')
+      // `limit`, not `take`: the join is many-to-one, so rows map 1:1 to
+      // recipients and TypeORM's two-query `take` path is pure overhead.
+      .limit(limit + 1);
+
+    if (query.cursor) {
+      const cursor = decodeNotificationCursor(query.cursor);
+      qb.andWhere(
+        '(recipient.createdAt, recipient.id) < (CAST(:cursorTs AS timestamp), CAST(:cursorId AS uuid))',
+        { cursorTs: cursor.createdAt, cursorId: cursor.id },
+      );
+    }
+
+    const { entities, raw } = await qb.getRawAndEntities<{
+      recipient_id: string;
+      cursor_ts: string;
+    }>();
+    const hasMore = entities.length > limit;
+    const notifications = hasMore ? entities.slice(0, limit) : entities;
+    const last = notifications[notifications.length - 1];
+    const lastTs = last && raw.find((r) => r.recipient_id === last.id)?.cursor_ts;
+
     const data: NotificationResponseDto[] = notifications.map((n) => {
       const key = `notification.${n.notification.type}`;
       const message = this.i18n.translate<string>(key, {
@@ -105,11 +137,13 @@ export class NotificationsService {
         refId: n.notification.refId ?? undefined,
       };
     });
-    return getManyResponse({
-      query,
+    return {
       data,
-      total,
-    });
+      nextCursor:
+        hasMore && last && lastTs
+          ? encodeNotificationCursor({ createdAt: lastTs, id: last.id })
+          : null,
+    };
   }
 
   async getUnreadCount(userId: string) {
@@ -139,6 +173,17 @@ export class NotificationsService {
     return this.notificationRecipientRepo.update(
       { id, userId },
       { status: NotificationStatus.READ },
+    );
+  }
+
+  /**
+   * Back to UNREAD, not SENT: the user has already seen it, so it should get
+   * its unread dot back without bumping the bell's "new" count.
+   */
+  async markAsUnread(id: string, userId: string) {
+    return this.notificationRecipientRepo.update(
+      { id, userId },
+      { status: NotificationStatus.UNREAD },
     );
   }
 

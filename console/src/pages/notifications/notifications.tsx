@@ -18,9 +18,7 @@ export default function NotificationsPage() {
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({
-          queryKey: getNotificationsControllerGetNotificationsInfiniteQueryKey({
-            limit: 10,
-          }),
+          queryKey: getNotificationsControllerGetNotificationsInfiniteQueryKey(),
         });
         queryClient.invalidateQueries({
           queryKey: getNotificationsControllerGetUnreadCountQueryKey(),
