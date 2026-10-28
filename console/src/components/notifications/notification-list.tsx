@@ -20,6 +20,10 @@ export function NotificationList({ onClose }: NotificationListProps) {
         query: {
           getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
           initialPageParam: undefined,
+          // A focus refetch re-walks every loaded cursor at once, so tabbing
+          // back to the console would fire N page requests. New notifications
+          // already arrive through useNotificationStream.
+          refetchOnWindowFocus: false,
         },
       },
     );

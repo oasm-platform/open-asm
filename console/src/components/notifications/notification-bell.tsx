@@ -9,8 +9,8 @@ import {
 import { cn } from '@/lib/utils';
 import { useNotificationStream } from '@/hooks/use-notification-stream';
 import {
-  getNotificationsControllerGetNotificationsInfiniteQueryKey,
   getNotificationsControllerGetUnreadCountQueryKey,
+  NotificationResponseDtoStatus,
   useNotificationsControllerGetUnreadCount,
   useNotificationsControllerMarkAllAsRead,
   useNotificationsControllerMarkAllAsUnread,
@@ -18,6 +18,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { Bell, CheckCheck, Loader2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { patchNotificationPages } from './notification-cache';
 import { NotificationList } from './notification-list';
 
 export function NotificationBell() {
@@ -25,15 +26,25 @@ export function NotificationBell() {
   const queryClient = useQueryClient();
   const { data: unreadCountData } = useNotificationsControllerGetUnreadCount();
   const unreadCount = typeof unreadCountData === 'number' ? unreadCountData : 0;
+  // Opening the bell demotes not-yet-seen ('sent') items to 'unread' so they
+  // get their dot back. The badge counts 'sent' only, so it drops to zero.
   const markAllAsUnread = useNotificationsControllerMarkAllAsUnread({
     mutation: {
       onSuccess: () => {
-        queryClient.refetchQueries({
-          queryKey: getNotificationsControllerGetUnreadCountQueryKey(),
-        });
-        queryClient.refetchQueries({
-          queryKey: getNotificationsControllerGetNotificationsInfiniteQueryKey(),
-        });
+        patchNotificationPages(queryClient, (notifications) =>
+          notifications.map((notification) =>
+            notification.status === NotificationResponseDtoStatus.sent
+              ? {
+                  ...notification,
+                  status: NotificationResponseDtoStatus.unread,
+                }
+              : notification,
+          ),
+        );
+        queryClient.setQueryData(
+          getNotificationsControllerGetUnreadCountQueryKey(),
+          0,
+        );
       },
     },
   });
@@ -41,12 +52,16 @@ export function NotificationBell() {
   const markAllAsRead = useNotificationsControllerMarkAllAsRead({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({
-          queryKey: getNotificationsControllerGetNotificationsInfiniteQueryKey(),
-        });
-        queryClient.invalidateQueries({
-          queryKey: getNotificationsControllerGetUnreadCountQueryKey(),
-        });
+        patchNotificationPages(queryClient, (notifications) =>
+          notifications.map((notification) => ({
+            ...notification,
+            status: NotificationResponseDtoStatus.read,
+          })),
+        );
+        queryClient.setQueryData(
+          getNotificationsControllerGetUnreadCountQueryKey(),
+          0,
+        );
       },
     },
   });
