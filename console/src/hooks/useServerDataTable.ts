@@ -63,11 +63,23 @@ export function useServerDataTable({
   const setParams = useCallback(
     (newParams: Partial<typeof internalParams>) => {
       if (isUpdateSearchQueryParam) {
+        // A param at its default stays out of the URL: reading falls back to
+        // it anyway. Only page/pageSize — a sort default can differ from the
+        // route's, and dropping it would hand the column back to the route.
+        const urlDefaults: Record<string, unknown> = {
+          page: defaultPage,
+          pageSize: defaultPageSize,
+        };
         navigate({
           search: ((prev: Record<string, unknown>) => {
             const next = { ...prev } as Record<string, unknown>;
             Object.entries(newParams).forEach(([key, value]) => {
-              if (value === undefined || value === null || value === '') {
+              if (
+                value === undefined ||
+                value === null ||
+                value === '' ||
+                urlDefaults[key] === value
+              ) {
                 delete next[key];
               } else {
                 next[key] = value;
@@ -84,7 +96,7 @@ export function useServerDataTable({
         }));
       }
     },
-    [isUpdateSearchQueryParam, navigate],
+    [isUpdateSearchQueryParam, navigate, defaultPage, defaultPageSize],
   );
 
   return {

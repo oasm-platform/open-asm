@@ -669,17 +669,18 @@ task docker-compose
 This starts:
 - Console (port 3000)
 - Core API (port 6276, gRPC port 16276)
-- A single worker instance (fixed connector port 26276 admits one worker per host)
+- One worker instance (`task docker-compose workers=3` runs three)
 - PostgreSQL with pgvector (port 5432)
 - Redis (port 6379)
 - Geo-IP proxy (port 4360)
 - RustFS S3-compatible storage (port 9000, admin UI 9001)
 
 Notes:
-- The compose service key is `oasm-worker` (not `worker`). Do not scale this
-  service: it publishes the fixed connector port `26276` that spawned connector
-  containers dial back on, so a second replica fails with
-  `Bind for 0.0.0.0:26276 failed: port is already allocated`.
+- The compose service key is `oasm-worker` (not `worker`). It scales: spawned
+  connector containers join the `oasm-connectors` network and dial each replica
+  on its own IP (`WORKER_CONNECTOR_NETWORK`), so no host port is published.
+  Replicas share the `worker-state` volume but each locks its own token slot
+  (`.worker-token`, `.worker-token.1`, …) and keeps a distinct identity.
 - The worker needs the host Docker socket (it spawns connector containers via
   the Docker Engine API). That socket is root-equivalent on the host — only run
   trusted connector images.

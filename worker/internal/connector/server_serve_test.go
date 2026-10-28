@@ -2,11 +2,28 @@ package connector
 
 import (
 	"context"
+	"net"
 	"testing"
 	"time"
 
 	"google.golang.org/grpc"
 )
+
+// Port 0 lets the OS pick a free port (several workers on one host); Port must
+// report the port actually bound, never the 0 that was requested.
+func TestPortReportsOSAssignedPort(t *testing.T) {
+	srv, err := NewServer("127.0.0.1:0", NewProxy(), "tok")
+	if err != nil {
+		t.Fatalf("NewServer: %v", err)
+	}
+	defer srv.lis.Close()
+	if srv.Port() == 0 {
+		t.Fatal("Port() = 0, want the OS-assigned port")
+	}
+	if want := srv.Addr().(*net.TCPAddr).Port; srv.Port() != want {
+		t.Fatalf("Port() = %d, want listener port %d", srv.Port(), want)
+	}
+}
 
 // Serve must surface a non-nil grpc serve error as its return value (not a
 // swallowed nil) so the caller's "connector server stopped: %v" warning

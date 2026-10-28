@@ -95,7 +95,7 @@ task migration:run
 task migration:revert
 
 # Docker
-task docker-compose    # build+recreate full stack (single worker instance)
+task docker-compose    # build+recreate full stack (workers=N scales oasm-worker, default 1)
 ```
 
 Missing entries: `console:test:coverage`, `console:e2e`, `api:test:watch`, `api:test:cov` exist as package scripts but have **no** task entry — add one instead of calling the script.
@@ -169,7 +169,7 @@ Migration location: `core-api/src/database/migrations/` (58 files, newest last).
 ### worker
 - Go module `worker/`, business logic in `internal/{cli,config,connector,execution,runtime,grpcclient,hostmetrics,observability,resource,security,telemetry,transport,tui,worker}`.
 - `cmd/cli` flags: `--mode cli|node`, `--api-key`, `--max-concurrency`, `--grpc-host`, `--grpc-port`, `--tool-path`, `--network`. `cmd/app` is the same thing driven purely by `WORKER_*` env.
-- **Connector model:** the worker node is a *node* that dispatches work to connector containers over the Docker Engine API and serves their callback gRPC on `:26276`. It therefore needs the host Docker socket (docker-outside-of-docker, root-equivalent — trusted images only) and the socket's group (`group_add: ['0']` on Docker Desktop). It auto-adds the `host-gateway` extra-host on Linux so `host.docker.internal` resolves; `WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT=1` is a **dev-only** escape hatch (compose pins the address instead).
+- **Connector model:** the worker node is a *node* that dispatches work to connector containers over the Docker Engine API and serves their callback gRPC on `:26276`. It therefore needs the host Docker socket (docker-outside-of-docker, root-equivalent — trusted images only) and the socket's group (`group_add: ['0']` on Docker Desktop). It auto-adds the `host-gateway` extra-host on Linux so `host.docker.internal` resolves; `WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT=1` is a **dev-only** escape hatch (compose sets `WORKER_CONNECTOR_NETWORK` instead: connectors join that network and dial the worker container's own IP on it).
 - Join identity is persisted at `WORKER_TOKEN_FILE` on the `worker-state` volume. Losing that file mints a new identity and startup orphan-reconcile can no longer recognise previously spawned containers.
 - Connector catalogue comes from `core-api/resources/connectors/manifest.json`; refresh with `task sync-connectors` (set `MANIFEST_PATH=<local oasm-connectors checkout>/manifest.json` to preview an unmerged connector instead of pulling `main`).
 
@@ -198,9 +198,9 @@ Migration location: `core-api/src/database/migrations/` (58 files, newest last).
 
 `task docker-compose` = `docker compose --env-file ./core-api/.env up -d --build --force-recreate`.
 
-Services: `console` (`:3000`), `core-api` (`:6276` + `:16276`, healthcheck `/api/health`), `oasm-worker` (socket-mounted, `:26276` published), `postgres` (pg17+pgvector), `redis`, `geo-ip` (`:4360`), `rustfs` (`:9000`/`:9001`), and a one-shot `migration` service that gates `core-api` startup (`service_completed_successfully`).
+Services: `console` (`:3000`), `core-api` (`:6276` + `:16276`, healthcheck `/api/health`), `oasm-worker` (socket-mounted, connector callback `:26276` on the `oasm-connectors` network, not published), `postgres` (pg17+pgvector), `redis`, `geo-ip` (`:4360`), `rustfs` (`:9000`/`:9001`), and a one-shot `migration` service that gates `core-api` startup (`service_completed_successfully`).
 
-The compose service key is `oasm-worker`, **not** `worker`. Do not scale that service: it publishes the fixed connector port `26276` that spawned connector containers dial back on, so a second replica fails with `Bind for 0.0.0.0:26276 failed: port is already allocated`. Run one worker per host.
+The compose service key is `oasm-worker`, **not** `worker`. It scales (`task docker-compose workers=3`): connector containers join the `oasm-connectors` network and dial each replica on its own IP, so nothing is published on the host. Replicas share `worker-state` but each locks its own token slot (`.worker-token`, `.worker-token.1`, …) — two workers resuming the same token would share an identity and reap each other's connectors.
 
 Volumes worth knowing: `pgdata`, `redis-data`, `geoip-data`, `rustfs-data`, `worker-tools-cache` (shared tool cache across workers), `worker-state` (worker join identity). `.open-api` is bind-mounted into `core-api` so the container regenerates the spec the console codegen consumes.
 

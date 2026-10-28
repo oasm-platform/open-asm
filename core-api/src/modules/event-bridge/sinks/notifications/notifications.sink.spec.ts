@@ -161,6 +161,25 @@ findBy = jest.fn().mockImplementation((where: { id?: { _value: string[] } }) => 
       );
     });
 
+    it('stays silent on a run that found nothing new', async () => {
+      // A rescan of an unchanged target still publishes the run's outcome;
+      // only the in-app "new assets" message depends on there being any.
+      xreadgroup.mockResolvedValue([
+        entry('workflow.run.completed', {
+          targetValue: 'scanme.sh',
+          targetId: 't-1',
+          hosts: 0,
+          ports: 0,
+          services: 0,
+          techs: 0,
+        }),
+      ]);
+      await service.runOnce();
+
+      expect(notificationSave).not.toHaveBeenCalled();
+      expect(xack).toHaveBeenCalled();
+    });
+
     it('sends the incomplete-run notice only when the run did NOT finish', async () => {
       // A clean run already reported its new assets; "your scan stopped
       // halfway" after a clean finish is noise.
@@ -224,6 +243,33 @@ findBy = jest.fn().mockImplementation((where: { id?: { _value: string[] } }) => 
             assetValue: 'a.example',
             targetId: 't-1',
             assetId: 'as-1',
+          },
+        }),
+      );
+    });
+  });
+
+  describe('asset.url.discovered', () => {
+    it('notifies the workspace once per target with the new URL count', async () => {
+      xreadgroup.mockResolvedValue([
+        entry('asset.url.discovered', {
+          jobHistoryId: 'run-1',
+          targetId: 't-1',
+          targetValue: 'example.com',
+          count: 37,
+          urls: ['https://example.com/a'],
+        }),
+      ]);
+      await service.runOnce();
+
+      expect(notificationSave).toHaveBeenCalledTimes(1);
+      expect(notificationSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: NotificationType.NEW_URL_FOUND,
+          metadata: {
+            count: '37',
+            targetValue: 'example.com',
+            targetId: 't-1',
           },
         }),
       );
@@ -301,6 +347,7 @@ findBy = jest.fn().mockImplementation((where: { id?: { _value: string[] } }) => 
       xreadgroup.mockResolvedValue([
         entry('workflow.run.completed', {
           targetValue: 'example.com',
+          hosts: 3,
           failedSteps: ['step-2'],
         }),
       ]);

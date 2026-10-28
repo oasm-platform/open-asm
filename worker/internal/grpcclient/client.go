@@ -2,8 +2,10 @@ package grpcclient
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -13,6 +15,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"oasm-worker/internal/config"
+	"oasm-worker/internal/filelock"
 	jobRegistryPb "oasm-worker/internal/gen/jobs_registry"
 	workerPb "oasm-worker/internal/gen/workers"
 )
@@ -36,6 +39,9 @@ type Client struct {
 	// tokenFile is where the worker token is persisted across restarts so a
 	// rejoin can recover the same worker identity (core matches on the token).
 	tokenFile string
+	// tokenLock holds tokenFile's slot so no concurrent worker sharing the
+	// location resumes the same identity (see claimTokenFile). Nil = unlocked.
+	tokenLock *filelock.Lock
 
 	workers workerPb.WorkersServiceClient
 	jobs    jobRegistryPb.JobsRegistryServiceClient
@@ -116,7 +122,7 @@ func NewClient(apiKey, grpcHost, toolPath string, logger Logger, dialOpts ...grp
 		telemetryCallTimeout: 3 * time.Second,
 	}
 
-	c.tokenFile = resolveTokenFilePath()
+	c.tokenFile, c.tokenLock = claimTokenFile(resolveTokenFilePath(), logger)
 	if tok := readTokenFile(c.tokenFile); tok != "" {
 		auth.setToken(tok)
 		logger.Verbose("resumed worker token from %s", c.tokenFile)
@@ -138,6 +144,45 @@ func resolveTokenFilePath() string {
 	return config.DataPath(tokenFileName)
 }
 
+// maxTokenSlots bounds how many live workers can share one token location:
+// replicas of a scaled compose service on one state volume, or several worker
+// processes run by one user.
+const maxTokenSlots = 64
+
+// claimTokenFile picks this process's token file: the first slot of base whose
+// lock no live worker holds. Slot 0 is base itself, so a lone worker keeps
+// resuming its existing identity; slot n is base.n. The lock is held until
+// Close or process exit. Without it, workers sharing the location would resume
+// the SAME identity, and a restarting one's orphan reconcile would remove its
+// siblings' running connectors as its own. Any failure other than contention
+// (e.g. a read-only dir) falls back to base unlocked — the historic behavior.
+func claimTokenFile(base string, logger Logger) (string, *filelock.Lock) {
+	if err := os.MkdirAll(filepath.Dir(base), 0o700); err != nil {
+		logger.Warning("cannot lock a worker token slot next to %s (%v) — using it unlocked", base, err)
+		return base, nil
+	}
+	for i := 0; i < maxTokenSlots; i++ {
+		path := base
+		if i > 0 {
+			path = fmt.Sprintf("%s.%d", base, i)
+		}
+		lock, err := filelock.TryLock(path + ".lock")
+		if errors.Is(err, filelock.ErrLocked) {
+			continue
+		}
+		if err != nil {
+			logger.Warning("cannot lock worker token slot %s (%v) — using %s unlocked", path, err, base)
+			return base, nil
+		}
+		if i > 0 {
+			logger.Info("worker token slot %d (%s): another worker holds the lower slots", i, path)
+		}
+		return path, lock
+	}
+	logger.Warning("all %d worker token slots of %s are held — using it unlocked", maxTokenSlots, base)
+	return base, nil
+}
+
 // readTokenFile returns the trimmed worker token from path, or "" when the
 // file is missing or empty (both states mean "no identity to resume").
 func readTokenFile(path string) string {
@@ -148,8 +193,9 @@ func readTokenFile(path string) string {
 	return strings.TrimSpace(string(b))
 }
 
-// Close closes the underlying gRPC connection.
+// Close closes the underlying gRPC connection and releases the token slot.
 func (c *Client) Close() error {
+	_ = c.tokenLock.Unlock()
 	if c.conn != nil {
 		return c.conn.Close()
 	}

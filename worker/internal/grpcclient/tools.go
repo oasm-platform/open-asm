@@ -16,9 +16,15 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
+	"oasm-worker/internal/filelock"
 	workers "oasm-worker/internal/gen/workers"
 )
+
+// toolDownloadLockName serializes DownloadTools across workers sharing one
+// tool directory.
+const toolDownloadLockName = ".download.lock"
 
 // DownloadTools resolves the tool directory, downloads and extracts every
 // archive in the built-in tool registry via the Storage stream, persists the
@@ -33,12 +39,29 @@ func (c *Client) DownloadTools(ctx context.Context) error {
 
 	statePath := filepath.Join(absToolPath, ".tool_versions.json")
 
+	// Workers sharing the tool dir (scaled compose replicas on one volume)
+	// would otherwise wipe and extract over each other's files at boot. The
+	// first one downloads; the rest wait, then hit the cache it wrote.
+	if err := os.MkdirAll(absToolPath, 0o755); err != nil {
+		return fmt.Errorf("failed to create tool directory: %w", err)
+	}
+	lock, err := filelock.Acquire(ctx, filepath.Join(absToolPath, toolDownloadLockName), time.Second)
+	if err != nil {
+		return fmt.Errorf("failed to lock tool directory: %w", err)
+	}
+	defer lock.Unlock()
+
 	if _, err := os.Stat(statePath); os.IsNotExist(err) {
 		c.logger.Info("Tool cache not found, cleaning up directory contents for fresh download")
 
 		entries, err := os.ReadDir(absToolPath)
 		if err == nil {
 			for _, entry := range entries {
+				// Deleting the held lock file would let the next worker lock a
+				// fresh inode and run concurrently.
+				if entry.Name() == toolDownloadLockName {
+					continue
+				}
 				removePath := filepath.Join(absToolPath, entry.Name())
 				if err := os.RemoveAll(removePath); err != nil {
 					return fmt.Errorf("failed to remove item %s: %w", removePath, err)

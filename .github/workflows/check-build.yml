@@ -10,6 +10,11 @@ on:
       - reopened
   workflow_dispatch:
 
+permissions:
+  contents: read
+  # dorny/paths-filter lists PR files through the REST API.
+  pull-requests: read
+
 jobs:
   # Detect file changes
   changes:

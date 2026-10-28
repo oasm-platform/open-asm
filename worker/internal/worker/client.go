@@ -363,6 +363,9 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 		// Non-fatal: worker can still operate legacy path without connector server.
 		proxy = connector.NewProxy()
 		proxy.SetLogger(log)
+		// Port containers dial back on: the configured one, or the OS-assigned
+		// one when WORKER_CONNECTOR_PORT=0 (several workers on one host).
+		connectorPort := cfg.ConnectorPort
 		connectorServer, err := connector.NewServer(
 			// Bind all interfaces ("host:port" with an empty host): connector
 			// containers reach this listener via host.docker.internal / bridge
@@ -376,6 +379,7 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 		if err != nil {
 			log.Error("connector server init failed (non-fatal): %v", err)
 		} else {
+			connectorPort = connectorServer.Port()
 			connectorServer.SetLogger(log)
 			// mTLS is env-gated (WORKER_CONNECTOR_TLS_CERT/KEY/CA, all three
 			// required); without it the listener stays plaintext for backward
@@ -404,7 +408,7 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 			// WORKER_CONNECTOR_ADDR env by viper) > process env fallback > auto-derived
 			// (container self IPv4 / host.docker.internal / bridge IPv4 gateway).
 			// Empty = auto-derive; an IPv6 dial requires an explicit bracketed override.
-			dockerRT, err := runtime.NewDockerRuntime("", cfg.ConnectorAddr, cfg.ConnectorPort, cfg.ConnectorToken)
+			dockerRT, err := runtime.NewDockerRuntime("", cfg.ConnectorAddr, connectorPort, cfg.ConnectorToken, cfg.ConnectorNetwork)
 			if err != nil {
 				log.Error("container engine unavailable — image/connector jobs disabled: %v", err)
 			} else {

@@ -8,19 +8,44 @@ import { NotificationRecipient } from './entities/notification-recipient.entity'
 import { Notification } from './entities/notification.entity';
 import { NotificationsService } from './notifications.service';
 import { NotificationsSink } from '../event-bridge/sinks/notifications/notifications.sink';
+import { BadRequestException } from '@nestjs/common';
+import {
+  CURSOR_TS_SQL,
+  decodeNotificationCursor,
+  encodeNotificationCursor,
+} from './notification-cursor';
 
-function buildQueryBuilderMock() {
+const RECIPIENT_ID = (n: number) =>
+  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+
+/** `count` recipient rows, newest first, as getRawAndEntities returns them. */
+function rows(count: number) {
+  const entities = Array.from({ length: count }, (_, i) => ({
+    id: RECIPIENT_ID(i),
+    status: NotificationStatus.SENT,
+    createdAt: new Date('2026-10-28T10:00:00.000Z'),
+    notification: { type: 'ASSET_NEW_DETECT', metadata: {} },
+  }));
+  const raw = entities.map((e, i) => ({
+    recipient_id: e.id,
+    cursor_ts: `2026-10-28T10:00:00.${String(999999 - i).padStart(6, '0')}`,
+  }));
+  return { entities, raw };
+}
+
+function buildQueryBuilderMock(result = rows(0)) {
   const qb: Record<string, jest.Mock> = {
-    getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+    getRawAndEntities: jest.fn().mockResolvedValue(result),
   };
   for (const method of [
     'leftJoinAndSelect',
     'where',
     'andWhere',
     'orderBy',
+    'addOrderBy',
     'select',
-    'skip',
-    'take',
+    'addSelect',
+    'limit',
   ]) {
     qb[method] = jest.fn().mockReturnValue(qb);
   }
@@ -37,7 +62,7 @@ describe('NotificationsService', () => {
     update: jest.Mock;
   };
 
-  const query = { page: 1, limit: 10 };
+  const query = { limit: 10 };
 
   beforeEach(async () => {
     notificationRecipientRepo = {
@@ -108,6 +133,71 @@ describe('NotificationsService', () => {
     );
   });
 
+  describe('keyset pagination', () => {
+    it('reads one row past the page, newest first, with id breaking ties', async () => {
+      const qb = buildQueryBuilderMock();
+      notificationRecipientRepo.createQueryBuilder.mockReturnValue(qb);
+
+      await service.getNotifications('user-1', 'ws-1', query, 'en');
+
+      expect(qb.limit).toHaveBeenCalledWith(11);
+      expect(qb.orderBy).toHaveBeenCalledWith('recipient.createdAt', 'DESC');
+      expect(qb.addOrderBy).toHaveBeenCalledWith('recipient.id', 'DESC');
+      expect(qb.addSelect).toHaveBeenCalledWith(CURSOR_TS_SQL, 'cursor_ts');
+    });
+
+    it('returns a cursor at the last row shown when more rows exist', async () => {
+      const result = rows(11);
+      const qb = buildQueryBuilderMock(result);
+      notificationRecipientRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const page = await service.getNotifications('user-1', 'ws-1', query, 'en');
+
+      expect(page.data).toHaveLength(10);
+      // Built from the Postgres-rendered timestamp, not the entity's Date.
+      expect(decodeNotificationCursor(page.nextCursor!)).toEqual({
+        createdAt: result.raw[9].cursor_ts,
+        id: RECIPIENT_ID(9),
+      });
+    });
+
+    it('has no cursor on the last page', async () => {
+      const qb = buildQueryBuilderMock(rows(10));
+      notificationRecipientRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const page = await service.getNotifications('user-1', 'ws-1', query, 'en');
+
+      expect(page.data).toHaveLength(10);
+      expect(page.nextCursor).toBeNull();
+    });
+
+    it('continues strictly after the cursor row', async () => {
+      const qb = buildQueryBuilderMock();
+      notificationRecipientRepo.createQueryBuilder.mockReturnValue(qb);
+      const cursor = encodeNotificationCursor({
+        createdAt: '2026-10-28T10:00:00.123456',
+        id: RECIPIENT_ID(1),
+      });
+
+      await service.getNotifications('user-1', 'ws-1', { ...query, cursor }, 'en');
+
+      expect(qb.andWhere).toHaveBeenCalledWith(
+        '(recipient.createdAt, recipient.id) < (CAST(:cursorTs AS timestamp), CAST(:cursorId AS uuid))',
+        { cursorTs: '2026-10-28T10:00:00.123456', cursorId: RECIPIENT_ID(1) },
+      );
+    });
+
+    it('rejects a malformed cursor before querying', async () => {
+      const qb = buildQueryBuilderMock();
+      notificationRecipientRepo.createQueryBuilder.mockReturnValue(qb);
+
+      await expect(
+        service.getNotifications('user-1', 'ws-1', { ...query, cursor: 'nope!' }, 'en'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(qb.getRawAndEntities).not.toHaveBeenCalled();
+    });
+  });
+
   it('counts unread notifications per user', async () => {
     await service.getUnreadCount('user-1');
 
@@ -117,5 +207,14 @@ describe('NotificationsService', () => {
         status: NotificationStatus.SENT,
       },
     });
+  });
+
+  it('marks one notification unread without counting it as new again', async () => {
+    await service.markAsUnread('rcpt-1', 'user-1');
+
+    expect(notificationRecipientRepo.update).toHaveBeenCalledWith(
+      { id: 'rcpt-1', userId: 'user-1' },
+      { status: NotificationStatus.UNREAD },
+    );
   });
 });

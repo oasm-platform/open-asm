@@ -102,6 +102,7 @@ export const EVENT_POLICY: Record<EventName, EventPolicy> = {
   'asset.discovered': { persist: false, severity: 'important' },
   'asset.updated': { persist: false, severity: 'normal' },
   'asset.enabled_changed': { persist: false, severity: 'normal' },
+  'asset.url.discovered': { persist: false, severity: 'normal' },
   'job.created': { persist: false, severity: 'normal' },
   'job.started': { persist: false, severity: 'normal' },
   'job.completed': { persist: false, severity: 'normal' },

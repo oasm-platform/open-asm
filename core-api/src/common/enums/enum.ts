@@ -181,6 +181,8 @@ export enum NotificationType {
   SCAN_INCOMPLETE = 'SCAN_INCOMPLETE',
   NEW_VULNERABILITY_FOUND = 'NEW_VULNERABILITY_FOUND',
   WORKSPACE_INVITATION = 'WORKSPACE_INVITATION',
+  /** A URL discovery run stored URLs no earlier run had. */
+  NEW_URL_FOUND = 'NEW_URL_FOUND',
 }
 
 export enum Language {
@@ -242,6 +244,8 @@ export enum DefaultWorkflow {
   VULNERABILITY_SCAN_BASIC = 'vulnerability_scan_basic.yaml',
   // Git organization targets: scans every repository after each sync.
   REPOSITORY_SCAN = 'repository_scan.yaml',
+  // Started on demand from the Assets URLs tab.
+  URL_DISCOVERY = 'url_discovery.yaml',
 }
 
 export enum EventTriggerType {

@@ -18,4 +18,11 @@ export class GetHostAssetsDTO {
 
   @ApiProperty()
   createdAt: Date;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Found by the latest finished scan of its kind on this target (badged as new)',
+  })
+  isNew?: boolean;
 }

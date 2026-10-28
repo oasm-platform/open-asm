@@ -45,7 +45,7 @@ func TestCreateSkipsPullWhenImageCached(t *testing.T) {
 		path := strings.TrimPrefix(r.URL.Path, "/v1.44")
 		switch {
 		case r.Method == http.MethodGet && strings.HasPrefix(path, "/images/") && strings.HasSuffix(path, "/json"):
-			// ImageInspectWithRaw: image is already present locally.
+			// ImageInspect: image is already present locally.
 			w.Header().Set("Content-Type", "application/json")
 			fmt.Fprint(w, `{"Id":"sha256:abc123"}`)
 		case r.Method == http.MethodPost && path == "/containers/create":

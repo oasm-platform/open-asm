@@ -1,9 +1,33 @@
 import { JobRunType } from '@/common/enums/enum';
 import type { AssetGroupWorkflowService } from '@/modules/asset-group/asset-group-workflow.service';
 import type { AssetGroupWorkflow } from '@/modules/asset-group/entities/asset-groups-workflows.entity';
+import type { AssetsService } from '@/modules/assets/assets.service';
+import type { Target } from '@/modules/targets/entities/target.entity';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { Job } from 'bullmq';
-import { AssetGroupsScheduleConsumer } from './scan-schedule.processor';
+import {
+  AssetGroupsScheduleConsumer,
+  AssetsDiscoveryScheduleConsumer,
+} from './scan-schedule.processor';
+
+describe('AssetsDiscoveryScheduleConsumer', () => {
+  it('re-scans the target as a scheduled run in its own workspace', async () => {
+    const assetsService = { reScan: jest.fn() };
+    const consumer = new AssetsDiscoveryScheduleConsumer(
+      assetsService as unknown as AssetsService,
+    );
+
+    await consumer.process({
+      data: { id: 'target-1', workspaceId: 'workspace-1' },
+    } as unknown as Job<Target>);
+
+    expect(assetsService.reScan).toHaveBeenCalledWith(
+      'target-1',
+      'workspace-1',
+      JobRunType.SCHEDULED,
+    );
+  });
+});
 
 describe('AssetGroupsScheduleConsumer', () => {
   const mockAssetGroupWorkflowService = {

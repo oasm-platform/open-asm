@@ -12,9 +12,7 @@ export function useNotificationStream() {
   const handleMessage = useCallback(() => {
     // Invalidate queries to refetch
     queryClient.invalidateQueries({
-      queryKey: getNotificationsControllerGetNotificationsInfiniteQueryKey({
-        limit: 10,
-      }),
+      queryKey: getNotificationsControllerGetNotificationsInfiniteQueryKey(),
     });
     queryClient.invalidateQueries({
       queryKey: getNotificationsControllerGetUnreadCountQueryKey(),

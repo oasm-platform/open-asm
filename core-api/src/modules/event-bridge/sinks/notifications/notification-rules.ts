@@ -44,6 +44,15 @@ export const NOTIFICATION_RULES: Partial<Record<EventName, NotificationRule[]>> 
         type: NotificationType.ASSET_NEW_DETECT,
         scope: NotificationScope.GROUP,
         audience: 'workspace-members',
+        // The producer publishes every run, including a rescan that found
+        // nothing; "New assets discovered for X: " with no counts is noise.
+        when: (event) => {
+          const p = readPayload('workflow.run.completed', event);
+          return (
+            (p.hosts ?? 0) + (p.ports ?? 0) + (p.services ?? 0) + (p.techs ?? 0) >
+            0
+          );
+        },
         metadata: (event) => {
           const p = readPayload('workflow.run.completed', event);
           return {
@@ -88,6 +97,23 @@ export const NOTIFICATION_RULES: Partial<Record<EventName, NotificationRule[]>> 
             assetValue: p.assetValue ?? '',
             targetId: p.targetId ?? '',
             assetId: p.assetId ?? '',
+          };
+        },
+      },
+    ],
+    // New URLs stored by a URL discovery run: one note per target, never one
+    // per URL. The producer only publishes when there is at least one.
+    'asset.url.discovered': [
+      {
+        type: NotificationType.NEW_URL_FOUND,
+        scope: NotificationScope.GROUP,
+        audience: 'workspace-members',
+        metadata: (event) => {
+          const p = readPayload('asset.url.discovered', event);
+          return {
+            count: String(p.count ?? 0),
+            targetValue: p.targetValue ?? '',
+            targetId: p.targetId ?? '',
           };
         },
       },

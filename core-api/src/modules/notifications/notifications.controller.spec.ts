@@ -30,6 +30,7 @@ describe('NotificationsController workspace permission guards', () => {
     ['markAllAsRead', 'PATCH /mark-read'],
     ['markAllAsUnread', 'PATCH /mark-unread'],
     ['markAsRead', 'PATCH /:id/read'],
+    ['markAsUnread', 'PATCH /:id/unread'],
     ['deleteNotification', 'DELETE /:id'],
   ])('%s (%s) stays unguarded (per-user state, no write key in catalog)', (method, _route) => {
     const handler = (

@@ -143,6 +143,16 @@ func (s *Server) Addr() net.Addr {
 	return s.lis.Addr()
 }
 
+// Port returns the TCP port the listener actually bound: the OS-assigned one
+// when the server was created on port 0 (WORKER_CONNECTOR_PORT=0), which is
+// what lets several workers share one host. 0 if the listener is not TCP.
+func (s *Server) Port() int {
+	if a, ok := s.lis.Addr().(*net.TCPAddr); ok {
+		return a.Port
+	}
+	return 0
+}
+
 // Serve starts the gRPC server and blocks until ctx is cancelled (graceful
 // stop → returns nil). If the underlying grpc server fails to serve — e.g.
 // ErrServerStopped when Serve is re-entered after a stop — the error is

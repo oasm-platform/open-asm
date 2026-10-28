@@ -239,6 +239,12 @@ func newTestServerWithLogger(t *testing.T, logger Logger) *testServer {
 	jobsRegistry.RegisterJobsRegistryServiceServer(grpcSrv, jobsSrv)
 	go func() { _ = grpcSrv.Serve(lis) }()
 
+	// Never touch a real token file (or the repo tree) during tests: steer
+	// NewClient's token slot claim into a temp dir before it runs.
+	if os.Getenv("WORKER_TOKEN_FILE") == "" {
+		t.Setenv("WORKER_TOKEN_FILE", filepath.Join(t.TempDir(), ".worker-token"))
+	}
+
 	// Create Client with bufconn dialer. The passthrough:/// scheme makes
 	// grpc.NewClient invoke the custom dialer instead of resolving via DNS.
 	client, err := NewClient("test-api-key", "passthrough:///bufnet", "test-tools", logger,
@@ -247,12 +253,6 @@ func newTestServerWithLogger(t *testing.T, logger Logger) *testServer {
 		}))
 	if err != nil {
 		t.Fatalf("failed to create client: %v", err)
-	}
-	if env := os.Getenv("WORKER_TOKEN_FILE"); env != "" {
-		client.tokenFile = env
-	} else {
-		// Never touch a real token file (or the repo tree) during tests.
-		client.tokenFile = filepath.Join(t.TempDir(), ".worker-token")
 	}
 	t.Cleanup(func() {
 		_ = client.Close()

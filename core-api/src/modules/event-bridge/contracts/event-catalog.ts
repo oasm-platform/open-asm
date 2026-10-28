@@ -16,7 +16,7 @@
  * that is deliberate rather than redundant. Once the leaf is passed to
  * `publish()`, the runtime has no way to recover the path it came from, so the
  * name has to travel inside the value. `event.spec.ts` asserts the two copies
- * agree for all 85 events, so the duplication cannot rot.
+ * agree for all 86 events, so the duplication cannot rot.
  *
  * Naming contract: `<domain>.<action>` (or `<domain>.<sub_resource>.<action>`,
  * e.g. `workspace.config.updated`), lowercase, snake_case, past tense for
@@ -160,6 +160,13 @@ export const EVENT_CATALOG = {
     enabled_changed: {
       name: 'asset.enabled_changed',
       summary: 'Asset enabled or disabled',
+    },
+    url: {
+      // From the end of a url_discovery run.
+      discovered: {
+        name: 'asset.url.discovered',
+        summary: 'New URLs found by a URL discovery run',
+      },
     },
   },
   asset_group: {

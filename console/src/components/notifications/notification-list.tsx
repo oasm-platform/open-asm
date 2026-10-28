@@ -1,10 +1,12 @@
-import { Button } from '@/components/ui/button';
 import {
   type NotificationResponseDto,
   useNotificationsControllerGetNotificationsInfinite,
 } from '@/services/apis/gen/queries';
 import { Loader2 } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import { NotificationItem } from './notification-item';
+
+const PAGE_SIZE = 20;
 
 interface NotificationListProps {
   onClose?: () => void;
@@ -13,15 +15,37 @@ interface NotificationListProps {
 export function NotificationList({ onClose }: NotificationListProps) {
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
     useNotificationsControllerGetNotificationsInfinite(
-      { limit: 10 },
+      { limit: PAGE_SIZE },
       {
         query: {
-          getNextPageParam: (lastGroup) =>
-            lastGroup.hasNextPage ? lastGroup.page + 1 : undefined,
-          initialPageParam: 1,
+          getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+          initialPageParam: undefined,
+          // A focus refetch re-walks every loaded cursor at once, so tabbing
+          // back to the console would fire N page requests. New notifications
+          // already arrive through useNotificationStream.
+          refetchOnWindowFocus: false,
         },
       },
     );
+
+  // Loads the next page once the end of the list scrolls into view. No root:
+  // the observer is clipped by whichever ancestor scrolls (the bell's
+  // ScrollArea, or the page itself). Re-observing after each page lands fires
+  // again right away if the end is still visible, so a tall screen fills up.
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || !hasNextPage || isFetchingNextPage) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) fetchNextPage();
+      },
+      { rootMargin: '0px 0px 200px 0px' },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, data]);
 
   if (isLoading) {
     return (
@@ -51,23 +75,10 @@ export function NotificationList({ onClose }: NotificationListProps) {
           onClose={onClose}
         />
       ))}
-      {hasNextPage && (
+      <div ref={sentinelRef} aria-hidden />
+      {isFetchingNextPage && (
         <div className="flex justify-center p-4">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fetchNextPage()}
-            disabled={isFetchingNextPage}
-          >
-            {isFetchingNextPage ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Loading...
-              </>
-            ) : (
-              'Load more'
-            )}
-          </Button>
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
         </div>
       )}
     </div>
