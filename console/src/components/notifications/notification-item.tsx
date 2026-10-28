@@ -7,7 +7,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import {
-  getNotificationsControllerGetNotificationsInfiniteQueryKey,
   getNotificationsControllerGetUnreadCountQueryKey,
   type NotificationResponseDto,
   NotificationResponseDtoStatus,
@@ -21,6 +20,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { memo, useCallback } from 'react';
 import { Link } from '@tanstack/react-router';
+import { patchNotificationPages } from './notification-cache';
 import { splitNotificationUrl } from './notification-url';
 
 dayjs.extend(relativeTime);
@@ -37,26 +37,52 @@ export const NotificationItem = memo(function NotificationItem({
   onClose,
 }: NotificationItemProps) {
   const queryClient = useQueryClient();
-  const refresh = useCallback(() => {
-    queryClient.invalidateQueries({
-      queryKey: getNotificationsControllerGetNotificationsInfiniteQueryKey(),
-    });
-    queryClient.invalidateQueries({
-      queryKey: getNotificationsControllerGetUnreadCountQueryKey(),
-    });
-  }, [queryClient]);
+  // Reading a not-yet-seen ('sent') item changes the badge, so that one count
+  // request is still needed. The paginated list is patched in place instead.
+  const patchPages = useCallback(
+    (update: (data: NotificationResponseDto[]) => NotificationResponseDto[]) => {
+      patchNotificationPages(queryClient, update);
+      queryClient.invalidateQueries({
+        queryKey: getNotificationsControllerGetUnreadCountQueryKey(),
+      });
+    },
+    [queryClient],
+  );
 
   const markAsRead = useNotificationsControllerMarkAsRead({
-    mutation: { onSuccess: refresh },
+    mutation: {
+      onSuccess: (_data, { id }) =>
+        patchPages((notifications) =>
+          notifications.map((notification) =>
+            notification.id === id
+              ? { ...notification, status: NotificationResponseDtoStatus.read }
+              : notification,
+          ),
+        ),
+    },
   });
   const markAsUnread = useNotificationsControllerMarkAsUnread({
-    mutation: { onSuccess: refresh },
+    mutation: {
+      onSuccess: (_data, { id }) =>
+        patchPages((notifications) =>
+          notifications.map((notification) =>
+            notification.id === id
+              ? {
+                  ...notification,
+                  status: NotificationResponseDtoStatus.unread,
+                }
+              : notification,
+          ),
+        ),
+    },
   });
 
   const deleteNotification = useNotificationsControllerDeleteNotification({
     mutation: {
-      onSuccess: () => {
-        refresh();
+      onSuccess: (_data, { id }) => {
+        patchPages((notifications) =>
+          notifications.filter((notification) => notification.id !== id),
+        );
         onClose?.();
       },
     },

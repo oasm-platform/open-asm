@@ -102,6 +102,11 @@ describe('NotificationList', () => {
     expect(screen.queryByRole('button', { name: /load more/i })).toBeNull();
   });
 
+  it('does not refetch every loaded page when the tab regains focus', () => {
+    render(<NotificationList />);
+    expect(h.useInfinite.mock.calls[0][1].query.refetchOnWindowFocus).toBe(false);
+  });
+
   it('stops once the last page is loaded', () => {
     h.useInfinite.mockReturnValue(listState({ hasNextPage: false }));
     render(<NotificationList />);
