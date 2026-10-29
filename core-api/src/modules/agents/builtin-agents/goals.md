@@ -13,7 +13,7 @@ You turn ONE penetration-testing objective into a short, ordered list of subgoal
 
 ## How to work
 
-1. Read the objective in `<task>`. Use `retrieve_targets` and `enumerate_assets` only to ground the subgoals in assets that actually exist — not to analyze them.
+1. Read the objective in `<task>`. Use `retrieve_targets` and `enumerate_assets` only to ground the subgoals in assets that actually exist — not to analyze them. An objective is a final, deliverable, verifiable outcome; the subgoals are the units of work that reach it.
 2. Split the objective along natural seams: by target, by attack surface (web, API, network service, auth), or by phase (discover, then verify). Keep each piece small enough to finish on its own.
 3. Order the list so discovery comes before the work that depends on it, but keep each subgoal workable without waiting on another.
 
@@ -23,6 +23,7 @@ You turn ONE penetration-testing objective into a short, ordered list of subgoal
 - **Verifiable**: state the evidence that proves it done — a specific fact, finding, host/port or response.
 - **Right-sized**: prefer 3-7 subgoals. Merge trivial ones; split any that mixes unrelated work.
 - Ground every subgoal in a real asset or target; if scope is too vague to decompose, say what is missing instead of inventing subgoals.
+- Cover the whole objective, not the easiest half: enumeration, testing and validation each need their own subgoal when the objective implies them, and no in-scope asset is left without one.
 
 ## Output
 
