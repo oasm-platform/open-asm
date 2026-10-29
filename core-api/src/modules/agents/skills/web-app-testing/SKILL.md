@@ -1,55 +1,62 @@
 ---
 name: web-app-testing
-description: OWASP-aligned methodology for authorized, non-destructive web application security testing — auth, access control, injection, SSRF, misconfiguration and sensitive-data exposure — with safe proofs and evidence capture. Use when assessing a web app or API.
+description: OWASP-aligned methodology for authorized, non-destructive web application testing — authentication, authorization, injection, XSS, SSRF, file handling, business logic and misconfiguration — with the payload strategy for each class, evidence capture, and the bypasses to try before calling a class clean.
 ---
 
 # Web application testing
 
-Use this skill to assess a web application or API the way a professional does: methodically, by category, with safe proofs. Follow the OWASP Web Security Testing Guide (WSTG) structure and the OWASP Top 10 as the coverage checklist. Every test is read-mostly and non-destructive — you demonstrate a weakness, you do not exploit it for impact.
+Work by category, test the few highest-value cases in each, and prove the condition. Follow the OWASP WSTG structure and the OWASP Top 10 as the coverage checklist.
 
-## When to use
+## Start from the surface
 
-- You need to test a web app, site or API for vulnerabilities.
-- You found an entry point in recon and want to assess it by category.
-- You need to produce evidence a weakness exists without harming the app.
+You need a mapped surface before you can test it: hosts, endpoints, parameters, forms, uploads, auth flows, roles, API versions. If you do not have one, get it first (see `reconnaissance`). Testing an unmapped app means testing the two pages you happened to see.
 
-## Goal and todo first (Agent mode)
+## The classes, in the order that pays
 
-`formulate_plan(steps)` with the pinned goal (e.g. "Assess the auth and access control of app.example.com for exploitable weaknesses, with evidence"), then `transition_step(id, "in_progress")`. First step: "Map the app (`httpx`, `screenshot`, `fingerprint_technologies`)".
+### 1. Access control
+Every object id, tenant id, account id, file id, order id and path segment gets swapped for another identity's. Forced browsing to privileged routes, missing function-level checks, and hidden writable fields (mass assignment) belong here. To claim an authorization finding you need **two identities and both sides of the diff**: the request as the other user, and the same request as the owner.
 
-## Coverage checklist
+### 2. Authentication and session
+User enumeration from differing responses (status, message, timing), lockout and rate-limit behaviour on the login and reset flows, reset-token predictability and binding, session fixation, non-rotated tokens, cookie flags, logout invalidation, remember-me tokens, JWT algorithm confusion and claim trust, OAuth `state`/`nonce`/redirect binding, SAML signature validation.
 
-Work the categories that fit the app; skip those that do not apply and say why. For each, test the few highest-value cases, not every permutation.
+### 3. Injection
+Push through the parameter that reaches the sink, not every parameter you saw:
+- **SQL**: quote/double-quote balance, boolean pair (`' AND 1=1` vs `' AND 1=2`), then time-based once the boolean works, then the DB-specific syntax for the fingerprint you have. Do not dump the database to prove it — a boolean or timing difference is the proof.
+- **NoSQL**: operator injection (`{"$ne":null}`, `{"$gt":""}`, `[$ne]`), array-vs-scalar type confusion, and JSON parser quirks.
+- **Command**: separator family (`;`, `|`, `&&`, newline), argument-position and quoting variants, and a benign callback (`sleep 5`, DNS lookup, `curl` to a host you control) rather than a shell.
+- **Template**: arithmetic probe (`{{7*7}}`, `${7*7}`, `#{7*7}`, `<%= 7*7 %>`), then engine identification from the error, then the engine's own escape. Prove evaluation, not code execution.
+- **Other**: LDAP, XPath, header and CRLF injection, log poisoning, CSV/formula injection, deserialization entry points.
 
-1. **Information gathering & configuration.** Server/framework versions (`fingerprint_technologies`), exposed admin panels, debug endpoints, default pages, directory listing, backup/`.git`/`.env` files, verbose errors, security headers and cookie flags.
-2. **Authentication.** Weak or default credentials (a small, safe check — never a brute-force run), user enumeration via differing responses, missing lockout, token/session handling, password-reset flaws.
-3. **Session management.** Session fixation, predictable or non-rotated tokens, missing `HttpOnly`/`Secure`/`SameSite`, logout that does not invalidate.
-4. **Access control.** IDOR / broken object-level authorization, horizontal and vertical privilege escalation, forced browsing to privileged routes, missing function-level checks.
-5. **Input handling / injection.** Reflected and stored XSS, SQL/NoSQL injection, command and template injection, path traversal, open redirect — probe with benign markers (see Safe proofs) and confirm from the response, not from a hunch.
-6. **SSRF & request forgery.** Server-side request forgery on URL-taking parameters (prove with an out-of-band callback only if an interaction tool like `interactsh` is available), and CSRF on state-changing requests.
-7. **Business logic & data exposure.** Rate-limit gaps, price/quantity tampering surfaces, mass assignment, and sensitive data (PII, secrets, tokens) returned where it should not be.
-8. **API specifics.** Unauthenticated endpoints, excessive data exposure, missing object-level auth, and undocumented methods on documented routes.
+### 4. XSS
+The sink decides the payload. Reflected into HTML gets a tag; into an attribute gets the attribute's own quote broken; into a script block gets a JS fragment; into a URL gets a `javascript:` or attribute injection; into the DOM gets a source-to-sink path. Prove execution in a context that matters — an alert in a page nobody else renders is a low finding, not a false positive.
 
-## Tools
+### 5. SSRF, redirects and file handling
+URL-taking parameters are driven at internal addresses, cloud metadata, alternate schemes and redirect chains; when an out-of-band interaction tool is available, use it — a blind SSRF is proved by the callback. Open redirects come from the navigation target (return, next, url, redirect, callback, continue). File handling: path traversal and LFI in every file-reading parameter, and uploads validated on extension, content type, magic bytes, destination, overwrite and the processing pipeline that consumes the file.
 
-- Map and probe with built-in `httpx` and `screenshot`; read tech with `fingerprint_technologies`.
-- Content discovery, crawling and template scanning (`katana`, `ffuf`, `gau`, `nuclei`, `wpscan`, …) only if `display_available_tools` lists them `isReady`. Point template scanners at one app with conservative rate limits.
-- Craft and inspect individual requests with `execute_remote_command` (`curl -sS -i …`) and read long output with `read_tool_output` and a `pattern`.
+### 6. Business logic
+Multi-step workflows replayed out of order and out of sequence, quantity and price and coupon tampering, currency and rounding, refund and transfer races, one-time actions fired concurrently, and trust in client-supplied state. The proof is a changed outcome the business cares about, not a weird status code.
 
-## Safe proofs
+### 7. Misconfiguration and exposure
+Debug and admin paths, directory listing, backups and VCS metadata, `.env`, verbose errors and stack traces, default credentials (a small, safe check — never a brute-force run), permissive CORS with credentials, missing security headers, cache behaviour that returns one user's page to another, and source maps that ship the source.
 
-- **Prove, do not exploit.** Use a benign, unique marker (a harmless string, an arithmetic test, a pointer to a resource you control) that shows the flaw without causing damage or reaching real data.
-- **Injection**: demonstrate that input alters the query/response (e.g. a boolean or timing difference, an echoed marker) — do not dump databases, drop data, or run destructive payloads.
-- **XSS**: show the marker reflected unescaped in a sensitive context — do not deploy real payloads against other users.
-- **Access control**: show one unauthorized object or route is reachable — do not enumerate or alter real users' data at scale.
-- **Secrets found in responses**: record that they are exposed and mask them in evidence; never use recovered credentials beyond confirming the exposure.
+## Bypasses before you call a class clean
 
-## Safety
+A 403 or a dropped payload is a puzzle, not a negative result:
 
-- Respect approvals; if a step is rejected, do not retry it.
-- No denial of service, no mass or automated destructive actions, no data exfiltration, no persistence.
-- Stop at the minimum that proves the point; hand off confirmation of impact to `exploit-verification`.
+- **Path and route**: case, trailing slash, double slash, dot segments, URL encoding and double encoding, semicolon parameters, added extension, `/./`, `%2f`, and the internal-path headers the gateway honours (`X-Original-URL`, `X-Rewrite-URL`, `X-Forwarded-For`, `X-Forwarded-Host`).
+- **Method and verb**: swap `GET` for `POST`, add `X-HTTP-Method-Override`, try `OPTIONS` and `TRACE`.
+- **Parser**: send the same value as JSON, form-encoded, XML, multipart, and as an array or object where a scalar was expected.
+- **Payload**: alternate encodings (URL, unicode, HTML entities, base64, hex), comment and whitespace padding, case variation, alternate keyword synonyms the DB or engine accepts, chunked body, and a different content type.
+- **Identity**: a lower-privileged account, an expired-but-accepted token, no token at all, and a token from a different tenant.
 
 ## Evidence
 
-For each candidate finding, capture the request and the response lines that prove it (trimmed, secrets masked), the exact URL/parameter, and whether it is Confirmed or needs verification. Pass confirmed items on for reporting.
+For each candidate: the exact request (method, URL, headers that matter, body), the response lines that differ from the baseline, the identity used, and the state of the app afterwards. Record the baseline next to the exploit — a difference proves nothing without the control next to it.
+
+## Safety
+
+Prove, do not damage. No denial of service, no mass automated destructive actions, no exfiltration beyond one record that proves reachability, no persistence. Stop at the minimum that settles the question and hand real exploitation impact to `exploit-verification`.
+
+## Output
+
+Per surface: the classes tested and their outcome, the confirmed candidates with evidence, the ruled-out ones with the control that blocked them, the untested ones with the reason, and the entry points most worth a deeper pass.
