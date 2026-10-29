@@ -7,6 +7,7 @@ import { DEFAULT_RUSTFS_ENDPOINT } from '../src/modules/storage/storage.config';
 import { Role } from '../src/common/enums/enum';
 import { StorageService } from '../src/modules/storage/storage.service';
 import { closeTestApp, createTestApp, type TestApp } from './helpers/app';
+import { signIn } from './helpers/auth';
 import { createUser, cleanupE2eData } from './helpers/workspace';
 
 /**
@@ -69,18 +70,20 @@ describe('Presigned storage access (e2e)', () => {
 
     const signedUp = await createUser(server, { name: 'E2E Presign Admin' });
     admin.userId = signedUp.userId;
-    admin.cookie = signedUp.cookie;
 
     // `POST /api/auth/admin/set-role` (better-auth's admin plugin) requires an
     // admin that a throwaway test DB has no reason to have, so this performs the
-    // same grant `POST /api/admin/init` performs internally. `AuthGuard` reads
-    // the user row through `getSession` on every request, so no re-login is
-    // needed — and the upload assertion below failing with 403 would mean the
-    // grant did not take, rather than passing silently as a non-admin.
+    // same grant `POST /api/admin/init` performs internally. The sign-up
+    // session is cached in Redis with the user as it was (role `user`), and a
+    // raw SQL write never refreshes that cache, so sign in again to get a
+    // session carrying the grant — the upload assertion below failing with 403
+    // would mean the grant did not take, rather than passing silently as a
+    // non-admin.
     await dataSource.query(`UPDATE users SET role = $1 WHERE id = $2`, [
       Role.ADMIN,
       admin.userId,
     ]);
+    admin.cookie = await signIn(server, signedUp.email, signedUp.password);
   });
 
   afterAll(async () => {

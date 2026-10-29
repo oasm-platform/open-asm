@@ -5,7 +5,6 @@ import {
   SidebarInput,
 } from '@/components/ui/sidebar';
 import useDebounce from '@/hooks/use-debounce';
-import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import {
   useSearchControllerDeleteSearchHistory,
   useSearchControllerGetSearchHistory,
@@ -99,9 +98,6 @@ const DropdownCard = React.memo(
     setValue: UseFormSetValue<{ value: string }>;
     value: string;
   }) => {
-    const {
-      state: { selectedWorkspaceId },
-    } = useWorkspaceState();
     const { mutate } = useSearchControllerDeleteSearchHistory();
 
     const debouncedValue = useDebounce(value, 500);
@@ -111,7 +107,6 @@ const DropdownCard = React.memo(
     const { data } = useSearchControllerSearchAssetsTargets(
       {
         value: debouncedValue,
-        workspaceId: selectedWorkspaceId || '',
         isSaveHistory: false,
       },
       { query: { enabled: value.length > 0 } },
@@ -119,7 +114,6 @@ const DropdownCard = React.memo(
 
     const { data: historyData, queryKey } = useSearchControllerGetSearchHistory(
       {
-        workspaceId: selectedWorkspaceId || '',
         query: debouncedValue,
         limit: value.length > 0 ? 3 : 10,
       },

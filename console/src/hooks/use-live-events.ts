@@ -185,7 +185,11 @@ export function useLiveEvents(
 
     return () => {
       listeners.delete(listener);
-      if (listeners.size === 0) disconnect();
+      // Deferred: StrictMode's remount, or a page swapping in another
+      // listener, re-registers in the same task and keeps the stream.
+      queueMicrotask(() => {
+        if (listeners.size === 0) disconnect();
+      });
     };
   }, [key, workspaceId]);
 }

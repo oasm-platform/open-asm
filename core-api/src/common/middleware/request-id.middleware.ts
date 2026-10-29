@@ -1,6 +1,6 @@
 import type { RequestWithMetadata } from '@/common/interfaces/app.interface';
 import { randomUUID } from 'crypto';
-import type { NextFunction, Response } from 'express';
+import type { NodeResponse } from '@nestjs/platform-node';
 
 /**
  * RFC 4122 UUID shape, version-agnostic: a client may legitimately propagate a
@@ -24,8 +24,8 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  */
 export function requestIdMiddleware(
   req: RequestWithMetadata,
-  res: Response,
-  next: NextFunction,
+  res: NodeResponse,
+  next: () => void,
 ): void {
   if (!req.requestId) {
     const incoming = req.headers['x-request-id'];

@@ -1,6 +1,6 @@
 import { requestIdMiddleware } from '@/common/middleware/request-id.middleware';
 import type { RequestWithMetadata } from '@/common/interfaces/app.interface';
-import type { Response } from 'express';
+import type { NodeResponse } from '@nestjs/platform-node';
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -19,7 +19,7 @@ describe('requestIdMiddleware', () => {
   const run = () =>
     requestIdMiddleware(
       req as RequestWithMetadata,
-      res as unknown as Response,
+      res as unknown as NodeResponse,
       next,
     );
 

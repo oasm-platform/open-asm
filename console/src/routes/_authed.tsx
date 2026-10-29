@@ -18,21 +18,29 @@ export const Route = createFileRoute('/_authed')({
 });
 
 function AuthedLayout() {
-  // Read session directly from React Query cache so we always have the
-  // live value — useRouteContext is stale because beforeLoad does not
-  // re-run when queryClient.clear() wipes the session.
+  // Read the live session: useRouteContext is stale because beforeLoad does
+  // not re-run when the session ends.
   const { data: liveSession } = useSession();
-  const { workspaces, isLoading: isWorkspaceLoading } = useWorkspaceSelector();
+  const {
+    workspaces,
+    isLoading: isWorkspaceLoading,
+    selectedWorkspace,
+  } = useWorkspaceSelector();
   const { pathname } = useLocation();
+  // The root picks a workspace in an effect, one render after the list
+  // arrives (right after login nothing is selected yet). Mounting the layout
+  // before that starts workspace-scoped work, like the live event stream,
+  // without a workspace and restarts it a moment later.
+  const isSelectingWorkspace = workspaces.length > 0 && !selectedWorkspace;
 
   // The HTML #boot-splash covers the screen until the workspace load
   // finishes — remove it as soon as the layout is ready to render.
-  const isReady = !isWorkspaceLoading && !!liveSession;
+  const isReady = !isWorkspaceLoading && !isSelectingWorkspace && !!liveSession;
   useEffect(() => {
     if (isReady) removeBootSplash();
   }, [isReady]);
 
-  if (isWorkspaceLoading || !liveSession) return null;
+  if (!isReady) return null;
 
   const isWorkspacesRoute = pathname.startsWith('/workspaces');
   if (!isWorkspacesRoute && (!workspaces || workspaces.length === 0)) {
@@ -41,7 +49,9 @@ function AuthedLayout() {
 
   return (
     <ProtectedLayout>
-      <Outlet />
+      {/* Remounted on a switch: no page keeps observing the previous
+          workspace's queries, or refetches them with the new header. */}
+      <Outlet key={selectedWorkspace} />
     </ProtectedLayout>
   );
 }

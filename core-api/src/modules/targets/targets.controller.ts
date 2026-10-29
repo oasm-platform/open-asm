@@ -17,14 +17,13 @@ import {
   Delete,
   Get,
   Param,
-  ParseUUIDPipe,
   Patch,
   Post,
   Query,
   Req,
   Res,
 } from '@nestjs/common';
-import { Response } from 'express';
+import type { NodeResponse } from '@nestjs/platform-node';
 import {
   BulkTargetResultDto,
   CreateMultipleTargetsDto,
@@ -116,7 +115,7 @@ export class TargetsController {
   @Get('export')
   async exportTargetsToCSV(
     @WorkspaceId() workspaceId: string,
-    @Res() res: Response,
+    @Res() res: NodeResponse,
   ) {
     // Helper function to format date as DD-MM-YYYY
     const formatDate = (date: Date | null | undefined): string => {
@@ -206,16 +205,18 @@ export class TargetsController {
     response: {
       serialization: DefaultMessageResponseDto,
     },
+    request: {
+      getWorkspaceId: true,
+    },
   })
   // target.deleted is written explicitly in TargetsService.deleteTarget (the
   // interceptor cannot see the deleted entity), with the actor context built
   // here from the request — see AuditService.buildActorContext.
   @WorkspaceAccess('target.write')
-  @Delete(':id/workspace/:workspaceId')
+  @Delete(':id')
   deleteTarget(
     @Param() { id }: IdQueryParamDto,
-    @Param('workspaceId', new ParseUUIDPipe({ version: '4' }))
-    workspaceId: string,
+    @WorkspaceId() workspaceId: string,
     @UserContext() userContext: UserContextPayload,
     @Req() req: RequestWithMetadata,
   ) {

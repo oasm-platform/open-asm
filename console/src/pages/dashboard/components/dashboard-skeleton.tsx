@@ -463,7 +463,7 @@ export function AssetTrendsSkeleton() {
   return (
     <TrendChartSkeleton
       icon={<TrendingUp className="size-4" />}
-      title="Asset trend"
+      title="Attack surface trend"
     />
   );
 }
@@ -473,7 +473,7 @@ export function IssuesTimelineSkeleton() {
     <TrendChartSkeleton
       icon={<Bug className="size-4" />}
       issuesOnly
-      title="Issues Timeline"
+      title="Vulnerability trend"
     />
   );
 }
@@ -484,14 +484,14 @@ export function RecentAssetsSkeleton() {
       fullHeight
       icon={<Clock3 className="size-4" />}
       showIcons={false}
-      title="Recent Hosts"
+      title="Newly discovered hosts"
     />
   );
 }
 
 export function TopPortsSkeleton() {
   return (
-    <ListCardSkeleton icon={<Radio className="size-4" />} title="Top Ports" />
+    <ListCardSkeleton icon={<Radio className="size-4" />} title="Top exposed ports" />
   );
 }
 
@@ -499,7 +499,7 @@ export function TopTechnologiesSkeleton() {
   return (
     <ListCardSkeleton
       icon={<Layers3 className="size-4" />}
-      title="Technologies"
+      title="Top technologies"
     />
   );
 }
@@ -510,7 +510,7 @@ export function TopAssetsVulnerabilitiesSkeleton() {
       fullHeight
       icon={<Bug className="size-4" />}
       rows={5}
-      title="Top assets with most vulnerabilities"
+      title="Most vulnerable assets"
     />
   );
 }

@@ -126,8 +126,8 @@ describe('ToolsService — readiness flags', () => {
       });
 
       const result = await service.getManyTools({
-        page: 1, limit: 10, workspaceId: 'ws-001',
-      } as any);
+        page: 1, limit: 10,
+      } as any, 'ws-001');
 
       const tool = result.data[0] as any;
       expect(tool.hasConfigProfile).toBeUndefined();
@@ -156,8 +156,8 @@ describe('ToolsService — readiness flags', () => {
       mockWorkerCount();
 
       const result = await service.getManyTools({
-        page: 1, limit: 10, search: '', workspaceId: 'ws-001',
-      } as any);
+        page: 1, limit: 10, search: '',
+      } as any, 'ws-001');
 
       expect(result.data).toHaveLength(1);
       // No ILike in where — plain findAndCount called
@@ -172,8 +172,8 @@ describe('ToolsService — readiness flags', () => {
       mockWorkerCount();
 
       const result = await service.getManyTools({
-        page: 1, limit: 10, search: 'nucle', workspaceId: 'ws-001',
-      } as any);
+        page: 1, limit: 10, search: 'nucle',
+      } as any, 'ws-001');
 
       const callArg = toolsRepo.findAndCount.mock.calls[0][0];
       // The where should contain ILike conditions
@@ -193,8 +193,8 @@ describe('ToolsService — readiness flags', () => {
       mockWorkerCount();
 
       const result = await service.getManyTools({
-        page: 1, limit: 10, search: 'subdomain', workspaceId: 'ws-001',
-      } as any);
+        page: 1, limit: 10, search: 'subdomain',
+      } as any, 'ws-001');
 
       const callArg = toolsRepo.findAndCount.mock.calls[0][0];
       expect(callArg.where).toBeDefined();
@@ -209,8 +209,7 @@ describe('ToolsService — readiness flags', () => {
 
       const result = await service.getManyTools({
         page: 1, limit: 10, search: 'nuclei', category: ToolCategory.VULNERABILITIES,
-        workspaceId: 'ws-001',
-      } as any);
+      } as any, 'ws-001');
 
       expect(result.data).toHaveLength(1);
       const callArg = toolsRepo.findAndCount.mock.calls[0][0];
@@ -224,8 +223,7 @@ describe('ToolsService — readiness flags', () => {
 
       await service.getManyTools({
         page: 1, limit: 10, category: ToolCategory.URL_DISCOVERY,
-        workspaceId: 'ws-001',
-      } as any);
+      } as any, 'ws-001');
 
       const where = toolsRepo.findAndCount.mock.calls[0][0].where;
       const branch = (Array.isArray(where) ? where[0] : where) as Record<string, any>;
@@ -244,8 +242,7 @@ describe('ToolsService — readiness flags', () => {
 
       const result = await service.getManyTools({
         page: 1, limit: 10, search: 'nuclei', type: WorkerType.CONNECTOR,
-        workspaceId: 'ws-001',
-      } as any);
+      } as any, 'ws-001');
 
       expect(result.data).toHaveLength(1);
     });
@@ -256,8 +253,8 @@ describe('ToolsService — readiness flags', () => {
       mockWorkerCount();
 
       const result = await service.getManyTools({
-        page: 1, limit: 10, search: 'nonexistent', workspaceId: 'ws-001',
-      } as any);
+        page: 1, limit: 10, search: 'nonexistent',
+      } as any, 'ws-001');
 
       expect(result.data).toHaveLength(0);
       expect(result.total).toBe(0);
@@ -269,8 +266,8 @@ describe('ToolsService — readiness flags', () => {
       mockWorkerCount();
 
       await service.getManyTools({
-        page: 1, limit: 10, search: '   nuclei   ', workspaceId: 'ws-001',
-      } as any);
+        page: 1, limit: 10, search: '   nuclei   ',
+      } as any, 'ws-001');
 
       const callArg = toolsRepo.findAndCount.mock.calls[0][0];
       expect(callArg.where).toBeDefined();
@@ -283,8 +280,8 @@ describe('ToolsService — readiness flags', () => {
       mockWorkerCount();
 
       await service.getManyTools({
-        page: 1, limit: 10, search: '   ', workspaceId: 'ws-001',
-      } as any);
+        page: 1, limit: 10, search: '   ',
+      } as any, 'ws-001');
 
       const callArg = toolsRepo.findAndCount.mock.calls[0][0];
       // whitespace-only → no search where clause
@@ -312,8 +309,8 @@ describe('ToolsService — readiness flags', () => {
       mockWorkerCount();
 
       await service.getManyTools({
-        page: 1, limit: 10, workspaceId: 'ws-001',
-      } as any);
+        page: 1, limit: 10,
+      } as any, 'ws-001');
 
       const callArg = toolsRepo.findAndCount.mock.calls[0][0];
       expect(callArg.order).toEqual({ name: 'ASC' });
@@ -325,8 +322,8 @@ describe('ToolsService — readiness flags', () => {
       mockWorkerCount();
 
       await service.getManyTools({
-        page: 1, limit: 10, sortBy: 'updatedAt', sortOrder: 'DESC', workspaceId: 'ws-001',
-      } as any);
+        page: 1, limit: 10, sortBy: 'updatedAt', sortOrder: 'DESC',
+      } as any, 'ws-001');
 
       const callArg = toolsRepo.findAndCount.mock.calls[0][0];
       expect(callArg.order).toEqual({ updatedAt: 'DESC' });
@@ -339,8 +336,7 @@ describe('ToolsService — readiness flags', () => {
 
       await service.getManyTools({
         page: 1, limit: 10, sortBy: 'passwordHash; DROP TABLE tools', sortOrder: 'DESC',
-        workspaceId: 'ws-001',
-      } as any);
+      } as any, 'ws-001');
 
       const callArg = toolsRepo.findAndCount.mock.calls[0][0];
       expect(callArg.order).toEqual({ name: 'ASC' });
@@ -673,8 +669,7 @@ describe('ToolsService — readiness flags', () => {
       const result = await service.getManyTools({
         page: 1,
         limit: 10,
-        workspaceId: 'ws-001',
-      } as any);
+      } as any, 'ws-001');
 
       // Exactly ONE profile query for both tools (In-operator)
       expect(profilesRepo.find).toHaveBeenCalledTimes(1);
@@ -733,8 +728,7 @@ describe('ToolsService — readiness flags', () => {
       const result = await service.getManyTools({
         page: 1,
         limit: 10,
-        workspaceId: 'ws-001',
-      } as any);
+      } as any, 'ws-001');
 
       expect(profilesRepo.find).not.toHaveBeenCalled();
       expect((result.data[0] as any).isReady).toBe(true);

@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { plainToInstance } from 'class-transformer';
-import type { Request, Response } from 'express';
+import type { NodeRequest, NodeResponse } from '@nestjs/platform-node';
 import { AuditService } from './audit.service';
 import {
   AuditActionCatalogResponseDto,
@@ -166,8 +166,8 @@ export class AuditEventsController {
   async exportAuditEvents(
     @Param() { id }: IdQueryParamDto,
     @Query() query: GetAuditEventsQueryDto,
-    @Req() req: Request,
-    @Res() res: Response,
+    @Req() req: NodeRequest,
+    @Res() res: NodeResponse,
   ): Promise<void> {
     const rows = await this.auditService.exportEvents(id, query);
 

@@ -3,7 +3,7 @@ import { AgentTool } from '@/modules/agents/agents.tools';
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
-import type { Request, Response } from 'express';
+import type { NodeRequest, NodeResponse } from '@nestjs/platform-node';
 import { z } from 'zod';
 
 interface AiToolLike {
@@ -66,8 +66,8 @@ export class McpService implements OnModuleInit, OnModuleDestroy {
 
   async handleSSEConnection(
     workspaceId: string,
-    _req: Request,
-    res: Response,
+    _req: NodeRequest,
+    res: NodeResponse,
   ): Promise<void> {
     const messageEndpoint = `/${API_GLOBAL_PREFIX}/mcp/message`;
     const transport = new SSEServerTransport(
@@ -111,7 +111,7 @@ export class McpService implements OnModuleInit, OnModuleDestroy {
     await server.connect(transport);
   }
 
-  async handleMessage(req: Request, res: Response): Promise<void> {
+  async handleMessage(req: NodeRequest, res: NodeResponse): Promise<void> {
     const sessionId = req.query.sessionId as string;
     const session = this.sessions.get(sessionId);
 

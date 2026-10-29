@@ -24,11 +24,11 @@ const TopTechnologies = () => {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2">
             <Layers className="h-5 w-5 text-primary" />
-            Technologies
+            Top technologies
           </CardTitle>
         </CardHeader>
-        <CardContent className="flex h-full items-center justify-center text-sm text-red-600">
-          Error loading data
+        <CardContent className="flex h-full items-center justify-center text-sm text-destructive">
+          Couldn&apos;t load data
         </CardContent>
       </Card>
     );
@@ -44,7 +44,7 @@ const TopTechnologies = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Layers className="h-5 w-5 text-primary" />
-          Technologies
+          Top technologies
         </CardTitle>
       </CardHeader>
       <CardContent className="min-h-0 flex-1">

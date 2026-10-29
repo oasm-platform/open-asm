@@ -16,8 +16,6 @@ vi.mock('@/utils/authClient', () => ({
     signOut: vi.fn(),
     admin: {},
   },
-  SESSION_QUERY_KEY: ['auth', 'session'],
-  sessionQueryOptions: { queryKey: ['auth', 'session'] },
   isVoluntaryLogout: false,
   markVoluntaryLogout: vi.fn(),
   resetVoluntaryLogout: vi.fn(),

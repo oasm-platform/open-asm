@@ -218,12 +218,14 @@ export class EventPublishInterceptor implements NestInterceptor {
   }
 
   /**
-   * First value of the `id` route param. Express types a repeated param as an
-   * array, hence the unwrap.
+   * First value of the `id` route param. The adapter types route params as
+   * `Record<string, any>` and a repeated param arrives as an array, so the
+   * value is narrowed instead of trusted.
    */
   private routeParamId(req: RequestWithMetadata): string | undefined {
-    const id = req.params?.id;
-    return Array.isArray(id) ? id[0] : id;
+    const params: Record<string, unknown> = req.params;
+    const id: unknown = Array.isArray(params['id']) ? params['id'][0] : params['id'];
+    return typeof id === 'string' ? id : undefined;
   }
 
   /**

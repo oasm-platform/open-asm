@@ -11,7 +11,7 @@ describe('TargetsController workspace permission guards', () => {
     ['getTargetsInWorkspace', 'GET /', ['target.read']],
     ['exportTargetsToCSV', 'GET /export', ['target.read']],
     ['getTargetById', 'GET /:id', ['target.read']],
-    ['deleteTarget', 'DELETE /:id/workspace/:workspaceId', ['target.write']],
+    ['deleteTarget', 'DELETE /:id', ['target.write']],
     ['reScanTarget', 'POST /:id/re-scan', ['target.write']],
     ['updateTarget', 'PATCH /:id', ['target.write']],
   ];

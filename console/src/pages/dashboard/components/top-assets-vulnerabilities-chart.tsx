@@ -5,16 +5,10 @@ import { useStatisticControllerGetTopAssetsWithMostVulnerabilities } from '@/ser
 import { Bug, ChevronRight } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 import clsx from 'clsx';
+import { SEVERITY_BG_CLASS } from '../severity';
 
-const severityColors = {
-  info: 'bg-muted-foreground/40',
-  low: 'bg-chart-1',
-  medium: 'bg-chart-2',
-  high: 'bg-chart-3',
-  critical: 'bg-chart-5',
-};
-
-const severityOrder = ['info', 'low', 'medium', 'high', 'critical'] as const;
+// Info findings are not open vulnerabilities, so they are not in `total`.
+const severityOrder = ['critical', 'high', 'medium', 'low'] as const;
 
 const TopAssetsVulnerabilities = () => {
   const navigate = useNavigate();
@@ -41,11 +35,11 @@ const TopAssetsVulnerabilities = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Bug className="h-5 w-5 text-primary" />
-            Top assets with most vulnerabilities
+            Most vulnerable assets
           </CardTitle>
         </CardHeader>
-        <CardContent className="flex h-full items-center justify-center text-sm text-red-600">
-          Error loading data
+        <CardContent className="flex h-full items-center justify-center text-sm text-destructive">
+          Couldn&apos;t load data
         </CardContent>
       </Card>
     );
@@ -56,13 +50,13 @@ const TopAssetsVulnerabilities = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Bug className="h-5 w-5 text-primary" />
-          Top assets with most vulnerabilities
+          Most vulnerable assets
         </CardTitle>
       </CardHeader>
       <CardContent className="min-h-0 flex-1">
         {assets.length === 0 ? (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            No assets with vulnerabilities
+            No assets with open vulnerabilities
           </div>
         ) : (
           <div className="min-h-0 h-full space-y-1 overflow-y-auto pr-1">
@@ -94,7 +88,7 @@ const TopAssetsVulnerabilities = () => {
                     return (
                       <div
                         key={severity}
-                        className={clsx('h-full', severityColors[severity])}
+                        className={clsx('h-full', SEVERITY_BG_CLASS[severity])}
                         style={{ width: `${(count / item.total) * 100}%` }}
                       />
                     );

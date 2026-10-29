@@ -3,17 +3,20 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { MicroserviceOptions } from '@nestjs/microservices';
 import { Transport } from '@nestjs/microservices';
-import type { NestExpressApplication } from '@nestjs/platform-express';
+import type {
+  NestNodeApplication,
+  NodeRequest,
+  NodeResponse,
+} from '@nestjs/platform-node';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { apiReference } from '@scalar/nestjs-api-reference';
 import 'dotenv/config';
-import type { Response } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
 import { join } from 'path';
 import 'reflect-metadata';
 import { AppModule } from './app.module';
-import { configureApp } from './bootstrap/configure-app';
+import { configureApp, createHttpAdapter } from './bootstrap/configure-app';
 import {
   API_GLOBAL_PREFIX,
   APP_NAME,
@@ -22,10 +25,14 @@ import {
 } from './common/constants/app.constants';
 import { mergeBetterAuthSpec } from './utils/mergeBetterAuth';
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    bodyParser: false,
-    logger: ['log', 'error', 'warn', 'verbose'],
-  });
+  const app = await NestFactory.create<NestNodeApplication>(
+    AppModule,
+    createHttpAdapter(),
+    {
+      bodyParser: false,
+      logger: ['log', 'error', 'warn', 'verbose'],
+    },
+  );
   configureApp(app);
 
   // API docs at http://localhost:6276/api/docs (Scalar)
@@ -43,12 +50,18 @@ async function bootstrap() {
   const documentFactory = () =>
     mergeBetterAuthSpec(SwaggerModule.createDocument(app, config));
 
+  const renderApiReference = apiReference({
+    content: documentFactory(),
+    darkMode: true,
+  }) as (req: NodeRequest, res: NodeResponse) => void;
+  // Scalar replies with res.send(html), which the Node adapter sends as
+  // text/plain unless a Content-Type is already set.
   app.use(
     `/${API_GLOBAL_PREFIX}/docs`,
-    apiReference({
-      content: documentFactory(),
-      darkMode: true,
-    }),
+    (req: NodeRequest, res: NodeResponse) => {
+      res.type('html');
+      renderApiReference(req, res);
+    },
   );
 
   const pathOutputOpenApi = '../.open-api/open-api.json';

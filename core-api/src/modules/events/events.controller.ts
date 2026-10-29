@@ -16,7 +16,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { isUUID } from 'class-validator';
-import type { Request } from 'express';
+import type { NodeRequest } from '@nestjs/platform-node';
 import type { Observable } from 'rxjs';
 import { EventsService } from './events.service';
 
@@ -42,7 +42,7 @@ export class EventsController {
     request: { getWorkspaceId: true },
   })
   async stream(
-    @Req() req: Request,
+    @Req() req: NodeRequest,
     @UserContext() user: UserContextPayload,
   ): Promise<Observable<MessageEvent>> {
     const workspaceId = await this.resolveWorkspace(req, user.id);
@@ -56,7 +56,7 @@ export class EventsController {
    * notifications-only stream (a user with no workspace yet).
    */
   private async resolveWorkspace(
-    req: Request,
+    req: NodeRequest,
     userId: string,
   ): Promise<string | undefined> {
     const header = req.headers[WORKSPACE_HEADER_NAME.toLowerCase()];

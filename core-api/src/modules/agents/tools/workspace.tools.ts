@@ -100,7 +100,7 @@ export function getStatisticsTool(
     description:
       'Return security dashboard summary: asset/vulnerability counts, severity breakdown, security score. No params.',
     inputSchema: z.object({}),
-    execute: () => deps.statisticService.getStatistics({ workspaceId }),
+    execute: () => deps.statisticService.getStatistics(workspaceId),
   });
 }
 

@@ -16,16 +16,15 @@ import { usePermission } from '@/hooks/usePermission';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import { ChevronsUpDown, Check, Crown, GalleryVerticalEnd, Plus, UserPlus } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
-import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { sessionQueryOptions } from '@/utils/authClient';
+import { useSession } from '@/utils/authClient';
 
 export function WorkspaceSwitcher() {
   const { workspaces, isLoading, selectedWorkspace, handleSelectWorkspace } =
     useWorkspaceSelector();
   const { hasPermission } = usePermission();
   const isMobile = useIsMobile();
-  const { data: session } = useQuery(sessionQueryOptions);
+  const { data: session } = useSession();
   const currentUserId = session?.user?.id;
 
   const itemHeightClass = 'h-9';

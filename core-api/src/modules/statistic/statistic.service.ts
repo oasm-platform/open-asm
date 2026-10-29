@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, MoreThanOrEqual } from 'typeorm';
+import { DataSource, LessThan, MoreThanOrEqual } from 'typeorm';
 import { TlsStatisticResponseDto } from './dto/tls-statistic.dto';
 import { TopPortsResponseDto } from './dto/top-ports.dto';
 import { TopTechnologiesResponseDto } from './dto/top-technologies.dto';
@@ -27,13 +27,11 @@ import { Target } from '../targets/entities/target.entity';
 import { AssetLocationDto } from './dto/asset-location.dto';
 
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
+import { openVulnerabilityCondition } from '../vulnerabilities/open-vulnerability';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { IssuesTimelineResponseDto } from './dto/issues-timeline.dto';
-import {
-  GetStatisticQueryDto,
-  StatisticResponseDto,
-} from './dto/statistic.dto';
+import { StatisticResponseDto } from './dto/statistic.dto';
 import { TimelineResponseDto } from './dto/timeline.dto';
 import { TopAssetVulnerabilities } from './dto/top-assets-vulnerabilities.dto';
 import { TopTagAsset } from './dto/top-tags-assets.dto';
@@ -74,6 +72,15 @@ interface StatisticSnapshot {
 
 /** How many of a run's new hosts the run-completed event names. */
 const NEW_HOSTS_PREVIEW = 10;
+
+/** How long a workspace's live numbers are shared between requests. */
+const CURRENT_STATISTICS_TTL_SECONDS = 60;
+
+/** How long a workspace's IP geolocation breakdown is reused. */
+const ASSET_LOCATIONS_TTL_SECONDS = 10 * 60;
+
+/** How far back the timelines reach. */
+const TIMELINE_MONTHS = 3;
 
 @Injectable()
 export class StatisticService {
@@ -119,35 +126,31 @@ export class StatisticService {
   /**
    * Retrieves the total count of targets in a workspace.
    *
-   * @param query - The query parameters containing workspaceId.
+   * @param workspaceId - The ID of the workspace.
    * @returns A promise that resolves to the total count of targets.
    */
-  async getTotalTargets(query: GetStatisticQueryDto): Promise<number> {
-    return this.countTargets(query.workspaceId);
+  async getTotalTargets(workspaceId: string): Promise<number> {
+    return this.countTargets(workspaceId);
   }
 
   /**
    * Retrieves the total count of assets in a workspace.
    *
-   * @param query - The query parameters containing workspaceId.
+   * @param workspaceId - The ID of the workspace.
    * @returns A promise that resolves to the total count of assets.
    */
-  async getTotalAssets(query: GetStatisticQueryDto): Promise<number> {
-    return this.countAssets(query.workspaceId);
+  async getTotalAssets(workspaceId: string): Promise<number> {
+    return this.countAssets(workspaceId);
   }
 
   /**
    * Retrieves all statistics for a workspace.
    *
-   * @param query - The query parameters containing workspaceId.
+   * @param workspaceId - The ID of the workspace.
    * @returns A promise that resolves to an object containing all statistics.
    */
-  async getStatistics(
-    query: GetStatisticQueryDto,
-  ): Promise<StatisticResponseDto> {
-    const statistics = await this.calculateStatistics([query.workspaceId]);
-
-    const workspaceStats = statistics[0]; // Get the first (and only) workspace statistics
+  async getStatistics(workspaceId: string): Promise<StatisticResponseDto> {
+    const workspaceStats = await this.getCurrentStatistics(workspaceId);
 
     return {
       assets: workspaceStats.assets,
@@ -166,42 +169,134 @@ export class StatisticService {
   }
 
   /**
-   * Retrieves timeline statistics for a workspace within the last 3 months
-   *
-   * @param query - The query parameters containing workspaceId
-   * @returns A promise that resolves to timeline statistics
+   * The live numbers of a workspace. Several dashboard cards and the timeline
+   * ask for them at once, and computing them is a handful of aggregate scans,
+   * so concurrent and repeated reads share one result for a minute.
+   */
+  private async getCurrentStatistics(workspaceId: string): Promise<Statistic> {
+    return this.cached(
+      `statistic:current:${workspaceId}`,
+      CURRENT_STATISTICS_TTL_SECONDS,
+      async () => (await this.calculateStatistics([workspaceId]))[0],
+    );
+  }
+
+  /**
+   * Reads `key` from Redis, or computes the value and stores it for
+   * `ttlSeconds`. A Redis failure only costs the cache: the value is computed
+   * and served anyway.
+   */
+  private async cached<T>(
+    key: string,
+    ttlSeconds: number,
+    compute: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      const hit = await this.redisService.get(key);
+      if (hit) return JSON.parse(hit) as T;
+    } catch {
+      // Cache unavailable — compute below.
+    }
+
+    const value = await compute();
+    try {
+      await this.redisService.setex(key, ttlSeconds, JSON.stringify(value));
+    } catch {
+      // Not cached this time; the next read computes again.
+    }
+    return value;
+  }
+
+  /**
+   * Daily statistics of a workspace over the last {@link TIMELINE_MONTHS}
+   * months, oldest first, ending with the live numbers.
    */
   async getTimelineStatistics(
     workspaceId: string,
   ): Promise<TimelineResponseDto> {
-    const threeMonthsAgo = new Date();
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    const from = new Date();
+    from.setUTCHours(0, 0, 0, 0);
+    from.setUTCMonth(from.getUTCMonth() - TIMELINE_MONTHS);
 
-    const statistics = await this.dataSource.getRepository(Statistic).find({
-      where: {
-        workspace: { id: workspaceId },
-        createdAt: MoreThanOrEqual(threeMonthsAgo),
-      },
-      order: {
-        createdAt: 'ASC',
-      },
-    });
+    const repository = this.dataSource.getRepository(Statistic);
+    const workspace = { id: workspaceId };
+    const [snapshots, baseline, current] = await Promise.all([
+      repository.find({
+        where: { workspace, createdAt: MoreThanOrEqual(from) },
+        order: { createdAt: 'ASC' },
+      }),
+      // Snapshots are stored only when a number changes, so the last one
+      // before the window holds the values the window opens with.
+      repository.findOne({
+        where: { workspace, createdAt: LessThan(from) },
+        order: { createdAt: 'DESC' },
+      }),
+      this.getCurrentStatistics(workspaceId),
+    ]);
 
-    const now = await this.calculateStatistics([workspaceId]).then((res) => {
-      const data = res[0];
-      data.createdAt = new Date();
-      data.updatedAt = new Date();
-      return data;
-    });
+    const data = StatisticService.toDailySeries(
+      baseline ? [baseline, ...snapshots] : snapshots,
+      from,
+      current,
+    );
+    return { data, total: data.length };
+  }
 
+  /**
+   * One point per day from `from` to today, oldest first, so a chart spaces
+   * its points by real time. Each snapshot is carried forward until the next
+   * one; days before the first snapshot are left out, and the last point is
+   * `current`, dated now.
+   */
+  static toDailySeries(
+    snapshots: Statistic[],
+    from: Date,
+    current: Statistic,
+  ): Statistic[] {
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+
+    const series: Statistic[] = [];
+    let next = 0;
+    let carried: Statistic | undefined;
+    for (
+      const day = new Date(from);
+      day < today;
+      day.setUTCDate(day.getUTCDate() + 1)
+    ) {
+      const dayEnd = new Date(day);
+      dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+      while (
+        next < snapshots.length &&
+        new Date(snapshots[next].createdAt) < dayEnd
+      ) {
+        carried = snapshots[next++];
+      }
+      if (carried) series.push(StatisticService.asTimelinePoint(carried, day));
+    }
+    series.push(StatisticService.asTimelinePoint(current, new Date()));
+    return series;
+  }
+
+  /** A stored or live statistic as a timeline point dated `at`. */
+  private static asTimelinePoint(statistic: Statistic, at: Date): Statistic {
     return {
-      data: statistics.concat(now),
-      total: statistics.length,
+      ...statistic,
+      // Snapshots stored before Info stopped counting as open include it in
+      // `vuls`; the severity columns give the same number for every point.
+      vuls:
+        statistic.criticalVuls +
+        statistic.highVuls +
+        statistic.mediumVuls +
+        statistic.lowVuls,
+      createdAt: new Date(at),
+      updatedAt: new Date(at),
     };
   }
 
   /**
-   * Retrieves issues timeline statistics for a workspace.
+   * Open vulnerabilities per day of a workspace, on the same days as
+   * {@link getTimelineStatistics}.
    *
    * @param workspaceId - The ID of the workspace.
    * @returns A promise that resolves to issues timeline statistics.
@@ -209,22 +304,12 @@ export class StatisticService {
   async getIssuesTimeline(
     workspaceId: string,
   ): Promise<IssuesTimelineResponseDto> {
-    const rawResults: { vuls: number; createdAt: Date }[] =
-      await this.dataSource
-        .getRepository(Statistic)
-        .createQueryBuilder('workspace_statistics')
-        .select('vuls, "createdAt"')
-        .where('"workspaceId" = :workspaceId', { workspaceId })
-        .andWhere('"createdAt" >= :threeMonthsAgo', {
-          threeMonthsAgo: new Date(
-            new Date().setMonth(new Date().getMonth() - 3),
-          ),
-        })
-        .getRawMany();
+    const { data } = await this.getTimelineStatistics(workspaceId);
+    const points = data.map(({ vuls, createdAt }) => ({ vuls, createdAt }));
 
     return {
-      data: rawResults,
-      total: rawResults.length,
+      data: points,
+      total: points.length,
     };
   }
 
@@ -252,39 +337,30 @@ export class StatisticService {
   async getTopAssetsWithMostVulnerabilities(
     workspaceId: string,
   ): Promise<TopAssetVulnerabilities[]> {
+    // Starts from the open findings instead of every asset, and ranks by the
+    // worst severity first: two criticals outrank fifty lows. Info findings
+    // are reported but neither ranked nor totalled, as on the open count.
     const rawResults: RawAssetVulCount[] = await this.dataSource
-      .getRepository(Asset)
-      .createQueryBuilder('asset')
+      .getRepository(Vulnerability)
+      .createQueryBuilder('v')
       .select('asset.id', 'id')
       .addSelect('asset.value', 'value')
-      .addSelect(
-        "COUNT(CASE WHEN v.severity = 'critical' THEN 1 ELSE NULL END)",
-        'critical',
-      )
-      .addSelect(
-        "COUNT(CASE WHEN v.severity = 'high' THEN 1 ELSE NULL END)",
-        'high',
-      )
-      .addSelect(
-        "COUNT(CASE WHEN v.severity = 'medium' THEN 1 ELSE NULL END)",
-        'medium',
-      )
-      .addSelect(
-        "COUNT(CASE WHEN v.severity = 'low' THEN 1 ELSE NULL END)",
-        'low',
-      )
-      .addSelect(
-        "COUNT(CASE WHEN v.severity = 'info' THEN 1 ELSE NULL END)",
-        'info',
-      )
-      .addSelect('COUNT(v.id)', 'total')
-      .leftJoin('asset.vulnerabilities', 'v')
-      .leftJoin('v.vulnerabilityDismissal', 'dismissal')
+      .addSelect(`COUNT(*) FILTER (WHERE v.severity = 'critical')`, 'critical')
+      .addSelect(`COUNT(*) FILTER (WHERE v.severity = 'high')`, 'high')
+      .addSelect(`COUNT(*) FILTER (WHERE v.severity = 'medium')`, 'medium')
+      .addSelect(`COUNT(*) FILTER (WHERE v.severity = 'low')`, 'low')
+      .addSelect(`COUNT(*) FILTER (WHERE v.severity = 'info')`, 'info')
+      .addSelect(`COUNT(*) FILTER (WHERE v.severity <> 'info')`, 'total')
+      .innerJoin('v.asset', 'asset')
       .innerJoin('asset.target', 'target')
       .where('target.workspaceId = :workspaceId', { workspaceId })
-      .andWhere('dismissal.vulnerabilityId IS NULL')
+      .andWhere(openVulnerabilityCondition('v'))
       .groupBy('asset.id, asset.value')
-      .orderBy('total', 'DESC')
+      .having(`COUNT(*) FILTER (WHERE v.severity <> 'info') > 0`)
+      .orderBy('critical', 'DESC')
+      .addOrderBy('high', 'DESC')
+      .addOrderBy('medium', 'DESC')
+      .addOrderBy('low', 'DESC')
       .limit(10)
       .getRawMany();
 
@@ -305,14 +381,22 @@ export class StatisticService {
    * Fetches all unique IPs, batches them to the geo IP service, then aggregates by country.
    */
   async getAssetLocations(workspaceId: string): Promise<AssetLocationDto[]> {
-    const allIps = await this.getAllWorkspaceIps(workspaceId);
-    if (allIps.length === 0) {
-      return [];
-    }
+    // Every IP of the workspace goes through the geo IP service, so the
+    // breakdown is reused for a while instead of resolved on each visit.
+    return this.cached(
+      `statistic:asset-locations:${workspaceId}`,
+      ASSET_LOCATIONS_TTL_SECONDS,
+      async () => {
+        const allIps = await this.getAllWorkspaceIps(workspaceId);
+        if (allIps.length === 0) {
+          return [];
+        }
 
-    const geoResults = await this.batchGeoIpLookup(allIps);
+        const geoResults = await this.batchGeoIpLookup(allIps);
 
-    return this.aggregateByCountry(geoResults);
+        return this.aggregateByCountry(geoResults);
+      },
+    );
   }
 
   /**
@@ -463,13 +547,11 @@ export class StatisticService {
       .getRepository(Vulnerability)
       .createQueryBuilder('vuln')
       .leftJoin('vuln.asset', 'asset')
-      .leftJoin('vuln.vulnerabilityDismissal', 'dismissal')
       .leftJoin('asset.target', 'target')
       .select('target.workspaceId', 'workspaceId')
       .addSelect('vuln.severity', 'severity')
       .addSelect('COUNT(vuln.id)', 'count')
-      .where('1=1')
-      .andWhere('dismissal.vulnerabilityId IS NULL');
+      .where(openVulnerabilityCondition('vuln'));
 
     if (workspaceIds?.length) {
       query.andWhere('target.workspaceId IN (:...workspaceIds)', {
@@ -550,141 +632,46 @@ export class StatisticService {
   }
 
   /**
-   * Retrieves the count of unique hosts (distinct asset.value) for each workspace.
-   * Counts only hosts that have at least one AssetService, matching the frontend
-   * host-assets-tab counting logic.
+   * Hosts, services and distinct ports per workspace, in one scan of
+   * asset_services. A host counts only when it exposes a service, matching
+   * the host assets tab and the run-completed notification.
    */
-  async getHostCounts(filter: StatisticFilter) {
+  async getServiceFootprintCounts(filter: StatisticFilter) {
     const { workspaceIds, targetId, startDate, endDate } = filter;
-    const subQuery = this.dataSource
+    const query = this.dataSource
       .createQueryBuilder()
       .select('target.workspaceId', 'workspaceId')
-      .addSelect('asset.value', 'host')
+      .addSelect('COUNT(DISTINCT asset.value)', 'hosts')
+      .addSelect('COUNT(assetService.id)', 'services')
+      .addSelect('COUNT(DISTINCT assetService.port)', 'ports')
       .from(AssetService, 'assetService')
       .innerJoin('assetService.asset', 'asset')
       .innerJoin('asset.target', 'target')
-      .where('1=1')
-      .andWhere('asset.value IS NOT NULL');
-
-    if (workspaceIds?.length) {
-      subQuery.andWhere('target.workspaceId IN (:...workspaceIds)', {
-        workspaceIds,
-      });
-    }
-    if (targetId) {
-      subQuery.andWhere('target.id = :targetId', { targetId });
-    }
-    if (startDate) {
-      subQuery.andWhere('"assetService"."createdAt" >= :startDate', {
-        startDate,
-      });
-    }
-    if (endDate) {
-      subQuery.andWhere('"assetService"."createdAt" <= :endDate', {
-        endDate,
-      });
-    }
-
-    // Main query to count distinct hosts (asset.value) for each workspaceId
-    return this.dataSource
-      .createQueryBuilder()
-      .select('sq."workspaceId"', 'workspaceId')
-      .addSelect('COUNT(DISTINCT sq.host)', 'count')
-      .from(`(${subQuery.getQuery()})`, 'sq')
-      .setParameters(subQuery.getParameters())
-      .groupBy('sq."workspaceId"')
-      .getRawMany<{ workspaceId: string; count: string }>();
-  }
-
-  /**
-   * Retrieves the count of AssetService entities for each workspace.
-   * @param workspaceIds An array of workspace IDs.
-   * @returns An array of objects containing the workspaceId and service count.
-   */
-  async getServiceCounts(filter: StatisticFilter) {
-    const { workspaceIds, targetId, startDate, endDate } = filter;
-    // Subquery to get AssetService linked to workspaceId
-    const subQuery = this.dataSource
-      .createQueryBuilder()
-      .select('target.workspaceId', 'workspaceId')
-      .addSelect('assetService.id', 'serviceId')
-      .from(AssetService, 'assetService')
-      .leftJoin('assetService.asset', 'asset')
-      .leftJoin('asset.target', 'target')
       .where('1=1');
 
     if (workspaceIds?.length) {
-      subQuery.andWhere('target.workspaceId IN (:...workspaceIds)', {
+      query.andWhere('target.workspaceId IN (:...workspaceIds)', {
         workspaceIds,
       });
     }
     if (targetId) {
-      subQuery.andWhere('target.id = :targetId', { targetId });
+      query.andWhere('target.id = :targetId', { targetId });
     }
     if (startDate) {
-      subQuery.andWhere('"assetService"."createdAt" >= :startDate', {
+      query.andWhere('"assetService"."createdAt" >= :startDate', {
         startDate,
       });
     }
     if (endDate) {
-      subQuery.andWhere('"assetService"."createdAt" <= :endDate', { endDate });
+      query.andWhere('"assetService"."createdAt" <= :endDate', { endDate });
     }
 
-    // Main query to count distinct services for each workspaceId
-    return this.dataSource
-      .createQueryBuilder()
-      .select('sq."workspaceId"', 'workspaceId')
-      .addSelect('COUNT(DISTINCT sq."serviceId")', 'count')
-      .from(`(${subQuery.getQuery()})`, 'sq')
-      .setParameters(subQuery.getParameters())
-      .groupBy('sq."workspaceId"')
-      .getRawMany<{ workspaceId: string; count: string }>();
-  }
-
-  /**
-   * Retrieves the count of unique ports for each workspace.
-   * Uses a subquery to unnest the ports array and count distinct values.
-   * @param workspaceIds An array of workspace IDs.
-   * @returns An array of objects containing the workspaceId and unique port count.
-   */
-  async getPortCounts(filter: StatisticFilter) {
-    const { workspaceIds, targetId, startDate, endDate } = filter;
-    // Subquery to unnest the 'ports' array from Port and link to workspaceId
-    const subQuery = this.dataSource
-      .createQueryBuilder()
-      .select('target.workspaceId', 'workspaceId')
-      .addSelect('assetService.port', 'port')
-      .from(AssetService, 'assetService')
-      .leftJoin('assetService.asset', 'asset')
-      .leftJoin('asset.target', 'target')
-      .where('1=1');
-
-    if (workspaceIds?.length) {
-      subQuery.andWhere('target.workspaceId IN (:...workspaceIds)', {
-        workspaceIds,
-      });
-    }
-    if (targetId) {
-      subQuery.andWhere('target.id = :targetId', { targetId });
-    }
-    if (startDate) {
-      subQuery.andWhere('"assetService"."createdAt" >= :startDate', {
-        startDate,
-      });
-    }
-    if (endDate) {
-      subQuery.andWhere('"assetService"."createdAt" <= :endDate', { endDate });
-    }
-
-    // Main query to count distinct ports for each workspaceId
-    return this.dataSource
-      .createQueryBuilder()
-      .select('sq."workspaceId"', 'workspaceId')
-      .addSelect('COUNT(DISTINCT sq.port)', 'count') // Count distinct ports
-      .from(`(${subQuery.getQuery()})`, 'sq')
-      .setParameters(subQuery.getParameters())
-      .groupBy('sq."workspaceId"')
-      .getRawMany<{ workspaceId: string; count: string }>();
+    return query.groupBy('target.workspaceId').getRawMany<{
+      workspaceId: string;
+      hosts: string;
+      services: string;
+      ports: string;
+    }>();
   }
 
   async getTlsStatistics(
@@ -885,15 +872,13 @@ export class StatisticService {
       targetCounts,
       vulnerabilityCounts,
       techCounts,
-      portCounts,
-      serviceCounts,
+      footprintCounts,
     ] = await Promise.all([
       this.getAssetCounts({ workspaceIds, targetId }),
       this.getTargetCounts({ workspaceIds, targetId }),
       this.getVulnerabilityCounts({ workspaceIds, targetId }),
       this.getTechCounts({ workspaceIds, targetId }),
-      this.getPortCounts({ workspaceIds, targetId }),
-      this.getServiceCounts({ workspaceIds, targetId }),
+      this.getServiceFootprintCounts({ workspaceIds, targetId }),
     ]);
 
     // Initialize a Map to store statistics for each workspace
@@ -934,7 +919,8 @@ export class StatisticService {
     vulnerabilityCounts.forEach((row) => {
       const stat = statisticsMap.get(row.workspaceId);
       if (stat) {
-        stat.vuls += Number(row.count); // Total vulnerabilities
+        // Info findings are reported on their own, not as open vulnerabilities.
+        if (row.severity !== 'info') stat.vuls += Number(row.count);
         switch (row.severity) {
           case 'critical':
             stat.criticalVuls = Number(row.count);
@@ -961,30 +947,24 @@ export class StatisticService {
       if (stat) stat.techs = Number(row.count);
     });
 
-    // Update port counts in the statistics Map
-    portCounts.forEach((row) => {
+    // Update host-facing service and port counts in the statistics Map
+    footprintCounts.forEach((row) => {
       const stat = statisticsMap.get(row.workspaceId);
-      if (stat) stat.ports = Number(row.count);
-    });
-
-    // Update service counts in the statistics Map
-    serviceCounts.forEach((row) => {
-      const stat = statisticsMap.get(row.workspaceId);
-      if (stat) stat.services = Number(row.count);
+      if (stat) {
+        stat.services = Number(row.services);
+        stat.ports = Number(row.ports);
+      }
     });
 
     // Calculate scores for each workspace
     for (const [, stat] of statisticsMap) {
-      stat.score = StatisticService.calculateSecurityScore(
-        {
-          [Severity.CRITICAL]: stat.criticalVuls,
-          [Severity.HIGH]: stat.highVuls,
-          [Severity.MEDIUM]: stat.mediumVuls,
-          [Severity.LOW]: stat.lowVuls,
-          [Severity.INFO]: stat.infoVuls,
-        },
-        stat.assets,
-      );
+      stat.score = StatisticService.calculateSecurityScore({
+        [Severity.CRITICAL]: stat.criticalVuls,
+        [Severity.HIGH]: stat.highVuls,
+        [Severity.MEDIUM]: stat.mediumVuls,
+        [Severity.LOW]: stat.lowVuls,
+        [Severity.INFO]: stat.infoVuls,
+      });
     }
 
     // Convert the Map to an array and return
@@ -992,36 +972,41 @@ export class StatisticService {
   }
 
   /**
-   * Calculates a security score (0-10) from severity counts and asset count.
-   * Shared formula used by dashboard and report services.
+   * Security score (0–100) from open vulnerability counts. Shared formula
+   * used by dashboard and report services.
+   *
+   * The score follows the worst findings, not the size of the attack surface
+   * and not Info findings: each severity takes a penalty that grows with
+   * diminishing returns up to its cap, and an open critical (or high) keeps
+   * the score out of the top grade bands however few there are. With the
+   * console's bands (A ≥ 90, B ≥ 80, C ≥ 70, D ≥ 60, F below), an open high
+   * caps the grade at B and an open critical at D.
    */
   static calculateSecurityScore(
     severityCounts: Record<Severity, number>,
-    totalAssets: number,
   ): number {
-    if (totalAssets <= 0) return 10;
-
     const critical = severityCounts[Severity.CRITICAL] || 0;
     const high = severityCounts[Severity.HIGH] || 0;
     const medium = severityCounts[Severity.MEDIUM] || 0;
     const low = severityCounts[Severity.LOW] || 0;
-    const info = severityCounts[Severity.INFO] || 0;
 
-    const alpha = 0.3; // asset weight
-    const beta = 0.7; // vuln weight
+    // `cap` is the most a severity can take off; each further finding takes
+    // `1 - decay` of what is left of it.
+    const penalty = (count: number, cap: number, decay: number) =>
+      cap * (1 - Math.pow(decay, count));
 
-    const vulRisk = critical * 5 + high * 3 + medium * 2 + low * 1 + info * 0.5;
-    const Rvuln = Math.min(10, vulRisk / totalAssets);
-    const Rasset = Math.min(10, totalAssets / 100);
+    let score =
+      100 -
+      penalty(critical, 40, 0.5) -
+      penalty(high, 25, 0.7) -
+      penalty(medium, 15, 0.85) -
+      penalty(low, 5, 0.9);
 
-    if (vulRisk === 0) return 10;
+    if (critical > 0) score = Math.min(score, 69);
+    else if (high > 0) score = Math.min(score, 89);
 
-    const totalScore = Math.max(0, 10 - (alpha * Rasset + beta * Rvuln));
-    const finalScore = Math.round(totalScore * 10) / 10;
-
-    return Math.round(finalScore) === finalScore
-      ? Math.round(finalScore)
-      : finalScore;
+    // Rounded down, so any open finding moves the score off 100.
+    return Math.floor(score);
   }
 
   /**
@@ -1045,7 +1030,7 @@ export class StatisticService {
       .where('target.workspaceId = :workspaceId', { workspaceId })
       .andWhere('v.createdAt >= :startDate', { startDate })
       .andWhere('v.createdAt <= :endDate', { endDate })
-      .andWhere('v.isArchived = :isArchived', { isArchived: false })
+      .andWhere(openVulnerabilityCondition('v'))
       .groupBy("TO_CHAR(v.createdAt, 'YYYY-MM-DD')")
       .orderBy('date', 'ASC');
 
@@ -1139,7 +1124,7 @@ export class StatisticService {
       .select('v.severity', 'severity')
       .addSelect('COUNT(*)', 'count')
       .where('target.workspaceId = :workspaceId', { workspaceId })
-      .andWhere('v.isArchived = :isArchived', { isArchived: false });
+      .andWhere(openVulnerabilityCondition('v'));
 
     if (options?.startDate) {
       qb.andWhere('v.createdAt >= :startDate', {
@@ -1203,7 +1188,7 @@ export class StatisticService {
       .addSelect(`SUM(CASE WHEN v.severity = 'low' THEN 1 ELSE 0 END)`, 'low')
       .addSelect(`SUM(CASE WHEN v.severity = 'info' THEN 1 ELSE 0 END)`, 'info')
       .where('target.workspaceId = :workspaceId', { workspaceId })
-      .andWhere('v.isArchived = :isArchived', { isArchived: false })
+      .andWhere(openVulnerabilityCondition('v'))
       .groupBy('asset.value')
       .orderBy('"totalCount"', 'DESC')
       .limit(limit);
@@ -1272,7 +1257,7 @@ export class StatisticService {
       .addSelect(`SUM(CASE WHEN v.severity = 'info' THEN 1 ELSE 0 END)`, 'info')
       .addSelect('COUNT(v.id)', 'total')
       .where('t.workspaceId = :workspaceId', { workspaceId })
-      .andWhere('v.isArchived = :isArchived', { isArchived: false })
+      .andWhere(openVulnerabilityCondition('v'))
       .groupBy('t.id')
       .addGroupBy('t.value')
       .addGroupBy('t.type')
@@ -1329,22 +1314,24 @@ export class StatisticService {
     workspaceId: string,
     options?: { startDate?: Date; endDate?: Date },
   ): Promise<number> {
+    const filter = { workspaceIds: [workspaceId], ...options };
+
+    if (countType === 'vulnerabilities') {
+      // One row per severity; Info findings are not open vulnerabilities.
+      const rows = await this.getVulnerabilityCounts(filter);
+      return rows
+        .filter((row) => row.severity !== 'info')
+        .reduce((sum, row) => sum + Number(row.count), 0);
+    }
+    if (countType === 'services' || countType === 'ports') {
+      const [row] = await this.getServiceFootprintCounts(filter);
+      return row ? Number(row[countType]) : 0;
+    }
+
     const methodMap = {
-      assets: () =>
-        this.getAssetCounts({ workspaceIds: [workspaceId], ...options }),
-      targets: () =>
-        this.getTargetCounts({ workspaceIds: [workspaceId], ...options }),
-      vulnerabilities: () =>
-        this.getVulnerabilityCounts({
-          workspaceIds: [workspaceId],
-          ...options,
-        }),
-      services: () =>
-        this.getServiceCounts({ workspaceIds: [workspaceId], ...options }),
-      ports: () =>
-        this.getPortCounts({ workspaceIds: [workspaceId], ...options }),
-      techs: () =>
-        this.getTechCounts({ workspaceIds: [workspaceId], ...options }),
+      assets: () => this.getAssetCounts(filter),
+      targets: () => this.getTargetCounts(filter),
+      techs: () => this.getTechCounts(filter),
     };
 
     const results = await methodMap[countType]();
@@ -1450,22 +1437,19 @@ export class StatisticService {
   async takeSnapshotStatisticTarget(
     targetId: string,
   ): Promise<StatisticSnapshot> {
-    const [hosts, ports, services, techs] = await Promise.all([
-      this.getHostCounts({ targetId }).then((res) =>
-        res.length > 0 ? Number(res[0].count) : 0,
-      ),
-      this.getPortCounts({ targetId }).then((res) =>
-        res.length > 0 ? Number(res[0].count) : 0,
-      ),
-      this.getServiceCounts({ targetId }).then((res) =>
-        res.length > 0 ? Number(res[0].count) : 0,
-      ),
+    const [[footprint], techs] = await Promise.all([
+      this.getServiceFootprintCounts({ targetId }),
       this.getTechCounts({ targetId }).then((res) =>
         res.length > 0 ? Number(res[0].count) : 0,
       ),
     ]);
 
-    return { hosts, ports, services, techs };
+    return {
+      hosts: Number(footprint?.hosts ?? 0),
+      ports: Number(footprint?.ports ?? 0),
+      services: Number(footprint?.services ?? 0),
+      techs,
+    };
   }
 
   /**

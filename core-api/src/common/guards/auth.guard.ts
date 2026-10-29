@@ -7,9 +7,11 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
+import { UserPresenceService } from '@/modules/auth/user-presence.service';
 import type { getSession } from 'better-auth/api';
 import type { Auth } from 'better-auth/auth';
 import { fromNodeHeaders } from 'better-auth/node';
+import type { NodeResponse } from '@nestjs/platform-node';
 import {
   API_GLOBAL_PREFIX,
   AUTH_INSTANCE_KEY,
@@ -51,6 +53,8 @@ export class AuthGuard implements CanActivate {
     private readonly reflector: Reflector,
     @Inject(AUTH_INSTANCE_KEY)
     private readonly auth: Auth,
+    @Inject(UserPresenceService)
+    private readonly presence: UserPresenceService,
   ) {}
 
   /**
@@ -93,9 +97,23 @@ export class AuthGuard implements CanActivate {
       return true;
     }
 
-    const currentSession = await this.auth.api.getSession({
-      headers: fromNodeHeaders(request.headers),
-    });
+    const { headers: authHeaders, response: currentSession } =
+      await this.auth.api.getSession({
+        headers: fromNodeHeaders(request.headers),
+        returnHeaders: true,
+      });
+
+    // getSession extends a session last refreshed over a day ago and re-issues
+    // its cookie. An in-process call drops that Set-Cookie unless it is copied
+    // onto the response, and the browser cookie would then still expire seven
+    // days after it was issued while the session itself lives on.
+    const setCookies = authHeaders?.getSetCookie() ?? [];
+    if (setCookies.length) {
+      context
+        .switchToHttp()
+        .getResponse<NodeResponse>()
+        .append('Set-Cookie', setCookies);
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const isOptional = this.reflector.get('OPTIONAL', context.getHandler());
@@ -108,6 +126,15 @@ export class AuthGuard implements CanActivate {
     request.session = currentSession.session;
     if (currentSession.user) {
       request.user = currentSession.user as UserContextPayload;
+    }
+
+    // Before the role check: a forbidden request still means the user is
+    // online. An admin impersonating the user does not.
+    const { impersonatedBy } = currentSession.session as {
+      impersonatedBy?: string | null;
+    };
+    if (currentSession.user && !impersonatedBy) {
+      this.presence.touch(currentSession.user.id);
     }
 
     // getAllAndOverride, not get: class-level `@Roles(...)` lives on the

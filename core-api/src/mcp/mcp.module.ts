@@ -3,7 +3,7 @@ import { AgentsModule } from '@/modules/agents/agents.module';
 import { ApiKeysModule } from '@/modules/apikeys/apikeys.module';
 import type { MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { Global, Module } from '@nestjs/common';
-import { json } from 'express';
+import { json } from 'body-parser';
 import { McpController } from './mcp.controller';
 import { McpGuard } from './mcp.guard';
 import { McpService } from './mcp.service';

@@ -22,11 +22,12 @@ import {
 } from '@nestjs/core';
 import { createMiddleware, type Auth } from 'better-auth';
 import { toNodeHandler } from 'better-auth/node';
-import type { Request, Response } from 'express';
+import type { NodeRequest, NodeResponse } from '@nestjs/platform-node';
 import { APIErrorExceptionFilter } from '../../common/filters/api-error-exception-filter';
 import { SkipBodyParsingMiddleware } from '../../common/middlewares/skip-body-parsing.middlewares';
 import { auth } from './auth';
 import { AuthService } from './auth.service';
+import { UserPresenceService } from './user-presence.service';
 
 /**
  * Configuration options for the AuthModule
@@ -125,7 +126,7 @@ export class AuthModule implements NestModule, OnModuleInit {
       // little hack to ignore any global prefix
       // for now i'll just not support a global prefix
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      .use(`${basePath}/*splat`, (req: Request, res: Response) => {
+      .use(`${basePath}/*splat`, (req: NodeRequest, res: NodeResponse) => {
         //Temporary fix basePath for better-call
         req.url = req.originalUrl;
         req.baseUrl = '';
@@ -194,6 +195,7 @@ export class AuthModule implements NestModule, OnModuleInit {
         useValue: options,
       },
       AuthService,
+      UserPresenceService,
     ];
 
     if (!options.disableExceptionFilter) {
@@ -217,6 +219,7 @@ export class AuthModule implements NestModule, OnModuleInit {
           useValue: options,
         },
         AuthService,
+        UserPresenceService,
       ],
     };
   }

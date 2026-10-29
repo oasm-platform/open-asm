@@ -8,8 +8,8 @@ import { useWorkspaceState } from './useWorkspaceSelector';
  *
  * The workspace is resolved from the X-Workspace-Id header, which the axios
  * client injects from the globally selected workspace. The query is disabled
- * until a workspace is actually selected, and is invalidated automatically on
- * workspace switch (see useWorkspaceSelector#handleSelectWorkspace).
+ * until a workspace is actually selected, and is cached per workspace (see
+ * hashWorkspaceQueryKey), so a switch reads the new workspace's permissions.
  *
  * @example
  * const { permissions, isOwner, hasPermission } = usePermission();
@@ -22,8 +22,10 @@ export function usePermission() {
   const query = useWorkspacesControllerGetCurrentPermission({
     query: {
       enabled: Boolean(state.selectedWorkspaceId),
-      // staleTime 0 (default): refetch on window focus, remount and workspace
-      // switch so permission changes by the admin show up without a reload.
+      // Every page mounts this (see Page). A permission change by the admin
+      // still shows up without a reload, on the next mount or window focus
+      // after these 30 seconds.
+      staleTime: 30_000,
     },
   });
 

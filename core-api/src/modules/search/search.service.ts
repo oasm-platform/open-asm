@@ -42,8 +42,8 @@ export class SearchService {
   ): Promise<SearchResponseDto> {
     // First, get the total count for both assets and targets
     const [assetsCount, targetsCount] = await Promise.all([
-      this.statisticService.getTotalAssets(query),
-      this.statisticService.getTotalTargets(query),
+      this.statisticService.getTotalAssets(workspaceId),
+      this.statisticService.getTotalTargets(workspaceId),
     ]);
 
     const totalItems = assetsCount + targetsCount;

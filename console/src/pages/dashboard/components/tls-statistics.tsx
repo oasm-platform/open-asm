@@ -36,9 +36,9 @@ const TlsStatistics = () => {
     return (
       <Card className="h-full">
         <CardHeader>
-          <CardTitle>TLS Statistics</CardTitle>
+          <CardTitle>Certificates</CardTitle>
         </CardHeader>
-        <CardContent className="text-red-600">Error loading data</CardContent>
+        <CardContent className="text-destructive">Couldn&apos;t load data</CardContent>
       </Card>
     );
   }
@@ -49,29 +49,35 @@ const TlsStatistics = () => {
   const threeMonthsLater = new Date(today);
   threeMonthsLater.setMonth(threeMonthsLater.getMonth() + 3);
 
+  // Expiry buckets split every certificate once; "new" overlaps them, so it
+  // is shown beside the bar rather than as a segment of it.
   const items = [
-    { label: 'already expired', value: data.alreadyExpired, color: 'bg-red-400', endDate: today },
-    { label: 'expire in a month', value: data.expireInAMonth, color: 'bg-orange-300', startDate: today, endDate: oneMonthLater },
-    { label: 'expire in 3 months', value: data.expireIn3Months, color: 'bg-yellow-300', startDate: oneMonthLater, endDate: threeMonthsLater },
-    { label: 'won\'t expire anytime soon', value: data.wontExpireAnytimeSoon, color: 'bg-green-300', startDate: threeMonthsLater },
-    { label: 'new certificates discovered', value: data.newCertificatesDiscovered, color: 'bg-blue-400' },
+    { label: 'Expired', value: data.alreadyExpired, color: 'bg-red-400', endDate: today },
+    { label: 'Expires within a month', value: data.expireInAMonth, color: 'bg-orange-300', startDate: today, endDate: oneMonthLater },
+    { label: 'Expires in 1–3 months', value: data.expireIn3Months, color: 'bg-yellow-300', startDate: oneMonthLater, endDate: threeMonthsLater },
+    { label: 'Valid for 3+ months', value: data.wontExpireAnytimeSoon, color: 'bg-green-300', startDate: threeMonthsLater },
   ];
 
   const total = items.reduce((sum, item) => sum + item.value, 0);
 
   return (
     <Card className="h-full">
-      <CardHeader>
-        <CardTitle>TLS Statistics</CardTitle>
+      <CardHeader className="flex flex-row items-baseline justify-between space-y-0">
+        <CardTitle>Certificates</CardTitle>
+        {data.newCertificatesDiscovered > 0 && (
+          <span className="text-xs text-muted-foreground">
+            {data.newCertificatesDiscovered} new in the last 30 days
+          </span>
+        )}
       </CardHeader>
       <CardContent>
         {/* Progress bar */}
-        <div className="flex h-4 w-full overflow-hidden rounded-full mb-6">
+        <div className="flex h-4 w-full overflow-hidden rounded-full mb-6 bg-muted">
           {items.map((item) => (
             <div
               key={item.label}
               className={item.color}
-              style={{ width: `${(item.value / total) * 100}%` }}
+              style={{ width: `${total ? (item.value / total) * 100 : 0}%` }}
             />
           ))}
         </div>
@@ -86,7 +92,7 @@ const TlsStatistics = () => {
             >
               <span className="text-base font-bold w-12">{item.value >= 1000 ? `${(item.value / 1000).toFixed(1)}K` : item.value}</span>
               <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${item.color}`} />
-              <span className="text-sm text-muted-foreground capitalize">{item.label}</span>
+              <span className="text-sm text-muted-foreground">{item.label}</span>
             </button>
           ))}
         </div>

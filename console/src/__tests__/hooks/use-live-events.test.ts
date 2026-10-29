@@ -87,7 +87,7 @@ describe('useLiveEvents', () => {
     a.unmount();
     expect(stream.signal.aborted).toBe(false);
     b.unmount();
-    expect(stream.signal.aborted).toBe(true);
+    await waitFor(() => expect(stream.signal.aborted).toBe(true));
   });
 
   it('keeps delivering when one handler throws', async () => {
@@ -121,6 +121,18 @@ describe('useLiveEvents', () => {
     await waitFor(() => expect(streams).toHaveLength(2));
     expect(streams[0].signal.aborted).toBe(true);
     expect(streams[1].headers['X-Workspace-Id']).toBe('ws-2');
+    unmount();
+  });
+
+  it('keeps the stream through a StrictMode remount', async () => {
+    const { unmount } = renderHook(() => useLiveEvents('worker.*', vi.fn()), {
+      reactStrictMode: true,
+    });
+
+    await waitFor(() => expect(streams).toHaveLength(1));
+    await Promise.resolve();
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(streams[0].signal.aborted).toBe(false);
     unmount();
   });
 

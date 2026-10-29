@@ -1,7 +1,7 @@
 import {
   getWorkspaceIdFromRequest,
 } from '@/common/decorators/workspace-id.decorator';
-import type { Request } from 'express';
+import type { NodeRequest } from '@nestjs/platform-node';
 
 describe('getWorkspaceIdFromRequest', () => {
   it('reads the X-Workspace-Id header (lowercased by Node http)', () => {
@@ -9,7 +9,7 @@ describe('getWorkspaceIdFromRequest', () => {
     // request exposes `x-workspace-id`, never `X-Workspace-Id`.
     const req = {
       headers: { 'x-workspace-id': '11111111-1111-4111-8111-111111111111' },
-    } as unknown as Request;
+    } as unknown as NodeRequest;
     expect(getWorkspaceIdFromRequest(req)).toBe(
       '11111111-1111-4111-8111-111111111111',
     );
@@ -19,7 +19,7 @@ describe('getWorkspaceIdFromRequest', () => {
     const req = {
       headers: { 'x-workspace-id': '11111111-1111-4111-8111-111111111111' },
       cookies: { wid: '22222222-2222-4222-8222-222222222222' },
-    } as unknown as Request;
+    } as unknown as NodeRequest;
     expect(getWorkspaceIdFromRequest(req)).toBe(
       '11111111-1111-4111-8111-111111111111',
     );
@@ -29,7 +29,7 @@ describe('getWorkspaceIdFromRequest', () => {
     const req = {
       headers: {},
       cookies: { wid: '22222222-2222-4222-8222-222222222222' },
-    } as unknown as Request;
+    } as unknown as NodeRequest;
     expect(getWorkspaceIdFromRequest(req)).toBe(
       '22222222-2222-4222-8222-222222222222',
     );
@@ -43,14 +43,14 @@ describe('getWorkspaceIdFromRequest', () => {
           '22222222-2222-4222-8222-222222222222',
         ],
       },
-    } as unknown as Request;
+    } as unknown as NodeRequest;
     expect(getWorkspaceIdFromRequest(req)).toBe(
       '11111111-1111-4111-8111-111111111111',
     );
   });
 
   it('returns undefined when neither header nor cookie is present', () => {
-    const req = { headers: {} } as unknown as Request;
+    const req = { headers: {} } as unknown as NodeRequest;
     expect(getWorkspaceIdFromRequest(req)).toBeUndefined();
   });
 });

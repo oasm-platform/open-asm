@@ -56,6 +56,13 @@ import {
 } from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
 
+/**
+ * The list filters plus the workspace the request runs in. The workspace
+ * comes from the request header via the controller, never from the client's
+ * query.
+ */
+type WorkerQuery = GetManyWorkersDto & { workspaceId?: string };
+
 @Injectable()
 export class WorkersService {
   private logger = new Logger('WorkersService');
@@ -277,7 +284,7 @@ export class WorkersService {
    *          along with total count and pagination information.
    */
   public async getWorkers(
-    query: GetManyWorkersDto,
+    query: WorkerQuery,
     options?: {
       /**
        * Only the workers agents of this workspace may use: its own
@@ -360,7 +367,7 @@ export class WorkersService {
    * the active jobs of the whole page counted in one grouped query.
    */
   public async getWorkerList(
-    query: GetManyWorkersDto,
+    query: WorkerQuery,
   ): Promise<GetManyBaseResponseDto<WorkerListItemDto>> {
     const { page, limit, sortOrder } = query;
     const sortBy = (query.sortBy || 'createdAt').replace(/[^a-zA-Z0-9_]/g, '');
@@ -418,7 +425,7 @@ export class WorkersService {
   /** The `WHERE` of {@link getWorkers} and {@link getWorkerList}. */
   private applyWorkerFilters(
     queryBuilder: SelectQueryBuilder<WorkerInstance>,
-    query: GetManyWorkersDto,
+    query: WorkerQuery,
     options?: { agentWorkspaceId?: string },
   ): void {
     const { workspaceId, enabledAgentMode, scope, runMode } = query;

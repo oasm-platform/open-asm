@@ -30,7 +30,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 
-import type { Response } from 'express';
+import type { NodeResponse } from '@nestjs/platform-node';
 import { AgentsCompletionsService } from './agents.completions';
 import { AgentsApprovalsService } from './agents.approvals';
 import { AgentsConfigService } from './agents.config';
@@ -565,7 +565,7 @@ export class AgentsController {
     @Body() dto: SendMessageDto,
     @WorkspaceId() workspaceId: string,
     @UserId() userId: string,
-    @Res() res: Response,
+    @Res() res: NodeResponse,
   ): Promise<void> {
     // The run outlives this HTTP request. A client disconnect (navigating to
     // another conversation/tab) must NOT kill it: we keep draining the stream
@@ -778,7 +778,7 @@ export class AgentsController {
     @Param('id') id: string,
     @WorkspaceId() workspaceId: string,
     @UserId() userId: string,
-    @Res() res: Response,
+    @Res() res: NodeResponse,
   ): Promise<void> {
     // Ownership check. A chat started on the client has no row until its first
     // message is saved, so a missing conversation has nothing to resume: 204,

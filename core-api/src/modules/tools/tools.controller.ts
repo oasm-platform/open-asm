@@ -134,9 +134,7 @@ export class ToolsController {
     if (!workspaceId) {
       throw new BadRequestException('Workspace ID is required');
     }
-    // Override the workspaceId from DTO with the one from header
-    query.workspaceId = workspaceId;
-    return this.toolsService.getManyTools(query);
+    return this.toolsService.getManyTools(query, workspaceId);
   }
 
   @Doc({

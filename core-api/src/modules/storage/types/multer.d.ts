@@ -1,6 +1,6 @@
-import type { Request } from 'express';
+import type { NodeRequest } from '@nestjs/platform-node';
 
-export interface MulterFile extends Request {
+export interface MulterFile extends NodeRequest {
   file: Express.Multer.File;
 }
 

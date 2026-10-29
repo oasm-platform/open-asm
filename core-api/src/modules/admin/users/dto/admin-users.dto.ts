@@ -45,6 +45,15 @@ export class AdminUserDto {
 
   @ApiProperty()
   updatedAt: Date;
+
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description:
+      "Time of the user's latest authenticated request; null when there was none in the last 30 days.",
+  })
+  lastActiveAt: Date | null;
 }
 
 /** `search` matches the user's name or email. */
