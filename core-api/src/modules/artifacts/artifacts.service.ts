@@ -414,9 +414,14 @@ export class ArtifactsService {
       .where('artifact.status IN (:...statuses)', {
         statuses: [ArtifactStatus.PENDING, ArtifactStatus.DELETED],
       })
-      .andWhere('(artifact.expiresAt IS NULL OR artifact.expiresAt < :cutoff)', {
-        cutoff: new Date(Date.now() - PENDING_PURGE_GRACE_MS),
-      })
+      .andWhere(
+        '(artifact.expiresAt IS NULL OR artifact.expiresAt < :cutoff OR (artifact.status = :deleted AND artifact.source != :upload))',
+        {
+          cutoff: new Date(Date.now() - PENDING_PURGE_GRACE_MS),
+          deleted: ArtifactStatus.DELETED,
+          upload: ArtifactSource.UPLOAD,
+        },
+      )
       .orderBy('artifact.updatedAt', 'ASC')
       .limit(SWEEP_BATCH_SIZE)
       .getMany();
@@ -463,8 +468,9 @@ export class ArtifactsService {
   /**
    * Deletes the object, releases its quota and drops the row, under a row
    * lock so it cannot race `completeUpload`. A READY row is left alone, and
-   * so is a DELETED row whose upload form is still valid: replaying the form
+   * so is a DELETED upload whose form is still valid: replaying the form
    * would otherwise recreate the object with no row and no quota charged.
+   * Server-side files never had a form, so they free their quota at once.
    */
   async purge(id: string): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
@@ -477,6 +483,7 @@ export class ArtifactsService {
       }
       if (
         artifact.status === ArtifactStatus.DELETED &&
+        artifact.source === ArtifactSource.UPLOAD &&
         artifact.expiresAt &&
         artifact.expiresAt.getTime() + PENDING_PURGE_GRACE_MS > Date.now()
       ) {

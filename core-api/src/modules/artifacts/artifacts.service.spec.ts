@@ -462,6 +462,20 @@ describe('ArtifactsService', () => {
       expect(manager.delete).not.toHaveBeenCalled();
     });
 
+    it('purges a deleted agent file at once: it never had an upload form', async () => {
+      manager.findOne.mockResolvedValue(
+        makeArtifact({
+          status: ArtifactStatus.DELETED,
+          source: ArtifactSource.AGENT,
+          expiresAt: new Date(),
+        }),
+      );
+      await service.purge('artifact-1');
+      expect(storage.deleteFile).toHaveBeenCalled();
+      expect(quota.releaseUsed).toHaveBeenCalledWith(manager, WS, 100);
+      expect(manager.delete).toHaveBeenCalled();
+    });
+
     it('purges a deleted row once its upload form has expired', async () => {
       manager.findOne.mockResolvedValue(
         makeArtifact({
