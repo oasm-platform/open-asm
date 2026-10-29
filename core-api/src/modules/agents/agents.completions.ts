@@ -76,20 +76,17 @@ import {
 } from './shared/turn-stats';
 
 /**
- * Whether this run may plan. PLAN mode makes plans the user approves
- * (`create`). Agent mode otherwise keeps its own todo list (`track`): it must
- * write a goal and steps before running any tool, without review. After a
- * plan is approved, AUTO or MANUAL outside Agent mode never plan, but may
- * still have to `finish` the steps that plan left; otherwise `off`.
+ * Whether this run may plan. Agent mode keeps its own plan (`track`): every
+ * new plan is approved by the user before any tool runs, and it may grow
+ * while it runs. Ask mode never plans, but may still have to `finish` the
+ * steps an Agent-mode plan left; otherwise `off`.
  */
-export type PlanningState = 'create' | 'track' | 'finish' | 'off';
+export type PlanningState = 'track' | 'finish' | 'off';
 
 export function planningState(
-  mode: AgentApprovalMode,
   todos: Pick<AgentTodoItem, 'status'>[],
   agentMode?: AgentMode,
 ): PlanningState {
-  if (mode === AgentApprovalMode.PLAN) return 'create';
   if (agentMode === AgentMode.AGENT) return 'track';
   const unfinished = todos.some(
     (t) => t.status === 'pending' || t.status === 'in_progress',
@@ -100,26 +97,19 @@ export function planningState(
 /** What is left of the plan tools while an approved plan is finished */
 const FINISH_PLAN_TOOLS = new Set(['transition_step', 'scrap_plan']);
 
-const PLAN_MODE_CONTEXT =
-  '# PLAN MODE IS ON (overrides any instruction above about not planning)\n' +
-  'The user turned on plan mode. For any request that needs one or more tool calls (reading assets, vulnerabilities, targets, issues, statistics, running commands, ...), ' +
-  'your FIRST tool call must be formulate_plan with the steps you will take. ' +
-  'The user reviews and approves the plan (choosing whether it runs automatically or asks per command) before any other tool can run; ' +
-  'tool calls made before that are refused. Put data gathering into the plan steps instead of doing it first. ' +
-  'Only a question you can fully answer from general knowledge, with no tool at all, needs no plan.';
-
 const TRACK_PLAN_CONTEXT =
-  '# AGENT MODE: GOAL AND TODO FIRST (enforced by the system)\n' +
+  '# AGENT MODE: APPROVED PLAN FIRST (enforced by the system)\n' +
   'Before any tool call that does work (workspace lookups, commands, connectors, subagents, MCP tools), ' +
-  'call formulate_plan with the goal of the request and the steps that reach it, then transition_step the first step to in_progress. ' +
-  'Tool calls made while no step is in progress are refused. Memory tools and load_skill work at any time. ' +
+  'call formulate_plan with the steps that reach the goal of the request. The user reviews every new plan and approves it ' +
+  '(choosing whether it runs automatically or asks per command) or rejects it; then transition_step the first step to in_progress. ' +
+  'Tool calls made while no step is in progress are refused, so put data gathering into the plan steps instead of doing it first. Memory tools and load_skill work at any time. ' +
   'The goal stays pinned above the plan until every step is completed or failed; check each step against it. ' +
-  'No user review: start step 1 right after formulate_plan. Use append_step for work you discover on the way, and scrap_plan if the user changes the task.';
+  'Use append_step for work you discover while the plan runs, and scrap_plan if the user changes the task.';
 
 const FINISH_PLAN_CONTEXT =
   '# AN APPROVED PLAN IS UNFINISHED\n' +
   'The user approved the CURRENT EXECUTION PLAN above earlier. Finish its remaining steps with transition_step, or call scrap_plan if the user wants something else. ' +
-  'You cannot create a new plan or add steps: plan mode is off.';
+  'You cannot create a new plan or add steps: only Agent mode plans.';
 
 export interface StreamMessageResult {
   stream: ReadableStream<UIMessageChunk>;
@@ -354,22 +344,30 @@ export class AgentsCompletionsService {
   }
 
   /**
-   * Aborts the active run of a conversation. Returns false if there is none.
-   * The run stays registered (so `running` stays true) until it has saved
-   * its stopped state; clearActiveRun removes it then.
+   * Aborts the active run of a conversation and cancels its pending and
+   * running subagents, also when the run itself already ended. Returns false
+   * if there was nothing to stop. The run stays registered (so `running`
+   * stays true) until it has saved its stopped state; clearActiveRun removes
+   * it then.
    */
-  stopRun(conversationId: string): boolean {
+  async stopRun(conversationId: string): Promise<boolean> {
     const controller = this.activeRuns.get(conversationId);
-    if (!controller || controller.signal.aborted) return false;
-    controller.abort();
-    // A user stop leaves no step running: reset the in_progress step back to
-    // pending so the todo list stops spinning (the live stream is closing, so
-    // the client reflects this optimistically / on its next load). Matches the
-    // error path, and lets a later message resume the step.
-    this.resetTodosOnError(conversationId).catch((err) =>
-      this.logger.error('Failed to reset todos on stop', err),
-    );
-    return true;
+    const aborted = !!controller && !controller.signal.aborted;
+    if (aborted) {
+      // First, so the run queues no subagent after the cancel below
+      controller.abort();
+      // A user stop leaves no step running: reset the in_progress step back
+      // to pending so the todo list stops spinning (the live stream is
+      // closing, so the client reflects this optimistically / on its next
+      // load). Matches the error path, and lets a later message resume the
+      // step.
+      this.resetTodosOnError(conversationId).catch((err) =>
+        this.logger.error('Failed to reset todos on stop', err),
+      );
+    }
+    const cancelled =
+      await this.subagents.cancelForConversation(conversationId);
+    return aborted || cancelled > 0;
   }
 
   /**
@@ -1189,7 +1187,7 @@ export class AgentsCompletionsService {
 
   /**
    * dispatch_subagent / get_subagent_result, AGENT mode only. They only
-   * read or queue, but stay gated so PLAN mode blocks them.
+   * read or queue, but stay gated so nothing runs before a plan is approved.
    */
   private getSubagentTools(
     agentMode: AgentMode,
@@ -1219,9 +1217,9 @@ export class AgentsCompletionsService {
   }
 
   /**
-   * Plan tools for this run: none when planning is off, all of them (without
-   * review) for Agent mode's own todo list, and only the tools that finish or
-   * drop an approved plan when one is left over.
+   * Plan tools for this run: none when planning is off, all of them for
+   * Agent mode's own plan (each new one reviewed by the user), and only the
+   * tools that finish or drop an approved plan when one is left over.
    */
   private getPlanTools(
     planning: PlanningState,
@@ -1234,7 +1232,7 @@ export class AgentsCompletionsService {
       ...plan,
       selfManaged: planning === 'track',
     }) as ToolSet;
-    if (planning === 'create' || planning === 'track') return tools;
+    if (planning === 'track') return tools;
     return Object.fromEntries(
       Object.entries(tools).filter(([name]) => FINISH_PLAN_TOOLS.has(name)),
     );
@@ -1305,11 +1303,8 @@ export class AgentsCompletionsService {
     const userContext = formatUserInstructions(agentConfig);
 
     const todos = await this.loadTodoItems(conversation.id);
-    const planning = planningState(conversation.approvalMode, todos, agentMode);
-    // AUTO and MANUAL outside Agent mode never plan, so they get no plan
-    // prompt and no old plan. Plan mode applies in every agent mode: it
-    // overrides ASK.md's "answer directly", since the user explicitly asked
-    // to see a plan first
+    const planning = planningState(todos, agentMode);
+    // Ask mode never plans, so it gets no plan prompt and no finished plan
     const todosContext =
       planning === 'off'
         ? ''
@@ -1320,7 +1315,6 @@ export class AgentsCompletionsService {
         : [
             this.getPrompt('PLAN.md'),
             {
-              create: PLAN_MODE_CONTEXT,
               track: TRACK_PLAN_CONTEXT,
               finish: FINISH_PLAN_CONTEXT,
             }[planning],
@@ -2100,10 +2094,7 @@ export class AgentsCompletionsService {
     const MAX_CONSECUTIVE_ERRORS = 3;
     const isAgentMode = agentMode === AgentMode.AGENT;
     // Keep running an approved plan to its end, in Ask mode too
-    const continuesPlan =
-      isAgentMode ||
-      options.approvalMode === AgentApprovalMode.PLAN ||
-      options.planning === 'finish';
+    const continuesPlan = isAgentMode || options.planning === 'finish';
     let stalledIterations = 0;
     let consecutiveErrors = 0;
     let lastFingerprint: string | undefined;
@@ -2796,11 +2787,7 @@ export class AgentsCompletionsService {
     // Step 11: Create a shared event emitter for broadcasting todo updates to the stream
     const todosEmitter = new EventEmitter();
 
-    const planning = planningState(
-      conversation.approvalMode,
-      todoItems,
-      agentMode,
-    );
+    const planning = planningState(todoItems, agentMode);
 
     // Agent mode: derive this objective's goal from the question and stream it
     // to the UI right away (like the title), unless a plan is still running.
@@ -2821,9 +2808,7 @@ export class AgentsCompletionsService {
     const approval: ApprovalSettings = {
       userId,
       mode: conversation.approvalMode,
-      // In PLAN mode nothing runs before the user has seen and approved a plan
-      planFirst: true,
-      // In Agent mode nothing runs before the agent has started its todo list
+      // In Agent mode nothing runs before a step of an approved plan started
       ...(planning === 'track' && {
         needsTodo: async () =>
           !(await this.todoRepository.exists({

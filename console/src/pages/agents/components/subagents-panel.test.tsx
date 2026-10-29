@@ -163,4 +163,24 @@ describe('SubagentsPanel', () => {
       query: { refetchInterval: SUBAGENT_TRANSCRIPT_POLL_MS },
     });
   });
+
+  it('shows a cancelled subagent as stopped, neither running nor polled', async () => {
+    const user = userEvent.setup();
+    render(
+      <SubagentsPanel
+        subagents={[row({ status: 'cancelled', result: null })]}
+        conversationId="c1"
+      />,
+    );
+
+    expect(screen.getByLabelText('Cancelled')).toBeInTheDocument();
+    expect(screen.getByText('1 done')).toBeInTheDocument();
+    await user.click(screen.getByText('@researcher'));
+    expect(useDetail).toHaveBeenCalledWith('c1', 's1', {
+      query: { refetchInterval: false },
+    });
+    expect(
+      screen.getByText('Cancelled when the conversation was stopped.'),
+    ).toBeInTheDocument();
+  });
 });

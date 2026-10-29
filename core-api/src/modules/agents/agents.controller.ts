@@ -742,8 +742,9 @@ export class AgentsController {
   @Doc({
     summary: 'Stop the active response',
     description:
-      'Aborts the in-progress agent run of a conversation. Use this instead of ' +
-      'dropping the stream connection, which now lets the run finish in the background.',
+      'Aborts the in-progress agent run of a conversation and cancels its pending ' +
+      'and running subagents. Use this instead of dropping the stream connection, ' +
+      'which now lets the run finish in the background.',
     request: {
       getWorkspaceId: true,
       params: [{ name: 'id', description: 'Conversation ID' }],
@@ -757,7 +758,7 @@ export class AgentsController {
   ): Promise<DefaultMessageResponseDto> {
     // Ownership check (throws NotFound if the conversation is not the user's)
     await this.agentsService.getConversation(id, workspaceId, userId);
-    const stopped = this.agentsCompletionsService.stopRun(id);
+    const stopped = await this.agentsCompletionsService.stopRun(id);
     return { message: stopped ? 'Response stopped' : 'No active response' };
   }
 

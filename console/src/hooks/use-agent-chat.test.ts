@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
     | ((data: { type: string; data: unknown }) => void)
     | undefined,
   orvalClient: vi.fn(),
+  stopConversation: vi.fn(async (): Promise<unknown> => ({})),
   status: 'streaming' as string,
   messagesData: undefined as unknown,
   onError: undefined as ((error: Error) => void) | undefined,
@@ -88,7 +89,9 @@ vi.mock('@/services/apis/gen/queries', () => ({
     in_progress: 'in_progress',
     completed: 'completed',
     failed: 'failed',
+    cancelled: 'cancelled',
   },
+  agentsControllerStopConversation: mocks.stopConversation,
   useAgentsControllerGetMessagesInfinite: () => ({
     data: mocks.messagesData,
     isLoading: false,
@@ -158,7 +161,7 @@ describe('useAgentChat approvals', () => {
           toolCallId: 'tool-1',
           kind: 'plan',
           command: '',
-          mode: 'plan',
+          mode: 'manual',
           plan: ['Enumerate subdomains'],
         },
       });
@@ -386,6 +389,41 @@ describe('useAgentChat run that outlived the stream', () => {
     const { result } = renderHook(() => useAgentChat({ conversationId: 'c1' }));
     expect(result.current.isStreaming).toBe(false);
   });
+
+  it('shows the saved progress of a run this page does not stream', () => {
+    // Its resume had nothing to replay: the chat only holds the seed, which
+    // leaves the answer in progress out
+    mocks.chatMessages = [
+      { id: 'u1', role: 'user', parts: [{ type: 'text', text: 'hi' }] },
+    ];
+    mocks.messagesData = {
+      pages: [
+        {
+          running: true,
+          data: [
+            {
+              id: 'a1',
+              role: 'assistant',
+              parts: [{ type: 'reasoning', text: 'Checking the ports' }],
+              metadata: { status: 'streaming' },
+            },
+            { id: 'u1', role: 'user', content: 'hi' },
+          ],
+        },
+      ],
+    };
+    try {
+      const { result } = renderHook(() =>
+        useAgentChat({ conversationId: 'c1' }),
+      );
+      expect(result.current.messages.map((m) => m.id)).toEqual(['u1', 'a1']);
+      expect(result.current.messages[1].parts).toEqual([
+        { type: 'reasoning', text: 'Checking the ports' },
+      ]);
+    } finally {
+      mocks.chatMessages = [];
+    }
+  });
 });
 
 describe('useAgentChat conversation stats', () => {
@@ -486,6 +524,34 @@ describe('useAgentChat subagents', () => {
 
     expect(mocks.orvalClient).toHaveBeenCalledTimes(1);
   });
+
+  it('marks queued and running subagents cancelled when the user stops', async () => {
+    mocks.orvalClient.mockResolvedValueOnce({
+      id: 'c1',
+      subagents: [
+        subagent('in_progress'),
+        { ...subagent('pending'), id: 's2' },
+        { ...subagent('completed'), id: 's3' },
+      ],
+    });
+    const { result } = renderHook(() => useAgentChat({ conversationId: 'c1' }));
+    await flush();
+
+    act(() => {
+      result.current.onStop();
+    });
+    expect(mocks.stopConversation).toHaveBeenCalledWith('c1');
+    expect(result.current.subagents.map((s) => s.status)).toEqual([
+      'cancelled',
+      'cancelled',
+      'completed',
+    ]);
+    expect(result.current.subagents[0].completedAt).toEqual(expect.any(String));
+    expect(result.current.subagents[2]).toEqual({
+      ...subagent('completed'),
+      id: 's3',
+    });
+  });
 });
 
 describe('seedFromSaved', () => {
@@ -508,6 +574,34 @@ describe('seedFromSaved', () => {
   it('keeps a trailing user message even mid-stream', () => {
     const saved = [msg('a1', 'assistant'), msg('u2', 'user')];
     expect(seedFromSaved(saved, pages('streaming'))).toBe(saved);
+  });
+
+  it('drops every answer of the running turn, finished iterations too', () => {
+    // The replay rebuilds the whole turn as one answer from its first chunk
+    const saved = [
+      msg('u1', 'user'),
+      msg('a1', 'assistant'),
+      msg('u2', 'user'),
+      msg('a2', 'assistant'),
+      msg('a3', 'assistant'),
+    ];
+    const running = [
+      { running: true, data: [{ role: 'assistant', metadata: { status: 'streaming' } }] },
+    ];
+    expect(seedFromSaved(saved, running).map((m) => m.id)).toEqual([
+      'u1',
+      'a1',
+      'u2',
+    ]);
+    // Also while it waits between iterations, its newest answer finished
+    const between = [
+      { running: true, data: [{ role: 'assistant', metadata: { status: 'completed' } }] },
+    ];
+    expect(seedFromSaved(saved, between).map((m) => m.id)).toEqual([
+      'u1',
+      'a1',
+      'u2',
+    ]);
   });
 });
 

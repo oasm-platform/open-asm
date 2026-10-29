@@ -243,6 +243,11 @@ export function SubagentTranscript({
             Queued, waiting for a free slot…
           </p>
         )}
+        {subagent.status === SubagentResponseDtoStatus.cancelled && (
+          <p className="text-sm text-muted-foreground">
+            Cancelled when the conversation was stopped.
+          </p>
+        )}
         {subagent.error && (
           <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm whitespace-pre-wrap text-destructive">
             {subagent.error}

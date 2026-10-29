@@ -1,13 +1,17 @@
 import { useSyncExternalStore } from 'react';
 
-export type ApprovalMode = 'auto' | 'plan' | 'manual';
+/**
+ * How commands run. Agent mode has every new plan approved first in either
+ * mode. A choice stored as the retired 'plan' mode reads as the default.
+ */
+export type ApprovalMode = 'auto' | 'manual';
 
 const STORAGE_KEY = 'agent-approval-mode';
 const DEFAULT_MODE: ApprovalMode = 'manual';
 const listeners = new Set<() => void>();
 
 export function isApprovalMode(value: unknown): value is ApprovalMode {
-  return value === 'auto' || value === 'plan' || value === 'manual';
+  return value === 'auto' || value === 'manual';
 }
 
 let current: ApprovalMode = (() => {

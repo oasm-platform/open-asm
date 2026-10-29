@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { streamText } from 'ai';
 import {
   AgentsSubagentsService,
+  SUBAGENT_HEARTBEAT_MS,
   SUBAGENT_MAX_ACTIVE_PER_CONVERSATION,
   SUBAGENT_TRANSCRIPT_FIELD_MAX_CHARS,
   subagentToolNames,
@@ -469,6 +470,131 @@ describe('AgentsSubagentsService', () => {
         status: SubagentStatus.PENDING,
         sortOrder: 3,
       });
+    });
+
+    it('queues nothing once the dispatching run was stopped', async () => {
+      const stopped = new AbortController();
+      stopped.abort();
+      await expect(
+        service.dispatch(ctx, 'researcher', 'task', stopped.signal),
+      ).rejects.toThrow('The run was stopped');
+      expect(tx.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('cancel', () => {
+    const run = (job: object) =>
+      (service as unknown as { run: (j: unknown) => Promise<void> }).run(job);
+    const job = {
+      id: 's1',
+      conversationId: 'c1',
+      name: 'researcher',
+      task: 't',
+    };
+    /** A run that only ends when its abort signal fires. */
+    const hangUntilAborted = (opts: { abortSignal: AbortSignal }) => {
+      const aborted = new Promise<never>((_, reject) =>
+        opts.abortSignal.addEventListener('abort', () =>
+          reject(new Error('aborted')),
+        ),
+      );
+      aborted.catch(() => {});
+      return { steps: aborted, text: aborted };
+    };
+    const untilStreaming = async () => {
+      while ((streamText as jest.Mock).mock.calls.length === 0) {
+        await new Promise((r) => setImmediate(r));
+      }
+    };
+    /** Writes that move the row out of in_progress (done, failed, requeued) */
+    const statusWrites = () =>
+      (repo.query.mock.calls as unknown[][]).filter((c) =>
+        /result = \$3|error = \$3|"startedAt" = NULL/.test(String(c[0])),
+      );
+
+    it('cancels the active rows of the conversation under its lock', async () => {
+      tx.query = jest.fn((): Promise<unknown> =>
+        Promise.resolve([[{ id: 's1' }, { id: 's2' }], 2]),
+      );
+      await expect(service.cancelForConversation('c1')).resolves.toBe(2);
+      expect(tx.findOne).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          where: { id: 'c1' },
+          lock: { mode: 'pessimistic_write' },
+        }),
+      );
+      const [sql, params] = tx.query.mock.calls[0];
+      expect(String(sql)).toContain('status IN ($3, $4)');
+      expect(params).toEqual([
+        'c1',
+        SubagentStatus.CANCELLED,
+        SubagentStatus.PENDING,
+        SubagentStatus.IN_PROGRESS,
+      ]);
+
+      tx.query.mockResolvedValueOnce([[], 0]);
+      await expect(service.cancelForConversation('c1')).resolves.toBe(0);
+    });
+
+    it('aborts a run of this instance and leaves its row cancelled', async () => {
+      (streamText as jest.Mock).mockImplementationOnce(hangUntilAborted);
+      tx.query = jest.fn((): Promise<unknown> =>
+        Promise.resolve([[{ id: 's1' }], 1]),
+      );
+      const running = run(job);
+      await untilStreaming();
+
+      await service.cancelForConversation('c1');
+      await running;
+      // Neither completed, failed nor requeued
+      expect(statusWrites()).toHaveLength(0);
+      expect(Logger.prototype.error).not.toHaveBeenCalled();
+    });
+
+    it('does not store a run aborted after its first step as completed', async () => {
+      // The SDK resolves with the partial run when aborted after a step
+      (streamText as jest.Mock).mockImplementationOnce(
+        (opts: { abortSignal: AbortSignal }) => {
+          const steps = new Promise((resolve) =>
+            opts.abortSignal.addEventListener('abort', () =>
+              resolve([{ toolCalls: [] }]),
+            ),
+          );
+          return { steps, text: Promise.resolve('partial') };
+        },
+      );
+      const running = run(job);
+      await untilStreaming();
+      await service.onModuleDestroy();
+      await running;
+      const writes = statusWrites();
+      expect(writes).toHaveLength(1);
+      // Shut down mid-run: back to the queue
+      expect(String(writes[0][0])).toContain('"startedAt" = NULL');
+      expect(writes[0][1]).toEqual(
+        expect.arrayContaining(['s1', SubagentStatus.PENDING]),
+      );
+    });
+
+    it('stops a run whose row was cancelled elsewhere at its heartbeat', async () => {
+      jest.useFakeTimers();
+      try {
+        (streamText as jest.Mock).mockImplementationOnce(hangUntilAborted);
+        const running = run(job);
+        await jest.advanceTimersByTimeAsync(0);
+        expect(streamText).toHaveBeenCalled();
+        // The heartbeat finds no running row (the default query mock)
+        await jest.advanceTimersByTimeAsync(SUBAGENT_HEARTBEAT_MS);
+        await running;
+        const heartbeat = repo.query.mock.calls.find((c) =>
+          String(c[0]).includes('RETURNING id'),
+        );
+        expect(heartbeat?.[1]).toEqual(['s1', SubagentStatus.IN_PROGRESS]);
+        expect(statusWrites()).toHaveLength(0);
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 

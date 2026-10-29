@@ -240,6 +240,26 @@ describe('RedisService stream helpers', () => {
     });
   });
 
+  describe('xrange', () => {
+    it('reads the whole range by default and folds fields into a map', async () => {
+      const xrange = jest.fn().mockResolvedValue([['1-0', ['a', 'b']]]);
+      Object.assign(client, { xrange });
+
+      await expect(service.xrange('s')).resolves.toEqual([
+        { id: '1-0', fields: { a: 'b' } },
+      ]);
+      expect(xrange).toHaveBeenCalledWith('s', '-', '+');
+    });
+
+    it('limits the read with COUNT after the range', async () => {
+      const xrange = jest.fn().mockResolvedValue([]);
+      Object.assign(client, { xrange });
+
+      await service.xrange('s', '-', '+', 1);
+      expect(xrange).toHaveBeenCalledWith('s', '-', '+', 'COUNT', 1);
+    });
+  });
+
   describe('setIfAbsent', () => {
     it('reports true only for the caller that created the key', async () => {
       client.set.mockResolvedValueOnce('OK').mockResolvedValueOnce(null);

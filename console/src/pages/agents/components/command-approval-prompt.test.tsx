@@ -17,7 +17,7 @@ const planApproval = (): PendingApproval =>
   approval({
     kind: 'plan',
     command: '',
-    mode: 'plan',
+    mode: 'manual',
     tool: 'formulate_plan',
     description: 'Review the plan before the agent starts running it',
     plan: ['Enumerate subdomains', 'Scan ports'],

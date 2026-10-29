@@ -16,6 +16,12 @@ import { RedisService } from '@/services/redis/redis.service';
  * Each chunk is stored as the exact JSON string the live endpoint writes after
  * `data: `, so replay reproduces the send stream byte for byte and the AI SDK's
  * reconnect parser handles it with no special casing.
+ *
+ * A replay must start at the run's first chunk: the client rejects a delta
+ * whose part never started. A long run outgrows {@link MAX_ENTRIES} and loses
+ * its oldest chunks, so {@link reset} opens the buffer with a begin marker and
+ * a backlog without it is not replayed; the client then shows the progress
+ * the run saves to the database.
  */
 @Injectable()
 export class AgentsStreamBufferService {
@@ -44,11 +50,20 @@ export class AgentsStreamBufferService {
   /**
    * Clears any buffer left by a previous run of this conversation, so a new
    * run never replays stale chunks or a done marker in the middle of its own
-   * stream. Best-effort: a failure here only costs resumability.
+   * stream, and opens the new one with the begin marker. Best-effort: a
+   * failure here only costs resumability.
    */
   async reset(conversationId: string): Promise<void> {
     try {
       await this.redis.del(this.key(conversationId));
+      await this.redis.xadd(
+        this.key(conversationId),
+        { begin: '1' },
+        {
+          maxLen: AgentsStreamBufferService.MAX_ENTRIES,
+          ttlSeconds: AgentsStreamBufferService.ACTIVE_TTL_SECONDS,
+        },
+      );
     } catch (error) {
       this.logger.warn(`Failed to reset stream buffer: ${String(error)}`);
     }
@@ -139,6 +154,8 @@ export class AgentsStreamBufferService {
     const last = await this.redis.xlast(key);
     if (last?.fields.done === '1') return null;
     if (!last && !isRunActive()) return null;
+    // Trimmed past its beginning: a replay would break the client
+    if (last && !(await this.startsAtBegin(key))) return null;
 
     const redis = this.redis;
     const logger = this.logger;
@@ -230,6 +247,11 @@ export class AgentsStreamBufferService {
           await redis.subscribe(channel, onMessage);
 
           const backlog = await redis.xrange(key);
+          // Trimmed since the check above: end it rather than replay a part
+          if (backlog.length > 0 && backlog[0].fields.begin !== '1') {
+            close();
+            return;
+          }
           for (const entry of backlog) {
             if (closed) return;
             if (entry.fields.done === '1') {
@@ -268,5 +290,11 @@ export class AgentsStreamBufferService {
         closeStream();
       },
     });
+  }
+
+  /** Whether the buffer still holds its begin marker (nothing was trimmed). */
+  private async startsAtBegin(key: string): Promise<boolean> {
+    const [first] = await this.redis.xrange(key, '-', '+', 1);
+    return first?.fields.begin === '1';
   }
 }

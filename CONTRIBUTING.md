@@ -54,7 +54,7 @@ Full walkthrough: [`DEVELOPER_GUIDE.md`](DEVELOPER_GUIDE.md). Repo conventions f
    task worker:test                                     # + task worker:test-race for concurrency changes
    ```
 4. If you touched contracts, regenerate **before** pushing:
-   - API contract → `task gen-api` (needs booted API), commit `.open-api/*.json` **and** `console/src/services/apis/gen/queries.ts`.
+   - API contract → `task gen-api` (needs booted API), commit `console/src/services/apis/gen/queries.ts` (the `.open-api/` spec is gitignored).
    - Proto files → `task proto`, output in `worker/internal/gen/`.
    - Connector catalog → `task sync-connectors` (or `MANIFEST_PATH=<local>/manifest.json` for preview).
 5. Push, open a PR against `main` with a clear description, linked issue, and test evidence.

@@ -43,6 +43,9 @@ lerna-debug.log*
 .env.local
 .env
 
+# Generated OpenAPI spec: core-api rewrites it on every boot
+/.open-api/
+
 # temp directory
 .temp
 .tmp

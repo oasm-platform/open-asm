@@ -22,6 +22,13 @@ describe('getToolStatus', () => {
     expect(
       getToolStatus('output-available', {
         error:
+          'Not executed: Agent mode needs an approved plan first. Call formulate_plan ...',
+      }),
+    ).toBe('needs-plan');
+    // As saved by the retired plan mode
+    expect(
+      getToolStatus('output-available', {
+        error:
           'Not executed: this conversation needs an approved plan first. Call formulate_plan ...',
       }),
     ).toBe('needs-plan');
