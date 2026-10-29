@@ -25,6 +25,11 @@ retrieve_web_page({ url: "https://example.com/path" })
 
 Always use `retrieve_web_page` instead of trying to construct fetch requests manually. It handles User-Agent headers and error handling automatically.
 
+Two jobs use it:
+
+- **Vulnerability intelligence** — CVE detail, exploit availability, vendor advisory, fixed version.
+- **Payload and bypass research** — when a WAF or parser drops your payload, fetch what actually works against that product or edge before inventing variants from memory. The current corpus from a public research page beats a remembered payload from training data, and you cite the page you took it from.
+
 ## Workflow
 
 ### 0. Goal and Todo (Agent mode)
@@ -65,7 +70,8 @@ Pick the right source for the query:
 1. Call `retrieve_web_page` with the constructed URL
 2. Parse the `body` content — extract relevant sections
 3. If the page has links to related content, fetch up to 3-5 linked pages for comprehensive analysis
-4. Synthesize findings from multiple sources
+4. Synthesize findings from multiple sources and keep the URL of each fact you reuse — a claim with no source is a claim the main agent cannot check
+5. Prefer the primary source (vendor advisory, NVD, CISA KEV, the project's own security page) over a blog or an aggregator, and say which one you used
 
 ### 4. Correlate with Workspace
 
