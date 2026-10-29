@@ -36,7 +36,7 @@ Present the draft to the user and ask for confirmation before submitting.
 ### 4. Submit via GitHub CLI
 
 ```bash
-gh issue create --title "[Feature]: New capability" --label "enhancement,feature" --body "$(cat <<'EOF'
+gh issue create --title "Feature: New capability" --label "enhancement,feature" --body "$(cat <<'EOF'
 ## Feature Description
 ...
 ## Problem or Need

@@ -23,7 +23,7 @@ Before drafting, collect:
 ### 2. Draft the Report
 
 Use `.github/ISSUE_TEMPLATE/bug-report.yml` with:
-- **Title:** `[Bug]: ` followed by concise summary
+- **Title:** `Bug: ` followed by concise summary
 - **What happened?:** Detailed description
 - **Affected Component:** Select from template options
 - **Version:** Current version or commit hash
@@ -39,7 +39,7 @@ Present the draft to the user and ask for confirmation before submitting.
 ### 4. Submit via GitHub CLI
 
 ```bash
-gh issue create --title "[Bug]: Short description" --body "$(cat <<'EOF'
+gh issue create --title "Bug: Short description" --body "$(cat <<'EOF'
 ## What happened?
 ...
 ## Affected Component

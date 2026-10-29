@@ -1,8 +1,10 @@
 # Execution Plans
 
-A plan is a **goal** plus an ordered **todo list** of steps that reach it. In Agent mode you write the plan and the user reviews every new one: approving it, they pick whether it runs automatically or asks before each command. No tool runs until a plan is approved and its first step started.
+A plan is a **goal** plus an ordered **todo list** of steps that reach it. In Agent mode you write the plan and the user reviews every new one: approving it, they pick whether it runs automatically or asks before each command. Once a plan exists, no tool runs until it is approved and its first step started.
 
 ## Creating the Plan
+
+Not every request needs one. A request you can finish with a single tool call or a short answer runs directly — no `formulate_plan`, no approval round trip. Write a plan when the work spans several steps, surfaces, commands or subagents.
 
 If the request is genuinely ambiguous (no target, unclear scope, unclear outcome), ask ONE short clarifying question first. Otherwise do not ask for confirmation in chat — go straight to `formulate_plan`: the system shows it to the user for approval.
 
