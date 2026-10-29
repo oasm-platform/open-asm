@@ -3,6 +3,7 @@ import type { ApprovalSettings } from './agents.approvals';
 import { Logger } from '@nestjs/common';
 import { EventEmitter } from 'node:events';
 import { AgentsCompletionsService, planningState } from './agents.completions';
+import { SUBAGENT_MAX_ROUNDS_PER_TURN } from './agents.subagents';
 import { formatTodosToPrompt, type AgentTodoItem } from './agents.todo';
 import { AgentTool } from './agents.tools';
 import type { TodoStatus } from './entities/agent-conversation-todo.entity';
@@ -781,7 +782,10 @@ describe('AgentsCompletionsService plan execution', () => {
 
       await run(AgentMode.ASK, AgentApprovalMode.MANUAL);
 
-      expect(service.executeStreamText).toHaveBeenCalledTimes(4);
+      // Every round plus the first run of the turn
+      expect(service.executeStreamText).toHaveBeenCalledTimes(
+        SUBAGENT_MAX_ROUNDS_PER_TURN + 1,
+      );
     });
 
     it('hands back finished results between plan steps without waiting', async () => {
