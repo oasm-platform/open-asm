@@ -27,7 +27,7 @@ export class WorkspaceStorageUsage {
   @JoinColumn({ name: 'workspaceId' })
   workspace: Relation<Workspace>;
 
-  /** Admin override; null means the `ARTIFACT_WORKSPACE_QUOTA_BYTES` default. */
+  /** Admin override; null means the `ARTIFACT_WORKSPACE_QUOTA_BYTES` constant. */
   @Column({ type: 'bigint', nullable: true, transformer: bigintTransformer })
   quotaBytes: number | null;
 

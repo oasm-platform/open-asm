@@ -135,7 +135,7 @@ export class AdminWorkspacesController {
   @Doc({
     summary: 'Set workspace storage quota',
     description:
-      'Overrides the storage quota of one workspace. `null` resets it to the server default (ARTIFACT_WORKSPACE_QUOTA_BYTES).',
+      'Overrides the storage quota of one workspace. `null` resets it to the default quota.',
     response: {
       serialization: WorkspaceStorageQuotaDto,
     },

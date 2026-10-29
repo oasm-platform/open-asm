@@ -1,3 +1,7 @@
+import {
+  ARTIFACT_MAX_FILE_BYTES,
+  ARTIFACT_WORKSPACE_QUOTA_BYTES,
+} from '@/common/constants/app.constants';
 import { ArtifactStatus } from '@/common/enums/enum';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import {
@@ -6,10 +10,7 @@ import {
   NotFoundException,
   PayloadTooLargeException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { DataSource, EntityManager } from 'typeorm';
-import type { ArtifactsConfig } from './artifacts.config';
-import { parseArtifactsConfig } from './artifacts.config';
 import type { ArtifactUsageDto, WorkspaceStorageQuotaDto } from './dto/artifacts.dto';
 import { Artifact } from './entities/artifact.entity';
 import { WorkspaceStorageUsage } from './entities/workspace-storage-usage.entity';
@@ -22,23 +23,12 @@ export const STORAGE_QUOTA_EXCEEDED = 'STORAGE_QUOTA_EXCEEDED';
  */
 @Injectable()
 export class ArtifactQuotaService {
-  private readonly config: ArtifactsConfig;
-
-  constructor(
-    private readonly dataSource: DataSource,
-    configService: ConfigService,
-  ) {
-    this.config = parseArtifactsConfig(configService);
-  }
-
-  get maxFileBytes(): number {
-    return this.config.maxFileBytes;
-  }
+  constructor(private readonly dataSource: DataSource) {}
 
   assertFileSize(sizeBytes: number): void {
-    if (sizeBytes > this.config.maxFileBytes) {
+    if (sizeBytes > ARTIFACT_MAX_FILE_BYTES) {
       throw new PayloadTooLargeException(
-        `File exceeds the ${this.config.maxFileBytes} byte limit`,
+        `File exceeds the ${ARTIFACT_MAX_FILE_BYTES} byte limit`,
       );
     }
   }
@@ -68,7 +58,7 @@ export class ArtifactQuotaService {
       .setParameters({
         workspaceId,
         bytes,
-        defaultQuota: this.config.workspaceQuotaBytes,
+        defaultQuota: ARTIFACT_WORKSPACE_QUOTA_BYTES,
       })
       .execute();
 
@@ -142,10 +132,10 @@ export class ArtifactQuotaService {
     ]);
 
     return {
-      quotaBytes: usage?.quotaBytes ?? this.config.workspaceQuotaBytes,
+      quotaBytes: usage?.quotaBytes ?? ARTIFACT_WORKSPACE_QUOTA_BYTES,
       usedBytes: usage?.usedBytes ?? 0,
       reservedBytes: usage?.reservedBytes ?? 0,
-      maxFileBytes: this.config.maxFileBytes,
+      maxFileBytes: ARTIFACT_MAX_FILE_BYTES,
       bySource: bySource.map((row) => ({
         source: row.source,
         bytes: Number(row.bytes),

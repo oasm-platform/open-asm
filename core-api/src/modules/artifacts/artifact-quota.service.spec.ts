@@ -1,5 +1,8 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
+import {
+  ARTIFACT_MAX_FILE_BYTES,
+  ARTIFACT_WORKSPACE_QUOTA_BYTES,
+} from '@/common/constants/app.constants';
 import type { DataSource, EntityManager } from 'typeorm';
 import { ArtifactQuotaService, STORAGE_QUOTA_EXCEEDED } from './artifact-quota.service';
 
@@ -25,23 +28,13 @@ const queryBuilder = (result: unknown) => {
 };
 
 describe('ArtifactQuotaService', () => {
-  const config = (values: Record<string, string>) =>
-    ({ get: (key: string) => values[key] }) as unknown as ConfigService;
-
-  const build = (dataSource: Partial<DataSource> = {}, env = {}) =>
-    new ArtifactQuotaService(dataSource as DataSource, config(env));
-
-  it('falls back to the default limits for missing or invalid env values', () => {
-    expect(build({}, { ARTIFACT_MAX_FILE_BYTES: 'abc' }).maxFileBytes).toBe(
-      50 * 1024 * 1024,
-    );
-    expect(build({}, { ARTIFACT_MAX_FILE_BYTES: '10' }).maxFileBytes).toBe(10);
-  });
+  const build = (dataSource: Partial<DataSource> = {}) =>
+    new ArtifactQuotaService(dataSource as DataSource);
 
   it('rejects a file over the per-file limit', () => {
-    const service = build({}, { ARTIFACT_MAX_FILE_BYTES: '10' });
-    expect(() => service.assertFileSize(10)).not.toThrow();
-    expect(() => service.assertFileSize(11)).toThrow();
+    const service = build();
+    expect(() => service.assertFileSize(ARTIFACT_MAX_FILE_BYTES)).not.toThrow();
+    expect(() => service.assertFileSize(ARTIFACT_MAX_FILE_BYTES + 1)).toThrow();
   });
 
   describe('reserve', () => {
@@ -55,7 +48,7 @@ describe('ArtifactQuotaService', () => {
           .mockReturnValueOnce(update),
       };
 
-      await build({}, { ARTIFACT_WORKSPACE_QUOTA_BYTES: '500' }).reserve(
+      await build().reserve(
         manager as unknown as EntityManager,
         'ws-1',
         100,
@@ -68,7 +61,7 @@ describe('ArtifactQuotaService', () => {
       expect(update.setParameters).toHaveBeenCalledWith({
         workspaceId: 'ws-1',
         bytes: 100,
-        defaultQuota: 500,
+        defaultQuota: ARTIFACT_WORKSPACE_QUOTA_BYTES,
       });
     });
 
