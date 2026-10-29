@@ -101,10 +101,6 @@ export class ArtifactQuotaService {
   }
 
   async getUsage(workspaceId: string): Promise<ArtifactUsageDto> {
-    const usage = await this.dataSource
-      .getRepository(WorkspaceStorageUsage)
-      .findOneBy({ workspaceId });
-
     const ready = () =>
       this.dataSource
         .getRepository(Artifact)
@@ -113,7 +109,8 @@ export class ArtifactQuotaService {
         .where('artifact.workspaceId = :workspaceId', { workspaceId })
         .andWhere('artifact.status = :status', { status: ArtifactStatus.READY });
 
-    const [bySource, byUser] = await Promise.all([
+    const [usage, bySource, byUser] = await Promise.all([
+      this.dataSource.getRepository(WorkspaceStorageUsage).findOneBy({ workspaceId }),
       ready()
         .addSelect('artifact.source', 'source')
         .groupBy('artifact.source')

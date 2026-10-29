@@ -3,6 +3,8 @@ import {
   ArtifactShareType,
   ArtifactSource,
   ArtifactStatus,
+  AuditActorType,
+  AuditOutcome,
 } from '@/common/enums/enum';
 import { getManyResponse } from '@/utils/getManyResponse';
 import type { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
@@ -19,6 +21,9 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
+import type { EventEnvelopeData } from '../event-bridge/contracts/event-envelope';
+import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
 import { ArtifactQuotaService } from './artifact-quota.service';
 import type {
   ArtifactDownloadDto,
@@ -36,6 +41,7 @@ import { Artifact } from './entities/artifact.entity';
 
 export const ARTIFACTS_BUCKET = 'artifacts';
 export const ARTIFACT_MANAGE_PERMISSION = 'artifact.manage';
+export const ARTIFACT_WRITE_PERMISSION = 'artifact.write';
 /** Upload window for a presigned POST; the reservation lives as long. */
 export const PENDING_UPLOAD_TTL_SECONDS = 15 * 60;
 /** Extra time after `expiresAt` before the sweep purges a pending or deleted row. */
@@ -54,14 +60,23 @@ export interface CreateArtifactFromBufferInput {
   metadata?: Record<string, unknown>;
 }
 
+const workspacePrefix = (workspaceId: string) => `workspaces/${workspaceId}/`;
+
 /** Keeps object keys predictable; the display name stays in the DB row. */
 export function toObjectKey(workspaceId: string, id: string, name: string) {
-  const safe = name.replace(/[^A-Za-z0-9._-]/g, '_').replace(/^[._]+/, '');
-  return `workspaces/${workspaceId}/${id}/${safe.slice(0, 200) || 'file'}`;
+  const safe = name
+    .replace(/[^A-Za-z0-9._-]/g, '_')
+    // Storage rejects any key containing '..'
+    .replace(/\.{2,}/g, '.')
+    .replace(/^[._]+/, '');
+  return `${workspacePrefix(workspaceId)}${id}/${safe.slice(0, 200) || 'file'}`;
 }
 
+const hasPermission = (permissions: string[], key: string) =>
+  permissions.includes('*') || permissions.includes(key);
+
 const canManage = (permissions: string[]) =>
-  permissions.includes('*') || permissions.includes(ARTIFACT_MANAGE_PERMISSION);
+  hasPermission(permissions, ARTIFACT_MANAGE_PERMISSION);
 
 @Injectable()
 export class ArtifactsService {
@@ -77,6 +92,7 @@ export class ArtifactsService {
     private readonly dataSource: DataSource,
     private readonly storageService: StorageService,
     private readonly quota: ArtifactQuotaService,
+    private readonly eventBridge: EventBridgeService,
   ) {}
 
   /** Reserves quota, records a pending artifact and returns a size-pinned POST. */
@@ -177,9 +193,15 @@ export class ArtifactsService {
       await this.purge(artifact.id).catch((purgeError: unknown) =>
         this.logger.warn(`Purge after failed upload: ${String(purgeError)}`),
       );
+      // The row may already be gone with its workspace, leaving purge
+      // nothing to find, so the object is deleted here as well.
+      await this.storageService
+        .deleteFile(artifact.objectKey, artifact.bucket)
+        .catch(() => undefined);
       throw error;
     }
 
+    await this.publishCreated(artifact);
     return this.toDto(artifact, input.userId);
   }
 
@@ -295,7 +317,8 @@ export class ArtifactsService {
 
   /**
    * Soft-deletes, then purges; a purge that fails or must wait for the
-   * upload form to expire is done by the sweep.
+   * upload form to expire is done by the sweep. The owner needs
+   * artifact.write, anyone else artifact.manage.
    */
   async remove(
     workspaceId: string,
@@ -304,8 +327,16 @@ export class ArtifactsService {
     permissions: string[],
   ): Promise<{ message: string }> {
     const artifact = await this.findVisible(workspaceId, userId, id, permissions);
-    if (artifact.createdByUserId !== userId && !canManage(permissions)) {
-      throw new ForbiddenException('Only the owner can delete this file');
+    const isOwner = artifact.createdByUserId === userId;
+    if (
+      !canManage(permissions) &&
+      !(isOwner && hasPermission(permissions, ARTIFACT_WRITE_PERMISSION))
+    ) {
+      throw new ForbiddenException(
+        isOwner
+          ? 'Requires artifact.write'
+          : 'Only the owner can delete this file',
+      );
     }
 
     await this.artifactRepo.update(
@@ -440,28 +471,22 @@ export class ArtifactsService {
     return purged;
   }
 
-  /** Object keys of every file in a workspace; read before deleting it. */
-  async getWorkspaceObjectKeys(workspaceId: string): Promise<string[]> {
-    const rows = await this.artifactRepo.find({
-      select: { objectKey: true },
-      where: { workspaceId },
-    });
-    return rows.map((row) => row.objectKey);
-  }
-
   /**
-   * Deletes objects whose rows are already gone (workspace deleted, rows
-   * cascaded). Nothing can retry them, so failures are only logged.
+   * Deletes every object under a deleted workspace's prefix. Runs after its
+   * rows are gone, so an agent upload that landed meanwhile goes too. Never
+   * throws: nothing is left to retry it, so failures are only logged.
    */
-  async deleteObjects(objectKeys: string[]): Promise<void> {
-    for (const key of objectKeys) {
-      await this.storageService
-        .deleteFile(key, ARTIFACTS_BUCKET)
-        .catch((error: unknown) => {
-          if (!(error instanceof NotFoundException)) {
-            this.logger.warn(`Delete of orphaned object ${key} failed: ${String(error)}`);
-          }
-        });
+  async deleteWorkspaceObjects(workspaceId: string): Promise<void> {
+    try {
+      const { failed } = await this.storageService.deleteByPrefix(
+        ARTIFACTS_BUCKET,
+        workspacePrefix(workspaceId),
+      );
+      if (failed) {
+        this.logger.warn(`${failed} object(s) of workspace ${workspaceId} were not deleted`);
+      }
+    } catch (error) {
+      this.logger.warn(`Delete of workspace ${workspaceId} objects failed: ${String(error)}`);
     }
   }
 
@@ -545,11 +570,41 @@ export class ArtifactsService {
     });
   }
 
+  /** Turns the reservation into usage; fails if the row went away meanwhile. */
   private async markReady(manager: EntityManager, artifact: Artifact) {
-    await this.quota.commit(manager, artifact.workspaceId, artifact.sizeBytes);
     // `expiresAt` stays: `purge` keeps a deleted row until the form expires.
-    await manager.update(Artifact, artifact.id, { status: ArtifactStatus.READY });
+    const { affected } = await manager.update(
+      Artifact,
+      { id: artifact.id, status: ArtifactStatus.PENDING },
+      { status: ArtifactStatus.READY },
+    );
+    if (!affected) {
+      throw new NotFoundException('File was removed during upload');
+    }
+    await this.quota.commit(manager, artifact.workspaceId, artifact.sizeBytes);
     artifact.status = ArtifactStatus.READY;
+  }
+
+  private async publishCreated(artifact: Artifact): Promise<void> {
+    await this.eventBridge.publishSafely(
+      EVENT_CATALOG.artifact.created,
+      {
+        workspaceId: artifact.workspaceId,
+        actor: {
+          type: AuditActorType.Agent,
+          ...(artifact.createdByUserId ? { id: artifact.createdByUserId } : {}),
+        },
+        outcome: AuditOutcome.Success,
+        resourceType: 'artifact',
+        resourceId: artifact.id,
+        metadata: {
+          source: artifact.source,
+          sizeBytes: artifact.sizeBytes,
+          mimeType: artifact.mimeType,
+        },
+      } satisfies EventEnvelopeData,
+      { subject: `workspace:${artifact.workspaceId}/artifact:${artifact.id}` },
+    );
   }
 
   private presignDownload(artifact: Artifact): Promise<ArtifactDownloadDto> {
@@ -557,7 +612,9 @@ export class ArtifactsService {
       bucket: artifact.bucket,
       key: artifact.objectKey,
       fileName: artifact.name,
-      contentType: artifact.mimeType,
+      // Never the stored type: storage is proxied on the app origin, so a
+      // file served as a script or stylesheet could be loaded by a page.
+      contentType: 'application/octet-stream',
       expiresIn: DOWNLOAD_TTL_SECONDS,
     });
   }

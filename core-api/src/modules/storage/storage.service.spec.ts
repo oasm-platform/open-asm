@@ -13,6 +13,7 @@ import {
   CreateBucketCommand,
   GetBucketPolicyStatusCommand,
   HeadBucketCommand,
+  ListObjectsV2Command,
   PutBucketCorsCommand,
   PutBucketPolicyCommand,
   PutObjectCommand,
@@ -106,6 +107,48 @@ describe('StorageService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+  });
+
+  describe('deleteByPrefix', () => {
+    it('should delete every listed object under the prefix, page by page', async () => {
+      sendMock.mockImplementation((command: { input: Record<string, unknown> }) => {
+        if (command instanceof ListObjectsV2Command) {
+          return Promise.resolve(
+            command.input.ContinuationToken
+              ? { Contents: [{ Key: 'workspaces/w/b/2.md' }] }
+              : {
+                  Contents: [{ Key: 'workspaces/w/a/1.md' }],
+                  NextContinuationToken: 'token-2',
+                },
+          );
+        }
+        return command.input.Key === 'workspaces/w/b/2.md'
+          ? Promise.reject(new Error('boom'))
+          : Promise.resolve({});
+      });
+
+      await expect(service.deleteByPrefix('artifacts', 'workspaces/w/')).resolves.toEqual({
+        deleted: 1,
+        failed: 1,
+      });
+      expect(sendMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          input: { Bucket: 'artifacts', Prefix: 'workspaces/w/', ContinuationToken: undefined },
+        }),
+      );
+      expect(sendMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          input: { Bucket: 'artifacts', Key: 'workspaces/w/a/1.md' },
+        }),
+      );
+    });
+
+    it('should refuse an empty prefix, which would match the whole bucket', async () => {
+      await expect(service.deleteByPrefix('artifacts', ' ')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(sendMock).not.toHaveBeenCalled();
+    });
   });
 
   describe('listFiles', () => {

@@ -890,6 +890,50 @@ export class StorageService implements OnModuleInit {
     return files;
   }
 
+  /**
+   * Deletes every object whose key starts with `prefix`, one listing page at
+   * a time. A failed delete is counted rather than thrown, so one bad object
+   * cannot stop the rest of the cleanup.
+   */
+  public async deleteByPrefix(
+    bucket: string,
+    prefix: string,
+  ): Promise<{ deleted: number; failed: number }> {
+    // An empty prefix would match the whole bucket.
+    if (!prefix.trim()) {
+      throw new BadRequestException('prefix is required');
+    }
+    const client = this.rustFsClient.getClient();
+    let deleted = 0;
+    let failed = 0;
+    let continuationToken: string | undefined;
+
+    do {
+      const response = await client.send(
+        new ListObjectsV2Command({
+          Bucket: bucket,
+          Prefix: prefix,
+          ContinuationToken: continuationToken,
+        }),
+      );
+      for (const { Key } of response.Contents ?? []) {
+        if (!Key) continue;
+        try {
+          await client.send(new DeleteObjectCommand({ Bucket: bucket, Key }));
+          deleted++;
+        } catch (error: unknown) {
+          failed++;
+          this.logger.warn(
+            `Failed to delete ${bucket}/${Key}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+      continuationToken = response.NextContinuationToken;
+    } while (continuationToken);
+
+    return { deleted, failed };
+  }
+
   public async deleteFile(
     filePath: string,
     bucket: string = 'default',

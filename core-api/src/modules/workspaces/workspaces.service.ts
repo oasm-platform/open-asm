@@ -368,9 +368,6 @@ export class WorkspacesService implements OnModuleInit {
     // audit row must stay atomic with the workspace-row delete below).
     await this.deleteAllTargetsFromWorkspace(id);
 
-    // File rows cascade with the workspace; their objects go once it is gone.
-    const artifactKeys = await this.artifactsService.getWorkspaceObjectKeys(id);
-
     await this.dataSource.transaction(async (manager) => {
       await manager.delete(Workspace, { id });
       if (auditContext) {
@@ -386,7 +383,9 @@ export class WorkspacesService implements OnModuleInit {
         });
       }
     });
-    await this.artifactsService.deleteObjects(artifactKeys);
+    // File rows cascaded above; their objects go in the background, since a
+    // large workspace would outlast the request.
+    void this.artifactsService.deleteWorkspaceObjects(id);
 
     return {
       message: 'Workspace deleted successfully',

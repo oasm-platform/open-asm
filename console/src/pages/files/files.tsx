@@ -46,6 +46,7 @@ const ACCESS_LABEL: Record<ArtifactDto['shareType'], string> = {
 export function Files() {
   const { hasPermission } = usePermission();
   const canManage = hasPermission('artifact.manage');
+  const canWrite = hasPermission('artifact.write');
   const [scope, setScope] = useQueryTab({
     tabParam: 'scope',
     defaultValue: 'mine',
@@ -195,7 +196,7 @@ export function Files() {
                 <Download className="h-4 w-4" />
               </Button>
             )}
-            {file.isOwner && (
+            {file.isOwner && canWrite && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -205,7 +206,7 @@ export function Files() {
                 <Share2 className="h-4 w-4" />
               </Button>
             )}
-            {(file.isOwner || canManage) && (
+            {((file.isOwner && canWrite) || canManage) && (
               <ConfirmDialog
                 title="Delete file"
                 description={`Delete "${file.name}"? This cannot be undone.`}

@@ -2,6 +2,7 @@ import {
   ArtifactShareType,
   ArtifactSource,
   ArtifactStatus,
+  AuditActorType,
 } from '@/common/enums/enum';
 import type { StorageService } from '@/modules/storage/storage.service';
 import {
@@ -13,6 +14,7 @@ import {
   PayloadTooLargeException,
 } from '@nestjs/common';
 import type { DataSource, Repository } from 'typeorm';
+import type { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
 import type { ArtifactQuotaService } from './artifact-quota.service';
 import {
   ArtifactsService,
@@ -59,13 +61,14 @@ describe('ArtifactsService', () => {
   let membersRepo: { find: jest.Mock };
   let storage: Record<string, jest.Mock>;
   let quota: Record<string, jest.Mock>;
+  let eventBridge: { publishSafely: jest.Mock };
 
   beforeEach(() => {
     manager = {
       findOne: jest.fn(),
       create: jest.fn((_entity, value: unknown) => value),
       save: jest.fn((value: unknown) => Promise.resolve(value)),
-      update: jest.fn(),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
       delete: jest.fn(),
       insert: jest.fn(),
     };
@@ -95,7 +98,8 @@ describe('ArtifactsService', () => {
         expiresAt: new Date(),
       }),
       headObject: jest.fn(),
-      deleteFile: jest.fn(),
+      deleteFile: jest.fn().mockResolvedValue(undefined),
+      deleteByPrefix: jest.fn().mockResolvedValue({ deleted: 0, failed: 0 }),
       uploadFile: jest.fn(),
       getPresignedDownloadUrl: jest
         .fn()
@@ -108,6 +112,7 @@ describe('ArtifactsService', () => {
       releaseReserved: jest.fn(),
       releaseUsed: jest.fn(),
     };
+    eventBridge = { publishSafely: jest.fn() };
     const dataSource = {
       transaction: jest.fn((cb: (m: unknown) => unknown) => cb(manager)),
       getRepository: jest.fn(() => membersRepo),
@@ -120,6 +125,7 @@ describe('ArtifactsService', () => {
       dataSource as unknown as DataSource,
       storage as unknown as StorageService,
       quota as unknown as ArtifactQuotaService,
+      eventBridge as unknown as EventBridgeService,
     );
   });
 
@@ -127,6 +133,10 @@ describe('ArtifactsService', () => {
     it('scopes keys by workspace and artifact and strips unsafe characters', () => {
       expect(toObjectKey('w', 'a', '../bá o?.txt')).toBe('workspaces/w/a/b__o_.txt');
       expect(toObjectKey('w', 'a', '...')).toBe('workspaces/w/a/file');
+    });
+
+    it('collapses consecutive dots, which storage rejects in a key', () => {
+      expect(toObjectKey('w', 'a', 'v2..final...pdf')).toBe('workspaces/w/a/v2.final.pdf');
     });
   });
 
@@ -211,9 +221,11 @@ describe('ArtifactsService', () => {
         status: 'ready',
       });
       expect(quota.commit).toHaveBeenCalledWith(manager, WS, 100);
-      expect(manager.update).toHaveBeenCalledWith(expect.anything(), 'artifact-1', {
-        status: ArtifactStatus.READY,
-      });
+      expect(manager.update).toHaveBeenCalledWith(
+        expect.anything(),
+        { id: 'artifact-1', status: ArtifactStatus.PENDING },
+        { status: ArtifactStatus.READY },
+      );
     });
 
     it('deletes the object and releases the reservation on a size mismatch', async () => {
@@ -255,9 +267,9 @@ describe('ArtifactsService', () => {
       );
     });
 
-    it('lets a member the file is shared with download it', async () => {
+    it('lets a member the file is shared with download it as an opaque attachment', async () => {
       artifactRepo.findOne.mockResolvedValue(
-        makeArtifact({ shareType: ArtifactShareType.SHARED }),
+        makeArtifact({ shareType: ArtifactShareType.SHARED, mimeType: 'text/javascript' }),
       );
       shareRepo.existsBy.mockResolvedValue(true);
 
@@ -266,7 +278,11 @@ describe('ArtifactsService', () => {
         expiresIn: 300,
       });
       expect(storage.getPresignedDownloadUrl).toHaveBeenCalledWith(
-        expect.objectContaining({ fileName: 'report.pdf', expiresIn: 300 }),
+        expect.objectContaining({
+          fileName: 'report.pdf',
+          contentType: 'application/octet-stream',
+          expiresIn: 300,
+        }),
       );
     });
 
@@ -385,9 +401,29 @@ describe('ArtifactsService', () => {
       artifactRepo.findOne.mockResolvedValue(
         makeArtifact({ shareType: ArtifactShareType.PUBLIC }),
       );
-      await expect(service.remove(WS, OTHER, 'artifact-1', [])).rejects.toThrow(
-        ForbiddenException,
+      await expect(
+        service.remove(WS, OTHER, 'artifact-1', ['artifact.write']),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('refuses the owner without artifact.write', async () => {
+      artifactRepo.findOne.mockResolvedValue(makeArtifact());
+      await expect(
+        service.remove(WS, OWNER, 'artifact-1', ['artifact.read']),
+      ).rejects.toThrow(ForbiddenException);
+      expect(artifactRepo.update).not.toHaveBeenCalled();
+    });
+
+    it('lets the owner with artifact.write delete', async () => {
+      artifactRepo.findOne.mockResolvedValue(makeArtifact());
+      manager.findOne.mockResolvedValue(
+        makeArtifact({ status: ArtifactStatus.DELETED, source: ArtifactSource.AGENT }),
       );
+
+      await expect(
+        service.remove(WS, OWNER, 'artifact-1', ['artifact.read', 'artifact.write']),
+      ).resolves.toEqual({ message: 'File deleted' });
+      expect(quota.releaseUsed).toHaveBeenCalledWith(manager, WS, 100);
     });
 
     it('lets artifact.manage delete and releases used bytes after the object is gone', async () => {
@@ -498,7 +534,7 @@ describe('ArtifactsService', () => {
   });
 
   describe('createFromBuffer', () => {
-    it('uploads, commits usage and records the agent source', async () => {
+    it('uploads, commits usage, records the agent source and audits the save', async () => {
       const dto = await service.createFromBuffer({
         workspaceId: WS,
         userId: OWNER,
@@ -518,6 +554,16 @@ describe('ArtifactsService', () => {
       );
       expect(quota.commit).toHaveBeenCalledWith(manager, WS, 5);
       expect(dto).toMatchObject({ source: 'agent', status: 'ready', sizeBytes: 5 });
+      expect(eventBridge.publishSafely).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'artifact.created' }),
+        expect.objectContaining({
+          workspaceId: WS,
+          actor: { type: AuditActorType.Agent, id: OWNER },
+          resourceType: 'artifact',
+          resourceId: dto.id,
+        }),
+        { subject: `workspace:${WS}/artifact:${dto.id}` },
+      );
     });
 
     it('releases the reservation when the upload fails', async () => {
@@ -538,6 +584,41 @@ describe('ArtifactsService', () => {
       ).rejects.toThrow('s3 down');
       expect(quota.releaseReserved).toHaveBeenCalledWith(manager, WS, 5);
       expect(quota.commit).not.toHaveBeenCalled();
+      expect(eventBridge.publishSafely).not.toHaveBeenCalled();
+    });
+
+    it('deletes the object when the row went away during the upload', async () => {
+      // Workspace deleted mid-upload: the row cascaded, so nothing turns ready.
+      manager.update.mockResolvedValue({ affected: 0 });
+      manager.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.createFromBuffer({
+          workspaceId: WS,
+          userId: OWNER,
+          source: ArtifactSource.AGENT,
+          name: 'notes.md',
+          mimeType: 'text/markdown',
+          buffer: Buffer.from('hello'),
+        }),
+      ).rejects.toThrow(NotFoundException);
+      expect(quota.commit).not.toHaveBeenCalled();
+      expect(storage.deleteFile).toHaveBeenCalledWith(
+        expect.stringMatching(/notes\.md$/),
+        'artifacts',
+      );
+    });
+  });
+
+  describe('deleteWorkspaceObjects', () => {
+    it('deletes everything under the workspace prefix', async () => {
+      await service.deleteWorkspaceObjects(WS);
+      expect(storage.deleteByPrefix).toHaveBeenCalledWith('artifacts', `workspaces/${WS}/`);
+    });
+
+    it('never throws: the workspace is already gone', async () => {
+      storage.deleteByPrefix.mockRejectedValue(new Error('s3 down'));
+      await expect(service.deleteWorkspaceObjects(WS)).resolves.toBeUndefined();
     });
   });
 });

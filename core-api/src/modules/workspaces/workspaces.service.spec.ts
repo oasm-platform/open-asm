@@ -41,8 +41,7 @@ describe('WorkspacesService', () => {
   };
   let mockDataSource: Partial<DataSource>;
   let mockArtifactsService: {
-    getWorkspaceObjectKeys: jest.Mock;
-    deleteObjects: jest.Mock;
+    deleteWorkspaceObjects: jest.Mock;
   };
   let mockManager: any;
   let fixedTransactionalRepository: {
@@ -237,8 +236,7 @@ describe('WorkspacesService', () => {
     };
 
     mockArtifactsService = {
-      getWorkspaceObjectKeys: jest.fn().mockResolvedValue(['workspaces/ws/a/f.txt']),
-      deleteObjects: jest.fn().mockResolvedValue(undefined),
+      deleteWorkspaceObjects: jest.fn().mockResolvedValue(undefined),
     };
 
     mockDataSource = {
@@ -1119,12 +1117,9 @@ describe('WorkspacesService', () => {
       expect(mockManager.delete).toHaveBeenCalledWith(Workspace, {
         id: testWorkspaceId,
       });
-      expect(mockArtifactsService.getWorkspaceObjectKeys).toHaveBeenCalledWith(
+      expect(mockArtifactsService.deleteWorkspaceObjects).toHaveBeenCalledWith(
         testWorkspaceId,
       );
-      expect(mockArtifactsService.deleteObjects).toHaveBeenCalledWith([
-        'workspaces/ws/a/f.txt',
-      ]);
       expect(mockAuditService.recordInTx).toHaveBeenCalledTimes(1);
       expect(mockAuditService.recordInTx).toHaveBeenCalledWith(
         mockManager,
@@ -1194,7 +1189,7 @@ describe('WorkspacesService', () => {
 
       expect(mockAuditService.recordInTx).not.toHaveBeenCalled();
       // The rows survived, so their files must too.
-      expect(mockArtifactsService.deleteObjects).not.toHaveBeenCalled();
+      expect(mockArtifactsService.deleteWorkspaceObjects).not.toHaveBeenCalled();
     });
 
     it('removeMember records member.removed in the tx and pseudonymizes the removed user after commit (scenario 9)', async () => {

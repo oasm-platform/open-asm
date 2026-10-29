@@ -157,10 +157,13 @@ export class EventPublishInterceptor implements NestInterceptor {
       const resourceType = config.resourceType ?? name.split('.')[0];
       // A failed request has no result to read an id from, so the route param is
       // the only thing that can still correlate the attempt to a resource — same
-      // fallback the old audit interceptor used.
+      // fallback the old audit interceptor used. Handlers whose result never
+      // carries the id opt in to the same fallback on success.
       const resourceId =
         extract.resourceId ??
-        (outcome === AuditOutcome.Failure ? this.routeParamId(req) : undefined);
+        (config.resourceIdFromRoute || outcome === AuditOutcome.Failure
+          ? this.routeParamId(req)
+          : undefined);
       const subject =
         extract.subject ??
         `workspace:${workspaceId}/${resourceType}${

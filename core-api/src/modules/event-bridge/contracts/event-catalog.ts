@@ -419,9 +419,11 @@ export const EVENT_CATALOG = {
     },
   },
   artifact: {
+    created: { name: 'artifact.created', summary: 'File saved by an agent' },
     downloaded: { name: 'artifact.downloaded', summary: 'File downloaded' },
     updated: { name: 'artifact.updated', summary: 'File access changed' },
     shared: { name: 'artifact.shared', summary: 'File shared with members' },
+    unshared: { name: 'artifact.unshared', summary: 'File unshared from a member' },
     deleted: { name: 'artifact.deleted', summary: 'File deleted' },
   },
   storage: {

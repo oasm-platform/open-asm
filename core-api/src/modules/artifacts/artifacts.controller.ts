@@ -111,7 +111,7 @@ export class ArtifactsController {
     response: { serialization: ArtifactDownloadDto },
     request: { getWorkspaceId: true },
   })
-  @PublishEvent(EVENT_CATALOG.artifact.downloaded)
+  @PublishEvent(EVENT_CATALOG.artifact.downloaded, { resourceIdFromRoute: true })
   @WorkspaceAccess('artifact.read')
   @Get(':id/download')
   download(
@@ -147,12 +147,13 @@ export class ArtifactsController {
   @Doc({
     summary: 'Delete a file',
     description:
-      'Deletes the file and releases its storage. Allowed for the creator and artifact.manage holders.',
+      'Deletes the file and releases its storage. Allowed for the creator (with artifact.write) and artifact.manage holders.',
     response: { serialization: DefaultMessageResponseDto },
     request: { getWorkspaceId: true },
   })
-  @PublishEvent(EVENT_CATALOG.artifact.deleted)
-  @WorkspaceAccess('artifact.write')
+  @PublishEvent(EVENT_CATALOG.artifact.deleted, { resourceIdFromRoute: true })
+  // The service checks artifact.write (owner) or artifact.manage (anyone's file).
+  @WorkspaceAccess('artifact.read')
   @Delete(':id')
   remove(
     @Param() { id }: IdQueryParamDto,
@@ -191,6 +192,7 @@ export class ArtifactsController {
     request: { getWorkspaceId: true },
   })
   @PublishEvent(EVENT_CATALOG.artifact.shared, {
+    resourceIdFromRoute: true,
     metadata: (_body, result) => ({
       shared: (result as ShareArtifactResponseDto | undefined)?.shared ?? 0,
     }),
@@ -216,6 +218,7 @@ export class ArtifactsController {
     response: { serialization: DefaultMessageResponseDto },
     request: { getWorkspaceId: true },
   })
+  @PublishEvent(EVENT_CATALOG.artifact.unshared, { resourceIdFromRoute: true })
   @WorkspaceAccess('artifact.write')
   @Delete(':id/shares/:userId')
   removeShare(

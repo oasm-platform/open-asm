@@ -16242,7 +16242,7 @@ export const useArtifactsControllerUpdate = <
 };
 
 /**
- * Deletes the file and releases its storage. Allowed for the creator and artifact.manage holders.
+ * Deletes the file and releases its storage. Allowed for the creator (with artifact.write) and artifact.manage holders.
  * @summary Delete a file
  */
 export const artifactsControllerRemove = (

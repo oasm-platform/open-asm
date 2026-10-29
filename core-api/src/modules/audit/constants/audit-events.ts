@@ -77,10 +77,12 @@ export const AUDIT_ACTION_CATALOG = [
   { action: 'api_key.revoked', label: 'Revoked API key', controller: 'ApiKeysController', method: 'revoke' },
   // audit (35)
   { action: 'audit.exported', label: 'Exported audit log', controller: 'AuditEventsController', method: 'exportAuditEvents' },
-  // artifacts / storage (36–40)
+  // artifacts / storage (36–42)
+  { action: 'artifact.created', label: 'Agent saved file', controller: 'AgentsController', method: 'streamMessage' },
   { action: 'artifact.downloaded', label: 'Downloaded file', controller: 'ArtifactsController', method: 'download' },
   { action: 'artifact.updated', label: 'Changed file access', controller: 'ArtifactsController', method: 'update' },
   { action: 'artifact.shared', label: 'Shared file', controller: 'ArtifactsController', method: 'addShares' },
+  { action: 'artifact.unshared', label: 'Unshared file', controller: 'ArtifactsController', method: 'removeShare' },
   { action: 'artifact.deleted', label: 'Deleted file', controller: 'ArtifactsController', method: 'remove' },
   { action: 'storage.quota.updated', label: 'Changed storage quota', controller: 'AdminWorkspacesController', method: 'updateStorageQuota' },
 ] as const satisfies readonly AuditActionEntry[];

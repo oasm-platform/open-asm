@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class AddArtifacts1793088593368 implements MigrationInterface {
-    name = 'AddArtifacts1793088593368'
+export class AddArtifacts1793247842288 implements MigrationInterface {
+    name = 'AddArtifacts1793247842288'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`CREATE TABLE "workspace_storage_usage" ("workspaceId" uuid NOT NULL, "quotaBytes" bigint, "usedBytes" bigint NOT NULL DEFAULT '0', "reservedBytes" bigint NOT NULL DEFAULT '0', "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "CHK_wsu_quota_nonneg" CHECK ("quotaBytes" IS NULL OR "quotaBytes" >= 0), CONSTRAINT "CHK_wsu_reserved_nonneg" CHECK ("reservedBytes" >= 0), CONSTRAINT "CHK_wsu_used_nonneg" CHECK ("usedBytes" >= 0), CONSTRAINT "PK_5383288b693046e70f095922e85" PRIMARY KEY ("workspaceId"))`);
