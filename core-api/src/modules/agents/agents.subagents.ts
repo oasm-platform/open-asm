@@ -38,23 +38,26 @@ import {
 import { DEFAULT_MAX_STEPS, stepLimit } from './shared/step-limit';
 import { addSteps, emptyStats, finalizeStats } from './shared/turn-stats';
 
-/** Background runs per process. */
-export const SUBAGENT_MAX_CONCURRENCY = 2;
+/**
+ * Background runs per process. Wide enough that one conversation can fan out
+ * over several independent surfaces at once without starving the others.
+ */
+export const SUBAGENT_MAX_CONCURRENCY = 4;
 /** Pending + running subagents allowed per conversation. */
-export const SUBAGENT_MAX_ACTIVE_PER_CONVERSATION = 5;
+export const SUBAGENT_MAX_ACTIVE_PER_CONVERSATION = 10;
 export const SUBAGENT_TASK_MAX_CHARS = 8_000;
 export const SUBAGENT_RESULT_MAX_CHARS = 20_000;
 /** Restarts a stale run survives before it is marked failed. */
 export const SUBAGENT_MAX_ATTEMPTS = 2;
-export const SUBAGENT_JOB_TIMEOUT_MS = 10 * 60_000;
+export const SUBAGENT_JOB_TIMEOUT_MS = 20 * 60_000;
 /** A running row with no heartbeat for this long was interrupted. */
 export const SUBAGENT_STALE_MS = 2 * 60_000;
 export const SUBAGENT_HEARTBEAT_MS = 30_000;
 export const SUBAGENT_SWEEP_MS = 30_000;
 /** Total time one user turn may wait for its subagents. */
-export const SUBAGENT_WAIT_BUDGET_MS = 5 * 60_000;
+export const SUBAGENT_WAIT_BUDGET_MS = 8 * 60_000;
 /** Times one user turn may resume with subagent results. */
-export const SUBAGENT_MAX_ROUNDS_PER_TURN = 3;
+export const SUBAGENT_MAX_ROUNDS_PER_TURN = 5;
 /** Cap of each tool input/output and step text in the transcript. */
 export const SUBAGENT_TRANSCRIPT_FIELD_MAX_CHARS = 4_000;
 /** Steps stop being recorded once a run's transcript reaches this size. */
@@ -253,14 +256,18 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
       : '';
     return (
       '## Available Subagents\n' +
-      'You are the main agent and talk with the user. Prefer to delegate: when a request (or a part of it) matches a subagent below, ' +
-      'make that part a plan step and run it with `dispatch_subagent(name, task)` instead of doing it yourself. ' +
-      'A subagent has its own context and tools and keeps the heavy work (scanning, enumeration, research, reporting) out of yours, ' +
-      'so reach for one whenever the work fits a role — not only for large tasks.\n' +
-      'Do it yourself only for small talk, a single quick lookup, and the final answer to the user.\n' +
-      'A subagent runs in the background and returns a summary; results are delivered to you automatically when it finishes ' +
-      '(use `get_subagent_result(id)` to check early). Dispatch independent subagents in the same step so they run in parallel, ' +
-      'then check their results in a later step. Write each task so it stands alone: include the ids, targets and the question.\n' +
+      'You are the main agent: you orchestrate and talk with the user, subagents do the work. ' +
+      'Anything that touches a target — scanning, enumeration, crawling, fuzzing, payload spraying, reproducing a finding, reading a repository — ' +
+      'is a subagent\'s job, even when it looks small. Make it a plan step and run it with `dispatch_subagent(name, task)`.\n' +
+      'Keep for yourself only small talk, workspace lookups, plan and memory bookkeeping, reading subagent output, and the final answer.\n' +
+      'How to delegate well:\n' +
+      '- Dispatch wide in ONE step: independent subagents go in the same step so they run in parallel; never dispatch one and wait while nothing else runs.\n' +
+      '- One job per subagent, one target per job. Split a surface into as many subagents as it has independent dimensions (per host, per endpoint group, per vulnerability class, per validation).\n' +
+      '- Re-dispatch on every new surface: a new host, endpoint group, parameter cluster, JS bundle, login form or technology version is a new subagent, not a new step inside the one that found it.\n' +
+      '- Every candidate finding gets its own validation subagent, and that verifier is not told the expected verdict or the payload that supposedly worked.\n' +
+      '- Write each task so it stands alone: the exact target and ids, what is already known, the tool to use, and the evidence that ends the job. Never a vague brief.\n' +
+      '- A subagent runs in the background and returns a summary; results are delivered to you automatically when it finishes ' +
+      '(use `get_subagent_result(id)` to check early). Judge a result against the goal and read the raw lines behind it with `read_tool_output` before calling anything confirmed.\n' +
       lines.join('\n') +
       closing
     );
@@ -514,12 +521,26 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
         workspaceId,
         overrides.skills ?? [],
       );
+      // Short-term memory is the conversation's scratchpad: a subagent that
+      // writes its facts there hands them to the next step instead of losing
+      // them with its own context. Long-term memory stays with the main agent.
+      const stmTools = this.agentTool.getMemoryTools(
+        workspaceId,
+        userId,
+        conversation.id,
+      );
+      const requested = subagentToolNames(def, allowWrite);
       const tools = withoutDisabledTools<Record<string, Tool>>(
         {
           ...Object.fromEntries(
-            subagentToolNames(def, allowWrite)
+            requested
               .filter((t) => allTools[t])
               .map((t) => [t, allTools[t]]),
+          ),
+          ...Object.fromEntries(
+            requested
+              .filter((t) => t.startsWith('stm_') && t in stmTools)
+              .map((t) => [t, stmTools[t] as Tool]),
           ),
           ...(skills.length > 0
             ? {
@@ -831,7 +852,8 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
       description:
         'Delegate a self-contained task to the background subagent whose role matches it (see Available Subagents). ' +
         'A built-in subagent runs the security tools its role needs (scans, connectors, commands on the pinned worker); a custom one runs them when the conversation is in auto-approval. ' +
-        'Returns immediately with the subagent id; the result is delivered to you automatically when it finishes. Independent subagents can be dispatched in parallel.',
+        'Returns immediately with the subagent id; the result is delivered to you automatically when it finishes. Independent subagents can be dispatched in parallel. ' +
+        'Dispatch one subagent per independent surface, in the same step, rather than doing the work yourself or running them one after another.',
       inputSchema: z.object({
         name: z
           .string()

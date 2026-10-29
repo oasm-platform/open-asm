@@ -185,6 +185,13 @@ describe('AgentsSubagentsService', () => {
           ].map((t) => [t, { description: t, execute: jest.fn() }]),
         ),
       ),
+      getMemoryTools: jest.fn(() =>
+        Object.fromEntries(
+          ['stm_write', 'stm_read', 'stm_list', 'ltm_write', 'ltm_read'].map(
+            (t) => [t, { description: t, execute: jest.fn() }],
+          ),
+        ),
+      ),
     };
     definitions = {
       listSubagents: jest.fn(() => Promise.resolve([definition()])),
@@ -297,6 +304,29 @@ describe('AgentsSubagentsService', () => {
     const call = (streamText as jest.Mock).mock.calls[0][0];
     expect(Object.keys(call.tools)).toEqual(
       expect.arrayContaining(['inspect_issue', 'execute_remote_command']),
+    );
+  });
+
+  it('gives a subagent the short-term memory tools it declares, never the long-term ones', async () => {
+    definitions.listSubagents.mockResolvedValue([
+      definition({ metadata: { tools: ['inspect_issue', 'stm_write', 'stm_read', 'ltm_write', 'ltm_read'] } }),
+    ]);
+    (streamText as jest.Mock).mockReturnValue(
+      streamResult({ text: 'ok', steps: [] }),
+    );
+    await (service as unknown as { run: (j: unknown) => Promise<void> }).run({
+      id: 's1',
+      conversationId: 'c1',
+      name: 'researcher',
+      task: 't',
+    });
+
+    const call = (streamText as jest.Mock).mock.calls[0][0];
+    expect(Object.keys(call.tools)).toEqual(
+      expect.arrayContaining(['stm_write', 'stm_read']),
+    );
+    expect(Object.keys(call.tools)).not.toEqual(
+      expect.arrayContaining(['ltm_write', 'ltm_read']),
     );
   });
 
