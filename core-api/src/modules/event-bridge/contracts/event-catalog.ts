@@ -419,28 +419,10 @@ export const EVENT_CATALOG = {
     },
   },
   artifact: {
-    created: { name: 'artifact.created', summary: 'File upload started' },
-    upload: {
-      completed: {
-        name: 'artifact.upload.completed',
-        summary: 'File upload completed',
-      },
-    },
     downloaded: { name: 'artifact.downloaded', summary: 'File downloaded' },
-    updated: { name: 'artifact.updated', summary: 'File renamed or access changed' },
+    updated: { name: 'artifact.updated', summary: 'File access changed' },
     shared: { name: 'artifact.shared', summary: 'File shared with members' },
     deleted: { name: 'artifact.deleted', summary: 'File deleted' },
-    folder: {
-      created: { name: 'artifact.folder.created', summary: 'Folder created' },
-      updated: {
-        name: 'artifact.folder.updated',
-        summary: 'Folder renamed or moved',
-      },
-      deleted: {
-        name: 'artifact.folder.deleted',
-        summary: 'Folder and its contents deleted',
-      },
-    },
   },
   storage: {
     object: {

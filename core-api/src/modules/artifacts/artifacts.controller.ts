@@ -32,11 +32,9 @@ import {
   ArtifactUsageDto,
   ArtifactUserDto,
   GetArtifactsQueryDto,
-  PresignArtifactDto,
-  PresignArtifactResponseDto,
   ShareArtifactDto,
   ShareArtifactResponseDto,
-  UpdateArtifactDto,
+  UpdateArtifactAccessDto,
 } from './dto/artifacts.dto';
 
 const artifactId = (result: unknown) => (result as { id?: string })?.id;
@@ -48,51 +46,6 @@ export class ArtifactsController {
     private readonly artifactsService: ArtifactsService,
     private readonly quotaService: ArtifactQuotaService,
   ) {}
-
-  @Doc({
-    summary: 'Start a file upload',
-    description:
-      'Reserves workspace quota for a pending file and returns a presigned POST whose policy pins the exact size and content type. Returns 409 STORAGE_QUOTA_EXCEEDED when the workspace is full.',
-    response: { serialization: PresignArtifactResponseDto },
-    request: { getWorkspaceId: true },
-  })
-  @PublishEvent(EVENT_CATALOG.artifact.created, {
-    resourceId: (result) =>
-      (result as PresignArtifactResponseDto | undefined)?.artifact.id,
-    metadata: (body) => ({
-      sizeBytes: (body as PresignArtifactDto).sizeBytes,
-      contentType: (body as PresignArtifactDto).contentType,
-    }),
-  })
-  @WorkspaceAccess('artifact.write')
-  @Post('presign')
-  presign(
-    @Body() dto: PresignArtifactDto,
-    @WorkspaceId() workspaceId: string,
-    @UserContext() user: UserContextPayload,
-  ) {
-    return this.artifactsService.presignUpload(workspaceId, user.id, dto);
-  }
-
-  @Doc({
-    summary: 'Finish a file upload',
-    description:
-      'Checks the uploaded object against the declared size and marks the file ready. Creator only.',
-    response: { serialization: ArtifactDto },
-    request: { getWorkspaceId: true },
-  })
-  @PublishEvent(EVENT_CATALOG.artifact.upload.completed, {
-    resourceId: artifactId,
-  })
-  @WorkspaceAccess('artifact.write')
-  @Post(':id/complete')
-  complete(
-    @Param() { id }: IdQueryParamDto,
-    @WorkspaceId() workspaceId: string,
-    @UserContext() user: UserContextPayload,
-  ) {
-    return this.artifactsService.completeUpload(workspaceId, user.id, id);
-  }
 
   @Doc({
     summary: 'List files',
@@ -170,25 +123,21 @@ export class ArtifactsController {
   }
 
   @Doc({
-    summary: 'Rename a file or change its access',
+    summary: 'Change who can access a file',
     response: { serialization: ArtifactDto },
     request: { getWorkspaceId: true },
   })
   @PublishEvent(EVENT_CATALOG.artifact.updated, {
     resourceId: artifactId,
-    changes: (body) => {
-      const { name, shareType } = body as UpdateArtifactDto;
-      return {
-        ...(name !== undefined ? { name: { after: name } } : {}),
-        ...(shareType !== undefined ? { shareType: { after: shareType } } : {}),
-      };
-    },
+    changes: (body) => ({
+      shareType: { after: (body as UpdateArtifactAccessDto).shareType },
+    }),
   })
   @WorkspaceAccess('artifact.write')
   @Patch(':id')
   update(
     @Param() { id }: IdQueryParamDto,
-    @Body() dto: UpdateArtifactDto,
+    @Body() dto: UpdateArtifactAccessDto,
     @WorkspaceId() workspaceId: string,
     @UserContext() user: UserContextPayload,
   ) {

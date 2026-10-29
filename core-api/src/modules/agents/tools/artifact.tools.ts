@@ -34,7 +34,7 @@ export function artifactTools(
     }),
     execute: (params: { fileName: string; content: string; mimeType: string }) =>
       failSoft('save file', async () => {
-        // Same rule as POST /artifacts/presign; chat itself needs no permission.
+        // Saving needs artifact.write; chat itself needs no permission.
         const { permissionKeys } =
           await deps.workspacesService.getMembershipWithPermissions(workspaceId, userId);
         if (!permissionKeys.includes('*') && !permissionKeys.includes('artifact.write')) {

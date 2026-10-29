@@ -46,31 +46,6 @@ export async function uploadToPresignedUrl(
 }
 
 /**
- * Upload a file with a presigned POST (multipart form). The signed policy pins
- * the key, content type and exact byte size, so storage itself rejects any
- * other file.
- *
- * @param url POST target from the presign endpoint.
- * @param fields Policy fields; S3 requires them before the `file` field.
- * @param file The file to store.
- * @returns The successful response (2xx).
- */
-export async function uploadToPresignedPost(
-  url: string,
-  fields: Record<string, string>,
-  file: Blob,
-): Promise<Response> {
-  const form = new FormData();
-  for (const [key, value] of Object.entries(fields)) {
-    form.append(key, value);
-  }
-  form.append('file', file);
-  const res = await fetch(url, { method: 'POST', body: form });
-  await throwIfNotOk(res, 'Upload');
-  return res;
-}
-
-/**
  * Download an object with a presigned GET URL as UTF-8 text.
  *
  * @param url Absolute presigned GET URL.

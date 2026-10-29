@@ -872,33 +872,6 @@ export type ArtifactDto = {
   updatedAt: string;
 };
 
-/**
- * Form fields to send before the `file` field
- */
-export type ArtifactUploadDtoFields = { [key: string]: string };
-
-export type ArtifactUploadDto = {
-  /** POST target for the multipart form upload */
-  url: string;
-  /** Form fields to send before the `file` field */
-  fields: ArtifactUploadDtoFields;
-  expiresAt: string;
-};
-
-export type PresignArtifactResponseDto = {
-  artifact: ArtifactDto;
-  upload: ArtifactUploadDto;
-};
-
-export type PresignArtifactDto = {
-  fileName: string;
-  /** Exact file size in bytes */
-  sizeBytes: number;
-  contentType: string;
-  /** Target folder; root when omitted */
-  parentFolderId?: string;
-};
-
 export type GetManyArtifactDtoDto = {
   data: ArtifactDto[];
   total: number;
@@ -941,23 +914,17 @@ export type ArtifactDownloadDto = {
   expiresIn: number;
 };
 
-export type UpdateArtifactDtoShareType =
-  (typeof UpdateArtifactDtoShareType)[keyof typeof UpdateArtifactDtoShareType];
+export type UpdateArtifactAccessDtoShareType =
+  (typeof UpdateArtifactAccessDtoShareType)[keyof typeof UpdateArtifactAccessDtoShareType];
 
-export const UpdateArtifactDtoShareType = {
+export const UpdateArtifactAccessDtoShareType = {
   private: 'private',
   shared: 'shared',
   public: 'public',
 } as const;
 
-export type UpdateArtifactDto = {
-  name?: string;
-  shareType?: UpdateArtifactDtoShareType;
-  /**
-   * Move into this folder; null moves to the root
-   * @nullable
-   */
-  parentFolderId?: string | null;
+export type UpdateArtifactAccessDto = {
+  shareType: UpdateArtifactAccessDtoShareType;
 };
 
 export type ShareArtifactResponseDto = {
@@ -994,21 +961,6 @@ export type ArtifactFolderDetailDto = {
   updatedAt: string;
   /** Breadcrumb from the top-level folder down to this one */
   path: ArtifactFolderPathItemDto[];
-};
-
-export type CreateArtifactFolderDto = {
-  name: string;
-  /** Parent folder; root when omitted */
-  parentFolderId?: string;
-};
-
-export type UpdateArtifactFolderDto = {
-  name?: string;
-  /**
-   * Move under this folder; null moves to the root
-   * @nullable
-   */
-  parentFolderId?: string | null;
 };
 
 export type String = { [key: string]: unknown };
@@ -15517,188 +15469,6 @@ export const useWorkspacesControllerMakeArchived = <
 };
 
 /**
- * Reserves workspace quota for a pending file and returns a presigned POST whose policy pins the exact size and content type. Returns 409 STORAGE_QUOTA_EXCEEDED when the workspace is full.
- * @summary Start a file upload
- */
-export const artifactsControllerPresign = (
-  presignArtifactDto: PresignArtifactDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<PresignArtifactResponseDto>(
-    {
-      url: `/api/artifacts/presign`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: presignArtifactDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getArtifactsControllerPresignMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof artifactsControllerPresign>>,
-    TError,
-    { data: PresignArtifactDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof artifactsControllerPresign>>,
-  TError,
-  { data: PresignArtifactDto },
-  TContext
-> => {
-  const mutationKey = ['artifactsControllerPresign'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof artifactsControllerPresign>>,
-    { data: PresignArtifactDto }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return artifactsControllerPresign(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type ArtifactsControllerPresignMutationResult = NonNullable<
-  Awaited<ReturnType<typeof artifactsControllerPresign>>
->;
-export type ArtifactsControllerPresignMutationBody = PresignArtifactDto;
-export type ArtifactsControllerPresignMutationError = unknown;
-
-/**
- * @summary Start a file upload
- */
-export const useArtifactsControllerPresign = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof artifactsControllerPresign>>,
-      TError,
-      { data: PresignArtifactDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof artifactsControllerPresign>>,
-  TError,
-  { data: PresignArtifactDto },
-  TContext
-> => {
-  return useMutation(
-    getArtifactsControllerPresignMutationOptions(options),
-    queryClient,
-  );
-};
-
-/**
- * Checks the uploaded object against the declared size and marks the file ready. Creator only.
- * @summary Finish a file upload
- */
-export const artifactsControllerComplete = (
-  id: string,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<ArtifactDto>(
-    { url: `/api/artifacts/${id}/complete`, method: 'POST', signal },
-    options,
-  );
-};
-
-export const getArtifactsControllerCompleteMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof artifactsControllerComplete>>,
-    TError,
-    { id: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof artifactsControllerComplete>>,
-  TError,
-  { id: string },
-  TContext
-> => {
-  const mutationKey = ['artifactsControllerComplete'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof artifactsControllerComplete>>,
-    { id: string }
-  > = (props) => {
-    const { id } = props ?? {};
-
-    return artifactsControllerComplete(id, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type ArtifactsControllerCompleteMutationResult = NonNullable<
-  Awaited<ReturnType<typeof artifactsControllerComplete>>
->;
-
-export type ArtifactsControllerCompleteMutationError = unknown;
-
-/**
- * @summary Finish a file upload
- */
-export const useArtifactsControllerComplete = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof artifactsControllerComplete>>,
-      TError,
-      { id: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof artifactsControllerComplete>>,
-  TError,
-  { id: string },
-  TContext
-> => {
-  return useMutation(
-    getArtifactsControllerCompleteMutationOptions(options),
-    queryClient,
-  );
-};
-
-/**
  * Lists ready files: `mine` (default), `shared` with me, or `all` (requires artifact.manage).
  * @summary List files
  */
@@ -16378,11 +16148,11 @@ export function useArtifactsControllerGetById<
 }
 
 /**
- * @summary Rename a file or change its access
+ * @summary Change who can access a file
  */
 export const artifactsControllerUpdate = (
   id: string,
-  updateArtifactDto: UpdateArtifactDto,
+  updateArtifactAccessDto: UpdateArtifactAccessDto,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
@@ -16391,7 +16161,7 @@ export const artifactsControllerUpdate = (
       url: `/api/artifacts/${id}`,
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      data: updateArtifactDto,
+      data: updateArtifactAccessDto,
       signal,
     },
     options,
@@ -16405,14 +16175,14 @@ export const getArtifactsControllerUpdateMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof artifactsControllerUpdate>>,
     TError,
-    { id: string; data: UpdateArtifactDto },
+    { id: string; data: UpdateArtifactAccessDto },
     TContext
   >;
   request?: SecondParameter<typeof orvalClient>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof artifactsControllerUpdate>>,
   TError,
-  { id: string; data: UpdateArtifactDto },
+  { id: string; data: UpdateArtifactAccessDto },
   TContext
 > => {
   const mutationKey = ['artifactsControllerUpdate'];
@@ -16426,7 +16196,7 @@ export const getArtifactsControllerUpdateMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof artifactsControllerUpdate>>,
-    { id: string; data: UpdateArtifactDto }
+    { id: string; data: UpdateArtifactAccessDto }
   > = (props) => {
     const { id, data } = props ?? {};
 
@@ -16439,11 +16209,11 @@ export const getArtifactsControllerUpdateMutationOptions = <
 export type ArtifactsControllerUpdateMutationResult = NonNullable<
   Awaited<ReturnType<typeof artifactsControllerUpdate>>
 >;
-export type ArtifactsControllerUpdateMutationBody = UpdateArtifactDto;
+export type ArtifactsControllerUpdateMutationBody = UpdateArtifactAccessDto;
 export type ArtifactsControllerUpdateMutationError = unknown;
 
 /**
- * @summary Rename a file or change its access
+ * @summary Change who can access a file
  */
 export const useArtifactsControllerUpdate = <
   TError = unknown,
@@ -16453,7 +16223,7 @@ export const useArtifactsControllerUpdate = <
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof artifactsControllerUpdate>>,
       TError,
-      { id: string; data: UpdateArtifactDto },
+      { id: string; data: UpdateArtifactAccessDto },
       TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -16462,7 +16232,7 @@ export const useArtifactsControllerUpdate = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof artifactsControllerUpdate>>,
   TError,
-  { id: string; data: UpdateArtifactDto },
+  { id: string; data: UpdateArtifactAccessDto },
   TContext
 > => {
   return useMutation(
@@ -17245,100 +17015,6 @@ export function useArtifactFoldersControllerGetMany<
 }
 
 /**
- * @summary Create a folder
- */
-export const artifactFoldersControllerCreate = (
-  createArtifactFolderDto: CreateArtifactFolderDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<ArtifactFolderDto>(
-    {
-      url: `/api/artifact-folders`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: createArtifactFolderDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getArtifactFoldersControllerCreateMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof artifactFoldersControllerCreate>>,
-    TError,
-    { data: CreateArtifactFolderDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof artifactFoldersControllerCreate>>,
-  TError,
-  { data: CreateArtifactFolderDto },
-  TContext
-> => {
-  const mutationKey = ['artifactFoldersControllerCreate'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof artifactFoldersControllerCreate>>,
-    { data: CreateArtifactFolderDto }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return artifactFoldersControllerCreate(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type ArtifactFoldersControllerCreateMutationResult = NonNullable<
-  Awaited<ReturnType<typeof artifactFoldersControllerCreate>>
->;
-export type ArtifactFoldersControllerCreateMutationBody =
-  CreateArtifactFolderDto;
-export type ArtifactFoldersControllerCreateMutationError = unknown;
-
-/**
- * @summary Create a folder
- */
-export const useArtifactFoldersControllerCreate = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof artifactFoldersControllerCreate>>,
-      TError,
-      { data: CreateArtifactFolderDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof artifactFoldersControllerCreate>>,
-  TError,
-  { data: CreateArtifactFolderDto },
-  TContext
-> => {
-  return useMutation(
-    getArtifactFoldersControllerCreateMutationOptions(options),
-    queryClient,
-  );
-};
-
-/**
  * Returns the folder with its breadcrumb path.
  * @summary Get a folder
  */
@@ -17508,189 +17184,6 @@ export function useArtifactFoldersControllerGetById<
 
   return withQueryKey(query, queryOptions.queryKey);
 }
-
-/**
- * @summary Rename or move a folder
- */
-export const artifactFoldersControllerUpdate = (
-  id: string,
-  updateArtifactFolderDto: UpdateArtifactFolderDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<ArtifactFolderDto>(
-    {
-      url: `/api/artifact-folders/${id}`,
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      data: updateArtifactFolderDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getArtifactFoldersControllerUpdateMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof artifactFoldersControllerUpdate>>,
-    TError,
-    { id: string; data: UpdateArtifactFolderDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof artifactFoldersControllerUpdate>>,
-  TError,
-  { id: string; data: UpdateArtifactFolderDto },
-  TContext
-> => {
-  const mutationKey = ['artifactFoldersControllerUpdate'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof artifactFoldersControllerUpdate>>,
-    { id: string; data: UpdateArtifactFolderDto }
-  > = (props) => {
-    const { id, data } = props ?? {};
-
-    return artifactFoldersControllerUpdate(id, data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type ArtifactFoldersControllerUpdateMutationResult = NonNullable<
-  Awaited<ReturnType<typeof artifactFoldersControllerUpdate>>
->;
-export type ArtifactFoldersControllerUpdateMutationBody =
-  UpdateArtifactFolderDto;
-export type ArtifactFoldersControllerUpdateMutationError = unknown;
-
-/**
- * @summary Rename or move a folder
- */
-export const useArtifactFoldersControllerUpdate = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof artifactFoldersControllerUpdate>>,
-      TError,
-      { id: string; data: UpdateArtifactFolderDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof artifactFoldersControllerUpdate>>,
-  TError,
-  { id: string; data: UpdateArtifactFolderDto },
-  TContext
-> => {
-  return useMutation(
-    getArtifactFoldersControllerUpdateMutationOptions(options),
-    queryClient,
-  );
-};
-
-/**
- * Deletes the folder, its subfolders and every file in them, and releases their storage.
- * @summary Delete a folder
- */
-export const artifactFoldersControllerRemove = (
-  id: string,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<DefaultMessageResponseDto>(
-    { url: `/api/artifact-folders/${id}`, method: 'DELETE', signal },
-    options,
-  );
-};
-
-export const getArtifactFoldersControllerRemoveMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof artifactFoldersControllerRemove>>,
-    TError,
-    { id: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof artifactFoldersControllerRemove>>,
-  TError,
-  { id: string },
-  TContext
-> => {
-  const mutationKey = ['artifactFoldersControllerRemove'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof artifactFoldersControllerRemove>>,
-    { id: string }
-  > = (props) => {
-    const { id } = props ?? {};
-
-    return artifactFoldersControllerRemove(id, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type ArtifactFoldersControllerRemoveMutationResult = NonNullable<
-  Awaited<ReturnType<typeof artifactFoldersControllerRemove>>
->;
-
-export type ArtifactFoldersControllerRemoveMutationError = unknown;
-
-/**
- * @summary Delete a folder
- */
-export const useArtifactFoldersControllerRemove = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof artifactFoldersControllerRemove>>,
-      TError,
-      { id: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof artifactFoldersControllerRemove>>,
-  TError,
-  { id: string },
-  TContext
-> => {
-  return useMutation(
-    getArtifactFoldersControllerRemoveMutationOptions(options),
-    queryClient,
-  );
-};
 
 /**
  * Redirects to a short-lived download URL. 404 when the file does not exist or is not public.
@@ -46259,7 +45752,7 @@ export const useAdminWorkspacesControllerSetArchived = <
 };
 
 /**
- * Overrides the storage quota of one workspace. `null` resets it to the server default (ARTIFACT_WORKSPACE_QUOTA_BYTES).
+ * Overrides the storage quota of one workspace. `null` resets it to the default quota.
  * @summary Set workspace storage quota
  */
 export const adminWorkspacesControllerUpdateStorageQuota = (

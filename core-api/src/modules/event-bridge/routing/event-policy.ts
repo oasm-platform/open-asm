@@ -70,15 +70,10 @@ export const EVENT_POLICY: Record<EventName, EventPolicy> = {
   'api_key.created': { persist: true, severity: 'important' },
   'api_key.revoked': { persist: true, severity: 'important' },
   'audit.exported': { persist: true, severity: 'important' },
-  'artifact.created': { persist: true, severity: 'normal' },
-  'artifact.upload.completed': { persist: true, severity: 'normal' },
   'artifact.downloaded': { persist: true, severity: 'normal' },
   'artifact.updated': { persist: true, severity: 'important' },
   'artifact.shared': { persist: true, severity: 'important' },
   'artifact.deleted': { persist: true, severity: 'important' },
-  'artifact.folder.created': { persist: true, severity: 'normal' },
-  'artifact.folder.updated': { persist: true, severity: 'normal' },
-  'artifact.folder.deleted': { persist: true, severity: 'important' },
   'storage.quota.updated': { persist: true, severity: 'important' },
 
   // ─── Runtime events ──────────────────────────────────────────────────────

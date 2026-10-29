@@ -7,6 +7,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import type { ArtifactFolderPathItemDto } from '@/services/apis/gen/queries';
+import { FolderOpen } from 'lucide-react';
 import { Fragment } from 'react';
 
 interface FolderBreadcrumbProps {
@@ -28,7 +29,12 @@ export function FolderBreadcrumb({ path, onNavigate }: FolderBreadcrumbProps) {
                 <BreadcrumbPage>{crumb.name}</BreadcrumbPage>
               ) : (
                 <BreadcrumbLink asChild>
-                  <button type="button" onClick={() => onNavigate(crumb.id)}>
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5"
+                    onClick={() => onNavigate(crumb.id)}
+                  >
+                    {index === 0 && <FolderOpen className="h-3.5 w-3.5" />}
                     {crumb.name}
                   </button>
                 </BreadcrumbLink>

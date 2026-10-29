@@ -75,6 +75,13 @@ export class UpdateArtifactDto {
   parentFolderId?: string | null;
 }
 
+/** Users only change access; renames and moves are for internal services. */
+export class UpdateArtifactAccessDto {
+  @ApiProperty({ enum: ArtifactShareType })
+  @IsEnum(ArtifactShareType)
+  shareType: ArtifactShareType;
+}
+
 export class ShareArtifactDto {
   @ApiProperty({ type: [String], example: ['alice@example.com'] })
   @IsArray()

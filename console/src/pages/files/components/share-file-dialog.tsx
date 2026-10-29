@@ -22,13 +22,14 @@ import {
   useArtifactsControllerRemoveShare,
   useArtifactsControllerUpdate,
   type ArtifactDto,
-  type UpdateArtifactDtoShareType,
 } from '@/services/apis/gen/queries';
 import { Copy, X } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-const ACCESS_OPTIONS: { value: UpdateArtifactDtoShareType; label: string }[] = [
+type ShareType = ArtifactDto['shareType'];
+
+const ACCESS_OPTIONS: { value: ShareType; label: string }[] = [
   { value: 'private', label: 'Private — only you' },
   { value: 'shared', label: 'Shared — you and the people below' },
   { value: 'public', label: 'Public — anyone with the link' },
@@ -63,7 +64,7 @@ export function ShareFileDialog({
     },
   });
 
-  const changeAccess = async (shareType: UpdateArtifactDtoShareType) => {
+  const changeAccess = async (shareType: ShareType) => {
     await update.mutateAsync({ id: file.id, data: { shareType } });
     setAccess(shareType);
     onChanged();
@@ -106,7 +107,7 @@ export function ShareFileDialog({
           <Select
             value={access}
             onValueChange={(v) =>
-              void changeAccess(v as UpdateArtifactDtoShareType).catch(() => {})
+              void changeAccess(v as ShareType).catch(() => {})
             }
             disabled={update.isPending}
           >
