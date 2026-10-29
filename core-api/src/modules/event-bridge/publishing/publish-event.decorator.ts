@@ -17,6 +17,12 @@ export interface PublishEventConfig {
   /** Extracts the resourceId from the handler's success result. */
   resourceId?: (result: unknown) => string | undefined;
   /**
+   * Takes the resourceId from the `:id` route param on success too, for
+   * handlers whose result does not carry it (downloads, deletes). A failed
+   * request always falls back to it.
+   */
+  resourceIdFromRoute?: boolean;
+  /**
    * Extracts the workspaceId from the handler's success result. Used by actions
    * where the workspace is created BY the call (`workspace.created`) — there is
    * no request workspaceId yet, and the engine skips the publish when neither

@@ -2,6 +2,11 @@ import { Roles } from '@/common/decorators/app.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
 import { Role } from '@/common/enums/enum';
+import { ArtifactQuotaService } from '@/modules/artifacts/artifact-quota.service';
+import {
+  UpdateStorageQuotaDto,
+  WorkspaceStorageQuotaDto,
+} from '@/modules/artifacts/dto/artifacts.dto';
 import { EVENT_CATALOG } from '@/modules/event-bridge/contracts/event-catalog';
 import { PublishEvent } from '@/modules/event-bridge/publishing/publish-event.decorator';
 import { ArchiveWorkspaceDto } from '@/modules/workspaces/dto/workspaces.dto';
@@ -36,6 +41,7 @@ const auditTarget = {
 export class AdminWorkspacesController {
   constructor(
     private readonly adminWorkspacesService: AdminWorkspacesService,
+    private readonly artifactQuotaService: ArtifactQuotaService,
   ) {}
 
   @Doc({
@@ -124,5 +130,33 @@ export class AdminWorkspacesController {
     @Body() { isArchived }: ArchiveWorkspaceDto,
   ) {
     return this.adminWorkspacesService.setArchived(id, isArchived);
+  }
+
+  @Doc({
+    summary: 'Set workspace storage quota',
+    description:
+      'Overrides the storage quota of one workspace. `null` resets it to the default quota.',
+    response: {
+      serialization: WorkspaceStorageQuotaDto,
+    },
+  })
+  @PublishEvent(EVENT_CATALOG.storage.quota.updated, {
+    workspaceId: (result) =>
+      (result as WorkspaceStorageQuotaDto | undefined)?.workspaceId,
+    resourceId: (result) =>
+      (result as WorkspaceStorageQuotaDto | undefined)?.workspaceId,
+    metadata: () => ({ platformAdmin: true }),
+    changes: (body) => ({
+      quotaBytes: {
+        after: (body as UpdateStorageQuotaDto | undefined)?.quotaBytes,
+      },
+    }),
+  })
+  @Patch(':id/storage-quota')
+  updateStorageQuota(
+    @Param() { id }: IdQueryParamDto,
+    @Body() { quotaBytes }: UpdateStorageQuotaDto,
+  ): Promise<WorkspaceStorageQuotaDto> {
+    return this.artifactQuotaService.setQuota(id, quotaBytes);
   }
 }

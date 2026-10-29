@@ -31,6 +31,7 @@ import { createHash, randomBytes, randomUUID } from 'crypto';
 import type { NodeRequest, NodeResponse } from '@nestjs/platform-node';
 import { DataSource, EntityManager, In, MoreThan, Repository } from 'typeorm';
 import { ApiKeysService } from '../apikeys/apikeys.service';
+import { ArtifactsService } from '../artifacts/artifacts.service';
 import { AuditContext, AuditService } from '../audit/audit.service';
 import { CreateNotificationDto } from '../notifications/dto/create-notification.dto';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -104,6 +105,7 @@ export class WorkspacesService implements OnModuleInit {
     private workflowTemplateService: WorkflowTemplateService,
     private workspaceEncryptionService: WorkspaceEncryptionService,
     private auditService: AuditService,
+    private artifactsService: ArtifactsService,
   ) {}
 
   async onModuleInit() {}
@@ -381,6 +383,9 @@ export class WorkspacesService implements OnModuleInit {
         });
       }
     });
+    // File rows cascaded above; their objects go in the background, since a
+    // large workspace would outlast the request.
+    void this.artifactsService.deleteWorkspaceObjects(id);
 
     return {
       message: 'Workspace deleted successfully',

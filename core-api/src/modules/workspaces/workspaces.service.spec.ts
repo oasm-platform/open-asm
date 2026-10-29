@@ -13,6 +13,7 @@ import type { Repository } from 'typeorm';
 import { DataSource } from 'typeorm';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { ApiKeysService } from '../apikeys/apikeys.service';
+import { ArtifactsService } from '../artifacts/artifacts.service';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { WorkflowTemplateService } from '../workflows/workflow-template.service';
@@ -39,6 +40,9 @@ describe('WorkspacesService', () => {
     buildActorContext: jest.Mock;
   };
   let mockDataSource: Partial<DataSource>;
+  let mockArtifactsService: {
+    deleteWorkspaceObjects: jest.Mock;
+  };
   let mockManager: any;
   let fixedTransactionalRepository: {
     find: jest.Mock;
@@ -231,6 +235,10 @@ describe('WorkspacesService', () => {
       generateWrappedDEK: jest.fn().mockReturnValue('wrapped-dek'),
     };
 
+    mockArtifactsService = {
+      deleteWorkspaceObjects: jest.fn().mockResolvedValue(undefined),
+    };
+
     mockDataSource = {
       transaction: jest.fn((cb: (m: any) => unknown) => cb(mockManager)),
     };
@@ -281,6 +289,10 @@ describe('WorkspacesService', () => {
         {
           provide: WorkspaceEncryptionService,
           useValue: mockWorkspaceEncryptionService,
+        },
+        {
+          provide: ArtifactsService,
+          useValue: mockArtifactsService,
         },
       ],
     }).compile();
@@ -1105,6 +1117,9 @@ describe('WorkspacesService', () => {
       expect(mockManager.delete).toHaveBeenCalledWith(Workspace, {
         id: testWorkspaceId,
       });
+      expect(mockArtifactsService.deleteWorkspaceObjects).toHaveBeenCalledWith(
+        testWorkspaceId,
+      );
       expect(mockAuditService.recordInTx).toHaveBeenCalledTimes(1);
       expect(mockAuditService.recordInTx).toHaveBeenCalledWith(
         mockManager,
@@ -1173,6 +1188,8 @@ describe('WorkspacesService', () => {
       ).rejects.toThrow('workspace delete failed');
 
       expect(mockAuditService.recordInTx).not.toHaveBeenCalled();
+      // The rows survived, so their files must too.
+      expect(mockArtifactsService.deleteWorkspaceObjects).not.toHaveBeenCalled();
     });
 
     it('removeMember records member.removed in the tx and pseudonymizes the removed user after commit (scenario 9)', async () => {

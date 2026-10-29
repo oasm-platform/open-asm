@@ -1,6 +1,7 @@
 import type { Repository } from 'typeorm';
 
 import type { WrapperType } from '@/common/types/app.types';
+import type { ArtifactsService } from '@/modules/artifacts/artifacts.service';
 import type { AssetsService } from '@/modules/assets/assets.service';
 import type { ConnectorRegistryService } from '@/modules/connectors/connector-registry.service';
 import type { IssuesService } from '@/modules/issues/issues.service';
@@ -13,6 +14,7 @@ import type { ToolsService } from '@/modules/tools/tools.service';
 import type { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilities.service';
 import type { RemoteExecuteSubscribeService } from '@/modules/workers/remote-execute-subscribe.service';
 import type { WorkersService } from '@/modules/workers/workers.service';
+import type { WorkspacesService } from '@/modules/workspaces/workspaces.service';
 import type { RedisService } from '@/services/redis/redis.service';
 
 import type { AgentsApprovalsService } from '../agents.approvals';
@@ -47,6 +49,8 @@ export interface AgentToolDeps {
   toolConfigProfiles: ToolConfigProfilesService;
   remoteExecuteSubscribe: RemoteExecuteSubscribeService;
   redisService: RedisService;
+  artifactsService: ArtifactsService;
+  workspacesService: WorkspacesService;
 }
 
 export type Deps<K extends keyof AgentToolDeps> = Pick<AgentToolDeps, K>;

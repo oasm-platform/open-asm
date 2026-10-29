@@ -171,3 +171,7 @@ export const EVENT_BUS_MAX_ATTEMPTS = 5;
  */
 export const EVENT_BUS_AUDIT_LOCK_KEY = 'event-bus:audit-consumer';
 export const EVENT_BUS_AUDIT_LOCK_TTL_MS = 10_000;
+/** Per-file upload limit for workspace files; keep below the console nginx client_max_body_size (100m). */
+export const ARTIFACT_MAX_FILE_BYTES = 50 * 1024 * 1024;
+/** Default per-workspace storage quota; platform admins can override it per workspace. */
+export const ARTIFACT_WORKSPACE_QUOTA_BYTES = 1024 * 1024 * 1024;

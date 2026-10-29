@@ -30,23 +30,13 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
+import { formatBytes } from '@/utils/format-bytes';
 
 const CONTAINERS_PER_PAGE = 12;
 
 const numberValue = (value: string | number | undefined) => {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
-};
-
-const formatBytes = (value: string | number | undefined) => {
-  const bytes = numberValue(value);
-  if (bytes <= 0) return '—';
-  const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
-  const index = Math.min(
-    Math.floor(Math.log(bytes) / Math.log(1024)),
-    units.length - 1,
-  );
-  return `${(bytes / 1024 ** index).toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
 };
 
 const formatUptime = (seconds: number) => {

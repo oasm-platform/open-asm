@@ -1,3 +1,4 @@
+import { ArtifactsModule } from '@/modules/artifacts/artifacts.module';
 import { AssetsModule } from '@/modules/assets/assets.module';
 import { ConnectorsModule } from '@/modules/connectors/connectors.module';
 import { StatisticModule } from '@/modules/statistic/statistic.module';
@@ -53,6 +54,7 @@ import { HttpModule } from '@nestjs/axios';
       AgentDefinition,
     ]),
     AssetsModule,
+    ArtifactsModule,
     TargetsModule,
     forwardRef(() => VulnerabilitiesModule),
     StatisticModule,

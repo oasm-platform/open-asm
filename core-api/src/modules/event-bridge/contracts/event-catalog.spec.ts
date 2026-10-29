@@ -78,13 +78,13 @@ describe('event catalog', () => {
     // The tree is the authored source; EVENT_DEFINITIONS is derived. If the
     // walk ever stops matching the shape, these fail rather than the bridge
     // publishing half a catalog.
-    it('exposes 86 leaves', () => {
-      // 86 = the 85 left once `worker.alive` was removed (a heartbeat is read
+    it('exposes 93 leaves', () => {
+      // 93 = the 85 left once `worker.alive` was removed (a heartbeat is read
       // from `workers.lastSeenAt`, not streamed, and on the shared stream it
-      // would be the entry MAXLEN evicts first), plus `asset.url.discovered`.
-      // Asserting the count means the removal cannot be half-reverted without
-      // failing here.
-      expect(EVENT_DEFINITIONS).toHaveLength(86);
+      // would be the entry MAXLEN evicts first), plus `asset.url.discovered`
+      // and the 7 artifact/storage-quota audit events. Asserting the
+      // count means the removal cannot be half-reverted without failing here.
+      expect(EVENT_DEFINITIONS).toHaveLength(93);
     });
 
     it('has no worker.alive leaf, so nothing can publish a heartbeat', () => {
@@ -162,10 +162,10 @@ describe('event catalog', () => {
 
     it('derives the domain as the first path segment', () => {
       const domains = new Set(EVENT_NAMES.map((name) => name.split('.')[0]));
-      // 19 domains: workspace, member, permission_group, target, asset,
+      // Domains: workspace, member, permission_group, target, asset,
       // asset_group, network, vulnerability, report, job, workflow,
-      // integration, api_key, audit, worker, scan, issue, statistics,
-      // system_config, storage, notification.
+      // integration, api_key, audit, artifact, worker, scan, issue,
+      // statistics, system_config, storage, notification.
       expect(domains.size).toBe(Object.keys(EVENT_CATALOG).length);
     });
   });
@@ -182,7 +182,7 @@ describe('event catalog', () => {
     });
 
     it('carries the audit action count', () => {
-      expect(AUDIT_ACTION_CATALOG).toHaveLength(35);
+      expect(AUDIT_ACTION_CATALOG).toHaveLength(42);
     });
   });
 

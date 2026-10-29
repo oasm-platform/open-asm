@@ -55,6 +55,9 @@ const CONTROLLER_FILES: Record<string, string> = {
   IntegrationsController: '@/modules/integrations/integrations.controller',
   ApiKeysController: '@/modules/apikeys/apikeys.controller',
   AuditEventsController: '@/modules/audit/audit-events.controller',
+  ArtifactsController: '@/modules/artifacts/artifacts.controller',
+  ArtifactFoldersController: '@/modules/artifacts/artifact-folders.controller',
+  AdminWorkspacesController: '@/modules/admin/workspaces/admin-workspaces.controller',
 };
 
 /**
@@ -74,6 +77,8 @@ const NOT_YET_RESOLVABLE: Record<string, string> = {
     'ApiKeysController is empty in v1 (keys created internally, no HTTP endpoint); wiring lands in M4',
   'api_key.revoked':
     'ApiKeysController is empty in v1 (no HTTP endpoint); wiring lands in M4',
+  'artifact.created':
+    'published by ArtifactsService when the agent save_file tool runs, not by a decorated handler',
 };
 
 /**

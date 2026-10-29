@@ -269,6 +269,20 @@ describe('EventPublishInterceptor', () => {
       await runFailing({ event: EVENT_CATALOG.target.created }, new Error('boom'), req);
       expect(published()).toMatchObject({ resourceId: 't-9' });
     });
+
+    it('uses the route param on success only for handlers that opt in', async () => {
+      const req = makeRequest({ params: { id: 'a-1' }, body: undefined });
+      await run({ event: EVENT_CATALOG.artifact.deleted }, { message: 'ok' }, req);
+      expect(published()).not.toHaveProperty('resourceId');
+
+      publishSafely.mockClear();
+      await run(
+        { event: EVENT_CATALOG.artifact.deleted, resourceIdFromRoute: true },
+        { message: 'ok' },
+        req,
+      );
+      expect(published()).toMatchObject({ resourceId: 'a-1' });
+    });
   });
 
   describe('secret redaction', () => {

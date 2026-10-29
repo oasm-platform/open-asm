@@ -13,17 +13,26 @@ import {
   CreateBucketCommand,
   GetBucketPolicyStatusCommand,
   HeadBucketCommand,
+  ListObjectsV2Command,
   PutBucketCorsCommand,
   PutBucketPolicyCommand,
   PutObjectCommand,
   PutPublicAccessBlockCommand,
   S3ServiceException,
 } from '@aws-sdk/client-s3';
+import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type * as S3Module from '@aws-sdk/client-s3';
 import { DataSource } from 'typeorm';
 import { RustFsClient } from './rustfs.client';
-import { StorageService } from './storage.service';
+import { attachmentDisposition, StorageService } from './storage.service';
+
+jest.mock('@aws-sdk/s3-presigned-post', () => ({
+  createPresignedPost: jest.fn().mockResolvedValue({
+    url: 'https://public-example/artifacts',
+    fields: { key: 'k', Policy: 'p' },
+  }),
+}));
 
 jest.mock('@aws-sdk/s3-request-presigner', () => ({
   getSignedUrl: jest
@@ -98,6 +107,48 @@ describe('StorageService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+  });
+
+  describe('deleteByPrefix', () => {
+    it('should delete every listed object under the prefix, page by page', async () => {
+      sendMock.mockImplementation((command: { input: Record<string, unknown> }) => {
+        if (command instanceof ListObjectsV2Command) {
+          return Promise.resolve(
+            command.input.ContinuationToken
+              ? { Contents: [{ Key: 'workspaces/w/b/2.md' }] }
+              : {
+                  Contents: [{ Key: 'workspaces/w/a/1.md' }],
+                  NextContinuationToken: 'token-2',
+                },
+          );
+        }
+        return command.input.Key === 'workspaces/w/b/2.md'
+          ? Promise.reject(new Error('boom'))
+          : Promise.resolve({});
+      });
+
+      await expect(service.deleteByPrefix('artifacts', 'workspaces/w/')).resolves.toEqual({
+        deleted: 1,
+        failed: 1,
+      });
+      expect(sendMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          input: { Bucket: 'artifacts', Prefix: 'workspaces/w/', ContinuationToken: undefined },
+        }),
+      );
+      expect(sendMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          input: { Bucket: 'artifacts', Key: 'workspaces/w/a/1.md' },
+        }),
+      );
+    });
+
+    it('should refuse an empty prefix, which would match the whole bucket', async () => {
+      await expect(service.deleteByPrefix('artifacts', ' ')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(sendMock).not.toHaveBeenCalled();
+    });
   });
 
   describe('listFiles', () => {
@@ -478,7 +529,8 @@ describe('StorageService', () => {
       expect(command.input).toMatchObject({
         Bucket: 'default',
         Key: 'b/r.pdf',
-        ResponseContentDisposition: 'attachment; filename="r.pdf"',
+        ResponseContentDisposition:
+          'attachment; filename="r.pdf"; filename*=UTF-8\'\'r.pdf',
         ResponseContentType: 'application/pdf',
       });
       expect(mockGetSignedUrl).toHaveBeenCalledWith(
@@ -495,6 +547,57 @@ describe('StorageService', () => {
       await expect(
         service.getPresignedDownloadUrl({ bucket: 'default', key: '../a' }),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('getPresignedPost', () => {
+    it('should pin exact size, content type and key in the policy', async () => {
+      const result = await service.getPresignedPost({
+        bucket: 'artifacts',
+        key: 'workspaces/w/a/f.txt',
+        contentType: 'text/plain',
+        sizeBytes: 42,
+        expiresIn: 900,
+      });
+
+      expect(createPresignedPost).toHaveBeenCalledWith(expect.anything(), {
+        Bucket: 'artifacts',
+        Key: 'workspaces/w/a/f.txt',
+        Conditions: [
+          ['content-length-range', 42, 42],
+          ['eq', '$Content-Type', 'text/plain'],
+        ],
+        Fields: { 'Content-Type': 'text/plain' },
+        Expires: 900,
+      });
+      expect(result.url).toBe('https://public-example/artifacts');
+      expect(result.fields).toEqual({ key: 'k', Policy: 'p' });
+      expect(result.expiresAt).toBeInstanceOf(Date);
+    });
+
+    it('should reject an invalid key', async () => {
+      await expect(
+        service.getPresignedPost({
+          bucket: 'artifacts',
+          key: '../x',
+          contentType: 'text/plain',
+          sizeBytes: 1,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('attachmentDisposition', () => {
+    it('should escape quotes and CR/LF and keep the exact name in filename*', () => {
+      expect(attachmentDisposition('a"b\r\nc.txt')).toBe(
+        'attachment; filename="a_b__c.txt"; filename*=UTF-8\'\'a%22b%0D%0Ac.txt',
+      );
+    });
+
+    it('should encode unicode and RFC 5987 reserved characters', () => {
+      expect(attachmentDisposition("bá'o(1).pdf")).toBe(
+        'attachment; filename="b_\'o(1).pdf"; filename*=UTF-8\'\'b%C3%A1%27o%281%29.pdf',
+      );
     });
   });
 
