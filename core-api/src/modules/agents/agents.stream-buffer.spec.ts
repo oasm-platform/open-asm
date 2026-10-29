@@ -32,8 +32,11 @@ class FakeRedis {
     return last ? { id: last.id, fields: { ...last.fields } } : null;
   });
 
-  xrange = jest.fn(async () =>
-    this.entries.map((e) => ({ id: e.id, fields: { ...e.fields } })),
+  xrange = jest.fn(
+    async (_key: string, _start?: string, _end?: string, count?: number) =>
+      this.entries
+        .slice(0, count ?? this.entries.length)
+        .map((e) => ({ id: e.id, fields: { ...e.fields } })),
   );
 
   subscribe = jest.fn(async (channel: string, cb: (c: string, m: string) => void) => {
@@ -95,10 +98,12 @@ describe('AgentsStreamBufferService', () => {
     expect(redis.expire).toHaveBeenCalledWith('agent:stream:c1', 120);
   });
 
-  it('resets by deleting the buffer key', async () => {
+  it('resets by deleting the buffer key and opening it with a begin marker', async () => {
     const { redis, service } = build();
+    await service.append('c1', '{"n":0}');
     await service.reset('c1');
     expect(redis.del).toHaveBeenCalledWith('agent:stream:c1');
+    expect(redis.entries.map((e) => e.fields)).toEqual([{ begin: '1' }]);
   });
 
   it('has nothing to resume with no buffer and no active run', async () => {
@@ -111,6 +116,7 @@ describe('AgentsStreamBufferService', () => {
     // The database holds the whole answer; replaying it would make the client
     // append it again onto its own copy.
     const { service } = build();
+    await service.reset('c1');
     await service.append('c1', '{"n":1}');
     await service.append('c1', '{"n":2}');
     await service.finish('c1');
@@ -120,6 +126,7 @@ describe('AgentsStreamBufferService', () => {
 
   it('replays the buffered chunks of a run still producing them', async () => {
     const { service } = build();
+    await service.reset('c1');
     await service.append('c1', '{"n":1}');
     await service.append('c1', '{"n":2}');
 
@@ -135,6 +142,7 @@ describe('AgentsStreamBufferService', () => {
 
   it('replays the backlog, tails a live chunk, de-duplicates, then closes', async () => {
     const { redis, service } = build();
+    await service.reset('c1');
     await service.append('c1', '{"n":1}'); // backlog
 
     const stream = await service.createResumeStream('c1', () => true);
@@ -157,6 +165,7 @@ describe('AgentsStreamBufferService', () => {
 
   it('passes a live-only chunk to resumers without recording it', async () => {
     const { redis, service } = build();
+    await service.reset('c1');
     await service.append('c1', '{"n":1}');
 
     const stream = await service.createResumeStream('c1', () => true);
@@ -173,6 +182,7 @@ describe('AgentsStreamBufferService', () => {
 
     // Never replayed to a later resumer
     expect(redis.entries.map((e) => e.fields.chunk)).toEqual([
+      undefined, // the begin marker
       '{"n":1}',
       '{"n":2}',
     ]);
@@ -183,6 +193,7 @@ describe('AgentsStreamBufferService', () => {
     // The client that left (a closed tab, or the one that switched away and
     // came back) must not cut the live chunks of the one still reading
     const { redis, service } = build();
+    await service.reset('c1');
     await service.append('c1', '{"n":1}');
 
     const left = await service.createResumeStream('c1', () => true);
@@ -203,9 +214,38 @@ describe('AgentsStreamBufferService', () => {
     expect(redis.hasSubscribers('agent:stream:chan:c1')).toBe(false);
   });
 
+  it('does not replay a backlog trimmed past the start of the run', async () => {
+    // A delta whose part started in a trimmed chunk breaks the client
+    const { redis, service } = build();
+    await service.reset('c1');
+    await service.append('c1', '{"type":"reasoning-start","id":"r"}');
+    await service.append('c1', '{"type":"reasoning-delta","id":"r"}');
+    redis.entries.splice(0, 2);
+
+    expect(await service.createResumeStream('c1', () => true)).toBeNull();
+  });
+
+  it('ends a resume whose backlog was trimmed after it was checked', async () => {
+    const { redis, service } = build();
+    await service.reset('c1');
+    await service.append('c1', '{"n":1}');
+    await service.append('c1', '{"n":2}');
+    // The check still sees the begin marker; the backlog read does not
+    redis.xrange.mockImplementationOnce(async () => [
+      { id: '1-0', fields: { begin: '1' } },
+    ]);
+    redis.entries.splice(0, 2);
+    const stream = await service.createResumeStream('c1', () => true);
+
+    const reader = stream!.getReader();
+    expect((await reader.read()).done).toBe(true);
+    expect(redis.hasSubscribers('agent:stream:chan:c1')).toBe(false);
+  });
+
   it('drops a resume whose run vanished without a done marker', async () => {
     jest.useFakeTimers({ doNotFake: ['setImmediate', 'queueMicrotask'] });
     const { service } = build();
+    await service.reset('c1');
     await service.append('c1', '{"n":1}');
 
     let active = true;

@@ -9,7 +9,7 @@ import {
   useApprovalMode,
   type ApprovalMode,
 } from '@/hooks/use-approval-mode';
-import { CheckIcon, HandIcon, ListChecksIcon, ZapIcon } from 'lucide-react';
+import { CheckIcon, HandIcon, ZapIcon } from 'lucide-react';
 import { memo } from 'react';
 
 const OPTIONS: Array<{
@@ -25,12 +25,6 @@ const OPTIONS: Array<{
     icon: ZapIcon,
   },
   {
-    id: 'plan',
-    label: 'Plan',
-    description: 'Review the plan first, then pick Auto or Manual',
-    icon: ListChecksIcon,
-  },
-  {
     id: 'manual',
     label: 'Manual',
     description: 'Approve each new command',
@@ -40,7 +34,7 @@ const OPTIONS: Array<{
 
 export const ApprovalModeSelect = memo(function ApprovalModeSelect() {
   const mode = useApprovalMode();
-  const active = OPTIONS.find((o) => o.id === mode) ?? OPTIONS[2];
+  const active = OPTIONS.find((o) => o.id === mode) ?? OPTIONS[1];
   const ActiveIcon = active.icon;
 
   return (

@@ -81,7 +81,7 @@ open-asm/
 │   ├── go.mod          # Go module definition
 │   ├── taskfile.yml    # worker:* tasks
 │   └── .example.env    # Environment template
-├── .open-api/          # OpenAPI spec — GENERATED, but tracked in git (commit it with contract changes)
+├── .open-api/          # OpenAPI spec — GENERATED on API boot, gitignored
 ├── docker-compose.yml  # Container orchestration
 ├── taskfile.yml        # Root task automation (includes the three sub-taskfiles)
 └── README.md           # Documentation
@@ -347,9 +347,10 @@ This uses orval to generate TanStack Query hooks from the OpenAPI spec. The spec
 itself (`.open-api/open-api.json`) is rewritten by core-api on **every boot**, so
 start the API before running this.
 
-`.open-api/` is generated but **tracked in git** — when you change the API
-contract, commit the regenerated spec together with
-`console/src/services/apis/gen/queries.ts`.
+`.open-api/` is generated and **gitignored** — when you change the API
+contract, commit the regenerated `console/src/services/apis/gen/queries.ts`.
+The better-auth spec merged into it is an input kept at
+`core-api/resources/openapi/better-auth.json`.
 
 Never edit `console/src/services/apis/gen/` or `console/src/routeTree.gen.ts`
 by hand; change the source and re-run the generator.
@@ -767,7 +768,7 @@ We welcome contributions! Please follow these steps:
    ```
 
    If your change touches the API contract, also run `task gen-api` and commit
-   the regenerated `.open-api/` spec and console API client. If it touches
+   the regenerated console API client. If it touches
    `core-api/src/proto/`, run `task proto`. If it changes the schema, use
    `task migration:generate name=<Name>` — never hand-write a migration.
 4. Test CI workflows locally: `bash .github/scripts/test-local.sh <workflow>`

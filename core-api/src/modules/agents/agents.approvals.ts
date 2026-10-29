@@ -32,14 +32,9 @@ export interface ApprovalContext {
   conversationId: string;
   mode: AgentApprovalMode;
   /**
-   * PLAN mode only: refuse tool calls until a plan has been approved (which
-   * switches the mode), so the user sees the plan before anything runs.
-   */
-  planFirst?: boolean;
-  /**
-   * Agent mode outside PLAN: resolves true while no todo step is in
-   * progress, and tool calls are refused until the agent has written its
-   * goal and todo list and started a step.
+   * Agent mode: resolves true while no todo step is in progress, and tool
+   * calls are refused until the agent has had its plan approved and started
+   * a step.
    */
   needsTodo?: () => Promise<boolean>;
 }
@@ -93,7 +88,7 @@ export interface ApprovalToolMeta {
    * so the emitted `command` is only a short label (see requestDecision).
    */
   input?: unknown;
-  /** Only reads data: runs without asking outside PLAN-first runs */
+  /** Only reads data: runs without asking once a plan step is in progress */
   readOnly?: boolean;
 }
 
@@ -106,9 +101,7 @@ export interface ApprovalDecision {
   allowed: boolean;
   /** What the user told the agent to do instead (rejections only) */
   feedback?: string;
-  /** Refused without asking: the agent must get a plan approved first */
-  planRequired?: boolean;
-  /** Refused without asking: the agent must write and start its todo list first */
+  /** Refused without asking: the agent must get its plan approved and start it first */
   todoRequired?: boolean;
 }
 
@@ -128,7 +121,7 @@ interface PendingRequest {
   settle: (decision: UserDecision) => void;
 }
 
-/** A plan blocked on the user (PLAN mode). Never stored: plans are one-off. */
+/** A plan blocked on the user (Agent mode). Never stored: plans are one-off. */
 interface PendingPlan {
   userId: string;
   workspaceId: string;
@@ -201,11 +194,10 @@ export class AgentsApprovalsService {
    * Resolves to `allowed: true` when the command may run. In AUTO mode it
    * always may; otherwise a previously approved identical command passes, and
    * anything else blocks until the user decides (or the request times out).
-   * PLAN mode asks like MANUAL here: it only differs once a plan exists (see
-   * requestPlanApproval), and approving that plan switches the mode. In
-   * Agent mode (`needsTodo`) nothing runs, in any mode, while no todo step
-   * is in progress. Read-only tools and tools the user allowed for the conversation pass
-   * without asking. When the user rejects with a message, it comes back as
+   * In Agent mode (`needsTodo`) nothing runs, in any mode, while no step of
+   * an approved plan is in progress (see requestPlanApproval). Read-only
+   * tools and tools the user allowed for the conversation pass without
+   * asking. When the user rejects with a message, it comes back as
    * `feedback`. `command` may be any size: only its hash is used for matching.
    */
   async authorize(
@@ -216,9 +208,6 @@ export class AgentsApprovalsService {
     meta?: ApprovalToolMeta,
     abortSignal?: AbortSignal,
   ): Promise<ApprovalDecision> {
-    if (ctx.mode === AgentApprovalMode.PLAN && ctx.planFirst) {
-      return { allowed: false, planRequired: true };
-    }
     if (ctx.needsTodo && (await ctx.needsTodo())) {
       return { allowed: false, todoRequired: true };
     }
@@ -341,7 +330,7 @@ export class AgentsApprovalsService {
   }
 
   /**
-   * PLAN mode: show the user a freshly formulated plan and block until they
+   * Agent mode: show the user a freshly formulated plan and block until they
    * approve it — choosing whether the run continues in AUTO or MANUAL mode —
    * or reject it. Leaving (abort) or not answering in time rejects it.
    */

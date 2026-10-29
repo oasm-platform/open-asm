@@ -68,13 +68,12 @@ export function normalizeSchemaType(value: unknown): unknown {
   return value;
 }
 
+/** The better-auth spec is an input, kept with the API's other resources. */
 function loadBetterAuthSpec(): BetterAuthSpec | null {
-  const betterAuthPath = path.join(
-    __dirname,
-    '..',
-    '..',
-    '..',
-    '.open-api',
+  const betterAuthPath = path.resolve(
+    process.cwd(),
+    'resources',
+    'openapi',
     'better-auth.json',
   );
   if (!fs.existsSync(betterAuthPath)) return null;

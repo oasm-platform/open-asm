@@ -188,14 +188,14 @@ async function switchApprovalMode(
 }
 
 /**
- * Plan tools. With `plan.approval` in PLAN mode, formulate_plan shows the
- * new plan to the user and waits for them to approve it, choosing whether
- * the rest of the run asks per command (MANUAL) or not (AUTO). With
- * `plan.selfManaged` (Agent mode outside PLAN) the agent keeps its own todo
- * list: plans are set without review. Otherwise formulate_plan and
- * append_step refuse: only transition_step and scrap_plan remain, to finish
- * or drop a plan approved earlier. The plan's goal is pinned in the
- * conversation metadata until the plan is replaced or dropped.
+ * Plan tools. With `plan.selfManaged` (Agent mode) the agent keeps its own
+ * plan: formulate_plan shows each new plan to the user and waits for them to
+ * approve it, choosing whether the run asks per command (MANUAL) or not
+ * (AUTO); while it runs, append_step extends it without another review.
+ * Otherwise formulate_plan and append_step refuse: only transition_step and
+ * scrap_plan remain, to finish or drop a plan left from Agent mode. Without
+ * `plan` (no run settings) plans are set without review. The plan's goal is
+ * pinned in the conversation metadata until the plan is replaced or dropped.
  */
 export function planTools(
   deps: PlanDeps,
@@ -227,16 +227,11 @@ export function planTools(
     }
   };
 
-  // Read at call time: approving a plan switches the run out of PLAN mode,
-  // and the plan it approved is the last one this run may make
-  const planningAllowed = () =>
-    !plan ||
-    !!plan.selfManaged ||
-    plan.approval.mode === AgentApprovalMode.PLAN;
+  const planningAllowed = () => !plan || !!plan.selfManaged;
 
   const formulatePlan = defineTool({
     description:
-      'Set the execution plan (todo list) before starting the work. Params: steps (string[]); goal (string, OPTIONAL). The goal is generated for you from the request and pinned in your context already — pass goal only to correct it. Output: success, message, goal, todos. ONLY call this when no active plan exists (all steps completed/failed, or plan is empty). If a plan is already in progress, you MUST execute existing steps — do NOT call this tool.',
+      'Set the execution plan (todo list) before starting the work; in Agent mode the user reviews and approves it before it runs. Params: steps (string[]); goal (string, OPTIONAL). The goal is generated for you from the request and pinned in your context already — pass goal only to correct it. Output: success, message, goal, todos. ONLY call this when no active plan exists (all steps completed/failed, or plan is empty). If a plan is already in progress, you MUST execute existing steps — do NOT call this tool.',
     inputSchema: z.object({
       goal: z
         .string()
@@ -316,7 +311,7 @@ export function planTools(
         // Show the plan right away, also while the user reviews it
         emitter?.emit('todos-updated', todos, goal);
 
-        if (plan?.approval.mode === AgentApprovalMode.PLAN) {
+        if (plan?.selfManaged) {
           const decision = await deps.approvals.requestPlanApproval(
             steps,
             options?.toolCallId ?? '',
@@ -355,7 +350,7 @@ export function planTools(
               (mode === AgentApprovalMode.AUTO
                 ? ' and lets it run without asking.'
                 : '; each command still asks for approval.') +
-              ' Start with step 1 now.',
+              ' Call transition_step(id, "in_progress") on step 1 and start it now.',
             goal,
             todos,
           };
@@ -436,15 +431,23 @@ export function planTools(
       content: z.string().min(1).describe('Todo content'),
     }),
     execute: async (params: { content: string }) => {
-      // An approved plan is a contract: no unreviewed steps after the fact
       if (!planningAllowed()) {
         return { success: false, message: PLANNING_OFF_MESSAGE };
       }
       return failSoft('add step', async () => {
         const todos = await todoRepo.find({ where: { conversationId } });
 
-        // Guard: warn but allow append during active plan (the LLM might genuinely need it)
         const active = todos.filter(isActive).length;
+        // Extends the approved plan while it runs; new work after it is a
+        // new plan, which the user reviews
+        if (plan?.selfManaged && active === 0) {
+          return {
+            success: false,
+            message:
+              'REJECTED: No plan is running. Call formulate_plan with this work as a new plan; the user reviews it before it runs.',
+          };
+        }
+        // Guard: warn but allow append during active plan (the LLM might genuinely need it)
         if (active > 0) {
           logger.warn(
             `[append_step] Adding step while ${active} step(s) still active`,

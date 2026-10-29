@@ -17,7 +17,7 @@ Before substantial work:
 1. **All commands go through `task` from the repo root.** Never `npm run`, `pnpm run`, `npx <bin>`, or raw `go test/go build/go vet`. The taskfiles carry the RAM/CPU limits and transform config that raw scripts bypass (`task lint` is sequential, `task test` uses `--maxWorkers=50% --workerIdleMemoryLimit=512MB` + SWC). If a needed entry is missing, **add it to the taskfile** — do not invoke the raw script.
 2. **Never create or hand-write a database migration.** See [Database Migrations](#database-migrations--hard-rule) — this is the single most-violated rule in this repo. No permission, no migration file.
 3. **Never run the TypeORM CLI, `psql` DDL, or any schema command directly.** Schema work happens only through `task migration:*`.
-4. **Never hand-edit generated code**: `console/src/services/apis/gen/`, `console/src/routeTree.gen.ts`, `worker/internal/gen/`, `.open-api/*`, `core-api/resources/connectors/manifest.json`. Change the source, re-run the generator. (`.open-api/` is generated *and* git-tracked — see gotcha 7.)
+4. **Never hand-edit generated code**: `console/src/services/apis/gen/`, `console/src/routeTree.gen.ts`, `worker/internal/gen/`, `.open-api/*`, `core-api/resources/connectors/manifest.json`. Change the source, re-run the generator. (`.open-api/` is generated and gitignored — see gotcha 7.)
 5. **Never commit `.env`** (gitignored). Copy from `*/example.env` / `worker/.example.env` via `task init` (the worker one is manual).
 6. **Ask before scope-creep.** Schema changes, new public API contracts, dependency bumps, and CI/workflow edits need explicit user sign-off — do not add them "while you're in there".
 7. **Keep every PR small and single-purpose.** Target ≤ 400 changed lines; CI (`pr-size`) fails above 1,000 lines or 40 files. See [Pull Request Size](#pull-request-size) — plan the split *before* writing code, not after.
@@ -85,7 +85,7 @@ task worker:build      # bin/oasm-cli + bin/oasm-app
 task worker:install    # go mod tidy
 
 # Codegen (MUST run after contract changes)
-task gen-api           # orval: .open-api/open-api.json -> console/src/services/apis/gen/queries.ts (API must be booted; commit the regenerated spec too)
+task gen-api           # orval: .open-api/open-api.json -> console/src/services/apis/gen/queries.ts (API must be booted; the spec itself is gitignored)
 task proto             # protoc -> worker/internal/gen/** (Go stubs; installs the 2 protoc plugins)
 task sync-connectors   # node scripts/sync-tool-manifest.mjs -> core-api/resources/connectors/manifest.json
 
@@ -209,11 +209,11 @@ Volumes worth knowing: `pgdata`, `redis-data`, `geoip-data`, `rustfs-data`, `wor
 0. **Never bypass the taskfile.** `npm run lint` / `pnpm run test` / `go test ./...` skip the RAM limits, worker caps, and transform config. Missing entry → add it to the taskfile.
 1. **No unauthorized migrations.** See [Database Migrations](#database-migrations--hard-rule). Permission first, `task migration:generate name=<Name>` second, hand-writing never.
 2. **`MIGRATION_NAME=` is a legacy alias** — `task migration:generate` wants `name=`; both work, neither is required-and-unchecked any more (missing name = hard error).
-3. **API contract change → `task gen-api`**, then commit **both** the regenerated `.open-api/*.json` spec *and* `console/src/services/apis/gen/queries.ts`. The API must be running (the spec is rewritten on every boot).
+3. **API contract change → `task gen-api`**, then commit the regenerated `console/src/services/apis/gen/queries.ts`. The API must be running (the spec is rewritten on every boot).
 4. **Proto change → `task proto`**; output is `worker/internal/gen/**`, and there is no `grpc-client/` dir.
 5. **Console tests are not in `task test`.** Use `task console:test:run` (CI parity) — and note `task console:test` alone is watch mode and will hang.
 6. **Generated code is read-only**: `console/src/services/apis/gen/`, `console/src/routeTree.gen.ts`, `worker/internal/gen/`, `.open-api/*`, `core-api/resources/connectors/manifest.json`.
-7. **`.open-api/` is generated *and* git-tracked** (it is **not** gitignored, contrary to older docs). core-api rewrites `open-api.json` on every boot, so it shows up as a modified file after any API start — that is expected. When the contract changes, commit the spec together with the regenerated console client.
+7. **`.open-api/` is generated and gitignored.** core-api writes `open-api.json` on every boot and orval writes `open-api.patched.json` next to it; neither is committed, so boot the API before `task gen-api`. The better-auth spec merged into it is an input, not output: `core-api/resources/openapi/better-auth.json` (committed).
 8. **Lint autofixes.** `task api:lint` runs with `--fix`; re-read files after linting instead of assuming your version survived.
 9. **`ENCRYPTION_KEYS` is order-sensitive** — the last key is the only one that encrypts.
 10. **`task lint` is sequential by design** (two type-aware ESLint processes exhaust RAM). Never run `api:lint` and `console:lint` in parallel/background.

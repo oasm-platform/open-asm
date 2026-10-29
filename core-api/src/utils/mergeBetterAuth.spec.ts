@@ -1,4 +1,4 @@
-import { normalizeSchemaType } from './mergeBetterAuth';
+import { mergeBetterAuthSpec, normalizeSchemaType } from './mergeBetterAuth';
 
 describe('normalizeSchemaType', () => {
   it('converts array-form type ["object","null"] to type + nullable', () => {
@@ -56,5 +56,20 @@ describe('normalizeSchemaType', () => {
       type: 'object',
       properties: { data: { type: 'object' } },
     });
+  });
+});
+
+describe('mergeBetterAuthSpec', () => {
+  it('merges the better-auth spec kept in the API resources', () => {
+    // Jest runs from core-api, like the API itself
+    const merged = mergeBetterAuthSpec({
+      openapi: '3.0.0',
+      info: { title: 't', version: '1' },
+      paths: {},
+    });
+    expect(Object.keys(merged.paths)).toEqual(
+      expect.arrayContaining(['/get-session', '/sign-out']),
+    );
+    expect(merged.paths['/get-session'].get?.tags).toEqual(['Authentication']);
   });
 });

@@ -546,7 +546,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Reads a range of stream entries, oldest first (`XRANGE key start end`).
+   * Reads a range of stream entries, oldest first (`XRANGE key start end
+   * [COUNT count]`).
    *
    * `-`/`+` are the min/max id sentinels, so the default reads the whole
    * stream. Unlike {@link xreadgroup} this is a plain, non-blocking read with
@@ -557,12 +558,14 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     stream: string,
     start = '-',
     end = '+',
+    count?: number,
   ): Promise<StreamEntry[]> {
-    const response = (await this.client.xrange(
-      stream,
-      start,
-      end,
-    )) as [string, string[]][];
+    const response = (await (count === undefined
+      ? this.client.xrange(stream, start, end)
+      : this.client.xrange(stream, start, end, 'COUNT', count))) as [
+      string,
+      string[],
+    ][];
 
     return response.map(([entryId, values]) => {
       const fields: Record<string, string> = {};

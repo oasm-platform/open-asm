@@ -10,7 +10,8 @@ import { MessageAction } from '@/components/ai-elements/message';
 // Tool call status
 // ---------------------------------------------------------------------------
 
-// Match rejectionMessage() / PLAN_REQUIRED_MESSAGE in core-api agents.tools.ts
+// Match rejectionMessage() / TODO_REQUIRED_MESSAGE in core-api tools/helpers.ts
+// (saved messages of the retired plan mode say the same)
 const REJECTED_MARKER = 'was not approved by the user';
 const PLAN_REQUIRED_MARKER = 'needs an approved plan first';
 

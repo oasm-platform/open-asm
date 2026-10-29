@@ -323,7 +323,7 @@ export class AgentTool {
 
   /**
    * Applies the approval gate to tools built outside this class (e.g. the
-   * subagent tools), so PLAN mode still blocks them until a plan is approved.
+   * subagent tools), so Agent mode still blocks them until a plan is approved.
    */
   gateTools(
     tools: Record<string, ToolType>,

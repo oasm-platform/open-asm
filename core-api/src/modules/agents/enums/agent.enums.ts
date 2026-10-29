@@ -40,6 +40,8 @@ export enum SubagentStatus {
   IN_PROGRESS = 'in_progress',
   COMPLETED = 'completed',
   FAILED = 'failed',
+  /** Stopped by the user before it finished; never delivered. */
+  CANCELLED = 'cancelled',
 }
 
 /** When an agent definition can run: as the main agent, as a subagent or both. */

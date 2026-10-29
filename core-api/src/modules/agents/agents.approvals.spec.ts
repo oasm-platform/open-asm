@@ -205,48 +205,6 @@ describe('AgentsApprovalsService', () => {
     ).resolves.toMatchObject({ allowed: false });
   });
 
-  it('asks for every new command in plan mode until a plan is approved', async () => {
-    const emitter = new EventEmitter();
-    const prompt = jest.fn((e: { approvalId: string }) => {
-      void service.decide(
-        e.approvalId,
-        AgentCommandApprovalStatus.APPROVED,
-        'w1',
-        'u1',
-      );
-    });
-    emitter.on('approval-required', prompt);
-    await service.authorize('a', 't1', ctx(AgentApprovalMode.PLAN), emitter);
-    await service.authorize('b', 't2', ctx(AgentApprovalMode.PLAN), emitter);
-    expect(prompt).toHaveBeenCalledTimes(2);
-  });
-
-  it('refuses without asking in plan-first runs until a plan is approved', async () => {
-    const emitter = new EventEmitter();
-    const prompt = jest.fn();
-    emitter.on('approval-required', prompt);
-    await expect(
-      service.authorize(
-        'nmap host',
-        't1',
-        { ...ctx(AgentApprovalMode.PLAN), planFirst: true },
-        emitter,
-      ),
-    ).resolves.toEqual({ allowed: false, planRequired: true });
-    expect(prompt).not.toHaveBeenCalled();
-    expect(rows).toHaveLength(0);
-
-    // once the approved plan switched the run to auto, it just runs
-    await expect(
-      service.authorize(
-        'nmap host',
-        't2',
-        { ...ctx(AgentApprovalMode.AUTO), planFirst: true },
-        emitter,
-      ),
-    ).resolves.toEqual({ allowed: true });
-  });
-
   it('refuses every call in Agent mode until a todo step is in progress', async () => {
     const emitter = new EventEmitter();
     const prompt = jest.fn();
@@ -285,7 +243,7 @@ describe('AgentsApprovalsService', () => {
       service.requestPlanApproval(
         steps,
         't1',
-        ctx(AgentApprovalMode.PLAN),
+        ctx(AgentApprovalMode.MANUAL),
         emitter,
         signal,
       );
@@ -352,7 +310,7 @@ describe('AgentsApprovalsService', () => {
       await expect(ignored).resolves.toEqual({ allowed: false });
 
       await expect(
-        service.requestPlanApproval(steps, 't1', ctx(AgentApprovalMode.PLAN)),
+        service.requestPlanApproval(steps, 't1', ctx(AgentApprovalMode.MANUAL)),
       ).resolves.toEqual({ allowed: false });
     });
 
@@ -419,7 +377,7 @@ describe('AgentsApprovalsService', () => {
     });
     emitter.on('approval-required', prompt);
     await service.authorize('a', 't1', ctx(AgentApprovalMode.MANUAL), emitter);
-    await service.authorize('b', 't2', ctx(AgentApprovalMode.PLAN), emitter);
+    await service.authorize('b', 't2', ctx(AgentApprovalMode.MANUAL), emitter);
     expect(prompt).toHaveBeenCalledTimes(1);
 
     await service.resetConversation('c1');
@@ -951,18 +909,6 @@ describe('AgentsApprovalsService', () => {
       ).resolves.toEqual({ allowed: true });
       expect(prompt).not.toHaveBeenCalled();
       expect(rows).toHaveLength(0);
-    });
-
-    it('still wait for the plan in plan mode', async () => {
-      await expect(
-        service.authorize(
-          'enumerate_assets {}',
-          't1',
-          { ...ctx(AgentApprovalMode.PLAN), planFirst: true },
-          undefined,
-          { tool: 'enumerate_assets', readOnly: true },
-        ),
-      ).resolves.toEqual({ allowed: false, planRequired: true });
     });
   });
 });

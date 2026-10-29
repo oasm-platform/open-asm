@@ -53,23 +53,22 @@ export function rejectionMessage(what: string, feedback?: string): string {
   return feedback ? `${base} The user says: ${feedback}` : base;
 }
 
-/** Matched by the console (chat-helpers.tsx) to show the call as "Needs plan" */
-export const PLAN_REQUIRED_MESSAGE =
-  'Not executed: this conversation needs an approved plan first. Call formulate_plan with the full plan (put this work in its steps) and wait for the user to approve it before calling other tools.';
-
-/** Agent mode works from its own todo list: no tool runs before one exists. */
+/**
+ * Agent mode works from a plan the user approved: no tool runs before one of
+ * its steps is in progress. Matched by the console (chat-helpers.tsx) to show
+ * the call as "Needs plan".
+ */
 export const TODO_REQUIRED_MESSAGE =
-  'Not executed: Agent mode needs a goal and a todo list first. Call formulate_plan with the goal and the steps (put this work in them), then transition_step the first step to in_progress before calling other tools. If the plan is finished, add this work with append_step or start a new plan.';
+  'Not executed: Agent mode needs an approved plan first. Call formulate_plan with the steps (put this work in them) and wait for the user to approve it, then transition_step the first step to in_progress before calling other tools. If the plan is finished, start a new one with formulate_plan.';
 
-/** Outside Agent mode, plans exist only in PLAN mode; AUTO and MANUAL just do the work. */
+/** Only Agent mode makes plans; Ask mode just answers. */
 export const PLANNING_OFF_MESSAGE =
-  'Not executed: planning is off in this conversation (only plan mode makes plans). Do the work directly with the other tools, without a plan.';
+  'Not executed: planning is off in this conversation (only Agent mode makes plans). Do the work directly with the other tools, without a plan.';
 
 export function deniedMessage(
   what: string,
   decision: ApprovalDecision,
 ): string {
-  if (decision.planRequired) return PLAN_REQUIRED_MESSAGE;
   if (decision.todoRequired) return TODO_REQUIRED_MESSAGE;
   return rejectionMessage(what, decision.feedback);
 }

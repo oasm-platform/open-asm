@@ -2,7 +2,11 @@ import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
 import type { ApprovalSettings } from './agents.approvals';
 import { Logger } from '@nestjs/common';
 import { EventEmitter } from 'node:events';
-import { AgentsCompletionsService, planningState } from './agents.completions';
+import {
+  AgentsCompletionsService,
+  planningState,
+  type PlanningState,
+} from './agents.completions';
 import { SUBAGENT_MAX_ROUNDS_PER_TURN } from './agents.subagents';
 import { formatTodosToPrompt, type AgentTodoItem } from './agents.todo';
 import { AgentTool } from './agents.tools';
@@ -213,7 +217,7 @@ describe('AgentTool plan tools', () => {
     );
   });
 
-  describe('outside plan mode', () => {
+  describe('outside Agent mode', () => {
     it.each([AgentApprovalMode.AUTO, AgentApprovalMode.MANUAL])(
       'refuses to make or extend a plan in %s mode',
       async (mode) => {
@@ -236,8 +240,15 @@ describe('AgentTool plan tools', () => {
         selfManaged: true,
       }) as unknown as Record<string, ToolLike>;
 
+    beforeEach(() => {
+      approvals.requestPlanApproval.mockResolvedValue({
+        allowed: true,
+        mode: AgentApprovalMode.AUTO,
+      });
+    });
+
     it.each([AgentApprovalMode.AUTO, AgentApprovalMode.MANUAL])(
-      'sets the plan without review and pins its goal in %s mode',
+      'has the user approve the plan, pins its goal and lets it grow in %s mode',
       async (mode) => {
         const tools = agentTools(mode);
         const made = await tools.formulate_plan.execute({
@@ -248,18 +259,39 @@ describe('AgentTool plan tools', () => {
           success: true,
           goal: 'List open ports of example.com',
         });
-        expect(approvals.requestPlanApproval).not.toHaveBeenCalled();
+        expect(approvals.requestPlanApproval).toHaveBeenCalledTimes(1);
         expect(metadata).toMatchObject({
           goal: 'List open ports of example.com',
         });
         expect(repo.rows.map((r) => r.content)).toEqual(['scan', 'report']);
 
+        // No second review for a step added while the plan runs
         expect(
           (await tools.append_step.execute({ content: 'verify' })).success,
         ).toBe(true);
         expect(repo.rows).toHaveLength(3);
+        expect(approvals.requestPlanApproval).toHaveBeenCalledTimes(1);
       },
     );
+
+    it('makes work after a finished plan a new plan to review', async () => {
+      const tools = agentTools(AgentApprovalMode.AUTO);
+      await tools.formulate_plan.execute({ steps: ['scan'] });
+      const [scan] = repo.rows;
+      await tools.transition_step.execute({ id: scan.id, status: 'in_progress' });
+      await tools.transition_step.execute({ id: scan.id, status: 'completed' });
+
+      const appended = await tools.append_step.execute({ content: 'more' });
+      expect(appended).toMatchObject({ success: false });
+      expect(appended.message).toContain('formulate_plan');
+      expect(repo.rows.map((r) => r.content)).toEqual(['scan']);
+
+      expect(
+        (await tools.formulate_plan.execute({ steps: ['more'] })).success,
+      ).toBe(true);
+      expect(approvals.requestPlanApproval).toHaveBeenCalledTimes(2);
+      expect(repo.rows.map((r) => r.content)).toEqual(['more']);
+    });
 
     it('sends the goal to the client only when it changes', async () => {
       const emitted = jest.fn();
@@ -380,9 +412,15 @@ describe('AgentTool plan tools', () => {
     });
   });
 
-  describe('in plan approval mode', () => {
+  describe('plan approval in Agent mode', () => {
+    const agentTodoTools = (approval: ApprovalSettings) =>
+      agentTool.getTodoTools('c1', emitter, {
+        workspaceId: 'w1',
+        approval,
+        selfManaged: true,
+      }) as unknown as Record<string, ToolLike>;
     const formulate = (approval: ApprovalSettings, steps: string[]) =>
-      todoTools(approval).formulate_plan.execute(
+      agentTodoTools(approval).formulate_plan.execute(
         { steps },
         { toolCallId: 'tc1' },
       );
@@ -396,14 +434,14 @@ describe('AgentTool plan tools', () => {
         return Promise.resolve({ allowed: true, mode: AgentApprovalMode.AUTO });
       });
 
-      await formulate(settings(AgentApprovalMode.PLAN), ['a', 'b']);
+      await formulate(settings(AgentApprovalMode.MANUAL), ['a', 'b']);
 
       expect(approvals.requestPlanApproval).toHaveBeenCalledWith(
         ['a', 'b'],
         'tc1',
         {
           userId: 'u1',
-          mode: AgentApprovalMode.PLAN,
+          mode: AgentApprovalMode.MANUAL,
           workspaceId: 'w1',
           conversationId: 'c1',
         },
@@ -415,7 +453,11 @@ describe('AgentTool plan tools', () => {
     it.each([AgentApprovalMode.AUTO, AgentApprovalMode.MANUAL])(
       'switches the run, the conversation and the client to %s',
       async (mode) => {
-        const approval = settings(AgentApprovalMode.PLAN);
+        const approval = settings(
+          mode === AgentApprovalMode.AUTO
+            ? AgentApprovalMode.MANUAL
+            : AgentApprovalMode.AUTO,
+        );
         const changed = jest.fn();
         emitter.on('approval-mode-changed', changed);
         approvals.requestPlanApproval.mockResolvedValue({
@@ -426,7 +468,8 @@ describe('AgentTool plan tools', () => {
         const result = await formulate(approval, ['a', 'b']);
 
         expect(result.success).toBe(true);
-        expect(result.message).toContain('Start with step 1');
+        expect(result.message).toContain('transition_step');
+        expect(result.message).toContain('step 1');
         expect(approval.mode).toBe(mode);
         expect(conversations.update).toHaveBeenCalledWith('c1', {
           approvalMode: mode,
@@ -438,7 +481,7 @@ describe('AgentTool plan tools', () => {
     );
 
     it('discards a rejected plan and tells the agent why', async () => {
-      const approval = settings(AgentApprovalMode.PLAN);
+      const approval = settings(AgentApprovalMode.MANUAL);
       const emitted = jest.fn();
       emitter.on('todos-updated', emitted);
       approvals.requestPlanApproval.mockResolvedValue({
@@ -453,19 +496,22 @@ describe('AgentTool plan tools', () => {
       expect(result.error).toContain('skip the port scan');
       expect(repo.rows).toHaveLength(0);
       expect(emitted).toHaveBeenLastCalledWith([], null);
-      expect(approval.mode).toBe(AgentApprovalMode.PLAN);
+      expect(approval.mode).toBe(AgentApprovalMode.MANUAL);
       expect(conversations.update).not.toHaveBeenCalled();
     });
 
     it('tells the agent to plan first when a tool runs before the plan', async () => {
       approvals.authorize.mockResolvedValue({
         allowed: false,
-        planRequired: true,
+        todoRequired: true,
       });
-      const tools = agentTool.getTools('w1', AgentMode.AGENT, emitter, 'c1', {
-        ...settings(AgentApprovalMode.PLAN),
-        planFirst: true,
-      }) as unknown as Record<string, { execute: ToolLike['execute'] }>;
+      const tools = agentTool.getTools(
+        'w1',
+        AgentMode.AGENT,
+        emitter,
+        'c1',
+        settings(AgentApprovalMode.AUTO),
+      ) as unknown as Record<string, { execute: ToolLike['execute'] }>;
 
       const result = (await tools.enumerate_assets.execute(
         {},
@@ -478,7 +524,7 @@ describe('AgentTool plan tools', () => {
     });
 
     it('lets later tool calls use the mode picked for the plan', async () => {
-      const approval = settings(AgentApprovalMode.PLAN);
+      const approval = settings(AgentApprovalMode.MANUAL);
       approvals.requestPlanApproval.mockResolvedValue({
         allowed: true,
         mode: AgentApprovalMode.AUTO,
@@ -506,13 +552,13 @@ describe('AgentTool plan tools', () => {
       );
     });
 
-    it('refuses another plan once one was approved', async () => {
-      const approval = settings(AgentApprovalMode.PLAN);
+    it('asks again for the next plan once the approved one is done', async () => {
+      const approval = settings(AgentApprovalMode.MANUAL);
       approvals.requestPlanApproval.mockResolvedValue({
         allowed: true,
-        mode: AgentApprovalMode.MANUAL,
+        mode: AgentApprovalMode.AUTO,
       });
-      const tools = todoTools(approval);
+      const tools = agentTodoTools(approval);
       await tools.formulate_plan.execute(
         { steps: ['a'] },
         { toolCallId: 'tc1' },
@@ -525,9 +571,16 @@ describe('AgentTool plan tools', () => {
         { steps: ['b'] },
         { toolCallId: 'tc2' },
       );
-      expect(again).toMatchObject({ success: false });
-      expect(approvals.requestPlanApproval).toHaveBeenCalledTimes(1);
-      expect(repo.rows.map((r) => r.content)).toEqual(['a']);
+      expect(again).toMatchObject({ success: true });
+      expect(approvals.requestPlanApproval).toHaveBeenCalledTimes(2);
+      expect(approvals.requestPlanApproval).toHaveBeenLastCalledWith(
+        ['b'],
+        'tc2',
+        expect.objectContaining({ mode: AgentApprovalMode.AUTO }),
+        emitter,
+        undefined,
+      );
+      expect(repo.rows.map((r) => r.content)).toEqual(['b']);
     });
   });
 });
@@ -596,6 +649,7 @@ describe('AgentsCompletionsService plan execution', () => {
   const run = async (
     agentMode = AgentMode.AGENT,
     approvalMode = AgentApprovalMode.MANUAL,
+    planning?: PlanningState,
   ) => {
     const stream: ReadableStream = service.createContinuationStream({
       llmConfig: {},
@@ -609,6 +663,7 @@ describe('AgentsCompletionsService plan execution', () => {
       todosEmitter: new EventEmitter(),
       agentMode,
       approvalMode,
+      planning,
       workspaceId: 'w1',
       userId: 'u1',
     });
@@ -631,18 +686,18 @@ describe('AgentsCompletionsService plan execution', () => {
     expect(repo.rows.every((r) => r.status === 'completed')).toBe(true);
   });
 
-  it('keeps running an approved plan in Ask mode when plan mode is on', async () => {
+  it('keeps running a plan left from Agent mode in Ask mode', async () => {
     repo.rows = [row('a', 'pending', 0), row('b', 'pending', 1)];
     const order = ['a', 'b'];
     iteration.mockImplementation(() => setStatus(order.shift()!, 'completed'));
 
-    await run(AgentMode.ASK, AgentApprovalMode.PLAN);
+    await run(AgentMode.ASK, AgentApprovalMode.MANUAL, 'finish');
 
     expect(service.executeStreamText).toHaveBeenCalledTimes(2);
     expect(repo.rows.every((r) => r.status === 'completed')).toBe(true);
   });
 
-  it('answers once in Ask mode without plan mode', async () => {
+  it('answers once in Ask mode without a plan to finish', async () => {
     repo.rows = [row('a', 'pending', 0)];
 
     await run(AgentMode.ASK, AgentApprovalMode.MANUAL);
@@ -750,10 +805,10 @@ describe('AgentsCompletionsService plan execution', () => {
     expect(repo.rows.map((r) => r.status)).toEqual(['completed', 'completed']);
   });
 
-  it('closes out a forgotten last step in Ask mode with plan approval', async () => {
+  it('closes out a forgotten last step of a plan finished in Ask mode', async () => {
     repo.rows = [row('a', 'in_progress', 0)];
 
-    await run(AgentMode.ASK, AgentApprovalMode.PLAN);
+    await run(AgentMode.ASK, AgentApprovalMode.MANUAL, 'finish');
 
     expect(repo.rows[0].status).toBe('completed');
   });
@@ -1002,19 +1057,20 @@ describe('AgentsCompletionsService plan mode prompt', () => {
     expect(await withConfig(null)).not.toContain(ltm);
   });
 
-  it.each([AgentMode.AGENT, AgentMode.ASK])(
-    'asks for a plan first in %s mode when plan mode is on',
-    async (agentMode) => {
-      const parts = await build(agentMode, AgentApprovalMode.PLAN);
+  it.each([AgentApprovalMode.AUTO, AgentApprovalMode.MANUAL])(
+    'asks for an approved plan first in Agent mode (%s)',
+    async (mode) => {
+      const parts = await build(AgentMode.AGENT, mode);
       // The last instruction; only the clock follows it
       const last = parts[parts.length - 2];
-      expect(last).toContain('PLAN MODE IS ON');
+      expect(last).toContain('APPROVED PLAN FIRST');
+      expect(last).toContain('The user reviews every new plan');
       expect(last).toContain('formulate_plan');
     },
   );
 
   it('ends with the time so the rest of the prompt can be cached', async () => {
-    const parts = await build(AgentMode.AGENT, AgentApprovalMode.PLAN);
+    const parts = await build(AgentMode.AGENT, AgentApprovalMode.MANUAL);
     expect(parts[parts.length - 1]).toMatch(/^Current time: /);
   });
 
@@ -1023,24 +1079,17 @@ describe('AgentsCompletionsService plan mode prompt', () => {
     async (mode) => {
       const parts = await build(AgentMode.ASK, mode, ['completed']);
       const text = parts.join('\n');
-      expect(text).not.toContain('PLAN MODE IS ON');
+      expect(text).not.toContain('APPROVED PLAN FIRST');
       expect(text).not.toContain('prompt:PLAN.md');
       expect(text).not.toContain('step 0');
     },
   );
 
-  it('loads the plan prompt in plan mode', async () => {
-    const parts = await build(AgentMode.AGENT, AgentApprovalMode.PLAN);
-    expect(parts.join('\n')).toContain('prompt:PLAN.md');
-  });
-
   it.each([AgentApprovalMode.AUTO, AgentApprovalMode.MANUAL])(
-    'requires a goal and todo in Agent mode (%s) and pins the goal',
+    'loads the plan prompt in Agent mode (%s) and pins the goal',
     async (mode) => {
       const empty = (await build(AgentMode.AGENT, mode)).join('\n');
       expect(empty).toContain('prompt:PLAN.md');
-      expect(empty).toContain('GOAL AND TODO FIRST');
-      expect(empty).not.toContain('PLAN MODE IS ON');
 
       const running = (
         await build(
@@ -1056,14 +1105,14 @@ describe('AgentsCompletionsService plan mode prompt', () => {
     },
   );
 
-  it('only lets an approved plan finish once the mode switched', async () => {
+  it('only lets a plan left from Agent mode finish in Ask mode', async () => {
     const parts = await build(AgentMode.ASK, AgentApprovalMode.MANUAL, [
       'completed',
       'pending',
     ]);
     const text = parts.join('\n');
     expect(text).toContain('AN APPROVED PLAN IS UNFINISHED');
-    expect(text).not.toContain('PLAN MODE IS ON');
+    expect(text).not.toContain('APPROVED PLAN FIRST');
     expect(text).toContain('step 1');
   });
 });
@@ -1116,32 +1165,16 @@ describe('subagents by agent mode', () => {
 describe('planning state', () => {
   const todo = (status: TodoStatus) => ({ status });
 
-  it('plans only in plan mode', () => {
-    expect(planningState(AgentApprovalMode.PLAN, [])).toBe('create');
-    expect(planningState(AgentApprovalMode.MANUAL, [])).toBe('off');
-    expect(planningState(AgentApprovalMode.AUTO, [todo('completed')])).toBe(
-      'off',
-    );
-  });
-
-  it('keeps its own todo in Agent mode outside plan mode', () => {
-    for (const mode of [AgentApprovalMode.AUTO, AgentApprovalMode.MANUAL]) {
-      expect(planningState(mode, [], AgentMode.AGENT)).toBe('track');
-    }
-    expect(planningState(AgentApprovalMode.PLAN, [], AgentMode.AGENT)).toBe(
-      'create',
-    );
-    expect(planningState(AgentApprovalMode.AUTO, [], AgentMode.ASK)).toBe(
-      'off',
-    );
+  it('plans in Agent mode only', () => {
+    expect(planningState([], AgentMode.AGENT)).toBe('track');
+    expect(planningState([todo('pending')], AgentMode.AGENT)).toBe('track');
+    expect(planningState([], AgentMode.ASK)).toBe('off');
+    expect(planningState([todo('completed')], AgentMode.ASK)).toBe('off');
   });
 
   it('finishes a plan approved earlier', () => {
     expect(
-      planningState(AgentApprovalMode.MANUAL, [
-        todo('completed'),
-        todo('pending'),
-      ]),
+      planningState([todo('completed'), todo('pending')], AgentMode.ASK),
     ).toBe('finish');
   });
 
@@ -1161,7 +1194,6 @@ describe('planning state', () => {
       );
     expect(tools('off')).toEqual([]);
     expect(tools('finish')).toEqual(['transition_step', 'scrap_plan']);
-    expect(tools('create')).toHaveLength(4);
     expect(tools('track')).toHaveLength(4);
     expect(service.agentTool.getTodoTools).toHaveBeenLastCalledWith(
       'c1',

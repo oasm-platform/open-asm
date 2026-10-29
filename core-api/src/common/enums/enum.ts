@@ -315,11 +315,13 @@ export enum TelegramConnectStatus {
   CONNECTED = 'CONNECTED',
 }
 
+/**
+ * How commands run. Agent mode has every new plan approved by the user first,
+ * in either mode.
+ */
 export enum AgentApprovalMode {
   /** Run every command without asking */
   AUTO = 'auto',
-  /** Ask once for the whole plan, then run commands automatically */
-  PLAN = 'plan',
   /** Ask for every command that has not been approved before */
   MANUAL = 'manual',
 }

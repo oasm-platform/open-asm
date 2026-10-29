@@ -23,7 +23,7 @@ export interface ToolCallState {
     | 'completed'
     | 'error'
     | 'rejected'
-    /** Refused until the user approves a plan (PLAN approval mode) */
+    /** Refused until the user approves a plan (Agent mode) */
     | 'needs-plan';
   input?: Record<string, unknown>;
   output?: unknown;

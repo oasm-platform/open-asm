@@ -47,6 +47,11 @@ const STATUS: Record<SubagentResponseDto['status'], SubagentStatusView> = {
     className: 'text-emerald-500',
   },
   failed: { label: 'Failed', icon: XCircle, className: 'text-destructive' },
+  cancelled: {
+    label: 'Cancelled',
+    icon: XCircle,
+    className: 'text-muted-foreground',
+  },
 };
 
 /** Run time so far (running) or in total (finished). */

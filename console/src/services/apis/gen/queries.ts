@@ -3322,6 +3322,7 @@ export const SubagentResponseDtoStatus = {
   in_progress: 'in_progress',
   completed: 'completed',
   failed: 'failed',
+  cancelled: 'cancelled',
 } as const;
 
 export type SubagentResponseDto = {
@@ -3375,7 +3376,6 @@ export type ConversationResponseDtoApprovalMode =
 
 export const ConversationResponseDtoApprovalMode = {
   auto: 'auto',
-  plan: 'plan',
   manual: 'manual',
 } as const;
 
@@ -3447,6 +3447,7 @@ export const SubagentDetailResponseDtoStatus = {
   in_progress: 'in_progress',
   completed: 'completed',
   failed: 'failed',
+  cancelled: 'cancelled',
 } as const;
 
 export type SubagentDetailResponseDto = {
@@ -3717,7 +3718,6 @@ export type SendMessageDtoApprovalMode =
 
 export const SendMessageDtoApprovalMode = {
   auto: 'auto',
-  plan: 'plan',
   manual: 'manual',
 } as const;
 
@@ -3942,7 +3942,6 @@ export type AgentConfigResponseDtoDefaultApprovalMode =
 
 export const AgentConfigResponseDtoDefaultApprovalMode = {
   auto: 'auto',
-  plan: 'plan',
   manual: 'manual',
 } as const;
 
@@ -4026,7 +4025,6 @@ export type UpsertAgentConfigDtoDefaultApprovalMode =
 
 export const UpsertAgentConfigDtoDefaultApprovalMode = {
   auto: 'auto',
-  plan: 'plan',
   manual: 'manual',
 } as const;
 
@@ -36631,7 +36629,7 @@ export const useAgentsControllerStreamMessage = <
 };
 
 /**
- * Aborts the in-progress agent run of a conversation. Use this instead of dropping the stream connection, which now lets the run finish in the background.
+ * Aborts the in-progress agent run of a conversation and cancels its pending and running subagents. Use this instead of dropping the stream connection, which now lets the run finish in the background.
  * @summary Stop the active response
  */
 export const agentsControllerStopConversation = (
