@@ -1,8 +1,8 @@
-import { yaml } from '@codemirror/lang-yaml';
 import { useBlocker, useNavigate } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { tokyoNight } from '@uiw/codemirror-theme-tokyo-night';
 import CodeMirror, { EditorView } from '@uiw/react-codemirror';
+import { yamlSchema } from 'codemirror-json-schema/yaml';
 import { AxiosError } from 'axios';
 import * as prettierYaml from 'prettier/plugins/yaml';
 import * as prettier from 'prettier/standalone';
@@ -31,6 +31,7 @@ import {
   type TemplateTab,
 } from '../hooks/use-template-tabs';
 import { TemplateTabs } from './template-tabs';
+import { nucleiSchema } from '../nuclei-schema';
 
 /** `<id>.yaml` from the top-level YAML id, sanitized; the default name if absent or unparsable. */
 function nameFromContent(content: string): string {
@@ -172,7 +173,8 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
   // Esc then Tab leaves the editor; CodeMirror keeps Tab for indentation.
   const extensions = useMemo(
     () => [
-      yaml(),
+      // YAML language plus Nuclei-schema autocomplete, hover docs and lint.
+      yamlSchema(nucleiSchema),
       EditorView.contentAttributes.of({
         'aria-label': `${tab.name} YAML. Press Escape then Tab to leave the editor.`,
       }),

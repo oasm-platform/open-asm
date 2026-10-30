@@ -37,3 +37,11 @@ overrides:
   # unused). auto-install-peers kept re-linking a stale solid-js@1.9.14 from
   # the lockfile, which pulls in seroval 1.5.x.
   "better-auth>solid-js": "-"
+
+# streamdown's published types import shiki, but it lists shiki only as a
+# devDependency, so they type-check against whichever shiki pnpm hoists (a
+# second major arrived with codemirror-json-schema). Same range as @streamdown/code.
+packageExtensions:
+  streamdown@2:
+    dependencies:
+      shiki: ^3.19.0
