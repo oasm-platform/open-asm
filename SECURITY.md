@@ -31,7 +31,7 @@ If the issue is clearly **not sensitive** (hardening idea, dependency bump, theo
 ## Scope Notes
 
 - **Worker Docker socket is by design.** The worker mounts `/var/run/docker.sock` to spawn connector containers (`docker-compose.yml`, `worker/internal/runtime/docker.go`). The socket is root-equivalent on the host — only run trusted connector images, never expose the worker to untrusted networks.
-- **Secrets live in `.env`, never in git.** `ENCRYPTION_KEYS` is order-sensitive (last key encrypts); `WORKER_API_KEY` must match what the API expects. Leaked-key rotation is an operator responsibility.
+- **Secrets live in `.env`, never in git.** the last `ENCRYPTION_KEYS` entry encrypts and must be a random 32+ character key when deployed (the API refuses to start otherwise); `WORKER_API_KEY` must match what the API expects. Leaked-key rotation is an operator responsibility.
 - **`.env` / deployment misconfiguration is out of code scope** for reports — flag it as a docs issue instead, unless the defect is in source code (e.g. an insecure default constant).
 
 ## Prior Audit (Point-in-Time)
