@@ -109,7 +109,7 @@ describe('ArtifactsService', () => {
       assertFileSize: jest.fn(),
       reserve: jest.fn(),
       commit: jest.fn(),
-      releaseReserved: jest.fn(),
+      releaseReserved: jest.fn().mockResolvedValue(undefined),
       releaseUsed: jest.fn(),
     };
     eventBridge = { publishSafely: jest.fn() };
@@ -657,9 +657,9 @@ describe('ArtifactsService', () => {
       manager.findOne.mockResolvedValue(row());
       const order: string[] = [];
       for (const [name, fn] of [
+        ['releaseUsed', quota.releaseUsed],
         ['reserve', quota.reserve],
         ['upload', storage.uploadFile],
-        ['releaseUsed', quota.releaseUsed],
         ['commit', quota.commit],
       ] as const) {
         fn.mockImplementation(() => {
@@ -678,7 +678,7 @@ describe('ArtifactsService', () => {
       expect(storage.uploadFile).toHaveBeenCalledWith('k.yaml', buffer, 'artifacts', 'application/yaml');
       expect(quota.releaseUsed).toHaveBeenCalledWith(manager, WS, 10);
       expect(quota.commit).toHaveBeenCalledWith(manager, WS, 25);
-      expect(order).toEqual(['reserve', 'upload', 'releaseUsed', 'commit']);
+      expect(order).toEqual(['releaseUsed', 'reserve', 'upload', 'commit']);
       expect(manager.save).toHaveBeenCalledWith(expect.objectContaining({ sizeBytes: 25 }));
     });
 
@@ -704,9 +704,19 @@ describe('ArtifactsService', () => {
       await expect(service.replaceContent(WS, OWNER, 'artifact-1', buffer)).rejects.toThrow(
         ConflictException,
       );
+      // releaseUsed runs first but shares the transaction, so the rollback undoes it.
       expect(storage.uploadFile).not.toHaveBeenCalled();
-      expect(quota.releaseUsed).not.toHaveBeenCalled();
       expect(quota.commit).not.toHaveBeenCalled();
+    });
+
+    it('lets a full workspace shrink a file', async () => {
+      manager.findOne.mockResolvedValue(row());
+      await service.replaceContent(WS, OWNER, 'artifact-1', Buffer.alloc(5));
+      expect(quota.releaseUsed).toHaveBeenCalledWith(manager, WS, 10);
+      expect(quota.reserve).toHaveBeenCalledWith(manager, WS, 5);
+      expect(quota.releaseUsed.mock.invocationCallOrder[0]).toBeLessThan(
+        quota.reserve.mock.invocationCallOrder[0],
+      );
     });
 
     it('releases the reservation when upload fails', async () => {

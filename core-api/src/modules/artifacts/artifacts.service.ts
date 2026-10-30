@@ -59,6 +59,7 @@ export interface CreateArtifactFromBufferInput {
   mimeType: string;
   buffer: Buffer;
   metadata?: Record<string, unknown>;
+  /** Callers must verify the folder belongs to the workspace (not checked here). */
   parentFolderId?: string | null;
   /** Who the audit event names; defaults to the agent. */
   actorType?: AuditActorType;
@@ -231,20 +232,25 @@ export class ArtifactsService {
         throw new ForbiddenException('Only the owner can change this file');
       }
       this.quota.assertFileSize(buffer.length);
+      // Release first so a full workspace can shrink; a quota failure on
+      // reserve rolls this back with the transaction.
+      await this.quota.releaseUsed(manager, workspaceId, artifact.sizeBytes);
       await this.quota.reserve(manager, workspaceId, buffer.length);
       try {
+        // shortcut: holds the workspace usage row lock during the upload; fine for small files (templates ≤ 256 KB), revisit before using this for large files.
         await this.storageService.uploadFile(
           artifact.objectKey,
           buffer,
           artifact.bucket,
           artifact.mimeType,
         );
-        await this.quota.releaseUsed(manager, workspaceId, artifact.sizeBytes);
         await this.quota.commit(manager, workspaceId, buffer.length);
         artifact.sizeBytes = buffer.length;
         await manager.save(artifact);
       } catch (error) {
-        await this.quota.releaseReserved(manager, workspaceId, buffer.length);
+        await this.quota
+          .releaseReserved(manager, workspaceId, buffer.length)
+          .catch(() => undefined);
         throw error;
       }
     });
