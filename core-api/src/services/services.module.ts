@@ -5,6 +5,7 @@ import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { GeoIpService } from './geo-ip/geo-ip.service';
 import { RedisLockService } from './redis/distributed-lock.service';
 import { RedisService } from './redis/redis.service';
+import { EncryptionUpgradeService } from './workspace-encryption/encryption-upgrade.service';
 import { WorkspaceEncryptionService } from './workspace-encryption/workspace-encryption.service';
 
 const services = [
@@ -12,6 +13,7 @@ const services = [
   RedisLockService,
   GeoIpService,
   WorkspaceEncryptionService,
+  EncryptionUpgradeService,
 ];
 
 @Global()

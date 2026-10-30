@@ -14,7 +14,8 @@ import { DEFAULT_ENCRYPTION_KEY } from '../constants/app.constants';
  * - `<index>:<iv>:<data>`: AES-256-CBC under ENCRYPTION_KEYS[index] (v1).
  * - `<iv>:<data>`: AES-256-CBC under an unknown KEK (before key indexes).
  * Workspace data encrypted with its DEK is `v2:dek:...` (workspace-encryption.util).
- * Only v2 is written; the CBC formats stay readable.
+ * Only v2 is written; the CBC formats stay readable until the boot upgrade
+ * (EncryptionUpgradeService) rewrites them.
  */
 
 const GCM_IV_LENGTH = 12;
