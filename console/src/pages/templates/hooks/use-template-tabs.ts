@@ -116,6 +116,11 @@ export function useTemplateTabs() {
     [setState],
   );
 
+  const activate = useCallback(
+    (id: string) => setState((prev) => ({ ...prev, activeId: id })),
+    [setState],
+  );
+
   const close = useCallback(
     (id: string) =>
       setState((prev) => {
@@ -129,5 +134,5 @@ export function useTemplateTabs() {
     [setState],
   );
 
-  return { tabs: state.tabs, activeId: state.activeId, open, openNew, update, markSaved, rename, close };
+  return { tabs: state.tabs, activeId: state.activeId, open, openNew, update, markSaved, rename, activate, close };
 }
