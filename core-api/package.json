@@ -79,7 +79,7 @@
     "node-telegram-bot-api": "^1.2.0",
     "nodemailer": "10.2.1",
     "pg": "^8.16.0",
-    "qs": "^6.15.3",
+    "qs": "^6.16.1",
     "react": "^19.2.7",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
