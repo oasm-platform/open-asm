@@ -11,10 +11,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import * as yaml from 'js-yaml';
 import { Repository } from 'typeorm';
 import { ArtifactFoldersService } from '../artifacts/artifact-folders.service';
-import {
-  ARTIFACT_MANAGE_PERMISSION,
-  ArtifactsService,
-} from '../artifacts/artifacts.service';
+import { ArtifactsService } from '../artifacts/artifacts.service';
 import type { ArtifactDto } from '../artifacts/dto/artifacts.dto';
 import { Artifact } from '../artifacts/entities/artifact.entity';
 import { StorageService } from '../storage/storage.service';
@@ -120,14 +117,8 @@ export class TemplatesService {
     workspaceId: string,
     userId: string,
     id: string,
-    permissions: string[],
   ): Promise<TemplateContentDto> {
-    const artifact = await this.findTemplate(workspaceId, id);
-    const canManage =
-      permissions.includes('*') || permissions.includes(ARTIFACT_MANAGE_PERMISSION);
-    if (!((await this.artifacts.canRead(artifact, userId)) || canManage)) {
-      throw new NotFoundException('Template not found');
-    }
+    const artifact = await this.findTemplate(workspaceId, userId, id);
     const { file } = await this.storage.getFile(artifact.objectKey, artifact.bucket);
     const chunks: Buffer[] = [];
     for await (const chunk of file.getStream()) {
@@ -166,7 +157,7 @@ export class TemplatesService {
     dto: SaveTemplateContentDto,
   ): Promise<ArtifactDto> {
     validateTemplate(undefined, dto.content);
-    await this.findTemplate(workspaceId, id);
+    await this.findTemplate(workspaceId, userId, id);
     return this.artifacts.replaceContent(
       workspaceId,
       userId,
@@ -183,12 +174,12 @@ export class TemplatesService {
   ): Promise<ArtifactDto> {
     const name = dto.name.trim();
     validateTemplate(name);
-    await this.findTemplate(workspaceId, id);
+    await this.findTemplate(workspaceId, userId, id);
     return this.artifacts.rename(workspaceId, userId, id, name);
   }
 
-  /** 404 unless the id is a ready artifact in the workspace templates folder. */
-  private async findTemplate(workspaceId: string, id: string): Promise<Artifact> {
+  /** 404 unless the id is a ready, readable artifact in the workspace templates folder. */
+  private async findTemplate(workspaceId: string, userId: string, id: string): Promise<Artifact> {
     const folder = await this.folders.ensureTemplatesFolder(workspaceId);
     const artifact = await this.artifactRepo.findOne({
       where: {
@@ -198,7 +189,13 @@ export class TemplatesService {
       },
       relations: { createdBy: true },
     });
-    if (!artifact || artifact.parentFolderId !== folder.id) throw new NotFoundException('Template not found');
+    if (
+      !artifact ||
+      artifact.parentFolderId !== folder.id ||
+      !(await this.artifacts.canRead(artifact, userId))
+    ) {
+      throw new NotFoundException('Template not found');
+    }
     return artifact;
   }
 }

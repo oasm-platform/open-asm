@@ -62,9 +62,9 @@ import { Workspace } from './entities/workspace.entity';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
-/** Invitation validity window: 7 days */
 // Retired with the move of templates onto artifacts; stripped so groups that still hold them stay editable.
 const RETIRED_PERMISSION_KEYS = new Set(['template.read', 'template.write']);
+/** Invitation validity window: 7 days */
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 /** ref tag used on workspace-invitation notifications so they can be located
  * (and deleted once the invite is accepted/declined/cancelled) via refId =

@@ -75,19 +75,21 @@ export class ArtifactFoldersService {
 
   /** The workspace-owned root folder for custom templates; created on first use. */
   async ensureTemplatesFolder(workspaceId: string): Promise<ArtifactFolder> {
+    const where = {
+      workspaceId,
+      parentFolderId: IsNull(),
+      createdByUserId: IsNull(),
+      name: TEMPLATES_FOLDER_NAME,
+    };
+    const order = { createdAt: 'ASC' } as const;
+    // Lock-free fast path; only a miss pays for the transaction + advisory lock.
+    const found = await this.folderRepo.findOne({ where, order });
+    if (found) return found;
     return this.dataSource.transaction(async (manager) => {
       await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
         `artifact-folders:templates:${workspaceId}`,
       ]);
-      const existing = await manager.findOne(ArtifactFolder, {
-        where: {
-          workspaceId,
-          parentFolderId: IsNull(),
-          createdByUserId: IsNull(),
-          name: TEMPLATES_FOLDER_NAME,
-        },
-        order: { createdAt: 'ASC' },
-      });
+      const existing = await manager.findOne(ArtifactFolder, { where, order });
       if (existing) return existing;
       return manager.save(
         this.folderRepo.create({

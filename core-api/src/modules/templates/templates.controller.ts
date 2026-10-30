@@ -3,10 +3,7 @@ import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator'
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
-import type {
-  RequestWithMetadata,
-  UserContextPayload,
-} from '@/common/interfaces/app.interface';
+import type { UserContextPayload } from '@/common/interfaces/app.interface';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
   Body,
@@ -17,7 +14,6 @@ import {
   Post,
   Put,
   Query,
-  Req,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ArtifactDto } from '../artifacts/dto/artifacts.dto';
@@ -65,14 +61,8 @@ export class TemplatesController {
     @Param() { id }: IdQueryParamDto,
     @WorkspaceId() workspaceId: string,
     @UserContext() user: UserContextPayload,
-    @Req() req: RequestWithMetadata,
   ) {
-    return this.templatesService.getContent(
-      workspaceId,
-      user.id,
-      id,
-      req.permissions ?? [],
-    );
+    return this.templatesService.getContent(workspaceId, user.id, id);
   }
 
   @Doc({

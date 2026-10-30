@@ -132,7 +132,7 @@ describe('TemplatesService', () => {
   describe('outside the templates folder', () => {
     it('404s for artifact outside templates folder', async () => {
       repo.findOne.mockResolvedValue(row({ parentFolderId: 'other' }));
-      await expect(service.getContent(WS, ME, 'a1', [])).rejects.toThrow(
+      await expect(service.getContent(WS, ME, 'a1')).rejects.toThrow(
         NotFoundException,
       );
       await expect(
@@ -154,6 +154,18 @@ describe('TemplatesService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
+    it('404s save and rename for a template the user cannot read', async () => {
+      artifacts.canRead.mockResolvedValue(false);
+      await expect(
+        service.saveContent(WS, 'other', 'a1', { content: 'id: a' }),
+      ).rejects.toThrow(NotFoundException);
+      await expect(
+        service.rename(WS, 'other', 'a1', { name: 'b.yaml' }),
+      ).rejects.toThrow(NotFoundException);
+      expect(artifacts.replaceContent).not.toHaveBeenCalled();
+      expect(artifacts.rename).not.toHaveBeenCalled();
+    });
+
     it('rename changes only name and keeps objectKey', async () => {
       await service.rename(WS, ME, 'a1', { name: ' b.yml ' });
       expect(artifacts.rename).toHaveBeenCalledWith(WS, ME, 'a1', 'b.yml');
@@ -169,23 +181,23 @@ describe('TemplatesService', () => {
 
   describe('getContent', () => {
     it('getContent returns text for a readable template', async () => {
-      const res = await service.getContent(WS, ME, 'a1', []);
+      const res = await service.getContent(WS, ME, 'a1');
       expect(res.content).toBe('id: a');
       expect(storage.getFile).toHaveBeenCalledWith('k/a.yaml', 'artifacts');
     });
 
     it('404s for a template the user cannot read', async () => {
       artifacts.canRead.mockResolvedValue(false);
-      await expect(service.getContent(WS, 'other', 'a1', [])).rejects.toThrow(
+      await expect(service.getContent(WS, 'other', 'a1')).rejects.toThrow(
         NotFoundException,
       );
     });
 
-    it('lets artifact.manage read any template', async () => {
+    it('does not let artifact.manage read a private template', async () => {
       artifacts.canRead.mockResolvedValue(false);
-      await expect(
-        service.getContent(WS, 'other', 'a1', ['artifact.manage']),
-      ).resolves.toMatchObject({ content: 'id: a' });
+      await expect(service.getContent(WS, 'other', 'a1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 

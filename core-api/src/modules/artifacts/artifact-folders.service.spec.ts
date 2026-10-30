@@ -30,6 +30,7 @@ describe('ArtifactFoldersService', () => {
   beforeEach(() => {
     folderRepo = {
       find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn().mockResolvedValue(null),
       create: jest.fn((value: unknown) => value),
       save: jest.fn((value: ArtifactFolder) => Promise.resolve({ ...folder(), ...value })),
     };
@@ -81,10 +82,21 @@ describe('ArtifactFoldersService', () => {
     name: 'custom-templates',
   };
 
-  it('ensureTemplatesFolder takes the advisory lock then returns the existing folder', async () => {
+  it('ensureTemplatesFolder returns an existing folder without a transaction', async () => {
     const existing = folder({ name: 'custom-templates', createdByUserId: null });
-    manager.findOne.mockResolvedValue(existing);
+    folderRepo.findOne.mockResolvedValue(existing);
     await expect(service.ensureTemplatesFolder(WS)).resolves.toBe(existing);
+    expect(folderRepo.findOne).toHaveBeenCalledWith({
+      where: TEMPLATES,
+      order: { createdAt: 'ASC' },
+    });
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  it('ensureTemplatesFolder on a miss locks, re-checks, then returns the winner', async () => {
+    const winner = folder({ name: 'custom-templates', createdByUserId: null });
+    manager.findOne.mockResolvedValue(winner);
+    await expect(service.ensureTemplatesFolder(WS)).resolves.toBe(winner);
     expect(manager.query).toHaveBeenCalledWith(
       'SELECT pg_advisory_xact_lock(hashtext($1))',
       ['artifact-folders:templates:ws-1'],
@@ -92,10 +104,14 @@ describe('ArtifactFoldersService', () => {
     expect(manager.query.mock.invocationCallOrder[0]).toBeLessThan(
       manager.findOne.mock.invocationCallOrder[0],
     );
+    expect(manager.findOne).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ where: TEMPLATES, order: { createdAt: 'ASC' } }),
+    );
     expect(manager.save).not.toHaveBeenCalled();
   });
 
-  it('ensureTemplatesFolder creates it when missing', async () => {
+  it('ensureTemplatesFolder creates it when still missing under the lock', async () => {
     manager.findOne.mockResolvedValue(null);
     await service.ensureTemplatesFolder(WS);
     expect(manager.save).toHaveBeenCalledWith({
@@ -104,15 +120,6 @@ describe('ArtifactFoldersService', () => {
       parentFolderId: null,
       name: 'custom-templates',
     });
-  });
-
-  it('ensureTemplatesFolder looks up the oldest match', async () => {
-    manager.findOne.mockResolvedValue(folder());
-    await service.ensureTemplatesFolder(WS);
-    expect(manager.findOne).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ where: TEMPLATES, order: { createdAt: 'ASC' } }),
-    );
   });
 
   it('lists subfolders of the workspace templates folder', async () => {
