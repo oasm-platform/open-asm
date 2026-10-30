@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DataTable } from '@/components/ui/data-table';
+import { OpenLink } from '@/components/ui/open-link';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -174,13 +175,15 @@ export function DetailProvider() {
             </div> */}
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={() => window.open(provider.websiteUrl || '', '_blank')}
-              disabled={!provider.websiteUrl}
-            >
-              Visit Website
-            </Button>
+            {provider.websiteUrl ? (
+              <Button asChild variant="outline">
+                <OpenLink href={provider.websiteUrl}>Visit Website</OpenLink>
+              </Button>
+            ) : (
+              <Button variant="outline" disabled>
+                Visit Website
+              </Button>
+            )}
             <CreateToolDialog providerId={id || ''}>
               <Button variant="outline">
                 <Plus className="mr-2 h-4 w-4" />
@@ -262,14 +265,14 @@ export function DetailProvider() {
               API Docs
             </h3>
             {provider.apiDocsUrl ? (
-              <a
+              <OpenLink
                 href={provider.apiDocsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-500 hover:underline"
               >
                 View Documentation
-              </a>
+              </OpenLink>
             ) : (
               <p>N/A</p>
             )}

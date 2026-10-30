@@ -1,3 +1,4 @@
+import { OpenLink } from '@/components/ui/open-link';
 import type { HttpResponseDTO } from '@/services/apis/gen/queries';
 import { Globe } from 'lucide-react';
 import { useState } from 'react';
@@ -13,7 +14,7 @@ export default function AssetValue({
   return httpResponse?.failed ? (
     <span className="text-gray-500 font-bold line-through">{value}</span>
   ) : (
-    <a
+    <OpenLink
       target="_blank"
       href={httpResponse?.url}
       className="inline-flex items-center gap-1 hover:text-blue-500 rounded transition-colors duration-200"
@@ -30,6 +31,6 @@ export default function AssetValue({
         <Globe className="w-5 h-5" />
       )}
       <pre className="break-all whitespace-pre-wrap">{value}</pre>
-    </a>
+    </OpenLink>
   );
 }

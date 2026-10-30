@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { OpenLink } from '@/components/ui/open-link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { axiosInstance } from '@/services/apis/axios-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -216,14 +217,14 @@ function PairingDialog({
                     />
                   </div>
                   <Button asChild variant="default" className="gap-2">
-                    <a
+                    <OpenLink
                       href={deepLink}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
                       <ExternalLink className="size-4" />
                       Open Telegram
-                    </a>
+                    </OpenLink>
                   </Button>
                   <p className="text-center text-xs text-muted-foreground">
                     Scan QR with your phone, or click the button to open

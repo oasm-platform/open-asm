@@ -5,6 +5,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { OpenLink } from "@/components/ui/open-link";
 import { cn } from "@/lib/utils";
 import { BookIcon, ChevronDownIcon } from "lucide-react";
 import type { ComponentProps } from "react";
@@ -60,7 +61,7 @@ export const SourcesContent = ({
 export type SourceProps = ComponentProps<"a">;
 
 export const Source = ({ href, title, children, ...props }: SourceProps) => (
-  <a
+  <OpenLink
     className="flex items-center gap-2"
     href={href}
     rel="noreferrer"
@@ -73,5 +74,5 @@ export const Source = ({ href, title, children, ...props }: SourceProps) => (
         <span className="block font-medium">{title}</span>
       </>
     )}
-  </a>
+  </OpenLink>
 );

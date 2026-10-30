@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge';
+import { OpenLink } from '@/components/ui/open-link';
 import type { Vulnerability } from '@/services/apis/gen/queries';
 import { ExternalLink } from 'lucide-react';
 
@@ -51,7 +52,7 @@ export function CodeLocation({
               {lines ? `:${lines}` : ''}
             </span>
             {url && (
-              <a
+              <OpenLink
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -59,7 +60,7 @@ export function CodeLocation({
                 className="text-muted-foreground hover:text-foreground"
               >
                 <ExternalLink className="size-4" />
-              </a>
+              </OpenLink>
             )}
           </div>
         </div>

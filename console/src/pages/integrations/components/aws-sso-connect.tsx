@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { OpenLink } from '@/components/ui/open-link';
 import {
   Select,
   SelectContent,
@@ -287,14 +288,14 @@ export function AwsSsoConnect({
             </code>
             {device.verificationUri && (
               <Button asChild variant="outline" className="gap-2">
-                <a
+                <OpenLink
                   href={device.verificationUriComplete || device.verificationUri}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
                   <ExternalLink className="size-4" />
                   Open verification page
-                </a>
+                </OpenLink>
               </Button>
             )}
           </div>
