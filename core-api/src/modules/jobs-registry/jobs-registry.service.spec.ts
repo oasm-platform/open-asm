@@ -1893,6 +1893,13 @@ describe('JobsRegistryService', () => {
 
     let mockAssetServiceQB: Record<string, jest.Mock>;
 
+    const nucleiTool = {
+      id: 'tool-nuclei',
+      name: 'nuclei',
+      categories: [{ name: ToolCategory.VULNERABILITIES, targetTypes: HOST }],
+      priority: 4,
+    } as any;
+
     const screenshotTool = {
       id: 'tool-ss',
       name: 'screenshot',
@@ -2016,6 +2023,32 @@ describe('JobsRegistryService', () => {
       expect(findExistsAndWhere()).toBeDefined();
       expect(mockAssetServiceQB.distinct).not.toHaveBeenCalled();
       expect(result).toHaveLength(1);
+    });
+
+    it('VULNERABILITIES (nuclei): one job per live service, not one per host', async () => {
+      // A bare hostname makes nuclei probe http://host:80 only, so the web
+      // scanner follows the services httpx confirmed instead.
+      mockAssetServiceQB.getMany.mockResolvedValue([
+        makeService('as-1'),
+        makeService('as-2'),
+      ]);
+
+      const result = await service.createNewJob({
+        tool: nucleiTool,
+        targetIds: ['target-1'],
+        workspaceId: 'ws-1',
+        workflow: { id: 'wf-1' } as any,
+      });
+
+      expect(findExistsAndWhere()).toContain('hr.failed = false');
+      expect(result).toHaveLength(2);
+      expect(
+        result.map(
+          (job) =>
+            (job as unknown as { assetService: { id: string } }).assetService
+              .id,
+        ),
+      ).toEqual(['as-1', 'as-2']);
     });
 
     it('HTTP_PROBE regression: no live filter applied; every service still produces a job', async () => {
@@ -2231,6 +2264,30 @@ describe('JobsRegistryService', () => {
       expect(existsSql).toBeDefined();
       expect(existsSql).toContain('http_responses');
       expect(existsSql).toContain('hr.failed = false');
+    });
+
+    it('S3b: a host vulnerability scanner (nmap) stays on findAssetsForJob', async () => {
+      mockAssetQB.getMany.mockResolvedValue([
+        { id: 'asset-1', value: 'example.com', isPrimary: true },
+      ]);
+
+      const result = await service.createNewJob({
+        tool: {
+          id: 'tool-nmap',
+          name: 'nmap',
+          categories: [
+            { name: ToolCategory.VULNERABILITIES, targetTypes: HOST },
+          ],
+          priority: 4,
+        } as any,
+        targetIds: ['target-1'],
+        workspaceId: 'ws-1',
+        workflow: { id: 'wf-1' } as any,
+      });
+
+      expect(mockAssetServiceQB.getMany).not.toHaveBeenCalled();
+      expect(result).toHaveLength(1);
+      expect((result[0] as any).assetService).toBeUndefined();
     });
 
     it('S3 regression: SUBDOMAINS uses findAssetsForJob, not asset services', async () => {
@@ -2602,6 +2659,50 @@ describe('JobsRegistryService', () => {
       givenWorkerAndQueue(buildWorker(), []);
 
       await expect(service.getNextJob('worker-uuid')).resolves.toBeNull();
+    });
+
+    it('hands a vulnerability job the URL httpx confirmed for its service', async () => {
+      // Given: a claimed nuclei job bound to the https service of a host
+      const { queryRunner } = buildQueryRunner([
+        {
+          id: 'job-1',
+          category: ToolCategory.VULNERABILITIES,
+          assetServiceId: 'as-1',
+          asset: { id: 'a1', value: 'app.example.com' },
+        },
+      ]);
+      const httpResponseQB = {
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        distinctOn: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getRawMany: jest
+          .fn()
+          .mockResolvedValue([
+            { assetServiceId: 'as-1', url: 'https://app.example.com:8443' },
+          ]),
+      };
+      const workerRepo = {
+        findOne: jest.fn().mockResolvedValue(buildWorker()),
+      };
+      const httpResponseRepo = {
+        createQueryBuilder: jest.fn().mockReturnValue(httpResponseQB),
+      };
+      mockDataSource.getRepository.mockImplementation((entity: any) => {
+        const name = entity?.name ?? entity;
+        if (name === 'WorkerInstance') return workerRepo;
+        return httpResponseRepo;
+      });
+      mockDataSource.createQueryRunner.mockReturnValue(queryRunner as any);
+
+      // When
+      const result = await service.getNextJobs('worker-uuid', 1);
+
+      // Then: the scanner gets the real scheme and port, not http://host:80
+      expect(result[0].targetUrl).toBe('https://app.example.com:8443');
     });
   });
 

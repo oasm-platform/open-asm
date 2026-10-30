@@ -44,6 +44,8 @@ export class GetNextJobResponseDto extends PickType(Job, [
 /** Extended result returned by getNextJob for connector-capable workers. */
 export interface GetNextJobResult extends GetNextJobResponseDto {
   tool?: { id: string; name: string };
+  /** URL httpx confirmed for the job's service; replaces the bare host input. */
+  targetUrl?: string;
   workspaceId?: string;
   configProfileId?: string;
   config?: Record<string, unknown> | null;

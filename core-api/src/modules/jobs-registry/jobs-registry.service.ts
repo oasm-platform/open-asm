@@ -38,6 +38,7 @@ import {
 } from 'typeorm';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { Asset } from '../assets/entities/assets.entity';
+import { HttpResponse } from '../assets/entities/http-response.entity';
 import type { TargetType } from '@/common/enums/enum';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { StorageService } from '../storage/storage.service';
@@ -171,6 +172,15 @@ const oneServicePerAsset = (services: AssetService[]): AssetService[] => {
   }
   return [...byAsset.values()];
 };
+
+/**
+ * Vulnerability scanners that scan one HTTP endpoint, not a host. They fan out
+ * over the services httpx confirmed live — one job per probed URL — instead of
+ * receiving the bare hostname: nuclei given `example.com` only probes
+ * http://example.com:80, so https and every non-standard port went unscanned.
+ * Host/network scanners (nmap, nessus) and repository scanners stay per-asset.
+ */
+const HTTP_ENDPOINT_SCANNERS = new Set(['nuclei']);
 
 @Injectable()
 export class JobsRegistryService {
@@ -407,14 +417,14 @@ export class JobsRegistryService {
     if (
       jobCategory === ToolCategory.HTTP_PROBE ||
       jobCategory === ToolCategory.SCREENSHOT ||
-      jobCategory === ToolCategory.URL_DISCOVERY
+      jobCategory === ToolCategory.URL_DISCOVERY ||
+      (jobCategory === ToolCategory.VULNERABILITIES &&
+        HTTP_ENDPOINT_SCANNERS.has(tool.name))
     ) {
-      // HTTP_PROBE must probe every enabled asset_service port; SCREENSHOT and
-      // URL_DISCOVERY are HTTP-crawl follow-ups and must only target services
-      // httpx actually confirmed live.
-      const liveOnly =
-        jobCategory === ToolCategory.SCREENSHOT ||
-        jobCategory === ToolCategory.URL_DISCOVERY;
+      // HTTP_PROBE must probe every enabled asset_service port; the others are
+      // HTTP follow-ups (crawl, screenshot, web vulnerability scan) and must
+      // only target services httpx actually confirmed live.
+      const liveOnly = jobCategory !== ToolCategory.HTTP_PROBE;
       const services = await this.findAssetServicesForJob(
         targetIds,
         assetIds,
@@ -861,8 +871,15 @@ export class JobsRegistryService {
 
       await queryRunner.commitTransaction();
 
+      const probedUrls = await this.findProbedUrls(jobs);
+
       return jobs.map((job) =>
-        this.toGetNextJobResult(worker, isBuiltInTools, job),
+        this.toGetNextJobResult(
+          worker,
+          isBuiltInTools,
+          job,
+          job.assetServiceId ? probedUrls.get(job.assetServiceId) : undefined,
+        ),
       );
     } catch (error) {
       Logger.error(
@@ -877,6 +894,55 @@ export class JobsRegistryService {
   }
 
   /**
+   * URL httpx last confirmed for each claimed vulnerability job's service, so
+   * the scanner receives `https://host:8443` instead of the bare hostname it
+   * would otherwise default to http://host:80. One query per claim batch;
+   * jobs of other categories never reach it.
+   */
+  private async findProbedUrls(jobs: Job[]): Promise<Map<string, string>> {
+    const serviceIds = [
+      ...new Set(
+        jobs
+          .filter(
+            (job) =>
+              job.category === ToolCategory.VULNERABILITIES &&
+              !!job.assetServiceId,
+          )
+          .map((job) => job.assetServiceId!),
+      ),
+    ];
+    if (serviceIds.length === 0) return new Map();
+
+    try {
+      const rows = await this.dataSource
+        .getRepository(HttpResponse)
+        .createQueryBuilder('hr')
+        .select('hr.assetServiceId', 'assetServiceId')
+        .addSelect('hr.url', 'url')
+        // Latest live response per service — DISTINCT ON needs the same
+        // leading ORDER BY column.
+        .distinctOn(['hr.assetServiceId'])
+        .where('hr.assetServiceId IN (:...serviceIds)', { serviceIds })
+        .andWhere('hr.failed = false')
+        .andWhere("hr.url IS NOT NULL AND hr.url <> ''")
+        .orderBy('hr.assetServiceId')
+        .addOrderBy('hr.createdAt', 'DESC')
+        .getRawMany<{ assetServiceId: string; url: string }>();
+
+      return new Map(rows.map((row) => [row.assetServiceId, row.url]));
+    } catch (error) {
+      // The claim is already committed: degrade to the host input rather than
+      // dropping jobs that are now IN_PROGRESS.
+      this.logger.warn(
+        `probed URL lookup failed, dispatching host inputs: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return new Map();
+    }
+  }
+
+  /**
    * Shapes a claimed Job row into the payload a worker consumes. Kept separate
    * from the claim so `getNextJobs` stays a pure query/claim concern.
    */
@@ -884,6 +950,7 @@ export class JobsRegistryService {
     worker: WorkerInstance,
     isBuiltInTools: boolean,
     job: Job,
+    targetUrl?: string,
   ): GetNextJobResult {
     const base: GetNextJobResult = {
       id: job.id,
@@ -893,6 +960,7 @@ export class JobsRegistryService {
       priority: job.priority,
       command: job.command,
       asset: job.asset,
+      ...(targetUrl ? { targetUrl } : {}),
     };
 
     // Connector support: include tool metadata for non-built-in workers

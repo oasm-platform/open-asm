@@ -21,6 +21,16 @@ describe('connector inputs', () => {
     ).toEqual({ target: 'app.example.com' });
   });
 
+  it('prefers the probed service URL over the bare host', () => {
+    expect(
+      buildConnectorInputs(
+        { value: 'app.example.com', target: { type: TargetType.DOMAIN } },
+        null,
+        'https://app.example.com:8443',
+      ),
+    ).toEqual({ target: 'https://app.example.com:8443' });
+  });
+
   it('sends the repository contract for repository assets', () => {
     expect(isRepositoryAsset(repoAsset)).toBe(true);
     expect(buildConnectorInputs(repoAsset)).toEqual({

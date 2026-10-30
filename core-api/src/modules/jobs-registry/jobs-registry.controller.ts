@@ -489,7 +489,7 @@ export class JobsRegistryController {
       target?: { type?: string; integrationId?: string | null } | null;
     };
     if (!isRepositoryAsset(asset)) {
-      return buildConnectorInputs(asset);
+      return buildConnectorInputs(asset, null, job.targetUrl);
     }
 
     const integrationId = asset.target?.integrationId;
