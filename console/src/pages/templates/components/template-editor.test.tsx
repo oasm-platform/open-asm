@@ -1,3 +1,4 @@
+import { SidebarProvider } from '@/components/ui/sidebar';
 import { renderWithProviders, screen, waitFor } from '@/test/utils';
 import { fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -39,6 +40,7 @@ vi.mock('@/hooks/usePermission', () => ({
 }));
 
 vi.mock('@uiw/react-codemirror', () => ({
+  EditorView: { contentAttributes: { of: () => [] } },
   default: ({
     value,
     onChange,
@@ -115,10 +117,10 @@ function Seed({ init }: { init: (api: Api) => void }) {
 
 function setup(init: (api: Api) => void) {
   return renderWithProviders(
-    <>
+    <SidebarProvider>
       <Seed init={init} />
       <TemplateEditor />
-    </>,
+    </SidebarProvider>,
   );
 }
 
@@ -135,6 +137,15 @@ const box = () =>
   screen.findByLabelText('Template content') as Promise<HTMLTextAreaElement>;
 
 describe('TemplateEditor', () => {
+  it("keeps tabs out of the 'global' root (shared across workspaces, persisted)", async () => {
+    const { queryClient } = setup((api) => api.openNew());
+    await box();
+    expect(queryClient.getQueryCache().findAll({ queryKey: ['global'] })).toHaveLength(0);
+    expect(queryClient.getQueryData(['template-tabs'])).toMatchObject({
+      tabs: [expect.objectContaining({ name: 'example-template.yaml' })],
+    });
+  });
+
   beforeEach(() => {
     saveAsync.mockReset();
     createAsync.mockReset();

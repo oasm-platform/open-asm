@@ -38,6 +38,7 @@ import {
   SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
 import useDebounce from '@/hooks/use-debounce';
@@ -55,11 +56,18 @@ import {
 import { useTemplateTabs } from '../hooks/use-template-tabs';
 
 const NAME_PATTERN = /\.ya?ml$/i;
+const NEW_SHORTCUT = /Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘I' : 'Ctrl+I';
 
 export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
   const { hasPermission } = usePermission();
   const canWrite = hasPermission('artifact.write');
-  const { tabs, open, openNew, rename: renameTab, close } = useTemplateTabs();
+  const { tabs, activeId, open, openNew, rename: renameTab, close } = useTemplateTabs();
+  const { isMobile, setOpenMobile } = useSidebar();
+  const activeArtifactId = tabs.find((t) => t.id === activeId)?.artifactId;
+  const startNew = () => {
+    openNew();
+    setOpenMobile(false);
+  };
   const navigate = useNavigate();
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -67,7 +75,7 @@ export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
     'mod+i',
     (e) => {
       e.preventDefault();
-      openNew();
+      startNew();
     },
     { enabled: canWrite, enableOnContentEditable: true, enableOnFormTags: true },
   );
@@ -161,7 +169,12 @@ export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
   const renderItem = (file: ArtifactDto, manage: boolean) => (
     <SidebarMenuItem key={file.id}>
       <SidebarMenuButton
-        onClick={() => open(file, !file.isOwner)}
+        onClick={() => {
+          open(file, !file.isOwner);
+          setOpenMobile(false);
+        }}
+        isActive={file.id === activeArtifactId}
+        aria-current={file.id === activeArtifactId ? 'true' : undefined}
         tooltip={file.name}
         className="pr-8"
       >
@@ -212,16 +225,16 @@ export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
   );
 
   return (
-    // In-flow, not the default fixed offcanvas: this panel sits inside the app layout, beside its nav.
-    <Sidebar collapsible="none" className="border-r max-md:hidden" {...props}>
+    // In-flow beside the app nav on desktop; a sheet on mobile, where it would not fit.
+    <Sidebar collapsible={isMobile ? 'offcanvas' : 'none'} className="border-r" {...props}>
       <SidebarContent>
         <SidebarGroup className="gap-2">
           {canWrite && (
             <div className="flex gap-2">
-              <Button size="sm" className="flex-1" onClick={openNew}>
+              <Button size="sm" className="flex-1" onClick={startNew}>
                 <Plus /> New
                 <kbd className="ml-1 rounded bg-primary-foreground/20 px-1 text-xs">
-                  Ctrl+I
+                  {NEW_SHORTCUT}
                 </kbd>
               </Button>
               <Button
@@ -282,7 +295,7 @@ export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
                 </p>
                 {canWrite && !debounced && (
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={openNew}>
+                    <Button size="sm" onClick={startNew}>
                       New template
                     </Button>
                     <Button

@@ -2,18 +2,20 @@ import { yaml } from '@codemirror/lang-yaml';
 import { useBlocker, useNavigate } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { tokyoNight } from '@uiw/codemirror-theme-tokyo-night';
-import CodeMirror from '@uiw/react-codemirror';
+import CodeMirror, { EditorView } from '@uiw/react-codemirror';
 import { AxiosError } from 'axios';
 import * as prettierYaml from 'prettier/plugins/yaml';
 import * as prettier from 'prettier/standalone';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { parse } from 'yaml';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useTheme } from '@/components/ui/theme-provider';
 import { usePermission } from '@/hooks/usePermission';
 import { handleServerError } from '@/lib/handle-server-error';
 import {
@@ -44,6 +46,7 @@ function nameFromContent(content: string): string {
 
 function TemplatePane({ tab }: { tab: TemplateTab }) {
   const { hasPermission } = usePermission();
+  const { resolvedTheme } = useTheme();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { update, markSaved, load } = useTemplateTabs();
@@ -161,14 +164,28 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
     ? `Shared by ${owner} · read-only`
     : readOnly
       ? 'Read-only'
-      : dirty
-        ? 'Unsaved changes'
-        : 'Saved';
+      : saving
+        ? 'Saving…'
+        : dirty
+          ? 'Unsaved changes'
+          : 'Saved';
+  // Esc then Tab leaves the editor; CodeMirror keeps Tab for indentation.
+  const extensions = useMemo(
+    () => [
+      yaml(),
+      EditorView.contentAttributes.of({
+        'aria-label': `${tab.name} YAML. Press Escape then Tab to leave the editor.`,
+      }),
+    ],
+    [tab.name],
+  );
 
   return (
     <div className="flex flex-1 min-h-0 flex-col">
       <div className="flex items-center gap-2 border-b px-3 py-1.5 text-xs text-muted-foreground">
-        <span className="truncate">{status}</span>
+        <span className="truncate" aria-live="polite">
+          {status}
+        </span>
         <div className="ml-auto flex gap-2">
           <Button
             size="sm"
@@ -179,7 +196,7 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
             Format
           </Button>
           <Button size="sm" onClick={() => void save()} disabled={!canSave}>
-            Save
+            {saving ? 'Saving…' : 'Save'}
           </Button>
         </div>
       </div>
@@ -209,8 +226,8 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
           <CodeMirror
             value={tab.content}
             onChange={(v) => update(tab.id, v)}
-            theme={tokyoNight}
-            extensions={[yaml()]}
+            theme={resolvedTheme === 'dark' ? tokyoNight : 'light'}
+            extensions={extensions}
             readOnly={readOnly}
             editable={!readOnly}
             className="text-sm h-full"
@@ -223,7 +240,9 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
 }
 
 export function TemplateEditor() {
-  const { tabs, activeId, activate, close } = useTemplateTabs();
+  const { tabs, activeId, activate, close, openNew } = useTemplateTabs();
+  const { hasPermission } = usePermission();
+  const { isMobile, setOpenMobile } = useSidebar();
   const [closing, setClosing] = useState<TemplateTab | null>(null);
   const active = tabs.find((t) => t.id === activeId);
   const anyDirty = tabs.some((t) => t.content !== t.savedContent);
@@ -244,12 +263,25 @@ export function TemplateEditor() {
         activeId={activeId}
         onSelect={activate}
         onClose={requestClose}
+        leading={isMobile ? <SidebarTrigger className="m-1" aria-label="Browse templates" /> : undefined}
       />
       {active ? (
         <TemplatePane key={active.id} tab={active} />
       ) : (
-        <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-          Select a template or create a new one
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
+          <p>Select a template or create a new one</p>
+          <div className="flex gap-2">
+            {hasPermission('artifact.write') && (
+              <Button size="sm" onClick={openNew}>
+                New template
+              </Button>
+            )}
+            {isMobile && (
+              <Button size="sm" variant="outline" onClick={() => setOpenMobile(true)}>
+                Browse templates
+              </Button>
+            )}
+          </div>
         </div>
       )}
       <ConfirmDialog

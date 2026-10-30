@@ -1,7 +1,7 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { v4 } from 'uuid';
 
-import createState from '@/hooks/createState';
 import type { ArtifactDto } from '@/services/apis/gen/queries';
 
 export type TemplateTab = {
@@ -40,10 +40,23 @@ http:
 
 type State = { tabs: TemplateTab[]; activeId?: string };
 
-const useTabsState = createState<State>('template-tabs', { tabs: [] });
+// Not createState: its 'global' root is shared by every workspace and persisted
+// to localStorage. This root is scoped per workspace and stays in memory.
+const TABS_KEY = ['template-tabs'];
+const EMPTY: State = { tabs: [] };
 
 export function useTemplateTabs() {
-  const { state, setState } = useTabsState();
+  const queryClient = useQueryClient();
+  const { data: state = EMPTY } = useQuery<State>({
+    queryKey: TABS_KEY,
+    queryFn: () => EMPTY,
+    staleTime: Infinity,
+  });
+  const setState = useCallback(
+    (fn: (prev: State) => State) =>
+      queryClient.setQueryData<State>(TABS_KEY, (prev) => fn(prev ?? EMPTY)),
+    [queryClient],
+  );
 
   const open = useCallback(
     (artifact: ArtifactDto, readOnly: boolean) =>

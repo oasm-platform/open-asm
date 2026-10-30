@@ -8,12 +8,15 @@ type Props = {
   activeId?: string;
   onSelect: (id: string) => void;
   onClose: (tab: TemplateTab) => void;
+  /** Rendered before the tabs, e.g. the mobile sidebar trigger. */
+  leading?: React.ReactNode;
 };
 
-export function TemplateTabs({ tabs, activeId, onSelect, onClose }: Props) {
-  if (!tabs.length) return null;
+export function TemplateTabs({ tabs, activeId, onSelect, onClose, leading }: Props) {
+  if (!tabs.length && !leading) return null;
   return (
-    <div role="tablist" className="flex overflow-x-auto border-b bg-background">
+    <div className="flex overflow-x-auto border-b bg-background">
+      {leading}
       {tabs.map((tab) => {
         const dirty = tab.content !== tab.savedContent;
         return (
@@ -28,10 +31,10 @@ export function TemplateTabs({ tabs, activeId, onSelect, onClose }: Props) {
           >
             <button
               type="button"
-              role="tab"
-              aria-selected={activeId === tab.id}
+              aria-current={activeId === tab.id ? 'true' : undefined}
+              title={tab.name}
               onClick={() => onSelect(tab.id)}
-              className="flex items-center gap-1 py-2 outline-none focus-visible:underline"
+              className="flex items-center gap-1 rounded py-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <FileCode className="size-4" />
               <span className="max-w-[150px] truncate">{tab.name}</span>
