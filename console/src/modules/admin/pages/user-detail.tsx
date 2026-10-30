@@ -7,6 +7,7 @@ import { useParams } from '@tanstack/react-router';
 import {
   Ban,
   CircleCheck,
+  Clock,
   MailCheck,
   MailWarning,
   ShieldCheck,
@@ -52,7 +53,12 @@ export default function UserDetail() {
                 {user.role === 'admin' ? <ShieldCheck /> : <UserIcon />}
                 {user.role}
               </Badge>
-              {user.banned ? (
+              {user.pendingApproval ? (
+                <Badge variant="outline" className="gap-1">
+                  <Clock />
+                  Pending approval
+                </Badge>
+              ) : user.banned ? (
                 <Badge variant="destructive" className="gap-1">
                   <Ban />
                   Banned

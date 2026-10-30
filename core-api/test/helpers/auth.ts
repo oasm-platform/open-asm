@@ -1,14 +1,18 @@
+import { auth } from '@/modules/auth/auth';
+import type { Auth } from 'better-auth';
 import { randomUUID } from 'node:crypto';
 import type { Server } from 'http';
 import * as request from 'supertest';
 
 /**
- * Creates a user through the real better-auth HTTP endpoint and returns its
- * session cookie.
+ * Creates a user through better-auth and returns a session cookie for it.
  *
- * Signing up over HTTP (rather than inserting a row) means the spec exercises
- * the same password hashing, session creation and cookie-attribute path that a
- * browser hits, so guard assertions run against a genuine session.
+ * `/sign-up/email` is closed over HTTP (`disabledPaths` in `auth.ts`), so the
+ * account is made with the server-side `auth.api.signUpEmail` call, the same
+ * one the first-admin bootstrap uses. The cookie then comes from a real HTTP
+ * sign-in, so the spec still exercises the password hashing, session creation
+ * and cookie-attribute path a browser hits, and guard assertions run against a
+ * genuine session.
  */
 export async function signUp(
   server: Server,
@@ -23,13 +27,12 @@ export async function signUp(
   const email = overrides.email ?? `e2e-${stamp}@example.com`;
   const password = overrides.password ?? 'Password123!';
 
-  const res = await request(server)
-    .post('/api/auth/sign-up/email')
-    .send({ email, password, name: overrides.name ?? 'E2E User' })
-    .expect(200);
+  const { user } = await (auth as Auth).api.signUpEmail({
+    body: { email, password, name: overrides.name ?? 'E2E User' },
+  });
 
-  const userId = (res.body as { user: { id: string } }).user.id;
-  return { cookie: cookieFrom(res), userId, email, password };
+  const cookie = await signIn(server, email, password);
+  return { cookie, userId: user.id, email, password };
 }
 
 /** Signs in an existing account and returns its session cookie. */

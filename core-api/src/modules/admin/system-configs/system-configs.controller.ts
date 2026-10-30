@@ -10,6 +10,7 @@ import {
   Delete,
   Get,
   Logger,
+  Patch,
   Post,
   Put,
 } from '@nestjs/common';
@@ -18,9 +19,12 @@ import {
   ConfirmLogoRequestDto,
   LogoPresignRequestDto,
   LogoPresignResponseDto,
+  SendTestMailDto,
   SystemConfigResponseDto,
+  SystemSettingsDto,
   UpdateSystemConfigDto,
 } from './dto/system-configs.dto';
+import { MailService } from './mail.service';
 import { SystemConfigsService } from './system-configs.service';
 
 const LOGO_MAX_SIZE_BYTES = 5 * 1024 * 1024;
@@ -36,6 +40,7 @@ export class SystemConfigsController {
   constructor(
     private readonly systemConfigsService: SystemConfigsService,
     private readonly storageService: StorageService,
+    private readonly mailService: MailService,
   ) {}
 
   private readonly logger = new Logger(SystemConfigsController.name);
@@ -82,6 +87,63 @@ export class SystemConfigsController {
     @Body() dto: UpdateSystemConfigDto,
   ): Promise<DefaultMessageResponseDto> {
     return this.systemConfigsService.updateConfig(dto);
+  }
+
+  /**
+   * Get feature settings
+   * @returns Settings keyed by section, defaults filled in
+   */
+  @Get('settings')
+  @Doc<SystemSettingsDto>({
+    summary: 'Get system settings',
+    description:
+      'Retrieves feature settings keyed by section, with defaults filled in',
+    response: {
+      serialization: SystemSettingsDto,
+    },
+  })
+  async getSettings(): Promise<SystemSettingsDto> {
+    return this.systemConfigsService.getSettingsView();
+  }
+
+  /**
+   * Update feature settings
+   * @param dto Sections to update
+   * @returns Success message
+   */
+  @Patch('settings')
+  @Doc<DefaultMessageResponseDto>({
+    summary: 'Update system settings',
+    description:
+      'Merges the given sections into the stored settings; fields left out keep their value',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+  })
+  async updateSettings(
+    @Body() dto: SystemSettingsDto,
+  ): Promise<DefaultMessageResponseDto> {
+    return this.systemConfigsService.updateSettings(dto);
+  }
+
+  /**
+   * Send a test email through the saved mail server
+   * @param dto Recipient
+   * @returns Success message
+   */
+  @Post('settings/mail-server/test')
+  @Doc<DefaultMessageResponseDto>({
+    summary: 'Send a test email',
+    description:
+      'Sends a test email through the saved mail server; a failure returns the server reason',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+  })
+  async sendTestMail(
+    @Body() dto: SendTestMailDto,
+  ): Promise<DefaultMessageResponseDto> {
+    return this.mailService.sendTest(dto.to);
   }
 
   /**

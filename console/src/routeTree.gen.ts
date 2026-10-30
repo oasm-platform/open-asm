@@ -15,12 +15,15 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as InitAdminRouteImport } from './routes/init-admin'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SignupRouteImport } from './routes/signup'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as AuthedReportsRouteImport } from './routes/_authed/reports'
 import { Route as AuthedSearchRouteImport } from './routes/_authed/search'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminAboutRouteImport } from './routes/admin/about'
+import { Route as AdminAuthenticationRouteImport } from './routes/admin/authentication'
 import { Route as AdminBrandRouteImport } from './routes/admin/brand'
+import { Route as AdminMailServerRouteImport } from './routes/admin/mail-server'
 import { Route as InviteTokenRouteImport } from './routes/invite/$token'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as SettingsTabRouteImport } from './routes/settings/$tab'
@@ -97,6 +100,11 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthedIndexRoute = AuthedIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -122,9 +130,19 @@ const AdminAboutRoute = AdminAboutRouteImport.update({
   path: '/about',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAuthenticationRoute = AdminAuthenticationRouteImport.update({
+  id: '/authentication',
+  path: '/authentication',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminBrandRoute = AdminBrandRouteImport.update({
   id: '/brand',
   path: '/brand',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminMailServerRoute = AdminMailServerRouteImport.update({
+  id: '/mail-server',
+  path: '/mail-server',
   getParentRoute: () => AdminRoute,
 } as any)
 const InviteTokenRoute = InviteTokenRouteImport.update({
@@ -376,10 +394,13 @@ export interface FileRoutesByFullPath {
   '/init-admin': typeof InitAdminRoute
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRouteWithChildren
+  '/signup': typeof SignupRoute
   '/reports': typeof AuthedReportsRoute
   '/search': typeof AuthedSearchRoute
   '/admin/about': typeof AdminAboutRoute
+  '/admin/authentication': typeof AdminAuthenticationRoute
   '/admin/brand': typeof AdminBrandRoute
+  '/admin/mail-server': typeof AdminMailServerRoute
   '/invite/$token': typeof InviteTokenRoute
   '/settings/$tab': typeof SettingsTabRoute
   '/admin/': typeof AdminIndexRoute
@@ -432,10 +453,13 @@ export interface FileRoutesByTo {
   '/$': typeof SplatRoute
   '/init-admin': typeof InitAdminRoute
   '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
   '/reports': typeof AuthedReportsRoute
   '/search': typeof AuthedSearchRoute
   '/admin/about': typeof AdminAboutRoute
+  '/admin/authentication': typeof AdminAuthenticationRoute
   '/admin/brand': typeof AdminBrandRoute
+  '/admin/mail-server': typeof AdminMailServerRoute
   '/invite/$token': typeof InviteTokenRoute
   '/settings/$tab': typeof SettingsTabRoute
   '/': typeof AuthedIndexRoute
@@ -493,10 +517,13 @@ export interface FileRoutesById {
   '/init-admin': typeof InitAdminRoute
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRouteWithChildren
+  '/signup': typeof SignupRoute
   '/_authed/reports': typeof AuthedReportsRoute
   '/_authed/search': typeof AuthedSearchRoute
   '/admin/about': typeof AdminAboutRoute
+  '/admin/authentication': typeof AdminAuthenticationRoute
   '/admin/brand': typeof AdminBrandRoute
+  '/admin/mail-server': typeof AdminMailServerRoute
   '/invite/$token': typeof InviteTokenRoute
   '/settings/$tab': typeof SettingsTabRoute
   '/_authed/': typeof AuthedIndexRoute
@@ -555,10 +582,13 @@ export interface FileRouteTypes {
     | '/init-admin'
     | '/login'
     | '/settings'
+    | '/signup'
     | '/reports'
     | '/search'
     | '/admin/about'
+    | '/admin/authentication'
     | '/admin/brand'
+    | '/admin/mail-server'
     | '/invite/$token'
     | '/settings/$tab'
     | '/admin/'
@@ -611,10 +641,13 @@ export interface FileRouteTypes {
     | '/$'
     | '/init-admin'
     | '/login'
+    | '/signup'
     | '/reports'
     | '/search'
     | '/admin/about'
+    | '/admin/authentication'
     | '/admin/brand'
+    | '/admin/mail-server'
     | '/invite/$token'
     | '/settings/$tab'
     | '/'
@@ -671,10 +704,13 @@ export interface FileRouteTypes {
     | '/init-admin'
     | '/login'
     | '/settings'
+    | '/signup'
     | '/_authed/reports'
     | '/_authed/search'
     | '/admin/about'
+    | '/admin/authentication'
     | '/admin/brand'
+    | '/admin/mail-server'
     | '/invite/$token'
     | '/settings/$tab'
     | '/_authed/'
@@ -732,6 +768,7 @@ export interface RootRouteChildren {
   InitAdminRoute: typeof InitAdminRoute
   LoginRoute: typeof LoginRoute
   SettingsRoute: typeof SettingsRouteWithChildren
+  SignupRoute: typeof SignupRoute
   InviteTokenRoute: typeof InviteTokenRoute
 }
 
@@ -779,6 +816,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authed/': {
       id: '/_authed/'
       path: '/'
@@ -814,11 +858,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAboutRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/authentication': {
+      id: '/admin/authentication'
+      path: '/authentication'
+      fullPath: '/admin/authentication'
+      preLoaderRoute: typeof AdminAuthenticationRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/brand': {
       id: '/admin/brand'
       path: '/brand'
       fullPath: '/admin/brand'
       preLoaderRoute: typeof AdminBrandRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/mail-server': {
+      id: '/admin/mail-server'
+      path: '/mail-server'
+      fullPath: '/admin/mail-server'
+      preLoaderRoute: typeof AdminMailServerRouteImport
       parentRoute: typeof AdminRoute
     }
     '/invite/$token': {
@@ -1238,7 +1296,9 @@ const AuthedRouteWithChildren =
 
 interface AdminRouteChildren {
   AdminAboutRoute: typeof AdminAboutRoute
+  AdminAuthenticationRoute: typeof AdminAuthenticationRoute
   AdminBrandRoute: typeof AdminBrandRoute
+  AdminMailServerRoute: typeof AdminMailServerRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminUsersIdRoute: typeof AdminUsersIdRoute
   AdminWorkspacesIdRoute: typeof AdminWorkspacesIdRoute
@@ -1248,7 +1308,9 @@ interface AdminRouteChildren {
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAboutRoute: AdminAboutRoute,
+  AdminAuthenticationRoute: AdminAuthenticationRoute,
   AdminBrandRoute: AdminBrandRoute,
+  AdminMailServerRoute: AdminMailServerRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminUsersIdRoute: AdminUsersIdRoute,
   AdminWorkspacesIdRoute: AdminWorkspacesIdRoute,
@@ -1285,6 +1347,7 @@ const rootRouteChildren: RootRouteChildren = {
   InitAdminRoute: InitAdminRoute,
   LoginRoute: LoginRoute,
   SettingsRoute: SettingsRouteWithChildren,
+  SignupRoute: SignupRoute,
   InviteTokenRoute: InviteTokenRoute,
 }
 export const routeTree = rootRouteImport

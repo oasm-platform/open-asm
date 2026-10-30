@@ -1,4 +1,5 @@
 import { DEFAULT_ENCRYPTION_KEY } from '@/common/constants/app.constants';
+import { decrypt } from '@/common/utils/encryption.util';
 import {
   decryptWithDEK,
   unwrapDEK,
@@ -38,6 +39,7 @@ describe('Encryption upgrade (e2e)', () => {
   let workspaceId: string;
   let userId: string;
   let configId: string;
+  let systemConfig: { id: string; settings: unknown };
   let dek: Buffer;
   const unreadable = legacyCbc(
     kekOf('a-key-nobody-has-0123456789abcdef'),
@@ -85,6 +87,28 @@ describe('Encryption upgrade (e2e)', () => {
     );
     configId = id;
 
+    // The mail server password, encrypted with the default KEK
+    [systemConfig] = await dataSource.query<
+      { id: string; settings: unknown }[]
+    >('SELECT id, settings FROM system_configs LIMIT 1');
+    systemConfig ??= (
+      await dataSource.query<{ id: string; settings: unknown }[]>(
+        `INSERT INTO system_configs (name) VALUES ('OASM') RETURNING id, settings`,
+      )
+    )[0];
+    await dataSource.query(
+      'UPDATE system_configs SET settings = settings || $1::jsonb WHERE id = $2',
+      [
+        JSON.stringify({
+          mailServer: {
+            host: 'smtp.e2e.test',
+            password: `0:${legacyCbc(kekOf(DEFAULT_ENCRYPTION_KEY), Buffer.from('smtp-pass'))}`,
+          },
+        }),
+        systemConfig.id,
+      ],
+    );
+
     process.env.ENCRYPTION_KEYS = NEW_KEY;
   });
 
@@ -95,6 +119,10 @@ describe('Encryption upgrade (e2e)', () => {
     await upgrade.upgrade();
     if (originalKeys === undefined) delete process.env.ENCRYPTION_KEYS;
     else process.env.ENCRYPTION_KEYS = originalKeys;
+    await dataSource.query(
+      'UPDATE system_configs SET settings = $1::jsonb WHERE id = $2',
+      [JSON.stringify(systemConfig.settings), systemConfig.id],
+    );
     await cleanupE2eData(dataSource, {
       workspaceIds: [workspaceId],
       userIds: [userId],
@@ -125,6 +153,13 @@ describe('Encryption upgrade (e2e)', () => {
     // Neither a ciphertext no key opens nor a plain value is ever rewritten
     expect(brave.apiKey).toBe(unreadable);
     expect(exa.apiKey).toBe('plain-key');
+
+    // System-wide secrets have no DEK: they move to the new KEK
+    const [{ settings }] = await dataSource.query<
+      { settings: { mailServer: { password: string } } }[]
+    >('SELECT settings FROM system_configs WHERE id = $1', [systemConfig.id]);
+    expect(settings.mailServer.password).toMatch(/^v2:[0-9a-f]{16}:/);
+    expect(decrypt(settings.mailServer.password)).toBe('smtp-pass');
   });
 
   it('has nothing left to do on the next boot', async () => {

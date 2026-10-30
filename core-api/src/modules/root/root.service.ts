@@ -53,6 +53,9 @@ export class RootService {
       },
     });
     const systemConfig = await this.systemConfigsService.getConfig();
+    // Read on every call, not cached, so a toggle shows up on the next fetch.
+    // After getConfig, which creates the config row if it is missing.
+    const allowSignUp = await this.systemConfigsService.isSignUpAllowed();
 
     const currentVersion = this.configService.get<string>('APP_VERSION');
 
@@ -60,6 +63,7 @@ export class RootService {
       isInit,
       name: systemConfig.name,
       logoPath: systemConfig.logoPath,
+      allowSignUp,
       currentVersion: currentVersion || null,
       storagePresignTtlSeconds: this.storageService.getPresignTtlSeconds(),
       gitRepoUrl: GIT_REPO_URL,

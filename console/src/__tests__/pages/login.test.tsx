@@ -1,15 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithProviders, screen, waitFor } from '@/test/utils';
+import { server } from '@/test/mocks/node';
+import { getRootControllerGetMetadataQueryKey } from '@/services/apis/gen/queries';
+import { QueryClient } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
 import Login from '@/pages/login/login';
 
-const { mockSignInEmail, mockToastError } = vi.hoisted(() => ({
+const {
+  mockSignInEmail,
+  mockSendVerificationEmail,
+  mockToastError,
+  mockToastSuccess,
+} = vi.hoisted(() => ({
   mockSignInEmail: vi.fn(),
+  mockSendVerificationEmail: vi.fn(),
   mockToastError: vi.fn(),
+  mockToastSuccess: vi.fn(),
 }));
 
 vi.mock('sonner', () => ({
-  toast: { error: mockToastError },
+  toast: { error: mockToastError, success: mockToastSuccess },
 }));
 
 vi.mock('@/utils/authClient', () => ({
@@ -17,6 +28,7 @@ vi.mock('@/utils/authClient', () => ({
     signIn: {
       email: mockSignInEmail,
     },
+    sendVerificationEmail: mockSendVerificationEmail,
   },
 }));
 
@@ -33,7 +45,9 @@ vi.mock('@/components/common/layout/auth-layout', () => ({
 describe('Login Page', () => {
   beforeEach(() => {
     mockSignInEmail.mockReset();
+    mockSendVerificationEmail.mockReset();
     mockToastError.mockReset();
+    mockToastSuccess.mockReset();
     mockSignInEmail.mockResolvedValue({});
   });
 
@@ -203,5 +217,127 @@ describe('Login Page', () => {
       expect(mockSignInEmail).toHaveBeenCalled();
     });
     expect(screen.getByRole('button', { name: /sign in/i })).toBeDisabled();
+  });
+
+  it('links to sign up while an admin allows it', async () => {
+    server.use(
+      http.get('/api/metadata', () =>
+        HttpResponse.json({ name: 'OpenASM Test', allowSignUp: true }),
+      ),
+    );
+    renderWithProviders(<Login />, {
+      routePath: '/login',
+      initialEntries: ['/login'],
+    });
+
+    expect(
+      await screen.findByRole('link', { name: /sign up/i }),
+    ).toHaveAttribute('href', '/signup');
+  });
+
+  it('hides the sign-up link while sign-up is closed', async () => {
+    server.use(
+      http.get('/api/metadata', () =>
+        HttpResponse.json({ name: 'OpenASM Test', allowSignUp: false }),
+      ),
+    );
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    renderWithProviders(<Login />, {
+      routePath: '/login',
+      initialEntries: ['/login'],
+      queryClient,
+    });
+
+    await waitFor(() => {
+      expect(
+        queryClient.getQueryData(getRootControllerGetMetadataQueryKey()),
+      ).toBeDefined();
+    });
+    expect(
+      screen.queryByRole('link', { name: /sign up/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  describe('email verification', () => {
+    it('confirms the email after the verification link', async () => {
+      renderWithProviders(<Login />, {
+        routePath: '/login',
+        initialEntries: ['/login?verified=1'],
+      });
+
+      expect(await screen.findByText('Email confirmed')).toBeInTheDocument();
+    });
+
+    it('says when the verification link did not work', async () => {
+      renderWithProviders(<Login />, {
+        routePath: '/login',
+        initialEntries: ['/login?verified=1&error=TOKEN_EXPIRED'],
+      });
+
+      expect(
+        await screen.findByText(/verification link didn't work/),
+      ).toBeInTheDocument();
+      expect(screen.queryByText('Email confirmed')).not.toBeInTheDocument();
+    });
+
+    it('offers to send the link again to an unconfirmed account', async () => {
+      mockSignInEmail.mockResolvedValue({
+        error: {
+          status: 403,
+          code: 'EMAIL_NOT_VERIFIED',
+          message: 'Verify your email address first.',
+        },
+      });
+      mockSendVerificationEmail.mockResolvedValue({ data: {}, error: null });
+      const user = userEvent.setup();
+      renderWithProviders(<Login />, {
+        routePath: '/login',
+        initialEntries: ['/login'],
+      });
+
+      await user.type(await screen.findByLabelText(/email/i), 'ada@example.com');
+      await user.type(screen.getByLabelText(/password/i), 'Password123!');
+      await user.click(screen.getByRole('button', { name: /sign in/i }));
+      await user.click(
+        await screen.findByRole('button', {
+          name: /send the verification email again/i,
+        }),
+      );
+
+      expect(mockSendVerificationEmail).toHaveBeenCalledWith({
+        email: 'ada@example.com',
+        callbackURL: `${window.location.origin}/login?verified=1`,
+      });
+      await waitFor(() => {
+        expect(mockToastSuccess).toHaveBeenCalledWith(
+          'Verification email sent',
+          expect.anything(),
+        );
+      });
+    });
+
+    it('does not offer the resend for a wrong password', async () => {
+      mockSignInEmail.mockResolvedValue({
+        error: { status: 401, message: 'Invalid email or password' },
+      });
+      const user = userEvent.setup();
+      renderWithProviders(<Login />, {
+        routePath: '/login',
+        initialEntries: ['/login'],
+      });
+
+      await user.type(await screen.findByLabelText(/email/i), 'ada@example.com');
+      await user.type(screen.getByLabelText(/password/i), 'wrongpassword');
+      await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+      expect(
+        await screen.findByText('Invalid email or password'),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /send the verification email again/i }),
+      ).not.toBeInTheDocument();
+    });
   });
 });
