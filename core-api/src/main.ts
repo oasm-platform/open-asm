@@ -23,8 +23,11 @@ import {
   DEFAULT_GRPC_PORT,
   DEFAULT_PORT,
 } from './common/constants/app.constants';
+import { assertEncryptionKeys } from './common/utils/encryption.util';
 import { mergeBetterAuthSpec } from './utils/mergeBetterAuth';
 async function bootstrap() {
+  // Before anything reads or writes a stored credential
+  assertEncryptionKeys();
   const app = await NestFactory.create<NestNodeApplication>(
     AppModule,
     createHttpAdapter(),

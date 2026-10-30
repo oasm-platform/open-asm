@@ -1,17 +1,19 @@
+import { randomBytes } from 'crypto';
 import {
-  createCipheriv,
-  createDecipheriv,
-  randomBytes,
-} from 'crypto';
-import {
+  cbcOpen,
   decrypt,
-  getActiveEncryptionKey,
-  parseEncryptionKeys,
+  decryptBytesWithKek,
+  encryptBytesWithKek,
+  gcmOpen,
+  gcmSeal,
+  isEncryptedWithActiveKek,
+  isUtf8,
+  parseCiphertext,
 } from './encryption.util';
 
-const ALGORITHM = 'aes-256-cbc';
-const IV_LENGTH = 16;
 const DEK_LENGTH = 32; // 256 bits for AES-256
+/** Key id of v2 data encrypted with the workspace DEK rather than a KEK */
+const DEK_KEY_ID = 'dek';
 
 /**
  * Generate a random 32-byte Data Encryption Key (DEK).
@@ -22,106 +24,66 @@ export function generateDEK(): Buffer {
 }
 
 /**
- * Wrap (encrypt) a DEK with the system KEK.
- * Uses the active key (last in ENCRYPTION_KEYS).
- * Returns "{activeIndex}:ivHex:encryptedHex" for storage in workspaces.dek.
- *
- * The index prefix enables O(1) key lookup during unwrap — critical for
- * key rotation: DEK wrapped with key-0 remains decryptable after adding key-1.
+ * Wrap (encrypt) a DEK with the active KEK, for storage in workspaces.dek.
+ * The `v2:<keyId>:` prefix finds the KEK again after keys are added or
+ * removed, so a rotation never loses the DEK.
  */
 export function wrapDEK(dek: Buffer): string {
-  const iv = randomBytes(IV_LENGTH);
-  const cipher = createCipheriv(ALGORITHM, getActiveEncryptionKey(), iv);
-  const encrypted = Buffer.concat([cipher.update(dek), cipher.final()]);
-  const allKeys = parseEncryptionKeys();
-  const activeIndex = allKeys.length - 1;
-  return `${activeIndex}:${iv.toString('hex')}:${encrypted.toString('hex')}`;
+  return encryptBytesWithKek(dek);
 }
 
 /**
- * Unwrap (decrypt) a wrapped DEK using the system KEK.
- * Uses key index prefix for O(1) lookup.
- * Falls back to trial decryption for legacy format (no prefix).
+ * Unwrap (decrypt) a wrapped DEK of any stored format. A legacy CBC unwrap
+ * only counts when it yields exactly 32 bytes, which a wrong key never does.
  */
 export function unwrapDEK(wrappedDEK: string): Buffer {
-  const parts = wrappedDEK.split(':');
-  const firstPartIsIndex = parts.length >= 3 && /^\d+$/.test(parts[0]);
-
-  let ivHex: string, encryptedHex: string, keys: Buffer[];
-
-  if (firstPartIsIndex) {
-    const keyIndex = parseInt(parts[0], 10);
-    const allKeys = parseEncryptionKeys();
-    if (keyIndex < 0 || keyIndex >= allKeys.length) {
-      throw new Error(
-        `Invalid key index in wrapped DEK: ${keyIndex} (have ${allKeys.length} keys)`,
-      );
-    }
-    keys = allKeys; // try all keys for backward compat
-    ivHex = parts[1];
-    encryptedHex = parts.slice(2).join(':');
-  } else {
-    // Legacy format — no prefix, try all keys
-    keys = parseEncryptionKeys();
-    ivHex = parts[0];
-    encryptedHex = parts.slice(1).join(':');
-  }
-
-  const iv = Buffer.from(ivHex, 'hex');
-  const encrypted = Buffer.from(encryptedHex, 'hex');
-
-  for (const key of keys) {
-    try {
-      const decipher = createDecipheriv(ALGORITHM, key, iv);
-      return Buffer.concat([decipher.update(encrypted), decipher.final()]);
-    } catch {
-      // Try next key
-    }
-  }
-  throw new Error('Failed to unwrap DEK — no valid KEK found');
+  return decryptBytesWithKek(wrappedDEK, (dek) => dek.length === DEK_LENGTH);
 }
 
 /**
  * Encrypt data using a workspace-specific DEK.
- * Format: "ivHex:encryptedHex" (no key index — DEK is the key itself).
+ * Format: `v2:dek:<iv>:<tag>:<data>` (AES-256-GCM).
  */
 export function encryptWithDEK(text: string, dek: Buffer): string {
-  const iv = randomBytes(IV_LENGTH);
-  const cipher = createCipheriv(ALGORITHM, dek, iv);
-  const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
-  return iv.toString('hex') + ':' + encrypted.toString('hex');
+  return `v2:${DEK_KEY_ID}:${gcmSeal(dek, Buffer.from(text, 'utf8'))}`;
 }
 
 /**
- * Decrypt data. Fallback chain: DEK → KEK (index prefix) → KEK trial.
+ * Decrypt workspace data in any stored format: v2 under the DEK, legacy CBC
+ * under the DEK, or anything encrypted with a KEK (pre-envelope data).
  *
- * @param encryptedText - "ivHex:encryptedHex" (DEK) or "{index}:ivHex:encryptedHex" (KEK)
+ * @param encryptedText - Stored ciphertext
  * @param dek - Cleartext DEK, or null for pre-envelope-encryption workspaces
  */
-export function decryptWithDEK(encryptedText: string, dek: Buffer | null): string {
-  const parts = encryptedText.split(':');
-  const firstPartIsIndex = parts.length >= 3 && /^\d+$/.test(parts[0]);
-  const ivHex = firstPartIsIndex ? parts[1] : parts[0];
-  const encryptedHex = firstPartIsIndex
-    ? parts.slice(2).join(':')
-    : parts.slice(1).join(':');
+export function decryptWithDEK(
+  encryptedText: string,
+  dek: Buffer | null,
+): string {
+  const parsed = parseCiphertext(encryptedText);
+  if (!parsed) throw new Error('Invalid encrypted data format');
 
-  if (!ivHex || !encryptedHex) {
-    throw new Error('Invalid encrypted data format');
-  }
-  const iv = Buffer.from(ivHex, 'hex');
-  const encrypted = Buffer.from(encryptedHex, 'hex');
-
-  // Layer 1: DEK (only for non-prefixed data — DEK-encrypted data has no prefix)
-  if (dek !== null && !firstPartIsIndex) {
-    try {
-      const decipher = createDecipheriv(ALGORITHM, dek, iv);
-      return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
-    } catch {
-      // DEK failed, fall through to KEK
-    }
+  if (parsed.kind === 'v2' && parsed.keyId === DEK_KEY_ID) {
+    if (!dek) throw new Error('Workspace has no DEK to decrypt with');
+    return gcmOpen(dek, parsed).toString('utf8');
   }
 
-  // Layer 2: KEK — leverage shared decrypt() which handles both formats
+  // Legacy DEK data shares the unprefixed CBC format with old KEK data
+  if (parsed.kind === 'legacy' && dek) {
+    const plain = cbcOpen(dek, parsed.iv, parsed.data);
+    if (plain && isUtf8(plain)) return plain.toString('utf8');
+  }
+
   return decrypt(encryptedText);
+}
+
+/**
+ * Whether a stored ciphertext predates the current format: everything is
+ * rewritten as v2 under the DEK, or under the active KEK for a workspace
+ * without one. Plain (unencrypted) values are not ciphertexts and never need it.
+ */
+export function needsReencryption(value: string, dek: Buffer | null): boolean {
+  if (!parseCiphertext(value)) return false;
+  return dek
+    ? !value.startsWith(`v2:${DEK_KEY_ID}:`)
+    : !isEncryptedWithActiveKek(value);
 }
