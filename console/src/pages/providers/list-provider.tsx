@@ -5,6 +5,7 @@ import { DataTable } from '@/components/ui/data-table';
 import { useProvidersControllerGetManyProviders } from '@/services/apis/gen/queries';
 
 import { Badge } from '@/components/ui/badge';
+import { OpenLink } from '@/components/ui/open-link';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import type { ToolProvider } from '@/services/apis/gen/queries';
 
@@ -40,9 +41,9 @@ const providerColumns: ColumnDef<ToolProvider>[] = [
       return (
         <div className="text-blue-500 hover:underline">
           {value ? (
-            <a href={value} target="_blank" rel="noopener noreferrer">
+            <OpenLink href={value} target="_blank" rel="noopener noreferrer">
               Visit
-            </a>
+            </OpenLink>
           ) : (
             '-'
           )}

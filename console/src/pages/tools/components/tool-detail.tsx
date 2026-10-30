@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import LogoFrame from '@/components/ui/logo-frame';
+import { OpenLink } from '@/components/ui/open-link';
 import ToolLogo from '@/components/ui/tool-logo';
 import {
   Table,
@@ -385,14 +386,14 @@ function OverviewSection({ meta }: { meta: ConnectorMeta }) {
               <div key={row.label}>
                 <p className="text-xs text-muted-foreground">{row.label}</p>
                 {row.href ? (
-                  <a
+                  <OpenLink
                     href={row.href}
                     target="_blank"
                     rel="noreferrer"
                     className="text-sm font-medium break-all text-primary underline-offset-4 hover:underline"
                   >
                     {row.value}
-                  </a>
+                  </OpenLink>
                 ) : (
                   <p className="text-sm font-medium break-all">{row.value}</p>
                 )}

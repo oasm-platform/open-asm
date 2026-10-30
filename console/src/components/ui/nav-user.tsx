@@ -14,6 +14,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
+import { OpenLink } from '@/components/ui/open-link';
 import { useBugReportUrl } from '@/hooks/use-bug-report-url';
 import { isAdminUser } from '@/modules/admin/utils';
 import { useRootControllerGetMetadata } from '@/services/apis/gen/queries';
@@ -125,26 +126,26 @@ export function NavUser({ isOnlyAvatar = false, dropdownSide }: NavUserProps) {
                 <DropdownMenuGroup>
                   {metadata?.docsUrl && (
                     <DropdownMenuItem asChild>
-                      <a
+                      <OpenLink
                         href={metadata.docsUrl}
                         target="_blank"
                         rel="noreferrer noopener"
                       >
                         <BookOpen />
                         Docs
-                      </a>
+                      </OpenLink>
                     </DropdownMenuItem>
                   )}
                   {bugReportUrl && (
                     <DropdownMenuItem asChild>
-                      <a
+                      <OpenLink
                         href={bugReportUrl}
                         target="_blank"
                         rel="noreferrer noopener"
                       >
                         <Bug />
                         Report an issue
-                      </a>
+                      </OpenLink>
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuGroup>

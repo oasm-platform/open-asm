@@ -2,6 +2,7 @@ import { createRootRouteWithContext, Outlet, Link } from '@tanstack/react-router
 import type { RouterContext } from '@/router';
 import { useWorkspaceSync } from '@/hooks/useWorkspaceSelector';
 import { usePermission } from '@/hooks/usePermission';
+import { OpenLinkDialog } from '@/components/ui/open-link';
 
 /**
  * Selects the workspace and warms its permissions for every route, so direct
@@ -24,6 +25,7 @@ function RootComponent() {
     <>
       <RootBootstrap />
       <Outlet />
+      <OpenLinkDialog />
     </>
   );
 }

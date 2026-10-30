@@ -8,6 +8,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
+import { OpenLink } from '@/components/ui/open-link';
 import { cn } from '@/lib/utils';
 import {
   useRootControllerGetLatestVersion,
@@ -100,7 +101,7 @@ export default function GetAboutProject() {
             {getLinks(repoUrl).map(
               ({ icon: Icon, title, description, href }) => (
                 <li key={href}>
-                  <a
+                  <OpenLink
                     href={href}
                     target="_blank"
                     rel="noreferrer noopener"
@@ -114,7 +115,7 @@ export default function GetAboutProject() {
                       </p>
                     </div>
                     <ExternalLink className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-                  </a>
+                  </OpenLink>
                 </li>
               ),
             )}
@@ -171,14 +172,14 @@ function VersionStatus({
       </div>
       {data && !data.isLatest && repoUrl && (
         <Button asChild size="sm" variant="outline">
-          <a
+          <OpenLink
             href={`${repoUrl}/releases/latest`}
             target="_blank"
             rel="noreferrer noopener"
           >
             View release
             <ExternalLink />
-          </a>
+          </OpenLink>
         </Button>
       )}
     </div>
