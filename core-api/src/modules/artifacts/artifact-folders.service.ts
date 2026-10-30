@@ -36,7 +36,7 @@ export class ArtifactFoldersService {
     parentFolderId?: string,
   ): Promise<ArtifactFolderDto[]> {
     if (parentFolderId) {
-      await this.artifactsService.findOwnedFolder(workspaceId, userId, parentFolderId);
+      await this.artifactsService.findReadableFolder(workspaceId, userId, parentFolderId);
     }
     const own = {
       workspaceId,

@@ -57,7 +57,7 @@ describe('ArtifactFoldersService', () => {
 
   it('lists only the caller\'s folders under a parent they own', async () => {
     await service.getMany(WS, OWNER, 'f-1');
-    expect(artifacts.findOwnedFolder).toHaveBeenCalledWith(WS, OWNER, 'f-1');
+    expect(artifacts.findReadableFolder).toHaveBeenCalledWith(WS, OWNER, 'f-1');
     expect(folderRepo.find).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -68,7 +68,7 @@ describe('ArtifactFoldersService', () => {
       }),
     );
 
-    artifacts.findOwnedFolder.mockRejectedValue(new NotFoundException());
+    artifacts.findReadableFolder.mockRejectedValue(new NotFoundException());
     await expect(service.getMany(WS, 'someone-else', 'f-1')).rejects.toThrow(
       NotFoundException,
     );
@@ -115,9 +115,17 @@ describe('ArtifactFoldersService', () => {
     );
   });
 
+  it('lists subfolders of the workspace templates folder', async () => {
+    await expect(service.getMany(WS, OWNER, 'tpl-folder')).resolves.toEqual([]);
+    expect(artifacts.findReadableFolder).toHaveBeenCalledWith(WS, OWNER, 'tpl-folder');
+    expect(artifacts.findOwnedFolder).not.toHaveBeenCalled();
+  });
+
   it('root listing includes the workspace templates folder', async () => {
     manager.findOne.mockResolvedValue(folder());
+    const ensure = jest.spyOn(service, 'ensureTemplatesFolder');
     await service.getMany(WS, OWNER);
+    expect(ensure).toHaveBeenCalledWith(WS);
     expect(folderRepo.find).toHaveBeenCalledWith(
       expect.objectContaining({
         where: [
