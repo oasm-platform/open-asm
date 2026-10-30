@@ -38,7 +38,6 @@ import {
   SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
 } from '@/components/ui/sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
 import useDebounce from '@/hooks/use-debounce';
@@ -213,10 +212,8 @@ export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
   );
 
   return (
-    <Sidebar
-      className="top-(--header-height) h-[calc(100svh-var(--header-height))]!"
-      {...props}
-    >
+    // In-flow, not the default fixed offcanvas: this panel sits inside the app layout, beside its nav.
+    <Sidebar collapsible="none" className="border-r max-md:hidden" {...props}>
       <SidebarContent>
         <SidebarGroup className="gap-2">
           {canWrite && (
@@ -337,7 +334,6 @@ export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
           </SidebarGroup>
         </Collapsible>
       </SidebarContent>
-      <SidebarRail />
 
       {renaming && (
         <RenameDialog

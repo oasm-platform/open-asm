@@ -8,7 +8,8 @@ export default function Templates() {
   useWorkspaceSelector();
 
   return (
-    <div className="h-screen flex flex-col">
+    // Fill the viewport below the app header (h-14) and the layout's main padding.
+    <div className="flex flex-col h-[calc(100svh-5.5rem)] md:h-[calc(100svh-6.5rem)] overflow-hidden rounded-md border">
       <SidebarProvider
         className="flex flex-col flex-1 min-h-0"
         style={{ '--sidebar-width': '20rem' } as React.CSSProperties}
