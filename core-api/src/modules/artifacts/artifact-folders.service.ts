@@ -2,7 +2,7 @@ import { ArtifactStatus } from '@/common/enums/enum';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, IsNull, Repository } from 'typeorm';
-import { ArtifactsService } from './artifacts.service';
+import { ArtifactsService, TEMPLATES_FOLDER_NAME } from './artifacts.service';
 import type {
   ArtifactFolderDetailDto,
   ArtifactFolderDto,
@@ -11,6 +11,8 @@ import type {
 } from './dto/artifacts.dto';
 import { ArtifactFolder } from './entities/artifact-folder.entity';
 import { Artifact } from './entities/artifact.entity';
+
+export { TEMPLATES_FOLDER_NAME };
 
 /** Guards the recursive walks against a corrupted (cyclic) tree. */
 const MAX_FOLDER_DEPTH = 100;
@@ -36,12 +38,16 @@ export class ArtifactFoldersService {
     if (parentFolderId) {
       await this.artifactsService.findOwnedFolder(workspaceId, userId, parentFolderId);
     }
+    const own = {
+      workspaceId,
+      createdByUserId: userId,
+      parentFolderId: parentFolderId ?? IsNull(),
+    };
+    if (!parentFolderId) await this.ensureTemplatesFolder(workspaceId);
     const folders = await this.folderRepo.find({
-      where: {
-        workspaceId,
-        createdByUserId: userId,
-        parentFolderId: parentFolderId ?? IsNull(),
-      },
+      where: parentFolderId
+        ? own
+        : [own, { workspaceId, parentFolderId: IsNull(), createdByUserId: IsNull(), name: TEMPLATES_FOLDER_NAME }],
       order: { name: 'ASC' },
     });
     return folders.map((folder) => this.toDto(folder));
@@ -52,7 +58,7 @@ export class ArtifactFoldersService {
     userId: string,
     id: string,
   ): Promise<ArtifactFolderDetailDto> {
-    const folder = await this.artifactsService.findOwnedFolder(workspaceId, userId, id);
+    const folder = await this.artifactsService.findReadableFolder(workspaceId, userId, id);
     const path = await this.dataSource.query<{ id: string; name: string }[]>(
       `WITH RECURSIVE path AS (
          SELECT id, name, "parentFolderId", 0 AS depth FROM artifact_folders WHERE id = $1
@@ -65,6 +71,33 @@ export class ArtifactFoldersService {
       [id, MAX_FOLDER_DEPTH],
     );
     return { ...this.toDto(folder), path };
+  }
+
+  /** The workspace-owned root folder for custom templates; created on first use. */
+  async ensureTemplatesFolder(workspaceId: string): Promise<ArtifactFolder> {
+    return this.dataSource.transaction(async (manager) => {
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `artifact-folders:templates:${workspaceId}`,
+      ]);
+      const existing = await manager.findOne(ArtifactFolder, {
+        where: {
+          workspaceId,
+          parentFolderId: IsNull(),
+          createdByUserId: IsNull(),
+          name: TEMPLATES_FOLDER_NAME,
+        },
+        order: { createdAt: 'ASC' },
+      });
+      if (existing) return existing;
+      return manager.save(
+        this.folderRepo.create({
+          workspaceId,
+          createdByUserId: null,
+          parentFolderId: null,
+          name: TEMPLATES_FOLDER_NAME,
+        }),
+      );
+    });
   }
 
   async create(

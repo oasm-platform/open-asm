@@ -20,7 +20,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
-import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, IsNull, Repository } from 'typeorm';
 import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
 import type { EventEnvelopeData } from '../event-bridge/contracts/event-envelope';
 import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
@@ -39,6 +39,7 @@ import { ArtifactFolder } from './entities/artifact-folder.entity';
 import { ArtifactShare } from './entities/artifact-share.entity';
 import { Artifact } from './entities/artifact.entity';
 
+export const TEMPLATES_FOLDER_NAME = 'custom-templates';
 export const ARTIFACTS_BUCKET = 'artifacts';
 export const ARTIFACT_MANAGE_PERMISSION = 'artifact.manage';
 export const ARTIFACT_WRITE_PERMISSION = 'artifact.write';
@@ -431,6 +432,27 @@ export class ArtifactsService {
       workspaceId,
       createdByUserId: userId,
     });
+    if (!folder) {
+      throw new NotFoundException('Folder not found');
+    }
+    return folder;
+  }
+
+  /** Own folder, or the workspace-owned templates folder (readable by every member). */
+  async findReadableFolder(
+    workspaceId: string,
+    userId: string,
+    id: string,
+  ): Promise<ArtifactFolder> {
+    const folder =
+      (await this.folderRepo.findOneBy({ id, workspaceId, createdByUserId: userId })) ??
+      (await this.folderRepo.findOneBy({
+        id,
+        workspaceId,
+        parentFolderId: IsNull(),
+        createdByUserId: IsNull(),
+        name: TEMPLATES_FOLDER_NAME,
+      }));
     if (!folder) {
       throw new NotFoundException('Folder not found');
     }
