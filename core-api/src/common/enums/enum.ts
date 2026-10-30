@@ -335,6 +335,7 @@ export enum AgentCommandApprovalStatus {
 export enum ArtifactSource {
   UPLOAD = 'upload',
   AGENT = 'agent',
+  TEMPLATE = 'template',
 }
 
 export enum ArtifactShareType {

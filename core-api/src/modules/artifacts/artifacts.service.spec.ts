@@ -608,6 +608,116 @@ describe('ArtifactsService', () => {
         'artifacts',
       );
     });
+
+    it('places the file in parentFolderId', async () => {
+      await service.createFromBuffer({
+        workspaceId: WS,
+        userId: OWNER,
+        source: ArtifactSource.TEMPLATE,
+        name: 't.yaml',
+        mimeType: 'application/yaml',
+        buffer: Buffer.from('id: x'),
+        parentFolderId: 'folder-1',
+      });
+      expect(manager.save).toHaveBeenCalledWith(
+        expect.objectContaining({ parentFolderId: 'folder-1' }),
+      );
+    });
+
+    it('publishes created with the given actor type', async () => {
+      await service.createFromBuffer({
+        workspaceId: WS,
+        userId: OWNER,
+        source: ArtifactSource.TEMPLATE,
+        name: 't.yaml',
+        mimeType: 'application/yaml',
+        buffer: Buffer.from('id: x'),
+        actorType: AuditActorType.User,
+      });
+      expect(eventBridge.publishSafely).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ actor: { type: 'user', id: OWNER } }),
+        expect.anything(),
+      );
+    });
+  });
+
+  describe('replaceContent', () => {
+    const buffer = Buffer.alloc(25);
+    const row = (o: Partial<Artifact> = {}) =>
+      makeArtifact({
+        sizeBytes: 10,
+        mimeType: 'application/yaml',
+        objectKey: 'k.yaml',
+        ...o,
+      });
+    beforeEach(() => artifactRepo.findOne.mockResolvedValue(row({ sizeBytes: 25 })));
+
+    it('swaps usage from old to new size', async () => {
+      manager.findOne.mockResolvedValue(row());
+      const order: string[] = [];
+      for (const [name, fn] of [
+        ['reserve', quota.reserve],
+        ['upload', storage.uploadFile],
+        ['releaseUsed', quota.releaseUsed],
+        ['commit', quota.commit],
+      ] as const) {
+        fn.mockImplementation(() => {
+          order.push(name);
+        });
+      }
+
+      await service.replaceContent(WS, OWNER, 'artifact-1', buffer);
+
+      expect(manager.findOne).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ lock: { mode: 'pessimistic_write' } }),
+      );
+      expect(quota.assertFileSize).toHaveBeenCalledWith(25);
+      expect(quota.reserve).toHaveBeenCalledWith(manager, WS, 25);
+      expect(storage.uploadFile).toHaveBeenCalledWith('k.yaml', buffer, 'artifacts', 'application/yaml');
+      expect(quota.releaseUsed).toHaveBeenCalledWith(manager, WS, 10);
+      expect(quota.commit).toHaveBeenCalledWith(manager, WS, 25);
+      expect(order).toEqual(['reserve', 'upload', 'releaseUsed', 'commit']);
+      expect(manager.save).toHaveBeenCalledWith(expect.objectContaining({ sizeBytes: 25 }));
+    });
+
+    it('rejects a non-owner', async () => {
+      manager.findOne.mockResolvedValue(row({ createdByUserId: OTHER }));
+      await expect(service.replaceContent(WS, OWNER, 'artifact-1', buffer)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(quota.reserve).not.toHaveBeenCalled();
+      expect(storage.uploadFile).not.toHaveBeenCalled();
+    });
+
+    it('404s for missing or non-ready rows', async () => {
+      manager.findOne.mockResolvedValue(null);
+      await expect(service.replaceContent(WS, OWNER, 'artifact-1', buffer)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('leaves object and usage untouched when quota is full', async () => {
+      manager.findOne.mockResolvedValue(row());
+      quota.reserve.mockRejectedValue(new ConflictException('full'));
+      await expect(service.replaceContent(WS, OWNER, 'artifact-1', buffer)).rejects.toThrow(
+        ConflictException,
+      );
+      expect(storage.uploadFile).not.toHaveBeenCalled();
+      expect(quota.releaseUsed).not.toHaveBeenCalled();
+      expect(quota.commit).not.toHaveBeenCalled();
+    });
+
+    it('releases the reservation when upload fails', async () => {
+      manager.findOne.mockResolvedValue(row());
+      storage.uploadFile.mockRejectedValue(new Error('s3 down'));
+      await expect(service.replaceContent(WS, OWNER, 'artifact-1', buffer)).rejects.toThrow(
+        's3 down',
+      );
+      expect(quota.releaseReserved).toHaveBeenCalledWith(manager, WS, 25);
+      expect(quota.commit).not.toHaveBeenCalled();
+    });
   });
 
   describe('deleteWorkspaceObjects', () => {

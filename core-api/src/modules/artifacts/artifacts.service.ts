@@ -59,6 +59,9 @@ export interface CreateArtifactFromBufferInput {
   mimeType: string;
   buffer: Buffer;
   metadata?: Record<string, unknown>;
+  parentFolderId?: string | null;
+  /** Who the audit event names; defaults to the agent. */
+  actorType?: AuditActorType;
 }
 
 const workspacePrefix = (workspaceId: string) => `workspaces/${workspaceId}/`;
@@ -202,8 +205,50 @@ export class ArtifactsService {
       throw error;
     }
 
-    await this.publishCreated(artifact);
+    await this.publishCreated(artifact, input.actorType ?? AuditActorType.Agent);
     return this.toDto(artifact, input.userId);
+  }
+
+  /**
+   * Overwrites a ready file's content and swaps its quota usage. Runs under
+   * the row lock so a concurrent delete either waits or makes this 404.
+   */
+  async replaceContent(
+    workspaceId: string,
+    userId: string,
+    id: string,
+    buffer: Buffer,
+  ): Promise<ArtifactDto> {
+    await this.dataSource.transaction(async (manager) => {
+      const artifact = await manager.findOne(Artifact, {
+        where: { id, workspaceId, status: ArtifactStatus.READY },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!artifact) {
+        throw new NotFoundException('File not found');
+      }
+      if (artifact.createdByUserId !== userId) {
+        throw new ForbiddenException('Only the owner can change this file');
+      }
+      this.quota.assertFileSize(buffer.length);
+      await this.quota.reserve(manager, workspaceId, buffer.length);
+      try {
+        await this.storageService.uploadFile(
+          artifact.objectKey,
+          buffer,
+          artifact.bucket,
+          artifact.mimeType,
+        );
+        await this.quota.releaseUsed(manager, workspaceId, artifact.sizeBytes);
+        await this.quota.commit(manager, workspaceId, buffer.length);
+        artifact.sizeBytes = buffer.length;
+        await manager.save(artifact);
+      } catch (error) {
+        await this.quota.releaseReserved(manager, workspaceId, buffer.length);
+        throw error;
+      }
+    });
+    return this.getById(workspaceId, userId, id, []);
   }
 
   async getMany(
@@ -607,13 +652,13 @@ export class ArtifactsService {
     artifact.status = ArtifactStatus.READY;
   }
 
-  private async publishCreated(artifact: Artifact): Promise<void> {
+  private async publishCreated(artifact: Artifact, actorType: AuditActorType): Promise<void> {
     await this.eventBridge.publishSafely(
       EVENT_CATALOG.artifact.created,
       {
         workspaceId: artifact.workspaceId,
         actor: {
-          type: AuditActorType.Agent,
+          type: actorType,
           ...(artifact.createdByUserId ? { id: artifact.createdByUserId } : {}),
         },
         outcome: AuditOutcome.Success,
