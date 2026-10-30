@@ -2,7 +2,17 @@ import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { ArtifactDto } from '@/modules/artifacts/dto/artifacts.dto';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  ArrayMaxSize,
+  ArrayNotEmpty,
+  IsArray,
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
@@ -53,4 +63,37 @@ export class TemplateContentDto {
 
   @ApiProperty()
   content: string;
+}
+
+/** At most this many templates per run; the connector downloads each one. */
+export const MAX_RUN_TEMPLATES = 100;
+
+export class RunTemplatesDto {
+  @ApiProperty({ type: [String], description: `Template IDs to run (max ${MAX_RUN_TEMPLATES})` })
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(MAX_RUN_TEMPLATES)
+  @IsUUID('4', { each: true })
+  templateIds: string[];
+
+  @ApiProperty({ type: [String], required: false, description: 'Scan these targets. Set exactly one of targetIds, assetIds, assetGroupIds.' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsUUID('4', { each: true })
+  targetIds?: string[];
+
+  @ApiProperty({ type: [String], required: false, description: 'Scan these assets.' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsUUID('4', { each: true })
+  assetIds?: string[];
+
+  @ApiProperty({ type: [String], required: false, description: 'Scan every asset in these groups.' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsUUID('4', { each: true })
+  assetGroupIds?: string[];
 }

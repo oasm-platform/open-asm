@@ -2597,6 +2597,82 @@ describe('JobsRegistryService', () => {
 
       await expect(service.getNextJob('worker-uuid')).resolves.toBeNull();
     });
+
+    describe('custom templates', () => {
+      const templateJob = (id: string) => ({
+        id,
+        retryCount: 0,
+        tool: { id: 'tool-1', name: 'nuclei' },
+        asset: { id: `a-${id}`, value: 'x', target: { workspaceId: 'ws-1' } },
+        config: { rateLimit: 10, customTemplateIds: ['t1', 't2'] },
+      });
+
+      const givenTemplates = (rows: unknown[]) => {
+        const artifactRepo = { find: jest.fn().mockResolvedValue(rows) };
+        mockDataSource.getRepository.mockImplementation((entity: unknown) =>
+          entity === WorkerInstance
+            ? { findOne: jest.fn().mockResolvedValue(buildWorker()) }
+            : artifactRepo,
+        );
+        return artifactRepo;
+      };
+
+      beforeEach(() => {
+        (mockStorageService as Record<string, jest.Mock>).getPresignedDownloadUrl =
+          jest.fn(({ key }: { key: string }) =>
+            Promise.resolve({ url: `http://rustfs:9000/${key}?sig`, expiresIn: 3600 }),
+          );
+      });
+
+      it('swaps template ids for presigned urls, signing each run once', async () => {
+        givenWorkerAndQueue(buildWorker(), [templateJob('j1'), templateJob('j2')]);
+        const artifactRepo = givenTemplates([
+          { id: 't2', bucket: 'artifacts', objectKey: 'k2', updatedAt: new Date(7) },
+          { id: 't1', bucket: 'artifacts', objectKey: 'k1', updatedAt: new Date(5) },
+        ]);
+
+        const result = await service.getNextJobs('worker-uuid', 2);
+
+        expect(result).toHaveLength(2);
+        expect(result[0].config).toEqual({
+          rateLimit: 10,
+          customTemplates: [
+            { url: 'http://rustfs:9000/k1?sig', cacheKey: 't1-5' },
+            { url: 'http://rustfs:9000/k2?sig', cacheKey: 't2-7' },
+          ],
+        });
+        expect(artifactRepo.find).toHaveBeenCalledTimes(1);
+        expect(artifactRepo.find).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ workspaceId: 'ws-1' }),
+          }),
+        );
+        expect(
+          (mockStorageService as Record<string, jest.Mock>).getPresignedDownloadUrl,
+        ).toHaveBeenCalledWith(expect.objectContaining({ absolute: true }));
+      });
+
+      it('fails a job whose template is gone instead of dispatching it', async () => {
+        givenWorkerAndQueue(buildWorker(), [templateJob('j1')]);
+        givenTemplates([
+          { id: 't1', bucket: 'artifacts', objectKey: 'k1', updatedAt: new Date(5) },
+        ]);
+        mockJobRepository.update.mockClear();
+
+        const result = await service.getNextJobs('worker-uuid', 1);
+
+        expect(result).toEqual([]);
+        expect(mockJobRepository.update).toHaveBeenCalledWith(
+          { id: 'j1', status: JobStatus.IN_PROGRESS },
+          expect.objectContaining({ status: JobStatus.FAILED }),
+        );
+        expect(mockJobErrorLogRepository.save).toHaveBeenCalledWith(
+          expect.objectContaining({
+            logMessage: 'A custom template of this run no longer exists',
+          }),
+        );
+      });
+    });
   });
 
 });

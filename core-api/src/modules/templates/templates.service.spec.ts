@@ -17,6 +17,10 @@ import type { StorageService } from '../storage/storage.service';
 import { TemplatesService } from './templates.service';
 import type { Artifact } from '../artifacts/entities/artifact.entity';
 import type { Repository } from 'typeorm';
+import type { AssetGroupAsset } from '../asset-group/entities/asset-groups-assets.entity';
+import type { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
+import type { ToolsService } from '../tools/tools.service';
+import { JobRunType } from '@/common/enums/enum';
 
 const WS = 'ws-1';
 const ME = 'me';
@@ -40,7 +44,10 @@ describe('TemplatesService', () => {
   let artifacts: Record<string, jest.Mock>;
   let folders: { ensureTemplatesFolder: jest.Mock };
   let storage: { getFile: jest.Mock };
-  let repo: { findOne: jest.Mock; createQueryBuilder: jest.Mock };
+  let repo: { find: jest.Mock; createQueryBuilder: jest.Mock };
+  let groupAssets: { find: jest.Mock };
+  let tools: { getToolByNames: jest.Mock };
+  let jobs: { createNewJob: jest.Mock };
   let qb: Record<string, jest.Mock>;
 
   beforeEach(() => {
@@ -72,14 +79,24 @@ describe('TemplatesService', () => {
     }
     qb.getManyAndCount = jest.fn().mockResolvedValue([[row()], 1]);
     repo = {
-      findOne: jest.fn().mockResolvedValue(row()),
+      find: jest.fn((opts: { where: { id: { value: string[] } } }) =>
+        Promise.resolve(opts.where.id.value.map((id) => row({ id }))),
+      ),
       createQueryBuilder: jest.fn(() => qb),
     };
+    groupAssets = { find: jest.fn().mockResolvedValue([]) };
+    tools = {
+      getToolByNames: jest.fn().mockResolvedValue([{ id: 'nuclei', priority: 3 }]),
+    };
+    jobs = { createNewJob: jest.fn().mockResolvedValue([{ id: 'j1' }, { id: 'j2' }]) };
     service = new TemplatesService(
       repo as unknown as Repository<Artifact>,
       artifacts as unknown as ArtifactsService,
       folders as unknown as ArtifactFoldersService,
       storage as unknown as StorageService,
+      groupAssets as unknown as Repository<AssetGroupAsset>,
+      tools as unknown as ToolsService,
+      jobs as unknown as JobsRegistryService,
     );
   });
 
@@ -131,7 +148,7 @@ describe('TemplatesService', () => {
 
   describe('outside the templates folder', () => {
     it('404s for artifact outside templates folder', async () => {
-      repo.findOne.mockResolvedValue(row({ parentFolderId: 'other' }));
+      repo.find.mockResolvedValue([row({ parentFolderId: 'other' })]);
       await expect(service.getContent(WS, ME, 'a1')).rejects.toThrow(
         NotFoundException,
       );
@@ -224,6 +241,79 @@ describe('TemplatesService', () => {
       expect(w).toContain('artifact.createdByUserId IS NULL');
       expect(w).toContain(`artifact.shareType = 'public'`);
       expect(w).toContain('artifact_shares');
+    });
+  });
+
+  describe('run', () => {
+    const T1 = '11111111-1111-4111-8111-111111111111';
+    const T2 = '22222222-2222-4222-8222-222222222222';
+
+    it('creates one nuclei run that carries only template ids', async () => {
+      const res = await service.run(WS, ME, { templateIds: [T1, T2, T1], targetIds: ['t'] });
+
+      expect(jobs.createNewJob).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tool: { id: 'nuclei', priority: 3 },
+          workspaceId: WS,
+          targetIds: ['t'],
+          assetIds: undefined,
+          jobRunType: JobRunType.MANUAL,
+          jobName: '2 custom templates',
+          config: { customTemplateIds: [T1, T2] },
+        }),
+      );
+      expect(res.message).toBe('Running 2 template(s) on 2 asset(s)');
+    });
+
+    it('expands asset groups into their assets', async () => {
+      groupAssets.find.mockResolvedValue([
+        { asset: { id: 'as1' } },
+        { asset: { id: 'as2' } },
+        { asset: { id: 'as1' } },
+      ]);
+
+      await service.run(WS, ME, { templateIds: [T1], assetGroupIds: ['g1'] });
+
+      expect(groupAssets.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { assetGroup: { id: expect.anything(), workspace: { id: WS } } },
+        }),
+      );
+      expect(jobs.createNewJob).toHaveBeenCalledWith(
+        expect.objectContaining({ assetIds: ['as1', 'as2'], targetIds: undefined }),
+      );
+    });
+
+    it('rejects an empty group instead of scanning every asset', async () => {
+      await expect(
+        service.run(WS, ME, { templateIds: [T1], assetGroupIds: ['g1'] }),
+      ).rejects.toThrow(BadRequestException);
+      expect(jobs.createNewJob).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [{}],
+      [{ targetIds: ['t'], assetIds: ['a'] }],
+      [{ targetIds: [], assetIds: [] }],
+    ])('requires exactly one scope (%p)', async (scope) => {
+      await expect(service.run(WS, ME, { templateIds: [T1], ...scope })).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('404s when any template is not readable', async () => {
+      artifacts.canRead.mockImplementation((a: Artifact) => Promise.resolve(a.id === T1));
+      await expect(
+        service.run(WS, ME, { templateIds: [T1, T2], assetIds: ['a'] }),
+      ).rejects.toThrow(NotFoundException);
+      expect(jobs.createNewJob).not.toHaveBeenCalled();
+    });
+
+    it('400s when no asset is scannable', async () => {
+      jobs.createNewJob.mockResolvedValue([]);
+      await expect(
+        service.run(WS, ME, { templateIds: [T1], assetIds: ['a'] }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

@@ -2,6 +2,7 @@ import { UserContext } from '@/common/decorators/app.decorator';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
 import type { UserContextPayload } from '@/common/interfaces/app.interface';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
@@ -23,6 +24,7 @@ import {
   CreateTemplateDto,
   GetTemplatesQueryDto,
   RenameTemplateDto,
+  RunTemplatesDto,
   SaveTemplateContentDto,
   TemplateContentDto,
 } from './dto/templates.dto';
@@ -79,6 +81,23 @@ export class TemplatesController {
     @UserContext() user: UserContextPayload,
   ) {
     return this.templatesService.create(workspaceId, user.id, dto);
+  }
+
+  @Doc({
+    summary: 'Run templates',
+    description:
+      'Scans targets, assets or asset groups (exactly one) with nuclei running only these templates. Findings land in Vulnerabilities.',
+    response: { serialization: DefaultMessageResponseDto },
+    request: { getWorkspaceId: true },
+  })
+  @WorkspaceAccess('artifact.read', 'vulnerability.write')
+  @Post('run')
+  run(
+    @Body() dto: RunTemplatesDto,
+    @WorkspaceId() workspaceId: string,
+    @UserContext() user: UserContextPayload,
+  ) {
+    return this.templatesService.run(workspaceId, user.id, dto);
   }
 
   @Doc({

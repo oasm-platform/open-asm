@@ -11,6 +11,7 @@ describe('TemplatesController workspace permission guards', () => {
     ['create', 'POST /', ['artifact.write']],
     ['saveContent', 'PUT /:id/content', ['artifact.write']],
     ['rename', 'PATCH /:id', ['artifact.write']],
+    ['run', 'POST /run', ['artifact.read', 'vulnerability.write']],
   ];
 
   it.each(cases)('%s (%s) requires %j', (method, route, keys) => {

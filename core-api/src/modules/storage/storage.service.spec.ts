@@ -1358,6 +1358,23 @@ describe('StorageService', () => {
       expect(result.url).toContain('X-Amz-Signature');
     });
 
+    it('relative mode: absolute download keeps the signed server URL', async () => {
+      setUrlBase('/api/storage');
+      mockGetSignedUrl.mockResolvedValueOnce(
+        'http://rustfs:9000/artifacts/k.yaml?X-Amz-Signature=abc',
+      );
+
+      const result = await service.getPresignedDownloadUrl({
+        bucket: 'artifacts',
+        key: 'k.yaml',
+        absolute: true,
+      });
+
+      expect(result.url).toBe(
+        'http://rustfs:9000/artifacts/k.yaml?X-Amz-Signature=abc',
+      );
+    });
+
     it('relative mode: upload URL is base-prefixed', async () => {
       setUrlBase('/api/storage');
       mockGetSignedUrl.mockResolvedValueOnce(

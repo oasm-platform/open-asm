@@ -534,8 +534,10 @@ export class StorageService implements OnModuleInit {
     expiresIn?: number;
     fileName?: string;
     contentType?: string;
+    /** Keep the signed absolute URL for non-browser clients (connectors). */
+    absolute?: boolean;
   }): Promise<{ url: string; expiresIn: number }> {
-    const { bucket, key, expiresIn, fileName, contentType } = opts;
+    const { bucket, key, expiresIn, fileName, contentType, absolute } = opts;
 
     this.assertValidLocation(bucket, key);
 
@@ -554,7 +556,10 @@ export class StorageService implements OnModuleInit {
 
     const url = await this.signCommand(command, clampedTtl);
 
-    return { url: this.toBrowserUrl(url), expiresIn: clampedTtl };
+    return {
+      url: absolute ? url : this.toBrowserUrl(url),
+      expiresIn: clampedTtl,
+    };
   }
 
   /**
