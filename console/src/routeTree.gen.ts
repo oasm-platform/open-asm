@@ -18,6 +18,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as AuthedReportsRouteImport } from './routes/_authed/reports'
 import { Route as AuthedSearchRouteImport } from './routes/_authed/search'
+import { Route as AuthedTemplatesRouteImport } from './routes/_authed/templates'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminAboutRouteImport } from './routes/admin/about'
 import { Route as AdminBrandRouteImport } from './routes/admin/brand'
@@ -110,6 +111,11 @@ const AuthedReportsRoute = AuthedReportsRouteImport.update({
 const AuthedSearchRoute = AuthedSearchRouteImport.update({
   id: '/search',
   path: '/search',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedTemplatesRoute = AuthedTemplatesRouteImport.update({
+  id: '/templates',
+  path: '/templates',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -378,6 +384,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRouteWithChildren
   '/reports': typeof AuthedReportsRoute
   '/search': typeof AuthedSearchRoute
+  '/templates': typeof AuthedTemplatesRoute
   '/admin/about': typeof AdminAboutRoute
   '/admin/brand': typeof AdminBrandRoute
   '/invite/$token': typeof InviteTokenRoute
@@ -434,6 +441,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/reports': typeof AuthedReportsRoute
   '/search': typeof AuthedSearchRoute
+  '/templates': typeof AuthedTemplatesRoute
   '/admin/about': typeof AdminAboutRoute
   '/admin/brand': typeof AdminBrandRoute
   '/invite/$token': typeof InviteTokenRoute
@@ -495,6 +503,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRouteWithChildren
   '/_authed/reports': typeof AuthedReportsRoute
   '/_authed/search': typeof AuthedSearchRoute
+  '/_authed/templates': typeof AuthedTemplatesRoute
   '/admin/about': typeof AdminAboutRoute
   '/admin/brand': typeof AdminBrandRoute
   '/invite/$token': typeof InviteTokenRoute
@@ -557,6 +566,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/reports'
     | '/search'
+    | '/templates'
     | '/admin/about'
     | '/admin/brand'
     | '/invite/$token'
@@ -613,6 +623,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/reports'
     | '/search'
+    | '/templates'
     | '/admin/about'
     | '/admin/brand'
     | '/invite/$token'
@@ -673,6 +684,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/_authed/reports'
     | '/_authed/search'
+    | '/_authed/templates'
     | '/admin/about'
     | '/admin/brand'
     | '/invite/$token'
@@ -798,6 +810,13 @@ declare module '@tanstack/react-router' {
       path: '/search'
       fullPath: '/search'
       preLoaderRoute: typeof AuthedSearchRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/templates': {
+      id: '/_authed/templates'
+      path: '/templates'
+      fullPath: '/templates'
+      preLoaderRoute: typeof AuthedTemplatesRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/admin/': {
@@ -1149,6 +1168,7 @@ declare module '@tanstack/react-router' {
 interface AuthedRouteChildren {
   AuthedReportsRoute: typeof AuthedReportsRoute
   AuthedSearchRoute: typeof AuthedSearchRoute
+  AuthedTemplatesRoute: typeof AuthedTemplatesRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
   AuthedAgentsCreateRoute: typeof AuthedAgentsCreateRoute
   AuthedAistudioAgentsRoute: typeof AuthedAistudioAgentsRoute
@@ -1192,6 +1212,7 @@ interface AuthedRouteChildren {
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedReportsRoute: AuthedReportsRoute,
   AuthedSearchRoute: AuthedSearchRoute,
+  AuthedTemplatesRoute: AuthedTemplatesRoute,
   AuthedIndexRoute: AuthedIndexRoute,
   AuthedAgentsCreateRoute: AuthedAgentsCreateRoute,
   AuthedAistudioAgentsRoute: AuthedAistudioAgentsRoute,

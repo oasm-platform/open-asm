@@ -834,6 +834,7 @@ export type ArtifactDtoSource =
 export const ArtifactDtoSource = {
   upload: 'upload',
   agent: 'agent',
+  template: 'template',
 } as const;
 
 export type ArtifactDtoShareType =
@@ -887,6 +888,7 @@ export type ArtifactUsageBySourceDtoSource =
 export const ArtifactUsageBySourceDtoSource = {
   upload: 'upload',
   agent: 'agent',
+  template: 'template',
 } as const;
 
 export type ArtifactUsageBySourceDto = {
@@ -4401,16 +4403,33 @@ export type UpdateProviderDto = {
   apiDocsUrl?: string;
 };
 
-export type Template = {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  fileName: string;
-  path: string;
+export type TemplateContentDto = {
+  artifact: ArtifactDto;
+  content: string;
 };
 
-export type CreateTemplateDTO = {
+export type CreateTemplateDto = {
+  /** Must end in .yaml or .yml */
+  name: string;
+  /** Nuclei template YAML (max 256 KB) */
+  content: string;
+};
+
+export type SaveTemplateContentDto = {
+  /** Nuclei template YAML (max 256 KB) */
+  content: string;
+};
+
+export type RenameTemplateDto = {
+  /** Must end in .yaml or .yml */
+  name: string;
+};
+
+export type PresignUploadRequestDto = {
+  /** Original file name of the object */
   fileName: string;
+  bucket?: string;
+  contentType?: string;
 };
 
 export type PresignUploadResponseDto = {
@@ -4422,17 +4441,10 @@ export type PresignUploadResponseDto = {
   expiresIn: number;
 };
 
-export type RenameTemplateDTO = {
-  fileName: string;
-};
-
-export type GetManyTemplateDto = {
-  data: Template[];
-  total: number;
-  page: number;
-  limit: number;
-  hasNextPage: boolean;
-  pageCount: number;
+export type PresignDownloadResponseDto = {
+  downloadUrl: string;
+  /** Lifetime of the presigned URL in seconds */
+  expiresIn: number;
 };
 
 export type AssetGroupLastRunDtoStatus =
@@ -4818,19 +4830,6 @@ export type GenerateVulReportBodyDto = {
   vulnIds?: string[];
   /** Minimum severity level (CRITICAL, HIGH, MEDIUM, LOW, INFO) */
   minSeverity?: GenerateVulReportBodyDtoMinSeverity;
-};
-
-export type PresignUploadRequestDto = {
-  /** Original file name of the object */
-  fileName: string;
-  bucket?: string;
-  contentType?: string;
-};
-
-export type PresignDownloadResponseDto = {
-  downloadUrl: string;
-  /** Lifetime of the presigned URL in seconds */
-  expiresIn: number;
 };
 
 export type Session = {
@@ -5662,13 +5661,33 @@ export type ProvidersControllerGetManyProvidersParams = {
   name?: string;
 };
 
-export type TemplatesControllerGetAllTemplatesParams = {
+export type TemplatesControllerGetManyParams = {
   search?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
-  value?: string;
+  /**
+   * `mine`: templates I created. `shared`: public or shared with me.
+   */
+  scope?: TemplatesControllerGetManyScope;
+};
+
+export type TemplatesControllerGetManyScope =
+  (typeof TemplatesControllerGetManyScope)[keyof typeof TemplatesControllerGetManyScope];
+
+export const TemplatesControllerGetManyScope = {
+  mine: 'mine',
+  shared: 'shared',
+} as const;
+
+export type StorageControllerPresignDownloadParams = {
+  bucket: string;
+  path: string;
+  /**
+   * Suggested download file name
+   */
+  fileName?: string;
 };
 
 export type AssetGroupControllerGetAllParams = {
@@ -5804,15 +5823,6 @@ export const ReportsControllerPreviewVulReportMinSeverity = {
   LOW: 'LOW',
   INFO: 'INFO',
 } as const;
-
-export type StorageControllerPresignDownloadParams = {
-  bucket: string;
-  path: string;
-  /**
-   * Suggested download file name
-   */
-  fileName?: string;
-};
 
 export type SocialSignInBodyIdTokenUserName = {
   firstName?: string;
@@ -41100,142 +41110,48 @@ export const useProvidersControllerDeleteProvider = <
 };
 
 /**
- * Create a new template with file stored in the storage
- * @summary Create a new templates
+ * Templates I created (`mine`, default) or that are public or shared with me (`shared`).
+ * @summary List custom templates
  */
-export const templatesControllerCreateTemplate = (
-  createTemplateDTO: CreateTemplateDTO,
+export const templatesControllerGetMany = (
+  params?: TemplatesControllerGetManyParams,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<Template>(
-    {
-      url: `/api/templates`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: createTemplateDTO,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getTemplatesControllerCreateTemplateMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
-    TError,
-    { data: CreateTemplateDTO },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
-  TError,
-  { data: CreateTemplateDTO },
-  TContext
-> => {
-  const mutationKey = ['templatesControllerCreateTemplate'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
-    { data: CreateTemplateDTO }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return templatesControllerCreateTemplate(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type TemplatesControllerCreateTemplateMutationResult = NonNullable<
-  Awaited<ReturnType<typeof templatesControllerCreateTemplate>>
->;
-export type TemplatesControllerCreateTemplateMutationBody = CreateTemplateDTO;
-export type TemplatesControllerCreateTemplateMutationError = unknown;
-
-/**
- * @summary Create a new templates
- */
-export const useTemplatesControllerCreateTemplate = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
-      TError,
-      { data: CreateTemplateDTO },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof templatesControllerCreateTemplate>>,
-  TError,
-  { data: CreateTemplateDTO },
-  TContext
-> => {
-  return useMutation(
-    getTemplatesControllerCreateTemplateMutationOptions(options),
-    queryClient,
-  );
-};
-
-/**
- * Retrieve all templates in a workspace
- * @summary Get all templates
- */
-export const templatesControllerGetAllTemplates = (
-  params?: TemplatesControllerGetAllTemplatesParams,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<GetManyTemplateDto>(
+  return orvalClient<GetManyArtifactDtoDto>(
     { url: `/api/templates`, method: 'GET', params, signal },
     options,
   );
 };
 
-export const getTemplatesControllerGetAllTemplatesInfiniteQueryKey = (
-  params?: TemplatesControllerGetAllTemplatesParams,
+export const getTemplatesControllerGetManyInfiniteQueryKey = (
+  params?: TemplatesControllerGetManyParams,
 ) => {
   return ['infinite', `/api/templates`, ...(params ? [params] : [])] as const;
 };
 
-export const getTemplatesControllerGetAllTemplatesQueryKey = (
-  params?: TemplatesControllerGetAllTemplatesParams,
+export const getTemplatesControllerGetManyQueryKey = (
+  params?: TemplatesControllerGetManyParams,
 ) => {
   return [`/api/templates`, ...(params ? [params] : [])] as const;
 };
 
-export const getTemplatesControllerGetAllTemplatesInfiniteQueryOptions = <
+export const getTemplatesControllerGetManyInfiniteQueryOptions = <
   TData = InfiniteData<
-    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
-    TemplatesControllerGetAllTemplatesParams['page']
+    Awaited<ReturnType<typeof templatesControllerGetMany>>,
+    TemplatesControllerGetManyParams['page']
   >,
   TError = unknown,
 >(
-  params?: TemplatesControllerGetAllTemplatesParams,
+  params?: TemplatesControllerGetManyParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        Awaited<ReturnType<typeof templatesControllerGetMany>>,
         TError,
         TData,
         QueryKey,
-        TemplatesControllerGetAllTemplatesParams['page']
+        TemplatesControllerGetManyParams['page']
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -41245,56 +41161,56 @@ export const getTemplatesControllerGetAllTemplatesInfiniteQueryOptions = <
 
   const queryKey =
     queryOptions?.queryKey ??
-    getTemplatesControllerGetAllTemplatesInfiniteQueryKey(params);
+    getTemplatesControllerGetManyInfiniteQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+    Awaited<ReturnType<typeof templatesControllerGetMany>>,
     QueryKey,
-    TemplatesControllerGetAllTemplatesParams['page']
+    TemplatesControllerGetManyParams['page']
   > = ({ signal, pageParam }) =>
-    templatesControllerGetAllTemplates(
+    templatesControllerGetMany(
       { ...params, page: pageParam ?? params?.['page'] },
       requestOptions,
       signal,
     );
 
   return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
-    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+    Awaited<ReturnType<typeof templatesControllerGetMany>>,
     TError,
     TData,
     QueryKey,
-    TemplatesControllerGetAllTemplatesParams['page']
+    TemplatesControllerGetManyParams['page']
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type TemplatesControllerGetAllTemplatesInfiniteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
+export type TemplatesControllerGetManyInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof templatesControllerGetMany>>
 >;
-export type TemplatesControllerGetAllTemplatesInfiniteQueryError = unknown;
+export type TemplatesControllerGetManyInfiniteQueryError = unknown;
 
-export function useTemplatesControllerGetAllTemplatesInfinite<
+export function useTemplatesControllerGetManyInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
-    TemplatesControllerGetAllTemplatesParams['page']
+    Awaited<ReturnType<typeof templatesControllerGetMany>>,
+    TemplatesControllerGetManyParams['page']
   >,
   TError = unknown,
 >(
-  params: undefined | TemplatesControllerGetAllTemplatesParams,
+  params: undefined | TemplatesControllerGetManyParams,
   options: {
     query: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        Awaited<ReturnType<typeof templatesControllerGetMany>>,
         TError,
         TData,
         QueryKey,
-        TemplatesControllerGetAllTemplatesParams['page']
+        TemplatesControllerGetManyParams['page']
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+          Awaited<ReturnType<typeof templatesControllerGetMany>>,
           TError,
-          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+          Awaited<ReturnType<typeof templatesControllerGetMany>>,
           QueryKey
         >,
         'initialData'
@@ -41305,29 +41221,29 @@ export function useTemplatesControllerGetAllTemplatesInfinite<
 ): DefinedUseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useTemplatesControllerGetAllTemplatesInfinite<
+export function useTemplatesControllerGetManyInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
-    TemplatesControllerGetAllTemplatesParams['page']
+    Awaited<ReturnType<typeof templatesControllerGetMany>>,
+    TemplatesControllerGetManyParams['page']
   >,
   TError = unknown,
 >(
-  params?: TemplatesControllerGetAllTemplatesParams,
+  params?: TemplatesControllerGetManyParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        Awaited<ReturnType<typeof templatesControllerGetMany>>,
         TError,
         TData,
         QueryKey,
-        TemplatesControllerGetAllTemplatesParams['page']
+        TemplatesControllerGetManyParams['page']
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+          Awaited<ReturnType<typeof templatesControllerGetMany>>,
           TError,
-          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+          Awaited<ReturnType<typeof templatesControllerGetMany>>,
           QueryKey
         >,
         'initialData'
@@ -41338,22 +41254,22 @@ export function useTemplatesControllerGetAllTemplatesInfinite<
 ): UseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useTemplatesControllerGetAllTemplatesInfinite<
+export function useTemplatesControllerGetManyInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
-    TemplatesControllerGetAllTemplatesParams['page']
+    Awaited<ReturnType<typeof templatesControllerGetMany>>,
+    TemplatesControllerGetManyParams['page']
   >,
   TError = unknown,
 >(
-  params?: TemplatesControllerGetAllTemplatesParams,
+  params?: TemplatesControllerGetManyParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        Awaited<ReturnType<typeof templatesControllerGetMany>>,
         TError,
         TData,
         QueryKey,
-        TemplatesControllerGetAllTemplatesParams['page']
+        TemplatesControllerGetManyParams['page']
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -41363,25 +41279,25 @@ export function useTemplatesControllerGetAllTemplatesInfinite<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get all templates
+ * @summary List custom templates
  */
 
-export function useTemplatesControllerGetAllTemplatesInfinite<
+export function useTemplatesControllerGetManyInfinite<
   TData = InfiniteData<
-    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
-    TemplatesControllerGetAllTemplatesParams['page']
+    Awaited<ReturnType<typeof templatesControllerGetMany>>,
+    TemplatesControllerGetManyParams['page']
   >,
   TError = unknown,
 >(
-  params?: TemplatesControllerGetAllTemplatesParams,
+  params?: TemplatesControllerGetManyParams,
   options?: {
     query?: Partial<
       UseInfiniteQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        Awaited<ReturnType<typeof templatesControllerGetMany>>,
         TError,
         TData,
         QueryKey,
-        TemplatesControllerGetAllTemplatesParams['page']
+        TemplatesControllerGetManyParams['page']
       >
     >;
     request?: SecondParameter<typeof orvalClient>;
@@ -41390,8 +41306,10 @@ export function useTemplatesControllerGetAllTemplatesInfinite<
 ): UseInfiniteQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions =
-    getTemplatesControllerGetAllTemplatesInfiniteQueryOptions(params, options);
+  const queryOptions = getTemplatesControllerGetManyInfiniteQueryOptions(
+    params,
+    options,
+  );
 
   const query = useInfiniteQuery(
     queryOptions,
@@ -41403,15 +41321,15 @@ export function useTemplatesControllerGetAllTemplatesInfinite<
   return withQueryKey(query, queryOptions.queryKey);
 }
 
-export const getTemplatesControllerGetAllTemplatesQueryOptions = <
-  TData = Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+export const getTemplatesControllerGetManyQueryOptions = <
+  TData = Awaited<ReturnType<typeof templatesControllerGetMany>>,
   TError = unknown,
 >(
-  params?: TemplatesControllerGetAllTemplatesParams,
+  params?: TemplatesControllerGetManyParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        Awaited<ReturnType<typeof templatesControllerGetMany>>,
         TError,
         TData
       >
@@ -41422,44 +41340,43 @@ export const getTemplatesControllerGetAllTemplatesQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ??
-    getTemplatesControllerGetAllTemplatesQueryKey(params);
+    queryOptions?.queryKey ?? getTemplatesControllerGetManyQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
+    Awaited<ReturnType<typeof templatesControllerGetMany>>
   > = ({ signal }) =>
-    templatesControllerGetAllTemplates(params, requestOptions, signal);
+    templatesControllerGetMany(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+    Awaited<ReturnType<typeof templatesControllerGetMany>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type TemplatesControllerGetAllTemplatesQueryResult = NonNullable<
-  Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
+export type TemplatesControllerGetManyQueryResult = NonNullable<
+  Awaited<ReturnType<typeof templatesControllerGetMany>>
 >;
-export type TemplatesControllerGetAllTemplatesQueryError = unknown;
+export type TemplatesControllerGetManyQueryError = unknown;
 
-export function useTemplatesControllerGetAllTemplates<
-  TData = Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+export function useTemplatesControllerGetMany<
+  TData = Awaited<ReturnType<typeof templatesControllerGetMany>>,
   TError = unknown,
 >(
-  params: undefined | TemplatesControllerGetAllTemplatesParams,
+  params: undefined | TemplatesControllerGetManyParams,
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        Awaited<ReturnType<typeof templatesControllerGetMany>>,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+          Awaited<ReturnType<typeof templatesControllerGetMany>>,
           TError,
-          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
+          Awaited<ReturnType<typeof templatesControllerGetMany>>
         >,
         'initialData'
       >;
@@ -41469,24 +41386,24 @@ export function useTemplatesControllerGetAllTemplates<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useTemplatesControllerGetAllTemplates<
-  TData = Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+export function useTemplatesControllerGetMany<
+  TData = Awaited<ReturnType<typeof templatesControllerGetMany>>,
   TError = unknown,
 >(
-  params?: TemplatesControllerGetAllTemplatesParams,
+  params?: TemplatesControllerGetManyParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        Awaited<ReturnType<typeof templatesControllerGetMany>>,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+          Awaited<ReturnType<typeof templatesControllerGetMany>>,
           TError,
-          Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>
+          Awaited<ReturnType<typeof templatesControllerGetMany>>
         >,
         'initialData'
       >;
@@ -41496,15 +41413,15 @@ export function useTemplatesControllerGetAllTemplates<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useTemplatesControllerGetAllTemplates<
-  TData = Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+export function useTemplatesControllerGetMany<
+  TData = Awaited<ReturnType<typeof templatesControllerGetMany>>,
   TError = unknown,
 >(
-  params?: TemplatesControllerGetAllTemplatesParams,
+  params?: TemplatesControllerGetManyParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        Awaited<ReturnType<typeof templatesControllerGetMany>>,
         TError,
         TData
       >
@@ -41516,18 +41433,18 @@ export function useTemplatesControllerGetAllTemplates<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get all templates
+ * @summary List custom templates
  */
 
-export function useTemplatesControllerGetAllTemplates<
-  TData = Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+export function useTemplatesControllerGetMany<
+  TData = Awaited<ReturnType<typeof templatesControllerGetMany>>,
   TError = unknown,
 >(
-  params?: TemplatesControllerGetAllTemplatesParams,
+  params?: TemplatesControllerGetManyParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerGetAllTemplates>>,
+        Awaited<ReturnType<typeof templatesControllerGetMany>>,
         TError,
         TData
       >
@@ -41538,7 +41455,7 @@ export function useTemplatesControllerGetAllTemplates<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getTemplatesControllerGetAllTemplatesQueryOptions(
+  const queryOptions = getTemplatesControllerGetManyQueryOptions(
     params,
     options,
   );
@@ -41552,133 +41469,44 @@ export function useTemplatesControllerGetAllTemplates<
 }
 
 /**
- * Create a presigned URL the client PUTs the template YAML to directly
- * @summary Presign a template upload
+ * Validates the YAML and stores it in the custom-templates folder.
+ * @summary Create a template
  */
-export const templatesControllerPresignTemplate = (
-  templateId: string,
+export const templatesControllerCreate = (
+  createTemplateDto: CreateTemplateDto,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<PresignUploadResponseDto>(
-    { url: `/api/templates/${templateId}/presign`, method: 'POST', signal },
-    options,
-  );
-};
-
-export const getTemplatesControllerPresignTemplateMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof templatesControllerPresignTemplate>>,
-    TError,
-    { templateId: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof templatesControllerPresignTemplate>>,
-  TError,
-  { templateId: string },
-  TContext
-> => {
-  const mutationKey = ['templatesControllerPresignTemplate'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof templatesControllerPresignTemplate>>,
-    { templateId: string }
-  > = (props) => {
-    const { templateId } = props ?? {};
-
-    return templatesControllerPresignTemplate(templateId, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type TemplatesControllerPresignTemplateMutationResult = NonNullable<
-  Awaited<ReturnType<typeof templatesControllerPresignTemplate>>
->;
-
-export type TemplatesControllerPresignTemplateMutationError = unknown;
-
-/**
- * @summary Presign a template upload
- */
-export const useTemplatesControllerPresignTemplate = <
-  TError = unknown,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof templatesControllerPresignTemplate>>,
-      TError,
-      { templateId: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof templatesControllerPresignTemplate>>,
-  TError,
-  { templateId: string },
-  TContext
-> => {
-  return useMutation(
-    getTemplatesControllerPresignTemplateMutationOptions(options),
-    queryClient,
-  );
-};
-
-/**
- * Rename the display filename of a template
- * @summary Rename a template file
- */
-export const templatesControllerRenameFile = (
-  templateId: string,
-  renameTemplateDTO: RenameTemplateDTO,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<Template>(
+  return orvalClient<ArtifactDto>(
     {
-      url: `/api/templates/${templateId}/rename`,
-      method: 'PATCH',
+      url: `/api/templates`,
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      data: renameTemplateDTO,
+      data: createTemplateDto,
       signal,
     },
     options,
   );
 };
 
-export const getTemplatesControllerRenameFileMutationOptions = <
+export const getTemplatesControllerCreateMutationOptions = <
   TError = unknown,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof templatesControllerRenameFile>>,
+    Awaited<ReturnType<typeof templatesControllerCreate>>,
     TError,
-    { templateId: string; data: RenameTemplateDTO },
+    { data: CreateTemplateDto },
     TContext
   >;
   request?: SecondParameter<typeof orvalClient>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof templatesControllerRenameFile>>,
+  Awaited<ReturnType<typeof templatesControllerCreate>>,
   TError,
-  { templateId: string; data: RenameTemplateDTO },
+  { data: CreateTemplateDto },
   TContext
 > => {
-  const mutationKey = ['templatesControllerRenameFile'];
+  const mutationKey = ['templatesControllerCreate'];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       'mutationKey' in options.mutation &&
@@ -41688,82 +41516,79 @@ export const getTemplatesControllerRenameFileMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof templatesControllerRenameFile>>,
-    { templateId: string; data: RenameTemplateDTO }
+    Awaited<ReturnType<typeof templatesControllerCreate>>,
+    { data: CreateTemplateDto }
   > = (props) => {
-    const { templateId, data } = props ?? {};
+    const { data } = props ?? {};
 
-    return templatesControllerRenameFile(templateId, data, requestOptions);
+    return templatesControllerCreate(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type TemplatesControllerRenameFileMutationResult = NonNullable<
-  Awaited<ReturnType<typeof templatesControllerRenameFile>>
+export type TemplatesControllerCreateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof templatesControllerCreate>>
 >;
-export type TemplatesControllerRenameFileMutationBody = RenameTemplateDTO;
-export type TemplatesControllerRenameFileMutationError = unknown;
+export type TemplatesControllerCreateMutationBody = CreateTemplateDto;
+export type TemplatesControllerCreateMutationError = unknown;
 
 /**
- * @summary Rename a template file
+ * @summary Create a template
  */
-export const useTemplatesControllerRenameFile = <
+export const useTemplatesControllerCreate = <
   TError = unknown,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof templatesControllerRenameFile>>,
+      Awaited<ReturnType<typeof templatesControllerCreate>>,
       TError,
-      { templateId: string; data: RenameTemplateDTO },
+      { data: CreateTemplateDto },
       TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
 ): UseMutationResult<
-  Awaited<ReturnType<typeof templatesControllerRenameFile>>,
+  Awaited<ReturnType<typeof templatesControllerCreate>>,
   TError,
-  { templateId: string; data: RenameTemplateDTO },
+  { data: CreateTemplateDto },
   TContext
 > => {
   return useMutation(
-    getTemplatesControllerRenameFileMutationOptions(options),
+    getTemplatesControllerCreateMutationOptions(options),
     queryClient,
   );
 };
 
 /**
- * Retrieve a template by its ID
- * @summary Get a template by ID
+ * @summary Get a template with its YAML
  */
-export const templatesControllerGetTemplateById = (
-  templateId: string,
+export const templatesControllerGetContent = (
+  id: string,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<Template>(
-    { url: `/api/templates/${templateId}`, method: 'GET', signal },
+  return orvalClient<TemplateContentDto>(
+    { url: `/api/templates/${id}/content`, method: 'GET', signal },
     options,
   );
 };
 
-export const getTemplatesControllerGetTemplateByIdQueryKey = (
-  templateId: string,
-) => {
-  return [`/api/templates/${templateId}`] as const;
+export const getTemplatesControllerGetContentQueryKey = (id: string) => {
+  return [`/api/templates/${id}/content`] as const;
 };
 
-export const getTemplatesControllerGetTemplateByIdQueryOptions = <
-  TData = Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+export const getTemplatesControllerGetContentQueryOptions = <
+  TData = Awaited<ReturnType<typeof templatesControllerGetContent>>,
   TError = unknown,
 >(
-  templateId: string,
+  id: string,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+        Awaited<ReturnType<typeof templatesControllerGetContent>>,
         TError,
         TData
       >
@@ -41774,49 +41599,47 @@ export const getTemplatesControllerGetTemplateByIdQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ??
-    getTemplatesControllerGetTemplateByIdQueryKey(templateId);
+    queryOptions?.queryKey ?? getTemplatesControllerGetContentQueryKey(id);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
-  > = ({ signal }) =>
-    templatesControllerGetTemplateById(templateId, requestOptions, signal);
+    Awaited<ReturnType<typeof templatesControllerGetContent>>
+  > = ({ signal }) => templatesControllerGetContent(id, requestOptions, signal);
 
   return {
     queryKey,
     queryFn,
-    enabled: templateId !== null && templateId !== undefined,
+    enabled: id !== null && id !== undefined,
     ...queryOptions,
   } as UseQueryOptions<
-    Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+    Awaited<ReturnType<typeof templatesControllerGetContent>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type TemplatesControllerGetTemplateByIdQueryResult = NonNullable<
-  Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
+export type TemplatesControllerGetContentQueryResult = NonNullable<
+  Awaited<ReturnType<typeof templatesControllerGetContent>>
 >;
-export type TemplatesControllerGetTemplateByIdQueryError = unknown;
+export type TemplatesControllerGetContentQueryError = unknown;
 
-export function useTemplatesControllerGetTemplateById<
-  TData = Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+export function useTemplatesControllerGetContent<
+  TData = Awaited<ReturnType<typeof templatesControllerGetContent>>,
   TError = unknown,
 >(
-  templateId: string,
+  id: string,
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+        Awaited<ReturnType<typeof templatesControllerGetContent>>,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+          Awaited<ReturnType<typeof templatesControllerGetContent>>,
           TError,
-          Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
+          Awaited<ReturnType<typeof templatesControllerGetContent>>
         >,
         'initialData'
       >;
@@ -41826,24 +41649,24 @@ export function useTemplatesControllerGetTemplateById<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useTemplatesControllerGetTemplateById<
-  TData = Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+export function useTemplatesControllerGetContent<
+  TData = Awaited<ReturnType<typeof templatesControllerGetContent>>,
   TError = unknown,
 >(
-  templateId: string,
+  id: string,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+        Awaited<ReturnType<typeof templatesControllerGetContent>>,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+          Awaited<ReturnType<typeof templatesControllerGetContent>>,
           TError,
-          Awaited<ReturnType<typeof templatesControllerGetTemplateById>>
+          Awaited<ReturnType<typeof templatesControllerGetContent>>
         >,
         'initialData'
       >;
@@ -41853,15 +41676,15 @@ export function useTemplatesControllerGetTemplateById<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useTemplatesControllerGetTemplateById<
-  TData = Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+export function useTemplatesControllerGetContent<
+  TData = Awaited<ReturnType<typeof templatesControllerGetContent>>,
   TError = unknown,
 >(
-  templateId: string,
+  id: string,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+        Awaited<ReturnType<typeof templatesControllerGetContent>>,
         TError,
         TData
       >
@@ -41873,18 +41696,18 @@ export function useTemplatesControllerGetTemplateById<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Get a template by ID
+ * @summary Get a template with its YAML
  */
 
-export function useTemplatesControllerGetTemplateById<
-  TData = Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+export function useTemplatesControllerGetContent<
+  TData = Awaited<ReturnType<typeof templatesControllerGetContent>>,
   TError = unknown,
 >(
-  templateId: string,
+  id: string,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof templatesControllerGetTemplateById>>,
+        Awaited<ReturnType<typeof templatesControllerGetContent>>,
         TError,
         TData
       >
@@ -41895,8 +41718,8 @@ export function useTemplatesControllerGetTemplateById<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getTemplatesControllerGetTemplateByIdQueryOptions(
-    templateId,
+  const queryOptions = getTemplatesControllerGetContentQueryOptions(
+    id,
     options,
   );
 
@@ -41909,38 +41732,45 @@ export function useTemplatesControllerGetTemplateById<
 }
 
 /**
- * Delete a template and its associated file from storage
- * @summary Delete a template
+ * Owner only. Replaces the YAML; 409 when the workspace quota is full.
+ * @summary Save template content
  */
-export const templatesControllerDeleteTemplate = (
-  templateId: string,
+export const templatesControllerSaveContent = (
+  id: string,
+  saveTemplateContentDto: SaveTemplateContentDto,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<AppResponseSerialization>(
-    { url: `/api/templates/${templateId}`, method: 'DELETE', signal },
+  return orvalClient<ArtifactDto>(
+    {
+      url: `/api/templates/${id}/content`,
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      data: saveTemplateContentDto,
+      signal,
+    },
     options,
   );
 };
 
-export const getTemplatesControllerDeleteTemplateMutationOptions = <
+export const getTemplatesControllerSaveContentMutationOptions = <
   TError = unknown,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
+    Awaited<ReturnType<typeof templatesControllerSaveContent>>,
     TError,
-    { templateId: string },
+    { id: string; data: SaveTemplateContentDto },
     TContext
   >;
   request?: SecondParameter<typeof orvalClient>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
+  Awaited<ReturnType<typeof templatesControllerSaveContent>>,
   TError,
-  { templateId: string },
+  { id: string; data: SaveTemplateContentDto },
   TContext
 > => {
-  const mutationKey = ['templatesControllerDeleteTemplate'];
+  const mutationKey = ['templatesControllerSaveContent'];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       'mutationKey' in options.mutation &&
@@ -41950,51 +41780,411 @@ export const getTemplatesControllerDeleteTemplateMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
-    { templateId: string }
+    Awaited<ReturnType<typeof templatesControllerSaveContent>>,
+    { id: string; data: SaveTemplateContentDto }
   > = (props) => {
-    const { templateId } = props ?? {};
+    const { id, data } = props ?? {};
 
-    return templatesControllerDeleteTemplate(templateId, requestOptions);
+    return templatesControllerSaveContent(id, data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type TemplatesControllerDeleteTemplateMutationResult = NonNullable<
-  Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>
+export type TemplatesControllerSaveContentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof templatesControllerSaveContent>>
 >;
-
-export type TemplatesControllerDeleteTemplateMutationError = unknown;
+export type TemplatesControllerSaveContentMutationBody = SaveTemplateContentDto;
+export type TemplatesControllerSaveContentMutationError = unknown;
 
 /**
- * @summary Delete a template
+ * @summary Save template content
  */
-export const useTemplatesControllerDeleteTemplate = <
+export const useTemplatesControllerSaveContent = <
   TError = unknown,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
+      Awaited<ReturnType<typeof templatesControllerSaveContent>>,
       TError,
-      { templateId: string },
+      { id: string; data: SaveTemplateContentDto },
       TContext
     >;
     request?: SecondParameter<typeof orvalClient>;
   },
   queryClient?: QueryClient,
 ): UseMutationResult<
-  Awaited<ReturnType<typeof templatesControllerDeleteTemplate>>,
+  Awaited<ReturnType<typeof templatesControllerSaveContent>>,
   TError,
-  { templateId: string },
+  { id: string; data: SaveTemplateContentDto },
   TContext
 > => {
   return useMutation(
-    getTemplatesControllerDeleteTemplateMutationOptions(options),
+    getTemplatesControllerSaveContentMutationOptions(options),
     queryClient,
   );
 };
+
+/**
+ * Owner only.
+ * @summary Rename a template
+ */
+export const templatesControllerRename = (
+  id: string,
+  renameTemplateDto: RenameTemplateDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ArtifactDto>(
+    {
+      url: `/api/templates/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: renameTemplateDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getTemplatesControllerRenameMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof templatesControllerRename>>,
+    TError,
+    { id: string; data: RenameTemplateDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof templatesControllerRename>>,
+  TError,
+  { id: string; data: RenameTemplateDto },
+  TContext
+> => {
+  const mutationKey = ['templatesControllerRename'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof templatesControllerRename>>,
+    { id: string; data: RenameTemplateDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return templatesControllerRename(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TemplatesControllerRenameMutationResult = NonNullable<
+  Awaited<ReturnType<typeof templatesControllerRename>>
+>;
+export type TemplatesControllerRenameMutationBody = RenameTemplateDto;
+export type TemplatesControllerRenameMutationError = unknown;
+
+/**
+ * @summary Rename a template
+ */
+export const useTemplatesControllerRename = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof templatesControllerRename>>,
+      TError,
+      { id: string; data: RenameTemplateDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof templatesControllerRename>>,
+  TError,
+  { id: string; data: RenameTemplateDto },
+  TContext
+> => {
+  return useMutation(
+    getTemplatesControllerRenameMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * @summary Create a presigned URL for direct-to-storage upload
+ */
+export const storageControllerPresignUpload = (
+  presignUploadRequestDto: PresignUploadRequestDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<PresignUploadResponseDto>(
+    {
+      url: `/api/storage/presign/upload`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: presignUploadRequestDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getStorageControllerPresignUploadMutationOptions = <
+  TError = void,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof storageControllerPresignUpload>>,
+    TError,
+    { data: PresignUploadRequestDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof storageControllerPresignUpload>>,
+  TError,
+  { data: PresignUploadRequestDto },
+  TContext
+> => {
+  const mutationKey = ['storageControllerPresignUpload'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof storageControllerPresignUpload>>,
+    { data: PresignUploadRequestDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return storageControllerPresignUpload(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type StorageControllerPresignUploadMutationResult = NonNullable<
+  Awaited<ReturnType<typeof storageControllerPresignUpload>>
+>;
+export type StorageControllerPresignUploadMutationBody =
+  PresignUploadRequestDto;
+export type StorageControllerPresignUploadMutationError = void;
+
+/**
+ * @summary Create a presigned URL for direct-to-storage upload
+ */
+export const useStorageControllerPresignUpload = <
+  TError = void,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof storageControllerPresignUpload>>,
+      TError,
+      { data: PresignUploadRequestDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof storageControllerPresignUpload>>,
+  TError,
+  { data: PresignUploadRequestDto },
+  TContext
+> => {
+  return useMutation(
+    getStorageControllerPresignUploadMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * @summary Create a presigned URL for direct-from-storage download
+ */
+export const storageControllerPresignDownload = (
+  params: StorageControllerPresignDownloadParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<PresignDownloadResponseDto>(
+    { url: `/api/storage/presign/download`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getStorageControllerPresignDownloadQueryKey = (
+  params?: StorageControllerPresignDownloadParams,
+) => {
+  return [
+    `/api/storage/presign/download`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getStorageControllerPresignDownloadQueryOptions = <
+  TData = Awaited<ReturnType<typeof storageControllerPresignDownload>>,
+  TError = void,
+>(
+  params: StorageControllerPresignDownloadParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerPresignDownload>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getStorageControllerPresignDownloadQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof storageControllerPresignDownload>>
+  > = ({ signal }) =>
+    storageControllerPresignDownload(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof storageControllerPresignDownload>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StorageControllerPresignDownloadQueryResult = NonNullable<
+  Awaited<ReturnType<typeof storageControllerPresignDownload>>
+>;
+export type StorageControllerPresignDownloadQueryError = void;
+
+export function useStorageControllerPresignDownload<
+  TData = Awaited<ReturnType<typeof storageControllerPresignDownload>>,
+  TError = void,
+>(
+  params: StorageControllerPresignDownloadParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerPresignDownload>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof storageControllerPresignDownload>>,
+          TError,
+          Awaited<ReturnType<typeof storageControllerPresignDownload>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStorageControllerPresignDownload<
+  TData = Awaited<ReturnType<typeof storageControllerPresignDownload>>,
+  TError = void,
+>(
+  params: StorageControllerPresignDownloadParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerPresignDownload>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof storageControllerPresignDownload>>,
+          TError,
+          Awaited<ReturnType<typeof storageControllerPresignDownload>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStorageControllerPresignDownload<
+  TData = Awaited<ReturnType<typeof storageControllerPresignDownload>>,
+  TError = void,
+>(
+  params: StorageControllerPresignDownloadParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerPresignDownload>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Create a presigned URL for direct-from-storage download
+ */
+
+export function useStorageControllerPresignDownload<
+  TData = Awaited<ReturnType<typeof storageControllerPresignDownload>>,
+  TError = void,
+>(
+  params: StorageControllerPresignDownloadParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof storageControllerPresignDownload>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getStorageControllerPresignDownloadQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
 
 /**
  * Retrieves all asset groups with optional filtering and pagination.
@@ -48548,271 +48738,6 @@ export function useEventsControllerStream<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions = getEventsControllerStreamQueryOptions(options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-/**
- * @summary Create a presigned URL for direct-to-storage upload
- */
-export const storageControllerPresignUpload = (
-  presignUploadRequestDto: PresignUploadRequestDto,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<PresignUploadResponseDto>(
-    {
-      url: `/api/storage/presign/upload`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      data: presignUploadRequestDto,
-      signal,
-    },
-    options,
-  );
-};
-
-export const getStorageControllerPresignUploadMutationOptions = <
-  TError = void,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof storageControllerPresignUpload>>,
-    TError,
-    { data: PresignUploadRequestDto },
-    TContext
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof storageControllerPresignUpload>>,
-  TError,
-  { data: PresignUploadRequestDto },
-  TContext
-> => {
-  const mutationKey = ['storageControllerPresignUpload'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      'mutationKey' in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof storageControllerPresignUpload>>,
-    { data: PresignUploadRequestDto }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return storageControllerPresignUpload(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type StorageControllerPresignUploadMutationResult = NonNullable<
-  Awaited<ReturnType<typeof storageControllerPresignUpload>>
->;
-export type StorageControllerPresignUploadMutationBody =
-  PresignUploadRequestDto;
-export type StorageControllerPresignUploadMutationError = void;
-
-/**
- * @summary Create a presigned URL for direct-to-storage upload
- */
-export const useStorageControllerPresignUpload = <
-  TError = void,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof storageControllerPresignUpload>>,
-      TError,
-      { data: PresignUploadRequestDto },
-      TContext
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof storageControllerPresignUpload>>,
-  TError,
-  { data: PresignUploadRequestDto },
-  TContext
-> => {
-  return useMutation(
-    getStorageControllerPresignUploadMutationOptions(options),
-    queryClient,
-  );
-};
-
-/**
- * @summary Create a presigned URL for direct-from-storage download
- */
-export const storageControllerPresignDownload = (
-  params: StorageControllerPresignDownloadParams,
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<PresignDownloadResponseDto>(
-    { url: `/api/storage/presign/download`, method: 'GET', params, signal },
-    options,
-  );
-};
-
-export const getStorageControllerPresignDownloadQueryKey = (
-  params?: StorageControllerPresignDownloadParams,
-) => {
-  return [
-    `/api/storage/presign/download`,
-    ...(params ? [params] : []),
-  ] as const;
-};
-
-export const getStorageControllerPresignDownloadQueryOptions = <
-  TData = Awaited<ReturnType<typeof storageControllerPresignDownload>>,
-  TError = void,
->(
-  params: StorageControllerPresignDownloadParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerPresignDownload>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getStorageControllerPresignDownloadQueryKey(params);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof storageControllerPresignDownload>>
-  > = ({ signal }) =>
-    storageControllerPresignDownload(params, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof storageControllerPresignDownload>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type StorageControllerPresignDownloadQueryResult = NonNullable<
-  Awaited<ReturnType<typeof storageControllerPresignDownload>>
->;
-export type StorageControllerPresignDownloadQueryError = void;
-
-export function useStorageControllerPresignDownload<
-  TData = Awaited<ReturnType<typeof storageControllerPresignDownload>>,
-  TError = void,
->(
-  params: StorageControllerPresignDownloadParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerPresignDownload>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof storageControllerPresignDownload>>,
-          TError,
-          Awaited<ReturnType<typeof storageControllerPresignDownload>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStorageControllerPresignDownload<
-  TData = Awaited<ReturnType<typeof storageControllerPresignDownload>>,
-  TError = void,
->(
-  params: StorageControllerPresignDownloadParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerPresignDownload>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof storageControllerPresignDownload>>,
-          TError,
-          Awaited<ReturnType<typeof storageControllerPresignDownload>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStorageControllerPresignDownload<
-  TData = Awaited<ReturnType<typeof storageControllerPresignDownload>>,
-  TError = void,
->(
-  params: StorageControllerPresignDownloadParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerPresignDownload>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Create a presigned URL for direct-from-storage download
- */
-
-export function useStorageControllerPresignDownload<
-  TData = Awaited<ReturnType<typeof storageControllerPresignDownload>>,
-  TError = void,
->(
-  params: StorageControllerPresignDownloadParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof storageControllerPresignDownload>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getStorageControllerPresignDownloadQueryOptions(
-    params,
-    options,
-  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

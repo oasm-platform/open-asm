@@ -35,6 +35,7 @@ import {
   CloudCheck,
   Cpu,
   FileChartPie,
+  FileCode,
   Group,
   LayoutDashboard,
   Plug,
@@ -129,6 +130,12 @@ export const menu: NavGroup[] = [
         icon: <Bug />,
         url: '/vulnerabilities',
         permission: 'vulnerability.read',
+      },
+      {
+        title: 'Templates',
+        icon: <FileCode />,
+        url: '/templates',
+        permission: 'artifact.read',
       },
       // {
       //   title: 'Issues',
