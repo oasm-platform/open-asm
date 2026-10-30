@@ -1,6 +1,7 @@
 import { FileCode, MoreVertical, Plus, Upload } from 'lucide-react';
 import { useRef, useState, type ComponentProps } from 'react';
 import { useNavigate } from '@tanstack/react-router';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { AxiosError } from 'axios';
 import { toast } from 'sonner';
 
@@ -54,9 +55,18 @@ const NAME_PATTERN = /\.ya?ml$/i;
 export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
   const { hasPermission } = usePermission();
   const canWrite = hasPermission('artifact.write');
-  const { tabs, open, openNew, close } = useTemplateTabs();
+  const { tabs, open, openNew, rename: renameTab, close } = useTemplateTabs();
   const navigate = useNavigate();
   const fileInput = useRef<HTMLInputElement>(null);
+
+  useHotkeys(
+    'mod+i',
+    (e) => {
+      e.preventDefault();
+      openNew();
+    },
+    { enabled: canWrite },
+  );
 
   const [search, setSearch] = useState('');
   const debounced = useDebounce(search, 400);
@@ -104,6 +114,8 @@ export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
               },
             },
           );
+          // Quota errors repeat for every remaining file; stop after the first.
+          break;
         } else {
           handleServerError(error);
         }
@@ -130,7 +142,7 @@ export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
       <SidebarMenuButton
         onClick={() => open(file, !file.isOwner)}
         tooltip={file.name}
-        className={manage ? 'pr-8' : undefined}
+        className="pr-8"
       >
         <FileCode />
         <span className="truncate">{file.name}</span>
@@ -142,8 +154,7 @@ export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
             : (file.createdBy?.name ?? 'Unknown')}
         </Badge>
       </SidebarMenuButton>
-      {manage && canWrite && (
-        <DropdownMenu modal={false}>
+      <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <SidebarMenuAction
               showOnHover
@@ -153,24 +164,29 @@ export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
             </SidebarMenuAction>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="right" align="start">
-            <DropdownMenuItem onSelect={() => setRenaming(file)}>
-              Rename
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setSharing(file)}>
-              Share
-            </DropdownMenuItem>
+            {manage && canWrite && (
+              <>
+                <DropdownMenuItem onSelect={() => setRenaming(file)}>
+                  Rename
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setSharing(file)}>
+                  Share
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuItem onSelect={() => void download(file)}>
               Download
             </DropdownMenuItem>
-            <DropdownMenuItem
-              variant="destructive"
-              onSelect={() => setDeleting(file)}
-            >
-              Delete
-            </DropdownMenuItem>
+            {manage && canWrite && (
+              <DropdownMenuItem
+                variant="destructive"
+                onSelect={() => setDeleting(file)}
+              >
+                Delete
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
-      )}
     </SidebarMenuItem>
   );
 
@@ -185,6 +201,9 @@ export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
             <div className="flex gap-2">
               <Button size="sm" className="flex-1" onClick={openNew}>
                 <Plus /> New
+                <kbd className="ml-1 rounded bg-primary-foreground/20 px-1 text-xs">
+                  Ctrl+I
+                </kbd>
               </Button>
               <Button
                 size="sm"
@@ -221,6 +240,8 @@ export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
           <SidebarGroupContent>
             {mine.isLoading ? (
               <Skeleton className="h-8 w-full" />
+            ) : mine.isError ? (
+              <LoadError onRetry={() => void mine.refetch()} />
             ) : myItems.length > 0 ? (
               <SidebarMenu>{myItems.map((f) => renderItem(f, true))}</SidebarMenu>
             ) : (
@@ -249,12 +270,14 @@ export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {(shared.isLoading || sharedItems.length > 0) && (
+        {(shared.isLoading || shared.isError || sharedItems.length > 0) && (
           <SidebarGroup>
             <SidebarGroupLabel>Shared with me</SidebarGroupLabel>
             <SidebarGroupContent>
               {shared.isLoading ? (
                 <Skeleton className="h-8 w-full" />
+              ) : shared.isError ? (
+                <LoadError onRetry={() => void shared.refetch()} />
               ) : (
                 <SidebarMenu>
                   {sharedItems.map((f) => renderItem(f, false))}
@@ -277,6 +300,7 @@ export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
               {
                 onSuccess: () => {
                   toast.success('Template renamed');
+                  renameTab(renaming.id, name);
                   setRenaming(null);
                   refresh();
                 },
@@ -318,6 +342,17 @@ export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
         />
       )}
     </Sidebar>
+  );
+}
+
+function LoadError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="flex flex-col items-start gap-2 px-2 py-1 text-sm text-muted-foreground">
+      <p>Could not load templates.</p>
+      <Button size="sm" variant="outline" onClick={onRetry}>
+        Retry
+      </Button>
+    </div>
   );
 }
 

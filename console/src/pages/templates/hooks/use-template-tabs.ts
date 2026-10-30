@@ -105,6 +105,17 @@ export function useTemplateTabs() {
     [setState],
   );
 
+  const rename = useCallback(
+    (artifactId: string, name: string) =>
+      setState((prev) => ({
+        ...prev,
+        tabs: prev.tabs.map((t) =>
+          t.artifactId === artifactId ? { ...t, name } : t,
+        ),
+      })),
+    [setState],
+  );
+
   const close = useCallback(
     (id: string) =>
       setState((prev) => {
@@ -118,5 +129,5 @@ export function useTemplateTabs() {
     [setState],
   );
 
-  return { tabs: state.tabs, activeId: state.activeId, open, openNew, update, markSaved, close };
+  return { tabs: state.tabs, activeId: state.activeId, open, openNew, update, markSaved, rename, close };
 }

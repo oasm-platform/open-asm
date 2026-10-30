@@ -8,8 +8,25 @@ const createAsync = vi.fn();
 const rename = vi.fn();
 const remove = vi.fn();
 
+const openNew = vi.fn();
+const renameTab = vi.fn();
+let canWrite = true;
+
+vi.mock('../hooks/use-template-tabs', async (importOriginal) => {
+  const real =
+    await importOriginal<typeof import('../hooks/use-template-tabs')>();
+  return {
+    ...real,
+    useTemplateTabs: () => ({
+      ...real.useTemplateTabs(),
+      openNew,
+      rename: renameTab,
+    }),
+  };
+});
+
 vi.mock('@/hooks/usePermission', () => ({
-  usePermission: () => ({ hasPermission: () => true }),
+  usePermission: () => ({ hasPermission: () => canWrite }),
 }));
 
 vi.mock('@/hooks/use-debounce', () => ({ default: (v: unknown) => v }));
@@ -39,7 +56,11 @@ const artifact = (over: Record<string, unknown>) => ({
   ...over,
 });
 
-async function setup(mine: unknown[], shared: unknown[] = []) {
+async function setup(
+  mine: unknown[],
+  shared: unknown[] = [],
+  extra: Record<string, unknown> = {},
+) {
   const { useTemplatesControllerGetMany } = await import(
     '@/services/apis/gen/queries'
   );
@@ -49,6 +70,7 @@ async function setup(mine: unknown[], shared: unknown[] = []) {
     data: { data: params?.scope === 'shared' ? shared : mine },
     isLoading: false,
     refetch: vi.fn(),
+    ...extra,
   })) as unknown as typeof useTemplatesControllerGetMany);
   return renderWithProviders(
     <SidebarProvider>
@@ -64,7 +86,10 @@ const yaml = (content: string, name: string) =>
 describe('TemplatesSidebar', () => {
   beforeEach(() => {
     createAsync.mockReset().mockResolvedValue({});
-    rename.mockClear();
+    rename.mockReset();
+    openNew.mockClear();
+    renameTab.mockClear();
+    canWrite = true;
     remove.mockClear();
   });
 
@@ -143,14 +168,78 @@ describe('TemplatesSidebar', () => {
     expect(remove).toHaveBeenCalledWith({ id: 'a1' }, expect.anything());
   });
 
-  it('shared section has no rename/delete actions', async () => {
+  it('shared rows menu offers Download only', async () => {
+    const user = userEvent.setup();
     await setup(
       [],
       [artifact({ id: 's1', name: 'theirs.yaml', isOwner: false })],
     );
-    await screen.findByText('theirs.yaml');
+    await user.click(
+      await screen.findByRole('button', { name: 'Actions for theirs.yaml' }),
+    );
     expect(
-      screen.queryByRole('button', { name: /actions for/i }),
-    ).not.toBeInTheDocument();
+      await screen.findByRole('menuitem', { name: 'Download' }),
+    ).toBeInTheDocument();
+    for (const n of ['Rename', 'Share', 'Delete']) {
+      expect(screen.queryByRole('menuitem', { name: n })).not.toBeInTheDocument();
+    }
+  });
+
+  it('without artifact.write own row menu shows Download only', async () => {
+    canWrite = false;
+    const user = userEvent.setup();
+    await setup([artifact({})]);
+    await user.click(
+      await screen.findByRole('button', { name: 'Actions for mine.yaml' }),
+    );
+    expect(
+      await screen.findByRole('menuitem', { name: 'Download' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Rename' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Delete' })).not.toBeInTheDocument();
+  });
+
+  it('Ctrl+I opens a new template', async () => {
+    const user = userEvent.setup();
+    await setup([artifact({})]);
+    await screen.findByText('mine.yaml');
+    await user.keyboard('{Control>}i{/Control}');
+    expect(openNew).toHaveBeenCalledTimes(1);
+  });
+
+  it('rename success syncs the open tab name', async () => {
+    const user = userEvent.setup();
+    rename.mockImplementation((_v, o) => o.onSuccess());
+    await setup([artifact({})]);
+    await user.click(
+      await screen.findByRole('button', { name: 'Actions for mine.yaml' }),
+    );
+    await user.click(await screen.findByRole('menuitem', { name: /rename/i }));
+    const input = await screen.findByLabelText('Template name');
+    await user.clear(input);
+    await user.type(input, 'new.yaml');
+    await user.click(screen.getByRole('button', { name: 'Rename' }));
+    expect(renameTab).toHaveBeenCalledWith('a1', 'new.yaml');
+  });
+
+  it('shows an error state with retry when the list fails', async () => {
+    await setup([], [], { isError: true });
+    expect(await screen.findAllByRole('button', { name: /retry/i })).not.toHaveLength(0);
+    expect(screen.queryByText(/no templates yet/i)).not.toBeInTheDocument();
+  });
+
+  it('stops uploading after a 409', async () => {
+    const { AxiosError } = await import('axios');
+    const user = userEvent.setup();
+    createAsync.mockRejectedValue(
+      new AxiosError('full', '409', undefined, undefined, {
+        status: 409,
+        data: { message: 'full' },
+      } as never),
+    );
+    await setup([]);
+    const input = (await screen.findByLabelText('Upload templates')) as HTMLInputElement;
+    await user.upload(input, [yaml('a', 'a.yaml'), yaml('b', 'b.yaml')]);
+    await waitFor(() => expect(createAsync).toHaveBeenCalledTimes(1));
   });
 });
