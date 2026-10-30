@@ -46,9 +46,12 @@ At each launch on a sandboxed worker, the worker checks that the browser really 
 After every command that runs in an open session (all but `close`), the worker captures the active tab's viewport as a JPEG, scaled to at most 1280 px wide (`browserSession.screenshot`). It sends the image as a `REMOTE_EXECUTE_RESULT_IMAGE` result before the command's EXIT. The image is a live view for the user only. It is never stored, and never reaches the model:
 
 1. Core publishes the image bytes as base64 on the command's Redis result channel. `RemoteExecuteService` returns the last image with the result but does not pass it to live terminal listeners.
-2. `execute_remote_command` keeps the image out of its result, and emits it as `browser-screenshot` on the run's emitter.
-3. The run streams it as a transient `data-browser-screenshot` chunk, which is not saved with the message. The stream buffer does not record it for replay either: `publishLive` hands it only to clients resuming at that moment.
-4. The console keeps the latest one in memory (`useAgentChat().browserScreenshot`), and the Browser tab of the chat side panel shows it. After a reload or a conversation switch, the tab stays empty until the next browser command.
+2. `execute_remote_command` keeps the image out of its result, and emits it as `browser-screenshot` on the run's emitter. The event names the browser session: the `-s b-<id>` of the command, or the `session: b-<id>` line `browser open` prints.
+3. A subagent run has an emitter of its own. `AgentsSubagentsService` adds the subagent's id and name to each of its screenshots and hands them to the conversation's live run (`subscribeScreenshots`).
+4. The run streams both as a transient `data-browser-screenshot` chunk, which is not saved with the message. The stream buffer does not record it for replay either: `publishLive` hands it only to clients resuming at that moment.
+5. The console keeps the latest picture of each session in memory (`useAgentChat().browserScreenshots`, at most 8). The Browser tab of the chat side panel shows every session, the main agent's and the subagents', in the order they started, labelled with the agent and the session id. After a reload or a conversation switch, the tab stays empty until the next browser command.
+
+A subagent's screenshots reach the console only while a run of the conversation is streaming on the instance that runs the subagent, like its status updates.
 
 A failed capture only drops the picture; the command's result is unchanged.
 
