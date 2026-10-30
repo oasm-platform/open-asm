@@ -245,6 +245,9 @@ export class ArtifactsService {
       );
       await this.quota.commit(manager, workspaceId, buffer.length);
       artifact.sizeBytes = buffer.length;
+      // A same-size edit changes no column, so TypeORM would skip the UPDATE;
+      // updatedAt is the version connectors cache templates by.
+      artifact.updatedAt = new Date();
       await manager.save(artifact);
     });
     return this.getById(workspaceId, userId, id, []);

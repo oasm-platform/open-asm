@@ -682,6 +682,16 @@ describe('ArtifactsService', () => {
       expect(manager.save).toHaveBeenCalledWith(expect.objectContaining({ sizeBytes: 25 }));
     });
 
+    it('bumps updatedAt even when the size is unchanged', async () => {
+      const before = new Date(0);
+      manager.findOne.mockResolvedValue(row({ sizeBytes: 25, updatedAt: before }));
+
+      await service.replaceContent(WS, OWNER, 'artifact-1', buffer);
+
+      const saved = manager.save.mock.calls[0][0] as Artifact;
+      expect(saved.updatedAt.getTime()).toBeGreaterThan(before.getTime());
+    });
+
     it('rejects a non-owner', async () => {
       manager.findOne.mockResolvedValue(row({ createdByUserId: OTHER }));
       await expect(service.replaceContent(WS, OWNER, 'artifact-1', buffer)).rejects.toThrow(
