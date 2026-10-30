@@ -25,6 +25,8 @@ interface SecretColumn {
   table: string;
   column: string;
   jsonb: boolean;
+  /** System-wide tables have no workspace, so their secrets use the KEK */
+  systemWide?: boolean;
   map: (value: unknown, reencrypt: Reencrypt) => unknown;
 }
 
@@ -73,6 +75,26 @@ const SECRET_COLUMNS: SecretColumn[] = [
     column: 'config',
     jsonb: true,
     map: mapConfigStrings,
+  },
+  {
+    // The SMTP password or API key (system-configs.service.ts)
+    table: 'system_configs',
+    column: 'settings',
+    jsonb: true,
+    systemWide: true,
+    map: (value, reencrypt) => {
+      const mailServer = (value as { mailServer?: Record<string, unknown> })
+        ?.mailServer;
+      return typeof mailServer?.password === 'string'
+        ? {
+            ...(value as object),
+            mailServer: {
+              ...mailServer,
+              password: reencrypt(mailServer.password),
+            },
+          }
+        : value;
+    },
   },
 ];
 
@@ -169,12 +191,13 @@ export class EncryptionUpgradeService implements OnApplicationBootstrap {
   }
 
   private async reencryptColumn(
-    { table, column, jsonb, map }: SecretColumn,
+    { table, column, jsonb, systemWide, map }: SecretColumn,
     counts: UpgradeCounts,
   ): Promise<void> {
+    const workspace = systemWide ? 'NULL' : '"workspaceId"';
     const rows: { id: string; workspaceId: string | null; value: unknown }[] =
       await this.dataSource.query(
-        `SELECT id, "workspaceId", "${column}" AS value FROM "${table}" WHERE "${column}" IS NOT NULL`,
+        `SELECT id, ${workspace} AS "workspaceId", "${column}" AS value FROM "${table}" WHERE "${column}" IS NOT NULL`,
       );
 
     for (const { id, workspaceId, value } of rows) {

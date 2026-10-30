@@ -25,7 +25,7 @@ export function UserInfo({ user }: { user: AdminUserDto }) {
       <DetailField label="Last active">
         <UserPresence lastActiveAt={user.lastActiveAt} />
       </DetailField>
-      {user.banned && (
+      {user.banned && !user.pendingApproval && (
         <>
           <DetailField label="Ban reason">{user.banReason || '—'}</DetailField>
           <DetailField label="Ban expires">

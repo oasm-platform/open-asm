@@ -31,6 +31,7 @@ describe('RootService', () => {
               name: 'Open ASM',
               logoPath: 'http://localhost:9000/system/logo.png',
             }),
+            isSignUpAllowed: jest.fn().mockResolvedValue(false),
           },
         },
         {
@@ -88,6 +89,20 @@ describe('RootService', () => {
 
       expect(result.logoPath).toBe('http://localhost:9000/system/logo.png');
       expect(result.storagePresignTtlSeconds).toBe(900);
+    });
+
+    it('reports the current sign-up setting on every call', async () => {
+      const isSignUpAllowed = module.get(SystemConfigsService)
+        .isSignUpAllowed as jest.Mock;
+
+      await expect(service.getMetadata()).resolves.toMatchObject({
+        allowSignUp: false,
+      });
+
+      isSignUpAllowed.mockResolvedValue(true);
+      await expect(service.getMetadata()).resolves.toMatchObject({
+        allowSignUp: true,
+      });
     });
   });
 });

@@ -1,11 +1,16 @@
 import Login from '@/pages/login/login';
 import { getRootControllerGetMetadataQueryOptions } from '@/services/apis/gen/queries';
 import { isVoluntaryLogout } from '@/utils/authClient';
+import { safeRedirectPath } from '@/utils/safe-redirect';
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { z } from 'zod';
 
 const loginSearchSchema = z.object({
   redirect: z.string().optional(),
+  // Set by the email verification link (utils/verification-url.ts); `error`
+  // is better-auth's code for an invalid or expired link
+  verified: z.coerce.string().optional(),
+  error: z.string().optional(),
 });
 
 export const Route = createFileRoute('/login')({
@@ -14,15 +19,7 @@ export const Route = createFileRoute('/login')({
   beforeLoad: async ({ context, search }) => {
     // During voluntary logout the session may still be in the router context for a few hundred ms — bouncing to the redirect target then would flash dashboard pages before teardown completes.
     if (context.session && !isVoluntaryLogout) {
-      // Only allow in-app paths as the redirect target — an absolute URL
-      // (e.g. http://...) would be parsed as a router path and 404, and a
-      // protocol-relative URL ('//host') would be an open redirect.
-      const redirectTo =
-        search.redirect?.startsWith('/') &&
-        !search.redirect.startsWith('//')
-          ? search.redirect
-          : '/';
-      throw redirect({ to: redirectTo });
+      throw redirect({ to: safeRedirectPath(search.redirect) });
     }
 
     let metadata;

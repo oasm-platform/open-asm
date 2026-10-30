@@ -40,6 +40,12 @@ export class AdminUserDto {
   })
   banExpires?: Date | null;
 
+  @ApiProperty({
+    description:
+      'Signed up through public sign-up and waiting for an admin to approve (unban) it',
+  })
+  pendingApproval: boolean;
+
   @ApiProperty()
   createdAt: Date;
 

@@ -1,7 +1,13 @@
+import {
+  MailService,
+  type MailMessage,
+} from '@/modules/admin/system-configs/mail.service';
+import { SystemConfigsService } from '@/modules/admin/system-configs/system-configs.service';
 import type { DataSource } from 'typeorm';
 import * as request from 'supertest';
 import type { App } from 'supertest/types';
 import { closeTestApp, createTestApp, type TestApp } from './helpers/app';
+import { signIn } from './helpers/auth';
 import { createUser, createWorkspace, cleanupE2eData } from './helpers/workspace';
 
 /**
@@ -21,6 +27,10 @@ import { createUser, createWorkspace, cleanupE2eData } from './helpers/workspace
  *     A's targets through list, direct id, or global search.
  *  8. Header and `wid` cookie resolve identically.
  *  9. Worker-token routes reject a missing/bad token and accept a valid one.
+ * 10. Public self sign-up follows the `auth.allowSignUp` system setting:
+ *     while closed, `/api/auth/sign-up/email` 403s and creates no account;
+ *     once open, it creates an account that cannot sign in until an admin
+ *     approves (unbans) it.
  */
 describe('Auth and tenancy matrix', () => {
   jest.setTimeout(60_000);
@@ -81,6 +91,165 @@ describe('Auth and tenancy matrix', () => {
       .set('Cookie', userA.cookie)
       .set('X-Workspace-Id', workspaceAId)
       .expect(404);
+  });
+
+  /**
+   * Runs `fn` with public sign-up open or closed. Open means an admin allows
+   * it and the mail server is on; mail is captured, not sent. Restores both
+   * settings afterwards.
+   */
+  const withSignUp = async (
+    open: boolean,
+    fn: (sent: MailMessage[]) => Promise<void>,
+  ) => {
+    const settings = app.app.get(SystemConfigsService);
+    const { auth } = await settings.getSettings();
+    const mailServer = await settings.getMailServer();
+    const sent: MailMessage[] = [];
+    const send = jest
+      .spyOn(app.app.get(MailService), 'send')
+      .mockImplementation((message) => {
+        sent.push(message);
+        return Promise.resolve();
+      });
+    await settings.updateSettings({
+      auth: { allowSignUp: open },
+      mailServer: {
+        enabled: open,
+        host: 'smtp.e2e.test',
+        fromEmail: 'no-reply@e2e.test',
+      },
+    });
+    try {
+      await fn(sent);
+    } finally {
+      send.mockRestore();
+      await settings.updateSettings({
+        auth: { allowSignUp: auth?.allowSignUp === true },
+        mailServer: {
+          enabled: mailServer.enabled,
+          host: mailServer.host,
+          fromEmail: mailServer.fromEmail,
+        },
+      });
+    }
+  };
+
+  it('refuses public self sign-up while it is closed', async () => {
+    const email = `e2e-signup-${Date.now()}@example.com`;
+    await withSignUp(false, async () => {
+      const metadata = await request(server).get('/api/metadata').expect(200);
+      expect(metadata.body).toMatchObject({ allowSignUp: false });
+
+      await request(server)
+        .post('/api/auth/sign-up/email')
+        .send({ email, password: 'Password123!', name: 'E2E Outsider' })
+        .expect(403);
+    });
+
+    const rows = await dataSource.query<unknown[]>(
+      'SELECT id FROM users WHERE email = $1',
+      [email],
+    );
+    expect(rows).toHaveLength(0);
+  });
+
+  it('keeps sign-up closed until the mail server is on', async () => {
+    await withSignUp(false, async () => {
+      await app.app
+        .get(SystemConfigsService)
+        .updateSettings({ auth: { allowSignUp: true } });
+
+      const metadata = await request(server).get('/api/metadata').expect(200);
+      expect(metadata.body).toMatchObject({ allowSignUp: false });
+      await request(server)
+        .post('/api/auth/sign-up/email')
+        .send({
+          email: `e2e-signup-nomail-${Date.now()}@example.com`,
+          password: 'Password123!',
+          name: 'E2E Outsider',
+        })
+        .expect(403);
+    });
+  });
+
+  it('opens sign-up to accounts that confirm their email, then wait for approval', async () => {
+    const email = `e2e-signup-open-${Date.now()}@example.com`;
+    const password = 'Password123!';
+    const callbackURL = 'http://console.e2e.test/login?verified=1';
+    const userIds: string[] = [];
+    try {
+      await withSignUp(true, async (sent) => {
+        const metadata = await request(server).get('/api/metadata').expect(200);
+        expect(metadata.body).toMatchObject({ allowSignUp: true });
+
+        const res = await request(server)
+          .post('/api/auth/sign-up/email')
+          .send({ email, password, name: 'E2E Newcomer', callbackURL })
+          .expect(200);
+        // Created, but signed out: no session until approved
+        expect(res.body).toMatchObject({ token: null });
+        expect(res.headers['set-cookie']).toBeUndefined();
+        const userId = (res.body as { user: { id: string } }).user.id;
+        userIds.push(userId);
+
+        // The confirmation link went out by mail
+        expect(sent).toHaveLength(1);
+        expect(sent[0]).toMatchObject({ to: email });
+        const link = new URL(/https?:\/\/\S+/.exec(sent[0].text)?.[0] ?? '');
+
+        // Same grant `POST /api/admin/init` performs; the test DB has no admin
+        const admin = await createUser(server, { name: 'E2E Approver' });
+        userIds.push(admin.userId);
+        await dataSource.query(
+          `UPDATE users SET role = 'admin' WHERE id = $1`,
+          [admin.userId],
+        );
+        const adminCookie = await signIn(server, admin.email, admin.password);
+        const approve = () =>
+          request(server)
+            .post('/api/auth/admin/unban-user')
+            .set('Cookie', adminCookie)
+            .send({ userId });
+
+        // Unconfirmed: sign-in asks for it, and approval waits for it
+        const unconfirmed = await request(server)
+          .post('/api/auth/sign-in/email')
+          .send({ email, password })
+          .expect(403);
+        expect(unconfirmed.body).toMatchObject({ code: 'EMAIL_NOT_VERIFIED' });
+        const pending = await request(server)
+          .get(`/api/admin/users/${userId}`)
+          .set('Cookie', adminCookie)
+          .expect(200);
+        expect(pending.body).toMatchObject({
+          pendingApproval: true,
+          emailVerified: false,
+        });
+        await approve().expect(403);
+
+        // Confirming sends them back to the console, still signed out
+        const confirmed = await request(server)
+          .get(link.pathname + link.search)
+          .expect(302);
+        expect(confirmed.headers.location).toBe(callbackURL);
+        expect(confirmed.headers['set-cookie']).toBeUndefined();
+
+        const unapproved = await request(server)
+          .post('/api/auth/sign-in/email')
+          .send({ email, password })
+          .expect(403);
+        expect(unapproved.body).toMatchObject({
+          message: 'Your account is not active. Contact your administrator.',
+        });
+
+        // Approving is unbanning
+        await approve().expect(200);
+        await signIn(server, email, password);
+      });
+    } finally {
+      await cleanupE2eData(dataSource, { userIds });
+    }
   });
 
   it('rejects a valid session without a workspace id', async () => {

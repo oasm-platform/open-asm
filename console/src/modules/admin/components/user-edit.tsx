@@ -28,12 +28,13 @@ import {
 import {
   getAdminUsersControllerGetUserQueryKey,
   getAdminUsersControllerGetUsersQueryKey,
+  useSystemConfigsControllerGetSettings,
   type AdminUserDto,
 } from '@/services/apis/gen/queries';
 import { authClient, useSession } from '@/utils/authClient';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Ban, Loader2 } from 'lucide-react';
+import { Ban, Loader2, UserCheck } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -485,6 +486,63 @@ function BanSection({ user, isSelf }: { user: AdminUserDto; isSelf: boolean }) {
   );
 }
 
+/**
+ * A public sign-up stays inactive until an admin approves (unbans) it. While
+ * the mail server is on, it has to confirm its email first; the API enforces
+ * that too.
+ */
+function ApprovalSection({ user }: { user: AdminUserDto }) {
+  const refreshUser = useRefreshUser(user.id);
+  const { data: settings } = useSystemConfigsControllerGetSettings();
+  const awaitingEmail = !!settings?.mailServer?.enabled && !user.emailVerified;
+
+  const { mutate, isPending } = useMutation({
+    mutationFn: () => unwrap(authClient.admin.unbanUser({ userId: user.id })),
+    onSuccess: () => {
+      toast.success('User approved.');
+      return refreshUser();
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to approve user.');
+    },
+  });
+
+  return (
+    <Card className="gap-4">
+      <CardHeader>
+        <CardTitle>Waiting for approval</CardTitle>
+        <CardDescription>
+          {user.name} signed up and can't sign in until the account is
+          approved.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-wrap items-center justify-between gap-4">
+        <div className="text-sm">
+          <p className="font-medium">Approve account</p>
+          <p className="text-xs text-muted-foreground">
+            {awaitingEmail
+              ? "They haven't confirmed their email yet. You can approve once they do."
+              : 'Let them sign in to the platform.'}
+          </p>
+        </div>
+        <Button
+          size="sm"
+          className="gap-1.5"
+          disabled={isPending || awaitingEmail}
+          onClick={() => mutate()}
+        >
+          {isPending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <UserCheck className="h-3.5 w-3.5" />
+          )}
+          Approve
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 /** Editable settings of a user account, one form per concern. */
 export function UserEdit({ user }: { user: AdminUserDto }) {
   const { data: session } = useSession();
@@ -492,10 +550,11 @@ export function UserEdit({ user }: { user: AdminUserDto }) {
 
   return (
     <div className="space-y-4">
+      {user.pendingApproval && <ApprovalSection user={user} />}
       <ProfileForm user={user} />
       <RoleForm user={user} isSelf={isSelf} />
       <PasswordForm user={user} />
-      <BanSection user={user} isSelf={isSelf} />
+      {!user.pendingApproval && <BanSection user={user} isSelf={isSelf} />}
     </div>
   );
 }
