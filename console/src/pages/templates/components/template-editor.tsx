@@ -30,6 +30,7 @@ import {
   useTemplateTabs,
   type TemplateTab,
 } from '../hooks/use-template-tabs';
+import { RunTemplatesDialog } from './run-templates-dialog';
 import { TemplateTabs } from './template-tabs';
 import { nucleiSchema } from '../nuclei-schema';
 
@@ -189,6 +190,15 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
           {status}
         </span>
         <div className="ml-auto flex gap-2">
+          {tab.artifactId && (
+            <RunTemplatesDialog
+              templateId={tab.artifactId}
+              // The server runs the saved version, so unsaved edits must not look runnable.
+              disabled={
+                dirty || loading || loadFailed || !hasPermission('vulnerability.write')
+              }
+            />
+          )}
           <Button
             size="sm"
             variant="outline"

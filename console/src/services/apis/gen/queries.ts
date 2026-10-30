@@ -4415,6 +4415,17 @@ export type CreateTemplateDto = {
   content: string;
 };
 
+export type RunTemplatesDto = {
+  /** Template IDs to run (max 100) */
+  templateIds: string[];
+  /** Scan these targets. Set exactly one of targetIds, assetIds, assetGroupIds. */
+  targetIds?: string[];
+  /** Scan these assets. */
+  assetIds?: string[];
+  /** Scan every asset in these groups. */
+  assetGroupIds?: string[];
+};
+
 export type SaveTemplateContentDto = {
   /** Nuclei template YAML (max 256 KB) */
   content: string;
@@ -41822,6 +41833,97 @@ export const useTemplatesControllerSaveContent = <
 > => {
   return useMutation(
     getTemplatesControllerSaveContentMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Scans targets, assets or asset groups (exactly one) with nuclei running only these templates. Findings land in Vulnerabilities.
+ * @summary Run templates
+ */
+export const templatesControllerRun = (
+  runTemplatesDto: RunTemplatesDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/templates/run`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: runTemplatesDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getTemplatesControllerRunMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof templatesControllerRun>>,
+    TError,
+    { data: RunTemplatesDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof templatesControllerRun>>,
+  TError,
+  { data: RunTemplatesDto },
+  TContext
+> => {
+  const mutationKey = ['templatesControllerRun'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof templatesControllerRun>>,
+    { data: RunTemplatesDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return templatesControllerRun(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TemplatesControllerRunMutationResult = NonNullable<
+  Awaited<ReturnType<typeof templatesControllerRun>>
+>;
+export type TemplatesControllerRunMutationBody = RunTemplatesDto;
+export type TemplatesControllerRunMutationError = unknown;
+
+/**
+ * @summary Run templates
+ */
+export const useTemplatesControllerRun = <TError = unknown, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof templatesControllerRun>>,
+      TError,
+      { data: RunTemplatesDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof templatesControllerRun>>,
+  TError,
+  { data: RunTemplatesDto },
+  TContext
+> => {
+  return useMutation(
+    getTemplatesControllerRunMutationOptions(options),
     queryClient,
   );
 };

@@ -166,6 +166,21 @@ describe('TemplateEditor', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
   });
 
+  it('offers Run for a saved template, but not while it has unsaved edits', async () => {
+    const user = userEvent.setup();
+    setup(openSaved());
+    await waitFor(async () => expect((await box()).value).toBe('id: one'));
+    expect(screen.getByRole('button', { name: 'Run' })).toBeEnabled();
+    await user.type(await box(), '2');
+    expect(screen.getByRole('button', { name: 'Run' })).toBeDisabled();
+  });
+
+  it('has no Run for a template that was never saved', async () => {
+    setup((api) => api.openNew());
+    await box();
+    expect(screen.queryByRole('button', { name: 'Run' })).toBeNull();
+  });
+
   it('save on Ctrl+S calls saveContent and clears dirty', async () => {
     const user = userEvent.setup();
     saveAsync.mockResolvedValue(artifact());
