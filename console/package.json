@@ -82,7 +82,7 @@
     "orval": "^8.9.1",
     "prettier": "^3.6.2",
     "qrcode.react": "^4.2.0",
-    "qs": "^6.14.1",
+    "qs": "^6.16.1",
     "radix-ui": "^1.4.3",
     "react": "^19.1.0",
     "react-day-picker": "^9.13.1",
