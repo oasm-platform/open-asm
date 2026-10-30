@@ -992,6 +992,31 @@ describe('WorkspacesService', () => {
       );
     });
 
+    it('ignores retired template keys still stored on a group being assigned', async () => {
+      const legacyGroupId = randomUUID();
+      (mockWorkspaceMembersRepository.findOne as jest.Mock)
+        .mockResolvedValueOnce(makeMember())
+        .mockResolvedValueOnce(makeMember())
+        .mockResolvedValueOnce({
+          memberPermissions: [{ permission: { permissions: ['group.read'] } }],
+        });
+      (mockPermissionRepository.find as jest.Mock).mockResolvedValue([
+        { id: legacyGroupId, permissions: ['group.read', 'template.read'] },
+      ]);
+
+      await service.updateMemberPermissions(
+        testWorkspaceId,
+        memberId,
+        [legacyGroupId],
+        testUserId,
+      );
+
+      expect(mockManager.save).toHaveBeenCalledWith(
+        WorkspaceMemberPermission,
+        expect.objectContaining({ permission: { id: legacyGroupId } }),
+      );
+    });
+
     it('should reject an empty permission list instead of stripping permissions', async () => {
       await expect(
         service.updateMemberPermissions(

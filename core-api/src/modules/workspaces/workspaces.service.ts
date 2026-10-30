@@ -1120,7 +1120,9 @@ export class WorkspacesService implements OnModuleInit {
     }
     const holderKeySet = new Set(holderKeys);
     const offending = groups.filter((group) =>
-      (group.permissions ?? []).some((key) => !holderKeySet.has(key)),
+      (group.permissions ?? []).some(
+        (key) => !RETIRED_PERMISSION_KEYS.has(key) && !holderKeySet.has(key),
+      ),
     );
     if (offending.length > 0) {
       throw new BadRequestException(

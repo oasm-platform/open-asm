@@ -12,7 +12,12 @@ import type {
 import { ArtifactFolder } from './entities/artifact-folder.entity';
 import { Artifact } from './entities/artifact.entity';
 
-export { TEMPLATES_FOLDER_NAME };
+/** A user root folder with this name would be mistaken for the templates folder once its owner is deleted. */
+function assertNotReservedRoot(name: string, parentFolderId: string | null | undefined): void {
+  if (!parentFolderId && name === TEMPLATES_FOLDER_NAME) {
+    throw new BadRequestException(`"${TEMPLATES_FOLDER_NAME}" is reserved at the root`);
+  }
+}
 
 /** Guards the recursive walks against a corrupted (cyclic) tree. */
 const MAX_FOLDER_DEPTH = 100;
@@ -107,6 +112,7 @@ export class ArtifactFoldersService {
     userId: string,
     dto: CreateArtifactFolderDto,
   ): Promise<ArtifactFolderDto> {
+    assertNotReservedRoot(dto.name, dto.parentFolderId);
     if (dto.parentFolderId) {
       await this.artifactsService.findOwnedFolder(workspaceId, userId, dto.parentFolderId);
     }
@@ -132,6 +138,7 @@ export class ArtifactFoldersService {
     const target = dto.parentFolderId;
     if (dto.name !== undefined) folder.name = dto.name;
     if (target !== undefined) folder.parentFolderId = target;
+    assertNotReservedRoot(folder.name, folder.parentFolderId);
 
     if (!target) {
       return this.toDto(await this.folderRepo.save(folder));

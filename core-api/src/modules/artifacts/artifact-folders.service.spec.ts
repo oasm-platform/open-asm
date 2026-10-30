@@ -209,6 +209,18 @@ describe('ArtifactFoldersService', () => {
     ).resolves.toMatchObject({ name: 'Q4', parentFolderId: null });
   });
 
+  it('refuses a user root folder named like the templates folder', async () => {
+    await expect(
+      service.create(WS, OWNER, { name: 'custom-templates' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.update(WS, OWNER, 'f-1', { name: 'custom-templates', parentFolderId: null }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.create(WS, OWNER, { name: 'custom-templates', parentFolderId: 'f-1' }),
+    ).resolves.toBeDefined();
+  });
+
   it('deletes the subtree and marks its files deleted for the sweep', async () => {
     dataSource.query.mockResolvedValue([{ id: 'f-1' }, { id: 'f-child' }]);
 
