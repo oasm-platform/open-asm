@@ -11,6 +11,32 @@ import type { Deps, ToolCallOptions } from './types';
 /** stderr kept in the model's result; it is not paged like stdout */
 const STDERR_MAX_CHARS = 4 * 1024;
 
+/** The page after a browser command, for the user's Browser panel. */
+export interface BrowserScreenshotEvent {
+  toolCallId: string;
+  command: string;
+  /** Base64 JPEG */
+  image: string;
+  /** The browser session (`b-<id>`) the command ran in */
+  browserSessionId?: string;
+  /** The subagent that ran the command; unset for the main agent */
+  subagent?: { id: string; name: string };
+}
+
+/**
+ * The browser session a command ran in: the one it names with `-s`, or the
+ * one `browser open` started (the first line of its output).
+ */
+export function browserSessionOf(
+  command: string,
+  stdout: string,
+): string | undefined {
+  return (
+    /(?:^|\s)-s\s+(b-[0-9a-f]{32})(?=\s|$)/.exec(command)?.[1] ??
+    /^session: (b-[0-9a-f]{32})\r?$/m.exec(stdout)?.[1]
+  );
+}
+
 const inputSchema = z.object({
   command: z.string().min(1).describe('Shell command to execute'),
 });
@@ -86,7 +112,13 @@ export function remoteExecuteTool(
       // A browser command comes back with the page as a JPEG: a live view
       // for the user's Browser panel, never stored nor shown to the model
       if (image) {
-        emitter?.emit('browser-screenshot', { toolCallId, command, image });
+        const browserSessionId = browserSessionOf(command, result.stdout);
+        emitter?.emit('browser-screenshot', {
+          toolCallId,
+          command,
+          image,
+          ...(browserSessionId ? { browserSessionId } : {}),
+        } satisfies BrowserScreenshotEvent);
       }
       // The live terminal already streamed everything; the model gets the
       // first page, since the result is resent on every later step

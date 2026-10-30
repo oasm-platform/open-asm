@@ -52,7 +52,7 @@ export default function AgentsChatPage() {
     hasMoreMessages,
     isLoadingMoreMessages,
     remoteExecuteEvents,
-    browserScreenshot,
+    browserScreenshots,
     onSendMessage,
     onRetry,
     onStop,
@@ -109,7 +109,7 @@ export default function AgentsChatPage() {
       subagents,
       messages,
       metadata: conversationMeta,
-      browserScreenshot,
+      browserScreenshots,
     });
     if (!panelContent[panelTab]) {
       const firstWithContent = SIDE_PANEL_TABS.find((t) => panelContent[t]);
@@ -132,7 +132,7 @@ export default function AgentsChatPage() {
       conversationId={conversationId}
       onSelectToolCall={handleSelectToolCall}
       remoteExecuteEvents={remoteExecuteEvents}
-      browserScreenshot={browserScreenshot}
+      browserScreenshots={browserScreenshots}
       className="flex-1"
     />
   );

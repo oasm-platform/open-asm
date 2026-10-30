@@ -41,9 +41,12 @@ interface SidePanelData {
   subagents: SubagentResponseDto[];
   messages: UIMessage[];
   metadata: ConversationMetadataDto | null | undefined;
-  /** Live view of the agent's browser, streamed by the current run */
-  browserScreenshot?: LiveBrowserScreenshot | null;
+  /** Live view of each browser session, streamed by the current run */
+  browserScreenshots?: LiveBrowserScreenshot[];
 }
+
+/** Stable default, so the memo below does not rerun on every render */
+const NO_SCREENSHOTS: LiveBrowserScreenshot[] = [];
 
 /** Which tabs have something to show, e.g. to pick one when the panel opens */
 export function sidePanelContent({
@@ -52,12 +55,12 @@ export function sidePanelContent({
   subagents,
   messages,
   metadata,
-  browserScreenshot,
+  browserScreenshots,
 }: SidePanelData): Record<SidePanelTab, boolean> {
   return {
     plan: (todos?.length ?? 0) > 0 || !!goal,
     subagents: subagents.length > 0,
-    browser: !!browserScreenshot,
+    browser: (browserScreenshots?.length ?? 0) > 0,
     tools: extractToolCalls(messages).length > 0,
     stats: !!(metadata?.model || metadata?.lastTurn),
   };
@@ -141,7 +144,7 @@ export function ChatSidePanel({
   conversationId,
   onSelectToolCall,
   remoteExecuteEvents,
-  browserScreenshot,
+  browserScreenshots = NO_SCREENSHOTS,
   className,
 }: ChatSidePanelProps) {
   const has = useMemo(
@@ -152,9 +155,9 @@ export function ChatSidePanel({
         subagents,
         messages,
         metadata,
-        browserScreenshot,
+        browserScreenshots,
       }),
-    [todos, goal, subagents, messages, metadata, browserScreenshot],
+    [todos, goal, subagents, messages, metadata, browserScreenshots],
   );
   const completed = todos?.filter((t) => t.status === 'completed').length ?? 0;
   const running = subagents.filter(isSubagentActive).length;
@@ -202,6 +205,9 @@ export function ChatSidePanel({
           <TabsTrigger value="browser" title="Browser">
             <Globe />
             <TabLabel>Browser</TabLabel>
+            {browserScreenshots.length > 1 && (
+              <TabCount>{browserScreenshots.length}</TabCount>
+            )}
           </TabsTrigger>
           <TabsTrigger value="tools" title="Tool calls">
             <Wrench />
@@ -258,9 +264,9 @@ export function ChatSidePanel({
         )}
       </TabsContent>
       <TabsContent value="browser" className={contentClassName}>
-        {browserScreenshot ? (
+        {has.browser ? (
           <BrowserPanel
-            screenshot={browserScreenshot}
+            screenshots={browserScreenshots}
             toolCalls={toolCalls}
             onSelectToolCall={onSelectToolCall}
           />
