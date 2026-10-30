@@ -47,13 +47,13 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
   // open() adds a blank tab; fill it once from a fresh fetch (never the cache,
   // which may predate another member's edit), unless the user already typed.
   useEffect(() => {
-    if (data && isFetchedAfterMount && !tab.content && !tab.savedContent) {
+    if (tab.artifactId && !tab.loaded && data && isFetchedAfterMount) {
       load(tab.id, data.artifact, data.content);
     }
-  }, [data, isFetchedAfterMount, tab.id, tab.content, tab.savedContent, load]);
+  }, [data, isFetchedAfterMount, tab.id, tab.artifactId, tab.loaded, load]);
 
-  const loadFailed = !!tab.artifactId && !tab.content && isError;
-  const loading = !!tab.artifactId && !tab.content && !isError;
+  const loadFailed = !!tab.artifactId && !tab.loaded && isError;
+  const loading = !!tab.artifactId && !tab.loaded && !isError;
   const readOnly = tab.readOnly || !hasPermission('artifact.write');
   const dirty = tab.content !== tab.savedContent;
   const canSave = dirty && !readOnly && !saving && !loading && !loadFailed;
@@ -239,7 +239,7 @@ export function TemplateEditor() {
         open={blocker.status === 'blocked'}
         onOpenChange={(o) => !o && blocker.reset?.()}
         title="Discard unsaved changes?"
-        description="Leaving this page discards templates you have not saved."
+        description="You have unsaved template changes. Leave this page anyway?"
         confirmText="Discard"
         onConfirm={() => blocker.proceed?.()}
       />

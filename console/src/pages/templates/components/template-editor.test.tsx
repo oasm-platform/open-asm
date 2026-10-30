@@ -12,6 +12,8 @@ const createAsync = vi.fn();
 let canWrite = true;
 let contentResult: { artifact: unknown; content: string } | undefined;
 let contentError = false;
+// Refetch failure that keeps the previously fetched data.
+let errorWithData = false;
 // When set, the hook first serves this cached copy (not fetched yet), then contentResult.
 let staleResult: { artifact: unknown; content: string } | undefined;
 const refetch = vi.fn();
@@ -67,7 +69,7 @@ vi.mock('@/services/apis/gen/queries', async (importOriginal) => ({
     return {
       data: contentError ? undefined : data,
       isLoading: !data && !contentError,
-      isError: contentError,
+      isError: contentError || errorWithData,
       isFetchedAfterMount: fresh,
       refetch,
     };
@@ -138,6 +140,7 @@ describe('TemplateEditor', () => {
     toastError.mockClear();
     canWrite = true;
     contentError = false;
+    errorWithData = false;
     staleResult = undefined;
     refetch.mockClear();
     saveOpts = undefined;
@@ -333,5 +336,28 @@ describe('TemplateEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(toastError).toHaveBeenCalledTimes(1));
     expect(saveOpts?.mutation?.onError).toBeTypeOf('function');
+  });
+
+  it('keeps the editor and Save enabled when a loaded tab is cleared', async () => {
+    const user = userEvent.setup();
+    setup(openSaved());
+    await waitFor(async () => expect((await box()).value).toBe('id: one'));
+    await user.clear(await box());
+    expect((await box()).value).toBe('');
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+  });
+
+  it('renders the editor, not the skeleton, when fetched content is empty', async () => {
+    contentResult = { artifact: artifact(), content: '' };
+    setup(openSaved());
+    expect(await box()).toBeInTheDocument();
+  });
+
+  it('does not show the error panel when a refetch fails on a loaded tab', async () => {
+    contentResult = { artifact: artifact(), content: '' };
+    errorWithData = true;
+    setup(openSaved());
+    expect(await box()).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
   });
 });

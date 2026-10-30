@@ -11,6 +11,8 @@ export type TemplateTab = {
   content: string;
   savedContent: string;
   readOnly: boolean;
+  /** False until the server copy has been fetched into the tab. */
+  loaded: boolean;
 };
 
 export const DEFAULT_TEMPLATE_NAME = 'example-template.yaml';
@@ -55,6 +57,7 @@ export function useTemplateTabs() {
           content: '',
           savedContent: '',
           readOnly,
+          loaded: false,
         };
         return { tabs: [...prev.tabs, tab], activeId: tab.id };
       }),
@@ -71,6 +74,7 @@ export function useTemplateTabs() {
           // Unsaved on purpose: a fresh tab counts as dirty until it is created.
           savedContent: '',
           readOnly: false,
+          loaded: true,
         };
         return { tabs: [...prev.tabs, tab], activeId: tab.id };
       }),
@@ -93,7 +97,7 @@ export function useTemplateTabs() {
         ...prev,
         tabs: prev.tabs.map((t) =>
           t.id === id
-            ? { ...t, artifactId: artifact.id, name: artifact.name, savedContent }
+            ? { ...t, artifactId: artifact.id, name: artifact.name, savedContent, loaded: true }
             : t,
         ),
       })),
@@ -107,7 +111,7 @@ export function useTemplateTabs() {
         ...prev,
         tabs: prev.tabs.map((t) =>
           t.id === id
-            ? { ...t, artifactId: artifact.id, name: artifact.name, content, savedContent: content }
+            ? { ...t, artifactId: artifact.id, name: artifact.name, content, savedContent: content, loaded: true }
             : t,
         ),
       })),
