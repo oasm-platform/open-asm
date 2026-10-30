@@ -8,7 +8,14 @@ import { Role, WorkerScope, WorkerType } from '@/common/enums/enum';
 import type { UserContextPayload } from '@/common/interfaces/app.interface';
 import { Metadata } from '@grpc/grpc-js';
 import { ForbiddenException } from '@nestjs/common';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
+import { RpcException } from '@nestjs/microservices';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { lastValueFrom, toArray } from 'rxjs';
+import { GrpcWorkerTokenGuard } from '@/common/guards/grpc-worker-token.guard';
 import type { GetManyWorkersDto } from './dto/workers.dto';
 import { RemoteExecuteSubscribeService } from './remote-execute-subscribe.service';
 import { WorkersController } from './workers.controller';
@@ -347,5 +354,67 @@ describe('WorkersController.grpcJoin', () => {
     await expect(
       join('172.19.0.5:443', '203.0.113.7, 172.19.0.7'),
     ).resolves.toBe('203.0.113.7');
+  });
+});
+
+describe('WorkersController tool archive gRPC', () => {
+  const controller = new WorkersController(
+    {} as never,
+    {} as never,
+    {} as never,
+    {} as never,
+    {} as never,
+  );
+  let root: string;
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'oasm-archive-'));
+    mkdirSync(join(root, 'public/archived/linux_amd64'), { recursive: true });
+    writeFileSync(join(root, 'public/archived/linux_amd64/tool.zip'), 'zip-bytes');
+    writeFileSync(join(root, '.env'), 'ENCRYPTION_KEYS=secret');
+    jest.spyOn(process, 'cwd').mockReturnValue(root);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it.each([GUARDS_METADATA])('requires a worker token on Storage and BuiltinToolRegistry', (key) => {
+    for (const method of ['grpcStorage', 'grpcBuiltinToolRegistry'] as const) {
+      const handler = WorkersController.prototype[method];
+      expect(Reflect.getMetadata(key, handler)).toContain(GrpcWorkerTokenGuard);
+    }
+  });
+
+  it('streams a file from the tool archive', async () => {
+    const chunks = await lastValueFrom(
+      controller.grpcStorage({ path: 'static/archived/linux_amd64/tool.zip' }).pipe(toArray()),
+    );
+    expect(Buffer.concat(chunks.map((c) => c.chunk)).toString()).toBe('zip-bytes');
+    expect(chunks.at(-1)?.eof).toBe(true);
+  });
+
+  it.each([
+    '.env',
+    'static/../.env',
+    'static/archived/../../.env',
+    '../../etc/passwd',
+    '/etc/passwd',
+    'public/archived',
+  ])('refuses %p outside the tool archive', async (path) => {
+    await expect(lastValueFrom(controller.grpcStorage({ path }))).rejects.toThrow(
+      RpcException,
+    );
+  });
+
+  it('lists only the requested platform archive', async () => {
+    await expect(
+      controller.grpcBuiltinToolRegistry({ os: 'linux', arch: 'amd64' }),
+    ).resolves.toEqual({ toolPaths: ['static/archived/linux_amd64/tool.zip'] });
+    await expect(
+      // `.._../..` resolves to public/ and would list the archive's parent.
+      controller.grpcBuiltinToolRegistry({ os: '..', arch: '../..' }),
+    ).resolves.toEqual({ toolPaths: [] });
   });
 });
