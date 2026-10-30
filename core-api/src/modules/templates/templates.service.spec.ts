@@ -259,7 +259,7 @@ describe('TemplatesService', () => {
           assetIds: undefined,
           jobRunType: JobRunType.MANUAL,
           jobName: '2 custom templates',
-          config: { customTemplateIds: [T1, T2] },
+          customTemplateIds: [T1, T2],
         }),
       );
       expect(res.message).toBe('Running 2 template(s) on 2 asset(s)');

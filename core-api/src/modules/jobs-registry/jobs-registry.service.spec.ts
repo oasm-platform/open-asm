@@ -2167,6 +2167,58 @@ describe('JobsRegistryService', () => {
       }
     });
 
+    describe('custom template keys', () => {
+      const nucleiTool = {
+        id: 'tool-nuclei',
+        name: 'nuclei',
+        categories: [{ name: ToolCategory.VULNERABILITIES, targetTypes: HOST }],
+        priority: 3,
+      } as any;
+
+      beforeEach(() => {
+        mockConnectorRegistryService.getConnector.mockReturnValue({ image: 'nuclei:3' });
+        // Pass the inline config through, as a merge over an empty profile does.
+        mockToolConfigProfilesService.resolveConfigForJob.mockImplementation(
+          (_ws: string, _tool: string, ref: { config?: Record<string, unknown> }) =>
+            Promise.resolve(ref.config),
+        );
+        mockAssetQB.getMany.mockResolvedValue([{ id: 'asset-1', value: 'x.example.com' }]);
+      });
+
+      it('drops template keys from a workflow inline config', async () => {
+        const [job] = await service.createNewJob({
+          tool: nucleiTool,
+          targetIds: ['target-1'],
+          workspaceId: 'ws-1',
+          workflow: { id: 'wf-1' } as any,
+          config: {
+            rateLimit: 5,
+            customTemplateIds: ['someone-elses-template'],
+            customTemplates: [{ url: 'http://evil/x', cacheKey: 'victim-1' }],
+          },
+        });
+
+        expect(job.config).toEqual({ rateLimit: 5 });
+        expect(mockToolConfigProfilesService.resolveConfigForJob).toHaveBeenCalledWith(
+          'ws-1',
+          'tool-nuclei',
+          expect.objectContaining({ config: { rateLimit: 5 } }),
+        );
+      });
+
+      it('keeps the explicit customTemplateIds of a template run', async () => {
+        const [job] = await service.createNewJob({
+          tool: nucleiTool,
+          assetIds: ['asset-1'],
+          workspaceId: 'ws-1',
+          workflow: undefined as any,
+          customTemplateIds: ['t1'],
+        });
+
+        expect(job.config).toEqual({ customTemplateIds: ['t1'] });
+      });
+    });
+
     it('S1b: URL_DISCOVERY keeps one service per asset, preferring 443 then 80', async () => {
       const assetA = { id: 'asset-a', isPrimary: true };
       const assetB = { id: 'asset-b', isPrimary: false };

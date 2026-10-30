@@ -163,6 +163,18 @@ const urlDiscoveryPortRank = (port: number): number =>
 /** Long enough to outlast the worker's local wait for a container slot. */
 const CUSTOM_TEMPLATE_URL_TTL_SECONDS = 3600;
 
+/** Platform-set config keys: from TemplatesService.run and claim-time signing only. */
+const TEMPLATE_CONFIG_KEYS = ['customTemplateIds', 'customTemplates'];
+
+function withoutTemplateKeys(
+  config: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  if (!config || !TEMPLATE_CONFIG_KEYS.some((key) => key in config)) return config;
+  const rest = { ...config };
+  for (const key of TEMPLATE_CONFIG_KEYS) delete rest[key];
+  return rest;
+}
+
 /** What the nuclei connector downloads for one saved template. */
 interface CustomTemplateRef {
   url: string;
@@ -302,9 +314,14 @@ export class JobsRegistryService {
     isPublishEvent,
     jobRunType,
     configProfileId,
-    config,
+    config: inlineConfig,
     category,
+    customTemplateIds,
   }: CreateJobs): Promise<Job[]> {
+    // A workflow's inline config is author-controlled and never schema-checked:
+    // template keys there would run templates the author cannot read, or seed
+    // a shared connector cache. Only the explicit customTemplateIds may set them.
+    const config = withoutTemplateKeys(inlineConfig);
     if (!tool) {
       throw new Error('Tool is required for creating a job');
     }
@@ -368,6 +385,9 @@ export class JobsRegistryService {
           message,
         });
         throw error;
+      }
+      if (customTemplateIds?.length) {
+        mergedConfig = { ...mergedConfig, customTemplateIds };
       }
     }
 

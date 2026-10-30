@@ -236,7 +236,7 @@ export class TemplatesService {
           ? templates[0].name
           : `${templates.length} custom templates`,
       jobRunType: JobRunType.MANUAL,
-      config: { customTemplateIds: templateIds },
+      customTemplateIds: templateIds,
     });
     if (jobs.length === 0) {
       throw new BadRequestException(

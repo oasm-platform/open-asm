@@ -215,6 +215,8 @@ export class CreateJobs extends PickType(Job, [
   jobRunType?: JobRunType;
   configProfileId?: string;
   config?: Record<string, unknown>;
+  /** Saved templates to run (TemplatesService.run); never read from `config`. */
+  customTemplateIds?: string[];
 }
 
 // --- Category-Specific Result DTOs ---
