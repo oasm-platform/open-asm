@@ -42,7 +42,6 @@ type BucketAccess =
 const BUCKET_ACCESS = {
   system: 'public',
   screenshot: 'tenant',
-  'nuclei-templates': 'tenant',
   'job-results': 'private',
   'cached-static': 'authenticated',
   reports: 'private',
@@ -324,17 +323,6 @@ export class StorageService implements OnModuleInit {
          INNER JOIN targets ON targets.id = assets."targetId"
          WHERE asset_services."screenshotPath" = $1`,
         [`screenshot/${key}`],
-      );
-      return [...new Set(rows.map((row) => row.workspaceId))];
-    }
-    if (bucket === 'nuclei-templates') {
-      const dotIndex = key.lastIndexOf('.');
-      const templateId = dotIndex > 0 ? key.slice(0, dotIndex) : key;
-      const rows: Array<{ workspaceId: string }> = await this.dataSource.query(
-        `SELECT templates."workspaceId" AS "workspaceId"
-         FROM templates
-         WHERE templates.id = $1`,
-        [templateId],
       );
       return [...new Set(rows.map((row) => row.workspaceId))];
     }

@@ -109,7 +109,7 @@ Branch: **`security-patch-2026-10-03`** (from `main`).
 | CT-13 | ✅ | `workspaceId` removed from `AddToolToWorkspaceDto` / `InstallToolDto`; taken from `@WorkspaceId()` |
 | SQ-01 | ✅ | Central `@Matches(/^[A-Za-z_][A-Za-z0-9_]*$/)` on `GetManyBaseQueryParams.sortBy` — one change, closes all 8 sinks |
 | AE-01 | ✅ | `@WorkerTokenAuth()` added |
-| AE-02 | ✅ | Closed: `GET /api/storage/:bucket/:path` is `@Optional()` with shared `authorizeRead` (`storage.controller.ts:317`); only `system` is anonymous, `screenshot`/`nuclei-templates` require membership of ANY owning workspace, `default`/unknown → 404. `GET /api/storage/presign/download` enforces the same helper before signing. Proof: `core-api/test/storage-read-authz.e2e-spec.ts` + `core-api/src/modules/storage/storage.controller.spec.ts`. |
+| AE-02 | ✅ | Closed: `GET /api/storage/:bucket/:path` is `@Optional()` with shared `authorizeRead` (`storage.controller.ts:317`); only `system` is anonymous, `screenshot`/`nuclei-templates` require membership of ANY owning workspace (superseded: the `nuclei-templates` bucket is retired; templates are workspace artifacts under `custom-templates`), `default`/unknown → 404. `GET /api/storage/presign/download` enforces the same helper before signing. Proof: `core-api/test/storage-read-authz.e2e-spec.ts` + `core-api/src/modules/storage/storage.controller.spec.ts`. |
 | AE-03 | ✅ | `@UseGuards(McpGuard)` on `POST /mcp/message` |
 | AE-04 | ✅ | `secret_token` derived via HMAC from the bot token, sent on `setWebhook`, verified with `timingSafeEqual` — no schema or `.env` change |
 | AE-06 | ✅ | `getProviderById(id, userContext)` enforces ownership; internal callers use a private raw loader |
@@ -135,7 +135,7 @@ session exists. Both it and `GET /api/storage/presign/download` share one
 helper, `authorizeRead` (`storage.controller.ts:317`), over the classes from
 `StorageService.getBucketAccess` (`storage.service.ts:58`): `public`
 (`system`) anonymous; `authenticated` (`cached-static`) any session, anonymous
-401; `tenant` (`screenshot`, `nuclei-templates`) anonymous 401, ownership via
+401; `tenant` (`screenshot`, `nuclei-templates`; superseded: `nuclei-templates` is retired, templates are workspace artifacts under `custom-templates`) anonymous 401, ownership via
 `resolveObjectWorkspaceIds` (`storage.service.ts:166`) with membership of ANY
 owning workspace required else 403, unknown keys 404; `private` (`reports`,
 `job-results`) 403; `blocked` (`default`, unknown) 404. `presign/download`
@@ -146,7 +146,7 @@ Deviation from the recommendation below is deliberate: the audit allow-listed
 `system`, `nuclei-templates` and `cached-static` as public, but the console
 sits behind auth, so no anonymous consumer needs the latter two —
 `cached-static` is session-gated and `nuclei-templates` is tenant-gated with
-no anonymous path lost. Authorized buckets serve `private, no-cache` with
+no anonymous path lost (superseded: the `nuclei-templates` bucket is retired; templates are workspace artifacts under `custom-templates`). Authorized buckets serve `private, no-cache` with
 `ETag`/`If-None-Match` 304 (`isNotModified`, `storage.controller.ts:362`);
 only `system` keeps `public, max-age=1209600` (14 days,
 `CACHE_STATIC_RESOURCE`).
@@ -707,7 +707,7 @@ private readonly privateBuckets = ['reports', 'job-results'];
 >
 > - **Original precondition:** **unauthenticated**.
 > - **Original impact:** any anonymous party who knew or guessed an object path could read a tenant's target screenshots — which for an ASM platform routinely depict internal admin panels, login pages and dashboards of the customer's internal estate. This was a direct confidentiality breach of scanned customers' infrastructure.
-> - **Fix applied (differs from the allow-list below):** `getBucketAccess` (`storage.service.ts:58`) classifies `system` public, `cached-static` authenticated, `screenshot`/`nuclei-templates` tenant, `reports`/`job-results` private (403), `default`/unknown blocked (404); unknown buckets default to blocked so a new bucket cannot silently escape. `nuclei-templates` and `cached-static` were tightened beyond the recommended public allow-list because the console sits behind auth.
+> - **Fix applied (differs from the allow-list below):** `getBucketAccess` (`storage.service.ts:58`) classifies `system` public, `cached-static` authenticated, `screenshot`/`nuclei-templates` tenant (superseded: `nuclei-templates` retired), `reports`/`job-results` private (403), `default`/unknown blocked (404); unknown buckets default to blocked so a new bucket cannot silently escape. `nuclei-templates` and `cached-static` were tightened beyond the recommended public allow-list because the console sits behind auth.
 >
 > The sibling note below about `GET :bucket/:path/download` (`:197-255`) is stale: that signed-token route no longer exists. Its successor is `GET /api/storage/presign/download` (`storage.controller.ts:198`), which takes bucket/path as query parameters but enforces the same `authorizeRead` bucket classes (`storage.controller.ts:317`) before signing — a foreign screenshot or template is refused with 403, so the bypass the old note worried about is closed.
 

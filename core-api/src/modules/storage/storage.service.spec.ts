@@ -1125,7 +1125,6 @@ describe('StorageService', () => {
       ['system', 'public'],
       ['cached-static', 'authenticated'],
       ['screenshot', 'tenant'],
-      ['nuclei-templates', 'tenant'],
       ['reports', 'private'],
       ['job-results', 'private'],
       ['default', 'blocked'],
@@ -1241,45 +1240,6 @@ describe('StorageService', () => {
       const ids = await service.resolveObjectWorkspaceIds(
         'screenshot',
         'missing.png',
-      );
-
-      expect(ids).toEqual([]);
-    });
-
-    it('should resolve the owning workspace of a nuclei template by id', async () => {
-      dataSourceQuery.mockResolvedValue([
-        { workspaceId: '33333333-3333-4333-8333-333333333333' },
-      ]);
-
-      const ids = await service.resolveObjectWorkspaceIds(
-        'nuclei-templates',
-        '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d.yaml',
-      );
-
-      expect(ids).toEqual(['33333333-3333-4333-8333-333333333333']);
-      expect(dataSourceQuery).toHaveBeenCalledTimes(1);
-      expect(dataSourceQuery.mock.calls[0][1]).toEqual([
-        '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d',
-      ]);
-    });
-
-    it('should strip only the final extension of a nuclei template key', async () => {
-      dataSourceQuery.mockResolvedValue([]);
-
-      await service.resolveObjectWorkspaceIds(
-        'nuclei-templates',
-        'my.template.yaml',
-      );
-
-      expect(dataSourceQuery.mock.calls[0][1]).toEqual(['my.template']);
-    });
-
-    it('should return [] when the nuclei template row is missing', async () => {
-      dataSourceQuery.mockResolvedValue([]);
-
-      const ids = await service.resolveObjectWorkspaceIds(
-        'nuclei-templates',
-        'd0d0d0d0-d0d0-4d0d-8d0d-d0d0d0d0d0d0.yaml',
       );
 
       expect(ids).toEqual([]);

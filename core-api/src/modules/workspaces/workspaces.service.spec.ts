@@ -784,6 +784,60 @@ describe('WorkspacesService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
+    it('updatePermissionGroup drops retired template keys', async () => {
+      const group = {
+        id: randomUUID(),
+        name: 'Viewer',
+        isSystem: false,
+        permissions: ['asset.read', 'template.read'],
+      };
+      (mockPermissionRepository.findOne as jest.Mock).mockResolvedValue(group);
+      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue({
+        memberPermissions: [{ permission: { permissions: ['*'] } }],
+      });
+
+      await service.updatePermissionGroup(
+        testWorkspaceId,
+        group.id,
+        { permissions: ['asset.read', 'template.write'] },
+        testUserId,
+      );
+
+      expect(group.permissions).toEqual(['asset.read']);
+    });
+
+    it('updatePermissionGroup still rejects other unknown keys', async () => {
+      (mockPermissionRepository.findOne as jest.Mock).mockResolvedValue({
+        id: randomUUID(),
+        name: 'Viewer',
+        isSystem: false,
+        permissions: ['group.read'],
+      });
+
+      await expect(
+        service.updatePermissionGroup(
+          testWorkspaceId,
+          randomUUID(),
+          { permissions: ['foo.bar'] },
+          testUserId,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('createPermissionGroup drops retired template keys', async () => {
+      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue(
+        holderMembership,
+      );
+
+      const result = await service.createPermissionGroup(
+        testWorkspaceId,
+        { name: 'Viewer', permissions: ['group.read', 'template.read'] },
+        testUserId,
+      );
+
+      expect(result.permissions).toEqual(['group.read']);
+    });
+
     it('should reject an empty update body', async () => {
       (mockPermissionRepository.findOne as jest.Mock).mockResolvedValue({
         id: randomUUID(),

@@ -324,49 +324,6 @@ describe('StorageController', () => {
       expect(storageService.getPresignedDownloadUrl).not.toHaveBeenCalled();
     });
 
-    it('lets a member presign their workspace nuclei-template', async () => {
-      jest
-        .spyOn(storageService, 'resolveObjectWorkspaceIds')
-        .mockResolvedValue(['ws-a']);
-      workspacesService.getMembershipWithPermissions.mockResolvedValue({
-        membership: {},
-        permissionKeys: [],
-      } as never);
-
-      const result = await controller.presignDownload(
-        { bucket: 'nuclei-templates', path: 'tpl-1.yaml' },
-        user,
-      );
-
-      expect(result).toEqual({
-        downloadUrl: 'https://storage.test/download?sig=1',
-        expiresIn: 600,
-      });
-      expect(storageService.getPresignedDownloadUrl).toHaveBeenCalledWith({
-        bucket: 'nuclei-templates',
-        key: 'tpl-1.yaml',
-        fileName: undefined,
-      });
-    });
-
-    it('rejects a presign of another workspace template with 403', async () => {
-      jest
-        .spyOn(storageService, 'resolveObjectWorkspaceIds')
-        .mockResolvedValue(['ws-a']);
-      workspacesService.getMembershipWithPermissions.mockRejectedValue(
-        new NotFoundException('Workspace member not found'),
-      );
-
-      await expect(
-        controller.presignDownload(
-          { bucket: 'nuclei-templates', path: 'tpl-1.yaml' },
-          user,
-        ),
-      ).rejects.toBeInstanceOf(ForbiddenException);
-
-      expect(storageService.getPresignedDownloadUrl).not.toHaveBeenCalled();
-    });
-
     it('rejects an anonymous presign of a tenant bucket with 401', async () => {
       await expect(
         controller.presignDownload(

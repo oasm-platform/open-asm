@@ -18,7 +18,7 @@ import {
  * or an unsigned direct-to-storage fetch of a helper-emitted plain URL.
  *
  * Bucket classes (`StorageService.getBucketAccess`): `system` is public,
- * `cached-static` needs a session, `screenshot`/`nuclei-templates` need a
+ * `cached-static` needs a session, `screenshot` needs a
  * session AND membership of ANY workspace that owns the object (screenshot keys
  * are `md5(asset.value)` and can collide across workspaces), `reports`/
  * `job-results` are private (403), `default` is blocked (404).
@@ -52,8 +52,6 @@ describe('Storage presign + public-read matrix (e2e)', () => {
 
   /** `screenshot/<key>` owned only by workspace A. */
   let ownedKey = '';
-  /** Template id owned only by workspace A; object key is `<id>.yaml`. */
-  let templateId = '';
   /** `system` object key, readable without a session. */
   let logoKey = '';
   /** `cached-static` object key, session-only on the presign route. */
@@ -70,7 +68,6 @@ describe('Storage presign + public-read matrix (e2e)', () => {
     'base64',
   );
   const textPayload = 'oasm storage read authz e2e\n';
-  const yamlPayload = 'id: e2e-template\ninfo:\n  name: e2e\n';
 
   async function seedScreenshotChain(
     workspaceId: string,
@@ -142,20 +139,6 @@ describe('Storage presign + public-read matrix (e2e)', () => {
     );
     await storage.uploadFile(ownedKey, png, 'screenshot');
     uploaded.push({ key: ownedKey, bucket: 'screenshot' });
-
-    // Workspace-A template; resolver strips the final extension to the id.
-    templateId = randomUUID();
-    await dataSource.query(
-      `INSERT INTO templates (id, "fileName", path, "workspaceId") VALUES ($1, $2, $3, $4)`,
-      [
-        templateId,
-        `e2e-${stamp}.yaml`,
-        `nuclei-templates/${templateId}.yaml`,
-        workspaceAId,
-      ],
-    );
-    await storage.uploadFile(`${templateId}.yaml`, Buffer.from(yamlPayload, 'utf8'), 'nuclei-templates');
-    uploaded.push({ key: `${templateId}.yaml`, bucket: 'nuclei-templates' });
 
     logoKey = `e2e-logo-${stamp}.png`;
     await storage.uploadFile(logoKey, png, 'system');
@@ -266,24 +249,6 @@ describe('Storage presign + public-read matrix (e2e)', () => {
         .query({ bucket: 'screenshot', path: unknown })
         .set('Cookie', userA.cookie)
         .expect(404);
-    });
-
-    it('lets the owner presign their own template with the yaml bytes', async () => {
-      const fetched = await fetchPresigned(
-        'nuclei-templates',
-        `${templateId}.yaml`,
-        userA.cookie,
-      );
-      expect(fetched.status).toBe(200);
-      expect(await fetched.text()).toBe(yamlPayload);
-    });
-
-    it('rejects a foreign-workspace presign of the template with 403', async () => {
-      await request(server)
-        .get('/api/storage/presign/download')
-        .query({ bucket: 'nuclei-templates', path: `${templateId}.yaml` })
-        .set('Cookie', userB.cookie)
-        .expect(403);
     });
 
     it('lets both colliding workspaces presign the shared screenshot', async () => {
