@@ -348,6 +348,55 @@ describe('AgentTool run_tool_connector', () => {
     expect((agentTool as any).redisService.setex).not.toHaveBeenCalled();
   });
 
+  describe('inline nuclei templates', () => {
+    const nuclei = { ...connector, name: 'Nuclei', slug: 'nuclei', image: 'nuclei:3' };
+    const createNucleiTool = () => {
+      const agentTool = createAgentTool();
+      const registry = (agentTool as any).connectorRegistry;
+      registry.getAgentConnectors.mockReturnValue([nuclei]);
+      registry.getConnector.mockReturnValue(nuclei);
+      return agentTool;
+    };
+
+    it('ships the templates in the run config without saving them', async () => {
+      const agentTool = createNucleiTool();
+      await runnable(agentTool).execute(
+        { tool: 'nuclei', target: 'example.com', templates: ['id: probe\n'] },
+        { toolCallId: 'call-1' },
+      );
+
+      const run = ((agentTool as any).remoteExecuteService.waitForToolRun as jest.Mock)
+        .mock.calls[0][1] as { configJson: string };
+      expect(JSON.parse(run.configJson)).toEqual({
+        rate: 10,
+        customTemplates: [{ content: 'id: probe\n' }],
+      });
+    });
+
+    it('reports an invalid template to the model instead of running', async () => {
+      const agentTool = createNucleiTool();
+      const result = await runnable(agentTool).execute(
+        { tool: 'nuclei', target: 'example.com', templates: ['info: {}\n'] },
+        { toolCallId: 'call-1' },
+      );
+
+      expect(result).toEqual({
+        error: 'templates[0]: Template must be a YAML mapping with a string "id"',
+      });
+      expect((agentTool as any).remoteExecuteService.waitForToolRun).not.toHaveBeenCalled();
+    });
+
+    it('refuses templates for any other tool', async () => {
+      const agentTool = createAgentTool();
+      await expect(
+        runnable(agentTool).execute(
+          { tool: 'nmap', target: 'example.com', templates: ['id: a\n'] },
+          { toolCallId: 'call-1' },
+        ),
+      ).resolves.toEqual({ error: 'templates only apply to the nuclei tool.' });
+    });
+  });
+
   it('refuses a tool not installed in the workspace', async () => {
     const agentTool = createAgentTool({
       toolsService: {
