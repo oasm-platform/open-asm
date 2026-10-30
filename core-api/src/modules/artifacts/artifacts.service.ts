@@ -232,27 +232,20 @@ export class ArtifactsService {
         throw new ForbiddenException('Only the owner can change this file');
       }
       this.quota.assertFileSize(buffer.length);
-      // Release first so a full workspace can shrink; a quota failure on
-      // reserve rolls this back with the transaction.
+      // Release first so a full workspace can shrink. Every quota change runs
+      // on this manager, so any failure below rolls all of them back.
       await this.quota.releaseUsed(manager, workspaceId, artifact.sizeBytes);
       await this.quota.reserve(manager, workspaceId, buffer.length);
-      try {
-        // shortcut: holds the workspace usage row lock during the upload; fine for small files (templates ≤ 256 KB), revisit before using this for large files.
-        await this.storageService.uploadFile(
-          artifact.objectKey,
-          buffer,
-          artifact.bucket,
-          artifact.mimeType,
-        );
-        await this.quota.commit(manager, workspaceId, buffer.length);
-        artifact.sizeBytes = buffer.length;
-        await manager.save(artifact);
-      } catch (error) {
-        await this.quota
-          .releaseReserved(manager, workspaceId, buffer.length)
-          .catch(() => undefined);
-        throw error;
-      }
+      // shortcut: holds the workspace usage row lock during the upload; fine for small files (templates ≤ 256 KB), revisit before using this for large files.
+      await this.storageService.uploadFile(
+        artifact.objectKey,
+        buffer,
+        artifact.bucket,
+        artifact.mimeType,
+      );
+      await this.quota.commit(manager, workspaceId, buffer.length);
+      artifact.sizeBytes = buffer.length;
+      await manager.save(artifact);
     });
     return this.getById(workspaceId, userId, id, []);
   }
@@ -364,18 +357,6 @@ export class ArtifactsService {
         ? { parentFolderId: dto.parentFolderId }
         : {}),
     });
-    return this.getById(workspaceId, userId, id, []);
-  }
-
-  /** Owner-only rename; the object key is unchanged. */
-  async rename(
-    workspaceId: string,
-    userId: string,
-    id: string,
-    name: string,
-  ): Promise<ArtifactDto> {
-    const artifact = await this.findOwned(workspaceId, userId, id);
-    await this.artifactRepo.update(artifact.id, { name });
     return this.getById(workspaceId, userId, id, []);
   }
 

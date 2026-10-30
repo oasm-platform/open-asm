@@ -47,7 +47,7 @@ describe('TemplatesService', () => {
     artifacts = {
       createFromBuffer: jest.fn().mockResolvedValue({ id: 'a1' }),
       replaceContent: jest.fn().mockResolvedValue({ id: 'a1' }),
-      rename: jest.fn().mockResolvedValue({ id: 'a1' }),
+      update: jest.fn().mockResolvedValue({ id: 'a1' }),
       canRead: jest.fn().mockResolvedValue(true),
       toDto: jest.fn((r: Artifact) => ({ id: r.id })),
     };
@@ -142,7 +142,7 @@ describe('TemplatesService', () => {
         service.rename(WS, ME, 'a1', { name: 'b.yaml' }),
       ).rejects.toThrow(NotFoundException);
       expect(artifacts.replaceContent).not.toHaveBeenCalled();
-      expect(artifacts.rename).not.toHaveBeenCalled();
+      expect(artifacts.update).not.toHaveBeenCalled();
     });
   });
 
@@ -163,16 +163,16 @@ describe('TemplatesService', () => {
         service.rename(WS, 'other', 'a1', { name: 'b.yaml' }),
       ).rejects.toThrow(NotFoundException);
       expect(artifacts.replaceContent).not.toHaveBeenCalled();
-      expect(artifacts.rename).not.toHaveBeenCalled();
+      expect(artifacts.update).not.toHaveBeenCalled();
     });
 
     it('rename changes only name and keeps objectKey', async () => {
       await service.rename(WS, ME, 'a1', { name: ' b.yml ' });
-      expect(artifacts.rename).toHaveBeenCalledWith(WS, ME, 'a1', 'b.yml');
+      expect(artifacts.update).toHaveBeenCalledWith(WS, ME, 'a1', { name: 'b.yml' });
     });
 
     it('rename by non-owner', async () => {
-      artifacts.rename.mockRejectedValue(new ForbiddenException());
+      artifacts.update.mockRejectedValue(new ForbiddenException());
       await expect(
         service.rename(WS, 'other', 'a1', { name: 'b.yaml' }),
       ).rejects.toThrow(ForbiddenException);

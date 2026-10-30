@@ -175,7 +175,7 @@ export class TemplatesService {
     const name = dto.name.trim();
     validateTemplate(name);
     await this.findTemplate(workspaceId, userId, id);
-    return this.artifacts.rename(workspaceId, userId, id, name);
+    return this.artifacts.update(workspaceId, userId, id, { name });
   }
 
   /** 404 unless the id is a ready, readable artifact in the workspace templates folder. */
