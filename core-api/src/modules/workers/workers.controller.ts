@@ -35,7 +35,7 @@ import { GrpcMethod, RpcException } from '@nestjs/microservices';
 import { ApiTags } from '@nestjs/swagger';
 import { createReadStream } from 'fs';
 import { readdir } from 'fs/promises';
-import { join } from 'path';
+import { join, resolve, sep } from 'path';
 import { Observable } from 'rxjs';
 import {
   GetManyWorkersDto,
@@ -89,6 +89,9 @@ function toGrpcTimestamp(value: string): GrpcTimestamp {
     nanos: (milliseconds % 1000) * 1_000_000,
   };
 }
+
+/** Tool archives served to workers, relative to the core-api working dir. */
+const TOOL_ARCHIVE_DIR = 'public/archived';
 
 @ApiTags('Workers')
 @Controller('workers')
@@ -253,13 +256,23 @@ export class WorkersController {
     };
   }
 
+  @UseGuards(GrpcWorkerTokenGuard)
   @GrpcMethod('WorkersService', 'Storage')
   grpcStorage(request: {
     path: string;
   }): Observable<{ chunk: Buffer; offset: number; eof: boolean }> {
     return new Observable((subscriber) => {
-      const normalizedPath = request.path.replace(/^static/, 'public');
-      const filePath = join(process.cwd(), normalizedPath);
+      // Workers only download tool archives (the paths BuiltinToolRegistry
+      // lists); anything resolving outside that tree — .env, ../ — is refused.
+      const archiveRoot = resolve(process.cwd(), TOOL_ARCHIVE_DIR);
+      const filePath = resolve(
+        process.cwd(),
+        request.path.replace(/^static/, 'public'),
+      );
+      if (!filePath.startsWith(archiveRoot + sep)) {
+        subscriber.error(new RpcException('Path is outside the tool archive'));
+        return;
+      }
       const stream = createReadStream(filePath, { highWaterMark: 1024 * 1024 }); // 1MB chunks
       let offset = 0;
 
@@ -413,13 +426,18 @@ export class WorkersController {
     return this.workersService.connectInternalNetwork(request);
   }
 
+  @UseGuards(GrpcWorkerTokenGuard)
   @GrpcMethod('WorkersService', 'BuiltinToolRegistry')
   async grpcBuiltinToolRegistry(request: {
     os: string;
     arch: string;
   }): Promise<{ toolPaths: string[] }> {
     const platform = `${request.os.toLowerCase()}_${request.arch.toLowerCase()}`;
-    const platformPath = join(process.cwd(), 'public/archived', platform);
+    // GOOS_GOARCH only: os/arch come from the worker and are joined into a path.
+    if (!/^[a-z0-9]+_[a-z0-9]+$/.test(platform)) {
+      return { toolPaths: [] };
+    }
+    const platformPath = join(process.cwd(), TOOL_ARCHIVE_DIR, platform);
 
     try {
       const files = await readdir(platformPath);
