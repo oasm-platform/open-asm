@@ -1,315 +1,204 @@
-import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
-import { UserContextPayload } from '@/common/interfaces/app.interface';
+import { ArtifactSource, ArtifactStatus, AuditActorType } from '@/common/enums/enum';
+import type { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import { getManyResponse } from '@/utils/getManyResponse';
 import {
   BadRequestException,
   Injectable,
-  Logger,
   NotFoundException,
+  PayloadTooLargeException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, ILike, Repository } from 'typeorm';
-import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
-import { PresignUploadResponseDto } from '../storage/dto/presign-storage.dto';
+import * as yaml from 'js-yaml';
+import { Repository } from 'typeorm';
+import { ArtifactFoldersService } from '../artifacts/artifact-folders.service';
+import {
+  ARTIFACT_MANAGE_PERMISSION,
+  ArtifactsService,
+} from '../artifacts/artifacts.service';
+import type { ArtifactDto } from '../artifacts/dto/artifacts.dto';
+import { Artifact } from '../artifacts/entities/artifact.entity';
 import { StorageService } from '../storage/storage.service';
-import { ToolsService } from '../tools/tools.service';
-import { WorkspacesService } from '../workspaces/workspaces.service';
-import { CreateTemplateDTO } from './dto/createTemplate.dto';
-import { GetManyTemplatesQueryDTO } from './dto/get-many-template-query';
-import { RenameTemplateDTO } from './dto/renameTemplate.dto';
-import { Template } from './entities/templates.entity';
+import type {
+  CreateTemplateDto,
+  GetTemplatesQueryDto,
+  RenameTemplateDto,
+  SaveTemplateContentDto,
+  TemplateContentDto,
+} from './dto/templates.dto';
+
+export const MAX_TEMPLATE_BYTES = 256 * 1024;
+const SORTABLE = new Set(['createdAt', 'updatedAt', 'name']);
+
+/** Trust boundary for template names and content; throws 400/413. */
+export function validateTemplate(name?: string, content?: string): void {
+  if (name !== undefined) {
+    if (!name || name.length > 200 || !/\.ya?ml$/i.test(name)) {
+      throw new BadRequestException(
+        'Template name must be 1-200 characters and end in .yaml or .yml',
+      );
+    }
+  }
+  if (content === undefined) return;
+  if (Buffer.byteLength(content, 'utf8') > MAX_TEMPLATE_BYTES) {
+    throw new PayloadTooLargeException('Template exceeds 256 KB');
+  }
+  // js-yaml ships no types here (same pattern as workflow-template.service).
+  /* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+  let doc: unknown;
+  try {
+    doc = yaml.load(content);
+  } catch (error) {
+    const e = error as { mark?: { line?: number }; reason?: string };
+    const line = e.mark?.line;
+    throw new BadRequestException(
+      `Invalid YAML${line !== undefined ? ` at line ${line + 1}` : ''}: ${e.reason ?? 'parse error'}`,
+    );
+  }
+  /* eslint-enable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+  const id = (doc as { id?: unknown } | null)?.id;
+  if (!doc || typeof doc !== 'object' || Array.isArray(doc) || typeof id !== 'string' || !id) {
+    throw new BadRequestException(
+      'Template must be a YAML mapping with a string "id"',
+    );
+  }
+}
 
 @Injectable()
 export class TemplatesService {
-  private readonly logger = new Logger(TemplatesService.name);
-
   constructor(
-    @InjectRepository(Template)
-    private readonly templateRepo: Repository<Template>,
-    private readonly workspacesService: WorkspacesService,
-    private readonly storageService: StorageService,
-    private jobService: JobsRegistryService,
-    private toolService: ToolsService,
+    @InjectRepository(Artifact)
+    private readonly artifactRepo: Repository<Artifact>,
+    private readonly artifacts: ArtifactsService,
+    private readonly folders: ArtifactFoldersService,
+    private readonly storage: StorageService,
   ) {}
 
-  /**
-   * Creates a new template in the specified workspace
-   * @param workspaceId The ID of the workspace where the template will be created
-   * @param userContext User context containing user information
-   * @param dto Data transfer object containing template creation details
-   * @returns Promise<Template> The created template object
-   * @throws NotFoundException if the workspace is not found
-   * @throws BadRequestException if a template with the same filename already exists
-   */
-  public async createTemplate(
+  async getMany(
     workspaceId: string,
-    userContext: UserContextPayload,
-    dto: CreateTemplateDTO,
-  ): Promise<Template> {
-    const workspace = await this.workspacesService.getWorkspaceById(
-      workspaceId,
-      userContext,
-    );
+    userId: string,
+    query: GetTemplatesQueryDto,
+  ): Promise<GetManyBaseResponseDto<ArtifactDto>> {
+    const { page, limit, search, sortOrder, scope } = query;
+    const sortBy = SORTABLE.has(query.sortBy) ? query.sortBy : 'createdAt';
+    const folder = await this.folders.ensureTemplatesFolder(workspaceId);
 
-    if (!workspace) throw new NotFoundException('Workspace not found');
+    const qb = this.artifactRepo
+      .createQueryBuilder('artifact')
+      .leftJoinAndSelect('artifact.createdBy', 'createdBy')
+      .where('artifact.workspaceId = :workspaceId', { workspaceId })
+      .andWhere('artifact.parentFolderId = :folderId', { folderId: folder.id })
+      .andWhere('artifact.status = :status', { status: ArtifactStatus.READY });
 
-    const template = await this.templateRepo.findOneBy({
-      fileName: dto.fileName,
-      workspace: { id: workspaceId },
+    if (scope === 'shared') {
+      qb.andWhere(
+        '(artifact.createdByUserId IS NULL OR artifact.createdByUserId != :userId)',
+        { userId },
+      ).andWhere(
+        `(artifact.shareType = 'public' OR (artifact.shareType = 'shared' AND EXISTS (SELECT 1 FROM artifact_shares s WHERE s."artifactId" = artifact.id AND s."userId" = :userId)))`,
+      );
+    } else {
+      qb.andWhere('artifact.createdByUserId = :userId', { userId });
+    }
+    if (search) {
+      qb.andWhere('artifact.name ILIKE :search', { search: `%${search}%` });
+    }
+
+    const [rows, total] = await qb
+      .orderBy(`artifact.${sortBy}`, sortOrder)
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return getManyResponse({
+      query,
+      data: rows.map((row) => this.artifacts.toDto(row, userId)),
+      total,
     });
-
-    if (template) throw new BadRequestException('File name was already taken');
-
-    const newTemplate = new Template();
-    newTemplate.fileName = dto.fileName;
-    newTemplate.workspace = workspace;
-    return this.templateRepo.save(newTemplate);
   }
 
-  /**
-   * Creates a presigned PUT URL so the client uploads the template YAML
-   * straight to storage, and pins the deterministic object path on the entity
-   * @param templateId The ID of the template to upload file for
-   * @param workspaceId The ID of the workspace containing the template
-   * @param userContext User context containing user information
-   * @returns Promise<PresignUploadResponseDto> The presigned upload target
-   * @throws NotFoundException if the workspace or template is not found
-   * @throws BadRequestException if the template doesn't belong to the workspace
-   */
-  public async presignTemplate(
-    templateId: string,
+  async getContent(
     workspaceId: string,
-    userContext: UserContextPayload,
-  ): Promise<PresignUploadResponseDto> {
-    await this.getTemplateById(templateId, workspaceId, userContext);
-
-    const bucket = 'nuclei-templates';
-    const key = `${templateId}.yaml`;
-    const contentType = 'text/yaml';
-
-    const { url, expiresIn } = await this.storageService.getPresignedUploadUrl({
-      bucket,
-      key,
-      contentType,
-    });
-
-    // Always overwrite: a path left over from an older key would diverge from
-    // the object load/save actually reads.
-    const path = `${bucket}/${key}`;
-    await this.templateRepo.update({ id: templateId }, { path });
-
-    return { uploadUrl: url, key, path, contentType, expiresIn };
-  }
-
-  /**
-   * Renames an existing template file in the specified workspace
-   * @param templateId The ID of the template to rename
-   * @param workspaceId The ID of the workspace containing the template
-   * @param userContext User context containing user information
-   * @param dto Data transfer object containing the new filename
-   * @returns Promise<Template> The renamed template object
-   * @throws NotFoundException if the workspace or template is not found
-   * @throws BadRequestException if the template doesn't belong to the workspace or filename is already taken
-   */
-  public async renameFile(
-    templateId: string,
-    workspaceId: string,
-    userContext: UserContextPayload,
-    dto: RenameTemplateDTO,
-  ): Promise<Template> {
-    const workspace = await this.workspacesService.getWorkspaceById(
-      workspaceId,
-      userContext,
-    );
-
-    if (!workspace) throw new NotFoundException('Cannot find the workspace');
-
-    const template = await this.templateRepo.findOne({
-      where: { id: templateId },
-      relations: ['workspace'],
-    });
-
-    if (!template) {
+    userId: string,
+    id: string,
+    permissions: string[],
+  ): Promise<TemplateContentDto> {
+    const artifact = await this.findTemplate(workspaceId, id);
+    const canManage =
+      permissions.includes('*') || permissions.includes(ARTIFACT_MANAGE_PERMISSION);
+    if (!((await this.artifacts.canRead(artifact, userId)) || canManage)) {
       throw new NotFoundException('Template not found');
     }
-
-    if (template.workspace.id !== workspaceId) {
-      throw new BadRequestException(
-        'Template does not belong to this workspace',
-      );
+    const { file } = await this.storage.getFile(artifact.objectKey, artifact.bucket);
+    const chunks: Buffer[] = [];
+    for await (const chunk of file.getStream()) {
+      chunks.push(Buffer.from(chunk as Uint8Array));
     }
-
-    const templateByFileName = await this.templateRepo.findOneBy({
-      fileName: dto.fileName,
-      workspace: { id: workspaceId },
-    });
-
-    if (templateByFileName)
-      throw new BadRequestException('File name was already taken');
-
-    template.fileName = dto.fileName;
-    return this.templateRepo.save(template);
-  }
-
-  /**
-   * Retrieves a template by its ID from the specified workspace
-   * @param templateId The ID of the template to retrieve
-   * @param workspaceId The ID of the workspace containing the template
-   * @param userContext User context containing user information
-   * @returns Promise<Template> The requested template object
-   * @throws NotFoundException if the workspace or template is not found
-   * @throws BadRequestException if the template doesn't belong to the workspace
-   */
-  async getTemplateById(
-    templateId: string,
-    workspaceId: string,
-    userContext: UserContextPayload,
-  ): Promise<Template> {
-    const workspace = await this.workspacesService.getWorkspaceById(
-      workspaceId,
-      userContext,
-    );
-
-    if (!workspace) throw new NotFoundException('Cannot find the workspace');
-
-    const template = await this.templateRepo.findOne({
-      where: { id: templateId },
-      relations: ['workspace'],
-    });
-
-    if (!template) {
-      throw new NotFoundException('Template not found');
-    }
-
-    if (template.workspace.id !== workspaceId) {
-      throw new BadRequestException(
-        'Template does not belong to this workspace',
-      );
-    }
-
-    return template;
-  }
-
-  /**
-   * Deletes a template by its ID from the specified workspace
-   * @param templateId The ID of the template to delete
-   * @param workspaceId The ID of the workspace containing the template
-   * @param userContext User context containing user information
-   * @returns Promise<void> Resolves when deletion is complete
-   * @throws NotFoundException if the template is not found
-   * @throws BadRequestException if the template doesn't belong to the workspace
-   */
-  async deleteTemplate(
-    templateId: string,
-    workspaceId: string,
-    userContext: UserContextPayload,
-  ): Promise<void> {
-    const template = await this.getTemplateById(
-      templateId,
-      workspaceId,
-      userContext,
-    );
-
-    if (template.path) {
-      const [bucket, path] = this.getFileAndBucket(template.path);
-      try {
-        await this.storageService.deleteFile(path, bucket);
-      } catch (error) {
-        // Log error but don't fail the operation
-        this.logger.warn('Failed to delete file from storage:', error);
-      }
-    }
-
-    // Delete template from database
-    await this.templateRepo.remove(template);
-  }
-
-  /**
-   * Retrieves all templates for the specified workspace with pagination and filtering
-   * @param query Query parameters for pagination and filtering
-   * @param workspaceId The ID of the workspace containing the templates
-   * @param userContext User context containing user information
-   * @returns Promise<GetManyBaseResponseDto<Template>> Paginated response containing templates
-   * @throws NotFoundException if the workspace is not found
-   */
-  async getAllTemplates(
-    query: GetManyTemplatesQueryDTO,
-    workspaceId: string,
-    userContext: UserContextPayload,
-  ): Promise<GetManyBaseResponseDto<Template>> {
-    const workspace = await this.workspacesService.getWorkspaceById(
-      workspaceId,
-      userContext,
-    );
-
-    if (!workspace) throw new NotFoundException('Cannot find the workspace');
-
-    const where: FindOptionsWhere<Template> = {
-      workspace: { id: workspaceId },
+    return {
+      artifact: this.artifacts.toDto(artifact, userId),
+      content: Buffer.concat(chunks).toString('utf8'),
     };
+  }
 
-    if (query.value) {
-      where.fileName = ILike(`%${query.value}%`);
-    }
-
-    const [data, total] = await this.templateRepo.findAndCount({
-      where,
-      order: {
-        createdAt: 'ASC',
-      },
-      take: query.limit,
-      skip: query.limit * (query.page - 1),
-      relations: ['workspace'],
+  async create(
+    workspaceId: string,
+    userId: string,
+    dto: CreateTemplateDto,
+  ): Promise<ArtifactDto> {
+    const name = dto.name.trim();
+    validateTemplate(name, dto.content);
+    const folder = await this.folders.ensureTemplatesFolder(workspaceId);
+    return this.artifacts.createFromBuffer({
+      workspaceId,
+      userId,
+      source: ArtifactSource.TEMPLATE,
+      name,
+      mimeType: 'application/yaml',
+      buffer: Buffer.from(dto.content, 'utf8'),
+      parentFolderId: folder.id,
+      actorType: AuditActorType.User,
     });
-
-    return getManyResponse({ query, data, total });
   }
 
-  /**
-   * Extracts bucket name and file path from a full path string
-   * @param path The full path string in format "bucket/file-path"
-   * @returns [bucket, path] An array containing the bucket name and file path
-   * @throws BadRequestException if the path format is invalid
-   */
-  private getFileAndBucket(path: string) {
-    const parts = path.split('/', 2);
-    if (parts.length < 2 || !parts[0] || !parts[1]) {
-      throw new BadRequestException(
-        'Invalid path format. Expected "bucket/path".',
-      );
-    }
-    return [parts[0], parts[1]];
+  async saveContent(
+    workspaceId: string,
+    userId: string,
+    id: string,
+    dto: SaveTemplateContentDto,
+  ): Promise<ArtifactDto> {
+    validateTemplate(undefined, dto.content);
+    await this.findTemplate(workspaceId, id);
+    return this.artifacts.replaceContent(
+      workspaceId,
+      userId,
+      id,
+      Buffer.from(dto.content, 'utf8'),
+    );
   }
 
-  /**
-   * Runs a template scan on a specified asset
-   * @param dto Data transfer object containing run template details including asset ID
-   * @param workspaceId The ID of the workspace where the scan will run
-   * @returns Promise<Job> The created job object for the scan
-   * @throws NotFoundException if the Nuclei tool is not available
-   */
-  // public async runTemplate(
-  //   dto: RunTemplateDto,
-  //   workspaceId: string,
-  // ): Promise<Job> {
-  //   const { assetId } = dto;
-  //   const [nuclei] = await this.toolService.getToolByNames({
-  //     names: ['nuclei'],
-  //   });
+  async rename(
+    workspaceId: string,
+    userId: string,
+    id: string,
+    dto: RenameTemplateDto,
+  ): Promise<ArtifactDto> {
+    const name = dto.name.trim();
+    validateTemplate(name);
+    await this.findTemplate(workspaceId, id);
+    return this.artifacts.rename(workspaceId, userId, id, name);
+  }
 
-  //   if (!nuclei) {
-  //     throw new NotFoundException('Nuclei tool is not available');
-  //   }
-
-  //   const job = await this.jobService.createNewJob({
-  //     tool: nuclei,
-  //     assetIds: [assetId],
-  //     workspaceId,
-  //     priority: 0,
-  //     isSaveRawResult: true,
-  //     isSaveData: false,
-  //   });
-
-  //   return job[0];
-  // }
+  /** 404 unless the id is a ready artifact in the workspace templates folder. */
+  private async findTemplate(workspaceId: string, id: string): Promise<Artifact> {
+    const folder = await this.folders.ensureTemplatesFolder(workspaceId);
+    const artifact = await this.artifactRepo.findOne({
+      where: {
+        id,
+        workspaceId,
+        status: ArtifactStatus.READY,
+      },
+      relations: { createdBy: true },
+    });
+    if (!artifact || artifact.parentFolderId !== folder.id) throw new NotFoundException('Template not found');
+    return artifact;
+  }
 }

@@ -368,6 +368,26 @@ describe('ArtifactsService', () => {
     });
   });
 
+  describe('rename', () => {
+    it('rename updates name only', async () => {
+      artifactRepo.findOne.mockResolvedValue(makeArtifact());
+      await service.rename(WS, OWNER, 'artifact-1', 'new.pdf');
+      expect(artifactRepo.update).toHaveBeenCalledWith('artifact-1', {
+        name: 'new.pdf',
+      });
+    });
+
+    it('rename by non-owner throws ForbiddenException', async () => {
+      artifactRepo.findOne.mockResolvedValue(
+        makeArtifact({ shareType: ArtifactShareType.PUBLIC }),
+      );
+      await expect(
+        service.rename(WS, OTHER, 'artifact-1', 'new.pdf'),
+      ).rejects.toThrow(ForbiddenException);
+      expect(artifactRepo.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe('addShares', () => {
     it('shares only with workspace members and never with the owner', async () => {
       artifactRepo.findOne.mockResolvedValue(makeArtifact());

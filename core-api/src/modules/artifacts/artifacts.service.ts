@@ -367,6 +367,18 @@ export class ArtifactsService {
     return this.getById(workspaceId, userId, id, []);
   }
 
+  /** Owner-only rename; the object key is unchanged. */
+  async rename(
+    workspaceId: string,
+    userId: string,
+    id: string,
+    name: string,
+  ): Promise<ArtifactDto> {
+    const artifact = await this.findOwned(workspaceId, userId, id);
+    await this.artifactRepo.update(artifact.id, { name });
+    return this.getById(workspaceId, userId, id, []);
+  }
+
   /**
    * Soft-deletes, then purges; a purge that fails or must wait for the
    * upload form to expire is done by the sweep. The owner needs
@@ -720,7 +732,7 @@ export class ArtifactsService {
     return artifact;
   }
 
-  private async canRead(artifact: Artifact, userId: string): Promise<boolean> {
+  async canRead(artifact: Artifact, userId: string): Promise<boolean> {
     switch (artifact.shareType) {
       case ArtifactShareType.PUBLIC:
         return true;
@@ -738,7 +750,7 @@ export class ArtifactsService {
     return { id: user.id, name: user.name, image: user.image ?? null };
   }
 
-  private toDto(artifact: Artifact, userId: string): ArtifactDto {
+  toDto(artifact: Artifact, userId: string): ArtifactDto {
     return {
       id: artifact.id,
       name: artifact.name,

@@ -6,17 +6,16 @@ describe('TemplatesController workspace permission guards', () => {
   const reflector = new Reflector();
 
   const cases: Array<[string, string, string[]]> = [
-    ['createTemplate', 'POST /', ['template.write']],
-    ['presignTemplate', 'POST /:templateId/presign', ['template.write']],
-    ['renameFile', 'PATCH /:templateId/rename', ['template.write']],
-    ['getTemplateById', 'GET /:templateId', ['template.read']],
-    ['getAllTemplates', 'GET /', ['template.read']],
-    ['deleteTemplate', 'DELETE /:templateId', ['template.write']],
+    ['getMany', 'GET /', ['artifact.read']],
+    ['getContent', 'GET /:id/content', ['artifact.read']],
+    ['create', 'POST /', ['artifact.write']],
+    ['saveContent', 'PUT /:id/content', ['artifact.write']],
+    ['rename', 'PATCH /:id', ['artifact.write']],
   ];
 
   it.each(cases)('%s (%s) requires %j', (method, route, keys) => {
     const handler = (
-      TemplatesController.prototype as Record<string, unknown>
+      TemplatesController.prototype as unknown as Record<string, unknown>
     )[method] as object;
     const required = reflector.getAllAndOverride(WorkspacePermissions, [
       handler,
