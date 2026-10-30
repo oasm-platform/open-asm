@@ -7,6 +7,7 @@ import { AxiosError } from 'axios';
 import * as prettierYaml from 'prettier/plugins/yaml';
 import * as prettier from 'prettier/standalone';
 import { useEffect, useState } from 'react';
+import { parse } from 'yaml';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { toast } from 'sonner';
 
@@ -22,8 +23,24 @@ import {
   useTemplatesControllerGetContent,
   useTemplatesControllerSaveContent,
 } from '@/services/apis/gen/queries';
-import { useTemplateTabs, type TemplateTab } from '../hooks/use-template-tabs';
+import {
+  DEFAULT_TEMPLATE_NAME,
+  useTemplateTabs,
+  type TemplateTab,
+} from '../hooks/use-template-tabs';
 import { TemplateTabs } from './template-tabs';
+
+/** `<id>.yaml` from the top-level YAML id, sanitized; the default name if absent or unparsable. */
+function nameFromContent(content: string): string {
+  try {
+    const id = (parse(content) as { id?: unknown } | null)?.id;
+    if (typeof id !== 'string') return DEFAULT_TEMPLATE_NAME;
+    const base = id.replace(/[^A-Za-z0-9._-]/g, '-').slice(0, 195);
+    return /[A-Za-z0-9]/.test(base) ? `${base}.yaml` : DEFAULT_TEMPLATE_NAME;
+  } catch {
+    return DEFAULT_TEMPLATE_NAME;
+  }
+}
 
 function TemplatePane({ tab }: { tab: TemplateTab }) {
   const { hasPermission } = usePermission();
@@ -69,7 +86,7 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
             id: tab.artifactId,
             data: { content },
           })
-        : await create.mutateAsync({ data: { name: tab.name, content } });
+        : await create.mutateAsync({ data: { name: nameFromContent(content), content } });
       markSaved(tab.id, artifact, content);
       queryClient.setQueryData(
         getTemplatesControllerGetContentQueryKey(artifact.id),

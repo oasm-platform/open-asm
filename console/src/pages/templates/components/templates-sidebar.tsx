@@ -1,4 +1,4 @@
-import { FileCode, MoreVertical, Plus, Upload } from 'lucide-react';
+import { ChevronRight, FileCode, MoreVertical, Plus, Upload } from 'lucide-react';
 import { useRef, useState, type ComponentProps } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -7,6 +7,11 @@ import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Dialog,
@@ -65,7 +70,7 @@ export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
       e.preventDefault();
       openNew();
     },
-    { enabled: canWrite },
+    { enabled: canWrite, enableOnContentEditable: true, enableOnFormTags: true },
   );
 
   const [search, setSearch] = useState('');
@@ -74,11 +79,15 @@ export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
     scope: 'mine',
     search: debounced || undefined,
     limit: 100,
+    sortBy: 'name',
+    sortOrder: 'ASC',
   });
   const shared = useTemplatesControllerGetMany({
     scope: 'shared',
     search: debounced || undefined,
     limit: 100,
+    sortBy: 'name',
+    sortOrder: 'ASC',
   });
   const refresh = () => {
     void mine.refetch();
@@ -116,6 +125,12 @@ export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
           );
           // Quota errors repeat for every remaining file; stop after the first.
           break;
+        } else if (
+          error instanceof AxiosError &&
+          (error.response?.status === 400 || error.response?.status === 413) &&
+          typeof error.response.data?.message === 'string'
+        ) {
+          toast.error(`${file.name}: ${error.response.data.message}`);
         } else {
           handleServerError(error);
         }
@@ -136,6 +151,13 @@ export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
 
   const myItems = mine.data?.data ?? [];
   const sharedItems = shared.data?.data ?? [];
+
+  const hint = (shown: number, total?: number) =>
+    total !== undefined && total > shown ? (
+      <p className="px-2 py-1 text-xs text-muted-foreground">
+        {`Showing ${shown} of ${total} — search to narrow`}
+      </p>
+    ) : null;
 
   const renderItem = (file: ArtifactDto, manage: boolean) => (
     <SidebarMenuItem key={file.id}>
@@ -235,15 +257,25 @@ export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
           />
         </SidebarGroup>
 
+        <Collapsible defaultOpen asChild>
         <SidebarGroup>
-          <SidebarGroupLabel>My templates</SidebarGroupLabel>
+          <SidebarGroupLabel asChild>
+            <CollapsibleTrigger className="group/trigger">
+              My templates
+              <ChevronRight className="ml-auto transition-transform group-data-[state=open]/trigger:rotate-90" />
+            </CollapsibleTrigger>
+          </SidebarGroupLabel>
+          <CollapsibleContent>
           <SidebarGroupContent>
             {mine.isLoading ? (
               <Skeleton className="h-8 w-full" />
             ) : mine.isError ? (
               <LoadError onRetry={() => void mine.refetch()} />
             ) : myItems.length > 0 ? (
-              <SidebarMenu>{myItems.map((f) => renderItem(f, true))}</SidebarMenu>
+              <>
+                <SidebarMenu>{myItems.map((f) => renderItem(f, true))}</SidebarMenu>
+                {hint(myItems.length, mine.data?.total)}
+              </>
             ) : (
               <div className="flex flex-col items-start gap-2 px-2 py-1 text-sm text-muted-foreground">
                 <p>
@@ -268,24 +300,42 @@ export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
               </div>
             )}
           </SidebarGroupContent>
+          </CollapsibleContent>
         </SidebarGroup>
+        </Collapsible>
 
-        {(shared.isLoading || shared.isError || sharedItems.length > 0) && (
+        <Collapsible defaultOpen asChild>
           <SidebarGroup>
-            <SidebarGroupLabel>Shared with me</SidebarGroupLabel>
-            <SidebarGroupContent>
-              {shared.isLoading ? (
-                <Skeleton className="h-8 w-full" />
-              ) : shared.isError ? (
-                <LoadError onRetry={() => void shared.refetch()} />
-              ) : (
-                <SidebarMenu>
-                  {sharedItems.map((f) => renderItem(f, false))}
-                </SidebarMenu>
-              )}
-            </SidebarGroupContent>
+            <SidebarGroupLabel asChild>
+              <CollapsibleTrigger className="group/trigger">
+                Shared with me
+                <ChevronRight className="ml-auto transition-transform group-data-[state=open]/trigger:rotate-90" />
+              </CollapsibleTrigger>
+            </SidebarGroupLabel>
+            <CollapsibleContent>
+              <SidebarGroupContent>
+                {shared.isLoading ? (
+                  <Skeleton className="h-8 w-full" />
+                ) : shared.isError ? (
+                  <LoadError onRetry={() => void shared.refetch()} />
+                ) : sharedItems.length > 0 ? (
+                  <>
+                    <SidebarMenu>
+                      {sharedItems.map((f) => renderItem(f, false))}
+                    </SidebarMenu>
+                    {hint(sharedItems.length, shared.data?.total)}
+                  </>
+                ) : (
+                  <p className="px-2 py-1 text-sm text-muted-foreground">
+                    {debounced
+                      ? 'No templates match your search.'
+                      : 'Nothing shared with you yet'}
+                  </p>
+                )}
+              </SidebarGroupContent>
+            </CollapsibleContent>
           </SidebarGroup>
-        )}
+        </Collapsible>
       </SidebarContent>
       <SidebarRail />
 

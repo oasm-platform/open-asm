@@ -1,4 +1,5 @@
 import { renderWithProviders, screen, waitFor } from '@/test/utils';
+import { fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AxiosError } from 'axios';
 import { useEffect, useState } from 'react';
@@ -190,6 +191,22 @@ describe('TemplateEditor', () => {
     expect(saveAsync).not.toHaveBeenCalled();
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled(),
+    );
+  });
+
+  it.each([
+    ['id: my-check\n', 'my-check.yaml'],
+    ['id: "we ird/id"\n', 'we-ird-id.yaml'],
+    ['info: {}\n', 'example-template.yaml'],
+    ['id: [\n', 'example-template.yaml'],
+  ])('names a new template from its id (%j -> %s)', async (content, name) => {
+    const user = userEvent.setup();
+    createAsync.mockResolvedValue(artifact({ id: 'n1', name }));
+    setup((api) => api.openNew());
+    fireEvent.change(await box(), { target: { value: content } });
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(createAsync).toHaveBeenCalledWith({ data: { name, content } }),
     );
   });
 

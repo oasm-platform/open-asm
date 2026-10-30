@@ -67,7 +67,7 @@ async function setup(
   vi.mocked(useTemplatesControllerGetMany).mockImplementation(((
     params: { scope?: string } | undefined,
   ) => ({
-    data: { data: params?.scope === 'shared' ? shared : mine },
+    data: { data: params?.scope === 'shared' ? shared : mine, ...(extra.total && params?.scope !== 'shared' ? { total: extra.total } : {}) },
     isLoading: false,
     refetch: vi.fn(),
     ...extra,
@@ -101,6 +101,52 @@ describe('TemplatesSidebar', () => {
     expect(await screen.findByText('one.yaml')).toBeInTheDocument();
     expect(screen.getByText('Private')).toBeInTheDocument();
     expect(screen.getByText('Shared')).toBeInTheDocument();
+  });
+
+  it('requests name-sorted lists and hints when more exist than shown', async () => {
+    const { useTemplatesControllerGetMany } = await import(
+      '@/services/apis/gen/queries'
+    );
+    await setup([artifact({})], [], { total: 250 });
+    expect(await screen.findByText('mine.yaml')).toBeInTheDocument();
+    expect(useTemplatesControllerGetMany).toHaveBeenCalledWith(
+      expect.objectContaining({ sortBy: 'name', sortOrder: 'ASC' }),
+    );
+    expect(screen.getByText('Showing 1 of 250 — search to narrow')).toBeInTheDocument();
+  });
+
+  it('always renders Shared with me, with an empty message', async () => {
+    await setup([artifact({})]);
+    expect(await screen.findByText('Shared with me')).toBeInTheDocument();
+    expect(screen.getByText('Nothing shared with you yet')).toBeInTheDocument();
+  });
+
+  it('collapses a section from its label', async () => {
+    const user = userEvent.setup();
+    await setup([artifact({})]);
+    await user.click(await screen.findByText('My templates'));
+    await waitFor(() =>
+      expect(screen.queryByText('mine.yaml')).not.toBeInTheDocument(),
+    );
+  });
+
+  it('upload error names the file and keeps going', async () => {
+    const { AxiosError } = await import('axios');
+    const { toast } = await import('sonner');
+    const spy = vi.spyOn(toast, 'error').mockImplementation(() => 1);
+    const user = userEvent.setup();
+    createAsync.mockRejectedValueOnce(
+      new AxiosError('bad', '400', undefined, undefined, {
+        status: 400,
+        data: { message: 'Invalid YAML at line 3' },
+      } as never),
+    );
+    await setup([]);
+    const input = (await screen.findByLabelText('Upload templates')) as HTMLInputElement;
+    await user.upload(input, [yaml('a', 'a.yaml'), yaml('id: b', 'b.yaml')]);
+    await waitFor(() => expect(createAsync).toHaveBeenCalledTimes(2));
+    expect(spy).toHaveBeenCalledWith('a.yaml: Invalid YAML at line 3');
+    spy.mockRestore();
   });
 
   it('lists shared templates with owner name', async () => {
