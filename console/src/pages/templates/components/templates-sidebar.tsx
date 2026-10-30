@@ -85,9 +85,9 @@ export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
     void shared.refetch();
   };
 
-  const create = useTemplatesControllerCreate();
-  const remove = useArtifactsControllerRemove();
-  const rename = useTemplatesControllerRename();
+  const create = useTemplatesControllerCreate({ mutation: { onError: () => {} } });
+  const remove = useArtifactsControllerRemove({ mutation: { onError: () => {} } });
+  const rename = useTemplatesControllerRename({ mutation: { onError: () => {} } });
 
   const [renaming, setRenaming] = useState<ArtifactDto | null>(null);
   const [deleting, setDeleting] = useState<ArtifactDto | null>(null);

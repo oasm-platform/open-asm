@@ -1,5 +1,5 @@
 import { yaml } from '@codemirror/lang-yaml';
-import { useNavigate } from '@tanstack/react-router';
+import { useBlocker, useNavigate } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { tokyoNight } from '@uiw/codemirror-theme-tokyo-night';
 import CodeMirror from '@uiw/react-codemirror';
@@ -16,6 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { usePermission } from '@/hooks/usePermission';
 import { handleServerError } from '@/lib/handle-server-error';
 import {
+  getTemplatesControllerGetContentQueryKey,
   getTemplatesControllerGetManyQueryKey,
   useTemplatesControllerCreate,
   useTemplatesControllerGetContent,
@@ -28,28 +29,34 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
   const { hasPermission } = usePermission();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { update, markSaved } = useTemplateTabs();
-  const saveContent = useTemplatesControllerSaveContent();
-  const create = useTemplatesControllerCreate();
+  const { update, markSaved, load } = useTemplateTabs();
+  const saveContent = useTemplatesControllerSaveContent({
+    mutation: { onError: () => {} }, // errors are shown here, not by the global handler
+  });
+  const create = useTemplatesControllerCreate({
+    mutation: { onError: () => {} },
+  });
   const [saving, setSaving] = useState(false);
   const [yamlError, setYamlError] = useState<string | null>(null);
 
-  const { data, isLoading } = useTemplatesControllerGetContent(
-    tab.artifactId ?? '',
-    { query: { enabled: !!tab.artifactId } },
-  );
+  const { data, isError, isFetchedAfterMount, refetch } =
+    useTemplatesControllerGetContent(tab.artifactId ?? '', {
+      query: { enabled: !!tab.artifactId },
+    });
 
-  // open() adds a blank tab; fill it once, unless the user already typed.
+  // open() adds a blank tab; fill it once from a fresh fetch (never the cache,
+  // which may predate another member's edit), unless the user already typed.
   useEffect(() => {
-    if (data && !tab.content && !tab.savedContent) {
-      markSaved(tab.id, data.artifact, data.content);
+    if (data && isFetchedAfterMount && !tab.content && !tab.savedContent) {
+      load(tab.id, data.artifact, data.content);
     }
-  }, [data, tab.id, tab.content, tab.savedContent, markSaved]);
+  }, [data, isFetchedAfterMount, tab.id, tab.content, tab.savedContent, load]);
 
-  const loading = !!tab.artifactId && isLoading && !tab.content;
+  const loadFailed = !!tab.artifactId && !tab.content && isError;
+  const loading = !!tab.artifactId && !tab.content && !isError;
   const readOnly = tab.readOnly || !hasPermission('artifact.write');
   const dirty = tab.content !== tab.savedContent;
-  const canSave = dirty && !readOnly && !saving && !loading;
+  const canSave = dirty && !readOnly && !saving && !loading && !loadFailed;
 
   const save = async () => {
     if (!canSave) return;
@@ -64,6 +71,10 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
           })
         : await create.mutateAsync({ data: { name: tab.name, content } });
       markSaved(tab.id, artifact, content);
+      queryClient.setQueryData(
+        getTemplatesControllerGetContentQueryKey(artifact.id),
+        { artifact, content },
+      );
       if (!tab.artifactId) {
         await queryClient.invalidateQueries({
           queryKey: getTemplatesControllerGetManyQueryKey(),
@@ -146,7 +157,7 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
             size="sm"
             variant="outline"
             onClick={() => void format()}
-            disabled={readOnly || loading}
+            disabled={readOnly || loading || loadFailed}
           >
             Format
           </Button>
@@ -163,7 +174,14 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
           {yamlError}
         </p>
       )}
-      {loading ? (
+      {loadFailed ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
+          <p>Could not load this template.</p>
+          <Button size="sm" variant="outline" onClick={() => void refetch()}>
+            Retry
+          </Button>
+        </div>
+      ) : loading ? (
         <div className="space-y-2 p-4">
           <Skeleton className="h-4 w-1/3" />
           <Skeleton className="h-4 w-2/3" />
@@ -193,12 +211,11 @@ export function TemplateEditor() {
   const active = tabs.find((t) => t.id === activeId);
   const anyDirty = tabs.some((t) => t.content !== t.savedContent);
 
-  useEffect(() => {
-    if (!anyDirty) return;
-    const guard = (e: BeforeUnloadEvent) => e.preventDefault();
-    window.addEventListener('beforeunload', guard);
-    return () => window.removeEventListener('beforeunload', guard);
-  }, [anyDirty]);
+  const blocker = useBlocker({
+    shouldBlockFn: () => anyDirty,
+    enableBeforeUnload: () => anyDirty,
+    withResolver: true,
+  });
 
   const requestClose = (tab: TemplateTab) =>
     tab.content !== tab.savedContent ? setClosing(tab) : close(tab.id);
@@ -218,6 +235,14 @@ export function TemplateEditor() {
           Select a template or create a new one
         </div>
       )}
+      <ConfirmDialog
+        open={blocker.status === 'blocked'}
+        onOpenChange={(o) => !o && blocker.reset?.()}
+        title="Discard unsaved changes?"
+        description="Leaving this page discards templates you have not saved."
+        confirmText="Discard"
+        onConfirm={() => blocker.proceed?.()}
+      />
       <ConfirmDialog
         open={!!closing}
         onOpenChange={(o) => !o && setClosing(null)}

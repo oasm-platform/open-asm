@@ -1,7 +1,8 @@
 import { renderWithProviders, screen, waitFor } from '@/test/utils';
 import userEvent from '@testing-library/user-event';
 import { AxiosError } from 'axios';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { getTemplatesControllerGetContentQueryKey } from '@/services/apis/gen/queries';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTemplateTabs } from '../hooks/use-template-tabs';
 import { TemplateEditor } from './template-editor';
@@ -10,6 +11,25 @@ const saveAsync = vi.fn();
 const createAsync = vi.fn();
 let canWrite = true;
 let contentResult: { artifact: unknown; content: string } | undefined;
+let contentError = false;
+// When set, the hook first serves this cached copy (not fetched yet), then contentResult.
+let staleResult: { artifact: unknown; content: string } | undefined;
+const refetch = vi.fn();
+let saveOpts: { mutation?: { onError?: () => void } } | undefined;
+let blocker: { status: string; proceed: () => void; reset: () => void } = {
+  status: 'idle',
+  proceed: vi.fn(),
+  reset: vi.fn(),
+};
+let blockerArgs: { shouldBlockFn: () => boolean } | undefined;
+
+vi.mock('@tanstack/react-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@tanstack/react-router')>()),
+  useBlocker: (args: { shouldBlockFn: () => boolean }) => {
+    blockerArgs = args;
+    return blocker;
+  },
+}));
 
 vi.mock('@/hooks/usePermission', () => ({
   usePermission: () => ({ hasPermission: () => canWrite }),
@@ -36,11 +56,26 @@ vi.mock('@uiw/react-codemirror', () => ({
 
 vi.mock('@/services/apis/gen/queries', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/services/apis/gen/queries')>()),
-  useTemplatesControllerGetContent: () => ({
-    data: contentResult,
-    isLoading: !contentResult,
-  }),
-  useTemplatesControllerSaveContent: () => ({ mutateAsync: saveAsync }),
+  useTemplatesControllerGetContent: () => {
+    const [fresh, setFresh] = useState(!staleResult);
+    useEffect(() => {
+      if (!staleResult) return;
+      const t = setTimeout(() => setFresh(true), 80);
+      return () => clearTimeout(t);
+    }, []);
+    const data = fresh ? contentResult : staleResult;
+    return {
+      data: contentError ? undefined : data,
+      isLoading: !data && !contentError,
+      isError: contentError,
+      isFetchedAfterMount: fresh,
+      refetch,
+    };
+  },
+  useTemplatesControllerSaveContent: (o: typeof saveOpts) => {
+    saveOpts = o;
+    return { mutateAsync: saveAsync };
+  },
   useTemplatesControllerCreate: () => ({ mutateAsync: createAsync }),
 }));
 
@@ -102,6 +137,11 @@ describe('TemplateEditor', () => {
     createAsync.mockReset();
     toastError.mockClear();
     canWrite = true;
+    contentError = false;
+    staleResult = undefined;
+    refetch.mockClear();
+    saveOpts = undefined;
+    blocker = { status: 'idle', proceed: vi.fn(), reset: vi.fn() };
     contentResult = { artifact: artifact(), content: 'id: one' };
   });
 
@@ -220,5 +260,78 @@ describe('TemplateEditor', () => {
     await waitFor(async () =>
       expect((await box()).value).toBe('id: one\nlist:\n  - a\n'),
     );
+  });
+
+  it('does not seed a new tab from a stale cached copy', async () => {
+    staleResult = { artifact: artifact(), content: 'id: old' };
+    contentResult = { artifact: artifact(), content: 'id: new' };
+    setup(openSaved());
+    await waitFor(async () => expect((await box()).value).toBe('id: new'));
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+  });
+
+  it('save and create write the new content into the content cache', async () => {
+    const user = userEvent.setup();
+    saveAsync.mockResolvedValue(artifact());
+    const { queryClient } = setup(openSaved());
+    // gcTime is 0 and the hook is mocked, so observe the write instead of the cache.
+    const spy = vi.spyOn(queryClient, 'setQueryData');
+    await waitFor(async () => expect((await box()).value).toBe('id: one'));
+    await user.type(await box(), '2');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(spy).toHaveBeenCalledWith(
+        getTemplatesControllerGetContentQueryKey('a1'),
+        { artifact: artifact(), content: 'id: one2' },
+      ),
+    );
+  });
+
+  it('keeps text typed while a save is in flight', async () => {
+    const user = userEvent.setup();
+    let resolve!: (a: unknown) => void;
+    saveAsync.mockReturnValue(new Promise((r) => (resolve = r)));
+    setup(openSaved());
+    await waitFor(async () => expect((await box()).value).toBe('id: one'));
+    await user.type(await box(), '2');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.type(await box(), '3');
+    resolve(artifact());
+    await waitFor(async () => expect((await box()).value).toBe('id: one23'));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled(),
+    );
+  });
+
+  it('shows an error with Retry when the content fails to load', async () => {
+    const user = userEvent.setup();
+    contentError = true;
+    setup(openSaved());
+    await user.click(await screen.findByRole('button', { name: 'Retry' }));
+    expect(refetch).toHaveBeenCalled();
+    expect(screen.queryByLabelText('Template content')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+  });
+
+  it('blocks in-app navigation while a tab is dirty and confirms', async () => {
+    const user = userEvent.setup();
+    blocker = { status: 'blocked', proceed: vi.fn(), reset: vi.fn() };
+    setup((api) => api.openNew());
+    await box();
+    expect(blockerArgs?.shouldBlockFn()).toBe(true);
+    expect(await screen.findByText('Discard unsaved changes?')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Discard' }));
+    expect(blocker.proceed).toHaveBeenCalled();
+  });
+
+  it('suppresses the global mutation toast so a 409 toasts once', async () => {
+    const user = userEvent.setup();
+    saveAsync.mockRejectedValue(axiosError(409, { message: 'full' }));
+    setup(openSaved());
+    await waitFor(async () => expect((await box()).value).toBe('id: one'));
+    await user.type(await box(), '2');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(toastError).toHaveBeenCalledTimes(1));
+    expect(saveOpts?.mutation?.onError).toBeTypeOf('function');
   });
 });

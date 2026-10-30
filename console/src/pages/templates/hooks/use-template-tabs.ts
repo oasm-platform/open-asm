@@ -86,19 +86,28 @@ export function useTemplateTabs() {
     [setState],
   );
 
+  // Leaves `content` alone: text typed while the save was in flight stays dirty.
   const markSaved = useCallback(
+    (id: string, artifact: ArtifactDto, savedContent: string) =>
+      setState((prev) => ({
+        ...prev,
+        tabs: prev.tabs.map((t) =>
+          t.id === id
+            ? { ...t, artifactId: artifact.id, name: artifact.name, savedContent }
+            : t,
+        ),
+      })),
+    [setState],
+  );
+
+  // Seeds a freshly opened tab from the server copy.
+  const load = useCallback(
     (id: string, artifact: ArtifactDto, content: string) =>
       setState((prev) => ({
         ...prev,
         tabs: prev.tabs.map((t) =>
           t.id === id
-            ? {
-                ...t,
-                artifactId: artifact.id,
-                name: artifact.name,
-                content,
-                savedContent: content,
-              }
+            ? { ...t, artifactId: artifact.id, name: artifact.name, content, savedContent: content }
             : t,
         ),
       })),
@@ -134,5 +143,5 @@ export function useTemplateTabs() {
     [setState],
   );
 
-  return { tabs: state.tabs, activeId: state.activeId, open, openNew, update, markSaved, rename, activate, close };
+  return { tabs: state.tabs, activeId: state.activeId, open, openNew, update, markSaved, load, rename, activate, close };
 }
