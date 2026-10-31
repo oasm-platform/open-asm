@@ -396,7 +396,7 @@ describe('AuditService', () => {
           ipAddress: '10.0.0.1',
           userAgent: 'old-agent',
         },
-        ip: '203.0.113.7',
+        socket: { remoteAddress: '203.0.113.7' },
         headers: { 'user-agent': 'new-agent' },
         requestId: 'req-1',
       } as unknown as RequestWithMetadata;

@@ -1,3 +1,4 @@
+import type { IncomingMessage } from 'node:http';
 import { BlockList, isIP } from 'node:net';
 
 /**
@@ -66,4 +67,20 @@ export function resolveClientIp(
     if (!isTrusted(hops[i])) return hops[i];
   }
   return peerIp;
+}
+
+/**
+ * Client IP of an HTTP request, resolved like a worker's gRPC join. Not
+ * `req.ip`: the HTTP adapter has no `trustProxy`, so behind nginx/cloudflared
+ * that is always the proxy's address.
+ */
+export function requestClientIp(
+  req: Pick<IncomingMessage, 'socket' | 'headers'>,
+): string | undefined {
+  const forwardedFor = req.headers?.['x-forwarded-for'];
+  return resolveClientIp(
+    req.socket?.remoteAddress,
+    typeof forwardedFor === 'string' ? forwardedFor : undefined,
+    parseTrustedProxies(process.env.TRUSTED_PROXIES),
+  );
 }
