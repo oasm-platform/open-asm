@@ -209,7 +209,7 @@ export class CreateJobs extends PickType(Job, [
    */
   assetServiceIds?: string[];
   workspaceId: string;
-  workflow: Workflow;
+  workflow?: Workflow;
   jobHistory?: JobHistory;
   jobName?: string;
   jobRunType?: JobRunType;
