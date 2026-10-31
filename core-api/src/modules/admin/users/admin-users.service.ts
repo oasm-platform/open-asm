@@ -1,3 +1,4 @@
+import { PENDING_APPROVAL_REASON } from '@/common/constants/app.constants';
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { Role } from '@/common/enums/enum';
 import { User } from '@/modules/auth/entities/user.entity';
@@ -32,6 +33,8 @@ export function toAdminUserDto(
     banned: user.banned ?? null,
     banReason: user.banReason ?? null,
     banExpires: user.banExpires ?? null,
+    pendingApproval:
+      !!user.banned && user.banReason === PENDING_APPROVAL_REASON,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
     lastActiveAt,

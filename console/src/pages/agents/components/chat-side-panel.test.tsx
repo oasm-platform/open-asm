@@ -84,20 +84,21 @@ const liveShot: LiveBrowserScreenshot = {
   toolCallId: 'b2',
   command: 'browser -s b-1 click @e3',
   image: '/9j/4AAQ',
+  browserSessionId: 'b-1',
 };
 
 function Harness({
   subagents = [],
   messages = [],
   remoteExecuteEvents,
-  browserScreenshot,
+  browserScreenshots,
   onClose = () => {},
   onSelectToolCall,
 }: {
   subagents?: SubagentResponseDto[];
   messages?: UIMessage[];
   remoteExecuteEvents?: Map<string, RemoteExecuteStreamEvent[]>;
-  browserScreenshot?: LiveBrowserScreenshot | null;
+  browserScreenshots?: LiveBrowserScreenshot[];
   onClose?: () => void;
   onSelectToolCall?: (id: string) => void;
 }) {
@@ -114,7 +115,7 @@ function Harness({
       metadata={null}
       onSelectToolCall={onSelectToolCall}
       remoteExecuteEvents={remoteExecuteEvents}
-      browserScreenshot={browserScreenshot}
+      browserScreenshots={browserScreenshots}
     />
   );
 }
@@ -208,7 +209,7 @@ describe('ChatSidePanel', () => {
     const { rerender } = render(
       <Harness
         messages={done}
-        browserScreenshot={liveShot}
+        browserScreenshots={[liveShot]}
         onSelectToolCall={onSelectToolCall}
       />,
     );
@@ -227,13 +228,53 @@ describe('ChatSidePanel', () => {
           ...done,
           browserCommand('b3', 'browser -s b-1 press Enter', 'input-available'),
         ]}
-        browserScreenshot={liveShot}
+        browserScreenshots={[liveShot]}
       />,
     );
     expect(screen.getByText('Running')).toBeInTheDocument();
     expect(screen.getByText('browser -s b-1 press Enter')).toBeInTheDocument();
     // The last picture stays until the running command brings a new one
     expect(screen.getByRole('img', { name: /click @e3/ })).toBeInTheDocument();
+  });
+
+  it("shows every browser session, the main agent's and the subagents'", async () => {
+    const user = userEvent.setup();
+    const onSelectToolCall = vi.fn();
+    const subagentShot: LiveBrowserScreenshot = {
+      toolCallId: 'x1',
+      command: 'browser -s b-2 snapshot -i',
+      image: '/9j/SUB',
+      browserSessionId: 'b-2',
+      subagent: { id: 's1', name: 'webapp-tester' },
+      receivedAt: 2,
+    };
+    render(
+      <Harness
+        messages={[
+          browserCommand('b2', 'browser -s b-1 click @e3', 'output-available'),
+          browserCommand('b4', 'browser open https://admin.example.com', 'input-available'),
+        ]}
+        browserScreenshots={[{ ...liveShot, receivedAt: 1 }, subagentShot]}
+        onSelectToolCall={onSelectToolCall}
+      />,
+    );
+
+    await user.click(screen.getByRole('tab', { name: /Browser/ }));
+    expect(screen.getByRole('tab', { name: /Browser/ })).toHaveTextContent('2');
+    expect(
+      screen.getByRole('img', { name: /Main agent after .*click @e3/ }),
+    ).toHaveAttribute('src', 'data:image/jpeg;base64,/9j/4AAQ');
+    expect(
+      screen.getByRole('img', { name: /webapp-tester after .*snapshot -i/ }),
+    ).toHaveAttribute('src', 'data:image/jpeg;base64,/9j/SUB');
+    expect(screen.getByText('b-2')).toHaveAttribute('title', 'b-2');
+    // Only the main agent's commands are in the chat
+    expect(screen.getAllByRole('button', { name: 'Show in chat' })).toHaveLength(1);
+    // A session being opened has no picture yet
+    expect(
+      screen.getByText('browser open https://admin.example.com'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Running')).toBeInTheDocument();
   });
 
   it('says so when a tab has nothing to show', async () => {
@@ -275,7 +316,7 @@ describe('sidePanelContent', () => {
         subagents: [subagent],
         messages: toolMessages,
         metadata,
-        browserScreenshot: liveShot,
+        browserScreenshots: [liveShot],
       }),
     ).toEqual({ plan: false, subagents: true, browser: true, tools: true, stats: true });
   });

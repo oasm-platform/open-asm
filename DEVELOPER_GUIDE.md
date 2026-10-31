@@ -609,10 +609,8 @@ There is no byte-streaming read route: object bytes are served only by
 storage itself (plain public URL or presigned URL). The only read gate is
 `presign/download` (`storage.controller.ts:210`), which keeps authorization
 via `authorizeRead` (`storage.controller.ts:233`) over the bucket classes
-from `StorageService.getBucketAccess` (`storage.service.ts:104`). This is
-the AE-02 posture: finding AE-02 in
-[`docs/security-audit-report.md`](docs/security-audit-report.md) is closed
-by this model.
+from `StorageService.getBucketAccess` (`storage.service.ts:104`). This
+model closes the storage-bucket exposure found in the 2026-09 audit (AE-02).
 
 | Class | Buckets | Rule |
 | --- | --- | --- |

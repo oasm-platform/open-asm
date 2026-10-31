@@ -2,6 +2,7 @@ import Page from '@/components/common/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { OpenLink } from '@/components/ui/open-link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import useDebounce from '@/hooks/use-debounce';
@@ -220,7 +221,7 @@ function RepositoriesTable({ targetId }: { targetId: string }) {
                 <Badge variant="secondary">
                   {repo.private ? 'Private' : 'Public'}
                 </Badge>
-                <a
+                <OpenLink
                   href={repo.url}
                   target="_blank"
                   rel="noreferrer noopener"
@@ -228,7 +229,7 @@ function RepositoriesTable({ targetId }: { targetId: string }) {
                   className="text-muted-foreground hover:text-foreground"
                 >
                   <ExternalLink className="size-4" />
-                </a>
+                </OpenLink>
               </div>
             </li>
           ))}

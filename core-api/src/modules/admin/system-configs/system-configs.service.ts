@@ -1,18 +1,40 @@
 import { GITHUB_REPO } from '@/common/constants/app.constants';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { ReleaseVersion } from '@/common/interfaces/app.interface';
+import { encrypt } from '@/common/utils/encryption.util';
 import { RedisService } from '@/services/redis/redis.service';
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  OnModuleInit,
+} from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import axios from 'axios';
 import { Repository } from 'typeorm';
 import { StorageService } from '@/modules/storage/storage.service';
 import {
+  MailProvider,
+  MailServerSettingsDto,
   SystemConfigResponseDto,
+  SystemSettingsDto,
   UpdateSystemConfigDto,
 } from './dto/system-configs.dto';
-import { SystemConfig } from './entities/system-config.entity';
+import { SystemConfig, SystemSettings } from './entities/system-config.entity';
+
+/** Stored `settings.mailServer`; `password` is encrypted */
+export interface MailServerConfig {
+  enabled: boolean;
+  provider: MailProvider;
+  host: string;
+  port: number;
+  secure: boolean;
+  username: string;
+  password?: string;
+  fromEmail: string;
+  fromName: string;
+}
 
 /**
  * Service for managing system configuration
@@ -21,6 +43,20 @@ import { SystemConfig } from './entities/system-config.entity';
 @Injectable()
 export class SystemConfigsService implements OnModuleInit {
   private static readonly DEFAULT_SYSTEM_NAME = 'OASM';
+  /** Defaults per settings section; stored fields override them */
+  private static readonly DEFAULT_SETTINGS: SystemSettings = {
+    auth: { allowSignUp: false },
+    mailServer: {
+      enabled: false,
+      provider: MailProvider.SMTP,
+      host: '',
+      port: 587,
+      secure: false,
+      username: '',
+      fromEmail: '',
+      fromName: '',
+    },
+  };
   private readonly logger = new Logger(SystemConfigsService.name);
 
   constructor(
@@ -97,6 +133,111 @@ export class SystemConfigsService implements OnModuleInit {
       return { message: 'System logo removed successfully' };
     }
     return { message: 'No system logo to remove' };
+  }
+
+  /**
+   * Get feature settings with each section's defaults filled in
+   * @returns Settings keyed by section
+   */
+  async getSettings(): Promise<SystemSettings> {
+    const config = await this.findOrCreateConfig();
+    const defaults = SystemConfigsService.DEFAULT_SETTINGS;
+    const stored = config.settings ?? {};
+    const sections = new Set([
+      ...Object.keys(defaults),
+      ...Object.keys(stored),
+    ]);
+
+    return Object.fromEntries(
+      [...sections].map((section) => [
+        section,
+        { ...defaults[section], ...stored[section] },
+      ]),
+    );
+  }
+
+  /**
+   * Feature settings as the admin API shows them: the mail server password is
+   * left out, and `mailServer.hasPassword` tells whether one is saved
+   * @returns Settings keyed by section
+   */
+  async getSettingsView(): Promise<SystemSettings> {
+    const settings = await this.getSettings();
+    const { password, ...mailServer } = settings.mailServer ?? {};
+    return {
+      ...settings,
+      mailServer: { ...mailServer, hasPassword: !!password },
+    };
+  }
+
+  /** The mail server with defaults filled in; `password` stays encrypted */
+  async getMailServer(): Promise<MailServerConfig> {
+    const { mailServer } = await this.getSettings();
+    return mailServer as unknown as MailServerConfig;
+  }
+
+  /**
+   * Whether public sign-up is open: an admin allows it (`auth.allowSignUp`,
+   * off by default) and the mail server is on to send verification emails
+   */
+  async isSignUpAllowed(): Promise<boolean> {
+    const { auth, mailServer } = await this.getSettings();
+    return auth?.allowSignUp === true && mailServer?.enabled === true;
+  }
+
+  /**
+   * Merge the given sections into the stored settings in one statement, so
+   * concurrent saves of different sections or fields don't overwrite each
+   * other. Fields left out of a section keep their stored value.
+   * @param dto Sections to update
+   * @returns Success message
+   */
+  async updateSettings(
+    dto: SystemSettingsDto,
+  ): Promise<DefaultMessageResponseDto> {
+    const patch = { ...(dto as SystemSettings) };
+    if (dto.mailServer) {
+      patch.mailServer = await this.prepareMailServerPatch(dto.mailServer);
+    }
+    const sections = Object.entries(patch).filter(
+      ([, value]) => value !== undefined && value !== null,
+    );
+
+    if (sections.length > 0) {
+      const config = await this.findOrCreateConfig();
+      await this.systemConfigRepository
+        .createQueryBuilder()
+        .update()
+        .set({
+          settings: () =>
+            `settings || (SELECT jsonb_object_agg(s.key, COALESCE(settings -> s.key, '{}'::jsonb) || s.value) FROM jsonb_each(CAST(:sections AS jsonb)) s)`,
+        })
+        .setParameter('sections', JSON.stringify(Object.fromEntries(sections)))
+        .where('id = :id', { id: config.id })
+        .execute();
+    }
+
+    return { message: 'System settings updated successfully' };
+  }
+
+  /**
+   * Encrypts a new password (an empty one keeps the saved password) and
+   * refuses to turn on a mail server that has no host or sender address.
+   */
+  private async prepareMailServerPatch(
+    dto: MailServerSettingsDto,
+  ): Promise<Record<string, unknown>> {
+    const { password, ...rest } = dto;
+    const patch: Record<string, unknown> = { ...rest };
+    if (password) patch.password = encrypt(password);
+
+    const merged = { ...(await this.getMailServer()), ...patch };
+    if (merged.enabled && (!merged.host || !merged.fromEmail)) {
+      throw new BadRequestException(
+        'Set a host and a sender email before turning on the mail server',
+      );
+    }
+    return patch;
   }
 
   /**

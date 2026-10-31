@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import type {
   LanguageModel,
+  PrepareStepFunction,
   StepResult,
   TextStreamPart,
   ToolSet,
@@ -66,6 +67,7 @@ import {
 } from './shared/conversation-metadata';
 import { DEFAULT_MAX_STEPS, stepLimit } from './shared/step-limit';
 import { TokenCounter } from './shared/token-counter';
+import type { BrowserScreenshotEvent } from './tools/remote-execute.tool';
 import {
   addSteps,
   addWait,
@@ -174,8 +176,42 @@ interface StreamTextOptions {
    * so it can detect the cut-off and continue, and true only for the final one.
    */
   forceSummaryOnLimit?: boolean;
+  /**
+   * Called before every step but the first: subagent results that finished
+   * since, as a prompt to hand the model, or undefined when there are none.
+   */
+  takeSubagentResults?: () => Promise<string | undefined>;
   /** Receives the token/timing stats of this streamText call (also on abort) */
   onStats?: (stats: StatsAccumulator) => void;
+}
+
+/**
+ * Hands results that arrive mid-run to the model as a user message before
+ * its next step, so it never polls for them. The SDK carries a step's
+ * messages into the following steps, so each result is added once.
+ */
+export function withStepResults<
+  T extends { prepareStep?: PrepareStepFunction<ToolSet> },
+>(
+  limit: T,
+  takeResults?: () => Promise<string | undefined>,
+): T & { prepareStep?: PrepareStepFunction<ToolSet> } {
+  if (!takeResults) return limit;
+  const prepareStep: PrepareStepFunction<ToolSet> = async (options) => {
+    const base = (await limit.prepareStep?.(options)) ?? {};
+    // The first step's prompt already ends with a user message
+    if (options.stepNumber === 0) return base;
+    const results = await takeResults();
+    if (!results) return base;
+    return {
+      ...base,
+      messages: [
+        ...(base.messages ?? options.messages),
+        { role: 'user', content: results },
+      ],
+    };
+  };
+  return { ...limit, prepareStep };
 }
 
 /** A finished step: its content is kept in stream order */
@@ -1186,8 +1222,9 @@ export class AgentsCompletionsService {
   }
 
   /**
-   * dispatch_subagent / get_subagent_result, AGENT mode only. They only
-   * read or queue, but stay gated so nothing runs before a plan is approved.
+   * dispatch_subagent / get_subagent_result / wait_for_subagents, AGENT mode
+   * only. They only read, queue or wait, but stay gated so nothing runs before
+   * a plan is approved.
    */
   private getSubagentTools(
     agentMode: AgentMode,
@@ -1759,9 +1796,12 @@ export class AgentsCompletionsService {
       ...(tools
         ? {
             tools,
-            ...stepLimit(llmConfig.maxSteps ?? DEFAULT_MAX_STEPS, {
-              forceSummary: options.forceSummaryOnLimit ?? true,
-            }),
+            ...withStepResults(
+              stepLimit(llmConfig.maxSteps ?? DEFAULT_MAX_STEPS, {
+                forceSummary: options.forceSummaryOnLimit ?? true,
+              }),
+              options.takeSubagentResults,
+            ),
           }
         : {}),
       // Enable reasoning/thinking via provider-specific options
@@ -2145,6 +2185,22 @@ export class AgentsCompletionsService {
       };
     }
 
+    // Results that finish while an iteration runs reach it at its next step;
+    // the iteration owns them like the ones injected into its prompt
+    const takeSubagentResults = async (): Promise<string | undefined> => {
+      try {
+        const rows = await this.subagents.takeUndelivered(conversationId);
+        if (rows.length === 0) return undefined;
+        const message = this.subagents.formatResultsMessage(rows);
+        pendingDeliveryIds.push(...rows.map((r) => r.id));
+        deliveredResults.push(message);
+        return message;
+      } catch (err) {
+        this.logger.error('Failed to take subagent results', err);
+        return undefined;
+      }
+    };
+
     const releasePendingDelivery = async () => {
       if (pendingDeliveryIds.length === 0) return;
       const ids = pendingDeliveryIds;
@@ -2261,11 +2317,7 @@ export class AgentsCompletionsService {
 
       // The page after each browser command, for the live Browser panel.
       // Transient: never part of the saved message.
-      const onBrowserScreenshot = (data: {
-        toolCallId: string;
-        command: string;
-        image: string;
-      }) => {
+      const onBrowserScreenshot = (data: BrowserScreenshotEvent) => {
         if (controllerClosed) return;
         controller.enqueue({
           type: 'data-browser-screenshot',
@@ -2328,6 +2380,12 @@ export class AgentsCompletionsService {
           } as unknown as UIMessageChunk);
         },
       );
+      // ...and the pages their browser commands load, for the same panel
+      const unsubscribeSubagentScreenshots =
+        this.subagents.subscribeScreenshots(
+          conversationId,
+          onBrowserScreenshot,
+        );
 
       // Emit initial conversation-created event
       controller.enqueue({
@@ -2394,6 +2452,8 @@ export class AgentsCompletionsService {
                 // continue; force a wrap-up only on the last allowed pass.
                 forceSummaryOnLimit:
                   !continuesPlan || iteration === MAX_SAFETY_ITERATIONS - 1,
+                // Only Agent mode has subagents
+                ...(isAgentMode ? { takeSubagentResults } : {}),
                 onStats: (stats) => {
                   turnAcc = mergeStats(turnAcc, stats);
                 },
@@ -2583,6 +2643,7 @@ export class AgentsCompletionsService {
         }
       } finally {
         unsubscribeSubagents();
+        unsubscribeSubagentScreenshots();
         // A placeholder no iteration finished (stopped mid-iteration or
         // between iterations, or every retry failed) must not stay
         // 'streaming'

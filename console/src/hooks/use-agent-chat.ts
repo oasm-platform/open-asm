@@ -2,7 +2,10 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import type { UIMessage } from 'ai';
 import type { AgentTodoItem } from '@/pages/agents/components/agent-todo-panel';
-import type { LiveBrowserScreenshot } from '@/pages/agents/components/browser-panel';
+import {
+  mergeBrowserScreenshot,
+  type LiveBrowserScreenshot,
+} from '@/pages/agents/components/browser-panel';
 import { isSubagentActive } from '@/pages/agents/components/subagents-panel';
 import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import {
@@ -182,8 +185,11 @@ interface UseAgentChatReturn {
     string,
     import('@/hooks/use-remote-execute-stream').RemoteExecuteStreamEvent[]
   >;
-  /** The page after the last browser command of a run seen live; never saved */
-  browserScreenshot: LiveBrowserScreenshot | null;
+  /**
+   * The page after the last browser command of each browser session (the
+   * main agent's and its subagents'), as seen live; never saved
+   */
+  browserScreenshots: LiveBrowserScreenshot[];
   onSendMessage: (content: string, options?: { agentMode?: string }) => void;
   onRetry: (() => void) | undefined;
   onStop: () => void;
@@ -449,8 +455,9 @@ export function useAgentChat({
     subagentsRef.current = subagents;
   }, [subagents]);
   const { appendEvent, eventsMap } = useRemoteExecuteStream();
-  const [browserScreenshot, setBrowserScreenshot] =
-    useState<LiveBrowserScreenshot | null>(null);
+  const [browserScreenshots, setBrowserScreenshots] = useState<
+    LiveBrowserScreenshot[]
+  >([]);
   // Parallel tool calls can each need approval, so keep a queue
   const [approvalQueue, setApprovalQueue] = useState<PendingApproval[]>([]);
   const pendingApproval = approvalQueue[0] ?? null;
@@ -724,7 +731,12 @@ export function useAgentChat({
         appendEvent(event);
       }
       if (data.type === 'data-browser-screenshot') {
-        setBrowserScreenshot(data.data as LiveBrowserScreenshot);
+        // Replaces the picture of its own session only
+        const shot = {
+          ...(data.data as LiveBrowserScreenshot),
+          receivedAt: Date.now(),
+        };
+        setBrowserScreenshots((prev) => mergeBrowserScreenshot(prev, shot));
       }
     },
   });
@@ -1142,7 +1154,7 @@ export function useAgentChat({
   useEffect(() => {
     // Subagents belong to one conversation: never show the previous one's
     setSubagents([]);
-    setBrowserScreenshot(null);
+    setBrowserScreenshots([]);
     if (!conversationId) {
       setTodos([]);
       setGoal(null);
@@ -1274,7 +1286,7 @@ export function useAgentChat({
     hasMoreMessages: hasNextPage ?? false,
     isLoadingMoreMessages: isFetchingNextPage,
     remoteExecuteEvents: eventsMap,
-    browserScreenshot,
+    browserScreenshots,
     onSendMessage: handleSendMessage,
     onRetry: onRetryAction,
     onStop: handleStop,

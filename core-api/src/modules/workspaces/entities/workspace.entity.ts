@@ -22,6 +22,9 @@ import {
 import { WorkspaceMembers } from './workspace-members.entity';
 import { WorkspacePermission } from './workspace-permission.entity';
 
+/** Workspace feature settings, one object per feature section */
+export type WorkspaceSettings = Record<string, Record<string, unknown>>;
+
 @Entity('workspaces')
 @Index('IDX_workspaces_owner', ['owner'])
 export class Workspace extends BaseEntity {
@@ -129,4 +132,11 @@ export class Workspace extends BaseEntity {
   @IsOptional()
   @Column({ type: 'timestamp', nullable: true })
   dekAt?: Date | null;
+
+  @ApiProperty({
+    description: 'Workspace feature settings keyed by section',
+    default: {},
+  })
+  @Column({ type: 'jsonb', default: {} })
+  settings: WorkspaceSettings;
 }

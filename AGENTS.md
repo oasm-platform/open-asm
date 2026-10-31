@@ -150,7 +150,7 @@ Migration location: `core-api/src/database/migrations/` (58 files, newest last).
 | `console/.env` (from `example.env`) | `VITE_API_URL` (dev `http://localhost:6276`) |
 | `worker/.env` (from `.example.env`) | `WORKER_API_KEY`, `WORKER_MAX_CONCURRENCY`, `WORKER_GRPC_HOST/PORT`, plus `WORKER_MODE`, `WORKER_TOOL_PATH`, `WORKER_TOKEN_FILE`, `WORKER_CONNECTOR_ADDR`, `WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT`, `WORKER_NETWORK` |
 
-`ENCRYPTION_KEYS` semantics matter: the last key encrypts *and* decrypts, earlier keys are decrypt-only — reordering the list locks every encrypted column.
+`ENCRYPTION_KEYS` semantics matter: the last key encrypts *and* decrypts, earlier keys are decrypt-only, and the built-in default stays decrypt-only too. New ciphertext is AES-256-GCM tagged with its key id (`v2:<keyId>:…`, workspace data `v2:dek:…`), so keys can move; the older AES-CBC formats stay readable, and `EncryptionUpgradeService` re-wraps DEKs and rewrites older ciphertext with the active key at boot. Outside development/test the API refuses to boot unless the last key is random and 32+ characters (`assertEncryptionKeys` in `main.ts`).
 
 ## Architecture Patterns
 
@@ -215,7 +215,7 @@ Volumes worth knowing: `pgdata`, `redis-data`, `geoip-data`, `rustfs-data`, `wor
 6. **Generated code is read-only**: `console/src/services/apis/gen/`, `console/src/routeTree.gen.ts`, `worker/internal/gen/`, `.open-api/*`, `core-api/resources/connectors/manifest.json`.
 7. **`.open-api/` is generated and gitignored.** core-api writes `open-api.json` on every boot and orval writes `open-api.patched.json` next to it; neither is committed, so boot the API before `task gen-api`. The better-auth spec merged into it is an input, not output: `core-api/resources/openapi/better-auth.json` (committed).
 8. **Lint autofixes.** `task api:lint` runs with `--fix`; re-read files after linting instead of assuming your version survived.
-9. **`ENCRYPTION_KEYS` is order-sensitive** — the last key is the only one that encrypts.
+9. **Only the last `ENCRYPTION_KEYS` entry encrypts.** Rotate by appending; drop an older key only after the boot log says no stored secret needs it. A new column holding secrets must be added to `SECRET_COLUMNS` in `encryption-upgrade.service.ts`, or rotation leaves it on the old key.
 10. **`task lint` is sequential by design** (two type-aware ESLint processes exhaust RAM). Never run `api:lint` and `console:lint` in parallel/background.
 11. **RustFS/S3 (`RUSTFS_*`) is not optional** — it backs storage, PDF reports, *and* the worker tool registry (`BuiltinToolRegistry` serves the tool archives). Compose only waits for `rustfs` to be *started*, not healthy, so a slow first boot can fail the first worker tool download.
 12. **The worker needs the Docker socket**; without the right group id the daemon returns "permission denied" and API-version negotiation silently falls back to 1.24.

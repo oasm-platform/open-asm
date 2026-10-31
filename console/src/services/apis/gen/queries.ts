@@ -578,6 +578,11 @@ export type WorkspaceDek = { [key: string]: unknown } | null;
  */
 export type WorkspaceDekAt = { [key: string]: unknown } | null;
 
+/**
+ * Workspace feature settings keyed by section
+ */
+export type WorkspaceSettings = { [key: string]: unknown };
+
 export type Workspace = {
   id: string;
   createdAt: string;
@@ -602,6 +607,8 @@ export type Workspace = {
    * @nullable
    */
   dekAt?: WorkspaceDekAt;
+  /** Workspace feature settings keyed by section */
+  settings: WorkspaceSettings;
 };
 
 export type CreateWorkspaceDto = {
@@ -1100,6 +1107,8 @@ export type GetMetadataDto = {
    * @nullable
    */
   logoPath: string | null;
+  /** Whether public sign-up is open, so the console shows the sign-up button */
+  allowSignUp: boolean;
   /** Current system version */
   currentVersion: GetMetadataDtoCurrentVersion;
   /** TTL in seconds for storage presigned URLs */
@@ -1166,6 +1175,50 @@ export type UpdateSystemConfigDto = {
   name?: string;
   /** Path to system logo */
   logoPath?: UpdateSystemConfigDtoLogoPath;
+};
+
+export type AuthSettingsDto = {
+  /** Let anyone create an account through public sign-up */
+  allowSignUp?: boolean;
+};
+
+export type MailProvider = (typeof MailProvider)[keyof typeof MailProvider];
+
+export const MailProvider = {
+  smtp: 'smtp',
+  resend: 'resend',
+  sendgrid: 'sendgrid',
+  postmark: 'postmark',
+  mailgun: 'mailgun',
+  ses: 'ses',
+  brevo: 'brevo',
+  gmail: 'gmail',
+} as const;
+
+export type MailServerSettingsDto = {
+  enabled?: boolean;
+  provider?: MailProvider;
+  host?: string;
+  port?: number;
+  /** Implicit TLS, usually port 465; off means STARTTLS */
+  secure?: boolean;
+  username?: string;
+  /** Write-only password or API key, stored encrypted. Leave out or empty to keep the saved one. */
+  password?: string;
+  /** Read-only: whether a password is saved */
+  hasPassword?: boolean;
+  fromEmail?: string;
+  /** Defaults to the system name */
+  fromName?: string;
+};
+
+export type SystemSettingsDto = {
+  auth?: AuthSettingsDto;
+  mailServer?: MailServerSettingsDto;
+};
+
+export type SendTestMailDto = {
+  to: string;
 };
 
 export type LogoPresignRequestDto = {
@@ -4641,6 +4694,8 @@ export type AdminUserDto = {
   banReason?: string | null;
   /** @nullable */
   banExpires?: string | null;
+  /** Signed up through public sign-up and waiting for an admin to approve (unban) it */
+  pendingApproval: boolean;
   createdAt: string;
   updatedAt: string;
   /**
@@ -19037,6 +19092,351 @@ export const useSystemConfigsControllerUpdateConfig = <
 > => {
   return useMutation(
     getSystemConfigsControllerUpdateConfigMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Retrieves feature settings keyed by section, with defaults filled in
+ * @summary Get system settings
+ */
+export const systemConfigsControllerGetSettings = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SystemSettingsDto>(
+    { url: `/api/admin/system-configs/settings`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getSystemConfigsControllerGetSettingsQueryKey = () => {
+  return [`/api/admin/system-configs/settings`] as const;
+};
+
+export const getSystemConfigsControllerGetSettingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof systemConfigsControllerGetSettings>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof systemConfigsControllerGetSettings>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getSystemConfigsControllerGetSettingsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof systemConfigsControllerGetSettings>>
+  > = ({ signal }) =>
+    systemConfigsControllerGetSettings(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof systemConfigsControllerGetSettings>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type SystemConfigsControllerGetSettingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof systemConfigsControllerGetSettings>>
+>;
+export type SystemConfigsControllerGetSettingsQueryError = unknown;
+
+export function useSystemConfigsControllerGetSettings<
+  TData = Awaited<ReturnType<typeof systemConfigsControllerGetSettings>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof systemConfigsControllerGetSettings>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof systemConfigsControllerGetSettings>>,
+          TError,
+          Awaited<ReturnType<typeof systemConfigsControllerGetSettings>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSystemConfigsControllerGetSettings<
+  TData = Awaited<ReturnType<typeof systemConfigsControllerGetSettings>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof systemConfigsControllerGetSettings>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof systemConfigsControllerGetSettings>>,
+          TError,
+          Awaited<ReturnType<typeof systemConfigsControllerGetSettings>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useSystemConfigsControllerGetSettings<
+  TData = Awaited<ReturnType<typeof systemConfigsControllerGetSettings>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof systemConfigsControllerGetSettings>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get system settings
+ */
+
+export function useSystemConfigsControllerGetSettings<
+  TData = Awaited<ReturnType<typeof systemConfigsControllerGetSettings>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof systemConfigsControllerGetSettings>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getSystemConfigsControllerGetSettingsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Merges the given sections into the stored settings; fields left out keep their value
+ * @summary Update system settings
+ */
+export const systemConfigsControllerUpdateSettings = (
+  systemSettingsDto: SystemSettingsDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/admin/system-configs/settings`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: systemSettingsDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getSystemConfigsControllerUpdateSettingsMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof systemConfigsControllerUpdateSettings>>,
+    TError,
+    { data: SystemSettingsDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof systemConfigsControllerUpdateSettings>>,
+  TError,
+  { data: SystemSettingsDto },
+  TContext
+> => {
+  const mutationKey = ['systemConfigsControllerUpdateSettings'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof systemConfigsControllerUpdateSettings>>,
+    { data: SystemSettingsDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return systemConfigsControllerUpdateSettings(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SystemConfigsControllerUpdateSettingsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof systemConfigsControllerUpdateSettings>>
+>;
+export type SystemConfigsControllerUpdateSettingsMutationBody =
+  SystemSettingsDto;
+export type SystemConfigsControllerUpdateSettingsMutationError = unknown;
+
+/**
+ * @summary Update system settings
+ */
+export const useSystemConfigsControllerUpdateSettings = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof systemConfigsControllerUpdateSettings>>,
+      TError,
+      { data: SystemSettingsDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof systemConfigsControllerUpdateSettings>>,
+  TError,
+  { data: SystemSettingsDto },
+  TContext
+> => {
+  return useMutation(
+    getSystemConfigsControllerUpdateSettingsMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Sends a test email through the saved mail server; a failure returns the server reason
+ * @summary Send a test email
+ */
+export const systemConfigsControllerSendTestMail = (
+  sendTestMailDto: SendTestMailDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/admin/system-configs/settings/mail-server/test`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: sendTestMailDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getSystemConfigsControllerSendTestMailMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof systemConfigsControllerSendTestMail>>,
+    TError,
+    { data: SendTestMailDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof systemConfigsControllerSendTestMail>>,
+  TError,
+  { data: SendTestMailDto },
+  TContext
+> => {
+  const mutationKey = ['systemConfigsControllerSendTestMail'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof systemConfigsControllerSendTestMail>>,
+    { data: SendTestMailDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return systemConfigsControllerSendTestMail(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SystemConfigsControllerSendTestMailMutationResult = NonNullable<
+  Awaited<ReturnType<typeof systemConfigsControllerSendTestMail>>
+>;
+export type SystemConfigsControllerSendTestMailMutationBody = SendTestMailDto;
+export type SystemConfigsControllerSendTestMailMutationError = unknown;
+
+/**
+ * @summary Send a test email
+ */
+export const useSystemConfigsControllerSendTestMail = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof systemConfigsControllerSendTestMail>>,
+      TError,
+      { data: SendTestMailDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof systemConfigsControllerSendTestMail>>,
+  TError,
+  { data: SendTestMailDto },
+  TContext
+> => {
+  return useMutation(
+    getSystemConfigsControllerSendTestMailMutationOptions(options),
     queryClient,
   );
 };

@@ -26,6 +26,7 @@ import { AgentsModelsCatalogService } from './agents.models-catalog';
 import { AgentsSkillsService } from './agents.skills';
 import { AgentTool, READ_ONLY_TOOLS } from './agents.tools';
 import { currentToolName } from './tools/helpers';
+import type { BrowserScreenshotEvent } from './tools/remote-execute.tool';
 import type { AgentDefinitionResponseDto } from './dto/agent-definition.dto';
 import type {
   SubagentDetailResponseDto,
@@ -64,6 +65,11 @@ export const SUBAGENT_SWEEP_MS = 30_000;
 export const SUBAGENT_WAIT_BUDGET_MS = 8 * 60_000;
 /** Times one user turn may resume with subagent results. */
 export const SUBAGENT_MAX_ROUNDS_PER_TURN = 5;
+/**
+ * Longest one wait_for_subagents call blocks. Stays well under the chunk
+ * timeout of the main run, which also covers the time a tool runs.
+ */
+export const SUBAGENT_WAIT_TOOL_MAX_MS = 2 * 60_000;
 /** Cap of each tool input/output and step text in the transcript. */
 export const SUBAGENT_TRANSCRIPT_FIELD_MAX_CHARS = 4_000;
 /** Steps stop being recorded once a run's transcript reaches this size. */
@@ -163,8 +169,8 @@ const instructionSource = (def: AgentDefinitionResponseDto): string =>
  * subagent. The main agent delegates a task with
  * `dispatch_subagent`; the row is the task and the queue entry. An in-process
  * drain claims rows atomically (pending -> in_progress), runs them with
- * read-only tools and stores the result, which is pushed back to the live run
- * of the conversation or delivered with the next message. Stopping the
+ * read-only tools and stores the result, which is handed to the live run of
+ * the conversation at its next step or delivered with the next message. Stopping the
  * conversation cancels its pending and running rows (issue #796).
  */
 @Injectable()
@@ -277,8 +283,8 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
       '- Re-dispatch on every new surface: a new host, endpoint group, parameter cluster, JS bundle, login form or technology version is a new subagent, not a new step inside the one that found it.\n' +
       '- Every candidate finding gets its own validation subagent, and that verifier is not told the expected verdict or the payload that supposedly worked.\n' +
       '- Write each task so it stands alone: the exact target and ids, what is already known, the tool to use, and the evidence that ends the job. Never a vague brief.\n' +
-      '- A subagent runs in the background and returns a summary; results are delivered to you automatically when it finishes ' +
-      '(use `get_subagent_result(id)` to check early). Judge a result against the goal and read the raw lines behind it with `read_tool_output` before calling anything confirmed.\n' +
+      '- A subagent runs in the background and returns a summary. Its result reaches you on its own at your next step once it finishes or fails: never poll for it. ' +
+      'Keep working on whatever does not depend on it; when only waiting is left, call `wait_for_subagents`. Judge a result against the goal and read the raw lines behind it with `read_tool_output` before calling anything confirmed.\n' +
       lines.join('\n') +
       closing
     );
@@ -574,10 +580,20 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
       const approval: ApprovalSettings | undefined = allowWrite
         ? { userId, mode: AgentApprovalMode.AUTO }
         : undefined;
+      // The pages its browser commands load go to the conversation's Browser
+      // panel, labelled with this run. Nothing here waits on the user: the
+      // tools are auto-allowed or never offered.
+      const toolEvents = new EventEmitter();
+      toolEvents.on('browser-screenshot', (shot: BrowserScreenshotEvent) => {
+        this.events.emit(this.screenshotKey(job.conversationId), {
+          ...shot,
+          subagent: { id: job.id, name: job.name },
+        } satisfies BrowserScreenshotEvent);
+      });
       const allTools = this.agentTool.getTools(
         workspaceId,
         AgentMode.AGENT,
-        undefined,
+        toolEvents,
         conversation.id,
         approval,
       ) as Record<string, Tool>;
@@ -762,8 +778,24 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  /** Listens to the browser screenshots of one conversation's subagents. */
+  subscribeScreenshots(
+    conversationId: string,
+    listener: (shot: BrowserScreenshotEvent) => void,
+  ): () => void {
+    const key = this.screenshotKey(conversationId);
+    this.events.on(key, listener);
+    return () => {
+      this.events.off(key, listener);
+    };
+  }
+
   private eventKey(conversationId: string): string {
     return `updated:${conversationId}`;
+  }
+
+  private screenshotKey(conversationId: string): string {
+    return `screenshot:${conversationId}`;
   }
 
   private notify(conversationId: string): void {
@@ -854,24 +886,53 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
     since?: Date,
   ): Promise<'settled' | 'timeout' | 'aborted'> {
     const deadline = Date.now() + timeoutMs;
-    const key = this.eventKey(conversationId);
     for (;;) {
       if (signal?.aborted) return 'aborted';
       if (!(await this.hasActive(conversationId, since))) return 'settled';
       const remaining = deadline - Date.now();
       if (remaining <= 0) return 'timeout';
-      await new Promise<void>((resolve) => {
-        const done = (): void => {
-          clearTimeout(timer);
-          this.events.off(key, done);
-          signal?.removeEventListener('abort', done);
-          resolve();
-        };
-        const timer = setTimeout(done, Math.min(2_000, remaining));
-        this.events.on(key, done);
-        signal?.addEventListener('abort', done, { once: true });
-      });
+      await this.nextUpdate(conversationId, Math.min(2_000, remaining), signal);
     }
+  }
+
+  /**
+   * Waits until a subagent of the conversation has a result nobody took, and
+   * takes them. Returns no rows once nothing is running, on timeout or abort.
+   */
+  async waitForResults(
+    conversationId: string,
+    timeoutMs: number,
+    signal?: AbortSignal,
+  ): Promise<AgentSubagent[]> {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const rows = await this.takeUndelivered(conversationId);
+      if (rows.length > 0) return rows;
+      if (signal?.aborted || !(await this.hasActive(conversationId))) return [];
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) return [];
+      await this.nextUpdate(conversationId, Math.min(2_000, remaining), signal);
+    }
+  }
+
+  /** Resolves on the conversation's next status event, the abort, or after `ms`. */
+  private nextUpdate(
+    conversationId: string,
+    ms: number,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const key = this.eventKey(conversationId);
+    return new Promise<void>((resolve) => {
+      const done = (): void => {
+        clearTimeout(timer);
+        this.events.off(key, done);
+        signal?.removeEventListener('abort', done);
+        resolve();
+      };
+      const timer = setTimeout(done, ms);
+      this.events.on(key, done);
+      signal?.addEventListener('abort', done, { once: true });
+    });
   }
 
   /** Marks finished, undelivered results delivered and returns them. */
@@ -927,7 +988,7 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
       description:
         'Delegate a self-contained task to the background subagent whose role matches it (see Available Subagents). ' +
         'A built-in subagent runs the security tools its role needs (scans, connectors, commands on the pinned worker); a custom one runs them when the conversation is in auto-approval. ' +
-        'Returns immediately with the subagent id; the result is delivered to you automatically when it finishes. Independent subagents can be dispatched in parallel. ' +
+        'Returns immediately with the subagent id; the result reaches you on its own at your next step once it finishes, so never poll for it. Independent subagents can be dispatched in parallel. ' +
         'Dispatch one subagent per independent surface, in the same step, rather than doing the work yourself or running them one after another.',
       inputSchema: z.object({
         name: z
@@ -958,7 +1019,7 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
             id: row.id,
             name: row.name,
             status: row.status,
-            note: 'Runs in the background; the result is delivered automatically when it finishes. Use get_subagent_result(id) to check early.',
+            note: 'Runs in the background; the result reaches you on its own at your next step once it finishes. Do not poll: keep working, or call wait_for_subagents when only waiting is left.',
           };
         } catch (error) {
           return { error: errorMessage(error) };
@@ -968,7 +1029,8 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
 
     const resultConfig = {
       description:
-        'Get the status and result of a subagent dispatched in this conversation.',
+        'Read the status and result of a subagent dispatched in this conversation, such as one handed back earlier. ' +
+        'It does not wait: to wait for running subagents, call wait_for_subagents.',
       inputSchema: z.object({
         id: z.string().uuid().describe('Subagent id from dispatch_subagent'),
       }),
@@ -989,6 +1051,56 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
           status: row.status,
           result: row.result,
           error: row.error,
+          ...(ACTIVE.includes(row.status)
+            ? {
+                note: 'Still running. Do not poll: its result reaches you on its own at your next step once it finishes. Keep working, or call wait_for_subagents when only waiting is left.',
+              }
+            : {}),
+        };
+      },
+    };
+
+    const waitConfig = {
+      description:
+        'Wait for the background subagents of this conversation: blocks until at least one finishes or fails ' +
+        `(at most ${SUBAGENT_WAIT_TOOL_MAX_MS / 60_000} minutes) and returns the results that are ready, plus the ones still running. ` +
+        'Call it when nothing is left to do but wait; results that finish while you work reach you without it.',
+      inputSchema: z.object({}),
+      execute: async (
+        _input: Record<string, never>,
+        options?: { abortSignal?: AbortSignal },
+      ) => {
+        const rows = await this.waitForResults(
+          ctx.conversationId,
+          SUBAGENT_WAIT_TOOL_MAX_MS,
+          options?.abortSignal,
+        );
+        rows.forEach((r) => ctx.onResultRead?.(r.id));
+        const running = await this.subagentRepository.find({
+          where: { conversationId: ctx.conversationId, status: In(ACTIVE) },
+          select: ['id', 'name', 'status'],
+          order: { sortOrder: 'ASC' },
+        });
+        const note =
+          rows.length > 0
+            ? undefined
+            : running.length > 0
+              ? 'None finished yet. Keep working, or call wait_for_subagents again.'
+              : 'No subagent is running and every result was already handed back.';
+        return {
+          results: rows.map((r) => ({
+            id: r.id,
+            name: r.name,
+            status: r.status,
+            result: r.result,
+            error: r.error,
+          })),
+          running: running.map((r) => ({
+            id: r.id,
+            name: r.name,
+            status: r.status,
+          })),
+          ...(note ? { note } : {}),
         };
       },
     };
@@ -999,6 +1111,9 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
       ),
       get_subagent_result: tool(
         resultConfig as unknown as Parameters<typeof tool>[0],
+      ),
+      wait_for_subagents: tool(
+        waitConfig as unknown as Parameters<typeof tool>[0],
       ),
     };
   }

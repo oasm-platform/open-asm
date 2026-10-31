@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { OpenLink } from '@/components/ui/open-link';
 import { Field } from '@/components/ui/field';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -172,10 +173,6 @@ export default function Reports() {
     }
   };
 
-  const handleDownload = (report: ReportResponseDto) => {
-    window.open(report.downloadUrl, '_blank');
-  };
-
   const handleDelete = (report: ReportResponseDto) => {
     deleteMutation.mutate({ id: report.id });
   };
@@ -212,15 +209,14 @@ export default function Reports() {
       header: '',
       cell: ({ row }) => (
         <div className="flex justify-end gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDownload(row.original);
-            }}
-          >
-            <Download className="h-4 w-4" />
+          <Button asChild variant="ghost" size="sm">
+            <OpenLink
+              href={row.original.downloadUrl}
+              aria-label={`Download ${row.original.fileName}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Download className="h-4 w-4" />
+            </OpenLink>
           </Button>
           <ConfirmDialog
             title="Delete Report"

@@ -31,9 +31,5 @@ If the issue is clearly **not sensitive** (hardening idea, dependency bump, theo
 ## Scope Notes
 
 - **Worker Docker socket is by design.** The worker mounts `/var/run/docker.sock` to spawn connector containers (`docker-compose.yml`, `worker/internal/runtime/docker.go`). The socket is root-equivalent on the host — only run trusted connector images, never expose the worker to untrusted networks.
-- **Secrets live in `.env`, never in git.** `ENCRYPTION_KEYS` is order-sensitive (last key encrypts); `WORKER_API_KEY` must match what the API expects. Leaked-key rotation is an operator responsibility.
+- **Secrets live in `.env`, never in git.** `BETTER_AUTH_SECRET` signs sessions and email verification links, and the last `ENCRYPTION_KEYS` entry encrypts stored credentials; outside local development the API refuses to start unless both are random 32+ character values. `WORKER_API_KEY` must match what the API expects. Leaked-key rotation is an operator responsibility.
 - **`.env` / deployment misconfiguration is out of code scope** for reports — flag it as a docs issue instead, unless the defect is in source code (e.g. an insecure default constant).
-
-## Prior Audit (Point-in-Time)
-
-A whitebox audit of `core-api` (cross-tenant isolation, IDOR, SQLi, auth controls) dated 2026-09-26 is recorded in [`docs/security-audit-report.md`](docs/security-audit-report.md). Remediation status per that report: 22 of 26 findings fixed on branch `security-patch-2026-10-03`; storage-bucket exposure (AE-02) was reverted at owner request and **still stands**; CORS/cookie/trusted-origin items were scoped as deployment configuration. Treat the report as a snapshot, not a guarantee — verify against current `main`.

@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { OpenLink } from '@/components/ui/open-link';
 import {
   isValidElement,
   memo,
@@ -42,10 +43,8 @@ const withClass = <T extends keyof React.JSX.IntrinsicElements>(
 const block = 'my-3 first:mt-0 last:mb-0';
 const heading = 'font-semibold tracking-tight leading-snug first:mt-0';
 
-const Link = withClass(
-  'a',
-  'font-medium text-primary underline decoration-primary/30 underline-offset-[3px] transition-colors wrap-anywhere hover:decoration-primary',
-);
+const linkClass =
+  'font-medium text-primary underline decoration-primary/30 underline-offset-[3px] transition-colors wrap-anywhere hover:decoration-primary';
 const Th = withClass('th', 'px-3 py-2 text-left align-middle font-semibold');
 const Td = withClass('td', 'px-3 py-2 align-top');
 
@@ -80,7 +79,14 @@ const fullComponents: Components = {
     'blockquote',
     cn(block, 'border-l-[3px] border-primary/40 pl-4 text-muted-foreground'),
   ),
-  a: (props) => <Link target="_blank" rel="noopener noreferrer" {...props} />,
+  a: ({ node: _node, className, ...props }) => (
+    <OpenLink
+      className={cn(linkClass, className)}
+      target="_blank"
+      rel="noopener noreferrer"
+      {...props}
+    />
+  ),
   img: withClass('img', 'my-2 max-w-full rounded-md border'),
   table: ({ node: _node, className, ...props }) => (
     <div className={cn(block, 'w-full overflow-x-auto rounded-lg border')}>

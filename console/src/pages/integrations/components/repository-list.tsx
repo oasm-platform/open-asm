@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { OpenLink } from '@/components/ui/open-link';
 import { Skeleton } from '@/components/ui/skeleton';
 import useDebounce from '@/hooks/use-debounce';
 import { useIntegrationsControllerListRepositoriesInfinite } from '@/services/apis/gen/queries';
@@ -98,7 +99,7 @@ export function RepositoryList({ integrationId }: RepositoryListProps) {
                 <Badge variant="secondary">
                   {repo.private ? 'Private' : 'Public'}
                 </Badge>
-                <a
+                <OpenLink
                   href={repo.url}
                   target="_blank"
                   rel="noreferrer noopener"
@@ -106,7 +107,7 @@ export function RepositoryList({ integrationId }: RepositoryListProps) {
                   className="text-muted-foreground hover:text-foreground"
                 >
                   <ExternalLink className="size-4" />
-                </a>
+                </OpenLink>
               </div>
             </li>
           ))}

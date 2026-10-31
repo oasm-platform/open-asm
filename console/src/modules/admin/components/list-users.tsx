@@ -43,7 +43,9 @@ const buildUserColumns = (ownerId?: string): ColumnDef<AdminUserDto>[] => [
     accessorKey: 'banned',
     header: 'Status',
     cell: ({ row }) =>
-      row.original.banned ? (
+      row.original.pendingApproval ? (
+        <Badge variant="outline">Pending approval</Badge>
+      ) : row.original.banned ? (
         <Badge variant="destructive">Banned</Badge>
       ) : (
         <Badge variant="secondary">Active</Badge>

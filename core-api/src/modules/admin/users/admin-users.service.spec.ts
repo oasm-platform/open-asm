@@ -1,3 +1,4 @@
+import { PENDING_APPROVAL_REASON } from '@/common/constants/app.constants';
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { Role } from '@/common/enums/enum';
 import { User } from '@/modules/auth/entities/user.entity';
@@ -6,7 +7,7 @@ import { NotFoundException } from '@nestjs/common';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { AdminUsersService } from './admin-users.service';
+import { AdminUsersService, toAdminUserDto } from './admin-users.service';
 import { GetManyAdminUsersDto } from './dto/admin-users.dto';
 
 const userRow = {
@@ -150,6 +151,23 @@ describe('AdminUsersService', () => {
       await expect(service.getUser('missing')).rejects.toBeInstanceOf(
         NotFoundException,
       );
+    });
+  });
+
+  describe('toAdminUserDto', () => {
+    const withBan = (banned: boolean, banReason?: string) =>
+      toAdminUserDto({ ...userRow, banned, banReason }, null);
+
+    it('marks a sign-up waiting for approval as pending', () => {
+      expect(withBan(true, PENDING_APPROVAL_REASON).pendingApproval).toBe(true);
+    });
+
+    it('does not treat an ordinary ban as pending', () => {
+      expect(withBan(true, 'Spam').pendingApproval).toBe(false);
+    });
+
+    it('is not pending once approved (unbanned)', () => {
+      expect(withBan(false).pendingApproval).toBe(false);
     });
   });
 });

@@ -1,4 +1,5 @@
 import AuthLayout from '@/components/common/layout/auth-layout';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -10,11 +11,14 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { getWorkspaceListQueryOptions } from '@/hooks/useWorkspaceSelector';
+import { useRootControllerGetMetadata } from '@/services/apis/gen/queries';
 import { authClient } from '@/utils/authClient';
+import { safeRedirectPath } from '@/utils/safe-redirect';
+import { verificationCallbackURL } from '@/utils/verification-url';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRouter, useSearch } from '@tanstack/react-router';
-import { Loader2Icon } from 'lucide-react';
+import { Link, useRouter, useSearch } from '@tanstack/react-router';
+import { Loader2Icon, MailCheck, MailWarning } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -35,20 +39,26 @@ export default function Login() {
   });
 
   const [loading, setLoading] = useState(false);
+  // Set when the account still has to confirm its email
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
 
   const queryClient = useQueryClient();
   const router = useRouter();
-  const { redirect } = useSearch({ strict: false });
+  const {
+    redirect,
+    verified,
+    error: verificationError,
+  } = useSearch({ strict: false });
+  // Refetched on mount, so an admin's toggle shows on the next visit
+  const { data: metadata } = useRootControllerGetMetadata();
 
   // Warm the post-login route chunks (JS + CSS) while the user is typing, so
   // a cold cache on a slow network doesn't leave them stuck here after a
   // successful sign-in. Only the code is fetched — preloadRoute() would run
   // _authed.beforeLoad, which bounces to /login without a session.
   useEffect(() => {
-    const target =
-      redirect?.startsWith('/') && !redirect.startsWith('//')
-        ? redirect.split(/[?#]/)[0]
-        : '/';
+    const target = safeRedirectPath(redirect).split(/[?#]/)[0];
     for (const route of router.getMatchedRoutes(target).matchedRoutes) {
       router.loadRouteChunk(route)?.catch(() => {
         // Best effort — the real navigation retries the chunk.
@@ -75,6 +85,9 @@ export default function Login() {
         void queryClient.prefetchQuery(getWorkspaceListQueryOptions());
       } else {
         setLoading(false);
+        setUnverifiedEmail(
+          res.error.code === 'EMAIL_NOT_VERIFIED' ? values.email : null,
+        );
         // 401/403 mean the credentials were rejected — show it on the
         // field. Anything else (5xx, gateway errors) is a server problem.
         if (res.error.status === 401 || res.error.status === 403) {
@@ -96,6 +109,27 @@ export default function Login() {
     }
   }
 
+  async function resendVerification(email: string) {
+    setResending(true);
+    const res = await authClient
+      .sendVerificationEmail({
+        email,
+        callbackURL: verificationCallbackURL(redirect),
+      })
+      .catch(() => null);
+    setResending(false);
+    if (res && !res.error) {
+      toast.success('Verification email sent', {
+        description: `Check ${email} for the link.`,
+      });
+    } else {
+      toast.error(
+        res?.error?.message || 'Failed to send the verification email.',
+        { richColors: true },
+      );
+    }
+  }
+
   return (
     <AuthLayout>
       <div className="flex w-full items-center justify-center bg-background px-6 py-12 lg:w-1/2">
@@ -108,6 +142,23 @@ export default function Login() {
               Sign in to access your workspace.
             </p>
           </div>
+          {verificationError ? (
+            <Alert variant="destructive">
+              <MailWarning />
+              <AlertTitle>The verification link didn&apos;t work</AlertTitle>
+              <AlertDescription>
+                It may have expired. Sign in to get a new one.
+              </AlertDescription>
+            </Alert>
+          ) : verified ? (
+            <Alert>
+              <MailCheck />
+              <AlertTitle>Email confirmed</AlertTitle>
+              <AlertDescription>
+                You can sign in once an administrator approves your account.
+              </AlertDescription>
+            </Alert>
+          ) : null}
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
               <FormField
@@ -148,8 +199,32 @@ export default function Login() {
                 {loading && <Loader2Icon className="animate-spin" />}
                 Sign in
               </Button>
+              {unverifiedEmail && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  disabled={resending}
+                  onClick={() => void resendVerification(unverifiedEmail)}
+                >
+                  {resending && <Loader2Icon className="animate-spin" />}
+                  Send the verification email again
+                </Button>
+              )}
             </form>
           </Form>
+          {metadata?.allowSignUp && (
+            <p className="text-center text-sm text-muted-foreground">
+              Don&apos;t have an account?{' '}
+              <Link
+                to="/signup"
+                search={{ redirect }}
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                Sign up
+              </Link>
+            </p>
+          )}
         </div>
       </div>
     </AuthLayout>

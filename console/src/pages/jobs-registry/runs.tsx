@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import JobStatusBadge from '@/components/ui/job-status';
+import { OpenLink } from '@/components/ui/open-link';
 import {
   Sheet,
   SheetContent,
@@ -225,14 +226,14 @@ const JobDetailPanel = memo(function JobDetailPanel({
             </span>
             {bugReportUrl && (
               <Button asChild size="sm" variant="outline">
-                <a
+                <OpenLink
                   href={bugReportUrl}
                   target="_blank"
                   rel="noreferrer noopener"
                 >
                   <Bug />
                   Report bug
-                </a>
+                </OpenLink>
               </Button>
             )}
           </div>
