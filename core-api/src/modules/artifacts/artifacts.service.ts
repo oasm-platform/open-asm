@@ -20,7 +20,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
-import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, IsNull, Repository } from 'typeorm';
 import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
 import type { EventEnvelopeData } from '../event-bridge/contracts/event-envelope';
 import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
@@ -39,6 +39,7 @@ import { ArtifactFolder } from './entities/artifact-folder.entity';
 import { ArtifactShare } from './entities/artifact-share.entity';
 import { Artifact } from './entities/artifact.entity';
 
+export const TEMPLATES_FOLDER_NAME = 'custom-templates';
 export const ARTIFACTS_BUCKET = 'artifacts';
 export const ARTIFACT_MANAGE_PERMISSION = 'artifact.manage';
 export const ARTIFACT_WRITE_PERMISSION = 'artifact.write';
@@ -58,6 +59,10 @@ export interface CreateArtifactFromBufferInput {
   mimeType: string;
   buffer: Buffer;
   metadata?: Record<string, unknown>;
+  /** Callers must verify the folder belongs to the workspace (not checked here). */
+  parentFolderId?: string | null;
+  /** Who the audit event names; defaults to the agent. */
+  actorType?: AuditActorType;
 }
 
 const workspacePrefix = (workspaceId: string) => `workspaces/${workspaceId}/`;
@@ -201,8 +206,51 @@ export class ArtifactsService {
       throw error;
     }
 
-    await this.publishCreated(artifact);
+    await this.publishCreated(artifact, input.actorType ?? AuditActorType.Agent);
     return this.toDto(artifact, input.userId);
+  }
+
+  /**
+   * Overwrites a ready file's content and swaps its quota usage. Runs under
+   * the row lock so a concurrent delete either waits or makes this 404.
+   */
+  async replaceContent(
+    workspaceId: string,
+    userId: string,
+    id: string,
+    buffer: Buffer,
+  ): Promise<ArtifactDto> {
+    await this.dataSource.transaction(async (manager) => {
+      const artifact = await manager.findOne(Artifact, {
+        where: { id, workspaceId, status: ArtifactStatus.READY },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!artifact) {
+        throw new NotFoundException('File not found');
+      }
+      if (artifact.createdByUserId !== userId) {
+        throw new ForbiddenException('Only the owner can change this file');
+      }
+      this.quota.assertFileSize(buffer.length);
+      // Release first so a full workspace can shrink. Every quota change runs
+      // on this manager, so any failure below rolls all of them back.
+      await this.quota.releaseUsed(manager, workspaceId, artifact.sizeBytes);
+      await this.quota.reserve(manager, workspaceId, buffer.length);
+      // shortcut: holds the workspace usage row lock during the upload; fine for small files (templates ≤ 256 KB), revisit before using this for large files.
+      await this.storageService.uploadFile(
+        artifact.objectKey,
+        buffer,
+        artifact.bucket,
+        artifact.mimeType,
+      );
+      await this.quota.commit(manager, workspaceId, buffer.length);
+      artifact.sizeBytes = buffer.length;
+      // A same-size edit changes no column, so TypeORM would skip the UPDATE;
+      // updatedAt is the version connectors cache templates by.
+      artifact.updatedAt = new Date();
+      await manager.save(artifact);
+    });
+    return this.getById(workspaceId, userId, id, []);
   }
 
   async getMany(
@@ -437,6 +485,27 @@ export class ArtifactsService {
     return folder;
   }
 
+  /** Own folder, or the workspace-owned templates folder (readable by every member). */
+  async findReadableFolder(
+    workspaceId: string,
+    userId: string,
+    id: string,
+  ): Promise<ArtifactFolder> {
+    const folder =
+      (await this.folderRepo.findOneBy({ id, workspaceId, createdByUserId: userId })) ??
+      (await this.folderRepo.findOneBy({
+        id,
+        workspaceId,
+        parentFolderId: IsNull(),
+        createdByUserId: IsNull(),
+        name: TEMPLATES_FOLDER_NAME,
+      }));
+    if (!folder) {
+      throw new NotFoundException('Folder not found');
+    }
+    return folder;
+  }
+
   /** Purges expired pending uploads and deleted rows whose upload form expired. */
   async purgeStale(): Promise<number> {
     const rows = await this.artifactRepo
@@ -585,13 +654,13 @@ export class ArtifactsService {
     artifact.status = ArtifactStatus.READY;
   }
 
-  private async publishCreated(artifact: Artifact): Promise<void> {
+  private async publishCreated(artifact: Artifact, actorType: AuditActorType): Promise<void> {
     await this.eventBridge.publishSafely(
       EVENT_CATALOG.artifact.created,
       {
         workspaceId: artifact.workspaceId,
         actor: {
-          type: AuditActorType.Agent,
+          type: actorType,
           ...(artifact.createdByUserId ? { id: artifact.createdByUserId } : {}),
         },
         outcome: AuditOutcome.Success,
@@ -647,7 +716,7 @@ export class ArtifactsService {
     return artifact;
   }
 
-  private async canRead(artifact: Artifact, userId: string): Promise<boolean> {
+  async canRead(artifact: Artifact, userId: string): Promise<boolean> {
     switch (artifact.shareType) {
       case ArtifactShareType.PUBLIC:
         return true;
@@ -665,7 +734,7 @@ export class ArtifactsService {
     return { id: user.id, name: user.name, image: user.image ?? null };
   }
 
-  private toDto(artifact: Artifact, userId: string): ArtifactDto {
+  toDto(artifact: Artifact, userId: string): ArtifactDto {
     return {
       id: artifact.id,
       name: artifact.name,

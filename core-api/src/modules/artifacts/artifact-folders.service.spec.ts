@@ -1,6 +1,6 @@
 import { ArtifactStatus } from '@/common/enums/enum';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import type { DataSource, Repository } from 'typeorm';
+import { IsNull, type DataSource, type Repository } from 'typeorm';
 import { ArtifactFoldersService } from './artifact-folders.service';
 import type { ArtifactsService } from './artifacts.service';
 import type { ArtifactFolder } from './entities/artifact-folder.entity';
@@ -25,16 +25,18 @@ describe('ArtifactFoldersService', () => {
   let folderRepo: Record<string, jest.Mock>;
   let manager: Record<string, jest.Mock>;
   let dataSource: { query: jest.Mock; transaction: jest.Mock };
-  let artifacts: { findOwnedFolder: jest.Mock };
+  let artifacts: { findOwnedFolder: jest.Mock; findReadableFolder: jest.Mock };
 
   beforeEach(() => {
     folderRepo = {
       find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn().mockResolvedValue(null),
       create: jest.fn((value: unknown) => value),
       save: jest.fn((value: ArtifactFolder) => Promise.resolve({ ...folder(), ...value })),
     };
     manager = {
       query: jest.fn(),
+      findOne: jest.fn(),
       save: jest.fn((value: ArtifactFolder) => Promise.resolve(value)),
       update: jest.fn(),
       delete: jest.fn(),
@@ -45,6 +47,7 @@ describe('ArtifactFoldersService', () => {
     };
     artifacts = {
       findOwnedFolder: jest.fn().mockResolvedValue(folder()),
+      findReadableFolder: jest.fn().mockResolvedValue(folder()),
     };
     service = new ArtifactFoldersService(
       folderRepo as unknown as Repository<ArtifactFolder>,
@@ -55,7 +58,7 @@ describe('ArtifactFoldersService', () => {
 
   it('lists only the caller\'s folders under a parent they own', async () => {
     await service.getMany(WS, OWNER, 'f-1');
-    expect(artifacts.findOwnedFolder).toHaveBeenCalledWith(WS, OWNER, 'f-1');
+    expect(artifacts.findReadableFolder).toHaveBeenCalledWith(WS, OWNER, 'f-1');
     expect(folderRepo.find).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -66,10 +69,94 @@ describe('ArtifactFoldersService', () => {
       }),
     );
 
-    artifacts.findOwnedFolder.mockRejectedValue(new NotFoundException());
+    artifacts.findReadableFolder.mockRejectedValue(new NotFoundException());
     await expect(service.getMany(WS, 'someone-else', 'f-1')).rejects.toThrow(
       NotFoundException,
     );
+  });
+
+  const TEMPLATES = {
+    workspaceId: WS,
+    parentFolderId: IsNull(),
+    createdByUserId: IsNull(),
+    name: 'custom-templates',
+  };
+
+  it('ensureTemplatesFolder returns an existing folder without a transaction', async () => {
+    const existing = folder({ name: 'custom-templates', createdByUserId: null });
+    folderRepo.findOne.mockResolvedValue(existing);
+    await expect(service.ensureTemplatesFolder(WS)).resolves.toBe(existing);
+    expect(folderRepo.findOne).toHaveBeenCalledWith({
+      where: TEMPLATES,
+      order: { createdAt: 'ASC' },
+    });
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  it('ensureTemplatesFolder on a miss locks, re-checks, then returns the winner', async () => {
+    const winner = folder({ name: 'custom-templates', createdByUserId: null });
+    manager.findOne.mockResolvedValue(winner);
+    await expect(service.ensureTemplatesFolder(WS)).resolves.toBe(winner);
+    expect(manager.query).toHaveBeenCalledWith(
+      'SELECT pg_advisory_xact_lock(hashtext($1))',
+      ['artifact-folders:templates:ws-1'],
+    );
+    expect(manager.query.mock.invocationCallOrder[0]).toBeLessThan(
+      manager.findOne.mock.invocationCallOrder[0],
+    );
+    expect(manager.findOne).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ where: TEMPLATES, order: { createdAt: 'ASC' } }),
+    );
+    expect(manager.save).not.toHaveBeenCalled();
+  });
+
+  it('ensureTemplatesFolder creates it when still missing under the lock', async () => {
+    manager.findOne.mockResolvedValue(null);
+    await service.ensureTemplatesFolder(WS);
+    expect(manager.save).toHaveBeenCalledWith({
+      workspaceId: WS,
+      createdByUserId: null,
+      parentFolderId: null,
+      name: 'custom-templates',
+    });
+  });
+
+  it('lists subfolders of the workspace templates folder', async () => {
+    await expect(service.getMany(WS, OWNER, 'tpl-folder')).resolves.toEqual([]);
+    expect(artifacts.findReadableFolder).toHaveBeenCalledWith(WS, OWNER, 'tpl-folder');
+    expect(artifacts.findOwnedFolder).not.toHaveBeenCalled();
+  });
+
+  it('root listing includes the workspace templates folder', async () => {
+    manager.findOne.mockResolvedValue(folder());
+    const ensure = jest.spyOn(service, 'ensureTemplatesFolder');
+    await service.getMany(WS, OWNER);
+    expect(ensure).toHaveBeenCalledWith(WS);
+    expect(folderRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: [
+          { workspaceId: WS, createdByUserId: OWNER, parentFolderId: IsNull() },
+          TEMPLATES,
+        ],
+      }),
+    );
+  });
+
+  it('getById resolves through findReadableFolder', async () => {
+    dataSource.query.mockResolvedValue([]);
+    await service.getById(WS, OWNER, 'f-1');
+    expect(artifacts.findReadableFolder).toHaveBeenCalledWith(WS, OWNER, 'f-1');
+    expect(artifacts.findOwnedFolder).not.toHaveBeenCalled();
+  });
+
+  it('update and remove still require ownership', async () => {
+    manager.query.mockResolvedValue([]);
+    dataSource.query.mockResolvedValue([{ id: 'f-1' }]);
+    await service.update(WS, OWNER, 'f-1', { name: 'x' });
+    await service.remove(WS, OWNER, 'f-1');
+    expect(artifacts.findOwnedFolder).toHaveBeenCalledTimes(2);
+    expect(artifacts.findReadableFolder).not.toHaveBeenCalled();
   });
 
   it('returns the breadcrumb path with the folder', async () => {
@@ -120,6 +207,18 @@ describe('ArtifactFoldersService', () => {
     await expect(
       service.update(WS, OWNER, 'f-1', { name: 'Q4', parentFolderId: null }),
     ).resolves.toMatchObject({ name: 'Q4', parentFolderId: null });
+  });
+
+  it('refuses a user root folder named like the templates folder', async () => {
+    await expect(
+      service.create(WS, OWNER, { name: 'custom-templates' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.update(WS, OWNER, 'f-1', { name: 'custom-templates', parentFolderId: null }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.create(WS, OWNER, { name: 'custom-templates', parentFolderId: 'f-1' }),
+    ).resolves.toBeDefined();
   });
 
   it('deletes the subtree and marks its files deleted for the sweep', async () => {

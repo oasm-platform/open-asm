@@ -2167,6 +2167,58 @@ describe('JobsRegistryService', () => {
       }
     });
 
+    describe('custom template keys', () => {
+      const nucleiTool = {
+        id: 'tool-nuclei',
+        name: 'nuclei',
+        categories: [{ name: ToolCategory.VULNERABILITIES, targetTypes: HOST }],
+        priority: 3,
+      } as any;
+
+      beforeEach(() => {
+        mockConnectorRegistryService.getConnector.mockReturnValue({ image: 'nuclei:3' });
+        // Pass the inline config through, as a merge over an empty profile does.
+        mockToolConfigProfilesService.resolveConfigForJob.mockImplementation(
+          (_ws: string, _tool: string, ref: { config?: Record<string, unknown> }) =>
+            Promise.resolve(ref.config),
+        );
+        mockAssetQB.getMany.mockResolvedValue([{ id: 'asset-1', value: 'x.example.com' }]);
+      });
+
+      it('drops template keys from a workflow inline config', async () => {
+        const [job] = await service.createNewJob({
+          tool: nucleiTool,
+          targetIds: ['target-1'],
+          workspaceId: 'ws-1',
+          workflow: { id: 'wf-1' } as any,
+          config: {
+            rateLimit: 5,
+            customTemplateIds: ['someone-elses-template'],
+            customTemplates: [{ url: 'http://evil/x', cacheKey: 'victim-1' }],
+          },
+        });
+
+        expect(job.config).toEqual({ rateLimit: 5 });
+        expect(mockToolConfigProfilesService.resolveConfigForJob).toHaveBeenCalledWith(
+          'ws-1',
+          'tool-nuclei',
+          expect.objectContaining({ config: { rateLimit: 5 } }),
+        );
+      });
+
+      it('keeps the explicit customTemplateIds of a template run', async () => {
+        const [job] = await service.createNewJob({
+          tool: nucleiTool,
+          assetIds: ['asset-1'],
+          workspaceId: 'ws-1',
+          workflow: undefined as any,
+          customTemplateIds: ['t1'],
+        });
+
+        expect(job.config).toEqual({ customTemplateIds: ['t1'] });
+      });
+    });
+
     it('S1b: URL_DISCOVERY keeps one service per asset, preferring 443 then 80', async () => {
       const assetA = { id: 'asset-a', isPrimary: true };
       const assetB = { id: 'asset-b', isPrimary: false };
@@ -2596,6 +2648,82 @@ describe('JobsRegistryService', () => {
       givenWorkerAndQueue(buildWorker(), []);
 
       await expect(service.getNextJob('worker-uuid')).resolves.toBeNull();
+    });
+
+    describe('custom templates', () => {
+      const templateJob = (id: string) => ({
+        id,
+        retryCount: 0,
+        tool: { id: 'tool-1', name: 'nuclei' },
+        asset: { id: `a-${id}`, value: 'x', target: { workspaceId: 'ws-1' } },
+        config: { rateLimit: 10, customTemplateIds: ['t1', 't2'] },
+      });
+
+      const givenTemplates = (rows: unknown[]) => {
+        const artifactRepo = { find: jest.fn().mockResolvedValue(rows) };
+        mockDataSource.getRepository.mockImplementation((entity: unknown) =>
+          entity === WorkerInstance
+            ? { findOne: jest.fn().mockResolvedValue(buildWorker()) }
+            : artifactRepo,
+        );
+        return artifactRepo;
+      };
+
+      beforeEach(() => {
+        (mockStorageService as Record<string, jest.Mock>).getPresignedDownloadUrl =
+          jest.fn(({ key }: { key: string }) =>
+            Promise.resolve({ url: `http://rustfs:9000/${key}?sig`, expiresIn: 3600 }),
+          );
+      });
+
+      it('swaps template ids for presigned urls, signing each run once', async () => {
+        givenWorkerAndQueue(buildWorker(), [templateJob('j1'), templateJob('j2')]);
+        const artifactRepo = givenTemplates([
+          { id: 't2', bucket: 'artifacts', objectKey: 'k2', updatedAt: new Date(7) },
+          { id: 't1', bucket: 'artifacts', objectKey: 'k1', updatedAt: new Date(5) },
+        ]);
+
+        const result = await service.getNextJobs('worker-uuid', 2);
+
+        expect(result).toHaveLength(2);
+        expect(result[0].config).toEqual({
+          rateLimit: 10,
+          customTemplates: [
+            { url: 'http://rustfs:9000/k1?sig', cacheKey: 't1-5' },
+            { url: 'http://rustfs:9000/k2?sig', cacheKey: 't2-7' },
+          ],
+        });
+        expect(artifactRepo.find).toHaveBeenCalledTimes(1);
+        expect(artifactRepo.find).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ workspaceId: 'ws-1' }),
+          }),
+        );
+        expect(
+          (mockStorageService as Record<string, jest.Mock>).getPresignedDownloadUrl,
+        ).toHaveBeenCalledWith(expect.objectContaining({ absolute: true }));
+      });
+
+      it('fails a job whose template is gone instead of dispatching it', async () => {
+        givenWorkerAndQueue(buildWorker(), [templateJob('j1')]);
+        givenTemplates([
+          { id: 't1', bucket: 'artifacts', objectKey: 'k1', updatedAt: new Date(5) },
+        ]);
+        mockJobRepository.update.mockClear();
+
+        const result = await service.getNextJobs('worker-uuid', 1);
+
+        expect(result).toEqual([]);
+        expect(mockJobRepository.update).toHaveBeenCalledWith(
+          { id: 'j1', status: JobStatus.IN_PROGRESS },
+          expect.objectContaining({ status: JobStatus.FAILED }),
+        );
+        expect(mockJobErrorLogRepository.save).toHaveBeenCalledWith(
+          expect.objectContaining({
+            logMessage: 'A custom template of this run no longer exists',
+          }),
+        );
+      });
     });
   });
 

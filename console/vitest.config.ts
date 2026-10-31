@@ -17,6 +17,8 @@ export default defineConfig({
     pool: 'forks',
     poolTimeout: 60000,
     dangerouslyIgnoreUnhandledErrors: true,
+    // Its ESM build uses extensionless imports that Node's loader rejects; let Vite resolve them.
+    server: { deps: { inline: ['codemirror-json-schema'] } },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

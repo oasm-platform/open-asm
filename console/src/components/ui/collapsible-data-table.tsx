@@ -200,9 +200,9 @@ export function CollapsibleDataTable<TData, TValue>({
               ))}
             </TableHeader>
           )}
-          <TableBody>
-            {showSkeleton ? (
-              [...Array(pageSize)].map((_, rowIndex) => (
+          {showSkeleton ? (
+            <TableBody>
+              {[...Array(pageSize)].map((_, rowIndex) => (
                 <TableRow key={`skeleton-${rowIndex}`}>
                   {[...Array(table.getAllLeafColumns().length)].map(
                     (_, colIndex) => (
@@ -212,47 +212,52 @@ export function CollapsibleDataTable<TData, TValue>({
                     ),
                   )}
                 </TableRow>
-              ))
-            ) : table.getRowModel().rows.length ? (
-              table.getRowModel().rows.map((row) => (
-                // No `asChild` here: Radix would clone a Fragment child and
-                // inject `data-state` onto it, which React rejects. `contents`
-                // keeps the wrapper out of the table layout.
-                <Collapsible key={row.id} className="contents">
-                  <>
-                    <CollapsibleTrigger asChild>
-                      <TableRow
-                        data-state={row.getIsSelected() && 'selected'}
-                        className={cn(
-                          rowClassName,
-                          'cursor-pointer',
-                          onRowClick && 'hover:bg-muted/50',
-                        )}
-                        onClick={() => onRowClick?.(row.original)}
-                      >
-                        {/* These cells render normally in their correct columns */}
-                        {row.getVisibleCells().map((cell) => (
-                          <TableCell key={cell.id}>
-                            {flexRender(
-                              cell.column.columnDef.cell,
-                              cell.getContext(),
-                            )}
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    </CollapsibleTrigger>
-
-                    <CollapsibleContent asChild>
-                      <TableRow className="bg-background hover:bg-background">
-                        <TableCell colSpan={columns.length} className="p-0">
-                          {collapsibleElement(row.original)}
+              ))}
+            </TableBody>
+          ) : table.getRowModel().rows.length ? (
+            table.getRowModel().rows.map((row) => (
+              // One <tbody> per row: a table may hold many, and it gives Radix a
+              // real element for `asChild` (a <div> or Fragment inside <tbody>
+              // is invalid HTML / rejected by React).
+              <Collapsible asChild key={row.id}>
+                <tbody
+                  data-slot="table-body"
+                  className="[&:last-child>tr:last-child]:border-0"
+                >
+                  <CollapsibleTrigger asChild>
+                    <TableRow
+                      data-state={row.getIsSelected() && 'selected'}
+                      className={cn(
+                        rowClassName,
+                        'cursor-pointer',
+                        onRowClick && 'hover:bg-muted/50',
+                      )}
+                      onClick={() => onRowClick?.(row.original)}
+                    >
+                      {/* These cells render normally in their correct columns */}
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id}>
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext(),
+                          )}
                         </TableCell>
-                      </TableRow>
-                    </CollapsibleContent>
-                  </>
-                </Collapsible>
-              ))
-            ) : (
+                      ))}
+                    </TableRow>
+                  </CollapsibleTrigger>
+
+                  <CollapsibleContent asChild>
+                    <TableRow className="bg-background hover:bg-background">
+                      <TableCell colSpan={columns.length} className="p-0">
+                        {collapsibleElement(row.original)}
+                      </TableCell>
+                    </TableRow>
+                  </CollapsibleContent>
+                </tbody>
+              </Collapsible>
+            ))
+          ) : (
+            <TableBody>
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
@@ -261,8 +266,8 @@ export function CollapsibleDataTable<TData, TValue>({
                   {emptyMessage}
                 </TableCell>
               </TableRow>
-            )}
-          </TableBody>
+            </TableBody>
+          )}
         </Table>
       </div>
 

@@ -403,10 +403,10 @@ directly, so upload and download traffic bypasses the API process.
 | Endpoint | Method | Purpose |
 | --- | --- | --- |
 | `/api/storage/presign/upload` | POST | Presigned `PUT` into any non-private bucket. `@Roles(Role.ADMIN)`. |
-| `/api/storage/presign/download` | GET | Presigned `GET`; optional `fileName` becomes `Content-Disposition`. Gated by `authorizeRead` (see Read authorization below), so a URL for another workspace's screenshot or template is refused with 403 before signing. |
+| `/api/storage/presign/download` | GET | Presigned `GET`; optional `fileName` becomes `Content-Disposition`. Gated by `authorizeRead` (see Read authorization below), so a URL for another workspace's screenshot is refused with 403 before signing. |
 | `/api/admin/system-configs/logo/presign` | POST | Presigned `PUT` for the app logo: `system` bucket, `logo-` prefix, image extensions only. `@Roles(Role.ADMIN)`. |
 | `/api/admin/system-configs/logo/confirm` | POST | `HeadObject` on the uploaded key, validates content type and size, then activates the logo. `@Roles(Role.ADMIN)`. |
-| `/api/templates/:templateId/presign` | POST | Presigned `PUT` for a template YAML. Requires workspace permission `template.write`. |
+| `/api/templates` | various | Custom Nuclei templates are stored as workspace artifacts in the `custom-templates` folder (see the `templates` module). Requires `artifact.read` / `artifact.write`. |
 
 Buckets come from `StorageService.buckets`; `privateBuckets = ['reports',
 'job-results']` are rejected by every presign endpoint.
@@ -616,7 +616,7 @@ model closes the storage-bucket exposure found in the 2026-09 audit (AE-02).
 | --- | --- | --- |
 | `public` | `system` | Allowed without a session (login page renders the logo anonymously). |
 | `authenticated` | `cached-static` | Any session allowed; anonymous gets 401. |
-| `tenant` | `screenshot`, `nuclei-templates` | Anonymous gets 401; ownership resolved via `resolveObjectWorkspaceIds` (`storage.service.ts:297`), membership of ANY owning workspace required, otherwise 403; unknown keys return 404 so the endpoint is not a workspace-existence oracle. |
+| `tenant` | `screenshot` | Anonymous gets 401; ownership resolved via `resolveObjectWorkspaceIds` (`storage.service.ts:297`), membership of ANY owning workspace required, otherwise 403; unknown keys return 404 so the endpoint is not a workspace-existence oracle. |
 | `private` | `reports`, `job-results` | Never signed: 403 via `assertBucketNotPrivate` before auth. |
 | `blocked` | `default` and anything unknown | 404 as if the object did not exist. |
 
@@ -634,9 +634,9 @@ boot bucket policy and plain URLs, while `getBucketAccess` keeps `system`
 
 This deliberately deviates from the audit allow-list, which recommended
 `system`, `nuclei-templates` and `cached-static` as public. The console sits
-behind auth, so no anonymous consumer needs those two buckets:
-`cached-static` is session-gated and `nuclei-templates` is tenant-gated with
-no anonymous path lost.
+behind auth, so no anonymous consumer needs `cached-static`, which is
+session-gated. The `nuclei-templates` bucket has since been retired: templates
+are stored as workspace artifacts under `custom-templates`.
 
 Residual risk: screenshot keys are `md5(asset.value)`
 (`core-api/src/modules/data-adapter/data-adapter.service.ts:641`), a flat key with no workspace prefix, so two
@@ -645,8 +645,7 @@ resistant, so a crafted value could alias another tenant's key; the mitigation
 is that authorization checks membership of ANY owning workspace
 (`resolveObjectWorkspaceIds` returns every distinct owner, never one
 arbitrary row), and finding or guessing a key still requires a session in at
-least one owning workspace. `nuclei-templates` keys are `<templateId>.yaml`
-and resolve by exact template id, so no cross-workspace aliasing there.
+least one owning workspace. Templates no longer use a bucket of their own (they are workspace artifacts under `custom-templates`).
 
 ### Deferred and still open
 

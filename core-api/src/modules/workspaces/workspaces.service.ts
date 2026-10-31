@@ -62,6 +62,8 @@ import { Workspace } from './entities/workspace.entity';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
+// Retired with the move of templates onto artifacts; stripped so groups that still hold them stay editable.
+const RETIRED_PERMISSION_KEYS = new Set(['template.read', 'template.write']);
 /** Invitation validity window: 7 days */
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 /** ref tag used on workspace-invitation notifications so they can be located
@@ -858,6 +860,9 @@ export class WorkspacesService implements OnModuleInit {
       );
     }
 
+    dto.permissions = dto.permissions.filter(
+      (key) => !RETIRED_PERMISSION_KEYS.has(key),
+    );
     this.assertPermissionKeysValid(dto.permissions);
     await this.assertCanGrantPermissionKeys(workspaceId, creatorId, dto.permissions);
 
@@ -931,6 +936,9 @@ export class WorkspacesService implements OnModuleInit {
     }
 
     if (dto.permissions !== undefined) {
+      dto.permissions = dto.permissions.filter(
+        (key) => !RETIRED_PERMISSION_KEYS.has(key),
+      );
       this.assertPermissionKeysValid(dto.permissions);
       await this.assertCanGrantPermissionKeys(workspaceId, updaterId, dto.permissions);
     }
@@ -1112,7 +1120,9 @@ export class WorkspacesService implements OnModuleInit {
     }
     const holderKeySet = new Set(holderKeys);
     const offending = groups.filter((group) =>
-      (group.permissions ?? []).some((key) => !holderKeySet.has(key)),
+      (group.permissions ?? []).some(
+        (key) => !RETIRED_PERMISSION_KEYS.has(key) && !holderKeySet.has(key),
+      ),
     );
     if (offending.length > 0) {
       throw new BadRequestException(

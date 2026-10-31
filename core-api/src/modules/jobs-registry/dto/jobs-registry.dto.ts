@@ -209,12 +209,14 @@ export class CreateJobs extends PickType(Job, [
    */
   assetServiceIds?: string[];
   workspaceId: string;
-  workflow: Workflow;
+  workflow?: Workflow;
   jobHistory?: JobHistory;
   jobName?: string;
   jobRunType?: JobRunType;
   configProfileId?: string;
   config?: Record<string, unknown>;
+  /** Saved templates to run (TemplatesService.run); never read from `config`. */
+  customTemplateIds?: string[];
 }
 
 // --- Category-Specific Result DTOs ---

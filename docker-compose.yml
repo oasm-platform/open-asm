@@ -212,8 +212,11 @@ services:
   rustfs:
     container_name: oasm-rustfs
     image: rustfs/rustfs:latest
+    # oasm-connectors: the nuclei connector downloads custom templates from
+    # presigned URLs signed against RUSTFS_ENDPOINT (http://rustfs:9000).
     networks:
       - oasm
+      - oasm-connectors
     ports:
       - '127.0.0.1:9000:9000'
       - '127.0.0.1:9001:9001'
