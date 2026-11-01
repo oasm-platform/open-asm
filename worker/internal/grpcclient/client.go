@@ -76,13 +76,13 @@ func WithTLS() grpc.DialOption {
 	return grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12}))
 }
 
+// maxRecvMsgBytes mirrors core-api's maxSendMessageLength (core-api/src/main.ts).
+const maxRecvMsgBytes = 64 * 1024 * 1024
+
 // NewClient validates the required configuration and creates a lazily-dialing
 // gRPC client for the core-api server. A worker token persisted by a previous
 // run is loaded here (before Connect) so the first Join can rejoin with the
 // same identity; a missing file just means the server assigns a new one.
-// maxRecvMsgBytes mirrors core-api's maxSendMessageLength (core-api/src/main.ts).
-const maxRecvMsgBytes = 64 * 1024 * 1024
-
 func NewClient(apiKey, grpcHost, toolPath string, logger Logger, dialOpts ...grpc.DialOption) (*Client, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("api key must not be empty")
