@@ -2668,6 +2668,19 @@ describe('JobsRegistryService', () => {
       expect(queryRunner.rollbackTransaction).not.toHaveBeenCalled();
     });
 
+    it('rolls back and returns [] when the claim fails before commit', async () => {
+      const { queryRunner } = givenWorkerAndQueue(buildWorker(), [
+        { id: 'job-1', asset: { id: 'a1', value: 'x' } },
+      ]);
+      (queryRunner as any).isTransactionActive = true;
+      queryRunner.manager.update.mockRejectedValue(new Error('update failed'));
+
+      await expect(service.getNextJobs('worker-uuid', 1)).resolves.toEqual([]);
+
+      expect(queryRunner.commitTransaction).not.toHaveBeenCalled();
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+    });
+
     describe('custom templates', () => {
       const templateJob = (id: string) => ({
         id,
@@ -2741,6 +2754,23 @@ describe('JobsRegistryService', () => {
             logMessage: 'A custom template of this run no longer exists',
           }),
         );
+      });
+
+      it('still dispatches the rest of the batch when failing a job throws', async () => {
+        givenWorkerAndQueue(buildWorker(), [
+          templateJob('j1'),
+          { id: 'j2', retryCount: 0, tool: { id: 'tool-1', name: 'nuclei' }, asset: { id: 'a-j2', value: 'x' }, config: {} },
+        ]);
+        givenTemplates([
+          { id: 't1', bucket: 'artifacts', objectKey: 'k1', updatedAt: new Date(5) },
+        ]);
+        jest
+          .spyOn(service as any, 'handleJobError')
+          .mockRejectedValue(new Error('db down'));
+
+        const result = await service.getNextJobs('worker-uuid', 2);
+
+        expect(result.map((j) => (j as { id: string }).id)).toEqual(['j2']);
       });
     });
   });
