@@ -2,7 +2,6 @@ import { ChevronRight, FileCode, MoreVertical, Plus, Upload } from 'lucide-react
 import { useRef, useState, type ComponentProps } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { AxiosError } from 'axios';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
@@ -54,6 +53,7 @@ import {
   type ArtifactDto,
 } from '@/services/apis/gen/queries';
 import { useTemplateTabs } from '../hooks/use-template-tabs';
+import { readApiError, toastStorageFull } from '../template-errors';
 
 const NAME_PATTERN = /\.ya?ml$/i;
 const NEW_SHORTCUT = /Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘I' : 'Ctrl+I';
@@ -120,24 +120,15 @@ export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
         });
         done++;
       } catch (error) {
-        if (error instanceof AxiosError && error.response?.status === 409) {
-          toast.error(
-            error.response.data?.message ?? 'Workspace storage is full',
-            {
-              action: {
-                label: 'Manage files',
-                onClick: () => void navigate({ to: '/settings/$tab', params: { tab: 'files' } }),
-              },
-            },
+        const { status, message } = readApiError(error);
+        if (status === 409) {
+          toastStorageFull(message, () =>
+            void navigate({ to: '/settings/$tab', params: { tab: 'files' } }),
           );
           // Quota errors repeat for every remaining file; stop after the first.
           break;
-        } else if (
-          error instanceof AxiosError &&
-          (error.response?.status === 400 || error.response?.status === 413) &&
-          typeof error.response.data?.message === 'string'
-        ) {
-          toast.error(`${file.name}: ${error.response.data.message}`);
+        } else if ((status === 400 || status === 413) && message) {
+          toast.error(`${file.name}: ${message}`);
         } else {
           handleServerError(error);
         }

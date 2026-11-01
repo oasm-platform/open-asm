@@ -3,7 +3,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { tokyoNight } from '@uiw/codemirror-theme-tokyo-night';
 import CodeMirror, { EditorView } from '@uiw/react-codemirror';
 import { yamlSchema } from 'codemirror-json-schema/yaml';
-import { AxiosError } from 'axios';
 import * as prettierYaml from 'prettier/plugins/yaml';
 import * as prettier from 'prettier/standalone';
 import { useEffect, useMemo, useState } from 'react';
@@ -36,6 +35,7 @@ import {
 import { RunTemplatesDialog } from './run-templates-dialog';
 import { TemplateTabs } from './template-tabs';
 import { nucleiSchema } from '../nuclei-schema';
+import { readApiError, toastStorageFull } from '../template-errors';
 
 /** `<id>.yaml` from the top-level YAML id, sanitized; the default name if absent or unparsable. */
 function nameFromContent(content: string): string {
@@ -106,21 +106,12 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
         });
       }
     } catch (error) {
-      const status = error instanceof AxiosError && error.response?.status;
-      const message: unknown = (error as AxiosError<{ message?: unknown }>)
-        .response?.data?.message;
+      const { status, message } = readApiError(error);
       if (status === 409) {
-        toast.error(
-          typeof message === 'string' ? message : 'Workspace storage is full',
-          {
-            action: {
-              label: 'Manage files',
-              onClick: () =>
-                void navigate({ to: '/settings/$tab', params: { tab: 'files' } }),
-            },
-          },
+        toastStorageFull(message, () =>
+          void navigate({ to: '/settings/$tab', params: { tab: 'files' } }),
         );
-      } else if (status === 400 && typeof message === 'string') {
+      } else if (status === 400 && message) {
         setYamlError(message);
       } else if (status === 413) {
         toast.error('Template is too large (256 KB maximum)');
