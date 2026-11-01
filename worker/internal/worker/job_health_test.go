@@ -304,8 +304,17 @@ func TestHandleConnectorResultForwardsLogsToTail(t *testing.T) {
 		close(done)
 	}()
 
-	// Log lines must reach the tail buffer while the drain is still running.
-	waitFor(t, 3*time.Second, func() bool { return strings.Contains(tail.String(), "scan started") })
+	// Log lines must surface while the drain is still running. Watch the worker
+	// log, not tail: the handler goroutine owns tail until done is closed.
+	deadline := time.After(3 * time.Second)
+	for surfaced := false; !surfaced; {
+		select {
+		case ev := <-events:
+			surfaced = strings.Contains(ev.Message, "container: nuclei: scan started")
+		case <-deadline:
+			t.Fatal("container log line was never surfaced while the job ran")
+		}
+	}
 
 	proxy.ForwardResult(execID, []byte(`{"host":"example.com"}`), nil)
 	proxy.MarkDone(execID)
@@ -317,7 +326,7 @@ func TestHandleConnectorResultForwardsLogsToTail(t *testing.T) {
 		t.Fatal("timeout waiting for handleConnectorResult")
 	}
 
-	if s := tail.String(); !strings.Contains(s, "probe 443 open") {
+	if s := tail.String(); !strings.Contains(s, "scan started") || !strings.Contains(s, "probe 443 open") {
 		t.Fatalf("expected both log lines in tail, got %q", s)
 	}
 }
