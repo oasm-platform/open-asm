@@ -185,12 +185,13 @@ export function useTemplateTabs() {
   );
 
   // Reverts this workspace's drafts: saved tabs back to their saved text, never-saved ones removed.
+  // Tabs mid-save are left alone: their request still lands and would resurrect or desync them.
   const discardDirty = useCallback(
     () =>
       setState((prev) => {
         const tabs = prev.tabs
-          .filter((t) => t.artifactId || !isDirty(t))
-          .map((t) => ({ ...t, content: t.savedContent }));
+          .filter((t) => t.saving || t.artifactId || !isDirty(t))
+          .map((t) => (t.saving ? t : { ...t, content: t.savedContent }));
         return {
           tabs,
           activeId: tabs.some((t) => t.id === prev.activeId)

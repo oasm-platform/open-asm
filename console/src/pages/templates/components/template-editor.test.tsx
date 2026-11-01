@@ -1,6 +1,6 @@
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { renderWithProviders, screen, waitFor } from '@/test/utils';
-import { fireEvent } from '@testing-library/react';
+import { act, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AxiosError } from 'axios';
 import { useEffect, useState } from 'react';
@@ -473,5 +473,27 @@ describe('TemplateEditor', () => {
       expect.objectContaining({ artifactId: 'a1', content: 'id: one', savedContent: 'id: one' }),
     ]);
     expect(blocker.proceed).toHaveBeenCalled();
+  });
+
+  it('Discard leaves tabs with a save in flight untouched', async () => {
+    const user = userEvent.setup();
+    blocker = { status: 'blocked', proceed: vi.fn(), reset: vi.fn() };
+    let api!: Api;
+    const { queryClient } = setup((a) => {
+      api = a;
+      a.open(artifact() as never, false);
+      a.openNew();
+    });
+    const key = ['template-tabs', ''];
+    type S = { tabs: { id: string; artifactId?: string; content: string; savedContent: string; saving: boolean }[] };
+    await waitFor(() => expect(queryClient.getQueryData<S>(key)?.tabs).toHaveLength(2));
+    const before = queryClient.getQueryData<S>(key)!.tabs;
+    await act(async () => {
+      api.update(before[0].id, 'id: edited');
+      before.forEach((t) => api.setSaving(t.id, true));
+    });
+    const saving = queryClient.getQueryData<S>(key)!.tabs;
+    await user.click(await screen.findByRole('button', { name: 'Discard' }));
+    expect(queryClient.getQueryData<S>(key)?.tabs).toEqual(saving);
   });
 });
