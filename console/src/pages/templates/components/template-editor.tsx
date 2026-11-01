@@ -27,7 +27,10 @@ import {
 } from '@/services/apis/gen/queries';
 import {
   DEFAULT_TEMPLATE_NAME,
+  TABS_ROOT,
+  isDirty,
   useTemplateTabs,
+  type State,
   type TemplateTab,
 } from '../hooks/use-template-tabs';
 import { RunTemplatesDialog } from './run-templates-dialog';
@@ -51,14 +54,14 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
   const { resolvedTheme } = useTheme();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { update, markSaved, load } = useTemplateTabs();
+  const { update, markSaved, setSaving, load } = useTemplateTabs();
   const saveContent = useTemplatesControllerSaveContent({
     mutation: { onError: () => {} }, // errors are shown here, not by the global handler
   });
   const create = useTemplatesControllerCreate({
     mutation: { onError: () => {} },
   });
-  const [saving, setSaving] = useState(false);
+  const { saving } = tab;
   const [yamlError, setYamlError] = useState<string | null>(null);
 
   const { data, isError, isFetchedAfterMount, refetch } =
@@ -83,7 +86,7 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
   const save = async () => {
     if (!canSave) return;
     const { content } = tab;
-    setSaving(true);
+    setSaving(tab.id, true);
     setYamlError(null);
     try {
       const artifact = tab.artifactId
@@ -125,7 +128,7 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
         handleServerError(error);
       }
     } finally {
-      setSaving(false);
+      setSaving(tab.id, false);
     }
   };
 
@@ -252,21 +255,26 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
 }
 
 export function TemplateEditor() {
-  const { tabs, activeId, activate, close, openNew } = useTemplateTabs();
+  const { tabs, activeId, activate, close, openNew, discardDirty } = useTemplateTabs();
+  const queryClient = useQueryClient();
   const { hasPermission } = usePermission();
   const { isMobile, setOpenMobile } = useSidebar();
   const [closing, setClosing] = useState<TemplateTab | null>(null);
   const active = tabs.find((t) => t.id === activeId);
-  const anyDirty = tabs.some((t) => t.content !== t.savedContent);
+  const anyDirty = tabs.some(isDirty);
 
   const blocker = useBlocker({
     shouldBlockFn: () => anyDirty,
-    enableBeforeUnload: () => anyDirty,
+    // Reload/close loses every workspace's drafts, not just the current one's.
+    enableBeforeUnload: () =>
+      queryClient
+        .getQueriesData<State>({ queryKey: [TABS_ROOT] })
+        .some(([, s]) => s?.tabs.some(isDirty)),
     withResolver: true,
   });
 
   const requestClose = (tab: TemplateTab) =>
-    tab.content !== tab.savedContent ? setClosing(tab) : close(tab.id);
+    isDirty(tab) ? setClosing(tab) : close(tab.id);
 
   return (
     <div className="flex flex-1 min-h-0 flex-col">
@@ -302,7 +310,10 @@ export function TemplateEditor() {
         title="Discard unsaved changes?"
         description="You have unsaved template changes. Leave this page anyway?"
         confirmText="Discard"
-        onConfirm={() => blocker.proceed?.()}
+        onConfirm={() => {
+          discardDirty();
+          blocker.proceed?.();
+        }}
       />
       <ConfirmDialog
         open={!!closing}

@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { v4 } from 'uuid';
 
+import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import type { ArtifactDto } from '@/services/apis/gen/queries';
 
 export type TemplateTab = {
@@ -13,6 +14,8 @@ export type TemplateTab = {
   readOnly: boolean;
   /** False until the server copy has been fetched into the tab. */
   loaded: boolean;
+  /** A save is in flight; lives on the tab so remounting the pane cannot reset it. */
+  saving: boolean;
 };
 
 export const DEFAULT_TEMPLATE_NAME = 'example-template.yaml';
@@ -38,24 +41,34 @@ http:
         status:
           - 200 # Match if response code is 200 (OK)`;
 
-type State = { tabs: TemplateTab[]; activeId?: string };
+export type State = { tabs: TemplateTab[]; activeId?: string };
 
 // Not createState: its 'global' root is shared by every workspace and persisted
-// to localStorage. This root is scoped per workspace and stays in memory.
-const TABS_KEY = ['template-tabs'];
+// to localStorage. The workspace id is explicit in the key (and the root is
+// unscoped in workspaceState.ts) so a save that outlives a workspace switch
+// still writes to the workspace it started in.
+export const TABS_ROOT = 'template-tabs';
 const EMPTY: State = { tabs: [] };
+
+export const isDirty = (t: TemplateTab) => t.content !== t.savedContent;
 
 export function useTemplateTabs() {
   const queryClient = useQueryClient();
+  const {
+    state: { selectedWorkspaceId },
+  } = useWorkspaceState();
   const { data: state = EMPTY } = useQuery<State>({
-    queryKey: TABS_KEY,
+    queryKey: [TABS_ROOT, selectedWorkspaceId],
     queryFn: () => EMPTY,
     staleTime: Infinity,
+    gcTime: Infinity, // drafts must outlive a workspace switch
   });
   const setState = useCallback(
     (fn: (prev: State) => State) =>
-      queryClient.setQueryData<State>(TABS_KEY, (prev) => fn(prev ?? EMPTY)),
-    [queryClient],
+      queryClient.setQueryData<State>([TABS_ROOT, selectedWorkspaceId], (prev) =>
+        fn(prev ?? EMPTY),
+      ),
+    [queryClient, selectedWorkspaceId],
   );
 
   const open = useCallback(
@@ -71,6 +84,7 @@ export function useTemplateTabs() {
           savedContent: '',
           readOnly,
           loaded: false,
+          saving: false,
         };
         return { tabs: [...prev.tabs, tab], activeId: tab.id };
       }),
@@ -88,6 +102,7 @@ export function useTemplateTabs() {
           savedContent: '',
           readOnly: false,
           loaded: true,
+          saving: false,
         };
         return { tabs: [...prev.tabs, tab], activeId: tab.id };
       }),
@@ -110,9 +125,18 @@ export function useTemplateTabs() {
         ...prev,
         tabs: prev.tabs.map((t) =>
           t.id === id
-            ? { ...t, artifactId: artifact.id, name: artifact.name, savedContent, loaded: true }
+            ? { ...t, artifactId: artifact.id, name: artifact.name, savedContent, loaded: true, saving: false }
             : t,
         ),
+      })),
+    [setState],
+  );
+
+  const setSaving = useCallback(
+    (id: string, saving: boolean) =>
+      setState((prev) => ({
+        ...prev,
+        tabs: prev.tabs.map((t) => (t.id === id ? { ...t, saving } : t)),
       })),
     [setState],
   );
@@ -160,5 +184,22 @@ export function useTemplateTabs() {
     [setState],
   );
 
-  return { tabs: state.tabs, activeId: state.activeId, open, openNew, update, markSaved, load, rename, activate, close };
+  // Reverts this workspace's drafts: saved tabs back to their saved text, never-saved ones removed.
+  const discardDirty = useCallback(
+    () =>
+      setState((prev) => {
+        const tabs = prev.tabs
+          .filter((t) => t.artifactId || !isDirty(t))
+          .map((t) => ({ ...t, content: t.savedContent }));
+        return {
+          tabs,
+          activeId: tabs.some((t) => t.id === prev.activeId)
+            ? prev.activeId
+            : tabs[tabs.length - 1]?.id,
+        };
+      }),
+    [setState],
+  );
+
+  return { tabs: state.tabs, activeId: state.activeId, open, openNew, update, markSaved, setSaving, discardDirty, load, rename, activate, close };
 }

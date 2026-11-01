@@ -6,6 +6,7 @@ import { AxiosError } from 'axios';
 import { useEffect, useState } from 'react';
 import { getTemplatesControllerGetContentQueryKey } from '@/services/apis/gen/queries';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { setGlobalWorkspaceId } from '@/utils/workspaceState';
 import { useTemplateTabs } from '../hooks/use-template-tabs';
 import { TemplateEditor } from './template-editor';
 
@@ -25,11 +26,13 @@ let blocker: { status: string; proceed: () => void; reset: () => void } = {
   proceed: vi.fn(),
   reset: vi.fn(),
 };
-let blockerArgs: { shouldBlockFn: () => boolean } | undefined;
+let blockerArgs:
+  | { shouldBlockFn: () => boolean; enableBeforeUnload: () => boolean }
+  | undefined;
 
 vi.mock('@tanstack/react-router', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@tanstack/react-router')>()),
-  useBlocker: (args: { shouldBlockFn: () => boolean }) => {
+  useBlocker: (args: NonNullable<typeof blockerArgs>) => {
     blockerArgs = args;
     return blocker;
   },
@@ -141,7 +144,7 @@ describe('TemplateEditor', () => {
     const { queryClient } = setup((api) => api.openNew());
     await box();
     expect(queryClient.getQueryCache().findAll({ queryKey: ['global'] })).toHaveLength(0);
-    expect(queryClient.getQueryData(['template-tabs'])).toMatchObject({
+    expect(queryClient.getQueryData(['template-tabs', ''])).toMatchObject({
       tabs: [expect.objectContaining({ name: 'example-template.yaml' })],
     });
   });
@@ -402,5 +405,73 @@ describe('TemplateEditor', () => {
     setup(openSaved());
     expect(await box()).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+  });
+
+  it('does not create twice when the pane remounts while create is in flight', async () => {
+    const user = userEvent.setup();
+    createAsync.mockReturnValue(new Promise(() => {}));
+    setup((api) => {
+      api.openNew();
+      api.openNew();
+    });
+    await box();
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    const tabs = screen.getAllByTitle('example-template.yaml');
+    await user.click(tabs[0]);
+    await user.click(screen.getAllByTitle('example-template.yaml')[1]);
+    expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled();
+    await user.keyboard('{Control>}s{/Control}');
+    expect(createAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('writes a save result into the workspace it started in', async () => {
+    const user = userEvent.setup();
+    let resolve!: (a: unknown) => void;
+    createAsync.mockReturnValue(new Promise((r) => (resolve = r)));
+    setGlobalWorkspaceId('w1');
+    try {
+      const { queryClient } = setup((api) => api.openNew());
+      await box();
+      await user.click(screen.getByRole('button', { name: 'Save' }));
+      setGlobalWorkspaceId('w2');
+      resolve(artifact({ id: 'n1', name: 'x.yaml' }));
+      await waitFor(() =>
+        expect(queryClient.getQueryData<{ tabs: { artifactId?: string }[] }>(['template-tabs', 'w1'])?.tabs[0]).toMatchObject({ artifactId: 'n1', saving: false }),
+      );
+      expect(queryClient.getQueryData<{ tabs: unknown[] }>(['template-tabs', 'w2'])?.tabs ?? []).toEqual([]);
+    } finally {
+      setGlobalWorkspaceId(null);
+    }
+  });
+
+  it('warns on reload when another workspace has a dirty tab', async () => {
+    setGlobalWorkspaceId('w1');
+    try {
+      const { queryClient } = setup(() => {});
+      queryClient.setQueryData(['template-tabs', 'w2'], {
+        tabs: [{ id: 't', name: 'a', content: 'b', savedContent: 'a', artifactId: 'x', readOnly: false, loaded: true, saving: false }],
+      });
+      await waitFor(() => expect(blockerArgs?.enableBeforeUnload()).toBe(true));
+      expect(blockerArgs?.shouldBlockFn()).toBe(false);
+    } finally {
+      setGlobalWorkspaceId(null);
+    }
+  });
+
+  it('Discard reverts saved drafts and drops never-saved tabs', async () => {
+    const user = userEvent.setup();
+    blocker = { status: 'blocked', proceed: vi.fn(), reset: vi.fn() };
+    const { queryClient } = setup((api) => {
+      api.open(artifact() as never, false);
+      api.openNew();
+    });
+    await waitFor(() =>
+      expect(queryClient.getQueryData<{ tabs: unknown[] }>(['template-tabs', ''])?.tabs).toHaveLength(2),
+    );
+    await user.click(await screen.findByRole('button', { name: 'Discard' }));
+    expect(queryClient.getQueryData<{ tabs: unknown[] }>(['template-tabs', ''])?.tabs).toEqual([
+      expect.objectContaining({ artifactId: 'a1', content: 'id: one', savedContent: 'id: one' }),
+    ]);
+    expect(blocker.proceed).toHaveBeenCalled();
   });
 });
