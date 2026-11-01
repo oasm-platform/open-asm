@@ -120,6 +120,7 @@ describe('JobsRegistryService', () => {
 
   const mockWorkerStreamRegistry = {
     publishCancel: jest.fn().mockResolvedValue(undefined),
+    publishJobsAvailable: jest.fn().mockResolvedValue(undefined),
     register: jest.fn(),
     unregister: jest.fn(),
   };
@@ -247,6 +248,10 @@ describe('JobsRegistryService', () => {
       expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
       expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
       expect(result).toEqual({ message: 'Job re-run successfully' });
+      // Workers in the workspace are nudged to claim it now, not on next poll.
+      expect(mockWorkerStreamRegistry.publishJobsAvailable).toHaveBeenCalledWith(
+        mockWorkspaceId,
+      );
 
       // Verify the job was updated correctly
       expect(mockQueryRunner.manager.save).toHaveBeenCalledWith({
@@ -1972,6 +1977,7 @@ describe('JobsRegistryService', () => {
       expect(mockAssetServiceQB.distinct).not.toHaveBeenCalled();
 
       expect(result).toHaveLength(2);
+      expect(mockWorkerStreamRegistry.publishJobsAvailable).toHaveBeenCalledWith('ws-1');
       expect(mockJobRepo.save).toHaveBeenCalledTimes(1);
       expect(mockJobRepo.save).toHaveBeenCalledWith(
         expect.arrayContaining([

@@ -270,8 +270,14 @@ message CoreToWorker {
     RegisterResponse register_resp  = 1;
     HeartbeatAck     heartbeat_ack  = 2;
     CancelRequest    cancel         = 3;
+    JobsAvailable    jobs_available = 4;
   }
 }
+
+// JobsAvailable tells the worker new jobs may be claimable now, so it calls
+// NextBatch instead of waiting out its idle poll backoff. It is a hint only:
+// the claim itself stays on NextBatch, and a lost hint costs one poll interval.
+message JobsAvailable {}
 
 // Register is the first frame on every connect. It carries the same identity
 // material as Join: an API key for a first-ever connect, or a persisted worker
