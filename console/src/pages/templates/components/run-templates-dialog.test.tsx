@@ -1,4 +1,5 @@
 import { renderWithProviders, screen, waitFor } from '@/test/utils';
+import { fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RunTemplatesDialog } from './run-templates-dialog';
@@ -11,6 +12,7 @@ globalThis.ResizeObserver ??= class {
 };
 
 const mutate = vi.fn();
+let manyTemplates = false;
 const page = <T,>(data: T[]) => ({
   data: { data, total: data.length, page: 1, limit: 10 },
   isLoading: false,
@@ -20,7 +22,9 @@ vi.mock('@/services/apis/gen/queries', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/services/apis/gen/queries')>()),
   useTemplatesControllerGetMany: (params: { scope: string }) =>
     page(
-      params.scope === 'mine'
+      params.scope === 'mine' && manyTemplates
+        ? Array.from({ length: 101 }, (_, i) => ({ id: `m${i}`, name: `m${i}.yaml` }))
+        : params.scope === 'mine'
         ? [{ id: 't1', name: 'one.yaml' }, { id: 't2', name: 'two.yaml' }]
         : [{ id: 't3', name: 'shared.yaml' }],
     ),
@@ -41,7 +45,10 @@ const runButton = () =>
   screen.getAllByRole('button', { name: 'Run' }).find((b) => b.closest('[role="dialog"]'))!;
 
 describe('RunTemplatesDialog', () => {
-  beforeEach(() => mutate.mockReset());
+  beforeEach(() => {
+    mutate.mockReset();
+    manyTemplates = false;
+  });
 
   it('preselects the open template and needs a scope before running', async () => {
     await openDialog();
@@ -80,4 +87,17 @@ describe('RunTemplatesDialog', () => {
       expect.anything(),
     );
   });
+
+  it('disables Run and shows the limit above 100 selected templates', async () => {
+    manyTemplates = true;
+    const user = await openDialog();
+    await user.click(await screen.findByText('example.com'));
+    expect(runButton()).toBeEnabled();
+
+    for (const box of screen.getAllByRole('checkbox', { name: /^m\d+\.yaml/ }))
+      fireEvent.click(box);
+
+    expect(await screen.findByText(/Select at most 100/)).toBeInTheDocument();
+    expect(runButton()).toBeDisabled();
+  }, 30_000);
 });

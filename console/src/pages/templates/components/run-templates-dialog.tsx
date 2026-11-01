@@ -26,6 +26,9 @@ import {
   useTemplatesControllerRun,
 } from '@/services/apis/gen/queries';
 
+// Mirrors the ArrayMaxSize(100) caps on the core-api run DTO.
+const MAX_SELECTED = 100;
+
 type Scope = 'targets' | 'assets' | 'groups';
 
 const SCOPE_FIELD = {
@@ -65,6 +68,7 @@ export function RunTemplatesDialog({ templateId, disabled }: RunTemplatesDialogP
     setSelected((prev) => ({ ...prev, [scope]: ids }));
 
   const ids = Array.from(selected[scope]);
+  const overLimit = templateIds.size > MAX_SELECTED || ids.length > MAX_SELECTED;
   const handleRun = () => {
     run.mutate(
       { data: { templateIds: Array.from(templateIds), [SCOPE_FIELD[scope]]: ids } },
@@ -117,6 +121,9 @@ export function RunTemplatesDialog({ templateId, disabled }: RunTemplatesDialogP
         <DialogFooter className="items-center sm:justify-between">
           <div className="text-sm text-muted-foreground">
             {templateIds.size} template(s), {ids.length} {scope} selected
+            {overLimit && (
+              <span className="ml-2 text-destructive">Select at most {MAX_SELECTED}</span>
+            )}
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setOpen(false)}>
@@ -124,7 +131,7 @@ export function RunTemplatesDialog({ templateId, disabled }: RunTemplatesDialogP
             </Button>
             <Button
               onClick={handleRun}
-              disabled={templateIds.size === 0 || ids.length === 0 || run.isPending}
+              disabled={templateIds.size === 0 || ids.length === 0 || overLimit || run.isPending}
             >
               {run.isPending ? 'Starting…' : 'Run'}
             </Button>
@@ -268,8 +275,18 @@ function GroupPicker(props: PickerProps) {
 
 function TemplateChecklist({ selected, onSelectedChange }: PickerProps) {
   // shortcut: first 100 of each list, same as the sidebar; add search/paging if users outgrow it.
-  const mine = useTemplatesControllerGetMany({ scope: 'mine', limit: 100, sortBy: 'name' });
-  const shared = useTemplatesControllerGetMany({ scope: 'shared', limit: 100, sortBy: 'name' });
+  const mine = useTemplatesControllerGetMany({
+    scope: 'mine',
+    limit: 100,
+    sortBy: 'name',
+    sortOrder: 'ASC',
+  });
+  const shared = useTemplatesControllerGetMany({
+    scope: 'shared',
+    limit: 100,
+    sortBy: 'name',
+    sortOrder: 'ASC',
+  });
   const rows = [...(mine.data?.data ?? []), ...(shared.data?.data ?? [])];
 
   return (
