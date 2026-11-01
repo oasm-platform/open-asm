@@ -942,11 +942,19 @@ export class JobsRegistryService {
         job.config = { ...rest, customTemplates: templates };
         dispatchable.push(job);
       } catch (error) {
-        await this.handleJobError(
-          { jobId: job.id, data: {} as UpdateResultDto['data'] },
-          job,
-          error instanceof Error ? error : new Error(String(error)),
-        );
+        try {
+          await this.handleJobError(
+            { jobId: job.id, data: {} as UpdateResultDto['data'] },
+            job,
+            error instanceof Error ? error : new Error(String(error)),
+          );
+        } catch (failError) {
+          // Drop this job but keep dispatching the rest of the committed claim.
+          this.logger.error(
+            `Failed to mark job ${job.id} failed after custom template error`,
+            failError instanceof Error ? failError.stack : String(failError),
+          );
+        }
       }
     }
     return dispatchable;
