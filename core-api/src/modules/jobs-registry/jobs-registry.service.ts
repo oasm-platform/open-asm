@@ -901,7 +901,10 @@ export class JobsRegistryService {
         'Error in getNextJobs',
         error instanceof Error ? error : new Error(String(error)),
       );
-      await queryRunner.rollbackTransaction();
+      // attachCustomTemplates runs after commit; nothing left to roll back then
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
       return [];
     } finally {
       await queryRunner.release();

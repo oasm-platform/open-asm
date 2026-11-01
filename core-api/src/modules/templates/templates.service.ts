@@ -17,7 +17,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import * as yaml from 'js-yaml';
 import { In, Repository } from 'typeorm';
 import { ArtifactFoldersService } from '../artifacts/artifact-folders.service';
-import { ArtifactsService } from '../artifacts/artifacts.service';
+import {
+  ArtifactsService,
+  TEMPLATE_NAME_ERROR,
+  TEMPLATE_NAME_RE,
+} from '../artifacts/artifacts.service';
 import type { ArtifactDto } from '../artifacts/dto/artifacts.dto';
 import { Artifact } from '../artifacts/entities/artifact.entity';
 import { AssetGroupAsset } from '../asset-group/entities/asset-groups-assets.entity';
@@ -39,10 +43,8 @@ const SORTABLE = new Set(['createdAt', 'updatedAt', 'name']);
 /** Trust boundary for template names and content; throws 400/413. */
 export function validateTemplate(name?: string, content?: string): void {
   if (name !== undefined) {
-    if (!name || name.length > 200 || !/\.ya?ml$/i.test(name)) {
-      throw new BadRequestException(
-        'Template name must be 1-200 characters and end in .yaml or .yml',
-      );
+    if (!name || name.length > 200 || !TEMPLATE_NAME_RE.test(name)) {
+      throw new BadRequestException(TEMPLATE_NAME_ERROR);
     }
   }
   if (content === undefined) return;

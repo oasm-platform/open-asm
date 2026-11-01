@@ -337,6 +337,24 @@ describe('ArtifactsService', () => {
       expect(artifactRepo.update).not.toHaveBeenCalled();
     });
 
+    it('rejects renaming a template to a non-yaml name', async () => {
+      artifactRepo.findOne.mockResolvedValue(
+        makeArtifact({ source: ArtifactSource.TEMPLATE, name: 'a.yaml' }),
+      );
+      await expect(
+        service.update(WS, OWNER, 'artifact-1', { name: 'a.txt' }),
+      ).rejects.toThrow('Template name must be 1-200 characters and end in .yaml or .yml');
+      expect(artifactRepo.update).not.toHaveBeenCalled();
+    });
+
+    it('renames a template to a valid yaml name', async () => {
+      artifactRepo.findOne.mockResolvedValue(
+        makeArtifact({ source: ArtifactSource.TEMPLATE, name: 'a.yaml' }),
+      );
+      await service.update(WS, OWNER, 'artifact-1', { name: 'b.yml' });
+      expect(artifactRepo.update).toHaveBeenCalledWith('artifact-1', { name: 'b.yml' });
+    });
+
     it('moves a file into one of the owner\'s folders, or back to the root', async () => {
       artifactRepo.findOne.mockResolvedValue(makeArtifact());
       folderRepo.findOneBy.mockResolvedValue({ id: 'folder-1' });

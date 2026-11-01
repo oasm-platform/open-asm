@@ -2211,7 +2211,7 @@ describe('JobsRegistryService', () => {
           tool: nucleiTool,
           assetIds: ['asset-1'],
           workspaceId: 'ws-1',
-          workflow: undefined as any,
+          workflow: undefined,
           customTemplateIds: ['t1'],
         });
 
@@ -2648,6 +2648,24 @@ describe('JobsRegistryService', () => {
       givenWorkerAndQueue(buildWorker(), []);
 
       await expect(service.getNextJob('worker-uuid')).resolves.toBeNull();
+    });
+
+    it('does not roll back a committed claim when attaching templates fails', async () => {
+      const { queryRunner } = givenWorkerAndQueue(buildWorker(), [
+        { id: 'job-1', asset: { id: 'a1', value: 'x' } },
+      ]);
+      (queryRunner as any).isTransactionActive = true;
+      queryRunner.commitTransaction.mockImplementation(() => {
+        (queryRunner as any).isTransactionActive = false;
+      });
+      jest
+        .spyOn(service as any, 'attachCustomTemplates')
+        .mockRejectedValue(new Error('boom'));
+
+      await expect(service.getNextJobs('worker-uuid', 1)).resolves.toEqual([]);
+
+      expect(queryRunner.commitTransaction).toHaveBeenCalled();
+      expect(queryRunner.rollbackTransaction).not.toHaveBeenCalled();
     });
 
     describe('custom templates', () => {

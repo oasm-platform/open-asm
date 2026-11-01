@@ -40,6 +40,9 @@ import { ArtifactShare } from './entities/artifact-share.entity';
 import { Artifact } from './entities/artifact.entity';
 
 export const TEMPLATES_FOLDER_NAME = 'custom-templates';
+export const TEMPLATE_NAME_RE = /\.ya?ml$/i;
+export const TEMPLATE_NAME_ERROR =
+  'Template name must be 1-200 characters and end in .yaml or .yml';
 export const ARTIFACTS_BUCKET = 'artifacts';
 export const ARTIFACT_MANAGE_PERMISSION = 'artifact.manage';
 export const ARTIFACT_WRITE_PERMISSION = 'artifact.write';
@@ -349,6 +352,13 @@ export class ArtifactsService {
     dto: UpdateArtifactDto,
   ): Promise<ArtifactDto> {
     const artifact = await this.findOwned(workspaceId, userId, id);
+    if (
+      artifact.source === ArtifactSource.TEMPLATE &&
+      dto.name !== undefined &&
+      (!dto.name || dto.name.length > 200 || !TEMPLATE_NAME_RE.test(dto.name))
+    ) {
+      throw new BadRequestException(TEMPLATE_NAME_ERROR);
+    }
     if (dto.parentFolderId) {
       await this.findOwnedFolder(workspaceId, userId, dto.parentFolderId);
     }
