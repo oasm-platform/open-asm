@@ -1,8 +1,10 @@
 import { Test } from '@nestjs/testing';
 import { Subject } from 'rxjs';
+import { WorkerScope } from '@/common/enums/enum';
 import { RedisService } from '@/services/redis/redis.service';
 import {
   WORKER_STREAM_CANCEL_CHANNEL,
+  WORKER_STREAM_JOBS_CHANNEL,
   WorkerStreamRegistry,
 } from './worker-stream-registry.service';
 
@@ -140,5 +142,47 @@ describe('WorkerStreamRegistry', () => {
       WORKER_STREAM_CANCEL_CHANNEL,
       expect.stringContaining('"jobId":"job-1"'),
     );
+  });
+
+  it('nudges only workers that can claim in the workspace', () => {
+    const collect = () => {
+      const subject = new Subject<Record<string, unknown>>();
+      const received: Record<string, unknown>[] = [];
+      subject.subscribe((value) => received.push(value));
+      return { subject, received };
+    };
+    const own = collect();
+    const other = collect();
+    const cloud = collect();
+    registry.register('w-own', own.subject, { workspaceId: 'ws-1' });
+    registry.register('w-other', other.subject, { workspaceId: 'ws-2' });
+    registry.register('w-cloud', cloud.subject, { scope: WorkerScope.CLOUD });
+
+    handlers.get(WORKER_STREAM_JOBS_CHANNEL)?.(WORKER_STREAM_JOBS_CHANNEL, 'ws-1');
+
+    expect(own.received).toEqual([{ jobsAvailable: {} }]);
+    expect(cloud.received).toEqual([{ jobsAvailable: {} }]);
+    expect(other.received).toHaveLength(0);
+  });
+
+  it('keeps each handler to its own channel', () => {
+    // RedisService hands every message to every callback.
+    const subject = new Subject<Record<string, unknown>>();
+    const received: Record<string, unknown>[] = [];
+    subject.subscribe((value) => received.push(value));
+    registry.register('worker-1', subject, { workspaceId: 'ws-1' });
+
+    handlers.get(WORKER_STREAM_CANCEL_CHANNEL)?.(WORKER_STREAM_JOBS_CHANNEL, 'ws-1');
+    handlers.get(WORKER_STREAM_JOBS_CHANNEL)?.(
+      WORKER_STREAM_CANCEL_CHANNEL,
+      JSON.stringify({ workerId: 'worker-1', jobId: 'job-1' }),
+    );
+
+    expect(received).toHaveLength(0);
+  });
+
+  it('publishes jobs-available hints to every instance', async () => {
+    await registry.publishJobsAvailable('ws-1');
+    expect(publish).toHaveBeenCalledWith(WORKER_STREAM_JOBS_CHANNEL, 'ws-1');
   });
 });

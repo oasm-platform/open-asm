@@ -504,6 +504,7 @@ export class JobsRegistryService {
     // Step 4: save all jobs
     if (jobsToInsert.length > 0) {
       await jobRepo.save(jobsToInsert);
+      this.notifyJobsAvailable(workspaceId);
     }
 
     return jobsToInsert;
@@ -1702,6 +1703,7 @@ export class JobsRegistryService {
       await queryRunner.manager.save(job);
 
       await queryRunner.commitTransaction();
+      this.notifyJobsAvailable(workspaceId);
 
       return { message: 'Job re-run successfully' };
     } catch (error) {
@@ -1710,6 +1712,24 @@ export class JobsRegistryService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  /**
+   * Nudge workers that can claim in this workspace to pull now instead of
+   * waiting out their idle poll. Fire-and-forget: the jobs are already saved,
+   * and a lost hint only delays pickup by one poll interval.
+   */
+  private notifyJobsAvailable(workspaceId: string | undefined): void {
+    if (!workspaceId) return;
+    this.workerStreamRegistry
+      .publishJobsAvailable(workspaceId)
+      .catch((error: unknown) =>
+        this.logger.warn(
+          `Failed to publish jobs-available for workspace ${workspaceId}: ${
+            error instanceof Error ? error.message : 'unknown error'
+          }`,
+        ),
+      );
   }
 
   public async cancelJob(
