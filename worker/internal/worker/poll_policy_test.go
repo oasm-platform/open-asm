@@ -1,6 +1,9 @@
 package worker
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestPollPolicy_FlowFillsAllSlots(t *testing.T) {
 	p := newPollPolicy()
@@ -49,9 +52,19 @@ func TestPollPolicy_JobResetsBackoff(t *testing.T) {
 	}
 }
 
-func TestPollPolicy_BusyReturnsShortDelay(t *testing.T) {
+func TestPollPolicy_EmptyClaimBacksOff(t *testing.T) {
+	// An empty claim used to come back as the 200ms "slots busy" delay, so an
+	// idle worker hit NextBatch ~5x/s forever.
 	p := newPollPolicy()
-	if got := p.nextDelay(0); got != pollBusyDelay {
-		t.Fatalf("nextDelay(0) = %v, want %v (all slots busy)", got, pollBusyDelay)
+	prev := time.Duration(0)
+	for i := 0; i < 10; i++ {
+		got := p.nextDelay(0)
+		if got < prev || got <= pollBusyDelay {
+			t.Fatalf("empty claim %d: nextDelay = %v, want a growing backoff (prev %v)", i, got, prev)
+		}
+		prev = got
+	}
+	if prev != pollMaxBackoff {
+		t.Fatalf("repeated empty claims must settle at %v, got %v", pollMaxBackoff, prev)
 	}
 }

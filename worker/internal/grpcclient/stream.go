@@ -141,6 +141,13 @@ func (c *Client) RunWorkerStream(ctx context.Context, onCancel StreamCancelFunc)
 			case *workers.CoreToWorker_HeartbeatAck:
 				// Liveness acknowledgement; nothing to do.
 
+			case *workers.CoreToWorker_JobsAvailable:
+				// Never block the receive loop: a hint already pending covers it.
+				select {
+				case c.jobsAvailable <- struct{}{}:
+				default:
+				}
+
 			case *workers.CoreToWorker_Cancel:
 				cancel := payload.Cancel
 				if cancel.GetJobId() == "" {

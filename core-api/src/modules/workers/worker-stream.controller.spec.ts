@@ -1,3 +1,4 @@
+import { WorkerScope } from '@/common/enums/enum';
 import { Metadata } from '@grpc/grpc-js';
 import { Test } from '@nestjs/testing';
 import { Subject, firstValueFrom, of, throwError } from 'rxjs';
@@ -22,7 +23,12 @@ describe('WorkerStreamController', () => {
     return metadata;
   };
 
-  const validWorker = { id: 'worker-1', token: TOKEN } as WorkerInstance;
+  const validWorker = {
+    id: 'worker-1',
+    token: TOKEN,
+    workspaceId: 'ws-1',
+    scope: WorkerScope.WORKSPACE,
+  } as WorkerInstance;
 
   beforeEach(async () => {
     registry = { register: jest.fn(), unregister: jest.fn() };
@@ -61,7 +67,11 @@ describe('WorkerStreamController', () => {
     expect(await first).toEqual({
       registerResp: expect.objectContaining({ workerId: 'worker-1', accepted: true }),
     });
-    expect(registry.register).toHaveBeenCalledWith('worker-1', expect.anything());
+    // The owner scopes which jobs-available hints reach this stream.
+    expect(registry.register).toHaveBeenCalledWith('worker-1', expect.anything(), {
+      workspaceId: 'ws-1',
+      scope: WorkerScope.WORKSPACE,
+    });
 
     // The heartbeat that arrived before authentication is not lost.
     const acks: Record<string, unknown>[] = [];
