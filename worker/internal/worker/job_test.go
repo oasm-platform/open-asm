@@ -497,6 +497,30 @@ func TestProcessJobLegacyBranch(t *testing.T) {
 	}
 }
 
+// A connector job reaching a worker whose Docker runtime failed to start must
+// fail with that cause, not fall through to the legacy path's "No command" (#824).
+func TestProcessJobConnectorWithoutRuntime(t *testing.T) {
+	client, jobsSrv, _ := newWorkerTestSetup(t)
+	events := make(chan TuiEvent, 64)
+
+	jobsSrv.nextFn = func() (*pb.Job, error) {
+		return &pb.Job{Id: "job-nort-1", Image: "ghcr.io/oasm-platform/connector-nuclei:3.11.1"}, nil
+	}
+
+	hadJob, usedAsync := processJob(context.Background(), pullJob(t, client), client, nil, "", events, nil, nil, nil)
+
+	if !hadJob || usedAsync {
+		t.Fatalf("expected hadJob=true usedAsync=false, got %v %v", hadJob, usedAsync)
+	}
+	results := jobsSrv.getResults()
+	if len(results) != 1 || !results[0].isError {
+		t.Fatalf("expected 1 error result, got %+v", results)
+	}
+	if !strings.Contains(results[0].raw, "container engine unavailable") {
+		t.Fatalf("expected the runtime cause in the error, got %q", results[0].raw)
+	}
+}
+
 func TestProcessJobNoJob(t *testing.T) {
 	client, jobsSrv, _ := newWorkerTestSetup(t)
 	events := make(chan TuiEvent, 64)
