@@ -136,7 +136,7 @@ services:
 
   postgres:
     container_name: oasm-postgres
-    image: pgvector/pgvector:pg17
+    image: pgvector/pgvector:pg18
     restart: always
     env_file:
       - ./core-api/.env
@@ -153,7 +153,8 @@ services:
         max-size: 10m
         max-file: '3'
     volumes:
-      - pgdata:/var/lib/postgresql/data:rw
+      # pg18 images keep PGDATA in /var/lib/postgresql/18/docker; mount the parent.
+      - pgdata:/var/lib/postgresql:rw
     # Loopback only: agent sandboxes on a shared worker must not reach the
     # database (trust auth) through the Docker bridge gateway.
     ports:
@@ -200,14 +201,13 @@ services:
 
   geo-ip:
     container_name: geo-ip
-    image: ghcr.io/l1ttps/geoip-proxy:latest
+    # DB-IP Lite databases ship inside the image (rebuilt daily), so no volume.
+    image: oasm/dbip:latest
     networks:
       - oasm
     ports:
       - '127.0.0.1:4360:4360'
     restart: 'always'
-    volumes:
-      - geoip-data:/app/data:rw
 
   rustfs:
     container_name: oasm-rustfs
@@ -259,7 +259,6 @@ volumes:
   pgdata:
   redis-data:
   redpanda-data:
-  geoip-data:
   rustfs-data:
   worker-tools-cache:
   worker-state:

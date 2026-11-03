@@ -56,7 +56,7 @@ jobs:
       contents: read
     services:
       postgres:
-        image: pgvector/pgvector:pg17
+        image: pgvector/pgvector:pg18
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -81,7 +81,7 @@ jobs:
       # so a missing endpoint takes down every suite rather than only the
       # geo-dependent ones. Same image as docker-compose's `geo-ip` service.
       geo-ip:
-        image: ghcr.io/l1ttps/geoip-proxy:latest
+        image: oasm/dbip:latest
         ports:
           - 4360:4360
       # The storage e2e suites prove presigned PUT/GET and read authorization
