@@ -206,10 +206,10 @@ describe('Asset filter tree (e2e)', () => {
     ['tag', 'contains', 'v%p', 'A'],
     ['tag', 'contains', 'v_p', 'B'],
     ['host', 'contains', '%', ''],
-    ['assetGroup', 'eq', 'GROUP', 'A'],
-    ['assetGroup', 'neq', 'GROUP', 'B'],
-    ['assetGroup', 'in', ['GROUP'], 'A'],
-    ['assetGroup', 'notIn', ['GROUP'], 'B'],
+    ['project', 'eq', 'GROUP', 'A'],
+    ['project', 'neq', 'GROUP', 'B'],
+    ['project', 'in', ['GROUP'], 'A'],
+    ['project', 'notIn', ['GROUP'], 'B'],
   ];
 
   const expected = (e: string) => [
