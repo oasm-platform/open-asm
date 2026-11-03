@@ -12,7 +12,7 @@ import { Plus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 
-export function AssetGroups() {
+export function Projects() {
   const {
     tableParams: { page, pageSize, sortBy, sortOrder, filter },
     tableHandlers: { setPage, setPageSize, setFilter, setParams },
@@ -72,22 +72,22 @@ export function AssetGroups() {
     },
     {
       query: {
-        queryKey: ['asset-group', pageSize, page, sortBy, sortOrder, filter],
+        queryKey: ['projects', pageSize, page, sortBy, sortOrder, filter],
       },
     },
   );
 
-  const assetGroups = data?.data ?? [];
+  const projects = data?.data ?? [];
   const total = data?.total ?? 0;
 
   return (
     <Page
-      title="Groups"
-      description="Group hosts and run security scans on them on a schedule"
-      permission="group.read"
+      title="Projects"
+      description="Organize hosts into projects and scan them on a schedule"
+      permission="project.read"
     >
       <DataTable
-        data={assetGroups}
+        data={projects}
         columns={columns}
         isLoading={isLoading}
         page={page}
@@ -100,7 +100,7 @@ export function AssetGroups() {
           <Button
             key="create"
             variant="outline"
-            onClick={() => navigate({ to: '/groups/create' })}
+            onClick={() => navigate({ to: '/projects/create' })}
           >
             <Plus />
             Create
@@ -111,8 +111,8 @@ export function AssetGroups() {
         onSortChange={(column, order) =>
           setParams({ sortBy: column, sortOrder: order })
         }
-        onRowClick={(row) => navigate({ to: '/groups/' + row.id })}
-        emptyMessage="No groups found"
+        onRowClick={(row) => navigate({ to: '/projects/' + row.id })}
+        emptyMessage="No projects found"
         filterColumnKey="name"
         filterValue={filter}
         onFilterChange={setFilter}

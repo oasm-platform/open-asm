@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithProviders, screen, waitFor } from '@/test/utils';
 import { within } from '@testing-library/react';
-import AssetGroupDetail from '@/pages/asset-group/asset-group-detail';
+import ProjectDetail from '@/pages/projects/project-detail';
 
-const mockGroup = {
-  id: 'group-1',
+const mockProject = {
+  id: 'project-1',
   name: 'Web Servers',
   hexColor: '#3b82f6',
   assetGroupWorkflows: [],
@@ -73,7 +73,7 @@ const resetAssets = () => {
   ];
 };
 
-vi.mock('@/pages/asset-group/components/asset-group-workflow', () => ({
+vi.mock('@/pages/projects/components/project-workflow', () => ({
   default: () => <div data-testid="mock-workflow" />,
 }));
 
@@ -93,7 +93,7 @@ vi.mock('@/services/apis/gen/queries', async (importOriginal) => {
       `/api/asset-group/${id}`,
     ],
     useAssetGroupControllerGetById: () => ({
-      data: mockGroup,
+      data: mockProject,
       refetch: vi.fn(),
       isLoading: false,
     }),
@@ -131,11 +131,11 @@ beforeEach(() => {
   resetAssets();
 });
 
-describe('AssetGroupDetail page', () => {
+describe('ProjectDetail page', () => {
   it('lists hosts with value and created date', async () => {
-    renderWithProviders(<AssetGroupDetail />, {
-      routePath: '/groups/$id',
-      initialEntries: ['/groups/group-1'],
+    renderWithProviders(<ProjectDetail />, {
+      routePath: '/projects/$id',
+      initialEntries: ['/projects/project-1'],
     });
 
     expect(await screen.findByText('https://example.com')).toBeInTheDocument();
@@ -150,22 +150,22 @@ describe('AssetGroupDetail page', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows the empty state when the group has no hosts', async () => {
+  it('shows the empty state when the project has no hosts', async () => {
     assetsRef.value = [];
-    renderWithProviders(<AssetGroupDetail />, {
-      routePath: '/groups/$id',
-      initialEntries: ['/groups/group-1'],
+    renderWithProviders(<ProjectDetail />, {
+      routePath: '/projects/$id',
+      initialEntries: ['/projects/project-1'],
     });
 
     expect(
-      await screen.findByText('No hosts in this group yet'),
+      await screen.findByText('No hosts in this project yet'),
     ).toBeInTheDocument();
   });
 
   it('removes a single host through the row action', async () => {
-    const { user, queryClient } = renderWithProviders(<AssetGroupDetail />, {
-      routePath: '/groups/$id',
-      initialEntries: ['/groups/group-1'],
+    const { user, queryClient } = renderWithProviders(<ProjectDetail />, {
+      routePath: '/projects/$id',
+      initialEntries: ['/projects/project-1'],
     });
     await screen.findByText('https://example.com');
     const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries');
@@ -180,14 +180,14 @@ describe('AssetGroupDetail page', () => {
 
     await waitFor(() => {
       expect(removeManyMock).toHaveBeenCalledWith(
-        { groupId: 'group-1', data: { assetIds: ['asset-1'] } },
+        { groupId: 'project-1', data: { assetIds: ['asset-1'] } },
         expect.anything(),
       );
       expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-        queryKey: ['/api/asset-group/group-1/assets'],
+        queryKey: ['/api/asset-group/project-1/assets'],
       });
       expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-        queryKey: ['/api/asset-group/group-1'],
+        queryKey: ['/api/asset-group/project-1'],
         exact: true,
       });
     });

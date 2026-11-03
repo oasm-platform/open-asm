@@ -28,25 +28,25 @@ interface Asset {
 }
 
 interface AssetSectionProps {
-  assetGroupId: string;
-  /** Count reported by the group itself; falls back to the table total. */
+  projectId: string;
+  /** Count reported by the project itself; falls back to the table total. */
   totalAssets?: number;
 }
 
 export const AssetSection: React.FC<AssetSectionProps> = ({
-  assetGroupId,
+  projectId,
   totalAssets,
 }) => {
   const queryClient = useQueryClient();
 
-  // Queries for assets in the asset group
+  // Queries for assets in the project
   const {
     tableParams: { page, pageSize, sortBy, sortOrder, filter },
     tableHandlers: { setPage, setPageSize, setParams, setFilter },
   } = useServerDataTable();
 
-  const assetsInGroupQuery = useAssetGroupControllerGetAssetsByAssetGroupsId(
-    assetGroupId,
+  const assetsInProjectQuery = useAssetGroupControllerGetAssetsByAssetGroupsId(
+    projectId,
     { page, limit: pageSize, sortBy, sortOrder, search: filter },
   );
 
@@ -58,7 +58,7 @@ export const AssetSection: React.FC<AssetSectionProps> = ({
     (assetIds: string[]) => {
       removeAssets(
         {
-          groupId: assetGroupId,
+          groupId: projectId,
           data: { assetIds },
         },
         {
@@ -66,23 +66,23 @@ export const AssetSection: React.FC<AssetSectionProps> = ({
             void queryClient.invalidateQueries({
               queryKey:
                 getAssetGroupControllerGetAssetsByAssetGroupsIdQueryKey(
-                  assetGroupId,
+                  projectId,
                 ),
             });
             void queryClient.invalidateQueries({
               queryKey: getAssetGroupControllerGetAssetsNotInAssetGroupQueryKey(
-                assetGroupId,
+                projectId,
               ),
             });
             void queryClient.invalidateQueries({
-              queryKey: getAssetGroupControllerGetByIdQueryKey(assetGroupId),
+              queryKey: getAssetGroupControllerGetByIdQueryKey(projectId),
               exact: true,
             });
           },
         },
       );
     },
-    [assetGroupId, removeAssets, queryClient],
+    [projectId, removeAssets, queryClient],
   );
 
   // Asset table columns
@@ -104,7 +104,7 @@ export const AssetSection: React.FC<AssetSectionProps> = ({
         cell: ({ row }) => (
           <ConfirmDialog
             title="Confirm Delete"
-            description="Are you sure you want to remove this host from the group? This action cannot be undone."
+            description="Are you sure you want to remove this host from the project? This action cannot be undone."
             onConfirm={() => handleRemoveAssets([row.original.id])}
             confirmText="Remove"
             cancelText="Cancel"
@@ -121,7 +121,7 @@ export const AssetSection: React.FC<AssetSectionProps> = ({
     [handleRemoveAssets, removePending],
   );
 
-  const hostCount = totalAssets ?? assetsInGroupQuery.data?.total ?? 0;
+  const hostCount = totalAssets ?? assetsInProjectQuery.data?.total ?? 0;
 
   return (
     <section className="flex flex-col gap-2 border-t pt-2">
@@ -129,21 +129,21 @@ export const AssetSection: React.FC<AssetSectionProps> = ({
         <div>
           <div className="leading-none font-semibold">Hosts</div>
           <div className="hidden text-sm text-muted-foreground md:block">
-            {hostCount} host{hostCount === 1 ? '' : 's'} in this group
+            {hostCount} host{hostCount === 1 ? '' : 's'} in this project
           </div>
         </div>
         <SelectAssetsDialog
-          assetGroupId={assetGroupId}
-          onAssetsAdded={() => assetsInGroupQuery.refetch()}
+          projectId={projectId}
+          onAssetsAdded={() => assetsInProjectQuery.refetch()}
         />
       </div>
       <div className="px-4 py-2 md:px-6">
         <DataTable
           columns={assetColumns}
-          data={assetsInGroupQuery.data?.data ?? []}
-          isLoading={assetsInGroupQuery.isLoading}
-          page={assetsInGroupQuery.data?.page ?? 1}
-          pageSize={assetsInGroupQuery.data?.limit ?? 10}
+          data={assetsInProjectQuery.data?.data ?? []}
+          isLoading={assetsInProjectQuery.isLoading}
+          page={assetsInProjectQuery.data?.page ?? 1}
+          pageSize={assetsInProjectQuery.data?.limit ?? 10}
           sortBy={sortBy}
           sortOrder={sortOrder}
           onPageChange={setPage}
@@ -154,8 +154,8 @@ export const AssetSection: React.FC<AssetSectionProps> = ({
           filterColumnKey="value"
           filterValue={filter}
           onFilterChange={setFilter}
-          totalItems={assetsInGroupQuery.data?.total ?? 0}
-          emptyMessage="No hosts in this group yet"
+          totalItems={assetsInProjectQuery.data?.total ?? 0}
+          emptyMessage="No hosts in this project yet"
         />
       </div>
     </section>

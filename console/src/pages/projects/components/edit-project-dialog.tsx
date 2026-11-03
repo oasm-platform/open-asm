@@ -48,20 +48,20 @@ const COLORS = [
   '#ec4899', // pink
 ] as const;
 
-interface EditAssetGroupDialogProps {
-  assetGroup: AssetGroup;
+interface EditProjectDialogProps {
+  project: AssetGroup;
   onSuccess?: () => void;
 }
 
-export function EditAssetGroupDialog({
-  assetGroup,
+export function EditProjectDialog({
+  project,
   onSuccess,
-}: EditAssetGroupDialogProps) {
+}: EditProjectDialogProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: assetGroup.name,
-      hexColor: assetGroup.hexColor || '',
+      name: project.name,
+      hexColor: project.hexColor || '',
     },
   });
 
@@ -73,23 +73,23 @@ export function EditAssetGroupDialog({
     (data: z.infer<typeof formSchema>) => {
       mutate(
         {
-          id: assetGroup.id,
+          id: project.id,
           data,
         },
         {
           onSuccess: () => {
             setOpen(false);
-            toast.success('Automation group updated successfully');
-            queryClient.invalidateQueries({ queryKey: ['asset-group'] });
+            toast.success('Project updated successfully');
+            queryClient.invalidateQueries({ queryKey: ['projects'] });
             onSuccess?.();
           },
           onError: () => {
-            toast.error('Failed to update automation group');
+            toast.error('Failed to update project');
           },
         },
       );
     },
-    [mutate, assetGroup.id, queryClient, onSuccess],
+    [mutate, project.id, queryClient, onSuccess],
   );
 
   const [open, setOpen] = useState(false);
@@ -110,16 +110,16 @@ export function EditAssetGroupDialog({
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Edit automation group</p>
+            <p>Edit project</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit automation group</DialogTitle>
+            <DialogTitle>Edit project</DialogTitle>
             <DialogDescription>
-              Update the name and color of your automation group.
+              Update the name and color of your project.
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -134,7 +134,7 @@ export function EditAssetGroupDialog({
                   <FormItem>
                     <FormLabel>Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Automation group name" {...field} />
+                      <Input placeholder="Project name" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

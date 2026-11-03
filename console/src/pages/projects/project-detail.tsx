@@ -13,10 +13,10 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { Clock, Layers, Server, Trash, type LucideIcon } from 'lucide-react';
 import { memo, useCallback, type ReactNode } from 'react';
 import { toast } from 'sonner';
-import { AssetGroupDetailSkeleton } from './asset-group-detail-skeleton';
-import AssetGroupWorkflow from './components/asset-group-workflow';
+import { ProjectDetailSkeleton } from './project-detail-skeleton';
+import ProjectWorkflow from './components/project-workflow';
 import { AssetSection } from './components/asset-section';
-import { EditAssetGroupDialog } from './components/edit-asset-group-dialog';
+import { EditProjectDialog } from './components/edit-project-dialog';
 
 dayjs.extend(relativeTime);
 
@@ -55,7 +55,7 @@ const InfoRow = memo(function InfoRow({
   );
 });
 
-export default function AssetGroupDetail() {
+export default function ProjectDetail() {
   const { id } = useParams({ strict: false });
   const navigate = useNavigate();
   const { data, refetch, isLoading } = useAssetGroupControllerGetById(id!);
@@ -67,27 +67,27 @@ export default function AssetGroupDetail() {
       { id: id! },
       {
         onSuccess: () => {
-          toast('Automation group deleted successfully');
-          // Invalidate the list cache so the deleted group disappears from
-          // the asset groups list when navigating back.
-          queryClient.invalidateQueries({ queryKey: ['asset-group'] });
-          navigate({ to: '/groups' });
+          toast('Project deleted successfully');
+          // Invalidate the list cache so the deleted project disappears from
+          // the projects list when navigating back.
+          queryClient.invalidateQueries({ queryKey: ['projects'] });
+          navigate({ to: '/projects' });
         },
         onError: () => {
-          toast.error('Failed to delete automation group');
+          toast.error('Failed to delete project');
         },
       },
     );
   }, [mutate, queryClient, navigate, id]);
 
-  if (isLoading) return <AssetGroupDetailSkeleton />;
+  if (isLoading) return <ProjectDetailSkeleton />;
 
   if (!data) {
     return (
-      <Page isShowButtonGoBack permission="group.read">
+      <Page isShowButtonGoBack permission="project.read">
         <div className="flex h-full items-center justify-center">
           <div className="text-lg text-red-500">
-            Error loading group details
+            Error loading project details
           </div>
         </div>
       </Page>
@@ -100,7 +100,7 @@ export default function AssetGroupDetail() {
   const toolCount = Object.keys(workflow?.workflow.content?.jobs ?? {}).length;
 
   // One row per fact, one fact per row. The hero carries identity only (name +
-  // the group colour, as a small swatch beside it) and never repeats a value
+  // the project colour, as a small swatch beside it) and never repeats a value
   // from below.
   const rows: {
     icon?: LucideIcon;
@@ -131,7 +131,7 @@ export default function AssetGroupDetail() {
   ];
 
   return (
-    <Page isShowButtonGoBack permission="group.read">
+    <Page isShowButtonGoBack permission="project.read">
       <div className="space-y-4">
         <Card className="gap-0 overflow-hidden py-0">
           {/* Identity: name + colour swatch, liveness, actions. Every other fact
@@ -144,13 +144,13 @@ export default function AssetGroupDetail() {
             />
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-xl font-semibold tracking-tight">
-                {data.name || 'Unnamed group'}
+                {data.name || 'Unnamed project'}
               </h1>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <EditAssetGroupDialog assetGroup={data} onSuccess={refetch} />
+              <EditProjectDialog project={data} onSuccess={refetch} />
               <ConfirmDialog
-                title="Delete automation group"
+                title="Delete project"
                 description={`Are you sure you want to delete "${data.name}"? This action cannot be undone.`}
                 onConfirm={handleDelete}
                 typeToConfirm="delete"
@@ -166,7 +166,7 @@ export default function AssetGroupDetail() {
 
           {/* Every fact, once. */}
           <CardContent className="border-t py-4">
-            <CardTitle className="sr-only">Group information</CardTitle>
+            <CardTitle className="sr-only">Project information</CardTitle>
             <div className="grid gap-x-4 gap-y-3.5 sm:grid-cols-2 lg:grid-cols-3">
               {rows.map((row) => (
                 <InfoRow key={row.label} {...row} />
@@ -176,12 +176,12 @@ export default function AssetGroupDetail() {
 
           {/* Schedule, tools and hosts share the card. Order and behaviour are
               unchanged — only the card chrome moved to the parent. */}
-          <AssetGroupWorkflow
-            assetGroupId={id!}
+          <ProjectWorkflow
+            projectId={id!}
             workflows={workflows}
             onRefetch={refetch}
           />
-          <AssetSection assetGroupId={id!} totalAssets={data.totalAssets} />
+          <AssetSection projectId={id!} totalAssets={data.totalAssets} />
         </Card>
       </div>
     </Page>

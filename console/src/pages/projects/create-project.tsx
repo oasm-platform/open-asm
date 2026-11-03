@@ -4,8 +4,8 @@ import Page from '@/components/common/page';
 import {
   ToolPipelineBuilder,
   type PipelineToolEntry,
-} from '@/pages/asset-group/components/tool-pipeline-builder';
-import { NoInstalledToolsState } from '@/pages/asset-group/components/no-installed-tools-state';
+} from '@/pages/projects/components/tool-pipeline-builder';
+import { NoInstalledToolsState } from '@/pages/projects/components/no-installed-tools-state';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -74,7 +74,7 @@ interface HostAssetRow {
   assetCount: number;
 }
 
-export function CreateAssetGroup() {
+export function CreateProject() {
   const navigate = useNavigate();
 
   const [step, setStep] = useState(0);
@@ -97,13 +97,13 @@ export function CreateAssetGroup() {
 
   const hostsQuery = useAssetsControllerGetHostAssets(
     { page, limit: pageSize, sortBy, sortOrder, value: filter },
-    { query: { queryKey: ['create-group-hosts', page, pageSize, sortBy, sortOrder, filter] } },
+    { query: { queryKey: ['create-project-hosts', page, pageSize, sortBy, sortOrder, filter] } },
   );
 
   const toolsQuery = useToolsControllerGetInstalledTools();
 
   // Pipeline-capable tool categories. url_discovery connectors (e.g. gau)
-  // run in the group pipeline alongside vulnerability scanners.
+  // run in the project pipeline alongside vulnerability scanners.
   const pipelineTools = useMemo(
     () =>
       (toolsQuery.data?.data ?? []).filter(
@@ -120,7 +120,7 @@ export function CreateAssetGroup() {
     [toolsQuery.data?.data],
   );
 
-  const { mutate: createAssetGroup, isPending } = useAssetGroupControllerCreate();
+  const { mutate: createProject, isPending } = useAssetGroupControllerCreate();
 
   const isLastStep = step === STEPS.length - 1;
   const canNext =
@@ -151,14 +151,14 @@ export function CreateAssetGroup() {
         category?: ToolCategory;
       }[];
     };
-    createAssetGroup(
+    createProject(
       { data: dto },
       {
         onSuccess: (response: AssetGroup) => {
-          navigate({ to: `/groups/${response.id}` });
+          navigate({ to: `/projects/${response.id}` });
         },
         onError: () => {
-          toast.error('Failed to create automation group');
+          toast.error('Failed to create project');
         },
       },
     );
@@ -214,11 +214,11 @@ export function CreateAssetGroup() {
   ];
 
   return (
-      <Page permission="group.write">
+      <Page permission="project.write">
       <div className="h-full overflow-y-auto">
         <Card className="mx-auto w-full max-w-4xl max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent">
           <CardHeader className="max-sm:px-0">
-            <CardTitle>Automation group</CardTitle>
+            <CardTitle>Project</CardTitle>
             <CardDescription>
               Runs automated security scans. Add your
               hosts, pick the tools to execute, and set a schedule — scans run
@@ -269,9 +269,9 @@ export function CreateAssetGroup() {
           {step === 0 && (
             <div className="flex max-w-md flex-col gap-5">
               <div className="flex flex-col gap-2">
-                <Label htmlFor="asset-group-name">Name</Label>
+                <Label htmlFor="project-name">Name</Label>
                 <Input
-                  id="asset-group-name"
+                  id="project-name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Production hosts"
@@ -360,7 +360,7 @@ export function CreateAssetGroup() {
 
           {/* Footer */}
           <div className="flex items-center justify-between border-t pt-4">
-            <Button variant="outline" onClick={() => navigate({ to: '/groups' })}>
+            <Button variant="outline" onClick={() => navigate({ to: '/projects' })}>
               Cancel
             </Button>
             <div className="flex items-center gap-2">

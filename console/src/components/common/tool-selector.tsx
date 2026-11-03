@@ -39,7 +39,7 @@ interface ToolSelectorProps {
 
 /**
  * Reusable selector for scanning tools (small circular logos). Used both when
- * creating an asset group and when managing a group's assigned tools.
+ * creating a project and when managing a project's assigned tools.
  */
 export function ToolSelector({
   tools,

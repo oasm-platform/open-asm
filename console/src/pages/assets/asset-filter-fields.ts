@@ -65,8 +65,9 @@ export const ASSET_FILTER_FIELDS: FilterFieldConfig[] = [
   { key: 'isNew', label: 'New', operators: ['eq'],
     useSuggestions: () => ({ options: NEW_OPTIONS, isFetching: false }),
     validate: (v) => (v === 'true' || v === 'false' ? null : 'Pick true or false') },
-  { key: 'assetGroup', label: 'Asset group', operators: ['eq', 'neq', 'in', 'notIn'],
-    validate: (v) => (UUID.test(v) ? null : 'Pick a group from the list'),
+  // Key stays 'assetGroup' until the API filter field is renamed to 'project'.
+  { key: 'assetGroup', label: 'Project', operators: ['eq', 'neq', 'in', 'notIn'],
+    validate: (v) => (UUID.test(v) ? null : 'Pick a project from the list'),
     useSuggestions: (s, on) => {
       const { targetIds, limit, page } = useScope(s);
       return wrap(useAssetGroupControllerGetAll({ targetIds, limit, page, search: s || undefined },
