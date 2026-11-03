@@ -3,8 +3,8 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   ToolPipelineBuilder,
   type PipelineToolEntry,
-} from '@/pages/asset-group/components/tool-pipeline-builder';
-import { NoInstalledToolsState } from '@/pages/asset-group/components/no-installed-tools-state';
+} from '@/pages/projects/components/tool-pipeline-builder';
+import { NoInstalledToolsState } from '@/pages/projects/components/no-installed-tools-state';
 import JobStatusBadge from '@/components/ui/job-status';
 import { useNavigate } from '@tanstack/react-router';
 import {
@@ -20,12 +20,12 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { getLocalTimezone, getNextRun } from '@/lib/cron-schedule';
-import RunWorkflowButton from '@/pages/asset-group/components/run-workflow-button';
+import RunWorkflowButton from '@/pages/projects/components/run-workflow-button';
 import {
   AssetGroupLastRunDtoStatus,
   ToolCategory,
   ToolsControllerGetManyToolsType,
-  type AssetGroupWorkflow as AssetGroupWorkflowRelation,
+  type AssetGroupWorkflow as ProjectWorkflowRelation,
   useAssetGroupControllerAddManyWorkflows,
   useAssetGroupControllerRemoveManyWorkflows,
   useAssetGroupControllerUpdateAssetGroupWorkflow,
@@ -45,13 +45,13 @@ import dayjs from 'dayjs';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
-export default function AssetGroupWorkflow({
-  assetGroupId,
+export default function ProjectWorkflow({
+  projectId,
   workflows,
   onRefetch,
 }: {
-  assetGroupId: string;
-  workflows: AssetGroupWorkflowRelation[];
+  projectId: string;
+  workflows: ProjectWorkflowRelation[];
   onRefetch: () => void;
 }) {
   const {
@@ -64,7 +64,7 @@ export default function AssetGroupWorkflow({
   const [draftSchedule, setDraftSchedule] =
     useState<CronScheduleChange | null>(null);
   const {
-    mutate: updateAssetGroupWorkflow,
+    mutate: updateProjectWorkflow,
     isPending: isPendingUpdateSchedule,
   } = useAssetGroupControllerUpdateAssetGroupWorkflow();
   // Create/update/delete workflow mutation
@@ -74,7 +74,7 @@ export default function AssetGroupWorkflow({
   const addWorkflowsMutation = useAssetGroupControllerAddManyWorkflows();
   const removeWorkflowsMutation = useAssetGroupControllerRemoveManyWorkflows();
 
-  // Tools rendered in the group workflow: providers + pipeline-capable
+  // Tools rendered in the project workflow: providers + pipeline-capable
   // categories (vulnerabilities, url_discovery, ports_scanner)
   const toolProviders = useMemo(
     () =>
@@ -103,7 +103,7 @@ export default function AssetGroupWorkflow({
     [toolProviders],
   );
 
-  // Only one workflow per group is expected.
+  // Only one workflow per project is expected.
   const currentWorkflow = workflows[0];
   const workflowId = currentWorkflow?.id;
 
@@ -128,7 +128,7 @@ export default function AssetGroupWorkflow({
   );
 
   // ---- Pipeline value derived from the workflow jobs map ----
-  // `jobs` is keyed by a unique job id (the tool name for group workflows) and
+  // `jobs` is keyed by a unique job id (the tool name for project workflows) and
   // a job without `needs` runs in parallel, so the map order is presentation
   // only. Every mutation below writes the map back.
   const jobs = useMemo(
@@ -203,7 +203,7 @@ export default function AssetGroupWorkflow({
       if (existingWorkflow) {
         if (next.length === 0) {
           await removeWorkflowsMutation.mutateAsync({
-            groupId: assetGroupId,
+            groupId: projectId,
             data: { workflowIds: [existingWorkflow.id] },
           });
           await deleteWorkflowMutation.mutateAsync({
@@ -222,17 +222,17 @@ export default function AssetGroupWorkflow({
       } else if (next.length > 0) {
         const createdWorkflow = await createWorkflowMutation.mutateAsync({
           data: {
-            name: `Group Workflow - ${assetGroupId}`,
+            name: `Project Workflow - ${projectId}`,
             content: {
               on: { schedule: '0 0 * * *', target: [] },
               jobs,
-              name: `Group Workflow - ${assetGroupId}`,
+              name: `Project Workflow - ${projectId}`,
             },
             filePath: '',
           },
         });
         await addWorkflowsMutation.mutateAsync({
-          groupId: assetGroupId,
+          groupId: projectId,
           data: { workflowIds: [createdWorkflow.id] },
         });
         toast.success('Workflow created with the selected pipeline!');
@@ -252,7 +252,7 @@ export default function AssetGroupWorkflow({
     updateWorkflowMutation,
     createWorkflowMutation,
     addWorkflowsMutation,
-    assetGroupId,
+    projectId,
     onRefetch,
   ]);
   const handleOpenSchedule = useCallback(() => {
@@ -274,7 +274,7 @@ export default function AssetGroupWorkflow({
   const handleDisableSchedule = useCallback(() => {
     if (!workflowId) return;
 
-    updateAssetGroupWorkflow(
+    updateProjectWorkflow(
       { id: workflowId, data: { schedule: 'disabled' } },
       {
         onSuccess: async () => {
@@ -287,13 +287,13 @@ export default function AssetGroupWorkflow({
         },
       },
     );
-  }, [workflowId, updateAssetGroupWorkflow, onRefetch]);
+  }, [workflowId, updateProjectWorkflow, onRefetch]);
 
   // Save a custom cron schedule from the dialog, same API as the dropdown
   const handleSaveCustomSchedule = useCallback(() => {
     if (!workflowId || !draftSchedule?.cron) return;
 
-    updateAssetGroupWorkflow(
+    updateProjectWorkflow(
       { id: workflowId, data: { schedule: draftSchedule.cron } },
       {
         onSuccess: async () => {
@@ -306,7 +306,7 @@ export default function AssetGroupWorkflow({
         },
       },
     );
-  }, [workflowId, draftSchedule, updateAssetGroupWorkflow, onRefetch]);
+  }, [workflowId, draftSchedule, updateProjectWorkflow, onRefetch]);
 
   return (
     <div className="flex flex-col gap-2">
@@ -428,7 +428,7 @@ export default function AssetGroupWorkflow({
           <div>
             <div className="leading-none font-semibold">Tools</div>
             <div className="hidden text-sm text-muted-foreground md:block">
-              Scanning tools assigned to this group. Click a tool to add or
+              Scanning tools assigned to this project. Click a tool to add or
               remove it.
             </div>
           </div>

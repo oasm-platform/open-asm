@@ -5,7 +5,7 @@ import { MoveUpRight, WrenchIcon } from 'lucide-react';
 const INSTALL_STEPS = [
   'Open the Tools page and browse the available scanners.',
   'Install a tool and choose its configuration.',
-  'Return here and add the tool to the group pipeline.',
+  'Return here and add the tool to the project pipeline.',
 ];
 
 export function NoInstalledToolsState() {
@@ -18,7 +18,7 @@ export function NoInstalledToolsState() {
         <h3 className="text-sm font-semibold">No tools installed yet</h3>
         <p className="mx-auto max-w-xl text-sm text-muted-foreground">
           Install a compatible scanner and choose its configuration before
-          adding it to this group.
+          adding it to this project.
         </p>
       </div>
       <ol className="grid w-full max-w-3xl gap-3 text-left text-sm text-muted-foreground sm:grid-cols-3">

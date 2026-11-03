@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithProviders, screen, waitFor } from '@/test/utils';
-import { CreateAssetGroup } from '@/pages/asset-group/create-asset-group';
+import { CreateProject } from '@/pages/projects/create-project';
 
 const mockHosts = [
   {
@@ -84,15 +84,15 @@ beforeEach(() => {
       _vars: unknown,
       opts?: { onSuccess?: (response: { id: string }) => void },
     ) => {
-      opts?.onSuccess?.({ id: 'group-1' });
+      opts?.onSuccess?.({ id: 'project-1' });
     },
   );
 });
 
-describe('CreateAssetGroup wizard page', () => {
+describe('CreateProject wizard page', () => {
   it('renders step 1 with name input and color palette; Next disabled until name entered', async () => {
-    const { user } = renderWithProviders(<CreateAssetGroup />, {
-      routePath: '/groups/create',
+    const { user } = renderWithProviders(<CreateProject />, {
+      routePath: '/projects/create',
     });
 
     // Step indicator + form fields
@@ -104,17 +104,17 @@ describe('CreateAssetGroup wizard page', () => {
     expect(screen.getByRole('button', { name: 'Back' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
 
-    await user.type(nameInput, 'My Group');
+    await user.type(nameInput, 'My Project');
     expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
   });
 
   it('guides users to install and select a tool when none are installed', async () => {
     installedToolsRef.current = [];
-    const { user, router } = renderWithProviders(<CreateAssetGroup />, {
-      routePath: '/groups/create',
+    const { user, router } = renderWithProviders(<CreateProject />, {
+      routePath: '/projects/create',
     });
 
-    await user.type(await screen.findByLabelText('Name'), 'My Group');
+    await user.type(await screen.findByLabelText('Name'), 'My Project');
     await user.click(screen.getByRole('button', { name: 'Next' }));
     await user.click(screen.getByRole('button', { name: 'Next' }));
 
@@ -123,11 +123,11 @@ describe('CreateAssetGroup wizard page', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Install a compatible scanner and choose its configuration before adding it to this group.',
+        'Install a compatible scanner and choose its configuration before adding it to this project.',
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText('Return here and add the tool to the group pipeline.'),
+      screen.getByText('Return here and add the tool to the project pipeline.'),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
 
@@ -142,9 +142,9 @@ describe('CreateAssetGroup wizard page', () => {
     });
   });
 
-  it('navigates to /groups when Cancel is clicked', async () => {
-    const { user, router } = renderWithProviders(<CreateAssetGroup />, {
-      routePath: '/groups/create',
+  it('navigates to /projects when Cancel is clicked', async () => {
+    const { user, router } = renderWithProviders(<CreateProject />, {
+      routePath: '/projects/create',
     });
 
     await user.click(
@@ -152,17 +152,17 @@ describe('CreateAssetGroup wizard page', () => {
     );
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/groups');
+      expect(router.state.location.pathname).toBe('/projects');
     });
   });
 
   it('walks all steps, selects hosts and tools, and saves a merged DTO', async () => {
-    const { user, router } = renderWithProviders(<CreateAssetGroup />, {
-      routePath: '/groups/create',
+    const { user, router } = renderWithProviders(<CreateProject />, {
+      routePath: '/projects/create',
     });
 
     // Step 1 -> 2
-    await user.type(await screen.findByLabelText('Name'), 'My Group');
+    await user.type(await screen.findByLabelText('Name'), 'My Project');
     await user.click(screen.getByRole('button', { name: 'Next' }));
 
     // Step 2: hosts table with row selection
@@ -184,28 +184,28 @@ describe('CreateAssetGroup wizard page', () => {
     await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
     const dto = createMock.mock.calls[0][0].data;
     expect(dto).toMatchObject({
-      name: 'My Group',
+      name: 'My Project',
       hostIds: ['asset-1'],
       tools: [{ toolId: 'tool-1' }],
     });
     expect(dto.schedule).toMatch(/^\S+ \S+ \S+ \S+ \S+$/);
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/groups/group-1');
+      expect(router.state.location.pathname).toBe('/projects/project-1');
     });
   });
 
   it('goes back to the previous step with Back and keeps entered values', async () => {
-    const { user } = renderWithProviders(<CreateAssetGroup />, {
-      routePath: '/groups/create',
+    const { user } = renderWithProviders(<CreateProject />, {
+      routePath: '/projects/create',
     });
 
-    await user.type(await screen.findByLabelText('Name'), 'My Group');
+    await user.type(await screen.findByLabelText('Name'), 'My Project');
     await user.click(screen.getByRole('button', { name: 'Next' }));
     await screen.findByText('https://example.com');
 
     await user.click(screen.getByRole('button', { name: 'Back' }));
     await waitFor(() => {
-      expect(screen.getByLabelText('Name')).toHaveValue('My Group');
+      expect(screen.getByLabelText('Name')).toHaveValue('My Project');
     });
   });
 });

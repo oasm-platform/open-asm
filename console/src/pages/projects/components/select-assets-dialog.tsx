@@ -35,7 +35,7 @@ interface Asset {
 }
 
 interface SelectAssetsDialogProps {
-  assetGroupId: string;
+  projectId: string;
   trigger?: React.ReactNode;
   onAssetsAdded?: () => void;
 }
@@ -48,14 +48,14 @@ const defaultTrigger = (
 );
 
 export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
-  assetGroupId,
+  projectId,
   trigger,
   onAssetsAdded,
 }) => {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
 
-  // Selected assets for adding to group
+  // Selected assets for adding to the project
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<string>('');
 
@@ -63,7 +63,7 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
   const addAssetsMutation = useAssetGroupControllerAddManyAssets();
   const addAsset = addAssetsMutation.mutate;
 
-  // Queries for assets not in asset group
+  // Queries for assets not in the project
   const {
     tableParams: { page, pageSize, sortBy, sortOrder },
     tableHandlers: { setPage, setPageSize, setParams },
@@ -72,19 +72,19 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
     defaultPageSize: 10,
   });
 
-  const assetsNotInGroupQuery = useAssetGroupControllerGetAssetsNotInAssetGroup(
-    assetGroupId,
+  const assetsNotInProjectQuery = useAssetGroupControllerGetAssetsNotInAssetGroup(
+    projectId,
     { page, limit: pageSize, sortBy, sortOrder, search: filter },
     { query: { enabled: open } },
   );
 
-  // Handle adding selected assets to the group
+  // Handle adding selected assets to the project
   const handleAddSelectedAssets = useCallback(() => {
     if (selectedAssets.size === 0) return;
 
     addAsset(
       {
-        groupId: assetGroupId,
+        groupId: projectId,
         data: { assetIds: Array.from(selectedAssets) },
       },
       {
@@ -94,29 +94,29 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
           void queryClient.invalidateQueries({
             queryKey:
               getAssetGroupControllerGetAssetsByAssetGroupsIdQueryKey(
-                assetGroupId,
+                projectId,
               ),
           });
           void queryClient.invalidateQueries({
             queryKey: getAssetGroupControllerGetAssetsNotInAssetGroupQueryKey(
-              assetGroupId,
+              projectId,
             ),
           });
           onAssetsAdded?.();
         },
       },
     );
-  }, [selectedAssets, addAsset, assetGroupId, queryClient, onAssetsAdded]);
+  }, [selectedAssets, addAsset, projectId, queryClient, onAssetsAdded]);
 
-  // Columns for assets not in group with selection
-  const assetsNotInGroupColumns: ColumnDef<Asset>[] = useMemo(
+  // Columns for assets not in the project, with selection
+  const assetsNotInProjectColumns: ColumnDef<Asset>[] = useMemo(
     () => [
       {
         id: 'select',
         header: () => {
           // Calculate if all page rows are selected based on our selectedAssets state
           const allIds =
-            assetsNotInGroupQuery.data?.data?.map((asset) => asset.id) || [];
+            assetsNotInProjectQuery.data?.data?.map((asset) => asset.id) || [];
           const allPageRowsSelected =
             allIds.length > 0 && allIds.every((id) => selectedAssets.has(id));
           const somePageRowsSelected = allIds.some((id) =>
@@ -132,14 +132,14 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
                 if (value) {
                   // When selecting all, add all visible assets that aren't already selected
                   const allIds =
-                    assetsNotInGroupQuery.data?.data?.map(
+                    assetsNotInProjectQuery.data?.data?.map(
                       (asset) => asset.id,
                     ) || [];
                   setSelectedAssets((prev) => new Set([...prev, ...allIds]));
                 } else {
                   // When deselecting all, remove all visible assets from selection
                   const allIds =
-                    assetsNotInGroupQuery.data?.data?.map(
+                    assetsNotInProjectQuery.data?.data?.map(
                       (asset) => asset.id,
                     ) || [];
                   setSelectedAssets((prev) => {
@@ -189,7 +189,7 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
           new Date(row.original.createdAt).toLocaleDateString(),
       },
     ],
-    [selectedAssets, assetsNotInGroupQuery.data],
+    [selectedAssets, assetsNotInProjectQuery.data],
   );
 
   const handleRowClick = useCallback(
@@ -225,16 +225,16 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
         <DialogHeader>
           <DialogTitle>Select hosts to add</DialogTitle>
           <DialogDescription>
-            Choose hosts not currently in this automation group to add
+            Choose hosts not currently in this project to add
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">
           <DataTable
-            columns={assetsNotInGroupColumns}
-            data={assetsNotInGroupQuery.data?.data || []}
-            isLoading={assetsNotInGroupQuery.isLoading}
-            page={assetsNotInGroupQuery.data?.page || 1}
-            pageSize={assetsNotInGroupQuery.data?.limit || 10}
+            columns={assetsNotInProjectColumns}
+            data={assetsNotInProjectQuery.data?.data || []}
+            isLoading={assetsNotInProjectQuery.isLoading}
+            page={assetsNotInProjectQuery.data?.page || 1}
+            pageSize={assetsNotInProjectQuery.data?.limit || 10}
             sortBy={sortBy}
             sortOrder={sortOrder}
             filterValue={filter}
@@ -245,14 +245,14 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
             onSortChange={(col, order) => {
               setParams({ sortBy: col, sortOrder: order });
             }}
-            totalItems={assetsNotInGroupQuery.data?.total || 0}
+            totalItems={assetsNotInProjectQuery.data?.total || 0}
             onRowClick={handleRowClick}
             tableState={tableState}
           />
         </div>
         <DialogFooter className="flex sm:justify-between">
           <div className="text-sm text-muted-foreground">
-            {selectedAssets.size} of {assetsNotInGroupQuery.data?.total || 0}{' '}
+            {selectedAssets.size} of {assetsNotInProjectQuery.data?.total || 0}{' '}
             selected
           </div>
           <Button
