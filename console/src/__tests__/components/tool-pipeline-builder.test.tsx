@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderWithProviders, screen, waitFor } from '@/test/utils';
 import type { Tool } from '@/services/apis/gen/queries';
-import { ToolPipelineBuilder } from '@/pages/asset-group/components/tool-pipeline-builder';
+import { ToolPipelineBuilder } from '@/pages/projects/components/tool-pipeline-builder';
 
 vi.mock('@/services/apis/gen/queries', async (importOriginal) => {
   const actual = await importOriginal<

@@ -1,5 +1,7 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { JobRunType } from '@/common/enums/enum';
+import { AssetGroupWorkflow } from '@/modules/asset-group/entities/asset-groups-workflows.entity';
+import { AssetGroup } from '@/modules/asset-group/entities/asset-groups.entity';
 import { HttpResponse } from '@/modules/assets/entities/http-response.entity';
 import { DiscoveredUrl } from '@/modules/assets/entities/discovered-url.entity';
 import { Port } from '@/modules/assets/entities/ports.entity';
@@ -9,11 +11,21 @@ import type {
   WorkflowRunScope,
   WorkflowRunStepStates,
 } from '@/modules/workflows/workflow-graph';
-import { Column, Entity, Index, ManyToOne, OneToMany, Relation } from 'typeorm';
+import {
+  Column,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  Relation,
+} from 'typeorm';
 import { Job } from './job.entity';
 
 @Entity('job_histories')
 @Index('IDX_job_histories_workflow', ['workflow'])
+@Index('IDX_job_histories_projectId_createdAt', ['projectId', 'createdAt'])
+@Index('IDX_job_histories_projectWorkflowId', ['projectWorkflowId'])
 export class JobHistory extends BaseEntity {
   @OneToMany(() => Job, (job) => job.jobHistory, {
     onDelete: 'CASCADE',
@@ -77,6 +89,31 @@ export class JobHistory extends BaseEntity {
     onDelete: 'CASCADE',
   })
   workflow: Relation<Workflow>;
+
+  /**
+   * Project that started the run (manual or scheduled run of one of its
+   * workflows). Null for target-triggered and standalone runs.
+   */
+  @Column({ type: 'uuid', nullable: true })
+  projectId?: string | null;
+
+  @ManyToOne(() => AssetGroup, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'projectId' })
+  project?: Relation<AssetGroup> | null;
+
+  /**
+   * The project's workflow binding (workflow + schedule) the run came from,
+   * so a workflow shared by two projects keeps their runs apart.
+   */
+  @Column({ type: 'uuid', nullable: true })
+  projectWorkflowId?: string | null;
+
+  @ManyToOne(() => AssetGroupWorkflow, {
+    onDelete: 'SET NULL',
+    nullable: true,
+  })
+  @JoinColumn({ name: 'projectWorkflowId' })
+  projectWorkflow?: Relation<AssetGroupWorkflow> | null;
 
   @Column({ nullable: true })
   jobHistoryName?: string;

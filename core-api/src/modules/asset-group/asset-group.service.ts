@@ -94,8 +94,8 @@ export class AssetGroupService {
         (subQuery) =>
           subQuery
             .select('COUNT(aga_sub.id)', 'count')
-            .from('assets_group_assets', 'aga_sub')
-            .where('aga_sub."assetGroupId" = assetGroup.id'),
+            .from('project_assets', 'aga_sub')
+            .where('aga_sub."projectId" = assetGroup.id'),
         'totalAssets',
       );
 
@@ -107,11 +107,11 @@ export class AssetGroupService {
             .select('MAX(jh."createdAt")', 'lastRunAt')
             .from('job_histories', 'jh')
             .innerJoin(
-              'asset_group_workflows',
+              'project_workflows',
               'agw_sub',
               'agw_sub."workflowId" = jh."workflowId"',
             )
-            .where('agw_sub."assetGroupId" = assetGroup.id'),
+            .where('agw_sub."projectId" = assetGroup.id'),
         'lastRunAt',
       );
 
@@ -491,7 +491,7 @@ export class AssetGroupService {
       );
 
       // Delete the group's workflows. The DB-level FK cascades remove the
-      // asset_group_workflows join rows and every job history + job that
+      // project_workflows join rows and every job history + job that
       // was created for this group (job_histories -> jobs -> job_error_log).
       const workflowIds = groupWorkflows
         .map((agw) => agw.workflow?.id)

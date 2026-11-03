@@ -54,7 +54,7 @@ export class AssetGroupController {
       getWorkspaceId: true,
     },
   })
-  @WorkspaceAccess('group.read')
+  @WorkspaceAccess('project.read')
   @Get()
   getAll(
     @Query() query: GetAllAssetGroupsQueryDto,
@@ -73,7 +73,7 @@ export class AssetGroupController {
       getWorkspaceId: true,
     },
   })
-  @WorkspaceAccess('group.read')
+  @WorkspaceAccess('project.read')
   @Get(':id')
   getById(@Param('id') id: string, @WorkspaceId() workspaceId: string) {
     return this.assetGroupService.getAssetGroupById(id, workspaceId);
@@ -89,7 +89,7 @@ export class AssetGroupController {
       getWorkspaceId: true,
     },
   })
-  @WorkspaceAccess('group.write')
+  @WorkspaceAccess('project.write')
   @Patch(':id')
   updateAssetGroupById(
     @Param() param: IdQueryParamDto,
@@ -113,13 +113,13 @@ export class AssetGroupController {
       getWorkspaceId: true,
     },
   })
-  @PublishEvent(EVENT_CATALOG.asset_group.created, {
+  @PublishEvent(EVENT_CATALOG.project.created, {
     // Best-effort changes from the body; name is required by the DTO.
     changes: (body) => ({
       name: { after: (body as { name?: string })?.name ?? '' },
     }),
   })
-  @WorkspaceAccess('group.write')
+  @WorkspaceAccess('project.write')
   @Post()
   create(
     @Body() createAssetGroupDto: CreateAssetGroupDto,
@@ -147,7 +147,7 @@ export class AssetGroupController {
       getWorkspaceId: true,
     },
   })
-  @WorkspaceAccess('group.write')
+  @WorkspaceAccess('project.write')
   @Post(':groupId/workflows')
   addManyWorkflows(
     @Param('groupId') groupId: string,
@@ -172,7 +172,7 @@ export class AssetGroupController {
       getWorkspaceId: true,
     },
   })
-  @WorkspaceAccess('group.write')
+  @WorkspaceAccess('project.write')
   @Post(':groupId/assets')
   addManyAssets(
     @Param('groupId') groupId: string,
@@ -196,7 +196,7 @@ export class AssetGroupController {
       getWorkspaceId: true,
     },
   })
-  @WorkspaceAccess('group.write')
+  @WorkspaceAccess('project.write')
   @Delete(':groupId/workflows')
   removeManyWorkflows(
     @Param('groupId') groupId: string,
@@ -220,7 +220,7 @@ export class AssetGroupController {
       getWorkspaceId: true,
     },
   })
-  @WorkspaceAccess('group.write')
+  @WorkspaceAccess('project.write')
   @Delete(':groupId/assets')
   removeManyAssets(
     @Param('groupId') groupId: string,
@@ -241,8 +241,8 @@ export class AssetGroupController {
       serialization: DefaultMessageResponseDto,
     },
   })
-  @PublishEvent(EVENT_CATALOG.asset_group.deleted)
-  @WorkspaceAccess('group.write')
+  @PublishEvent(EVENT_CATALOG.project.deleted)
+  @WorkspaceAccess('project.write')
   @Delete(':id')
   delete(@Param('id') id: string, @WorkspaceId() workspaceId: string) {
     return this.assetGroupService.delete(id, workspaceId);
@@ -259,7 +259,7 @@ export class AssetGroupController {
       getWorkspaceId: true,
     },
   })
-  @WorkspaceAccess('group.read')
+  @WorkspaceAccess('project.read')
   @Get(':assetGroupId/assets')
   getAssetsByAssetGroupsId(
     @Param('assetGroupId') assetGroupId: string,
@@ -284,7 +284,7 @@ export class AssetGroupController {
       getWorkspaceId: true,
     },
   })
-  @WorkspaceAccess('group.read')
+  @WorkspaceAccess('project.read')
   @Get(':assetGroupId/assets/not-in-group')
   getAssetsNotInAssetGroup(
     @Param('assetGroupId') assetGroupId: string,
@@ -306,7 +306,7 @@ export class AssetGroupController {
       serialization: AssetGroupWorkflow,
     },
   })
-  @WorkspaceAccess('group.write')
+  @WorkspaceAccess('project.write')
   @Patch('workflows/:id')
   updateAssetGroupWorkflow(
     @Param('id') assetGroupWorkflowId: string,

@@ -6,21 +6,21 @@ import { Column, Entity, Index, JoinColumn, ManyToOne, Relation } from 'typeorm'
 import { AssetGroup } from './asset-groups.entity';
 import { AssetGroupLastRunDto } from '../dto/asset-group-last-run.dto';
 
-@Entity('asset_group_workflows')
-@Index('IDX_agw_assetGroupId', ['assetGroup'])
-@Index('IDX_agw_workflowId', ['workflow'])
-@Index('IDX_agw_assetGroupId_workflowId', ['assetGroupId', 'workflowId'], { unique: true })
+@Entity('project_workflows')
+@Index('IDX_pw_projectId', ['assetGroup'])
+@Index('IDX_pw_workflowId', ['workflow'])
+@Index('IDX_pw_projectId_workflowId', ['assetGroupId', 'workflowId'], { unique: true })
 export class AssetGroupWorkflow extends BaseEntity {
   @ApiProperty()
   @ManyToOne(() => AssetGroup, (assetGroup) => assetGroup.assetGroupWorkflows, {
     onDelete: 'CASCADE',
   })
-  @JoinColumn({ name: 'assetGroupId' })
+  @JoinColumn({ name: 'projectId' })
   assetGroup: Relation<AssetGroup>;
 
   // Explicit FK column so the join id is available without loading the
   // relation (query builders only select it when the relation is joined).
-  @Column({ name: 'assetGroupId', type: 'uuid' })
+  @Column({ name: 'projectId', type: 'uuid' })
   assetGroupId: string;
 
   @ApiProperty({ type: () => Workflow })

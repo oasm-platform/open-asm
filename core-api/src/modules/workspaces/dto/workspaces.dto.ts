@@ -79,7 +79,7 @@ export class CurrentPermissionResponseDto {
       'Permission keys of the current user in the workspace, unioned across their permission groups',
     type: 'array',
     items: { type: 'string' },
-    example: ['group.read', 'target.write'],
+    example: ['project.read', 'target.write'],
   })
   currentPermission: string[];
 }

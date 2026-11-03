@@ -63,7 +63,7 @@ export class CreatePermissionGroupDto {
   name: string;
 
   @ApiProperty({
-    example: ['group.read', 'target.read'],
+    example: ['project.read', 'target.read'],
     description:
       'Permission keys granted by this group. "*" is reserved for the system Admin group.',
   })
@@ -90,7 +90,7 @@ export class UpdatePermissionGroupDto {
   @MaxLength(100)
   name?: string;
 
-  @ApiProperty({ required: false, example: ['group.read', 'target.read'] })
+  @ApiProperty({ required: false, example: ['project.read', 'target.read'] })
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(50)

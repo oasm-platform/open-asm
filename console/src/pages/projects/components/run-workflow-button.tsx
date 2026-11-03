@@ -6,7 +6,7 @@ import { Play } from 'lucide-react';
 import { memo, useCallback } from 'react';
 import { toast } from 'sonner';
 
-interface RunAssetGroupWorkflowButtonProps {
+interface RunProjectWorkflowButtonProps {
   id?: string;
   disabled?: boolean;
   onSuccess?: () => void;
@@ -15,7 +15,7 @@ const RunWorkflowButton = ({
   id,
   disabled,
   onSuccess,
-}: RunAssetGroupWorkflowButtonProps) => {
+}: RunProjectWorkflowButtonProps) => {
   const { mutate } = useAssetGroupControllerRunGroupWorkflowScheduler();
   const handleRun = useCallback(() => {
     if (id) {

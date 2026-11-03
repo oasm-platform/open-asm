@@ -202,10 +202,10 @@ export class AssetGroupAssetService {
       // Build query using query builder to get assets associated with the asset group
       const queryBuilder = this.assetRepo
         .createQueryBuilder('asset')
-        .innerJoin('assets_group_assets', 'aga', 'aga.assetId = asset.id')
-        .innerJoin('asset_groups', 'ag', 'ag.id = aga.assetGroupId')
+        .innerJoin('project_assets', 'aga', 'aga.assetId = asset.id')
+        .innerJoin('projects', 'ag', 'ag.id = aga.projectId')
         .where(
-          'aga.assetGroupId = :assetGroupId AND ag.workspaceId = :workspaceId',
+          'aga.projectId = :assetGroupId AND ag.workspaceId = :workspaceId',
           {
             assetGroupId,
             workspaceId,
@@ -264,9 +264,9 @@ export class AssetGroupAssetService {
       const queryBuilder = this.assetRepo
         .createQueryBuilder('asset')
         .leftJoin(
-          'assets_group_assets',
+          'project_assets',
           'aga',
-          'aga.assetId = asset.id AND aga.assetGroupId = :assetGroupId',
+          'aga.assetId = asset.id AND aga.projectId = :assetGroupId',
           { assetGroupId },
         )
         .innerJoin(

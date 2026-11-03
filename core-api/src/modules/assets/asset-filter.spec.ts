@@ -111,7 +111,7 @@ describe('compileAssetFilter', () => {
 
   it('tag and assetGroup use their join tables', () => {
     expect(compile(cond('tag', 'eq', 'prod'))?.sql).toContain('FROM asset_services_tags ast');
-    expect(compile(cond('assetGroup', 'eq', 'x'))?.sql).toContain('FROM assets_group_assets aga');
+    expect(compile(cond('assetGroup', 'eq', 'x'))?.sql).toContain('FROM project_assets aga');
   });
 
   it('combines a root AND with an OR group and numbers params uniquely', () => {

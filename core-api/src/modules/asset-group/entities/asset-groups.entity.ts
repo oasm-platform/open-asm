@@ -15,7 +15,7 @@ import { AssetGroupAsset } from './asset-groups-assets.entity';
 import { AssetGroupWorkflow } from './asset-groups-workflows.entity';
 
 @Unique(['name', 'workspace'])
-@Entity('asset_groups')
+@Entity('projects')
 export class AssetGroup extends BaseEntity {
   @ApiProperty()
   @IsString()

@@ -23,8 +23,8 @@ describe('M4.3 audit wiring (asset-group / internal-networks / vulnerabilities)'
 
   describe('decorator events (one per handler)', () => {
     it.each([
-      [AssetGroupController, 'create', 'asset_group.created'],
-      [AssetGroupController, 'delete', 'asset_group.deleted'],
+      [AssetGroupController, 'create', 'project.created'],
+      [AssetGroupController, 'delete', 'project.deleted'],
       [
         InternalNetworksController,
         'createInternalNetwork',
@@ -67,7 +67,7 @@ describe('M4.3 audit wiring (asset-group / internal-networks / vulnerabilities)'
     });
   });
 
-  describe('asset_group.created (create)', () => {
+  describe('project.created (create)', () => {
     it('records the group name from the body', () => {
       const config = auditConfig(AssetGroupController, 'create');
       expect(config.changes?.({ name: 'Web Servers' }, undefined)).toEqual({
@@ -83,11 +83,11 @@ describe('M4.3 audit wiring (asset-group / internal-networks / vulnerabilities)'
     });
   });
 
-  describe('asset_group.deleted (delete)', () => {
+  describe('project.deleted (delete)', () => {
     it('is wired without changes (name is not available)', () => {
       const config = auditConfig(AssetGroupController, 'delete');
       expect(config.event).toEqual({
-        name: 'asset_group.deleted',
+        name: 'project.deleted',
         summary: expect.any(String),
       });
       expect(config.changes).toBeUndefined();

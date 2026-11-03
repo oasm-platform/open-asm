@@ -31,10 +31,10 @@
     ]
   },
   {
-    "resource": "group",
+    "resource": "project",
     "actions": [
-      { "action": "read", "description": "View asset groups" },
-      { "action": "write", "description": "Create and edit asset groups" }
+      { "action": "read", "description": "View projects" },
+      { "action": "write", "description": "Create and edit projects" }
     ]
   },
   {

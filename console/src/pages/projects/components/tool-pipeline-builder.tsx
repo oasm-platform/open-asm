@@ -591,7 +591,7 @@ const MissingToolPopover = memo(function MissingToolPopover({
 });
 
 /**
- * Shared Option B pipeline builder for asset-group tool selection.
+ * Shared Option B pipeline builder for project tool selection.
  * Circular logo grid (old ToolSelector look): click an unselected logo to
  * add it (blocked connectors open the inline config sheet first), click a
  * selected logo to open its action panel (profile, inline config, remove).

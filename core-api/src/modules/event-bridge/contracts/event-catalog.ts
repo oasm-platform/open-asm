@@ -169,9 +169,9 @@ export const EVENT_CATALOG = {
       },
     },
   },
-  asset_group: {
-    created: { name: 'asset_group.created', summary: 'Asset group created' },
-    deleted: { name: 'asset_group.deleted', summary: 'Asset group deleted' },
+  project: {
+    created: { name: 'project.created', summary: 'Project created' },
+    deleted: { name: 'project.deleted', summary: 'Project deleted' },
   },
   network: {
     created: { name: 'network.created', summary: 'Internal network created' },

@@ -2,11 +2,11 @@ import Page from '@/components/common/page';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
-/** Full-page skeleton mirroring the group detail card: identity row, field grid,
+/** Full-page skeleton mirroring the project detail card: identity row, field grid,
  * then the schedule / tools / hosts sections that share the same card. */
-export function AssetGroupDetailSkeleton() {
+export function ProjectDetailSkeleton() {
   return (
-    <Page isShowButtonGoBack permission="group.read">
+    <Page isShowButtonGoBack permission="project.read">
       <Card className="gap-0 overflow-hidden py-0">
         <div className="flex items-center gap-3 p-5">
           <Skeleton className="size-3 shrink-0 rounded-full" />
