@@ -163,7 +163,7 @@ describe('event catalog', () => {
     it('derives the domain as the first path segment', () => {
       const domains = new Set(EVENT_NAMES.map((name) => name.split('.')[0]));
       // Domains: workspace, member, permission_group, target, asset,
-      // asset_group, network, vulnerability, report, job, workflow,
+      // project, network, vulnerability, report, job, workflow,
       // integration, api_key, audit, artifact, worker, scan, issue,
       // statistics, system_config, storage, notification.
       expect(domains.size).toBe(Object.keys(EVENT_CATALOG).length);

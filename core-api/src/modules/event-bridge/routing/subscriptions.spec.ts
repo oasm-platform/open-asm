@@ -153,7 +153,7 @@ describe('event bus subscriptions', () => {
         [
           'api_key',
           'artifact',
-          'asset_group',
+          'project',
           'audit',
           'member',
           'network',

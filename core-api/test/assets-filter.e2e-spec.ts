@@ -143,11 +143,11 @@ describe('Asset filter tree (e2e)', () => {
     svcB = b.serviceId;
 
     groupId = await insertOne(
-      `INSERT INTO asset_groups (name, "workspaceId") VALUES ($1, $2) RETURNING id`,
+      `INSERT INTO projects (name, "workspaceId") VALUES ($1, $2) RETURNING id`,
       ['e2e-filter-group', ctx.workspace.id],
     );
     await dataSource.query(
-      `INSERT INTO assets_group_assets ("assetGroupId", "assetId") VALUES ($1, $2)`,
+      `INSERT INTO project_assets ("projectId", "assetId") VALUES ($1, $2)`,
       [groupId, a.assetId],
     );
   });

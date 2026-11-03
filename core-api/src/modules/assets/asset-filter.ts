@@ -102,7 +102,7 @@ const FIELD_SQL: Record<Exclude<AssetFilterField, 'isNew'>, Pick<FilterFieldSpec
     like: (p) => `EXISTS (SELECT 1 FROM asset_services_tags ast WHERE ast."assetServiceId" = asset_service.id AND ast.tag ILIKE ${p})`,
   },
   assetGroup: {
-    any: (p) => `EXISTS (SELECT 1 FROM assets_group_assets aga WHERE aga."assetId" = asset.id AND aga."assetGroupId" = ANY(CAST(${p} AS uuid[])))`,
+    any: (p) => `EXISTS (SELECT 1 FROM project_assets aga WHERE aga."assetId" = asset.id AND aga."projectId" = ANY(CAST(${p} AS uuid[])))`,
   },
 };
 

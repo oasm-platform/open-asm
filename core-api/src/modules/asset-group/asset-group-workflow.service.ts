@@ -438,9 +438,9 @@ async getBindingWorkspace(assetGroupWorkflowId: string): Promise<string> {
     // Get all assets associated with the specific asset group workflow
     const assets = await this.assetRepo
       .createQueryBuilder('assets')
-      .innerJoin('assets_group_assets', 'aga', 'aga."assetId" = assets.id')
-      .innerJoin('asset_groups', 'ag', 'ag.id = aga."assetGroupId"')
-      .innerJoin('asset_group_workflows', 'agw', 'agw."assetGroupId" = ag.id')
+      .innerJoin('project_assets', 'aga', 'aga."assetId" = assets.id')
+      .innerJoin('projects', 'ag', 'ag.id = aga."projectId"')
+      .innerJoin('project_workflows', 'agw', 'agw."projectId" = ag.id')
       .where('agw.id = :assetGroupWorkflowId', { assetGroupWorkflowId })
       .getMany();
 
