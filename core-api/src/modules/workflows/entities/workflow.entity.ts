@@ -1,6 +1,6 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { ToolCategory } from '@/common/enums/enum';
-import { AssetGroupWorkflow } from '@/modules/asset-group/entities/asset-groups-workflows.entity';
+import { ProjectWorkflow } from '@/modules/projects/entities/project-workflow.entity';
 import { User } from '@/modules/auth/entities/user.entity';
 import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
@@ -31,7 +31,7 @@ export class On {
   @ApiProperty()
   target?: string[];
   // Plain string: arbitrary 5-field cron expressions are written into this
-  // JSONB content field (e.g. from asset-group workflow creation).
+  // JSONB content field (e.g. from project workflow creation).
   @ApiProperty({ example: '0 0 * * *' })
   @IsOptional()
   schedule?: string;
@@ -129,6 +129,7 @@ export class WorkflowContent {
 @Index(['filePath', 'workspace'], { unique: true })
 @Index('IDX_workflows_workspaceId', ['workspace'])
 export class Workflow extends BaseEntity {
+  @ApiProperty()
   @Column()
   name: string;
 
@@ -136,6 +137,7 @@ export class Workflow extends BaseEntity {
   @Column({ type: 'jsonb' })
   content: WorkflowContent;
 
+  @ApiProperty()
   @Column()
   filePath: string;
 
@@ -154,10 +156,10 @@ export class Workflow extends BaseEntity {
   })
   jobHistories?: JobHistory[];
 
-  @OneToMany(() => AssetGroupWorkflow, (agt) => agt.workflow, {
+  @OneToMany(() => ProjectWorkflow, (binding) => binding.workflow, {
     onDelete: 'CASCADE',
   })
-  assetGroupWorkflows?: Relation<AssetGroupWorkflow[]>;
+  projectWorkflows?: Relation<ProjectWorkflow[]>;
 
   @ApiProperty()
   @Column({ default: true })

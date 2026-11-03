@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ApiKeysModule } from './apikeys/apikeys.module';
-import { AssetGroupModule } from './asset-group/asset-group.module';
+import { ProjectsModule } from './projects/projects.module';
 import { AssetsModule } from './assets/assets.module';
 import { AuthModule } from './auth/auth.module';
 import { ConnectorsModule } from './connectors/connectors.module';
@@ -53,7 +53,7 @@ import { ArtifactsModule } from './artifacts/artifacts.module';
     ApiKeysModule,
     ProvidersModule,
     TemplatesModule,
-    AssetGroupModule,
+    ProjectsModule,
     IssuesModule,
     AdminModule,
     InternalNetworksModule,

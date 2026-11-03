@@ -32,6 +32,7 @@ import {
   Loader2,
   MinusCircle,
   MousePointerClick,
+  Zap,
 } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import {
@@ -232,6 +233,7 @@ const TRIGGER_META: Record<
 > = {
   manual: { label: 'Manual', icon: <MousePointerClick className="size-5" /> },
   scheduled: { label: 'Schedule', icon: <CalendarClock className="size-5" /> },
+  event: { label: 'Assets added', icon: <Zap className="size-5" /> },
 };
 
 /** First node of every run: how it was started. Every root step hangs off it. */

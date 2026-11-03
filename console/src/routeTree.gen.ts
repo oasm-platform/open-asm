@@ -39,7 +39,6 @@ import { Route as AuthedInternalNetworksIdRouteImport } from './routes/_authed/i
 import { Route as AuthedInternalNetworksCreateRouteImport } from './routes/_authed/internal-networks/create'
 import { Route as AuthedJobsIndexRouteImport } from './routes/_authed/jobs/index'
 import { Route as AuthedProjectsIndexRouteImport } from './routes/_authed/projects/index'
-import { Route as AuthedProjectsIdRouteImport } from './routes/_authed/projects/$id'
 import { Route as AuthedProjectsCreateRouteImport } from './routes/_authed/projects/create'
 import { Route as AuthedProvidersIndexRouteImport } from './routes/_authed/providers/index'
 import { Route as AuthedProvidersCreateRouteImport } from './routes/_authed/providers/create'
@@ -64,6 +63,8 @@ import { Route as AuthedAistudioConversationsIndexRouteImport } from './routes/_
 import { Route as AuthedAistudioConversationsConversationIdRouteImport } from './routes/_authed/aistudio/conversations/$conversationId'
 import { Route as AuthedAssetsServicesIdRouteImport } from './routes/_authed/assets/services/$id'
 import { Route as AuthedJobsRunsIdRouteImport } from './routes/_authed/jobs/runs/$id'
+import { Route as AuthedProjectsIdIndexRouteImport } from './routes/_authed/projects/$id/index'
+import { Route as AuthedProjectsIdTabRouteImport } from './routes/_authed/projects/$id/$tab'
 import { Route as AuthedProvidersIdIndexRouteImport } from './routes/_authed/providers/$id/index'
 import { Route as AuthedProvidersIdEditRouteImport } from './routes/_authed/providers/$id/edit'
 import { Route as AuthedTargetsIdIndexRouteImport } from './routes/_authed/targets/$id/index'
@@ -224,11 +225,6 @@ const AuthedProjectsIndexRoute = AuthedProjectsIndexRouteImport.update({
   path: '/projects/',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedProjectsIdRoute = AuthedProjectsIdRouteImport.update({
-  id: '/projects/$id',
-  path: '/projects/$id',
-  getParentRoute: () => AuthedRoute,
-} as any)
 const AuthedProjectsCreateRoute = AuthedProjectsCreateRouteImport.update({
   id: '/projects/create',
   path: '/projects/create',
@@ -354,6 +350,16 @@ const AuthedJobsRunsIdRoute = AuthedJobsRunsIdRouteImport.update({
   path: '/jobs/runs/$id',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedProjectsIdIndexRoute = AuthedProjectsIdIndexRouteImport.update({
+  id: '/projects/$id/',
+  path: '/projects/$id/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedProjectsIdTabRoute = AuthedProjectsIdTabRouteImport.update({
+  id: '/projects/$id/$tab',
+  path: '/projects/$id/$tab',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedProvidersIdIndexRoute = AuthedProvidersIdIndexRouteImport.update({
   id: '/providers/$id/',
   path: '/providers/$id/',
@@ -411,7 +417,6 @@ export interface FileRoutesByFullPath {
   '/aistudio/usage': typeof AuthedAistudioUsageRoute
   '/internal-networks/$id': typeof AuthedInternalNetworksIdRoute
   '/internal-networks/create': typeof AuthedInternalNetworksCreateRoute
-  '/projects/$id': typeof AuthedProjectsIdRoute
   '/projects/create': typeof AuthedProjectsCreateRoute
   '/providers/create': typeof AuthedProvidersCreateRoute
   '/targets/start-discovery': typeof AuthedTargetsStartDiscoveryRoute
@@ -440,12 +445,14 @@ export interface FileRoutesByFullPath {
   '/aistudio/conversations/$conversationId': typeof AuthedAistudioConversationsConversationIdRoute
   '/assets/services/$id': typeof AuthedAssetsServicesIdRoute
   '/jobs/runs/$id': typeof AuthedJobsRunsIdRoute
+  '/projects/$id/$tab': typeof AuthedProjectsIdTabRoute
   '/providers/$id/edit': typeof AuthedProvidersIdEditRoute
   '/targets/$id/$tab': typeof AuthedTargetsIdTabRoute
   '/settings/members/permission-groups/$permissionId': typeof SettingsMembersPermissionGroupsPermissionIdRoute
   '/settings/members/permission-groups/new': typeof SettingsMembersPermissionGroupsNewRoute
   '/agents/$id/': typeof AuthedAgentsIdIndexRoute
   '/aistudio/conversations/': typeof AuthedAistudioConversationsIndexRoute
+  '/projects/$id/': typeof AuthedProjectsIdIndexRoute
   '/providers/$id/': typeof AuthedProvidersIdIndexRoute
   '/targets/$id/': typeof AuthedTargetsIdIndexRoute
 }
@@ -471,7 +478,6 @@ export interface FileRoutesByTo {
   '/aistudio/usage': typeof AuthedAistudioUsageRoute
   '/internal-networks/$id': typeof AuthedInternalNetworksIdRoute
   '/internal-networks/create': typeof AuthedInternalNetworksCreateRoute
-  '/projects/$id': typeof AuthedProjectsIdRoute
   '/projects/create': typeof AuthedProjectsCreateRoute
   '/providers/create': typeof AuthedProvidersCreateRoute
   '/targets/start-discovery': typeof AuthedTargetsStartDiscoveryRoute
@@ -500,12 +506,14 @@ export interface FileRoutesByTo {
   '/aistudio/conversations/$conversationId': typeof AuthedAistudioConversationsConversationIdRoute
   '/assets/services/$id': typeof AuthedAssetsServicesIdRoute
   '/jobs/runs/$id': typeof AuthedJobsRunsIdRoute
+  '/projects/$id/$tab': typeof AuthedProjectsIdTabRoute
   '/providers/$id/edit': typeof AuthedProvidersIdEditRoute
   '/targets/$id/$tab': typeof AuthedTargetsIdTabRoute
   '/settings/members/permission-groups/$permissionId': typeof SettingsMembersPermissionGroupsPermissionIdRoute
   '/settings/members/permission-groups/new': typeof SettingsMembersPermissionGroupsNewRoute
   '/agents/$id': typeof AuthedAgentsIdIndexRoute
   '/aistudio/conversations': typeof AuthedAistudioConversationsIndexRoute
+  '/projects/$id': typeof AuthedProjectsIdIndexRoute
   '/providers/$id': typeof AuthedProvidersIdIndexRoute
   '/targets/$id': typeof AuthedTargetsIdIndexRoute
 }
@@ -535,7 +543,6 @@ export interface FileRoutesById {
   '/_authed/aistudio/usage': typeof AuthedAistudioUsageRoute
   '/_authed/internal-networks/$id': typeof AuthedInternalNetworksIdRoute
   '/_authed/internal-networks/create': typeof AuthedInternalNetworksCreateRoute
-  '/_authed/projects/$id': typeof AuthedProjectsIdRoute
   '/_authed/projects/create': typeof AuthedProjectsCreateRoute
   '/_authed/providers/create': typeof AuthedProvidersCreateRoute
   '/_authed/targets/start-discovery': typeof AuthedTargetsStartDiscoveryRoute
@@ -564,12 +571,14 @@ export interface FileRoutesById {
   '/_authed/aistudio/conversations/$conversationId': typeof AuthedAistudioConversationsConversationIdRoute
   '/_authed/assets/services/$id': typeof AuthedAssetsServicesIdRoute
   '/_authed/jobs/runs/$id': typeof AuthedJobsRunsIdRoute
+  '/_authed/projects/$id/$tab': typeof AuthedProjectsIdTabRoute
   '/_authed/providers/$id/edit': typeof AuthedProvidersIdEditRoute
   '/_authed/targets/$id/$tab': typeof AuthedTargetsIdTabRoute
   '/settings/members/permission-groups/$permissionId': typeof SettingsMembersPermissionGroupsPermissionIdRoute
   '/settings/members/permission-groups/new': typeof SettingsMembersPermissionGroupsNewRoute
   '/_authed/agents/$id/': typeof AuthedAgentsIdIndexRoute
   '/_authed/aistudio/conversations/': typeof AuthedAistudioConversationsIndexRoute
+  '/_authed/projects/$id/': typeof AuthedProjectsIdIndexRoute
   '/_authed/providers/$id/': typeof AuthedProvidersIdIndexRoute
   '/_authed/targets/$id/': typeof AuthedTargetsIdIndexRoute
 }
@@ -599,7 +608,6 @@ export interface FileRouteTypes {
     | '/aistudio/usage'
     | '/internal-networks/$id'
     | '/internal-networks/create'
-    | '/projects/$id'
     | '/projects/create'
     | '/providers/create'
     | '/targets/start-discovery'
@@ -628,12 +636,14 @@ export interface FileRouteTypes {
     | '/aistudio/conversations/$conversationId'
     | '/assets/services/$id'
     | '/jobs/runs/$id'
+    | '/projects/$id/$tab'
     | '/providers/$id/edit'
     | '/targets/$id/$tab'
     | '/settings/members/permission-groups/$permissionId'
     | '/settings/members/permission-groups/new'
     | '/agents/$id/'
     | '/aistudio/conversations/'
+    | '/projects/$id/'
     | '/providers/$id/'
     | '/targets/$id/'
   fileRoutesByTo: FileRoutesByTo
@@ -659,7 +669,6 @@ export interface FileRouteTypes {
     | '/aistudio/usage'
     | '/internal-networks/$id'
     | '/internal-networks/create'
-    | '/projects/$id'
     | '/projects/create'
     | '/providers/create'
     | '/targets/start-discovery'
@@ -688,12 +697,14 @@ export interface FileRouteTypes {
     | '/aistudio/conversations/$conversationId'
     | '/assets/services/$id'
     | '/jobs/runs/$id'
+    | '/projects/$id/$tab'
     | '/providers/$id/edit'
     | '/targets/$id/$tab'
     | '/settings/members/permission-groups/$permissionId'
     | '/settings/members/permission-groups/new'
     | '/agents/$id'
     | '/aistudio/conversations'
+    | '/projects/$id'
     | '/providers/$id'
     | '/targets/$id'
   id:
@@ -722,7 +733,6 @@ export interface FileRouteTypes {
     | '/_authed/aistudio/usage'
     | '/_authed/internal-networks/$id'
     | '/_authed/internal-networks/create'
-    | '/_authed/projects/$id'
     | '/_authed/projects/create'
     | '/_authed/providers/create'
     | '/_authed/targets/start-discovery'
@@ -751,12 +761,14 @@ export interface FileRouteTypes {
     | '/_authed/aistudio/conversations/$conversationId'
     | '/_authed/assets/services/$id'
     | '/_authed/jobs/runs/$id'
+    | '/_authed/projects/$id/$tab'
     | '/_authed/providers/$id/edit'
     | '/_authed/targets/$id/$tab'
     | '/settings/members/permission-groups/$permissionId'
     | '/settings/members/permission-groups/new'
     | '/_authed/agents/$id/'
     | '/_authed/aistudio/conversations/'
+    | '/_authed/projects/$id/'
     | '/_authed/providers/$id/'
     | '/_authed/targets/$id/'
   fileRoutesById: FileRoutesById
@@ -984,13 +996,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedProjectsIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/projects/$id': {
-      id: '/_authed/projects/$id'
-      path: '/projects/$id'
-      fullPath: '/projects/$id'
-      preLoaderRoute: typeof AuthedProjectsIdRouteImport
-      parentRoute: typeof AuthedRoute
-    }
     '/_authed/projects/create': {
       id: '/_authed/projects/create'
       path: '/projects/create'
@@ -1159,6 +1164,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedJobsRunsIdRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/projects/$id/': {
+      id: '/_authed/projects/$id/'
+      path: '/projects/$id'
+      fullPath: '/projects/$id/'
+      preLoaderRoute: typeof AuthedProjectsIdIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/projects/$id/$tab': {
+      id: '/_authed/projects/$id/$tab'
+      path: '/projects/$id/$tab'
+      fullPath: '/projects/$id/$tab'
+      preLoaderRoute: typeof AuthedProjectsIdTabRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/providers/$id/': {
       id: '/_authed/providers/$id/'
       path: '/providers/$id'
@@ -1214,7 +1233,6 @@ interface AuthedRouteChildren {
   AuthedAistudioUsageRoute: typeof AuthedAistudioUsageRoute
   AuthedInternalNetworksIdRoute: typeof AuthedInternalNetworksIdRoute
   AuthedInternalNetworksCreateRoute: typeof AuthedInternalNetworksCreateRoute
-  AuthedProjectsIdRoute: typeof AuthedProjectsIdRoute
   AuthedProjectsCreateRoute: typeof AuthedProjectsCreateRoute
   AuthedProvidersCreateRoute: typeof AuthedProvidersCreateRoute
   AuthedTargetsStartDiscoveryRoute: typeof AuthedTargetsStartDiscoveryRoute
@@ -1239,10 +1257,12 @@ interface AuthedRouteChildren {
   AuthedAistudioConversationsConversationIdRoute: typeof AuthedAistudioConversationsConversationIdRoute
   AuthedAssetsServicesIdRoute: typeof AuthedAssetsServicesIdRoute
   AuthedJobsRunsIdRoute: typeof AuthedJobsRunsIdRoute
+  AuthedProjectsIdTabRoute: typeof AuthedProjectsIdTabRoute
   AuthedProvidersIdEditRoute: typeof AuthedProvidersIdEditRoute
   AuthedTargetsIdTabRoute: typeof AuthedTargetsIdTabRoute
   AuthedAgentsIdIndexRoute: typeof AuthedAgentsIdIndexRoute
   AuthedAistudioConversationsIndexRoute: typeof AuthedAistudioConversationsIndexRoute
+  AuthedProjectsIdIndexRoute: typeof AuthedProjectsIdIndexRoute
   AuthedProvidersIdIndexRoute: typeof AuthedProvidersIdIndexRoute
   AuthedTargetsIdIndexRoute: typeof AuthedTargetsIdIndexRoute
 }
@@ -1257,7 +1277,6 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAistudioUsageRoute: AuthedAistudioUsageRoute,
   AuthedInternalNetworksIdRoute: AuthedInternalNetworksIdRoute,
   AuthedInternalNetworksCreateRoute: AuthedInternalNetworksCreateRoute,
-  AuthedProjectsIdRoute: AuthedProjectsIdRoute,
   AuthedProjectsCreateRoute: AuthedProjectsCreateRoute,
   AuthedProvidersCreateRoute: AuthedProvidersCreateRoute,
   AuthedTargetsStartDiscoveryRoute: AuthedTargetsStartDiscoveryRoute,
@@ -1283,10 +1302,12 @@ const AuthedRouteChildren: AuthedRouteChildren = {
     AuthedAistudioConversationsConversationIdRoute,
   AuthedAssetsServicesIdRoute: AuthedAssetsServicesIdRoute,
   AuthedJobsRunsIdRoute: AuthedJobsRunsIdRoute,
+  AuthedProjectsIdTabRoute: AuthedProjectsIdTabRoute,
   AuthedProvidersIdEditRoute: AuthedProvidersIdEditRoute,
   AuthedTargetsIdTabRoute: AuthedTargetsIdTabRoute,
   AuthedAgentsIdIndexRoute: AuthedAgentsIdIndexRoute,
   AuthedAistudioConversationsIndexRoute: AuthedAistudioConversationsIndexRoute,
+  AuthedProjectsIdIndexRoute: AuthedProjectsIdIndexRoute,
   AuthedProvidersIdIndexRoute: AuthedProvidersIdIndexRoute,
   AuthedTargetsIdIndexRoute: AuthedTargetsIdIndexRoute,
 }

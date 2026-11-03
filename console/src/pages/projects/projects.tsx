@@ -1,4 +1,5 @@
 import Page from '@/components/common/page';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -17,15 +18,29 @@ import {
 } from '@/components/ui/select';
 import useDebounce from '@/hooks/use-debounce';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
+import { getLocalTimezone } from '@/lib/cron-schedule';
+import { cn } from '@/lib/utils';
 import {
-  useAssetGroupControllerGetAll,
-  type AssetGroup,
+  ProjectStatusFilter,
+  ProjectTriggerType,
+  useProjectsControllerGetMany,
+  type ProjectListItemDto,
 } from '@/services/apis/gen/queries';
 import { useNavigate } from '@tanstack/react-router';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { FolderKanban, Plus, Search, SearchX } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import {
+  CalendarClock,
+  FolderKanban,
+  Play,
+  Plus,
+  Search,
+  SearchX,
+  Zap,
+} from 'lucide-react';
+import { memo, useEffect, useState } from 'react';
+import { SeverityBar, SeverityCounts } from './components/severity-bar';
+import { nextCronRun } from './project-utils';
 
 dayjs.extend(relativeTime);
 
@@ -37,9 +52,11 @@ const GRID_CLASS =
 const PAGE_SIZE = 12;
 
 const SORT_OPTIONS = {
+  risk: { label: 'Highest risk', sortBy: 'risk', sortOrder: 'DESC' },
   newest: { label: 'Newest', sortBy: 'createdAt', sortOrder: 'DESC' },
+  lastRun: { label: 'Last run', sortBy: 'lastRunAt', sortOrder: 'DESC' },
   name: { label: 'Name', sortBy: 'name', sortOrder: 'ASC' },
-  hosts: { label: 'Most hosts', sortBy: 'totalAssets', sortOrder: 'DESC' },
+  assets: { label: 'Most assets', sortBy: 'totalAssets', sortOrder: 'DESC' },
 } as const;
 
 type SortKey = keyof typeof SORT_OPTIONS;
@@ -47,21 +64,89 @@ type SortKey = keyof typeof SORT_OPTIONS;
 const toSortKey = (sortBy: string): SortKey =>
   (Object.keys(SORT_OPTIONS) as SortKey[]).find(
     (key) => SORT_OPTIONS[key].sortBy === sortBy,
-  ) ?? 'newest';
+  ) ?? 'risk';
 
-function ProjectCard({ project }: { project: AssetGroup }) {
+const STATUS_OPTIONS = [
+  { value: ProjectStatusFilter.active, label: 'Active' },
+  { value: ProjectStatusFilter.archived, label: 'Archived' },
+  { value: ProjectStatusFilter.all, label: 'All' },
+];
+
+function Meta({ label, value, title }: { label: string; value: string; title?: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[11px] tracking-wide text-muted-foreground uppercase">
+        {label}
+      </dt>
+      <dd className="truncate text-sm font-medium tabular-nums" title={title}>
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+/** How the project runs on its own, at a glance. */
+function TriggerChips({ project }: { project: ProjectListItemDto }) {
+  const enabled = project.triggers.filter((t) => t.enabled);
+  const hasCron = enabled.some((t) => t.type === ProjectTriggerType.cron);
+  const hasAssets = enabled.some((t) => t.type === ProjectTriggerType.assets_added);
+  const chip = 'gap-1 font-normal';
+  if (project.archivedAt) {
+    return <Badge variant="outline" className={chip}>Triggers off</Badge>;
+  }
+  if (!hasCron && !hasAssets) {
+    return (
+      <Badge variant="outline" className={chip}>
+        <Play className="size-3" />
+        Manual only
+      </Badge>
+    );
+  }
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {hasCron && (
+        <Badge variant="outline" className={chip}>
+          <CalendarClock className="size-3" />
+          Schedule
+        </Badge>
+      )}
+      {hasAssets && (
+        <Badge variant="outline" className={chip}>
+          <Zap className="size-3" />
+          Assets added
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+const ProjectCard = memo(function ProjectCard({
+  project,
+  timezone,
+}: {
+  project: ProjectListItemDto;
+  timezone: string;
+}) {
   const navigate = useNavigate();
-  const hosts = project.totalAssets || 0;
+  const next = project.archivedAt ? null : nextCronRun(project.triggers, timezone);
 
   return (
     // Same layout as the worker and tool cards: the detail link is a
     // full-card overlay
-    <div className="relative flex h-full flex-col items-start gap-2 rounded-lg border p-5 text-left transition-colors hover:bg-accent/70">
+    <div
+      className={cn(
+        'relative flex h-full flex-col gap-3 rounded-lg border p-5 text-left transition-colors hover:bg-accent/70',
+        project.archivedAt && 'opacity-70',
+      )}
+    >
       <button
         type="button"
         aria-label={project.name}
         onClick={() =>
-          navigate({ to: '/projects/$id', params: { id: project.id } })
+          navigate({
+            to: '/projects/$id/$tab',
+            params: { id: project.id, tab: 'overview' },
+          })
         }
         className="absolute inset-0 cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
@@ -72,31 +157,61 @@ function ProjectCard({ project }: { project: AssetGroup }) {
         >
           <FolderKanban className="size-3.5 text-white" />
         </span>
-        <h3 className="truncate text-base font-semibold">{project.name}</h3>
+        <h3 className="min-w-0 flex-1 truncate text-base font-semibold">
+          {project.name}
+        </h3>
+        {project.archivedAt ? (
+          <Badge variant="secondary">Archived</Badge>
+        ) : project.newVulnerabilities > 0 ? (
+          <Badge variant="soft">+{project.newVulnerabilities} new</Badge>
+        ) : null}
       </div>
-      <div className="flex w-full items-center justify-between gap-2 text-sm text-muted-foreground">
-        <span>
-          {hosts} host{hosts === 1 ? '' : 's'}
-        </span>
-        <span>
-          {project.lastRunAt
-            ? `Last run ${dayjs(project.lastRunAt).fromNow()}`
-            : 'Never run'}
-        </span>
+      {project.description && (
+        <p className="line-clamp-2 text-xs text-muted-foreground">
+          {project.description}
+        </p>
+      )}
+      <div className="flex flex-col gap-1.5">
+        <SeverityBar counts={project.openVulnerabilities} />
+        <SeverityCounts counts={project.openVulnerabilities} />
       </div>
-      <span className="text-xs text-muted-foreground">
-        Created {dayjs(project.createdAt).format('YYYY-MM-DD')}
-      </span>
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
+        <Meta label="Assets" value={String(project.totalAssets)} />
+        <Meta label="Workflows" value={String(project.workflowCount)} />
+        <Meta
+          label="Last run"
+          value={project.lastRunAt ? dayjs(project.lastRunAt).fromNow() : 'Never'}
+          title={
+            project.lastRunAt
+              ? dayjs(project.lastRunAt).format('DD MMM YYYY, HH:mm')
+              : undefined
+          }
+        />
+        <Meta
+          label="Next run"
+          value={next ? dayjs(next).fromNow() : '—'}
+          title={next ? dayjs(next).format('DD MMM YYYY, HH:mm') : undefined}
+        />
+      </dl>
+      <TriggerChips project={project} />
     </div>
   );
-}
+});
 
 export function Projects() {
   const navigate = useNavigate();
+  const timezone = getLocalTimezone();
   const {
     tableParams: { page, sortBy, sortOrder, filter },
     tableHandlers: { setPage, setFilter, setParams },
-  } = useServerDataTable({ defaultPageSize: PAGE_SIZE });
+  } = useServerDataTable({
+    defaultPageSize: PAGE_SIZE,
+    defaultSortBy: 'risk',
+    defaultSortOrder: 'DESC',
+  });
+  const [status, setStatus] = useState<ProjectStatusFilter>(
+    ProjectStatusFilter.active,
+  );
 
   // Typed search is debounced before it reaches the URL and the API
   const [search, setSearch] = useState(filter);
@@ -105,20 +220,14 @@ export function Projects() {
     setFilter(debouncedSearch);
   }, [debouncedSearch, setFilter]);
 
-  const { data, isLoading } = useAssetGroupControllerGetAll(
-    {
-      limit: PAGE_SIZE,
-      page,
-      sortBy,
-      sortOrder,
-      search: filter,
-    },
-    {
-      query: {
-        queryKey: ['projects', PAGE_SIZE, page, sortBy, sortOrder, filter],
-      },
-    },
-  );
+  const { data, isLoading } = useProjectsControllerGetMany({
+    limit: PAGE_SIZE,
+    page,
+    sortBy,
+    sortOrder,
+    search: filter,
+    status,
+  });
 
   const projects = data?.data ?? [];
   const pageCount = Math.ceil((data?.total ?? 0) / PAGE_SIZE);
@@ -128,17 +237,17 @@ export function Projects() {
       {[...Array(4)].map((_, i) => (
         <div
           key={i}
-          className="flex flex-col items-start gap-2 rounded-lg border p-5 animate-pulse"
+          className="flex flex-col gap-3 rounded-lg border p-5 animate-pulse"
         >
           <div className="flex items-center gap-2">
             <div className="size-6 rounded-md bg-muted" />
             <div className="h-4 w-28 rounded-md bg-muted" />
           </div>
-          <div className="flex w-full items-center justify-between gap-2">
-            <div className="h-3 w-16 rounded-md bg-muted" />
-            <div className="h-3 w-24 rounded-md bg-muted" />
+          <div className="h-1.5 w-full rounded-full bg-muted" />
+          <div className="grid grid-cols-2 gap-2">
+            <div className="h-8 rounded-md bg-muted" />
+            <div className="h-8 rounded-md bg-muted" />
           </div>
-          <div className="h-3 w-24 rounded-md bg-muted" />
         </div>
       ))}
     </div>
@@ -150,10 +259,13 @@ export function Projects() {
         <FolderKanban className="h-6 w-6 text-muted-foreground" />
       </div>
       <h3 className="text-lg font-medium text-muted-foreground">
-        No projects yet
+        {status === ProjectStatusFilter.archived
+          ? 'No archived projects'
+          : 'No projects yet'}
       </h3>
       <p className="text-sm text-muted-foreground">
-        Create a project to group hosts and scan them on a schedule.
+        Create a project to keep a set of assets scanned: pick them by hand or
+        by rules, choose the pipeline, and when it runs.
       </p>
     </div>
   );
@@ -176,7 +288,7 @@ export function Projects() {
     return (
       <div className={GRID_CLASS}>
         {projects.map((project) => (
-          <ProjectCard key={project.id} project={project} />
+          <ProjectCard key={project.id} project={project} timezone={timezone} />
         ))}
       </div>
     );
@@ -185,7 +297,7 @@ export function Projects() {
   return (
     <Page
       title="Projects"
-      description="Organize hosts into projects and scan them on a schedule"
+      description="Keep a set of assets scanned and see what each run found"
       permission="project.read"
     >
       <div className="flex flex-col gap-4">
@@ -211,6 +323,27 @@ export function Projects() {
                 className="h-9 pl-8 text-xs"
               />
             </div>
+            <Select
+              value={status}
+              onValueChange={(value) => {
+                setStatus(value as ProjectStatusFilter);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger
+                aria-label="Project status"
+                className="w-[120px] border-dashed py-0 text-xs focus:outline-none focus:ring-0 focus:ring-offset-0"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {STATUS_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Select
               value={toSortKey(sortBy)}
               onValueChange={(key) => {

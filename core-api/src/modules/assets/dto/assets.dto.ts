@@ -152,7 +152,7 @@ export class GetAssetsQueryDto extends GetManyBaseQueryParams {
     required: false,
     type: String,
     description:
-      'JSON filter tree, e.g. {"logic":"and","items":[{"field":"host","op":"contains","value":"api"},{"logic":"or","conditions":[{"field":"port","op":"in","value":["80","443"]},{"field":"ip","op":"inSubnet","value":["10.0.0.0/8"]}]}]}. Fields: host, port, ip, tech, url, statusCode, tlsHost, tag, assetGroup. Ops: eq, neq, contains, notContains, in, notIn, inSubnet.',
+      'JSON filter tree, e.g. {"logic":"and","items":[{"field":"host","op":"contains","value":"api"},{"logic":"or","conditions":[{"field":"port","op":"in","value":["80","443"]},{"field":"ip","op":"inSubnet","value":["10.0.0.0/8"]}]}]}. Fields: host, port, ip, tech, url, statusCode, tlsHost, tag, project. Ops: eq, neq, contains, notContains, in, notIn, inSubnet.',
   })
   @IsOptional()
   @Transform(({ value }: { value: unknown }) => parseFilterParam(value))

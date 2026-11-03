@@ -151,7 +151,11 @@ export enum ApiKeyType {
 
 export enum BullMQName {
   ASSETS_DISCOVERY_SCHEDULE = 'assets-discovery-schedule',
-  ASSET_GROUPS_WORKFLOW_SCHEDULE = 'asset-groups-workflow-schedule',
+  // The value predates the Projects rename and stays: renaming it would orphan
+  // the repeat schedulers already stored in Redis under the old queue.
+  PROJECT_WORKFLOW_SCHEDULE = 'asset-groups-workflow-schedule',
+  /** Delayed batches of the "assets added" project trigger. */
+  PROJECT_TRIGGER_EVENTS = 'project-trigger-events',
   JOB_RESULT = 'job-result',
   ISSUE_CREATION = 'issue-creation',
   VULNERABILITY_ANALYSIS = 'vulnerability-analysis',
@@ -214,6 +218,37 @@ export enum DismissReason {
 export enum JobRunType {
   MANUAL = 'manual',
   SCHEDULED = 'scheduled',
+  /** Started by an event trigger, e.g. assets added to a project. */
+  EVENT = 'event',
+}
+
+/** How a project scope rule treats the assets it matches. */
+export enum ProjectScopeRuleMode {
+  INCLUDE = 'include',
+  EXCLUDE = 'exclude',
+}
+
+/**
+ * What a project scope rule's value is matched against: a target id, a
+ * hostname (`*` wildcards), an IPv4/IPv6 CIDR, or one asset id.
+ */
+export enum ProjectScopeRuleType {
+  TARGET = 'target',
+  HOSTNAME = 'hostname',
+  CIDR = 'cidr',
+  ASSET = 'asset',
+}
+
+/** Why an asset belongs to a project. */
+export enum ProjectAssetSource {
+  MANUAL = 'manual',
+  RULE = 'rule',
+}
+
+/** When a project workflow runs on its own. */
+export enum ProjectTriggerType {
+  CRON = 'cron',
+  ASSETS_ADDED = 'assets_added',
 }
 
 export enum VulnerabilityAnalyzeStatus {
@@ -308,6 +343,8 @@ export enum EventBusGroup {
   Notifications = 'notifications',
   /** Outbound webhooks, Slack, ticketing systems. */
   Integrations = 'integrations',
+  /** Project scope rules and the "assets added" trigger. */
+  Projects = 'projects',
 }
 
 export enum TelegramConnectStatus {

@@ -50,7 +50,7 @@ export function freshRunSql(runColumn: string, targetColumn: string): string {
  * after a discovery) leaves it alone.
  *
  * "Later run on that target" is read from the run's scope, which only target-
- * triggered and manual runs record by target; an asset-group run therefore
+ * triggered and manual runs record by target; a project run therefore
  * never clears another run's rows.
  */
 export async function findFreshRuns(

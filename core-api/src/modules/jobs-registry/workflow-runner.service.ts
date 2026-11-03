@@ -31,8 +31,14 @@ export interface StartRunInput {
   jobRunType?: JobRunType;
   /** Scope of an event-triggered run: every step fans out to the target's assets. */
   targetIds?: string[];
-  /** Scope of an asset-group run: every step stays inside the selected assets. */
+  /** Scope of a project run: every step stays inside the selected assets. */
   assetIds?: string[];
+  /** Project that started the run (run provenance). */
+  projectId?: string;
+  /** The project workflow binding the run belongs to. */
+  projectWorkflowId?: string;
+  /** The project trigger that started it; absent for a manual run. */
+  triggerId?: string;
 }
 
 export interface StartRunResult {
@@ -96,6 +102,9 @@ export class WorkflowRunnerService {
         isCompleted: false,
         steps: {},
         scope: this.buildScope(input.targetIds, input.assetIds),
+        projectId: input.projectId ?? null,
+        projectWorkflowId: input.projectWorkflowId ?? null,
+        triggerId: input.triggerId ?? null,
       });
       await queryRunner.manager.save(jobHistory);
       await queryRunner.commitTransaction();
@@ -230,7 +239,7 @@ export class WorkflowRunnerService {
               category: step.category,
               // Every step of a run reuses the scope captured at start, so a
               // subdomain step's newly discovered assets are picked up by the
-              // next step while an asset-group run stays inside its selection.
+              // next step while a project run stays inside its selection.
               targetIds: scope.targetIds,
               assetIds: scope.assetIds,
               workflow,
