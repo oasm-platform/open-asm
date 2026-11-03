@@ -41,7 +41,7 @@ pnpm workspace (`pnpm-workspace.yaml`, `packageManager: pnpm@10.33.2`) with 2 No
 - `console/` — React 19 + Vite 8 + Tailwind v4. TanStack **Router** (file-based, `src/routes/` → generated `routeTree.gen.ts`) + TanStack Query, orval API client, shadcn/radix-ui/base-ui, recharts/echarts, xyflow, leaflet, Playwright e2e in `console/e2e/`.
 - `worker/` — Go 1.26 scanning worker (cobra + viper). Two entry points: `cmd/cli` (interactive TUI / headless) and `cmd/app` (env-driven, used by the Docker image). Talks to core-api over gRPC (`worker/internal/grpcclient/`, stubs in `worker/internal/gen/`), **spawns connector containers through the Docker Engine API** (`worker/internal/runtime/docker.go`), serves the connector callback gRPC on `:26276` (`worker/internal/connector/`), go-rod browser automation.
 
-Shared infra (see `docker-compose.yml`): PostgreSQL `pgvector/pgvector:pg17` (`:5432`), Redis (`:6379`), geo-ip proxy (`:4360`), RustFS S3 (`:9000`, admin UI `:9001`).
+Shared infra (see `docker-compose.yml`): PostgreSQL `pgvector/pgvector:pg18` (`:5432`), Redis (`:6379`), geo-ip (`oasm/dbip`, DB-IP Lite, `:4360`), RustFS S3 (`:9000`, admin UI `:9001`).
 
 ## Key Commands (via `task`, from the repo root)
 
@@ -202,7 +202,7 @@ Services: `console` (`:3000`), `core-api` (`:6276` + `:16276`, healthcheck `/api
 
 The compose service key is `oasm-worker`, **not** `worker`. It scales (`task docker-compose workers=3`): connector containers join the `oasm-connectors` network and dial each replica on its own IP, so nothing is published on the host. Replicas share `worker-state` but each locks its own token slot (`.worker-token`, `.worker-token.1`, …) — two workers resuming the same token would share an identity and reap each other's connectors.
 
-Volumes worth knowing: `pgdata`, `redis-data`, `geoip-data`, `rustfs-data`, `worker-tools-cache` (shared tool cache across workers), `worker-state` (worker join identity). `.open-api` is bind-mounted into `core-api` so the container regenerates the spec the console codegen consumes.
+Volumes worth knowing: `pgdata` (mounted at `/var/lib/postgresql` — pg18 layout), `redis-data`, `rustfs-data`, `worker-tools-cache` (shared tool cache across workers), `worker-state` (worker join identity). `.open-api` is bind-mounted into `core-api` so the container regenerates the spec the console codegen consumes.
 
 ## Common Gotchas
 
