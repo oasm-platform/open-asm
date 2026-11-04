@@ -27,7 +27,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { Target } from '../targets/entities/target.entity';
 import { ToolsService } from '../tools/tools.service';
 import { WorkflowsService } from '../workflows/workflows.service';
-import { orderedJobEntries } from '../workflows/workflow-graph';
+import { normalizeInput, orderedJobEntries } from '../workflows/workflow-graph';
 import {
   GetVulnerabilitiesStatisticsQueryDto,
   VulnerabilityStatisticsDto,
@@ -64,8 +64,9 @@ export class VulnerabilitiesService {
 
   /**
    * Initiates a vulnerability scan for the given targets. Host targets
-   * (DOMAIN, CIDR, IP) run the nuclei step of `vulnerability_scan_basic`;
-   * Git organization targets run the whole `repository_scan` workflow.
+   * (DOMAIN, CIDR, IP) run the nuclei step of `vulnerability_scan_basic`,
+   * once per web service discovery found (else once per host); Git
+   * organization targets run the whole `repository_scan` workflow.
    *
    * @param targetIds - The IDs of the targets to scan.
    * @returns A message indicating the scan has started.
@@ -110,6 +111,9 @@ export class VulnerabilitiesService {
         config: job?.config,
         configProfileId: job?.configProfileId,
         category: job?.category as ToolCategory | undefined,
+        // What nuclei takes, as a workflow run would: the template's
+        // `input: [web, host]` scans every live web service, not just the host.
+        input: normalizeInput(job?.input),
       });
     }
 

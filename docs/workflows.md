@@ -164,6 +164,10 @@ web_vulns:
   input: web               # only web services: every port, scheme kept
 ```
 
+The Fast scan (`POST /vulnerabilities/scan`) runs the nuclei step of
+`vulnerability_scan_basic.yaml` with its `input: [web, host]`: every web
+service httpx confirmed live, and the host itself when discovery found none.
+
 ## For contributors
 
 | File | What it does |
