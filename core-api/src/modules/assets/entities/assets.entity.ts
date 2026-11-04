@@ -1,5 +1,5 @@
 import { BaseEntity } from '@/common/entities/base.entity';
-import { AssetGroupAsset } from '@/modules/asset-group/entities/asset-groups-assets.entity';
+import { ProjectAsset } from '@/modules/projects/entities/project-asset.entity';
 import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity';
 import { Job } from '@/modules/jobs-registry/entities/job.entity';
 import { Target } from '@/modules/targets/entities/target.entity';
@@ -75,10 +75,10 @@ export class Asset extends BaseEntity {
   })
   vulnerabilities?: Relation<Vulnerability[]>;
 
-  @OneToMany(() => AssetGroupAsset, (aga) => aga.asset, {
+  @OneToMany(() => ProjectAsset, (projectAsset) => projectAsset.asset, {
     onDelete: 'CASCADE',
   })
-  assetGroupAssets?: Relation<AssetGroupAsset[]>;
+  projectAssets?: Relation<ProjectAsset[]>;
 
   @OneToMany(() => DnsRecord, (dns) => dns.asset, {
     onDelete: 'CASCADE',

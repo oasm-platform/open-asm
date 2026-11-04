@@ -1,5 +1,6 @@
 import {
   BullMQName,
+  DataKind,
   JobPriority,
   JobRunType,
   JobStatus,
@@ -15,11 +16,12 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { AssetGroupWorkflow } from '../asset-group/entities/asset-groups-workflows.entity';
+import { ProjectWorkflow } from '../projects/entities/project-workflow.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { DataAdapterService } from '../data-adapter/data-adapter.service';
 import { StorageService } from '../storage/storage.service';
 import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
+import type { Tool } from '../tools/entities/tools.entity';
 import { ToolsService } from '../tools/tools.service';
 import { WorkerStreamRegistry } from '../workers/worker-stream-registry.service';
 import { WorkerInstance } from '../workers/entities/worker.entity';
@@ -73,11 +75,11 @@ describe('JobsRegistryService', () => {
     save: jest.fn(),
   };
 
-  const mockAssetGroupWorkflowRepository = {
+  const mockProjectWorkflowRepository = {
     createQueryBuilder: jest.fn(),
   };
 
-  let mockAssetGroupWorkflowQB: {
+  let mockProjectWorkflowQB: {
     select: jest.Mock;
     innerJoin: jest.Mock;
     where: jest.Mock;
@@ -126,15 +128,15 @@ describe('JobsRegistryService', () => {
   };
 
   beforeEach(async () => {
-    mockAssetGroupWorkflowQB = {
+    mockProjectWorkflowQB = {
       select: jest.fn().mockReturnThis(),
       innerJoin: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
       getOne: jest.fn().mockResolvedValue(null),
     };
-    mockAssetGroupWorkflowRepository.createQueryBuilder.mockReturnValue(
-      mockAssetGroupWorkflowQB,
+    mockProjectWorkflowRepository.createQueryBuilder.mockReturnValue(
+      mockProjectWorkflowQB,
     );
 
     const module: TestingModule = await Test.createTestingModule({
@@ -152,8 +154,8 @@ describe('JobsRegistryService', () => {
           useValue: mockJobErrorLogRepository,
         },
         {
-          provide: getRepositoryToken(AssetGroupWorkflow),
-          useValue: mockAssetGroupWorkflowRepository,
+          provide: getRepositoryToken(ProjectWorkflow),
+          useValue: mockProjectWorkflowRepository,
         },
         {
           provide: DataSource,
@@ -1878,7 +1880,7 @@ describe('JobsRegistryService', () => {
 
   // ── SCREENSHOT live asset-service filter ─────────────────────────────
 
-  describe('createNewJob — SCREENSHOT live asset-service filter', () => {
+  describe('createNewJob', () => {
     const mockJobRepo = {
       create: jest
         .fn()
@@ -1891,613 +1893,167 @@ describe('JobsRegistryService', () => {
         .mockImplementation((jobs: unknown) => Promise.resolve(jobs)),
     };
 
-    let mockAssetServiceQB: Record<string, jest.Mock>;
+    const apex = { id: 'a-apex', value: 'example.com', isPrimary: true, target: { type: TargetType.DOMAIN } };
+    const app = { id: 'a-app', value: 'app.example.com', isPrimary: false, target: { type: TargetType.DOMAIN } };
+    const web8443 = { id: 's-8443', assetId: 'a-app', value: 'app.example.com:8443', port: 8443 };
 
-    const nucleiTool = {
-      id: 'tool-nuclei',
-      name: 'nuclei',
-      categories: [{ name: ToolCategory.VULNERABILITIES, targetTypes: HOST }],
-      priority: 4,
-    } as any;
-
-    const screenshotTool = {
-      id: 'tool-ss',
-      name: 'screenshot',
-      categories: [{ name: ToolCategory.SCREENSHOT, targetTypes: HOST }],
-      priority: 4,
-    } as any;
-
-    const httpProbeTool = {
-      id: 'tool-hp',
-      name: 'httpx',
-      categories: [{ name: ToolCategory.HTTP_PROBE, targetTypes: HOST }],
-      priority: 4,
-    } as any;
-
-    const makeService = (id: string) => ({
-      id,
-      value: `${id}.example.com`,
-      port: 443,
-      asset: { id: `asset-${id}`, isPrimary: true },
-    });
-
-    beforeEach(() => {
-      jest.clearAllMocks();
-      mockJobHistoryRepository.create = jest
-        .fn()
-        .mockReturnValue({ id: 'jh-1' });
-      mockJobHistoryRepository.save = jest
-        .fn()
-        .mockResolvedValue({ id: 'jh-1' });
-      mockConnectorRegistryService.getConnector.mockReturnValue(null);
-
-      mockAssetServiceQB = {
-        innerJoinAndSelect: jest.fn().mockReturnThis(),
-        innerJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        distinct: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([]),
-      };
-      const mockAssetServiceRepo = {
-        createQueryBuilder: jest.fn().mockReturnValue(mockAssetServiceQB),
-      };
-      mockDataSource.getRepository.mockImplementation((entity: any) => {
-        const name = entity?.name ?? entity;
-        if (name === 'AssetService') return mockAssetServiceRepo;
-        return mockJobRepo;
-      });
-    });
-
-    // Returns the first andWhere() SQL call containing an EXISTS subquery.
-    const findExistsAndWhere = (): string | undefined => {
-      const call = mockAssetServiceQB.andWhere.mock.calls.find(
-        ([sql]) => typeof sql === 'string' && sql.includes('EXISTS'),
-      );
-      return call?.[0] as string | undefined;
-    };
-
-    it('SCREENSHOT: filters to live services via EXISTS(http_responses failed=false) and creates one job per live service', async () => {
-      const liveServices = [makeService('as-1'), makeService('as-2')];
-      mockAssetServiceQB.getMany.mockResolvedValue(liveServices);
-
-      const result = await service.createNewJob({
-        tool: screenshotTool,
-        targetIds: ['target-1'],
-        workspaceId: 'ws-1',
-        workflow: { id: 'wf-1' } as any,
-      });
-
-      // Authoritative "httpx confirmed live" predicate must be applied as an
-      // EXISTS subquery (no row multiplication => no DISTINCT required).
-      const existsSql = findExistsAndWhere();
-      expect(existsSql).toBeDefined();
-      expect(existsSql).toContain('http_responses');
-      expect(existsSql).toContain('hr."assetServiceId" = "assetServices"."id"');
-      expect(existsSql).toContain('hr.failed = false');
-
-      // The buggy innerJoin/DISTINCT approach must be gone.
-      expect(mockAssetServiceQB.innerJoin).not.toHaveBeenCalledWith(
-        'assetServices.httpResponses',
-        'httpResponse',
-      );
-      expect(mockAssetServiceQB.distinct).not.toHaveBeenCalled();
-
-      expect(result).toHaveLength(2);
-      expect(mockWorkerStreamRegistry.publishJobsAvailable).toHaveBeenCalledWith('ws-1');
-      expect(mockJobRepo.save).toHaveBeenCalledTimes(1);
-      expect(mockJobRepo.save).toHaveBeenCalledWith(
-        expect.arrayContaining([
-          expect.objectContaining({ category: ToolCategory.SCREENSHOT }),
-        ]),
-      );
-    });
-
-    it('SCREENSHOT edge (empty): no live services => 0 jobs inserted, no throw', async () => {
-      mockAssetServiceQB.getMany.mockResolvedValue([]);
-
-      const result = await service.createNewJob({
-        tool: screenshotTool,
-        targetIds: ['target-1'],
-        workspaceId: 'ws-1',
-        workflow: { id: 'wf-1' } as any,
-      });
-
-      expect(result).toHaveLength(0);
-      expect(mockJobRepo.save).not.toHaveBeenCalled();
-    });
-
-    it('SCREENSHOT edge (dedup): EXISTS yields one job per service even with many http_responses', async () => {
-      // A service with N http_responses still surfaces ONCE from getMany()
-      // because EXISTS is a semi-join (no row multiplication); assert exactly
-      // one job per service and that DISTINCT is not needed.
-      mockAssetServiceQB.getMany.mockResolvedValue([makeService('as-1')]);
-
-      const result = await service.createNewJob({
-        tool: screenshotTool,
-        targetIds: ['target-1'],
-        workspaceId: 'ws-1',
-        workflow: { id: 'wf-1' } as any,
-      });
-
-      expect(findExistsAndWhere()).toBeDefined();
-      expect(mockAssetServiceQB.distinct).not.toHaveBeenCalled();
-      expect(result).toHaveLength(1);
-    });
-
-    it('VULNERABILITIES (nuclei): one job per live service, not one per host', async () => {
-      // A bare hostname makes nuclei probe http://host:80 only, so the web
-      // scanner follows the services httpx confirmed instead.
-      mockAssetServiceQB.getMany.mockResolvedValue([
-        makeService('as-1'),
-        makeService('as-2'),
-      ]);
-
-      const result = await service.createNewJob({
-        tool: nucleiTool,
-        targetIds: ['target-1'],
-        workspaceId: 'ws-1',
-        workflow: { id: 'wf-1' } as any,
-      });
-
-      expect(findExistsAndWhere()).toContain('hr.failed = false');
-      expect(result).toHaveLength(2);
-      expect(
-        result.map(
-          (job) =>
-            (job as unknown as { assetService: { id: string } }).assetService
-              .id,
-        ),
-      ).toEqual(['as-1', 'as-2']);
-    });
-
-    it('HTTP_PROBE regression: no live filter applied; every service still produces a job', async () => {
-      const allServices = [
-        makeService('as-1'),
-        makeService('as-2'),
-        makeService('as-3'),
-      ];
-      mockAssetServiceQB.getMany.mockResolvedValue(allServices);
-
-      const result = await service.createNewJob({
-        tool: httpProbeTool,
-        targetIds: ['target-1'],
-        workspaceId: 'ws-1',
-        workflow: { id: 'wf-1' } as any,
-      });
-
-      expect(mockAssetServiceQB.innerJoin).not.toHaveBeenCalledWith(
-        'assetServices.httpResponses',
-        'httpResponse',
-      );
-      expect(mockAssetServiceQB.andWhere).not.toHaveBeenCalledWith(
-        'httpResponse.failed = false',
-      );
-      // Non-live (HTTP_PROBE) path must NOT add the EXISTS live predicate.
-      expect(findExistsAndWhere()).toBeUndefined();
-      expect(mockAssetServiceQB.distinct).not.toHaveBeenCalled();
-      expect(result).toHaveLength(3);
-    });
-  });
-
-  // ── url_discovery routing ────────────────────────────────────────────
-
-  describe('createNewJob — category routing', () => {
-    const mockJobRepo = {
-      create: jest
-        .fn()
-        .mockImplementation((partial: Record<string, unknown>) => ({
-          id: 'job-uuid',
-          ...partial,
-        })),
-      save: jest
-        .fn()
-        .mockImplementation((jobs: unknown) => Promise.resolve(jobs)),
-    };
-
-    let mockAssetServiceQB: Record<string, jest.Mock>;
-    let mockAssetQB: Record<string, jest.Mock>;
-
-    const urlDiscoveryTool = {
-      id: 'tool-ud',
-      name: 'katana',
-      categories: [{ name: ToolCategory.URL_DISCOVERY, targetTypes: HOST }],
-      priority: 4,
-    } as any;
-
-    const screenshotTool = {
-      id: 'tool-ss',
-      name: 'screenshot',
-      categories: [{ name: ToolCategory.SCREENSHOT, targetTypes: HOST }],
-      priority: 4,
-    } as any;
-
-    const httpProbeTool = {
-      id: 'tool-hp',
-      name: 'httpx',
-      categories: [{ name: ToolCategory.HTTP_PROBE, targetTypes: HOST }],
-      priority: 4,
-    } as any;
-
-    const subdomainsTool = {
-      id: 'tool-sub',
-      name: 'subfinder',
-      categories: [{ name: ToolCategory.SUBDOMAINS, targetTypes: HOST }],
-      priority: 4,
-    } as any;
-
-    const portsScannerTool = {
-      id: 'tool-ports',
-      name: 'naabu',
-      categories: [{ name: ToolCategory.PORTS_SCANNER, targetTypes: HOST }],
-      priority: 3,
-    } as any;
-
-    const makeService = (id: string) => ({
-      id,
-      value: `${id}.example.com`,
-      port: 443,
-      asset: { id: `asset-${id}`, isPrimary: true, value: `${id}.example.com` },
-    });
-
-    const existsPredicate = (): string | undefined => {
-      const call = mockAssetServiceQB.andWhere.mock.calls.find(
-        ([sql]) => typeof sql === 'string' && sql.includes('EXISTS'),
-      );
-      return call?.[0] as string | undefined;
-    };
-
-    beforeEach(() => {
-      jest.clearAllMocks();
-      mockJobHistoryRepository.create = jest
-        .fn()
-        .mockReturnValue({ id: 'jh-1' });
-      mockJobHistoryRepository.save = jest
-        .fn()
-        .mockResolvedValue({ id: 'jh-1' });
-      mockConnectorRegistryService.getConnector.mockReturnValue(null);
-
-      mockAssetServiceQB = {
-        innerJoinAndSelect: jest.fn().mockReturnThis(),
-        innerJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        distinct: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([]),
-      };
-      mockAssetQB = {
-        innerJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([]),
-      };
-      mockDataSource.getRepository.mockImplementation((entity: any) => {
-        const name = entity?.name ?? entity;
-        if (name === 'AssetService') {
-          return { createQueryBuilder: jest.fn().mockReturnValue(mockAssetServiceQB) };
-        }
-        if (name === 'Asset') {
-          return { createQueryBuilder: jest.fn().mockReturnValue(mockAssetQB) };
-        }
-        return mockJobRepo;
-      });
-    });
-
-    it('S1: URL_DISCOVERY finds asset services (not assets) and creates one job per service with assetService + jobHistory', async () => {
-      mockAssetServiceQB.getMany.mockResolvedValue([
-        makeService('as-1'),
-        makeService('as-2'),
-      ]);
-
-      const result = await service.createNewJob({
-        tool: urlDiscoveryTool,
-        targetIds: ['target-1'],
-        workspaceId: 'ws-1',
-        workflow: { id: 'wf-1' } as any,
-      });
-
-      expect(result).toHaveLength(2);
-      expect(mockAssetServiceQB.getMany).toHaveBeenCalled();
-      expect(mockAssetQB.getMany).not.toHaveBeenCalled();
-      for (const job of result) {
-        expect((job as any).assetService).toBeDefined();
-        expect((job as any).jobHistory).toBeDefined();
-        expect((job as any).category).toBe(ToolCategory.URL_DISCOVERY);
-      }
-    });
-
-    it('S1b: URL_DISCOVERY keeps one service per asset, preferring 443 then 80', async () => {
-      const assetA = { id: 'asset-a', isPrimary: true };
-      const assetB = { id: 'asset-b', isPrimary: false };
-      mockAssetServiceQB.getMany.mockResolvedValue([
-        { id: 'a-8080', value: 'a.example.com', port: 8080, asset: assetA },
-        { id: 'a-80', value: 'a.example.com', port: 80, asset: assetA },
-        { id: 'a-443', value: 'a.example.com', port: 443, asset: assetA },
-        { id: 'b-8443', value: 'b.example.com', port: 8443, asset: assetB },
-        { id: 'b-80', value: 'b.example.com', port: 80, asset: assetB },
-      ]);
-
-      const result = await service.createNewJob({
-        tool: urlDiscoveryTool,
-        targetIds: ['target-1'],
-        workspaceId: 'ws-1',
-        workflow: { id: 'wf-1' } as any,
-      });
-
-      const serviceIds = result.map(
-        (job) => (job as unknown as { assetService: { id: string } }).assetService.id,
-      );
-      expect(serviceIds.sort()).toEqual([
-        'a-443',
-        'b-80',
-      ]);
-    });
-
-    it('S1c regression: SCREENSHOT still creates one job per live service', async () => {
-      const asset = { id: 'asset-a', isPrimary: true };
-      mockAssetServiceQB.getMany.mockResolvedValue([
-        { id: 'a-80', value: 'a.example.com', port: 80, asset },
-        { id: 'a-443', value: 'a.example.com', port: 443, asset },
-      ]);
-
-      const result = await service.createNewJob({
-        tool: screenshotTool,
-        targetIds: ['target-1'],
-        workspaceId: 'ws-1',
-        workflow: { id: 'wf-1' } as any,
-      });
-
-      expect(result).toHaveLength(2);
-    });
-
-    it('S2 edge: URL_DISCOVERY applies liveOnly=true (EXISTS http_responses failed=false)', async () => {
-      mockAssetServiceQB.getMany.mockResolvedValue([makeService('as-1')]);
-
-      await service.createNewJob({
-        tool: urlDiscoveryTool,
-        targetIds: ['target-1'],
-        workspaceId: 'ws-1',
-        workflow: { id: 'wf-1' } as any,
-      });
-
-      const existsSql = existsPredicate();
-      expect(existsSql).toBeDefined();
-      expect(existsSql).toContain('http_responses');
-      expect(existsSql).toContain('hr.failed = false');
-    });
-
-    it('S3b: a host vulnerability scanner (nmap) stays on findAssetsForJob', async () => {
-      mockAssetQB.getMany.mockResolvedValue([
-        { id: 'asset-1', value: 'example.com', isPrimary: true },
-      ]);
-
-      const result = await service.createNewJob({
-        tool: {
-          id: 'tool-nmap',
-          name: 'nmap',
-          categories: [
-            { name: ToolCategory.VULNERABILITIES, targetTypes: HOST },
-          ],
-          priority: 4,
-        } as any,
-        targetIds: ['target-1'],
-        workspaceId: 'ws-1',
-        workflow: { id: 'wf-1' } as any,
-      });
-
-      expect(mockAssetServiceQB.getMany).not.toHaveBeenCalled();
-      expect(result).toHaveLength(1);
-      expect((result[0] as any).assetService).toBeUndefined();
-    });
-
-    it('S3 regression: SUBDOMAINS uses findAssetsForJob, not asset services', async () => {
-      mockAssetQB.getMany.mockResolvedValue([
-        { id: 'asset-1', value: 'example.com', isPrimary: true },
-      ]);
-
-      const result = await service.createNewJob({
-        tool: subdomainsTool,
-        targetIds: ['target-1'],
-        workspaceId: 'ws-1',
-        workflow: { id: 'wf-1' } as any,
-      });
-
-      expect(mockAssetQB.getMany).toHaveBeenCalled();
-      expect(mockAssetServiceQB.getMany).not.toHaveBeenCalled();
-      expect(result).toHaveLength(1);
-    });
-
-    it('PORTS_SCANNER keeps the explicit asset scope supplied by a group workflow', async () => {
-      const selectedAssetIds = ['group-asset-1', 'group-asset-2'];
-      mockAssetQB.getMany.mockResolvedValue([
-        {
-          id: 'group-asset-1',
-          value: 'one.example.com',
-          isPrimary: true,
-        },
-        {
-          id: 'group-asset-2',
-          value: 'two.example.com',
-          isPrimary: true,
-        },
-      ]);
-
-      const result = await service.createNewJob({
-        tool: portsScannerTool,
-        assetIds: selectedAssetIds,
-        workspaceId: 'ws-1',
-        workflow: { id: 'wf-1' } as any,
-      });
-
-      expect(mockAssetQB.andWhere).toHaveBeenCalledWith(
-        'assets.id IN (:...assetIds)',
-        { assetIds: selectedAssetIds },
-      );
-      expect(mockAssetQB.andWhere).not.toHaveBeenCalledWith(
-        'assets.targetId IN (:...targetIds)',
-        expect.anything(),
-      );
-      expect(result.map((job) => job.asset.id)).toEqual(selectedAssetIds);
-    });
-
-    describe('category selection', () => {
-      const nmap = {
-        id: 'tool-nmap',
-        name: 'nmap',
-        priority: 4,
-        categories: [
-          { name: ToolCategory.PORTS_SCANNER, targetTypes: [TargetType.DOMAIN, TargetType.IP] },
-          { name: ToolCategory.HTTP_PROBE, targetTypes: [TargetType.DOMAIN] },
+    /** What the step-scope loader returns: apex never probed, app with one web service. */
+    const loadedScope = () => ({
+      scope: {
+        assets: [
+          { id: apex.id, value: apex.value, isPrimary: true, targetType: TargetType.DOMAIN },
+          { id: app.id, value: app.value, isPrimary: false, targetType: TargetType.DOMAIN },
         ],
-      } as any;
-
-      it('defaults job.category and target types to the tool first category', async () => {
-        mockAssetQB.getMany.mockResolvedValue([{ id: 'a-1', value: 'example.com', isPrimary: true }]);
-
-        const jobs = await service.createNewJob({
-          tool: nmap,
-          workspaceId: 'ws-1',
-          workflow: { id: 'wf-1' } as any,
-        });
-
-        expect(jobs.map((j) => j.category)).toEqual([ToolCategory.PORTS_SCANNER]);
-        expect(mockAssetQB.andWhere).toHaveBeenCalledWith('target.type IN (:...targetTypes)', {
-          targetTypes: [TargetType.DOMAIN, TargetType.IP],
-        });
-      });
-
-      it('uses the requested category for asset source and target types', async () => {
-        mockAssetServiceQB.getMany.mockResolvedValue([makeService('as-1')]);
-
-        const jobs = await service.createNewJob({
-          tool: nmap,
-          category: ToolCategory.HTTP_PROBE,
-          workspaceId: 'ws-1',
-          workflow: { id: 'wf-1' } as any,
-        });
-
-        expect(jobs.map((j) => j.category)).toEqual([ToolCategory.HTTP_PROBE]);
-        expect(mockAssetServiceQB.andWhere).toHaveBeenCalledWith('target.type IN (:...targetTypes)', {
-          targetTypes: [TargetType.DOMAIN],
-        });
-        expect(mockAssetQB.getMany).not.toHaveBeenCalled();
-      });
-
-      it('rejects a category the tool does not declare', async () => {
-        await expect(
-          service.createNewJob({
-            tool: nmap,
-            category: ToolCategory.SCREENSHOT,
-            workspaceId: 'ws-1',
-            workflow: { id: 'wf-1' } as any,
-          }),
-        ).rejects.toThrow('Tool "nmap" has no category "screenshot"');
-      });
+        services: new Map([['a-app', [web8443]]]),
+        web: new Map([['a-app', [{ ...web8443, scheme: 'https' as const }]]]),
+      },
+      assets: new Map<string, unknown>([
+        [apex.id, apex],
+        [app.id, app],
+      ]),
+      services: new Map<string, unknown>([[web8443.id, web8443]]),
     });
 
-    describe('target type filter', () => {
-      it('restricts assets to the target types the tool declares', async () => {
-        await service.createNewJob({
-          tool: { ...subdomainsTool, categories: [{ name: ToolCategory.SUBDOMAINS, targetTypes: [TargetType.DOMAIN] }] },
-          workspaceId: 'ws-1',
-          workflow: { id: 'wf-1' } as any,
-        });
+    let load: jest.SpyInstance;
 
-        expect(mockAssetQB.innerJoin).toHaveBeenCalledWith(
-          'assets.target',
-          'target',
-        );
-        expect(mockAssetQB.andWhere).toHaveBeenCalledWith(
-          'target.type IN (:...targetTypes)',
-          { targetTypes: [TargetType.DOMAIN] },
-        );
-      });
-
-      it('treats a category without declared target types as a host scanner', async () => {
-        await service.createNewJob({
-          tool: { ...portsScannerTool, categories: [{ name: ToolCategory.PORTS_SCANNER, targetTypes: [] }] },
-          workspaceId: 'ws-1',
-          workflow: { id: 'wf-1' } as any,
-        });
-
-        expect(mockAssetQB.andWhere).toHaveBeenCalledWith(
-          'target.type IN (:...targetTypes)',
-          {
-            targetTypes: [TargetType.DOMAIN, TargetType.IP, TargetType.CIDR],
-          },
-        );
-      });
-
-      it('restricts asset services the same way', async () => {
-        await service.createNewJob({
-          tool: { ...httpProbeTool, categories: [{ name: ToolCategory.HTTP_PROBE, targetTypes: [TargetType.IP] }] },
-          workspaceId: 'ws-1',
-          workflow: { id: 'wf-1' } as any,
-        });
-
-        expect(mockAssetServiceQB.innerJoin).toHaveBeenCalledWith(
-          'asset.target',
-          'target',
-        );
-        expect(mockAssetServiceQB.andWhere).toHaveBeenCalledWith(
-          'target.type IN (:...targetTypes)',
-          { targetTypes: [TargetType.IP] },
-        );
-      });
-
-      it('creates no job when no asset of a supported type is in scope', async () => {
-        mockAssetQB.getMany.mockResolvedValue([]);
-
-        const result = await service.createNewJob({
-          tool: { ...subdomainsTool, categories: [{ name: ToolCategory.SUBDOMAINS, targetTypes: [TargetType.DOMAIN] }] },
-          targetIds: ['ip-target'],
-          workspaceId: 'ws-1',
-          workflow: { id: 'wf-1' } as any,
-        });
-
-        // The workflow runner marks a zero-job step as skipped ('no-inputs').
-        expect(result).toEqual([]);
-      });
-    });
-
-    it('S3 regression: SCREENSHOT uses asset services with liveOnly=true; HTTP_PROBE with liveOnly=false', async () => {
-      mockAssetServiceQB.getMany.mockResolvedValue([makeService('as-1')]);
-
-      await service.createNewJob({
-        tool: screenshotTool,
-        targetIds: ['target-1'],
+    const tool = (name: string, categories: unknown[]): Tool =>
+      ({ id: `tool-${name}`, name, categories, priority: 4 }) as unknown as Tool;
+    const nikto = tool('nikto', [
+      {
+        name: ToolCategory.VULNERABILITIES,
+        targetTypes: [TargetType.DOMAIN, TargetType.IP],
+        inputs: [DataKind.WEB, DataKind.HOST],
+      },
+    ]);
+    const httpx = tool('httpx', [{ name: ToolCategory.HTTP_PROBE, targetTypes: HOST }]);
+    const nmap = tool('nmap', [
+      { name: ToolCategory.PORTS_SCANNER, targetTypes: [TargetType.DOMAIN, TargetType.IP] },
+      { name: ToolCategory.HTTP_PROBE, targetTypes: [TargetType.DOMAIN] },
+    ]);
+    const run = (args: Record<string, unknown>) =>
+      service.createNewJob({
         workspaceId: 'ws-1',
         workflow: { id: 'wf-1' } as any,
-      });
-      expect(existsPredicate()).toBeDefined();
+        ...args,
+      } as any);
 
+    beforeEach(() => {
       jest.clearAllMocks();
       mockJobHistoryRepository.create = jest.fn().mockReturnValue({ id: 'jh-1' });
       mockJobHistoryRepository.save = jest.fn().mockResolvedValue({ id: 'jh-1' });
       mockConnectorRegistryService.getConnector.mockReturnValue(null);
-      mockAssetServiceQB = {
-        innerJoinAndSelect: jest.fn().mockReturnThis(),
-        innerJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        distinct: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([makeService('as-1')]),
-      };
-      mockDataSource.getRepository.mockImplementation((entity: any) => {
-        const name = entity?.name ?? entity;
-        if (name === 'AssetService') {
-          return { createQueryBuilder: jest.fn().mockReturnValue(mockAssetServiceQB) };
-        }
-        return mockJobRepo;
+      mockDataSource.getRepository.mockReturnValue(mockJobRepo);
+      load = jest
+        .spyOn((service as any).stepScope, 'load')
+        .mockResolvedValue(loadedScope());
+    });
+
+    it("plans the jobs over the scope with the category's inputs", async () => {
+      const jobs = await run({ tool: nikto, targetIds: ['t-1'] });
+
+      expect(load).toHaveBeenCalledWith([DataKind.WEB, DataKind.HOST], {
+        targetIds: ['t-1'],
+        assetIds: undefined,
+        assetServiceIds: undefined,
+        workspaceId: 'ws-1',
+        targetTypes: [TargetType.DOMAIN, TargetType.IP],
+      });
+      // The apex was never probed: its host. The app: its web service.
+      expect(jobs.map((job) => [job.asset, job.assetService])).toEqual([
+        [apex, undefined],
+        [app, web8443],
+      ]);
+      expect(jobs.every((job) => job.category === ToolCategory.VULNERABILITIES)).toBe(true);
+      expect(mockJobRepo.save).toHaveBeenCalledTimes(1);
+      expect(mockWorkerStreamRegistry.publishJobsAvailable).toHaveBeenCalledWith('ws-1');
+    });
+
+    it("runs the step's own input instead of the category's", async () => {
+      const jobs = await run({ tool: nikto, input: [DataKind.WEB] });
+
+      expect(load).toHaveBeenCalledWith([DataKind.WEB], expect.anything());
+      expect(jobs.map((job) => job.assetService?.id)).toEqual(['s-8443']);
+    });
+
+    it('rejects an input the category does not take', async () => {
+      await expect(run({ tool: nikto, input: [DataKind.URL] })).rejects.toThrow(
+        '"nikto" (vulnerabilities) takes web, host; it cannot take url',
+      );
+      expect(load).not.toHaveBeenCalled();
+    });
+
+    it('stores the connector inputs on the job, the URL in target', async () => {
+      mockConnectorRegistryService.getConnector.mockReturnValue({ image: 'ghcr.io/nikto' });
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({ level: 1 });
+
+      const jobs = await run({ tool: nikto });
+
+      expect(jobs.map((job) => job.inputs)).toEqual([
+        { target: 'example.com' },
+        { target: 'https://app.example.com:8443' },
+      ]);
+      expect(jobs.every((job) => job.command === undefined)).toBe(true);
+    });
+
+    it('binds a built-in command to the service, with no stored inputs', async () => {
+      const jobs = await run({ tool: httpx });
+
+      expect(load).toHaveBeenCalledWith([DataKind.SERVICE], expect.anything());
+      expect(jobs).toHaveLength(1);
+      expect(jobs[0].assetService).toBe(web8443);
+      expect(jobs[0].inputs).toBeNull();
+    });
+
+    it('creates no job when nothing in scope fits (the step is skipped)', async () => {
+      load.mockResolvedValue({ scope: { assets: [] }, assets: new Map(), services: new Map() });
+
+      expect(await run({ tool: nikto })).toEqual([]);
+      expect(mockJobRepo.save).not.toHaveBeenCalled();
+    });
+
+    describe('category selection', () => {
+      it('defaults the category, its inputs and target types to the first one', async () => {
+        const jobs = await run({ tool: nmap });
+
+        expect(load).toHaveBeenCalledWith(
+          [DataKind.HOST],
+          expect.objectContaining({ targetTypes: [TargetType.DOMAIN, TargetType.IP] }),
+        );
+        expect(new Set(jobs.map((j) => j.category))).toEqual(new Set([ToolCategory.PORTS_SCANNER]));
       });
 
-      await service.createNewJob({
-        tool: httpProbeTool,
-        targetIds: ['target-1'],
-        workspaceId: 'ws-1',
-        workflow: { id: 'wf-1' } as any,
+      it('uses the requested category for inputs and target types', async () => {
+        await run({ tool: nmap, category: ToolCategory.HTTP_PROBE });
+
+        expect(load).toHaveBeenCalledWith(
+          [DataKind.SERVICE],
+          expect.objectContaining({ targetTypes: [TargetType.DOMAIN] }),
+        );
       });
-      expect(existsPredicate()).toBeUndefined();
+
+      it('rejects a category the tool does not declare', async () => {
+        await expect(run({ tool: nmap, category: ToolCategory.SCREENSHOT })).rejects.toThrow(
+          'Tool "nmap" has no category "screenshot"',
+        );
+      });
+
+      it('treats a category without declared target types as a host scanner', async () => {
+        await run({ tool: tool('naabu', [{ name: ToolCategory.PORTS_SCANNER, targetTypes: [] }]) });
+
+        expect(load).toHaveBeenCalledWith(
+          [DataKind.HOST],
+          expect.objectContaining({ targetTypes: HOST }),
+        );
+      });
+    });
+
+    it('passes the explicit scope of a project run through to the loader', async () => {
+      await run({ tool: nikto, assetIds: ['a-1', 'a-2'], assetServiceIds: ['s-1'] });
+
+      expect(load).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ assetIds: ['a-1', 'a-2'], assetServiceIds: ['s-1'], targetIds: undefined }),
+      );
     });
   });
 
@@ -2659,50 +2215,6 @@ describe('JobsRegistryService', () => {
       givenWorkerAndQueue(buildWorker(), []);
 
       await expect(service.getNextJob('worker-uuid')).resolves.toBeNull();
-    });
-
-    it('hands a vulnerability job the URL httpx confirmed for its service', async () => {
-      // Given: a claimed nuclei job bound to the https service of a host
-      const { queryRunner } = buildQueryRunner([
-        {
-          id: 'job-1',
-          category: ToolCategory.VULNERABILITIES,
-          assetServiceId: 'as-1',
-          asset: { id: 'a1', value: 'app.example.com' },
-        },
-      ]);
-      const httpResponseQB = {
-        select: jest.fn().mockReturnThis(),
-        addSelect: jest.fn().mockReturnThis(),
-        distinctOn: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        addOrderBy: jest.fn().mockReturnThis(),
-        getRawMany: jest
-          .fn()
-          .mockResolvedValue([
-            { assetServiceId: 'as-1', url: 'https://app.example.com:8443' },
-          ]),
-      };
-      const workerRepo = {
-        findOne: jest.fn().mockResolvedValue(buildWorker()),
-      };
-      const httpResponseRepo = {
-        createQueryBuilder: jest.fn().mockReturnValue(httpResponseQB),
-      };
-      mockDataSource.getRepository.mockImplementation((entity: any) => {
-        const name = entity?.name ?? entity;
-        if (name === 'WorkerInstance') return workerRepo;
-        return httpResponseRepo;
-      });
-      mockDataSource.createQueryRunner.mockReturnValue(queryRunner as any);
-
-      // When
-      const result = await service.getNextJobs('worker-uuid', 1);
-
-      // Then: the scanner gets the real scheme and port, not http://host:80
-      expect(result[0].targetUrl).toBe('https://app.example.com:8443');
     });
   });
 

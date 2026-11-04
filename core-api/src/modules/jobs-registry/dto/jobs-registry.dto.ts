@@ -1,5 +1,5 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
-import { JobRunType, JobStatus, ToolCategory } from '@/common/enums/enum';
+import { DataKind, JobRunType, JobStatus, ToolCategory } from '@/common/enums/enum';
 import { JobDataResultType } from '@/common/types/app.types';
 import { Asset } from '@/modules/assets/entities/assets.entity';
 import { DiscoveredUrl } from '@/modules/assets/entities/discovered-url.entity';
@@ -44,11 +44,11 @@ export class GetNextJobResponseDto extends PickType(Job, [
 /** Extended result returned by getNextJob for connector-capable workers. */
 export interface GetNextJobResult extends GetNextJobResponseDto {
   tool?: { id: string; name: string };
-  /** URL httpx confirmed for the job's service; replaces the bare host input. */
-  targetUrl?: string;
   workspaceId?: string;
   configProfileId?: string;
   config?: Record<string, unknown> | null;
+  /** The inputs the job was created for (see Job.inputs). */
+  inputs?: Record<string, string> | null;
 }
 
 export class WorkerIdParams {
@@ -202,6 +202,11 @@ export class CreateJobs extends PickType(Job, [
   tool: Tool;
   /** Category to run; omitted → the tool's first category. */
   category?: ToolCategory;
+  /**
+   * Input kinds the step takes, best first; omitted → the category's
+   * `inputs`. Must be among them (see tools/tool-io.ts).
+   */
+  input?: DataKind[];
   targetIds?: string[];
   assetIds?: string[];
   /**

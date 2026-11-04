@@ -1,7 +1,8 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { JobRunType } from '@/common/enums/enum';
-import { AssetGroupWorkflow } from '@/modules/asset-group/entities/asset-groups-workflows.entity';
-import { AssetGroup } from '@/modules/asset-group/entities/asset-groups.entity';
+import { Project } from '@/modules/projects/entities/project.entity';
+import { ProjectWorkflowTrigger } from '@/modules/projects/entities/project-workflow-trigger.entity';
+import { ProjectWorkflow } from '@/modules/projects/entities/project-workflow.entity';
 import { HttpResponse } from '@/modules/assets/entities/http-response.entity';
 import { DiscoveredUrl } from '@/modules/assets/entities/discovered-url.entity';
 import { Port } from '@/modules/assets/entities/ports.entity';
@@ -39,7 +40,7 @@ export class JobHistory extends BaseEntity {
 
   // Vulnerabilities are anchored to the tool that found them (and the asset),
   // not to the run that produced them. Deleting a job history (which cascades
-  // from a workflow/asset-group delete) must not delete findings, so the FK
+  // from a workflow/project delete) must not delete findings, so the FK
   // drops the provenance link instead of the row.
   @OneToMany(() => Vulnerability, (vulnerability) => vulnerability.jobHistory, {
     onDelete: 'SET NULL',
@@ -79,8 +80,8 @@ export class JobHistory extends BaseEntity {
 
   /**
    * Scan scope captured when the run started (`targetIds` for an event-triggered
-   * run, `assetIds` for an asset-group run). Steps dispatched later in the chain
-   * reuse it, so a group run never drifts to a target-wide fan-out.
+   * run, `assetIds` for a project run). Steps dispatched later in the chain
+   * reuse it, so a project run never drifts to a target-wide fan-out.
    */
   @Column({ type: 'jsonb', nullable: true })
   scope?: WorkflowRunScope | null;
@@ -91,29 +92,40 @@ export class JobHistory extends BaseEntity {
   workflow: Relation<Workflow>;
 
   /**
-   * Project that started the run (manual or scheduled run of one of its
-   * workflows). Null for target-triggered and standalone runs.
+   * Project that started the run (manual, scheduled or event run of one of
+   * its workflows). Null for target-triggered and standalone runs.
    */
   @Column({ type: 'uuid', nullable: true })
   projectId?: string | null;
 
-  @ManyToOne(() => AssetGroup, { onDelete: 'SET NULL', nullable: true })
+  @ManyToOne(() => Project, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'projectId' })
-  project?: Relation<AssetGroup> | null;
+  project?: Relation<Project> | null;
 
   /**
-   * The project's workflow binding (workflow + schedule) the run came from,
-   * so a workflow shared by two projects keeps their runs apart.
+   * The project's workflow binding the run came from, so a workflow shared by
+   * two projects keeps their runs apart.
    */
   @Column({ type: 'uuid', nullable: true })
   projectWorkflowId?: string | null;
 
-  @ManyToOne(() => AssetGroupWorkflow, {
+  @ManyToOne(() => ProjectWorkflow, {
     onDelete: 'SET NULL',
     nullable: true,
   })
   @JoinColumn({ name: 'projectWorkflowId' })
-  projectWorkflow?: Relation<AssetGroupWorkflow> | null;
+  projectWorkflow?: Relation<ProjectWorkflow> | null;
+
+  /** The trigger that started the run; null for a manual run. */
+  @Column({ type: 'uuid', nullable: true })
+  triggerId?: string | null;
+
+  @ManyToOne(() => ProjectWorkflowTrigger, {
+    onDelete: 'SET NULL',
+    nullable: true,
+  })
+  @JoinColumn({ name: 'triggerId' })
+  trigger?: Relation<ProjectWorkflowTrigger> | null;
 
   @Column({ nullable: true })
   jobHistoryName?: string;

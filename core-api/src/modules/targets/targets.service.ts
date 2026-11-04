@@ -28,6 +28,9 @@ import { sourceCodeHost } from '../integrations/repository-sync.plan';
 import { Asset } from '../assets/entities/assets.entity';
 import type { AuditContext } from '../audit/audit.service';
 import { AuditService } from '../audit/audit.service';
+import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
+import type { AssetDiscoveredPayload } from '../event-bridge/contracts/event-payloads';
+import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import {
   BulkTargetResultDto,
@@ -91,6 +94,7 @@ export class TargetsService implements OnModuleInit {
     @InjectQueue(BullMQName.ASSETS_DISCOVERY_SCHEDULE)
     private scanScheduleQueue: Queue<Target>,
     private readonly auditService: AuditService,
+    private readonly eventBridge: EventBridgeService,
   ) {}
 
   async onModuleInit() {
@@ -449,6 +453,9 @@ export class TargetsService implements OnModuleInit {
     );
 
     const targetValues = targets.map((t) => t.value);
+    // Assets created with the targets (primary asset, a CIDR's addresses),
+    // announced once the transaction commits.
+    let createdAssets: Array<{ id: string; target: { id: string } }> = [];
 
     // Use transaction to ensure atomicity
     const result = await this.repo.manager.transaction(
@@ -607,6 +614,7 @@ export class TargetsService implements OnModuleInit {
             .orIgnore()
             .execute();
         }
+        createdAssets = assetValues;
 
         return {
           created: createdTargetEntities,
@@ -622,6 +630,25 @@ export class TargetsService implements OnModuleInit {
     for (const target of result.created) {
       const typeToEvent = target.type.toLocaleLowerCase(); // e.g. DOMAIN -> domain, CIDR -> cidr
       this.eventEmitter.emit(`target.${typeToEvent}.create`, target);
+    }
+
+    // The target's own assets are new assets too: a project rule on the
+    // hostname or on a CIDR must see them, and no scan rediscovers them (a
+    // CIDR's addresses are never created again).
+    const assetIdsByTarget = new Map<string, string[]>();
+    for (const asset of createdAssets) {
+      assetIdsByTarget.set(asset.target.id, [
+        ...(assetIdsByTarget.get(asset.target.id) ?? []),
+        asset.id,
+      ]);
+    }
+    for (const [targetId, assetIds] of assetIdsByTarget) {
+      await this.eventBridge.publishSafely(EVENT_CATALOG.asset.discovered, {
+        workspaceId,
+        outcome: 'success',
+        resourceType: 'asset',
+        payload: { targetId, assetIds } satisfies AssetDiscoveredPayload,
+      });
     }
 
     return result;

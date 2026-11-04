@@ -1,5 +1,5 @@
 import { Reflector } from '@nestjs/core';
-import { AssetGroupController } from '../asset-group/asset-group.controller';
+import { ProjectsController } from '../projects/projects.controller';
 import { InternalNetworksController } from '../internal-networks/internal-networks.controller';
 import { VulnerabilitiesController } from '../vulnerabilities/vulnerabilities.controller';
 import {
@@ -9,7 +9,7 @@ import {
 
 type PublishEventMetadata = { event: unknown } & PublishEventConfig;
 
-describe('M4.3 audit wiring (asset-group / internal-networks / vulnerabilities)', () => {
+describe('M4.3 audit wiring (projects / internal-networks / vulnerabilities)', () => {
   const reflector = new Reflector();
 
   const auditConfig = (
@@ -23,8 +23,14 @@ describe('M4.3 audit wiring (asset-group / internal-networks / vulnerabilities)'
 
   describe('decorator events (one per handler)', () => {
     it.each([
-      [AssetGroupController, 'create', 'project.created'],
-      [AssetGroupController, 'delete', 'project.deleted'],
+      [ProjectsController, 'create', 'project.created'],
+      [ProjectsController, 'update', 'project.updated'],
+      [ProjectsController, 'archive', 'project.archived'],
+      [ProjectsController, 'unarchive', 'project.unarchived'],
+      [ProjectsController, 'delete', 'project.deleted'],
+      [ProjectsController, 'replaceScopeRules', 'project.updated'],
+      [ProjectsController, 'createWorkflow', 'project.updated'],
+      [ProjectsController, 'createTrigger', 'project.updated'],
       [
         InternalNetworksController,
         'createInternalNetwork',
@@ -55,8 +61,10 @@ describe('M4.3 audit wiring (asset-group / internal-networks / vulnerabilities)'
 
     it('handlers outside the M4.3 scope are NOT wired', () => {
       for (const [controller, method] of [
-        [AssetGroupController, 'getAll'],
-        [AssetGroupController, 'updateAssetGroupById'],
+        [ProjectsController, 'getMany'],
+        [ProjectsController, 'getVulnerabilities'],
+        // A run is recorded as a run (job history), not as a project change.
+        [ProjectsController, 'runWorkflow'],
         [InternalNetworksController, 'getManyInternalNetworks'],
         [InternalNetworksController, 'createTargetsFromInterfaces'],
         [VulnerabilitiesController, 'scan'],
@@ -68,15 +76,15 @@ describe('M4.3 audit wiring (asset-group / internal-networks / vulnerabilities)'
   });
 
   describe('project.created (create)', () => {
-    it('records the group name from the body', () => {
-      const config = auditConfig(AssetGroupController, 'create');
+    it('records the project name from the body', () => {
+      const config = auditConfig(ProjectsController, 'create');
       expect(config.changes?.({ name: 'Web Servers' }, undefined)).toEqual({
         name: { after: 'Web Servers' },
       });
     });
 
     it('falls back to an empty name when the body carries none', () => {
-      const config = auditConfig(AssetGroupController, 'create');
+      const config = auditConfig(ProjectsController, 'create');
       expect(config.changes?.({}, undefined)).toEqual({
         name: { after: '' },
       });
@@ -85,12 +93,28 @@ describe('M4.3 audit wiring (asset-group / internal-networks / vulnerabilities)'
 
   describe('project.deleted (delete)', () => {
     it('is wired without changes (name is not available)', () => {
-      const config = auditConfig(AssetGroupController, 'delete');
+      const config = auditConfig(ProjectsController, 'delete');
       expect(config.event).toEqual({
         name: 'project.deleted',
         summary: expect.any(String),
       });
       expect(config.changes).toBeUndefined();
+    });
+  });
+
+  describe('project activity', () => {
+    it.each(['update', 'archive', 'unarchive', 'delete', 'addAssets', 'updateTrigger'])(
+      '%s keeps the project id from the route, so the activity feed finds it',
+      (method) => {
+        expect(auditConfig(ProjectsController, method).resourceIdFromRoute).toBe(
+          true,
+        );
+      },
+    );
+
+    it('create takes the id of the created project', () => {
+      const config = auditConfig(ProjectsController, 'create');
+      expect(config.resourceId?.({ id: 'p-1' })).toBe('p-1');
     });
   });
 

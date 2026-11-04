@@ -11,6 +11,7 @@ import { AssetsService } from '../assets/assets.service';
 import type { Asset } from '../assets/entities/assets.entity';
 import type { AuditContext } from '../audit/audit.service';
 import { AuditService } from '../audit/audit.service';
+import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
 import { Integration } from '../integrations/entities/integration.entity';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import {
@@ -26,6 +27,7 @@ describe('TargetsService', () => {
   let mockWorkspacesService: Partial<WorkspacesService>;
   let mockAssetsService: Partial<AssetsService>;
   let mockEventEmitter: Partial<EventEmitter2>;
+  const mockEventBridge = { publishSafely: jest.fn() };
   let mockQueue: Partial<Queue>;
   let mockAuditService: { auditSafely: jest.Mock };
   let mockIntegrationRepository: { find: jest.Mock };
@@ -66,6 +68,7 @@ describe('TargetsService', () => {
     mockEventEmitter = {
       emit: jest.fn(),
     };
+    mockEventBridge.publishSafely.mockReset();
 
     mockQueue = {
       add: jest.fn(),
@@ -109,6 +112,7 @@ describe('TargetsService', () => {
           provide: AuditService,
           useValue: mockAuditService,
         },
+        { provide: EventBridgeService, useValue: mockEventBridge },
       ],
     }).compile();
 
@@ -466,6 +470,41 @@ describe('TargetsService', () => {
         'target.domain.create',
         expect.any(Object),
       );
+    });
+
+    it('announces each new target primary asset as discovered', async () => {
+      const createdTargets = ['first.com', 'second.com'].map((value) => ({
+        id: randomUUID(),
+        value,
+        type: TargetType.DOMAIN,
+        scanSchedule: 'DISABLED',
+      })) as unknown as Target[];
+      const mockManager = createMockEntityManager({ createdTargets });
+      (mockTargetRepository.manager as EntityManager).transaction = jest
+        .fn()
+        .mockImplementation(
+          (callback: (manager: EntityManager) => Promise<unknown>) =>
+            callback(mockManager),
+        );
+
+      await service.createMultipleTargets(
+        { targets: createdTargets.map((t) => ({ value: t.value })) },
+        workspaceId,
+        userContext,
+      );
+
+      // One event per target, after the transaction, so project scope rules
+      // on a hostname or CIDR see the target's own assets.
+      expect(mockEventBridge.publishSafely).toHaveBeenCalledTimes(2);
+      for (const target of createdTargets) {
+        expect(mockEventBridge.publishSafely).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'asset.discovered' }),
+          expect.objectContaining({
+            workspaceId,
+            payload: { targetId: target.id, assetIds: [expect.any(String)] },
+          }),
+        );
+      }
     });
 
     it('should throw BadRequestException for IP address as domain', async () => {

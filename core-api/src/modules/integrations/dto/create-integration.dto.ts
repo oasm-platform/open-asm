@@ -1,4 +1,4 @@
-import { IsCronSchedule } from '@/modules/asset-group/dto/cron-schedule.validator';
+import { IsCronSchedule } from '@/modules/projects/dto/cron-schedule.validator';
 import { IntegrationType } from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
 import {

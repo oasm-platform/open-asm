@@ -34,17 +34,14 @@ export function isRepositoryAsset(asset: InputAsset): boolean {
 /**
  * Builds the inputs of one connector job. Credentials are only attached to
  * repository assets, and only when resolved for this dispatch — they are
- * never stored on the job. `target` overrides the host for jobs bound to one
- * discovered service (the URL httpx probed), so a scanner hits the real
- * scheme and port instead of guessing.
+ * never stored on the job.
  */
 export function buildConnectorInputs(
   asset: InputAsset,
   credentials?: RepositoryCredentials | null,
-  target?: string,
 ): ConnectorInputs {
   if (!isRepositoryAsset(asset)) {
-    return { target: target || asset.value };
+    return { target: asset.value };
   }
 
   const meta = asset.metadata ?? {};

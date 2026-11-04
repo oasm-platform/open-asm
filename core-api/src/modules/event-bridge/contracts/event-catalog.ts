@@ -171,6 +171,12 @@ export const EVENT_CATALOG = {
   },
   project: {
     created: { name: 'project.created', summary: 'Project created' },
+    updated: {
+      name: 'project.updated',
+      summary: 'Project settings, scope, workflows or triggers changed',
+    },
+    archived: { name: 'project.archived', summary: 'Project archived' },
+    unarchived: { name: 'project.unarchived', summary: 'Project reopened' },
     deleted: { name: 'project.deleted', summary: 'Project deleted' },
   },
   network: {

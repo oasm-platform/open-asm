@@ -146,6 +146,30 @@ describe('JobsRegistryController', () => {
       });
     });
 
+    it('sends the inputs a job was planned with, e.g. the URL of a web service', async () => {
+      mockJobsRegistryService.getNextJob.mockResolvedValue({
+        id: 'job-3',
+        workspaceId: 'ws-1',
+        category: 'vulnerabilities',
+        asset: { value: 'app.example.com' },
+        config: null,
+        inputs: { target: 'https://app.example.com:8443' },
+        tool: { id: 'nikto', name: 'nikto' },
+      });
+      mockConnectorRegistry.getConnector.mockReturnValue({
+        name: 'Nikto',
+        slug: 'nikto',
+        image: 'ghcr.io/oasm-platform/connector-nikto:2.6.1',
+      });
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({});
+
+      const result = await controller.next({ id: 'worker-1' });
+
+      expect(result.inputs).toEqual({
+        fields: { target: { stringValue: 'https://app.example.com:8443' } },
+      });
+    });
+
     it('sends repository inputs with the integration token for a Git organization asset', async () => {
       mockJobsRegistryService.getNextJob.mockResolvedValue({
         id: 'job-2',

@@ -52,6 +52,28 @@ export enum ToolCategory {
 }
 
 /**
+ * The kinds of data that flow through a workflow: what a step hands a tool
+ * (its inputs) and what the tool finds (what it produces). docs/workflows.md
+ * explains each kind and what a connector receives for it.
+ */
+export enum DataKind {
+  /** The asset a target was created with: the domain or IP the user added. */
+  TARGET = 'target',
+  /** A hostname or IP address (any asset of a domain, IP or CIDR target). */
+  HOST = 'host',
+  /** An open port of a host, whatever it speaks (`host:port`). */
+  SERVICE = 'service',
+  /** A service that answered HTTP(S), as its base URL (`https://host:8443`). */
+  WEB = 'web',
+  /** A URL with a path, found by URL discovery (`https://host/login`). */
+  URL = 'url',
+  /** A repository of a Git organization target. */
+  REPOSITORY = 'repository',
+  /** A security finding. Tools produce it; none takes it as input yet. */
+  VULNERABILITY = 'vulnerability',
+}
+
+/**
  * Enum representing job statuses
  */
 export enum JobStatus {
@@ -151,7 +173,13 @@ export enum ApiKeyType {
 
 export enum BullMQName {
   ASSETS_DISCOVERY_SCHEDULE = 'assets-discovery-schedule',
-  ASSET_GROUPS_WORKFLOW_SCHEDULE = 'asset-groups-workflow-schedule',
+  // Schedules of project workflows (`on.schedule`), one job scheduler per
+  // entry: `project-trigger:<triggerId>`. The value predates the Projects
+  // rename and stays: under a new name the startup reconciliation would
+  // register every schedule again, but nothing would clear the old queue.
+  PROJECT_WORKFLOW_SCHEDULE = 'asset-groups-workflow-schedule',
+  /** Delayed batches of the "assets added" project trigger. */
+  PROJECT_TRIGGER_EVENTS = 'project-trigger-events',
   JOB_RESULT = 'job-result',
   ISSUE_CREATION = 'issue-creation',
   VULNERABILITY_ANALYSIS = 'vulnerability-analysis',
@@ -214,6 +242,56 @@ export enum DismissReason {
 export enum JobRunType {
   MANUAL = 'manual',
   SCHEDULED = 'scheduled',
+  /** Started by an event trigger, e.g. assets added to a project. */
+  EVENT = 'event',
+}
+
+/** How a project scope rule treats the assets it matches. */
+export enum ProjectScopeRuleMode {
+  INCLUDE = 'include',
+  EXCLUDE = 'exclude',
+}
+
+/**
+ * What a project scope rule's value is matched against: a target id, a
+ * hostname (`*` wildcards), an IPv4/IPv6 CIDR, or one asset id.
+ */
+export enum ProjectScopeRuleType {
+  TARGET = 'target',
+  HOSTNAME = 'hostname',
+  CIDR = 'cidr',
+  ASSET = 'asset',
+}
+
+/** Why an asset belongs to a project. */
+export enum ProjectAssetSource {
+  MANUAL = 'manual',
+  RULE = 'rule',
+}
+
+/** When a project workflow runs on its own. */
+export enum ProjectTriggerType {
+  CRON = 'cron',
+  ASSETS_ADDED = 'assets_added',
+}
+
+/**
+ * Which part of a project a `project.updated` event changed (its
+ * `metadata.change`). The project's activity shows the asset and workflow
+ * ones; settings and triggers are configuration and stay in the audit log.
+ */
+export enum ProjectChange {
+  SETTINGS = 'settings',
+  /** Picked by hand. */
+  ASSETS_ADDED = 'assets.added',
+  /** Discovered, and selected by the scope rules. */
+  ASSETS_DISCOVERED = 'assets.discovered',
+  ASSETS_REMOVED = 'assets.removed',
+  SCOPE = 'scope',
+  WORKFLOW_ADDED = 'workflow.added',
+  WORKFLOW_UPDATED = 'workflow.updated',
+  WORKFLOW_REMOVED = 'workflow.removed',
+  TRIGGERS = 'triggers',
 }
 
 export enum VulnerabilityAnalyzeStatus {
@@ -308,6 +386,8 @@ export enum EventBusGroup {
   Notifications = 'notifications',
   /** Outbound webhooks, Slack, ticketing systems. */
   Integrations = 'integrations',
+  /** Project scope rules and the "assets added" trigger. */
+  Projects = 'projects',
 }
 
 export enum TelegramConnectStatus {

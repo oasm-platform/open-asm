@@ -828,11 +828,14 @@ describe('DataAdapterService', () => {
       mockQueryRunner.manager
         .createQueryBuilder()
         .execute.mockResolvedValue(mockInsertResult);
-      mockQueryRunner.manager.getRawMany.mockResolvedValueOnce([
-        { id: 'a0', value: 'sub0.example.com' },
-        { id: 'a1', value: 'sub1.example.com' },
-        { id: 'a2', value: 'sub2.example.com' },
-      ]);
+      mockQueryRunner.manager.getRawMany
+        // Values the target already has, read before the insert.
+        .mockResolvedValueOnce([{ value: 'sub0.example.com' }])
+        .mockResolvedValueOnce([
+          { id: 'a0', value: 'sub0.example.com' },
+          { id: 'a1', value: 'sub1.example.com' },
+          { id: 'a2', value: 'sub2.example.com' },
+        ]);
 
       await service.upsertAssetsByTargetId(targetId, [
         { value: 'sub0.example.com', dnsRecords: { A: ['192.0.2.9'] } },
@@ -873,6 +876,14 @@ describe('DataAdapterService', () => {
       expect(builder.where).toHaveBeenCalledWith('"assetId" IN (:...assetIds)', {
         assetIds: ['a1', 'a2'],
       });
+      // Only the assets new to the target are announced, after the commit.
+      expect(mockEventBridge.publishSafely).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'asset.discovered' }),
+        expect.objectContaining({
+          resourceType: 'asset',
+          payload: { targetId, assetIds: ['a1', 'a2'] },
+        }),
+      );
     });
 
     it('toDnsFacetRows uppercases record types, dedupes values and keeps only valid IPs', () => {
@@ -1244,8 +1255,11 @@ describe('DataAdapterService', () => {
       expect(mockQueryRunner.manager.orIgnore).toHaveBeenCalled();
     });
 
-    it('S2c: missing assetServiceId skips insert with warn, no throw', async () => {
+    it('S2c: a host-wide job on a host without services skips insert with warn, no throw', async () => {
       const noServiceJob = { ...mockJob, assetServiceId: undefined } as unknown as Job;
+      mockQueryRunner.manager.getRepository = jest
+        .fn()
+        .mockReturnValue({ find: jest.fn().mockResolvedValue([]) });
       const warnSpy = jest
         .spyOn((service as any).logger, 'warn')
         .mockImplementation(() => undefined);
@@ -1261,6 +1275,31 @@ describe('DataAdapterService', () => {
       expect(warnSpy).toHaveBeenCalled();
       expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
       expect(mockQueryRunner.release).toHaveBeenCalled();
+    });
+
+    it('files the URLs of a host-wide job (gau, katana) under the service of their port', async () => {
+      const hostJob = { ...mockJob, assetServiceId: undefined } as unknown as Job;
+      const find = jest.fn().mockResolvedValue([
+        { id: 's-443', port: 443 },
+        { id: 's-8443', port: 8443 },
+      ]);
+      mockQueryRunner.manager.getRepository = jest.fn().mockReturnValue({ find });
+
+      await service.urlDiscovery({
+        data: [
+          { url: 'https://example.com:8443/admin' },
+          { url: 'https://example.com/login' },
+        ] as any,
+        job: hostJob,
+      });
+
+      expect(find).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { assetId: 'asset-id' } }),
+      );
+      expect(mockQueryRunner.manager.values).toHaveBeenCalledWith([
+        { url: 'https://example.com:8443/admin', assetServiceId: 's-8443', jobHistoryId: 'history-id' },
+        { url: 'https://example.com/login', assetServiceId: 's-443', jobHistoryId: 'history-id' },
+      ]);
     });
 
     it('rolls back and rethrows on error', async () => {
@@ -1909,6 +1948,87 @@ describe('DataAdapterService', () => {
           }),
         }),
       );
+    });
+
+    it('records the sighting on the project of a project run', async () => {
+      const found = { ...mockVulnerabilities[0], id: 'v-1', fingerprint: 'fp-1' };
+      const query = jest.fn().mockResolvedValue([]);
+      mockDataSource.transaction.mockImplementation(
+        async (callback: (manager: any) => Promise<any>) => {
+          await callback({ ...mockQueryRunner.manager, query });
+          return undefined;
+        },
+      );
+      mockWorkspacesService.getMemberOfWorkspaceByJobId.mockResolvedValue([
+        { user: { id: 'user-1' }, workspace: { id: 'workspace-id' } },
+      ]);
+      mockQueryRunner.manager.createQueryBuilder.mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([]),
+        insert: jest.fn().mockReturnThis(),
+        into: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        orUpdate: jest.fn().mockReturnThis(),
+        returning: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ raw: [found], identifiers: [] }),
+      });
+
+      await service.vulnerabilities({
+        data: [found],
+        job: {
+          ...mockJob,
+          jobHistory: { ...mockJob.jobHistory, id: 'run-1', projectId: 'p-1' },
+        },
+      });
+
+      // One row per (project, vulnerability); timesSeen counts runs, so a
+      // second report from the same run leaves it unchanged.
+      expect(query).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO "project_vulnerabilities"'),
+        ['p-1', 'run-1', ['v-1']],
+      );
+      expect(query.mock.calls[0][0]).toContain(
+        'IS DISTINCT FROM EXCLUDED."lastSeenJobHistoryId" THEN 1 ELSE 0',
+      );
+      expect(mockEventBridge.publishSafely).toHaveBeenCalledWith(
+        EVENT_CATALOG.vulnerability.detected,
+        expect.objectContaining({
+          payload: expect.objectContaining({ projectId: 'p-1' }),
+        }),
+      );
+    });
+
+    it('records no project sighting for a run outside a project', async () => {
+      const query = jest.fn();
+      mockDataSource.transaction.mockImplementation(
+        async (callback: (manager: any) => Promise<any>) => {
+          await callback({ ...mockQueryRunner.manager, query });
+          return undefined;
+        },
+      );
+      mockWorkspacesService.getMemberOfWorkspaceByJobId.mockResolvedValue([]);
+      mockQueryRunner.manager.createQueryBuilder.mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([]),
+        insert: jest.fn().mockReturnThis(),
+        into: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        orUpdate: jest.fn().mockReturnThis(),
+        returning: jest.fn().mockReturnThis(),
+        execute: jest
+          .fn()
+          .mockResolvedValue({ raw: [{ ...mockVulnerabilities[0], id: 'v-1' }], identifiers: [] }),
+      });
+
+      await service.vulnerabilities({ data: [mockVulnerabilities[0]], job: mockJob });
+
+      expect(query).not.toHaveBeenCalled();
     });
   });
 

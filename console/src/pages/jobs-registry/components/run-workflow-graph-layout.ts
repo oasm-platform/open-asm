@@ -51,7 +51,7 @@ export function stepDisplayStatus(step: WorkflowStepStatusDto): string {
 }
 
 /** How a run was started; the graph's first node. */
-export type RunTrigger = 'manual' | 'scheduled';
+export type RunTrigger = 'manual' | 'scheduled' | 'event';
 
 /** Id of the trigger node. A step id is a workflow job key, never this. */
 export const TRIGGER_NODE_ID = '__trigger__';
@@ -211,7 +211,12 @@ export function buildWorkflowGraphLayout(
       position: { x: 0, y: (columnHeight - NODE_HEIGHT) / 2 },
       draggable: false,
       selectable: false,
-      ariaLabel: trigger === 'scheduled' ? 'Started by a schedule' : 'Started manually',
+      ariaLabel:
+        trigger === 'scheduled'
+          ? 'Started by a schedule'
+          : trigger === 'event'
+            ? 'Started by new assets'
+            : 'Started manually',
       data: { trigger, startedAt } satisfies TriggerNodeData,
       style: { width: TRIGGER_WIDTH, height: NODE_HEIGHT },
       measured: { width: TRIGGER_WIDTH, height: NODE_HEIGHT },

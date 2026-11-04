@@ -1,189 +1,208 @@
 import Page from '@/components/common/page';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
-  useAssetGroupControllerDelete,
-  useAssetGroupControllerGetById,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  useProjectsControllerDelete,
+  useProjectsControllerGetById,
+  useProjectsControllerGetOverview,
 } from '@/services/apis/gen/queries';
-import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from '@tanstack/react-router';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
-import { Clock, Layers, Server, Trash, type LucideIcon } from 'lucide-react';
-import { memo, useCallback, type ReactNode } from 'react';
+import { ChevronDown, Play } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
+import { RunWorkflowDialog } from './components/run-workflow-dialog';
 import { ProjectDetailSkeleton } from './project-detail-skeleton';
-import ProjectWorkflow from './components/project-workflow';
-import { AssetSection } from './components/asset-section';
-import { EditProjectDialog } from './components/edit-project-dialog';
-
-dayjs.extend(relativeTime);
-
-/** Exact stamp, reused as the hover title of every relative time. */
-const stamp = (value?: string | null) =>
-  value ? dayjs(value).format('DD MMM YYYY, HH:mm:ss') : undefined;
-
-const absolute = (value?: string | null) =>
-  value ? dayjs(value).format('DD MMM YYYY, HH:mm') : '—';
-
-/** One field. Memoised: pure function of two props. */
-const InfoRow = memo(function InfoRow({
-  icon: Icon,
-  label,
-  value,
-  title,
-}: {
-  icon?: LucideIcon;
-  label: string;
-  value: ReactNode;
-  title?: string;
-}) {
-  return (
-    <div className="min-w-0">
-      <p className="flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-        {Icon && <Icon className="size-3" />}
-        {label}
-      </p>
-      <p
-        className="truncate text-sm font-medium tabular-nums"
-        title={title ?? (typeof value === 'string' ? value : undefined)}
-      >
-        {value || '—'}
-      </p>
-    </div>
-  );
-});
+import {
+  apiErrorMessage,
+  isProjectTab,
+  PROJECT_TABS,
+  totalOf,
+  useInvalidateProjects,
+  workflowLabel,
+  type ProjectTab,
+} from './project-utils';
+import { AssetsTab } from './tabs/assets-tab';
+import { OverviewTab } from './tabs/overview-tab';
+import { RunsTab } from './tabs/runs-tab';
+import { ScheduleTab } from './tabs/schedule-tab';
+import { SettingsTab } from './tabs/settings-tab';
+import { VulnerabilitiesTab } from './tabs/vulnerabilities-tab';
+import { WorkflowsTab } from './tabs/workflows-tab';
 
 export default function ProjectDetail() {
-  const { id } = useParams({ strict: false });
+  const { id = '', tab: rawTab } = useParams({ strict: false }) as {
+    id?: string;
+    tab?: string;
+  };
+  const tab: ProjectTab = isProjectTab(rawTab) ? rawTab : 'overview';
   const navigate = useNavigate();
-  const { data, refetch, isLoading } = useAssetGroupControllerGetById(id!);
-  const { mutate, isPending } = useAssetGroupControllerDelete();
-  const queryClient = useQueryClient();
+  const invalidate = useInvalidateProjects();
 
-  const handleDelete = useCallback(() => {
-    mutate(
-      { id: id! },
-      {
-        onSuccess: () => {
-          toast('Project deleted successfully');
-          // Invalidate the list cache so the deleted project disappears from
-          // the projects list when navigating back.
-          queryClient.invalidateQueries({ queryKey: ['projects'] });
-          navigate({ to: '/projects' });
-        },
-        onError: () => {
-          toast.error('Failed to delete project');
-        },
-      },
-    );
-  }, [mutate, queryClient, navigate, id]);
+  const { data: project, isLoading } = useProjectsControllerGetById(id);
+  const { data: overview } = useProjectsControllerGetOverview(id);
+  const remove = useProjectsControllerDelete();
+
+  const [runOpen, setRunOpen] = useState(false);
+  const [runBinding, setRunBinding] = useState<string | undefined>();
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   if (isLoading) return <ProjectDetailSkeleton />;
 
-  if (!data) {
+  if (!project) {
     return (
       <Page isShowButtonGoBack permission="project.read">
-        <div className="flex h-full items-center justify-center">
-          <div className="text-lg text-red-500">
-            Error loading project details
-          </div>
+        <div className="py-12 text-center">
+          <h2 className="text-xl font-semibold">Project not found</h2>
+          <p className="mt-2 text-muted-foreground">
+            It may have been deleted, or you don't have access to it.
+          </p>
+          <Button className="mt-4" onClick={() => navigate({ to: '/projects' })}>
+            Back to projects
+          </Button>
         </div>
       </Page>
     );
   }
 
-  const workflows = data.assetGroupWorkflows ?? [];
-  const workflow = workflows[0];
-  const lastRun = workflow?.lastRun;
-  const toolCount = Object.keys(workflow?.workflow.content?.jobs ?? {}).length;
+  const workflows = project.projectWorkflows ?? [];
+  const archived = !!project.archivedAt;
+  const goTab = (next: string) =>
+    navigate({
+      to: '/projects/$id/$tab',
+      params: { id, tab: next },
+      search: {},
+    });
 
-  // One row per fact, one fact per row. The hero carries identity only (name +
-  // the project colour, as a small swatch beside it) and never repeats a value
-  // from below.
-  const rows: {
-    icon?: LucideIcon;
-    label: string;
-    value: ReactNode;
-    title?: string;
-  }[] = [
-    { icon: Server, label: 'Hosts', value: String(data.totalAssets ?? 0) },
-    { icon: Layers, label: 'Tools in pipeline', value: String(toolCount) },
-    {
-      icon: Clock,
-      label: 'Last run',
-      value: lastRun?.createdAt
-        ? `${dayjs(lastRun.createdAt).fromNow()} · ${lastRun.jobRunType}`
-        : 'Never',
-      title: stamp(lastRun?.createdAt),
-    },
-    {
-      label: 'Created',
-      value: absolute(data.createdAt),
-      title: stamp(data.createdAt),
-    },
-    {
-      label: 'Updated',
-      value: absolute(data.updatedAt),
-      title: stamp(data.updatedAt),
-    },
-  ];
+  const openRun = (bindingId?: string) => {
+    setRunBinding(bindingId);
+    setRunOpen(true);
+  };
+
+  const handleDelete = () =>
+    remove.mutate(
+      { id },
+      {
+        onSuccess: () => {
+          toast.success('Project deleted');
+          void navigate({ to: '/projects' });
+          void invalidate(id);
+        },
+        onError: (error) =>
+          toast.error(apiErrorMessage(error, 'Failed to delete the project')),
+      },
+    );
+
+  const counts: Partial<Record<ProjectTab, number>> = {
+    assets: overview?.totalAssets ?? project.totalAssets,
+    vulnerabilities: totalOf(overview?.openVulnerabilities),
+    workflows: workflows.length,
+  };
+
+  const tabs: Record<ProjectTab, ReactNode> = {
+    overview: <OverviewTab projectId={id} project={project} />,
+    assets: <AssetsTab projectId={id} archived={archived} />,
+    vulnerabilities: <VulnerabilitiesTab projectId={id} workflows={workflows} />,
+    workflows: (
+      <WorkflowsTab
+        projectId={id}
+        workflows={workflows}
+        archived={archived}
+        onRun={openRun}
+      />
+    ),
+    schedule: (
+      <ScheduleTab projectId={id} workflows={workflows} archived={archived} />
+    ),
+    runs: <RunsTab projectId={id} workflows={workflows} />,
+    settings: <SettingsTab project={project} onDelete={() => setDeleteOpen(true)} />,
+  };
 
   return (
-    <Page isShowButtonGoBack permission="project.read">
-      <div className="space-y-4">
-        <Card className="gap-0 overflow-hidden py-0">
-          {/* Identity: name + colour swatch, liveness, actions. Every other fact
-              is printed once, in the grid below. */}
-          <div className="flex items-center gap-3 bg-gradient-to-r from-primary/[0.07] via-transparent to-transparent p-5">
-            <span
-              className="size-3 shrink-0 rounded-full ring-1 ring-border/60"
-              style={{ background: data.hexColor }}
-              aria-hidden
-            />
-            <div className="min-w-0 flex-1">
-              <h1 className="truncate text-xl font-semibold tracking-tight">
-                {data.name || 'Unnamed project'}
-              </h1>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <EditProjectDialog project={data} onSuccess={refetch} />
-              <ConfirmDialog
-                title="Delete project"
-                description={`Are you sure you want to delete "${data.name}"? This action cannot be undone.`}
-                onConfirm={handleDelete}
-                typeToConfirm="delete"
-                trigger={
-                  <Button size="icon" variant="ghost">
-                    <Trash className="size-4 text-red-500" />
-                  </Button>
-                }
-                disabled={isPending}
-              />
-            </div>
-          </div>
-
-          {/* Every fact, once. */}
-          <CardContent className="border-t py-4">
-            <CardTitle className="sr-only">Project information</CardTitle>
-            <div className="grid gap-x-4 gap-y-3.5 sm:grid-cols-2 lg:grid-cols-3">
-              {rows.map((row) => (
-                <InfoRow key={row.label} {...row} />
+    <Page
+      isShowButtonGoBack
+      permission="project.read"
+      title={
+        <span className="flex min-w-0 items-center gap-2.5">
+          <h1 className="truncate">{project.name}</h1>
+          {archived && <Badge variant="secondary">Archived</Badge>}
+        </span>
+      }
+      header={
+        <>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button disabled={archived || workflows.length === 0}>
+                <Play className="size-4" />
+                Run
+                <ChevronDown className="size-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Run on the whole scope</DropdownMenuLabel>
+              {workflows.map((binding) => (
+                <DropdownMenuItem key={binding.id} onSelect={() => openRun(binding.id)}>
+                  {workflowLabel(binding.workflow)}
+                </DropdownMenuItem>
               ))}
-            </div>
-          </CardContent>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-5">
+        <Tabs value={tab} onValueChange={goTab}>
+          <div className="w-full overflow-x-auto scrollbar-hide">
+            <TabsList className="flex w-max flex-nowrap rounded-none bg-transparent p-0">
+              {PROJECT_TABS.map((t) => (
+                <TabsTrigger
+                  key={t.value}
+                  value={t.value}
+                  className="h-9 flex-none hover:cursor-pointer"
+                  badge={counts[t.value]}
+                >
+                  {t.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
+        </Tabs>
 
-          {/* Schedule, tools and hosts share the card. Order and behaviour are
-              unchanged — only the card chrome moved to the parent. */}
-          <ProjectWorkflow
-            projectId={id!}
-            workflows={workflows}
-            onRefetch={refetch}
-          />
-          <AssetSection projectId={id!} totalAssets={data.totalAssets} />
-        </Card>
+        {archived && (
+          <p className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
+            This project is archived: schedules and event triggers are off and
+            it is read-only. Reopen it from the Settings tab to make changes.
+          </p>
+        )}
+
+        {tabs[tab]}
       </div>
+
+      <RunWorkflowDialog
+        projectId={id}
+        workflows={workflows}
+        totalAssets={counts.assets ?? 0}
+        open={runOpen}
+        onOpenChange={setRunOpen}
+        bindingId={runBinding}
+      />
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Delete project"
+        description={`Delete "${project.name}"? Its workflows and their run history go with it. Vulnerabilities stay in the workspace.`}
+        onConfirm={handleDelete}
+        typeToConfirm="delete"
+        disabled={remove.isPending}
+      />
     </Page>
   );
 }

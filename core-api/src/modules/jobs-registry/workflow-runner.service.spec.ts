@@ -400,7 +400,7 @@ describe('WorkflowRunnerService', () => {
       expect(getToolByNames).not.toHaveBeenCalled();
     });
 
-    it('keeps an asset-group run pinned to the selected assets', async () => {
+    it('keeps a project run pinned to the selected assets', async () => {
       await setup(createFakeDb());
       getToolByNames.mockResolvedValue([
         tool('naabu', ToolCategory.PORTS_SCANNER),

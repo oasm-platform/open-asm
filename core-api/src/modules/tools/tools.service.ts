@@ -28,6 +28,7 @@ import { Tool } from './entities/tools.entity';
 import { ToolConfigProfile } from './entities/tool-config-profiles.entity';
 import { WorkspaceTool } from './entities/workspace_tools.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
+import { categorySpec } from './tool-categories';
 import { DEFAULT_TOOL_TARGET_TYPES } from './tool-target-types';
 
 /** WHERE fragment: the tool declares `category` among its categories. */
@@ -750,10 +751,9 @@ export class ToolsService {
     const tool = this.toolsRepository.create({
       name: dto.name,
       description: dto.description,
-      categories: dto.categories.map((name) => ({
-        name,
-        targetTypes: [...DEFAULT_TOOL_TARGET_TYPES],
-      })),
+      categories: dto.categories.map((name) =>
+        categorySpec(name, [...DEFAULT_TOOL_TARGET_TYPES]),
+      ),
       // Set default values for other required fields
       type: WorkerType.PROVIDER, // or another appropriate default
       isOfficialSupport: false,

@@ -12,15 +12,13 @@ import {
 } from '@/components/ui/dialog';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import {
-  getAssetGroupControllerGetAssetsByAssetGroupsIdQueryKey,
-  getAssetGroupControllerGetAssetsNotInAssetGroupQueryKey,
-  useAssetGroupControllerAddManyAssets,
-  useAssetGroupControllerGetAssetsNotInAssetGroup,
+  useProjectsControllerAddAssets,
+  useProjectsControllerGetAssetCandidates,
 } from '@/services/apis/gen/queries';
-import { useQueryClient } from '@tanstack/react-query';
 import type { ColumnDef } from '@tanstack/react-table';
 import { PlusIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
+import { useInvalidateProjects } from '../project-utils';
 
 interface Asset {
   id: string;
@@ -52,7 +50,7 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
   trigger,
   onAssetsAdded,
 }) => {
-  const queryClient = useQueryClient();
+  const invalidate = useInvalidateProjects();
   const [open, setOpen] = useState(false);
 
   // Selected assets for adding to the project
@@ -60,7 +58,7 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
   const [filter, setFilter] = useState<string>('');
 
   // Mutations
-  const addAssetsMutation = useAssetGroupControllerAddManyAssets();
+  const addAssetsMutation = useProjectsControllerAddAssets();
   const addAsset = addAssetsMutation.mutate;
 
   // Queries for assets not in the project
@@ -72,7 +70,7 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
     defaultPageSize: 10,
   });
 
-  const assetsNotInProjectQuery = useAssetGroupControllerGetAssetsNotInAssetGroup(
+  const assetsNotInProjectQuery = useProjectsControllerGetAssetCandidates(
     projectId,
     { page, limit: pageSize, sortBy, sortOrder, search: filter },
     { query: { enabled: open } },
@@ -84,29 +82,19 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
 
     addAsset(
       {
-        groupId: projectId,
+        id: projectId,
         data: { assetIds: Array.from(selectedAssets) },
       },
       {
         onSuccess: () => {
           setSelectedAssets(new Set());
           setOpen(false);
-          void queryClient.invalidateQueries({
-            queryKey:
-              getAssetGroupControllerGetAssetsByAssetGroupsIdQueryKey(
-                projectId,
-              ),
-          });
-          void queryClient.invalidateQueries({
-            queryKey: getAssetGroupControllerGetAssetsNotInAssetGroupQueryKey(
-              projectId,
-            ),
-          });
+          void invalidate();
           onAssetsAdded?.();
         },
       },
     );
-  }, [selectedAssets, addAsset, projectId, queryClient, onAssetsAdded]);
+  }, [selectedAssets, addAsset, projectId, invalidate, onAssetsAdded]);
 
   // Columns for assets not in the project, with selection
   const assetsNotInProjectColumns: ColumnDef<Asset>[] = useMemo(

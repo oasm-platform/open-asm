@@ -28,6 +28,7 @@ import { formatCategory } from '@/pages/tools/components/format-category';
 import {
   ToolType,
   useToolConfigProfilesControllerList,
+  type DataKind,
   type Tool,
   type ToolCategory,
 } from '@/services/apis/gen/queries';
@@ -48,20 +49,37 @@ import {
   useState,
 } from 'react';
 import { toast } from 'sonner';
+import { capabilityOf, describeKinds, KIND_LABEL, pipelineHint } from './tool-io';
 
-/** A single tool entry in the pipeline. The pipeline is an unordered set — the tools all run at once. */
+/**
+ * A single tool entry in the pipeline. Tools of one step run at once; a step
+ * starts when every tool of the previous step is done.
+ */
 export interface PipelineToolEntry {
   toolId: string;
   config?: Record<string, unknown>;
   configProfileId?: string;
   /** Category to run the tool in; omitted → the tool's first. */
   category?: ToolCategory;
+  /** Kinds of data the tool takes, best first; omitted → its own inputs. */
+  input?: DataKind[];
+  /** Step of the pipeline, from 1; omitted → 1. */
+  stage?: number;
 }
+
+/** Sentinel select value for "the tool's own inputs". */
+const DEFAULT_INPUT = 'default';
+
+/** Highest step a tool can be moved to: one past the last used step. */
+const MAX_STAGES = 10;
+
+const stageOf = (entry: Pick<PipelineToolEntry, 'stage'>) =>
+  entry.stage && entry.stage > 0 ? entry.stage : 1;
 
 interface ToolPipelineBuilderProps {
   /** Full tool objects (with type / hasConfigProfile / isReady / logoUrl). */
   tools: Tool[];
-  /** The selected entries. Order is presentation only; they run in parallel. */
+  /** The selected entries, each with its step. */
   value: PipelineToolEntry[];
   onChange: (next: PipelineToolEntry[]) => void;
   disabled?: boolean;
@@ -324,11 +342,9 @@ const PipelineToolLogo = memo(
 );
 
 /**
- * Action panel for a selected tool: config profile, inline config, remove.
- *
- * There is no ordering control: the selected tools are saved as jobs without
- * `needs`, so they all run at once, and the map key order is not preserved by
- * jsonb anyway — a "move up" here would snap back on the next refetch.
+ * Action panel for a selected tool: step, config profile, inline config,
+ * remove. The step is saved as `needs` on the previous step's jobs, so it
+ * survives the round trip (jsonb does not keep key order, `needs` does).
  */
 const SelectedToolPanel = memo(function SelectedToolPanel({
   tool,
@@ -340,9 +356,15 @@ const SelectedToolPanel = memo(function SelectedToolPanel({
   onRemove,
   onOpenSheet,
   onProfilesLoaded,
+  stageCount,
+  ioHint,
 }: {
   tool: Tool;
   entry: PipelineToolEntry;
+  /** Why the tool may find little to scan here (see pipelineHint). */
+  ioHint?: string;
+  /** Steps offered: the used ones plus one more. */
+  stageCount: number;
   knownProfileIds: readonly string[] | undefined;
   disabled?: boolean;
   onClose: () => void;
@@ -356,6 +378,9 @@ const SelectedToolPanel = memo(function SelectedToolPanel({
   const linked = !!entry.configProfileId && !orphan;
   const usesDefault = !custom && !linked ? getBackendHasProfile(tool) : false;
   const toolLabel = tool.name;
+  const capability = capabilityOf(tool, entry.category);
+  const accepted = capability?.inputs ?? [];
+  const produces = capability?.produces ?? [];
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
@@ -382,6 +407,25 @@ const SelectedToolPanel = memo(function SelectedToolPanel({
         {usesDefault && <Badge variant="soft">Using default</Badge>}
 
       </div>
+      <Select
+        value={String(stageOf(entry))}
+        onValueChange={(value) =>
+          onPatchEntry(tool.id, { stage: Number(value) })
+        }
+        disabled={disabled}
+      >
+        <SelectTrigger aria-label="Step" className="h-8">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {Array.from({ length: stageCount }, (_, i) => i + 1).map((stage) => (
+            <SelectItem key={stage} value={String(stage)}>
+              Step {stage}
+              {stage === 1 ? ' (starts the run)' : ''}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       {tool.categories && tool.categories.length > 1 && (
         <Select
           value={entry.category ?? tool.categories[0].name}
@@ -401,6 +445,44 @@ const SelectedToolPanel = memo(function SelectedToolPanel({
             ))}
           </SelectContent>
         </Select>
+      )}
+      {accepted.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Takes {describeKinds(entry.input ?? accepted)}
+          {produces.length > 0 &&
+            ` · finds ${describeKinds(produces).replace(/, else /g, ', ')}`}
+        </p>
+      )}
+      {accepted.length > 1 && (
+        <Select
+          value={entry.input?.[0] ?? DEFAULT_INPUT}
+          onValueChange={(value) =>
+            onPatchEntry(tool.id, {
+              input:
+                value === DEFAULT_INPUT ? undefined : [value as DataKind],
+            })
+          }
+          disabled={disabled}
+        >
+          <SelectTrigger aria-label="Input" className="h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={DEFAULT_INPUT}>
+              {describeKinds(accepted).replace(/^./, (c) => c.toUpperCase())}
+            </SelectItem>
+            {accepted.map((kind) => (
+              <SelectItem key={kind} value={kind}>
+                Only {KIND_LABEL[kind]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+      {ioHint && (
+        <p className="rounded-md bg-muted px-2 py-1.5 text-xs text-muted-foreground">
+          {ioHint}
+        </p>
       )}
       <ToolProfileSelect
         toolId={tool.id}
@@ -598,6 +680,37 @@ const MissingToolPopover = memo(function MissingToolPopover({
  * The selected tools are saved as jobs with no `needs`, so they run in
  * parallel — there is deliberately no ordering control.
  */
+/** The pipeline read left to right: each step and the tools it runs. */
+function PipelineStages({
+  value,
+  tools,
+}: {
+  value: PipelineToolEntry[];
+  tools: Tool[];
+}) {
+  const names = new Map(tools.map((tool) => [tool.id, tool.name]));
+  const stages = [...new Set(value.map(stageOf))].sort((a, b) => a - b);
+  return (
+    <ol
+      className="flex flex-wrap items-center gap-2 text-xs"
+      aria-label="Pipeline order"
+    >
+      {stages.map((stage, index) => (
+        <li key={stage} className="flex items-center gap-2">
+          {index > 0 && <span className="text-muted-foreground">→</span>}
+          <span className="flex items-center gap-1 rounded-md border bg-muted/40 px-2 py-1">
+            <span className="font-medium text-muted-foreground">{index + 1}</span>
+            {value
+              .filter((entry) => stageOf(entry) === stage)
+              .map((entry) => names.get(entry.toolId) ?? 'unknown')
+              .join(', ')}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 function ToolPipelineBuilderComponent({
   tools,
   value,
@@ -636,6 +749,28 @@ function ToolPipelineBuilderComponent({
   const byId = useMemo(() => new Map(tools.map((t) => [t.id, t])), [tools]);
   const entryById = useMemo(
     () => new Map(value.map((e) => [e.toolId, e])),
+    [value],
+  );
+  // What the tools of the earlier steps find, for each tool's hint.
+  const ioHintFor = useCallback(
+    (entry: PipelineToolEntry, tool: Tool) => {
+      const earlier = value
+        .filter((other) => stageOf(other) < stageOf(entry))
+        .flatMap((other) => {
+          const otherTool = byId.get(other.toolId);
+          return otherTool
+            ? (capabilityOf(otherTool, other.category)?.produces ?? [])
+            : [];
+        });
+      const inputs =
+        entry.input ?? capabilityOf(tool, entry.category)?.inputs ?? [];
+      return pipelineHint(inputs, earlier);
+    },
+    [value, byId],
+  );
+  // The used steps plus one more, so a tool can always move after the rest.
+  const stageCount = useMemo(
+    () => Math.min(MAX_STAGES, Math.max(1, ...value.map(stageOf)) + 1),
     [value],
   );
   const filteredTools = useMemo(() => {
@@ -805,7 +940,7 @@ function ToolPipelineBuilderComponent({
           </div>
           <span className="text-xs text-muted-foreground">
             {value.length} selected
-            {value.length > 0 ? ' · runs in parallel' : ''}
+            {value.length > 0 && stageCount <= 2 ? ' · runs in parallel' : ''}
           </span>
         </div>
 
@@ -877,6 +1012,7 @@ function ToolPipelineBuilderComponent({
                   <SelectedToolPanel
                     tool={tool}
                     entry={entry}
+                    stageCount={stageCount}
                     knownProfileIds={knownProfilesByTool[tool.id]}
                     disabled={disabled}
                     onClose={handleCloseActive}
@@ -884,6 +1020,7 @@ function ToolPipelineBuilderComponent({
                     onRemove={handleRemove}
                     onOpenSheet={handleOpenSheet}
                     onProfilesLoaded={handleProfilesLoaded}
+                    ioHint={ioHintFor(entry, tool)}
                   />
                 </PopoverContent>
               </Popover>
@@ -903,6 +1040,7 @@ function ToolPipelineBuilderComponent({
             );
           })}
         </div>
+        {stageCount > 2 && <PipelineStages value={value} tools={tools} />}
         {tools.length > 0 && filteredTools.length === 0 && (
           <p className="text-sm text-muted-foreground">
             No tools match &quot;{search.trim()}&quot;
