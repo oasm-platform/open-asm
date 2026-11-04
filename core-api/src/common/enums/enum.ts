@@ -275,6 +275,25 @@ export enum ProjectTriggerType {
   ASSETS_ADDED = 'assets_added',
 }
 
+/**
+ * Which part of a project a `project.updated` event changed (its
+ * `metadata.change`). The project's activity shows the asset and workflow
+ * ones; settings and triggers are configuration and stay in the audit log.
+ */
+export enum ProjectChange {
+  SETTINGS = 'settings',
+  /** Picked by hand. */
+  ASSETS_ADDED = 'assets.added',
+  /** Discovered, and selected by the scope rules. */
+  ASSETS_DISCOVERED = 'assets.discovered',
+  ASSETS_REMOVED = 'assets.removed',
+  SCOPE = 'scope',
+  WORKFLOW_ADDED = 'workflow.added',
+  WORKFLOW_UPDATED = 'workflow.updated',
+  WORKFLOW_REMOVED = 'workflow.removed',
+  TRIGGERS = 'triggers',
+}
+
 export enum VulnerabilityAnalyzeStatus {
   NOT_ANALYZED = 'not_analyzed',
   RUNNING = 'running',

@@ -1,8 +1,10 @@
 import { ProjectTriggerType, TargetType } from '@/common/enums/enum';
 import {
+  enabledByKey,
   keyOfRow,
   onOfTriggers,
   planTriggerSync,
+  triggersOfInput,
   triggersOfOn,
   WorkflowOnError,
 } from './workflow-on';
@@ -51,6 +53,40 @@ describe('triggersOfOn', () => {
         'on.assetsAdded: unknown setting speed',
       ]),
     );
+  });
+});
+
+describe('triggersOfInput and enabledByKey', () => {
+  const input = {
+    schedule: [{ cron: ' 0  2 * * 1 ', enabled: false }, { cron: '30 14 * * *' }],
+    assetsAdded: { windowMinutes: 5, enabled: true },
+  };
+
+  it('reads what the workflow editor sends, without the on/off state', () => {
+    expect(triggersOfInput(input).map((t) => t.key)).toEqual([
+      'cron:0 2 * * 1',
+      'cron:30 14 * * *',
+      'assets_added',
+    ]);
+    expect(triggersOfInput({ assetsAdded: null })).toEqual([]);
+  });
+
+  it('keys the on/off state the same way, only where it was sent', () => {
+    expect([...enabledByKey(input)]).toEqual([
+      ['cron:0 2 * * 1', false],
+      ['assets_added', true],
+    ]);
+  });
+
+  it('takes the state of the first of two equal schedules, the one that is kept', () => {
+    const twice = { schedule: [{ cron: '0 2 * * 1', enabled: false }, { cron: '0 2 * * 1' }] };
+    expect(triggersOfInput(twice)).toHaveLength(1);
+    expect(enabledByKey({ schedule: [...twice.schedule, { cron: '0 2 * * 1', enabled: true }] }))
+      .toEqual(new Map([['cron:0 2 * * 1', false]]));
+  });
+
+  it('never takes "disabled" for a schedule', () => {
+    expect(() => triggersOfInput({ schedule: [{ cron: 'disabled' }] })).toThrow(WorkflowOnError);
   });
 });
 

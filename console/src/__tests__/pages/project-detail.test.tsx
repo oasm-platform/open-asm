@@ -36,12 +36,23 @@ const binding = {
   lastRun: null,
 };
 
-const { projectRef, vulnsMock, removeAssetsMock, deleteMock } = vi.hoisted(() => ({
-  projectRef: { value: {} as Record<string, unknown> },
-  vulnsMock: vi.fn(),
-  removeAssetsMock: vi.fn(),
-  deleteMock: vi.fn(),
+const tools = ['subfinder', 'nuclei'].map((name) => ({
+  id: `tool-${name}`,
+  name,
+  description: name,
+  categories: [{ name: 'vulnerabilities', targetTypes: [] }],
+  createdAt: '2026-01-01T00:00:00Z',
 }));
+
+const { projectRef, vulnsMock, removeAssetsMock, deleteMock, updateWorkflowMock } = vi.hoisted(
+  () => ({
+    projectRef: { value: {} as Record<string, unknown> },
+    vulnsMock: vi.fn(),
+    removeAssetsMock: vi.fn(),
+    deleteMock: vi.fn(),
+    updateWorkflowMock: vi.fn(),
+  }),
+);
 
 const baseProject = () => ({
   id: 'project-1',
@@ -72,7 +83,55 @@ const overview = {
     low: 0,
     info: 0,
   })),
-  activity: [],
+  activity: [
+    {
+      kind: 'audit',
+      at: '2026-01-05T00:00:00Z',
+      ref: 'project.updated',
+      change: 'assets.discovered',
+      added: 12,
+    },
+    {
+      kind: 'audit',
+      at: '2026-01-04T00:00:00Z',
+      ref: 'project.updated',
+      change: 'workflow.added',
+      workflowName: 'Web scan',
+      actorName: 'Admin',
+    },
+    {
+      kind: 'audit',
+      at: '2026-01-03T00:00:00Z',
+      ref: 'project.updated',
+      change: 'assets.removed',
+      removed: 3,
+      actorName: 'Admin',
+    },
+    {
+      kind: 'audit',
+      at: '2026-01-03T00:00:00Z',
+      ref: 'project.updated',
+      change: 'scope',
+      added: 5,
+      removed: 1,
+      actorName: 'Admin',
+    },
+    {
+      kind: 'dismissed',
+      at: '2026-01-02T00:00:00Z',
+      ref: 'dismissed',
+      count: 2,
+      reason: 'false_positive',
+      actorName: 'Admin',
+    },
+    {
+      kind: 'audit',
+      at: '2026-01-01T00:00:00Z',
+      ref: 'project.created',
+      added: 2,
+      actorName: 'Admin',
+    },
+  ],
 };
 
 const vulnerabilities = {
@@ -168,13 +227,13 @@ vi.mock('@/services/apis/gen/queries', async (importOriginal) => {
     }),
     useProjectsControllerGetTriggers: () => ({ data: binding.triggers, isLoading: false }),
     // Mounted (closed) by the Workflows tab's editor sheet.
-    useToolsControllerGetInstalledTools: () => ({ data: { data: [] }, isLoading: false }),
+    useToolsControllerGetInstalledTools: () => ({ data: { data: tools }, isLoading: false }),
     useProjectsControllerGetWorkflowTemplates: () => ({ data: [], isLoading: false }),
     useProjectsControllerGetMany: () => ({ data: { data: [] }, isLoading: false }),
     useProjectsControllerGetWorkflows: () => ({ data: [], isLoading: false }),
     useProjectsControllerGetAssetCandidates: () => ({ data: undefined, isLoading: false }),
     useProjectsControllerCreateWorkflow: idle,
-    useProjectsControllerUpdateWorkflow: idle,
+    useProjectsControllerUpdateWorkflow: () => ({ mutate: updateWorkflowMock, isPending: false }),
     useProjectsControllerUpdate: idle,
     useProjectsControllerAddAssets: idle,
     useProjectsControllerRemoveAssets: () => ({ mutate: removeAssetsMock, isPending: false }),
@@ -184,9 +243,6 @@ vi.mock('@/services/apis/gen/queries', async (importOriginal) => {
     useProjectsControllerRunWorkflow: idle,
     useProjectsControllerReplaceScopeRules: idle,
     useProjectsControllerPreviewScope: idle,
-    useProjectsControllerUpdateTrigger: idle,
-    useProjectsControllerRemoveTrigger: idle,
-    useProjectsControllerCreateTrigger: idle,
     useProjectsControllerRemoveWorkflow: idle,
   };
 });
@@ -196,6 +252,7 @@ beforeEach(() => {
   vulnsMock.mockReset();
   removeAssetsMock.mockReset();
   deleteMock.mockReset();
+  updateWorkflowMock.mockReset();
 });
 
 describe('Project detail page', () => {
@@ -210,6 +267,33 @@ describe('Project detail page', () => {
     expect(screen.getByRole('tab', { name: /Workflows\s*1/ })).toBeInTheDocument();
     expect(screen.getByText('Open vulnerabilities')).toBeInTheDocument();
     expect(screen.getByText('New vulnerabilities per week')).toBeInTheDocument();
+  });
+
+  it('says what changed in the recent activity', async () => {
+    renderWithProviders(<ProjectDetail />, at('overview'));
+
+    const card = (await screen.findByText('Recent activity')).closest('[data-slot="card"]');
+    const text = (card as HTMLElement).textContent ?? '';
+    expect(text).toContain('+12 assets discovered, matching the scope rules');
+    expect(text).toContain('Workflow Web scan added by Admin');
+    expect(text).toContain('−3 assets removed by Admin');
+    expect(text).toContain('+5 / −1 assets with a scope rule change by Admin');
+    expect(text).toContain('2 vulnerabilities dismissed · false positive by Admin');
+    expect(text).toContain('Project created with 2 assets by Admin');
+  });
+
+  it('opens a vulnerability to fix in the same sheet as the Vulnerabilities tab', async () => {
+    const { user, router } = renderWithProviders(<ProjectDetail />, at('overview'));
+
+    await user.click(await screen.findByRole('button', { name: /SQL injection/ }));
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    await waitFor(() => {
+      expect((router.state.location.search as { vulnerability?: string }).vulnerability).toBe(
+        'v-1',
+      );
+    });
+    expect(router.state.location.pathname).toBe('/projects/project-1/overview');
   });
 
   it('keeps the tab in the URL', async () => {
@@ -273,6 +357,69 @@ describe('Project detail page', () => {
     expect(sheet).toHaveTextContent('- subfinder');
   });
 
+  it('sets when a workflow runs while editing it', async () => {
+    const { user } = renderWithProviders(<ProjectDetail />, at('workflows'));
+
+    await user.click(await screen.findByRole('button', { name: 'Edit' }));
+    const sheet = await screen.findByRole('dialog');
+    const active = within(sheet).getByRole('switch', { name: 'Schedule 1 active' });
+    expect(active).toBeChecked();
+    await user.click(active);
+    await user.click(within(sheet).getByRole('button', { name: 'Add schedule' }));
+    await user.click(within(sheet).getByRole('button', { name: 'Save' }));
+
+    expect(updateWorkflowMock).toHaveBeenCalledWith(
+      {
+        id: 'project-1',
+        bindingId: 'b-1',
+        data: {
+          name: 'Recon and vuln scan',
+          tools: [{ toolId: 'tool-subfinder' }, { toolId: 'tool-nuclei', stage: 2 }],
+          on: {
+            schedule: [
+              { cron: '0 2 * * 1', enabled: false },
+              { cron: expect.stringMatching(/^\S+ \S+ \S+ \S+ \S+$/), enabled: true },
+            ],
+            assetsAdded: null,
+          },
+        },
+      },
+      expect.anything(),
+    );
+  });
+
+  it('does not save two schedules at the same time', async () => {
+    const { user } = renderWithProviders(<ProjectDetail />, at('workflows'));
+
+    await user.click(await screen.findByRole('button', { name: 'Edit' }));
+    const sheet = await screen.findByRole('dialog');
+    // A new schedule starts at the same default time as the one before.
+    await user.click(within(sheet).getByRole('button', { name: 'Add schedule' }));
+    await user.click(within(sheet).getByRole('button', { name: 'Add schedule' }));
+
+    expect(await within(sheet).findByText(/Same time as Schedule 2/)).toBeInTheDocument();
+    expect(within(sheet).getByRole('button', { name: 'Save' })).toBeDisabled();
+    await user.click(within(sheet).getByRole('button', { name: 'Remove schedule 3' }));
+    expect(within(sheet).queryByText(/Same time as/)).not.toBeInTheDocument();
+    expect(within(sheet).getByRole('button', { name: 'Save' })).toBeEnabled();
+  });
+
+  it('shows when workflows run on the Schedule tab, without editing there', async () => {
+    renderWithProviders(<ProjectDetail />, at('schedule'));
+
+    expect(await screen.findByText('Next 7 days')).toBeInTheDocument();
+    const row = screen.getByRole('row', { name: /Recon and vuln scan/ });
+    expect(row).toHaveTextContent('0 2 * * 1 · UTC');
+    expect(within(row).getByText('Active')).toBeInTheDocument();
+    expect(within(row).queryByRole('switch')).not.toBeInTheDocument();
+    expect(within(row).queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Add trigger/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Workflows' })).toHaveAttribute(
+      'href',
+      '/projects/project-1/workflows',
+    );
+  });
+
   it('makes an archived project read-only', async () => {
     projectRef.value = { ...baseProject(), archivedAt: '2026-01-05T00:00:00Z' };
     renderWithProviders(<ProjectDetail />, at('overview'));
@@ -280,7 +427,6 @@ describe('Project detail page', () => {
     expect(await screen.findByText('Archived')).toBeInTheDocument();
     expect(screen.getByText(/This project is archived/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Run/ })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /Edit/ })).toBeDisabled();
   });
 
   it('deletes the project after typing the confirmation', async () => {

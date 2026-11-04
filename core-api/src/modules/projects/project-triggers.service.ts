@@ -27,12 +27,15 @@ import {
   cronKey,
   type DefinedTrigger,
   DEFAULT_MAX_ASSETS,
+  enabledByKey,
   keyOfRow,
   normalizeAssetsAddedConfig,
   onOfTriggers,
   planTriggerSync,
+  triggersOfInput,
   triggersOfOn,
   WorkflowOnError,
+  type WorkflowOnInput,
 } from './workflow-on';
 
 
@@ -214,6 +217,49 @@ export class ProjectTriggersService implements OnApplicationBootstrap {
     await this.unregister(saved);
     if (!project.archivedAt) await this.register(saved);
     return saved;
+  }
+
+  /** The trigger rows of one workflow, oldest first. */
+  ofWorkflow(bindingId: string): Promise<ProjectWorkflowTrigger[]> {
+    return this.triggerRepo.find({
+      where: { projectWorkflowId: bindingId },
+      order: { createdAt: 'ASC' },
+    });
+  }
+
+  /**
+   * Replaces the `on:` block of a workflow with what the workflow editor
+   * sends: its schedules and "assets added", each possibly turned off.
+   * Entries that stay keep their row (state, history, scheduler); one sent
+   * without `enabled` keeps its state, a new one is on. The caller checks the
+   * project is writable.
+   *
+   * @returns the workflow's trigger rows after the change
+   */
+  async replaceOn(
+    projectId: string,
+    bindingId: string,
+    input: WorkflowOnInput,
+    manager: EntityManager = this.dataSource.manager,
+  ): Promise<ProjectWorkflowTrigger[]> {
+    const defined = definedTriggersOfInput(input);
+    const binding = await this.bindingWithWorkflow(projectId, bindingId, manager);
+    await this.writeOn(binding, manager, () => defined);
+    const rows = await this.syncWorkflow(bindingId, manager);
+
+    const project = await manager
+      .getRepository(Project)
+      .findOne({ where: { id: projectId } });
+    const wanted = enabledByKey(input);
+    for (const row of rows) {
+      const enabled = wanted.get(keyOfRow(row));
+      if (enabled === undefined || enabled === row.enabled) continue;
+      row.enabled = enabled;
+      await this.unregister(row, manager);
+      await manager.getRepository(ProjectWorkflowTrigger).save(row);
+      if (enabled && !project?.archivedAt) await this.register(row, manager);
+    }
+    return rows;
   }
 
   /** Removes a trigger from its workflow's file, and its row with it. */
@@ -658,5 +704,17 @@ function assertCron(cron: string | undefined): void {
     throw new BadRequestException(
       'A cron trigger needs a cron expression; disable the trigger to stop it',
     );
+  }
+}
+
+/** The triggers of a workflow editor's `on` input (400 for an invalid one). */
+export function definedTriggersOfInput(input: WorkflowOnInput): DefinedTrigger[] {
+  try {
+    return triggersOfInput(input);
+  } catch (error) {
+    if (error instanceof WorkflowOnError) {
+      throw new BadRequestException(`Invalid workflow triggers: ${error.message}`);
+    }
+    throw error;
   }
 }

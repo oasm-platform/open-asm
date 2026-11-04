@@ -59,11 +59,13 @@ jobs:
   A schedule scans all of them; `assetsAdded` scans the ones that just joined.
 - Each workflow has its own schedules. A project with several workflows runs
   each on its own clock.
-- Turning a trigger off (the switch on the Schedule tab) does not change the
-  file, like disabling a workflow on GitHub. Archiving the project turns
-  every trigger off until it is reopened.
-- The Schedule tab and the API (`/projects/:id/triggers`) edit this block;
-  so does saving the file. Editing the pipeline keeps it.
+- Turning a trigger off (its "Active" switch in the workflow editor) does not
+  change the file, like disabling a workflow on GitHub. Archiving the project
+  turns every trigger off until it is reopened.
+- Adding or editing a workflow sets this block, and so does creating a
+  project (`on` in the API, which replaces the whole block). The Schedule tab
+  only shows it, with the runs of the next 7 days. Saving the pipeline alone
+  keeps it.
 - `on.target` (`domain.create`, …) is for the workspace's default workflows,
   which run when a target is added; a project workflow never uses it.
 

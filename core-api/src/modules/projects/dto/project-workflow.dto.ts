@@ -1,3 +1,4 @@
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
@@ -11,6 +12,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { ProjectToolInput } from './create-project.dto';
+import { ProjectWorkflowOnDto } from './project-workflow-on.dto';
 
 /**
  * A new project workflow, from exactly one source: a default workflow
@@ -47,6 +49,16 @@ export class CreateProjectWorkflowDto {
   @IsOptional()
   @IsUUID()
   copyFromProjectWorkflowId?: string;
+
+  @ApiProperty({
+    required: false,
+    type: () => ProjectWorkflowOnDto,
+    description: 'When the workflow runs on its own: schedules and "assets added"',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ProjectWorkflowOnDto)
+  on?: ProjectWorkflowOnDto;
 }
 
 export class UpdateProjectWorkflowDto {
@@ -67,6 +79,16 @@ export class UpdateProjectWorkflowDto {
   @ValidateNested({ each: true })
   @Type(() => ProjectToolInput)
   tools?: ProjectToolInput[];
+
+  @ApiProperty({
+    required: false,
+    type: () => ProjectWorkflowOnDto,
+    description: 'Replaces when the workflow runs on its own; omitted = unchanged',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ProjectWorkflowOnDto)
+  on?: ProjectWorkflowOnDto;
 }
 
 export class RunProjectWorkflowDto {
@@ -82,6 +104,11 @@ export class RunProjectWorkflowDto {
   @ArrayUnique()
   @ArrayMaxSize(5000)
   assetIds?: string[];
+}
+
+export class ProjectWorkflowRemovedDto extends DefaultMessageResponseDto {
+  @ApiProperty({ description: 'Name of the removed workflow' })
+  name: string;
 }
 
 export class RunStartedDto {

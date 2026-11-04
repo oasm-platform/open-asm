@@ -10,7 +10,6 @@ import { NoInstalledToolsState } from '@/pages/projects/components/no-installed-
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { CronScheduleBuilder } from '@/components/ui/cron-schedule-builder';
 import { DataTable } from '@/components/ui/data-table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -53,6 +52,13 @@ import {
   ScopeRulesEditor,
   type EditableScopeRule,
 } from './components/scope-rules-editor';
+import {
+  isTriggersDraftValid,
+  newTriggersDraft,
+  onInputOf,
+  WorkflowTriggersForm,
+  type TriggersDraft,
+} from './components/workflow-triggers-form';
 import { apiErrorMessage, pipelineSteps, toToolInputs } from './project-utils';
 
 const STEPS = [
@@ -81,10 +87,7 @@ export function CreateProject() {
   const [pipelineSource, setPipelineSource] = useState<'template' | 'tools'>('template');
   const [template, setTemplate] = useState<string>();
   const [pipeline, setPipeline] = useState<PipelineToolEntry[]>([]);
-  const [scheduleOn, setScheduleOn] = useState(true);
-  const [schedule, setSchedule] = useState<string | undefined>(undefined);
-  const [onAssetsAdded, setOnAssetsAdded] = useState(true);
-  const [windowMinutes, setWindowMinutes] = useState(10);
+  const [triggers, setTriggers] = useState<TriggersDraft>(newTriggersDraft);
   const [runNow, setRunNow] = useState(true);
 
   const {
@@ -119,7 +122,7 @@ export function CreateProject() {
       : step === 2
         ? hasPipeline
         : step === 3
-          ? !scheduleOn || Boolean(schedule)
+          ? isTriggersDraftValid(triggers)
           : true;
 
   const handleNext = () => {
@@ -138,8 +141,7 @@ export function CreateProject() {
       ...(pipelineSource === 'template'
         ? { template }
         : { tools: toToolInputs(pipeline) }),
-      ...(scheduleOn && schedule ? { schedule } : {}),
-      ...(onAssetsAdded ? { onAssetsAdded: { windowMinutes } } : {}),
+      on: onInputOf(triggers),
       runNow,
     };
     createProject(
@@ -283,13 +285,8 @@ export function CreateProject() {
                 <Tabs defaultValue="rules">
                   <TabsList>
                     <TabsTrigger value="rules">By rules</TabsTrigger>
-                    <TabsTrigger value="hosts">
+                    <TabsTrigger value="hosts" badge={hostIds.size || undefined}>
                       Pick by hand
-                      {hostIds.size > 0 && (
-                        <span className="rounded-full border bg-muted px-1.5 text-[11px] tabular-nums">
-                          {hostIds.size}
-                        </span>
-                      )}
                     </TabsTrigger>
                   </TabsList>
                   <TabsContent value="rules" className="pt-3">
@@ -389,44 +386,7 @@ export function CreateProject() {
 
               {step === 3 && (
                 <div className="flex max-w-2xl flex-col gap-5">
-                  <div className="flex flex-col gap-3">
-                    <label className="flex items-center gap-2 text-sm font-medium">
-                      <Checkbox
-                        checked={scheduleOn}
-                        onCheckedChange={(value) => setScheduleOn(value === true)}
-                      />
-                      On a schedule
-                    </label>
-                    {scheduleOn && (
-                      <CronScheduleBuilder
-                        onChange={(change) => setSchedule(change.cron)}
-                      />
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="flex items-center gap-2 text-sm font-medium">
-                      <Checkbox
-                        checked={onAssetsAdded}
-                        onCheckedChange={(value) => setOnAssetsAdded(value === true)}
-                      />
-                      When new assets join the project
-                    </label>
-                    {onAssetsAdded && (
-                      <div className="flex items-center gap-2 pl-6 text-sm text-muted-foreground">
-                        Gather for
-                        <Input
-                          type="number"
-                          min={0}
-                          max={1440}
-                          value={windowMinutes}
-                          onChange={(e) => setWindowMinutes(Number(e.target.value))}
-                          className="h-8 w-20"
-                          aria-label="Minutes to gather new assets"
-                        />
-                        minutes, then scan only those assets
-                      </div>
-                    )}
-                  </div>
+                  <WorkflowTriggersForm value={triggers} onChange={setTriggers} />
                   <label className="flex items-center gap-2 text-sm font-medium">
                     <Checkbox
                       checked={runNow}

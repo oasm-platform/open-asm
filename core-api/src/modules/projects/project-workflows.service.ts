@@ -283,13 +283,15 @@ export class ProjectWorkflowsService {
    * cascade with it); a workflow bound from elsewhere is only unbound.
    * Schedulers must already be unregistered.
    */
-  async remove(projectId: string, bindingId: string): Promise<void> {
+  /** Removes a workflow from the project; returns it as it was. */
+  async remove(projectId: string, bindingId: string): Promise<ProjectWorkflow> {
     const binding = await this.findBinding(projectId, bindingId);
     if (isProjectOwnedWorkflow(binding.workflow?.filePath, projectId)) {
       await this.workflowRepo.delete(binding.workflow.id);
     } else {
       await this.bindingRepo.delete(binding.id);
     }
+    return binding;
   }
 
   /** Deletes every workflow the project owns (project delete). */

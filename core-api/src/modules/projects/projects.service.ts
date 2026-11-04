@@ -1,6 +1,12 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
-import { JobRunType, ProjectTriggerType } from '@/common/enums/enum';
+import {
+  AuditActorType,
+  AuditOutcome,
+  JobRunType,
+  ProjectChange,
+  ProjectTriggerType,
+} from '@/common/enums/enum';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { openVulnerabilityCondition } from '@/modules/vulnerabilities/open-vulnerability';
 import { getManyResponse } from '@/utils/getManyResponse';
@@ -12,6 +18,9 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import type { EventEnvelopeData } from '../event-bridge/contracts/event-envelope';
+import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
+import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
 import type { ProjectAssetDiscovery } from '../event-bridge/sinks/projects/projects.sink';
 import type { CreateProjectDto } from './dto/create-project.dto';
 import {
@@ -23,13 +32,23 @@ import type {
   ScopeRuleInputDto,
   ScopeSyncResultDto,
 } from './dto/project-scope.dto';
-import type { RunStartedDto } from './dto/project-workflow.dto';
+import type { ProjectAssetsChangedDto } from './dto/project-assets.dto';
+import type {
+  CreateProjectWorkflowDto,
+  ProjectWorkflowRemovedDto,
+  RunStartedDto,
+  UpdateProjectWorkflowDto,
+} from './dto/project-workflow.dto';
+import type { ProjectWorkflow } from './entities/project-workflow.entity';
 import type { UpdateProjectDto } from './dto/update-project.dto';
 import { Project } from './entities/project.entity';
 import { findProjectOrFail } from './project-access';
 import { ProjectAssetsService } from './project-assets.service';
 import { ProjectScopeService } from './project-scope.service';
-import { ProjectTriggersService } from './project-triggers.service';
+import {
+  definedTriggersOfInput,
+  ProjectTriggersService,
+} from './project-triggers.service';
 import { ProjectWorkflowsService } from './project-workflows.service';
 
 /** List sort keys beyond plain columns. */
@@ -53,6 +72,7 @@ export class ProjectsService implements ProjectAssetDiscovery {
     private readonly scope: ProjectScopeService,
     private readonly workflows: ProjectWorkflowsService,
     private readonly triggers: ProjectTriggersService,
+    private readonly eventBridge: EventBridgeService,
   ) {}
 
   /** Project cards: counts, open vulnerabilities, last run and triggers. */
@@ -200,11 +220,15 @@ export class ProjectsService implements ProjectAssetDiscovery {
       );
     }
     const hasPipeline = !!dto.tools?.length || !!dto.template;
-    if ((dto.schedule || dto.onAssetsAdded || dto.runNow) && !hasPipeline) {
+    if (
+      (dto.on || dto.schedule || dto.onAssetsAdded || dto.runNow) &&
+      !hasPipeline
+    ) {
       throw new BadRequestException(
-        'schedule, onAssetsAdded and runNow need a pipeline (tools or template)',
+        'on, schedule, onAssetsAdded and runNow need a pipeline (tools or template)',
       );
     }
+    if (dto.on) definedTriggersOfInput(dto.on);
     // Fail fast on bad rules before anything is written.
     if (dto.scopeRules?.length) {
       await this.scope.normalizeRules(workspaceId, dto.scopeRules);
@@ -232,14 +256,18 @@ export class ProjectsService implements ProjectAssetDiscovery {
           name: dto.workflowName,
           ...(dto.tools?.length ? { tools: dto.tools } : { template: dto.template }),
         });
-        if (dto.schedule && dto.schedule !== 'disabled') {
+        if (dto.on) {
+          await this.triggers.replaceOn(project.id, binding.id, dto.on);
+        }
+        // Before `on` existed the API took one schedule and one config.
+        if (!dto.on && dto.schedule && dto.schedule !== 'disabled') {
           await this.triggers.create(project.id, workspaceId, {
             projectWorkflowId: binding.id,
             type: ProjectTriggerType.CRON,
             cron: dto.schedule,
           });
         }
-        if (dto.onAssetsAdded) {
+        if (!dto.on && dto.onAssetsAdded) {
           await this.triggers.create(project.id, workspaceId, {
             projectWorkflowId: binding.id,
             type: ProjectTriggerType.ASSETS_ADDED,
@@ -263,6 +291,8 @@ export class ProjectsService implements ProjectAssetDiscovery {
       });
       throw error;
     }
+    // What it started with, for the `project.created` event.
+    project.totalAssets = await this.countAssets(project.id);
     return project;
   }
 
@@ -328,19 +358,25 @@ export class ProjectsService implements ProjectAssetDiscovery {
     id: string,
     workspaceId: string,
     assetIds: string[],
-  ): Promise<DefaultMessageResponseDto> {
+  ): Promise<ProjectAssetsChangedDto> {
     const added = await this.assets.add(id, workspaceId, assetIds);
     await this.triggers.onAssetsAdded(id, added);
-    return { message: `${added.length} assets added to the project` };
+    return {
+      message: `${added.length} assets added to the project`,
+      count: added.length,
+    };
   }
 
   async removeAssets(
     id: string,
     workspaceId: string,
     assetIds: string[],
-  ): Promise<DefaultMessageResponseDto> {
+  ): Promise<ProjectAssetsChangedDto> {
     const removed = await this.assets.remove(id, workspaceId, assetIds);
-    return { message: `${removed} assets removed from the project` };
+    return {
+      message: `${removed} assets removed from the project`,
+      count: removed,
+    };
   }
 
   /** Saves the rules, syncs the rule-added assets, notifies the triggers. */
@@ -371,7 +407,63 @@ export class ProjectsService implements ProjectAssetDiscovery {
     const added = await this.scope.addDiscoveredAssets(workspaceId, assetIds);
     for (const [projectId, projectAssetIds] of added) {
       await this.triggers.onAssetsAdded(projectId, projectAssetIds);
+      // No request made this change, so no `@PublishEvent`: the project's
+      // activity still shows it, done by the system.
+      const event: EventEnvelopeData = {
+        workspaceId,
+        outcome: AuditOutcome.Success,
+        actor: { type: AuditActorType.System },
+        resourceType: 'project',
+        resourceId: projectId,
+        metadata: {
+          change: ProjectChange.ASSETS_DISCOVERED,
+          added: projectAssetIds.length,
+        },
+      };
+      await this.eventBridge.publishSafely(EVENT_CATALOG.project.updated, event, {
+        subject: `workspace:${workspaceId}/project:${projectId}`,
+      });
     }
+  }
+
+  /**
+   * Adds a workflow to the project, with when it runs. The triggers are
+   * checked before the workflow is created, so a bad schedule adds nothing.
+   */
+  async addWorkflow(
+    id: string,
+    workspaceId: string,
+    dto: CreateProjectWorkflowDto,
+  ): Promise<ProjectWorkflow> {
+    const { on, ...source } = dto;
+    if (on) definedTriggersOfInput(on);
+    const binding = await this.workflows.create(id, workspaceId, source);
+    if (on) binding.triggers = await this.triggers.replaceOn(id, binding.id, on);
+    return binding;
+  }
+
+  /**
+   * Renames a workflow, replaces its pipeline and/or when it runs. Each part
+   * left out of `dto` stays as it is.
+   */
+  async updateWorkflow(
+    id: string,
+    workspaceId: string,
+    bindingId: string,
+    dto: UpdateProjectWorkflowDto,
+  ): Promise<ProjectWorkflow> {
+    await findProjectOrFail(this.projectRepo, id, workspaceId, {
+      writable: true,
+    });
+    const { on, ...rest } = dto;
+    if (on) definedTriggersOfInput(on);
+    if (rest.name !== undefined || rest.tools !== undefined) {
+      await this.workflows.update(id, workspaceId, bindingId, rest);
+    }
+    if (on) await this.triggers.replaceOn(id, bindingId, on);
+    const binding = await this.workflows.findBinding(id, bindingId);
+    binding.triggers = await this.triggers.ofWorkflow(bindingId);
+    return binding;
   }
 
   /** Unregisters a workflow's schedules, then deletes it. */
@@ -379,13 +471,16 @@ export class ProjectsService implements ProjectAssetDiscovery {
     id: string,
     workspaceId: string,
     bindingId: string,
-  ): Promise<DefaultMessageResponseDto> {
+  ): Promise<ProjectWorkflowRemovedDto> {
     await findProjectOrFail(this.projectRepo, id, workspaceId, {
       writable: true,
     });
     await this.triggers.unregisterProject(id, bindingId);
-    await this.workflows.remove(id, bindingId);
-    return { message: 'Workflow removed from the project' };
+    const removed = await this.workflows.remove(id, bindingId);
+    return {
+      message: 'Workflow removed from the project',
+      name: removed.workflow?.name ?? '',
+    };
   }
 
   async runWorkflow(

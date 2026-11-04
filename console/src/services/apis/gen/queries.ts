@@ -4715,6 +4715,33 @@ export type ProjectToolInput = {
   stage?: number;
 };
 
+export type ScheduleInputDto = {
+  /** 5-field cron expression, in UTC */
+  cron: string;
+  /** Off keeps the schedule in the workflow without running it. Omitted: a new schedule is on, an existing one keeps its state. */
+  enabled?: boolean;
+};
+
+export type AssetsAddedInputDto = {
+  /** Minutes to gather new assets into one run */
+  windowMinutes?: number;
+  /** Most assets one run takes; more start further runs */
+  maxAssets?: number;
+  /** Only assets of these target types; empty = all */
+  targetTypes?: TargetType[];
+  /** Off keeps the trigger in the workflow without running it */
+  enabled?: boolean;
+};
+
+export type ProjectWorkflowOnDto = {
+  schedule?: ScheduleInputDto[];
+  /**
+   * Run when assets join the project; absent or null = never
+   * @nullable
+   */
+  assetsAdded?: AssetsAddedInputDto | null;
+};
+
 export type AssetsAddedTriggerConfigDto = {
   /** Minutes to gather new assets into one run */
   windowMinutes?: number;
@@ -4743,9 +4770,11 @@ export type CreateProjectDto = {
   tools?: ProjectToolInput[];
   /** Name of the pipeline */
   workflowName?: string;
-  /** Cron schedule (UTC) of the pipeline, e.g. "0 2 * * 1". Requires a pipeline. */
+  /** When the pipeline runs on its own: schedules and "assets added". Requires a pipeline. Replaces schedule and onAssetsAdded. */
+  on?: ProjectWorkflowOnDto;
+  /** Deprecated, use on.schedule. Cron schedule (UTC) of the pipeline, e.g. "0 2 * * 1". Requires a pipeline. */
   schedule?: string;
-  /** Run the pipeline on assets as they join the project. Requires a pipeline. */
+  /** Deprecated, use on.assetsAdded. Run the pipeline on assets as they join the project. Requires a pipeline. */
   onAssetsAdded?: AssetsAddedTriggerConfigDto;
   /** Start a run on the whole scope right after creation */
   runNow?: boolean;
@@ -4814,12 +4843,41 @@ export type WeeklyNewVulnerabilitiesDto = {
   info: number;
 };
 
+/**
+ * What a `project.updated` audit changed
+ */
+export type ProjectChange = (typeof ProjectChange)[keyof typeof ProjectChange];
+
+export const ProjectChange = {
+  settings: 'settings',
+  assetsadded: 'assets.added',
+  assetsdiscovered: 'assets.discovered',
+  assetsremoved: 'assets.removed',
+  scope: 'scope',
+  workflowadded: 'workflow.added',
+  workflowupdated: 'workflow.updated',
+  workflowremoved: 'workflow.removed',
+  triggers: 'triggers',
+} as const;
+
+/**
+ * Why the vulnerabilities were dismissed
+ */
+export type DismissReason = (typeof DismissReason)[keyof typeof DismissReason];
+
+export const DismissReason = {
+  false_positive: 'false_positive',
+  used_in_test: 'used_in_test',
+  wont_fix: 'wont_fix',
+} as const;
+
 export type ProjectActivityDtoKind =
   (typeof ProjectActivityDtoKind)[keyof typeof ProjectActivityDtoKind];
 
 export const ProjectActivityDtoKind = {
   run: 'run',
   audit: 'audit',
+  dismissed: 'dismissed',
 } as const;
 
 export type ProjectActivityDtoChanges = { [key: string]: unknown };
@@ -4827,8 +4885,18 @@ export type ProjectActivityDtoChanges = { [key: string]: unknown };
 export type ProjectActivityDto = {
   kind: ProjectActivityDtoKind;
   at: string;
-  /** Run id or audit action */
+  /** Run id, audit action, or `dismissed` */
   ref: string;
+  /** What a `project.updated` audit changed */
+  change?: ProjectChange;
+  /** Assets that joined */
+  added?: number;
+  /** Assets that left */
+  removed?: number;
+  /** Vulnerabilities dismissed */
+  count?: number;
+  /** Why the vulnerabilities were dismissed */
+  reason?: DismissReason;
   runStatus?: string;
   workflowName?: string;
   jobRunType?: string;
@@ -4910,6 +4978,12 @@ export type GetManyAssetDto = {
   pageCount: number;
 };
 
+export type ProjectAssetsChangedDto = {
+  message: string;
+  /** Assets that joined or left the project */
+  count: number;
+};
+
 export type ProjectAssetIdsDto = {
   /** Asset IDs */
   assetIds: string[];
@@ -4951,12 +5025,22 @@ export type CreateProjectWorkflowDto = {
   tools?: ProjectToolInput[];
   /** Project workflow (binding) of any project to copy */
   copyFromProjectWorkflowId?: string;
+  /** When the workflow runs on its own: schedules and "assets added" */
+  on?: ProjectWorkflowOnDto;
 };
 
 export type UpdateProjectWorkflowDto = {
   name?: string;
   /** Replaces the pipeline */
   tools?: ProjectToolInput[];
+  /** Replaces when the workflow runs on its own; omitted = unchanged */
+  on?: ProjectWorkflowOnDto;
+};
+
+export type ProjectWorkflowRemovedDto = {
+  message: string;
+  /** Name of the removed workflow */
+  name: string;
 };
 
 export type RunStartedDto = {
@@ -44712,7 +44796,7 @@ export const projectsControllerAddAssets = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<DefaultMessageResponseDto>(
+  return orvalClient<ProjectAssetsChangedDto>(
     {
       url: `/api/projects/${id}/assets`,
       method: 'POST',
@@ -44807,7 +44891,7 @@ export const projectsControllerRemoveAssets = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<DefaultMessageResponseDto>(
+  return orvalClient<ProjectAssetsChangedDto>(
     {
       url: `/api/projects/${id}/assets`,
       method: 'DELETE',
@@ -45825,7 +45909,7 @@ export const useProjectsControllerCreateWorkflow = <
 };
 
 /**
- * Renames a project workflow or replaces its pipeline.
+ * Renames a project workflow, replaces its pipeline and/or when it runs (on).
  * @summary Update workflow
  */
 export const projectsControllerUpdateWorkflow = (
@@ -45936,7 +46020,7 @@ export const projectsControllerRemoveWorkflow = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<DefaultMessageResponseDto>(
+  return orvalClient<ProjectWorkflowRemovedDto>(
     {
       url: `/api/projects/${id}/workflows/${bindingId}`,
       method: 'DELETE',

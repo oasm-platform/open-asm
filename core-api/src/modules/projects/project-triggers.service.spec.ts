@@ -524,6 +524,55 @@ describe('ProjectTriggersService', () => {
       );
     });
 
+    it('replaces the whole on: block as the workflow editor sends it', async () => {
+      const ctx = fileSetup({
+        on: { schedule: [{ cron: '0 2 * * 1' }, { cron: '0 3 * * 1' }] },
+        rows: [
+          { type: ProjectTriggerType.CRON, cron: '0 2 * * 1', schedulerId: 'project-trigger:t-1' },
+          { type: ProjectTriggerType.CRON, cron: '0 3 * * 1', schedulerId: 'project-trigger:t-2' },
+        ],
+      });
+
+      const rows = await ctx.service.replaceOn(PROJECT_ID, BINDING_ID, {
+        schedule: [{ cron: '0  2 * * 1', enabled: false }, { cron: '30 14 * * *' }],
+        assetsAdded: { windowMinutes: 5, enabled: true },
+      });
+
+      expect(ctx.workflow.content.on).toEqual({
+        schedule: [{ cron: '0 2 * * 1' }, { cron: '30 14 * * *' }],
+        assetsAdded: { windowMinutes: 5, maxAssets: 200, targetTypes: [] },
+      });
+      // The kept schedule keeps its row and is turned off; the dropped one goes.
+      const kept = rows.find((t) => t.cron === '0 2 * * 1')!;
+      expect(kept).toMatchObject({ id: 't-1', enabled: false });
+      expect(rows.map((t) => t.cron ?? t.type)).toEqual(['0 2 * * 1', '30 14 * * *', 'assets_added']);
+      expect(ctx.scheduleQueue.removeJobScheduler).toHaveBeenCalledWith('project-trigger:t-1');
+      expect(ctx.scheduleQueue.removeJobScheduler).toHaveBeenCalledWith('project-trigger:t-2');
+    });
+
+    it('leaves the state of an entry sent without "enabled"', async () => {
+      const ctx = fileSetup({
+        on: { schedule: [{ cron: '0 2 * * 1' }] },
+        rows: [{ type: ProjectTriggerType.CRON, cron: '0 2 * * 1', enabled: false }],
+      });
+
+      const rows = await ctx.service.replaceOn(PROJECT_ID, BINDING_ID, {
+        schedule: [{ cron: '0 2 * * 1' }],
+      });
+
+      expect(rows[0]).toMatchObject({ id: 't-1', enabled: false });
+      expect(ctx.scheduleQueue.upsertJobScheduler).not.toHaveBeenCalled();
+    });
+
+    it('refuses an invalid entry and writes nothing', async () => {
+      const ctx = fileSetup({ on: { schedule: [{ cron: '0 2 * * 1' }] } });
+
+      await expect(
+        ctx.service.replaceOn(PROJECT_ID, BINDING_ID, { schedule: [{ cron: 'disabled' }] }),
+      ).rejects.toThrow('Invalid workflow triggers');
+      expect(ctx.workflow.content.on).toEqual({ schedule: [{ cron: '0 2 * * 1' }] });
+    });
+
     it('refuses a workflow it does not own', async () => {
       const ctx = fileSetup();
       ctx.workflow.filePath = 'domain_discovery';

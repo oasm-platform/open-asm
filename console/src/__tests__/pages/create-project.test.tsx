@@ -199,7 +199,7 @@ describe('CreateProject wizard page', () => {
     await user.click(await screen.findByRole('button', { name: 'Add to pipeline' }));
     await user.click(screen.getByRole('button', { name: 'Next' }));
 
-    // Triggers: schedule, new assets and run now are on by default.
+    // When it runs: one schedule, new assets and run now are on by default.
     expect(await screen.findByRole('button', { name: 'Create' })).toBeEnabled();
     await user.click(screen.getByRole('button', { name: 'Create' }));
 
@@ -211,17 +211,21 @@ describe('CreateProject wizard page', () => {
       scopeRules: [{ mode: 'include', type: 'hostname', value: '*.example.com' }],
       autoAddAssets: true,
       tools: [{ toolId: 'tool-1' }],
-      onAssetsAdded: { windowMinutes: 10 },
+      on: {
+        assetsAdded: { enabled: true, windowMinutes: 10, maxAssets: 200, targetTypes: [] },
+      },
       runNow: true,
     });
     expect(dto.template).toBeUndefined();
-    expect(dto.schedule).toMatch(/^\S+ \S+ \S+ \S+ \S+$/);
+    expect(dto.on.schedule).toEqual([
+      { cron: expect.stringMatching(/^\S+ \S+ \S+ \S+ \S+$/), enabled: true },
+    ]);
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/projects/project-1/overview');
     });
   });
 
-  it('creates from a template without a schedule', async () => {
+  it('creates from a template that runs only when started', async () => {
     const { user } = renderWithProviders(<CreateProject />, {
       routePath: '/projects/create',
     });
@@ -236,14 +240,17 @@ describe('CreateProject wizard page', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Next' }));
 
-    await user.click(await screen.findByRole('checkbox', { name: 'On a schedule' }));
+    await user.click(await screen.findByRole('button', { name: 'Remove schedule 1' }));
+    await user.click(
+      screen.getByRole('checkbox', { name: 'When assets join the project' }),
+    );
     await user.click(screen.getByRole('button', { name: 'Create' }));
 
     await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
     const dto = createMock.mock.calls[0][0].data;
     expect(dto).toMatchObject({ template: 'vulnerability_scan_basic.yaml' });
     expect(dto.tools).toBeUndefined();
-    expect(dto.schedule).toBeUndefined();
+    expect(dto.on).toEqual({ schedule: [], assetsAdded: null });
   });
 
   it('goes back to the previous step with Back and keeps entered values', async () => {

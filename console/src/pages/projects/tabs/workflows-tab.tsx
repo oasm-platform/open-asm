@@ -142,13 +142,7 @@ function WorkflowCard({
               onClick={onEdit}
             >
               <Pencil className="size-4" />
-              Edit pipeline
-            </Button>
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/projects/$id/$tab" params={{ id: projectId, tab: 'schedule' }}>
-                <CalendarClock className="size-4" />
-                Triggers
-              </Link>
+              Edit
             </Button>
             <Button
               variant="ghost"
