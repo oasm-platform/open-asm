@@ -203,8 +203,8 @@ describe('Project detail page', () => {
     renderWithProviders(<ProjectDetail />, at('overview'));
 
     expect(await screen.findByRole('heading', { name: 'Web Servers' })).toBeInTheDocument();
-    expect(screen.getByText('Public hosts of example.com')).toBeInTheDocument();
-    expect(screen.getByText('Active')).toBeInTheDocument();
+    expect(screen.queryByText('Public hosts of example.com')).not.toBeInTheDocument();
+    expect(screen.queryByText('Archived')).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Assets\s*2/ })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Vulnerabilities\s*3/ })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Workflows\s*1/ })).toBeInTheDocument();
@@ -227,8 +227,8 @@ describe('Project detail page', () => {
 
     expect(await screen.findByText('SQL injection')).toBeInTheDocument();
     expect(screen.getByText('Recurring ×3')).toBeInTheDocument();
-    const group = screen.getByRole('group', { name: 'Provenance' });
-    await user.click(within(group).getByRole('button', { name: /^New/ }));
+    const group = screen.getByRole('tablist', { name: 'Provenance' });
+    await user.click(within(group).getByRole('tab', { name: /^New/ }));
 
     await waitFor(() => {
       expect(vulnsMock).toHaveBeenLastCalledWith(

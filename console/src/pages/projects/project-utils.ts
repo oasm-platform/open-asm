@@ -1,4 +1,5 @@
 import { getNextRun } from '@/lib/cron-schedule';
+import { SEVERITY_BG_CLASS, SEVERITY_TEXT_CLASS } from '@/pages/dashboard/severity';
 import type { PipelineToolEntry } from '@/pages/projects/components/tool-pipeline-builder';
 import {
   JobRunType,
@@ -29,13 +30,13 @@ export type ProjectTab = (typeof PROJECT_TABS)[number]['value'];
 export const isProjectTab = (tab: string | undefined): tab is ProjectTab =>
   PROJECT_TABS.some((t) => t.value === tab);
 
-/** Severities from the worst down, with the colours of the stacked bars. */
+/** Severities from the worst down, in the dashboard's colours. */
 export const SEVERITIES = [
-  { key: 'critical', label: 'Critical', bar: 'bg-red-500', text: 'text-red-500' },
-  { key: 'high', label: 'High', bar: 'bg-orange-500', text: 'text-orange-500' },
-  { key: 'medium', label: 'Medium', bar: 'bg-yellow-500', text: 'text-yellow-600' },
-  { key: 'low', label: 'Low', bar: 'bg-blue-500', text: 'text-blue-500' },
-  { key: 'info', label: 'Info', bar: 'bg-gray-400', text: 'text-muted-foreground' },
+  { key: 'critical', label: 'Critical', bar: SEVERITY_BG_CLASS.critical, text: SEVERITY_TEXT_CLASS.critical },
+  { key: 'high', label: 'High', bar: SEVERITY_BG_CLASS.high, text: SEVERITY_TEXT_CLASS.high },
+  { key: 'medium', label: 'Medium', bar: SEVERITY_BG_CLASS.medium, text: SEVERITY_TEXT_CLASS.medium },
+  { key: 'low', label: 'Low', bar: SEVERITY_BG_CLASS.low, text: SEVERITY_TEXT_CLASS.low },
+  { key: 'info', label: 'Info', bar: SEVERITY_BG_CLASS.info, text: SEVERITY_TEXT_CLASS.info },
 ] as const satisfies ReadonlyArray<{
   key: keyof SeverityCountsDto;
   label: string;

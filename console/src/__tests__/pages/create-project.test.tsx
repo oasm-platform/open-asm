@@ -115,14 +115,14 @@ beforeEach(() => {
 });
 
 describe('CreateProject wizard page', () => {
-  it('renders step 1 with name, color and description; Next disabled until name entered', async () => {
+  it('renders step 1 with name and description; Next disabled until name entered', async () => {
     const { user } = renderWithProviders(<CreateProject />, {
       routePath: '/projects/create',
     });
 
     expect(await screen.findByText(/Info/)).toBeInTheDocument();
     const nameInput = screen.getByLabelText('Name');
-    expect(screen.getByLabelText('Select #78716C color')).toBeInTheDocument();
+    expect(screen.queryByText('Color')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Description')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Back' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();

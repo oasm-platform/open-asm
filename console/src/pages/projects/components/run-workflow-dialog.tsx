@@ -197,7 +197,7 @@ export function RunWorkflowDialog({
                         onCheckedChange={() => toggle(asset.id)}
                         aria-label={`Select ${asset.value}`}
                       />
-                      <span className="truncate font-mono text-xs">{asset.value}</span>
+                      <span className="truncate text-sm">{asset.value}</span>
                     </label>
                   ))
                 )}

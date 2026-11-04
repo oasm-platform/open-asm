@@ -13,7 +13,15 @@ import {
 import { Link } from '@tanstack/react-router';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { CalendarClock, Pencil, Play, Plus, Trash2, Zap } from 'lucide-react';
+import {
+  CalendarClock,
+  Pencil,
+  Play,
+  Plus,
+  Trash2,
+  Workflow,
+  Zap,
+} from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { PipelineSteps } from '../components/pipeline-steps';
@@ -61,15 +69,18 @@ function WorkflowCard({
     );
 
   return (
-    <Card className="gap-3">
-      <CardHeader className="flex flex-row items-start justify-between gap-2 pb-0">
-        <CardTitle className="text-sm">{workflowLabel(binding.workflow)}</CardTitle>
-        <Button size="sm" disabled={archived} onClick={onRun}>
-          <Play className="size-3.5" />
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+        <CardTitle className="flex items-center gap-2">
+          <Workflow className="size-5 text-primary" />
+          {workflowLabel(binding.workflow)}
+        </CardTitle>
+        <Button disabled={archived} onClick={onRun}>
+          <Play className="size-4" />
           Run
         </Button>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+      <CardContent className="flex flex-col gap-4">
         <PipelineSteps steps={pipelineSteps(binding.workflow.content)} />
         <div className="flex flex-wrap gap-1.5">
           {(binding.triggers ?? []).length === 0 && (
@@ -98,7 +109,7 @@ function WorkflowCard({
             ),
           )}
         </div>
-        <div className="flex items-center gap-2 border-t pt-3 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-2 border-t pt-4 text-sm text-muted-foreground">
           {lastRun ? (
             <>
               <JobStatusBadge status={lastRun.status as JobStatus} />
@@ -122,24 +133,23 @@ function WorkflowCard({
               title={owned ? undefined : 'Not owned by this project'}
               onClick={onEdit}
             >
-              <Pencil className="size-3.5" />
+              <Pencil className="size-4" />
               Edit pipeline
             </Button>
             <Button variant="ghost" size="sm" asChild>
               <Link to="/projects/$id/$tab" params={{ id: projectId, tab: 'schedule' }}>
-                <CalendarClock className="size-3.5" />
+                <CalendarClock className="size-4" />
                 Triggers
               </Link>
             </Button>
             <Button
               variant="ghost"
               size="icon"
-              className="size-8"
               disabled={archived}
               aria-label="Remove workflow"
               onClick={() => setConfirm(true)}
             >
-              <Trash2 className="size-3.5" />
+              <Trash2 className="size-4" />
             </Button>
           </span>
         </div>
@@ -192,11 +202,11 @@ export function WorkflowsTab({
         type="button"
         disabled={archived}
         onClick={() => openEditor()}
-        className="flex min-h-40 flex-col items-center justify-center gap-2 rounded-xl border border-dashed text-sm text-muted-foreground hover:bg-accent/40 disabled:pointer-events-none disabled:opacity-50"
+        className="flex min-h-40 flex-col items-center justify-center gap-2 rounded-xl border border-dashed text-muted-foreground transition-colors hover:bg-accent/70 disabled:pointer-events-none disabled:opacity-50"
       >
         <Plus className="size-5" />
-        Add workflow
-        <span className="text-xs">From a template, your own tools, or a copy</span>
+        <span className="font-medium text-foreground">Add workflow</span>
+        <span className="text-sm">From a template, your own tools, or a copy</span>
       </button>
       <WorkflowEditorSheet
         projectId={projectId}

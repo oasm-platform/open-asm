@@ -36,7 +36,7 @@ export const SeverityBar = memo(function SeverityBar({
   );
 });
 
-/** Counts per severity as small chips, zeros left out. */
+/** Counts per severity in their colours, zeros left out. */
 export const SeverityCounts = memo(function SeverityCounts({
   counts,
   className,
@@ -47,21 +47,21 @@ export const SeverityCounts = memo(function SeverityCounts({
   empty?: string;
 }) {
   if (!totalOf(counts)) {
-    return <span className="text-xs text-muted-foreground">{empty}</span>;
+    return <span className="text-sm text-muted-foreground">{empty}</span>;
   }
   return (
-    <div className={cn('flex flex-wrap items-center gap-1', className)}>
+    <div className={cn('flex flex-wrap items-center gap-x-3 gap-y-1', className)}>
       {SEVERITIES.map((s) =>
         counts?.[s.key] ? (
           <span
             key={s.key}
             title={s.label}
             className={cn(
-              'inline-flex items-center gap-1 rounded-full border px-1.5 text-[11px] font-semibold tabular-nums',
+              'inline-flex items-center gap-1.5 font-mono text-sm font-semibold tabular-nums',
               s.text,
             )}
           >
-            <span className={cn('size-1.5 rounded-full', s.bar)} />
+            <span className={cn('size-2 rounded-full', s.bar)} />
             {counts[s.key]}
           </span>
         ) : null,

@@ -75,7 +75,7 @@ const STATUS_OPTIONS = [
 function Meta({ label, value, title }: { label: string; value: string; title?: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] tracking-wide text-muted-foreground uppercase">
+      <dt className="text-xs text-muted-foreground">
         {label}
       </dt>
       <dd className="truncate text-sm font-medium tabular-nums" title={title}>
@@ -151,12 +151,7 @@ const ProjectCard = memo(function ProjectCard({
         className="absolute inset-0 cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
       <div className="flex w-full min-w-0 items-center gap-2">
-        <span
-          className="flex size-6 shrink-0 items-center justify-center rounded-md"
-          style={{ background: project.hexColor }}
-        >
-          <FolderKanban className="size-3.5 text-white" />
-        </span>
+        <FolderKanban className="size-5 shrink-0 text-primary" />
         <h3 className="min-w-0 flex-1 truncate text-base font-semibold">
           {project.name}
         </h3>
@@ -167,7 +162,7 @@ const ProjectCard = memo(function ProjectCard({
         ) : null}
       </div>
       {project.description && (
-        <p className="line-clamp-2 text-xs text-muted-foreground">
+        <p className="line-clamp-2 text-sm text-muted-foreground">
           {project.description}
         </p>
       )}

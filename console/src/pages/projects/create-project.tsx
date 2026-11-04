@@ -8,13 +8,7 @@ import {
 } from '@/pages/projects/components/tool-pipeline-builder';
 import { NoInstalledToolsState } from '@/pages/projects/components/no-installed-tools-state';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CronScheduleBuilder } from '@/components/ui/cron-schedule-builder';
 import { DataTable } from '@/components/ui/data-table';
@@ -60,7 +54,6 @@ import {
   type EditableScopeRule,
 } from './components/scope-rules-editor';
 import { apiErrorMessage, pipelineSteps, toToolInputs } from './project-utils';
-import { PROJECT_COLORS } from './tabs/settings-tab';
 
 const STEPS = [
   { title: 'Info', icon: <FileTextIcon className="size-4" /> },
@@ -81,7 +74,6 @@ export function CreateProject() {
 
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
-  const [hexColor, setHexColor] = useState<string | undefined>(undefined);
   const [description, setDescription] = useState('');
   const [rules, setRules] = useState<EditableScopeRule[]>([]);
   const [autoAddAssets, setAutoAddAssets] = useState(true);
@@ -137,7 +129,6 @@ export function CreateProject() {
     }
     const dto: CreateProjectDto = {
       name: name.trim(),
-      hexColor: hexColor || undefined,
       description: description.trim() || undefined,
       hostIds: Array.from(hostIds),
       scopeRules: rules
@@ -217,17 +208,14 @@ export function CreateProject() {
   ];
 
   return (
-    <Page permission="project.write">
+    <Page
+      title="Create project"
+      description="Choose the assets to keep scanned, the pipeline that scans them, and when it runs"
+      isShowButtonGoBack
+      permission="project.write"
+    >
       <div className="h-full overflow-y-auto">
         <Card className="mx-auto w-full max-w-4xl max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent">
-          <CardHeader className="max-sm:px-0">
-            <CardTitle>Project</CardTitle>
-            <CardDescription>
-              Keeps a set of assets scanned. Choose which assets belong to it,
-              the pipeline that scans them, and when it runs: on a schedule,
-              as new assets join, or on demand.
-            </CardDescription>
-          </CardHeader>
           <CardContent className="flex max-sm:px-0 flex-col gap-8">
             <Stepper
               value={step + 1}
@@ -277,26 +265,6 @@ export function CreateProject() {
                       onChange={(e) => setName(e.target.value)}
                       placeholder="e.g. Production hosts"
                     />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label>Color</Label>
-                    <div className="flex gap-2">
-                      {PROJECT_COLORS.map((color) => (
-                        <button
-                          key={color}
-                          type="button"
-                          className={cn(
-                            'h-8 w-8 cursor-pointer rounded-full border-2',
-                            hexColor === color
-                              ? 'border-gray-400 ring-2 ring-offset-2 ring-blue-500'
-                              : 'border-gray-300',
-                          )}
-                          style={{ backgroundColor: color }}
-                          onClick={() => setHexColor(color)}
-                          aria-label={`Select ${color} color`}
-                        />
-                      ))}
-                    </div>
                   </div>
                   <div className="flex flex-col gap-2">
                     <Label htmlFor="project-description">Description</Label>

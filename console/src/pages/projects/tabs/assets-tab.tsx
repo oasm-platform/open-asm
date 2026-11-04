@@ -1,6 +1,12 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DataTable } from '@/components/ui/data-table';
 import {
@@ -11,15 +17,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import useDebounce from '@/hooks/use-debounce';
 import {
   ProjectAssetSource,
   ProjectScopeRuleMode,
@@ -33,9 +30,10 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { Link } from '@tanstack/react-router';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { Minus, Pencil, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { Crosshair, Minus, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
+import { FilterSelect } from '../components/filter-select';
 import {
   isCompleteRule,
   ScopeRulesEditor,
@@ -104,39 +102,41 @@ function ScopeCard({ projectId, archived }: { projectId: string; archived: boole
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-0">
-        <CardTitle className="text-sm">Scope</CardTitle>
-        <div className="flex items-center gap-2">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <div className="flex flex-col gap-1.5">
+          <CardTitle className="flex items-center gap-2">
+            <Crosshair className="size-5 text-primary" />
+            Scope
+          </CardTitle>
           {scope && (
-            <Badge variant="outline" className="font-normal">
-              {scope.autoAddAssets ? 'Adds new matching assets' : 'Rules apply on save only'}
-            </Badge>
+            <CardDescription>
+              {scope.autoAddAssets
+                ? 'New assets that match the rules join on their own.'
+                : 'Rules apply when they are saved.'}
+            </CardDescription>
           )}
-          <Button size="sm" variant="outline" disabled={archived} onClick={startEdit}>
-            <Pencil className="size-3.5" />
-            Edit rules
-          </Button>
         </div>
+        <Button variant="outline" disabled={archived} onClick={startEdit}>
+          <Pencil className="size-4" />
+          Edit rules
+        </Button>
       </CardHeader>
-      <CardContent className="flex flex-wrap gap-2 text-sm">
+      <CardContent className="flex flex-wrap gap-2">
         {(scope?.rules ?? []).map((rule) => (
-          <span
-            key={rule.id}
-            className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs"
-          >
+          <Badge key={rule.id} variant="outline" className="gap-1.5 py-1 text-sm font-normal">
             {rule.mode === ProjectScopeRuleMode.include ? (
-              <Plus className="size-3 text-emerald-600" />
+              <Plus className="size-3.5 text-success" />
             ) : (
-              <Minus className="size-3 text-destructive" />
+              <Minus className="size-3.5 text-destructive" />
             )}
             <span className="text-muted-foreground">{TYPE_LABEL[rule.type]}</span>
-            <span className="font-mono">{rule.label}</span>
+            {rule.label}
             <span className="tabular-nums text-muted-foreground">· {rule.matched}</span>
-          </span>
+          </Badge>
         ))}
-        <span className="inline-flex items-center gap-1.5 rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground">
+        <Badge variant="outline" className="border-dashed py-1 text-sm font-normal text-muted-foreground">
           + {scope?.manualAssets ?? 0} picked by hand
-        </span>
+        </Badge>
       </CardContent>
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -172,16 +172,20 @@ function ScopeCard({ projectId, archived }: { projectId: string; archived: boole
 export function AssetsTab({ projectId, archived }: { projectId: string; archived: boolean }) {
   const invalidate = useInvalidateProjects();
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [text, setText] = useState('');
   const [source, setSource] = useState<ProjectAssetSource | 'all'>('all');
   const [removing, setRemoving] = useState<ProjectAssetDto | null>(null);
-  const debounced = useDebounce(text, 400);
   const remove = useProjectsControllerRemoveAssets();
+  const onSearch = useCallback((value: string) => {
+    setText(value);
+    setPage(1);
+  }, []);
 
   const { data, isLoading } = useProjectsControllerGetAssets(projectId, {
     page,
-    limit: PAGE_SIZE,
-    search: debounced,
+    limit: pageSize,
+    search: text,
     sortBy: 'addedAt',
     sortOrder: 'DESC',
     ...(source !== 'all' ? { source } : {}),
@@ -208,7 +212,7 @@ export function AssetsTab({ projectId, archived }: { projectId: string; archived
       header: 'Asset',
       cell: ({ row }) => (
         <span className="flex items-center gap-2">
-          <span className="font-mono text-xs">{row.original.value}</span>
+          <span className="font-medium">{row.original.value}</span>
           {dayjs(row.original.addedAt).isAfter(recent) && (
             <Badge variant="soft">New</Badge>
           )}
@@ -219,9 +223,9 @@ export function AssetsTab({ projectId, archived }: { projectId: string; archived
       accessorKey: 'targetType',
       header: 'Type',
       cell: ({ row }) => (
-        <span className="text-xs capitalize text-muted-foreground">
+        <Badge variant="outline" className="capitalize">
           {row.original.targetType.toLowerCase().replace('_', ' ')}
-        </span>
+        </Badge>
       ),
     },
     {
@@ -229,12 +233,12 @@ export function AssetsTab({ projectId, archived }: { projectId: string; archived
       header: 'Source',
       cell: ({ row }) =>
         row.original.source === ProjectAssetSource.rule ? (
-          <span className="text-xs">
-            Rule ·{' '}
-            <span className="font-mono">{row.original.rule?.label ?? 'deleted rule'}</span>
+          <span>
+            <span className="text-muted-foreground">Rule · </span>
+            {row.original.rule?.label ?? 'deleted rule'}
           </span>
         ) : (
-          <span className="text-xs text-muted-foreground">Picked by hand</span>
+          <span className="text-muted-foreground">Picked by hand</span>
         ),
     },
     {
@@ -252,21 +256,21 @@ export function AssetsTab({ projectId, archived }: { projectId: string; archived
           <Link
             to="/jobs/runs/$id"
             params={{ id: row.original.lastScan.runId }}
-            className="text-xs hover:underline"
-            title={dayjs(row.original.lastScan.createdAt).format('DD MMM YYYY, HH:mm')}
+            className="hover:underline"
+            title={dayjs(row.original.lastScan.createdAt).format('YYYY-MM-DD HH:mm')}
           >
             {dayjs(row.original.lastScan.createdAt).fromNow()}
           </Link>
         ) : (
-          <span className="text-xs text-muted-foreground">Never</span>
+          <span className="text-muted-foreground">Never</span>
         ),
     },
     {
       accessorKey: 'addedAt',
       header: 'Added',
       cell: ({ row }) => (
-        <span className="text-xs tabular-nums text-muted-foreground">
-          {dayjs(row.original.addedAt).format('DD/MM/YYYY')}
+        <span className="tabular-nums">
+          {new Date(row.original.addedAt).toLocaleDateString()}
         </span>
       ),
     },
@@ -277,7 +281,6 @@ export function AssetsTab({ projectId, archived }: { projectId: string; archived
         <Button
           variant="ghost"
           size="icon"
-          className="size-7"
           disabled={archived}
           aria-label={`Remove ${row.original.value}`}
           onClick={(e) => {
@@ -285,53 +288,50 @@ export function AssetsTab({ projectId, archived }: { projectId: string; archived
             setRemoving(row.original);
           }}
         >
-          <Trash2 className="size-3.5" />
+          <Trash2 className="size-4" />
         </Button>
       ),
     },
   ];
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       <ScopeCard projectId={projectId} archived={archived} />
-      <div className="flex flex-wrap items-center gap-2">
-        <Input
-          placeholder="Search assets..."
-          value={text}
-          onChange={(e) => {
-            setText(e.target.value);
-            setPage(1);
-          }}
-          className="h-8 w-full text-xs md:w-64"
-        />
-        <Select
-          value={source}
-          onValueChange={(value) => {
-            setSource(value as ProjectAssetSource | 'all');
-            setPage(1);
-          }}
-        >
-          <SelectTrigger aria-label="Source" className="h-8 w-[150px] text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All sources</SelectItem>
-            <SelectItem value={ProjectAssetSource.rule}>From rules</SelectItem>
-            <SelectItem value={ProjectAssetSource.manual}>Picked by hand</SelectItem>
-          </SelectContent>
-        </Select>
-        <div className="ml-auto">
-          {!archived && <SelectAssetsDialog projectId={projectId} />}
-        </div>
-      </div>
       <DataTable
         columns={columns}
         data={data?.data ?? []}
         isLoading={isLoading}
         page={page}
-        pageSize={PAGE_SIZE}
+        pageSize={pageSize}
         totalItems={data?.total ?? 0}
         onPageChange={setPage}
+        onPageSizeChange={(size) => {
+          setPageSize(size);
+          setPage(1);
+        }}
+        filterColumnKey="value"
+        filterValue={text}
+        onFilterChange={onSearch}
+        filterPlaceholder="Search assets"
+        filterComponents={[
+          <FilterSelect
+            key="source"
+            label="Source"
+            value={source}
+            onValueChange={(value) => {
+              setSource(value as ProjectAssetSource | 'all');
+              setPage(1);
+            }}
+            options={[
+              { value: 'all', label: 'All sources' },
+              { value: ProjectAssetSource.rule, label: 'From rules', dot: 'bg-blue-500' },
+              { value: ProjectAssetSource.manual, label: 'Picked by hand', dot: 'bg-green-500' },
+            ]}
+          />,
+        ]}
+        toolbarComponents={
+          archived ? [] : [<SelectAssetsDialog key="add" projectId={projectId} />]
+        }
         emptyMessage="No assets in this project yet"
       />
       <ConfirmDialog

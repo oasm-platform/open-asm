@@ -8,7 +8,7 @@ export const PipelineSteps = memo(function PipelineSteps({
   steps: string[][];
 }) {
   if (steps.length === 0) {
-    return <span className="text-xs text-muted-foreground">No tools</span>;
+    return <span className="text-sm text-muted-foreground">No tools</span>;
   }
   return (
     <div className="flex flex-wrap items-center gap-1.5" aria-label="Pipeline">
@@ -19,7 +19,7 @@ export const PipelineSteps = memo(function PipelineSteps({
             {tools.map((tool) => (
               <span
                 key={tool}
-                className="rounded-md border bg-muted/50 px-2 py-0.5 font-mono text-xs"
+                className="rounded-md border bg-muted/50 px-2 py-0.5 text-xs font-medium"
               >
                 {tool}
               </span>

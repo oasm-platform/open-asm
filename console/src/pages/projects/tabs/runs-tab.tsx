@@ -1,13 +1,6 @@
 import { DataTable } from '@/components/ui/data-table';
 import JobStatusBadge from '@/components/ui/job-status';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   JobRunType,
   VulnerabilityProvenance,
   useProjectsControllerGetRuns,
@@ -18,23 +11,24 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import type { ProjectDetailSearch } from '@/routes/_authed/projects/$id/$tab';
 import dayjs from 'dayjs';
-import duration from 'dayjs/plugin/duration';
-import relativeTime from 'dayjs/plugin/relativeTime';
+import { CalendarDays, Clock } from 'lucide-react';
 import { useState } from 'react';
+import { FilterSelect } from '../components/filter-select';
 import { assetCount, runTriggerLabel, workflowLabel } from '../project-utils';
-
-dayjs.extend(relativeTime);
-dayjs.extend(duration);
 
 const PAGE_SIZE = 20;
 
+/** "4m 14s", as on the jobs registry's run page. */
 function formatDuration(run: ProjectRunDto): string {
-  if (!run.isCompleted) return 'running';
-  const ms = dayjs(run.updatedAt).diff(dayjs(run.createdAt));
-  const d = dayjs.duration(Math.max(0, ms));
-  if (d.asHours() >= 1) return `${Math.floor(d.asHours())} h ${d.minutes()} min`;
-  if (d.asMinutes() >= 1) return `${Math.floor(d.asMinutes())} min`;
-  return `${d.seconds()} s`;
+  if (!run.isCompleted) return 'Running';
+  const total = Math.max(0, dayjs(run.updatedAt).diff(dayjs(run.createdAt), 'second'));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const parts: string[] = [];
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  parts.push(`${total % 60}s`);
+  return parts.join(' ');
 }
 
 export function RunsTab({
@@ -47,13 +41,14 @@ export function RunsTab({
   const navigate = useNavigate();
   const search = useSearch({ strict: false }) as ProjectDetailSearch;
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [runType, setRunType] = useState<JobRunType | 'all'>('all');
 
   const { data, isLoading } = useProjectsControllerGetRuns(
     projectId,
     {
       page,
-      limit: PAGE_SIZE,
+      limit: pageSize,
       ...(search.workflow ? { projectWorkflowId: search.workflow } : {}),
       ...(runType !== 'all' ? { jobRunType: runType } : {}),
     },
@@ -62,43 +57,35 @@ export function RunsTab({
 
   const columns: ColumnDef<ProjectRunDto>[] = [
     {
-      id: 'run',
+      accessorKey: 'workflowName',
       header: 'Run',
       cell: ({ row }) => (
-        <span className="font-mono text-xs">#{row.original.id.slice(0, 6)}</span>
+        <span className="flex items-center gap-2">
+          <JobStatusBadge status={row.original.status} />
+          <span className="font-medium">
+            {workflowLabel({ name: row.original.workflowName })}
+          </span>
+          <span className="text-muted-foreground">#{row.original.id.slice(0, 6)}</span>
+        </span>
       ),
-    },
-    {
-      accessorKey: 'workflowName',
-      header: 'Workflow',
-      cell: ({ row }) => workflowLabel({ name: row.original.workflowName }),
     },
     {
       id: 'trigger',
       header: 'Triggered by',
-      cell: ({ row }) => (
-        <span className="text-xs">
-          {runTriggerLabel(row.original.jobRunType)}
-        </span>
-      ),
+      cell: ({ row }) => runTriggerLabel(row.original.jobRunType),
     },
     {
       accessorKey: 'scopeSize',
       header: 'Scope',
       cell: ({ row }) => (
-        <span className="text-xs tabular-nums">{assetCount(row.original.scopeSize)}</span>
+        <span className="tabular-nums">{assetCount(row.original.scopeSize)}</span>
       ),
-    },
-    {
-      accessorKey: 'status',
-      header: 'Status',
-      cell: ({ row }) => <JobStatusBadge status={row.original.status} />,
     },
     {
       id: 'steps',
       header: 'Steps',
       cell: ({ row }) => (
-        <span className="text-xs tabular-nums">
+        <span className="tabular-nums">
           {row.original.stepsDone}/{row.original.stepsTotal}
           {row.original.stepsFailed > 0 && (
             <span className="text-destructive"> · {row.original.stepsFailed} failed</span>
@@ -112,9 +99,9 @@ export function RunsTab({
       cell: ({ row }) =>
         row.original.newVulnerabilities + row.original.recurringVulnerabilities ===
         0 ? (
-          <span className="text-xs text-muted-foreground">—</span>
+          <span className="text-muted-foreground">—</span>
         ) : (
-          <span className="flex gap-1.5 text-xs">
+          <span className="flex gap-2">
             {row.original.newVulnerabilities > 0 && (
               <Link
                 to="/projects/$id/$tab"
@@ -138,11 +125,9 @@ export function RunsTab({
       accessorKey: 'createdAt',
       header: 'Started',
       cell: ({ row }) => (
-        <span
-          className="text-xs text-muted-foreground"
-          title={dayjs(row.original.createdAt).format('DD MMM YYYY, HH:mm')}
-        >
-          {dayjs(row.original.createdAt).fromNow()}
+        <span className="flex items-center gap-2 tabular-nums text-muted-foreground">
+          <CalendarDays className="size-4" />
+          {dayjs(row.original.createdAt).format('YYYY-MM-DD HH:mm:ss')}
         </span>
       ),
     },
@@ -150,73 +135,74 @@ export function RunsTab({
       id: 'duration',
       header: 'Duration',
       cell: ({ row }) => (
-        <span className="text-xs tabular-nums text-muted-foreground">
+        <span className="flex items-center gap-2 tabular-nums text-muted-foreground">
+          <Clock className="size-4" />
           {formatDuration(row.original)}
         </span>
       ),
     },
   ];
 
+  const filters = [
+    <FilterSelect
+      key="trigger"
+      label="Triggered by"
+      value={runType}
+      onValueChange={(value) => {
+        setRunType(value as JobRunType | 'all');
+        setPage(1);
+      }}
+      options={[
+        { value: 'all', label: 'All triggers' },
+        { value: JobRunType.manual, label: 'Manual', dot: 'bg-blue-500' },
+        { value: JobRunType.scheduled, label: 'Schedule', dot: 'bg-purple-500' },
+        { value: JobRunType.event, label: 'Assets added', dot: 'bg-orange-500' },
+      ]}
+    />,
+  ];
+  if (workflows.length > 1) {
+    filters.unshift(
+      <FilterSelect
+        key="workflow"
+        label="Workflow"
+        value={search.workflow ?? 'all'}
+        onValueChange={(value) => {
+          setPage(1);
+          void navigate({
+            to: '/projects/$id/$tab',
+            params: { id: projectId, tab: 'runs' },
+            search: { ...search, workflow: value === 'all' ? undefined : value },
+            replace: true,
+          });
+        }}
+        options={[
+          { value: 'all', label: 'All workflows' },
+          ...workflows.map((binding) => ({
+            value: binding.id,
+            label: workflowLabel(binding.workflow),
+            dot: 'bg-blue-500',
+          })),
+        ]}
+      />,
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        {workflows.length > 1 && (
-          <Select
-            value={search.workflow ?? 'all'}
-            onValueChange={(value) => {
-              setPage(1);
-              void navigate({
-                to: '/projects/$id/$tab',
-                params: { id: projectId, tab: 'runs' },
-                search: { ...search, workflow: value === 'all' ? undefined : value },
-                replace: true,
-              });
-            }}
-          >
-            <SelectTrigger aria-label="Workflow" className="h-8 w-[180px] text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All workflows</SelectItem>
-              {workflows.map((binding) => (
-                <SelectItem key={binding.id} value={binding.id}>
-                  {workflowLabel(binding.workflow)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-        <Select
-          value={runType}
-          onValueChange={(value) => {
-            setRunType(value as JobRunType | 'all');
-            setPage(1);
-          }}
-        >
-          <SelectTrigger aria-label="Triggered by" className="h-8 w-[160px] text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Any trigger</SelectItem>
-            <SelectItem value={JobRunType.manual}>Manual</SelectItem>
-            <SelectItem value={JobRunType.scheduled}>Schedule</SelectItem>
-            <SelectItem value={JobRunType.event}>Assets added</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <DataTable
-        columns={columns}
-        data={data?.data ?? []}
-        isLoading={isLoading}
-        page={page}
-        pageSize={PAGE_SIZE}
-        totalItems={data?.total ?? 0}
-        onPageChange={setPage}
-        onRowClick={(row) =>
-          navigate({ to: '/jobs/runs/$id', params: { id: row.id } })
-        }
-        emptyMessage="No runs yet"
-      />
-    </div>
+    <DataTable
+      columns={columns}
+      data={data?.data ?? []}
+      isLoading={isLoading}
+      page={page}
+      pageSize={pageSize}
+      totalItems={data?.total ?? 0}
+      onPageChange={setPage}
+      onPageSizeChange={(size) => {
+        setPageSize(size);
+        setPage(1);
+      }}
+      filterComponents={filters}
+      onRowClick={(row) => navigate({ to: '/jobs/runs/$id', params: { id: row.id } })}
+      emptyMessage="No runs yet"
+    />
   );
 }

@@ -1,27 +1,24 @@
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { cn } from '@/lib/utils';
 import {
   useProjectsControllerArchive,
   useProjectsControllerUnarchive,
   useProjectsControllerUpdate,
   type Project,
 } from '@/services/apis/gen/queries';
+import { Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage, useInvalidateProjects } from '../project-utils';
-
-export const PROJECT_COLORS = [
-  '#78716C',
-  '#3b82f6',
-  '#22c55e',
-  '#f59e0b',
-  '#7e22ce',
-  '#ec4899',
-];
 
 function Row({
   title,
@@ -35,8 +32,8 @@ function Row({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-b py-3 last:border-0">
       <div className="min-w-0 flex-1 basis-60">
-        <p className="text-sm font-medium">{title}</p>
-        <p className="text-xs text-muted-foreground">{description}</p>
+        <p className="font-medium">{title}</p>
+        <p className="text-sm text-muted-foreground">{description}</p>
       </div>
       {children}
     </div>
@@ -57,19 +54,16 @@ export function SettingsTab({
   const archived = !!project.archivedAt;
 
   const [name, setName] = useState(project.name);
-  const [hexColor, setHexColor] = useState(project.hexColor ?? PROJECT_COLORS[0]);
   const [description, setDescription] = useState(project.description ?? '');
 
   // Follow the saved values, not every refetch of the same project.
   useEffect(() => {
     setName(project.name);
-    setHexColor(project.hexColor ?? PROJECT_COLORS[0]);
     setDescription(project.description ?? '');
-  }, [project.id, project.name, project.hexColor, project.description]);
+  }, [project.id, project.name, project.description]);
 
   const dirty =
     name.trim() !== project.name ||
-    hexColor !== project.hexColor ||
     description.trim() !== (project.description ?? '');
 
   const save = () =>
@@ -78,7 +72,6 @@ export function SettingsTab({
         id: project.id,
         data: {
           name: name.trim(),
-          hexColor,
           description: description.trim() || null,
         },
       },
@@ -104,10 +97,10 @@ export function SettingsTab({
     );
 
   return (
-    <div className="flex max-w-3xl flex-col gap-4">
+    <div className="max-w-3xl space-y-6">
       <Card>
-        <CardHeader className="pb-0">
-          <CardTitle className="text-sm">General</CardTitle>
+        <CardHeader>
+          <CardTitle>Information</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
@@ -118,28 +111,6 @@ export function SettingsTab({
               disabled={archived}
               onChange={(e) => setName(e.target.value)}
             />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label>Color</Label>
-            <div className="flex gap-2">
-              {PROJECT_COLORS.map((color) => (
-                <button
-                  key={color}
-                  type="button"
-                  disabled={archived}
-                  className={cn(
-                    'size-7 cursor-pointer rounded-full border-2',
-                    hexColor === color
-                      ? 'border-gray-400 ring-2 ring-blue-500 ring-offset-2'
-                      : 'border-gray-300',
-                  )}
-                  style={{ backgroundColor: color }}
-                  onClick={() => setHexColor(color)}
-                  aria-label={`Select ${color} color`}
-                  aria-pressed={hexColor === color}
-                />
-              ))}
-            </div>
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="project-description">Description</Label>
@@ -164,21 +135,20 @@ export function SettingsTab({
       </Card>
 
       <Card>
-        <CardHeader className="pb-0">
-          <CardTitle className="text-sm">Notifications</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
+        <CardHeader>
+          <CardTitle>Notifications</CardTitle>
+          <CardDescription>
             Runs of this project notify like any scan: new vulnerabilities and
             scan results go to the workspace's notification and integration
             channels.
-          </p>
-        </CardContent>
+          </CardDescription>
+        </CardHeader>
       </Card>
 
-      <Card className="border-destructive/40">
-        <CardHeader className="pb-0">
-          <CardTitle className="text-sm text-destructive">Danger zone</CardTitle>
+      <Card className="border-[0.5px] border-destructive">
+        <CardHeader>
+          <CardTitle className="text-destructive">Danger Zone</CardTitle>
+          <CardDescription>Actions that stop or remove this project</CardDescription>
         </CardHeader>
         <CardContent>
           <Row
@@ -201,7 +171,8 @@ export function SettingsTab({
             title="Delete project"
             description="Deletes the project's workflows and their run history. Vulnerabilities stay in the workspace."
           >
-            <Button variant="destructive" onClick={onDelete}>
+            <Button variant="outline" onClick={onDelete}>
+              <Trash2 className="size-4" />
               Delete
             </Button>
           </Row>

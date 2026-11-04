@@ -1,6 +1,12 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -28,7 +34,7 @@ import {
 } from '@/services/apis/gen/queries';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { CalendarClock, Pencil, Plus, Trash2, Zap } from 'lucide-react';
+import { CalendarClock, CalendarDays, Pencil, Plus, Trash2, Zap } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { TriggerDialog } from '../components/trigger-dialog';
@@ -130,11 +136,19 @@ export function ScheduleTab({
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-0">
-          <CardTitle className="text-sm">Next 7 days</CardTitle>
-          <span className="text-xs text-muted-foreground">{getTimezoneLabel(timezone)}</span>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div className="flex flex-col gap-1.5">
+            <CardTitle className="flex items-center gap-2">
+              <CalendarDays className="size-5 text-primary" />
+              Next 7 days
+            </CardTitle>
+            <CardDescription>
+              “Assets added” triggers have no fixed time, so they are not shown here.
+            </CardDescription>
+          </div>
+          <span className="text-sm text-muted-foreground">{getTimezoneLabel(timezone)}</span>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
@@ -142,20 +156,20 @@ export function ScheduleTab({
               <div
                 key={day.date.toISOString()}
                 className={cn(
-                  'flex min-h-24 flex-col gap-1.5 rounded-md border p-2',
+                  'flex min-h-24 flex-col gap-1.5 rounded-lg border p-2',
                   i === 0 && 'border-primary',
                 )}
               >
-                <span className="text-xs text-muted-foreground">
+                <span className="text-sm text-muted-foreground">
                   <span className="font-medium text-foreground">{day.date.format('ddd')}</span>{' '}
                   {day.date.format('DD/MM')}
                 </span>
                 {day.runs.map((run) => (
                   <span
                     key={`${run.triggerId}-${run.at.getTime()}`}
-                    className="rounded border-l-2 border-primary bg-primary/5 px-1.5 py-1 text-[11px] leading-tight"
+                    className="rounded-md border-l-2 border-primary bg-primary/5 px-2 py-1 text-xs leading-tight"
                   >
-                    <span className="block font-mono font-medium">
+                    <span className="block font-medium tabular-nums">
                       {dayjs(run.at).format('HH:mm')}
                     </span>
                     {run.workflow}
@@ -164,26 +178,32 @@ export function ScheduleTab({
               </div>
             ))}
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            “Assets added” triggers have no fixed time, so they are not shown here.
-          </p>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-0">
-          <CardTitle className="text-sm">Triggers</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div className="flex flex-col gap-1.5">
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="size-5 text-primary" />
+              Triggers
+            </CardTitle>
+            <CardDescription>
+              Turning a trigger off keeps its settings. Archiving the project
+              turns every trigger off until it is reopened.
+            </CardDescription>
+          </div>
           <Button
-            size="sm"
             variant="outline"
             disabled={archived || workflows.length === 0}
             onClick={() => open()}
           >
-            <Plus className="size-3.5" />
+            <Plus className="size-4" />
             Add trigger
           </Button>
         </CardHeader>
         <CardContent>
+          <div className="rounded-lg border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -225,11 +245,11 @@ export function ScheduleTab({
                         {isCron ? 'Schedule' : 'Assets added'}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-xs">
+                    <TableCell>
                       {isCron ? (
                         <span className="flex flex-col">
                           {formatCronLabel(trigger.cron ?? '', timezone) ?? trigger.cron}
-                          <span className="font-mono text-muted-foreground">
+                          <span className="text-xs text-muted-foreground">
                             {trigger.cron} · UTC
                           </span>
                         </span>
@@ -238,19 +258,19 @@ export function ScheduleTab({
                           Gather {trigger.config.windowMinutes ?? 10} min · up to{' '}
                           {trigger.config.maxAssets ?? 200} assets/run
                           {trigger.config.targetTypes?.length ? (
-                            <span className="text-muted-foreground">
+                            <span className="text-xs text-muted-foreground">
                               only {trigger.config.targetTypes.join(', ').toLowerCase()}
                             </span>
                           ) : null}
                         </span>
                       )}
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
+                    <TableCell className="text-muted-foreground">
                       {trigger.lastFiredAt ? dayjs(trigger.lastFiredAt).fromNow() : '—'}
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
+                    <TableCell className="text-muted-foreground">
                       {next
-                        ? dayjs(next).format('DD/MM HH:mm')
+                        ? dayjs(next).format('YYYY-MM-DD HH:mm')
                         : isCron
                           ? '—'
                           : 'On new assets'}
@@ -267,22 +287,20 @@ export function ScheduleTab({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="size-7"
                         disabled={archived}
                         aria-label="Edit trigger"
                         onClick={() => open(trigger)}
                       >
-                        <Pencil className="size-3.5" />
+                        <Pencil className="size-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="size-7"
                         disabled={archived}
                         aria-label="Remove trigger"
                         onClick={() => setRemoving(trigger)}
                       >
-                        <Trash2 className="size-3.5" />
+                        <Trash2 className="size-4" />
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -290,10 +308,7 @@ export function ScheduleTab({
               })}
             </TableBody>
           </Table>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Turning a trigger off keeps its settings. Archiving the project turns
-            every trigger off until it is reopened.
-          </p>
+          </div>
         </CardContent>
       </Card>
 

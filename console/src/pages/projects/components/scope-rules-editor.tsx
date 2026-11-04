@@ -174,7 +174,7 @@ export function ScopeRulesEditor({
                 </SelectContent>
               </Select>
             ) : rule.type === ProjectScopeRuleType.asset ? (
-              <span className="truncate px-2 font-mono text-xs" title={rule.value}>
+              <span className="truncate px-2 text-sm" title={rule.value}>
                 {rule.label ?? rule.value}
               </span>
             ) : (
@@ -184,7 +184,7 @@ export function ScopeRulesEditor({
                 onChange={(e) => patch(index, { value: e.target.value })}
                 placeholder={PLACEHOLDER[rule.type]}
                 aria-label={TYPE_LABEL[rule.type]}
-                className="h-8 font-mono text-xs"
+                className="h-8"
               />
             )}
             <span className="hidden text-right text-xs tabular-nums text-muted-foreground sm:block">

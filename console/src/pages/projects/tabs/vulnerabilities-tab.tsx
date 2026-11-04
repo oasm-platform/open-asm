@@ -1,14 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { SeverityBadge } from '@/components/ui/severity-badge';
 import {
   Sheet,
@@ -17,7 +9,13 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import useDebounce from '@/hooks/use-debounce';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import {
   TimelineSighting,
@@ -33,8 +31,9 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import type { ProjectDetailSearch } from '@/routes/_authed/projects/$id/$tab';
 import dayjs from 'dayjs';
-import { ExternalLink, X } from 'lucide-react';
-import { memo, useMemo, useState } from 'react';
+import { ExternalLink, Info, X } from 'lucide-react';
+import { memo, useCallback, useMemo, useState } from 'react';
+import { FilterSelect } from '../components/filter-select';
 import { SEVERITIES, workflowLabel } from '../project-utils';
 
 const PAGE_SIZE = 20;
@@ -66,24 +65,25 @@ export const ProvenanceBadge = memo(function ProvenanceBadge({
 
 const shortRun = (id?: string | null) => (id ? `#${id.slice(0, 6)}` : '—');
 
+/** Date of a sighting, with the run that made it. */
 function Sighting({ runId, at }: { runId?: string | null; at: string }) {
   return (
-    <span className="flex flex-col text-xs tabular-nums">
+    <span className="flex flex-col tabular-nums">
+      <span title={dayjs(at).format('YYYY-MM-DD HH:mm')}>
+        {new Date(at).toLocaleDateString()}
+      </span>
       {runId ? (
         <Link
           to="/jobs/runs/$id"
           params={{ id: runId }}
-          className="font-mono hover:underline"
+          className="text-xs text-muted-foreground hover:underline"
           onClick={(e) => e.stopPropagation()}
         >
-          {shortRun(runId)}
+          Run {shortRun(runId)}
         </Link>
       ) : (
-        <span className="text-muted-foreground">run deleted</span>
+        <span className="text-xs text-muted-foreground">Run deleted</span>
       )}
-      <span className="text-muted-foreground" title={dayjs(at).format('DD MMM YYYY, HH:mm')}>
-        {dayjs(at).format('DD MMM')}
-      </span>
     </span>
   );
 }
@@ -111,7 +111,7 @@ function TimelineSheet({
       <SheetContent className="w-full sm:max-w-lg">
         <SheetHeader>
           <SheetTitle className="pr-6">{vuln?.name ?? 'Vulnerability'}</SheetTitle>
-          <SheetDescription className="font-mono">{vuln?.assetValue}</SheetDescription>
+          <SheetDescription>{vuln?.assetValue}</SheetDescription>
         </SheetHeader>
         {isLoading || !data || !vuln ? (
           <p className="px-4 text-sm text-muted-foreground">Loading...</p>
@@ -145,7 +145,7 @@ function TimelineSheet({
                     <Link
                       to="/jobs/runs/$id"
                       params={{ id: run.id }}
-                      className="font-mono hover:underline"
+                      className="font-medium hover:underline"
                     >
                       {shortRun(run.id)}
                     </Link>
@@ -153,7 +153,7 @@ function TimelineSheet({
                       {workflowLabel({ name: run.workflowName })}
                     </span>
                     <span className="ml-auto text-xs tabular-nums text-muted-foreground">
-                      {dayjs(run.createdAt).format('DD MMM YYYY, HH:mm')}
+                      {dayjs(run.createdAt).format('YYYY-MM-DD HH:mm')}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -195,8 +195,12 @@ export function VulnerabilitiesTab({
   );
   const [status, setStatus] = useState<VulnerabilityStatus>(VulnerabilityStatus.open);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [text, setText] = useState('');
-  const debounced = useDebounce(text, 400);
+  const onSearch = useCallback((value: string) => {
+    setText(value);
+    setPage(1);
+  }, []);
 
   const setSearch = (patch: Partial<typeof search>) => {
     setPage(1);
@@ -210,8 +214,8 @@ export function VulnerabilitiesTab({
 
   const { data, isLoading } = useProjectsControllerGetVulnerabilities(projectId, {
     page,
-    limit: PAGE_SIZE,
-    search: debounced,
+    limit: pageSize,
+    search: text,
     status,
     ...(provenance ? { provenance } : {}),
     ...(severity.length ? { severity } : {}),
@@ -220,8 +224,8 @@ export function VulnerabilitiesTab({
   });
 
   const counts = data?.provenanceCounts;
-  const segments: Array<{ value?: VulnerabilityProvenance; label: string; count?: number }> = [
-    { label: 'All', count: counts?.all },
+  const segments: Array<{ value: string; label: string; count?: number }> = [
+    { value: 'all', label: 'All', count: counts?.all },
     { value: VulnerabilityProvenance.new, label: 'New', count: counts?.new },
     { value: VulnerabilityProvenance.recurring, label: 'Recurring', count: counts?.recurring },
     { value: VulnerabilityProvenance.not_seen, label: 'Not seen again', count: counts?.notSeen },
@@ -242,14 +246,14 @@ export function VulnerabilitiesTab({
     },
     {
       accessorKey: 'name',
-      header: 'Name',
+      header: 'Details',
       cell: ({ row }) => (
-        <div className="flex max-w-md flex-col">
-          <span className="truncate">{row.original.name}</span>
+        <div className="flex max-w-md items-center gap-2">
+          <span className="truncate font-medium">{row.original.name}</span>
           {row.original.cveId?.length ? (
-            <span className="truncate text-xs text-muted-foreground">
-              {row.original.cveId.join(', ')}
-            </span>
+            <Badge variant="outline" className="shrink-0">
+              {row.original.cveId[0]}
+            </Badge>
           ) : null}
         </div>
       ),
@@ -257,9 +261,6 @@ export function VulnerabilitiesTab({
     {
       accessorKey: 'assetValue',
       header: 'Asset',
-      cell: ({ row }) => (
-        <span className="font-mono text-xs">{row.original.assetValue}</span>
-      ),
     },
     {
       accessorKey: 'provenance',
@@ -292,120 +293,152 @@ export function VulnerabilitiesTab({
     },
   ];
 
+  const filters = [
+    <FilterSelect
+      key="status"
+      label="Status"
+      value={status}
+      onValueChange={(value) => {
+        setStatus(value as VulnerabilityStatus);
+        setPage(1);
+      }}
+      options={[
+        { value: VulnerabilityStatus.open, label: 'Open', dot: 'bg-red-500' },
+        { value: VulnerabilityStatus.dismissed, label: 'Dismissed', dot: 'bg-green-500' },
+        { value: VulnerabilityStatus.all, label: 'All statuses' },
+      ]}
+    />,
+  ];
+  if (workflows.length > 1) {
+    filters.push(
+      <FilterSelect
+        key="workflow"
+        label="Workflow"
+        value={search.workflow ?? 'all'}
+        onValueChange={(value) =>
+          setSearch({ workflow: value === 'all' ? undefined : value })
+        }
+        options={[
+          { value: 'all', label: 'All workflows' },
+          ...workflows.map((binding) => ({
+            value: binding.id,
+            label: workflowLabel(binding.workflow),
+            dot: 'bg-blue-500',
+          })),
+        ]}
+      />,
+    );
+  }
+  if (search.run) {
+    filters.push(
+      <Button
+        key="run"
+        variant="outline"
+        className="border-dashed text-xs"
+        aria-label="Clear the run filter"
+        onClick={() => setSearch({ run: undefined })}
+      >
+        Run {shortRun(search.run)}
+        <X className="size-3.5" />
+      </Button>,
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Provenance">
-        {segments.map((segment) => (
-          <Button
-            key={segment.label}
-            size="sm"
-            variant={provenance === segment.value ? 'default' : 'outline'}
-            aria-pressed={provenance === segment.value}
-            onClick={() => setSearch({ provenance: segment.value })}
-          >
-            {segment.label}
-            <span className="tabular-nums opacity-70">{segment.count ?? '–'}</span>
-          </Button>
-        ))}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <Input
-          placeholder="Search name, asset or CVE..."
-          value={text}
-          onChange={(e) => {
-            setText(e.target.value);
-            setPage(1);
-          }}
-          className="h-8 w-full text-xs md:w-64"
-        />
-        <div className="flex flex-wrap gap-1" role="group" aria-label="Severity">
-          {SEVERITIES.map((s) => {
-            const on = severity.includes(s.key as Severity);
-            return (
-              <button
-                key={s.key}
-                type="button"
-                aria-pressed={on}
-                onClick={() => toggleSeverity(s.key as Severity)}
-                className={cn(
-                  'inline-flex h-8 items-center gap-1.5 rounded-md border px-2 text-xs',
-                  on ? 'border-primary bg-primary/10' : 'hover:bg-accent',
-                )}
-              >
-                <span className={cn('size-2 rounded-full', s.bar)} />
-                {s.label}
-                <span className="tabular-nums text-muted-foreground">
-                  {data?.severityCounts?.[s.key] ?? 0}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        <Select
-          value={status}
-          onValueChange={(value) => {
-            setStatus(value as VulnerabilityStatus);
-            setPage(1);
-          }}
-        >
-          <SelectTrigger aria-label="Status" className="h-8 w-[130px] text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={VulnerabilityStatus.open}>Open</SelectItem>
-            <SelectItem value={VulnerabilityStatus.dismissed}>Dismissed</SelectItem>
-            <SelectItem value={VulnerabilityStatus.all}>All</SelectItem>
-          </SelectContent>
-        </Select>
-        {workflows.length > 1 && (
-          <Select
-            value={search.workflow ?? 'all'}
-            onValueChange={(value) =>
-              setSearch({ workflow: value === 'all' ? undefined : value })
-            }
-          >
-            <SelectTrigger aria-label="Workflow" className="h-8 w-[170px] text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All workflows</SelectItem>
-              {workflows.map((binding) => (
-                <SelectItem key={binding.id} value={binding.id}>
-                  {workflowLabel(binding.workflow)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-        {search.run && (
-          <Badge variant="outline" className="h-8 gap-1">
-            Run {shortRun(search.run)}
+    <div className="flex flex-col gap-5">
+      {/* Same figures as the vulnerabilities page; each one filters the list. */}
+      <div
+        className="flex flex-wrap items-center gap-x-12 gap-y-3"
+        role="group"
+        aria-label="Severity"
+      >
+        {SEVERITIES.map((s) => {
+          const on = severity.includes(s.key as Severity);
+          return (
             <button
+              key={s.key}
               type="button"
-              aria-label="Clear the run filter"
-              onClick={() => setSearch({ run: undefined })}
+              aria-pressed={on}
+              onClick={() => toggleSeverity(s.key as Severity)}
+              className={cn(
+                'flex flex-col items-start rounded-md text-left transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                severity.length > 0 && !on && 'opacity-40 hover:opacity-70',
+              )}
             >
-              <X className="size-3" />
+              <span className="text-sm text-muted-foreground">{s.label}</span>
+              <span className={cn('text-2xl font-bold', s.text)}>
+                {data?.severityCounts?.[s.key] ?? 0}
+              </span>
             </button>
-          </Badge>
-        )}
+          );
+        })}
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        “Not seen again” compares each finding with the last scan of its asset by
-        the same tool, so a run on a few new assets does not mark the rest as
-        fixed. Dismissing a vulnerability applies to the whole workspace.
-      </p>
+      <Tabs
+        value={provenance ?? 'all'}
+        onValueChange={(value) =>
+          setSearch({
+            provenance: value === 'all' ? undefined : (value as VulnerabilityProvenance),
+          })
+        }
+      >
+        <div className="flex items-center gap-2">
+          <TabsList
+            aria-label="Provenance"
+            className="flex w-max flex-nowrap rounded-none bg-transparent p-0"
+          >
+            {segments.map((segment) => (
+              <TabsTrigger
+                key={segment.value}
+                value={segment.value}
+                className="h-9 flex-none hover:cursor-pointer"
+              >
+                {segment.label}
+                <span className="font-normal tabular-nums text-muted-foreground">
+                  {segment.count ?? '–'}
+                </span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <TooltipProvider delayDuration={100}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="About provenance"
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <Info className="size-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                “Not seen again” compares each finding with the last scan of its
+                asset by the same tool, so a run on a few new assets does not mark
+                the rest as fixed. Dismissing a vulnerability applies to the whole
+                workspace.
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </Tabs>
 
       <DataTable
         columns={columns}
         data={data?.data ?? []}
         isLoading={isLoading}
         page={page}
-        pageSize={PAGE_SIZE}
+        pageSize={pageSize}
         totalItems={data?.total ?? 0}
         onPageChange={setPage}
+        onPageSizeChange={(size) => {
+          setPageSize(size);
+          setPage(1);
+        }}
+        filterColumnKey="name"
+        filterValue={text}
+        onFilterChange={onSearch}
+        filterPlaceholder="Search name, asset or CVE"
+        filterComponents={filters}
         onRowClick={(row) => setSearch({ vulnerability: row.id })}
         emptyMessage="No vulnerabilities match these filters"
       />

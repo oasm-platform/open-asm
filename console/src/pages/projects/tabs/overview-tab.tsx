@@ -1,4 +1,4 @@
-import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import JobStatusBadge from '@/components/ui/job-status';
 import { SeverityBadge } from '@/components/ui/severity-badge';
@@ -23,6 +23,16 @@ import {
 import { Link, useNavigate } from '@tanstack/react-router';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import {
+  Activity,
+  Bug,
+  CalendarClock,
+  ChartColumnStacked,
+  ShieldAlert,
+  TrendingUp,
+  Waypoints,
+  type LucideIcon,
+} from 'lucide-react';
 import { memo, useMemo } from 'react';
 import { SeverityCounts } from '../components/severity-bar';
 import { ProvenanceBadge } from './vulnerabilities-tab';
@@ -43,29 +53,31 @@ const AUDIT_LABELS: Record<string, string> = {
   'project.unarchived': 'Project reopened',
 };
 
+/** Same card as the dashboard's statistics: title and icon, then the number. */
 function Kpi({
   label,
   value,
+  icon: Icon,
+  onClick,
   children,
-  accent,
 }: {
   label: string;
   value: string;
+  icon: LucideIcon;
+  onClick?: () => void;
   children?: React.ReactNode;
-  accent?: boolean;
 }) {
   return (
-    <Card className="gap-1 py-4">
-      <CardContent className="flex flex-col gap-1 px-4">
-        <span className="text-xs text-muted-foreground">{label}</span>
-        <span
-          className={cn(
-            'text-2xl font-semibold tracking-tight tabular-nums',
-            accent && 'text-primary',
-          )}
-        >
-          {value}
-        </span>
+    <Card
+      className={cn('gap-2', onClick && 'cursor-pointer transition-colors hover:bg-accent/70')}
+      onClick={onClick}
+    >
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <CardTitle>{label}</CardTitle>
+        <Icon className="size-5 text-primary" />
+      </CardHeader>
+      <CardContent className="flex min-w-0 flex-col gap-2">
+        <p className="truncate font-mono text-4xl font-bold">{value}</p>
         {children}
       </CardContent>
     </Card>
@@ -278,23 +290,39 @@ export function OverviewTab({
   const open = totalOf(overview.openVulnerabilities);
   const freshRuns = overview.newVulnerabilityRuns;
 
+  const goTab = (tab: string, search?: Record<string, string>) =>
+    navigate({ to: '/projects/$id/$tab', params: { id: projectId, tab }, search });
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <Kpi label="Assets" value={String(overview.totalAssets)}>
-          <span className="text-xs text-muted-foreground">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Kpi
+          label="Assets"
+          value={String(overview.totalAssets)}
+          icon={Waypoints}
+          onClick={() => goTab('assets')}
+        >
+          <span className="text-sm text-muted-foreground">
             +{overview.newAssets} in the last 7 days
           </span>
         </Kpi>
-        <Kpi label="Open vulnerabilities" value={String(open)}>
+        <Kpi
+          label="Open vulnerabilities"
+          value={String(open)}
+          icon={Bug}
+          onClick={() => goTab('vulnerabilities')}
+        >
           <SeverityCounts counts={overview.openVulnerabilities} empty="Nothing open" />
         </Kpi>
         <Kpi
-          label="New in the last 7 days"
+          label="New in 7 days"
           value={`+${overview.newVulnerabilities}`}
-          accent={overview.newVulnerabilities > 0}
+          icon={TrendingUp}
+          onClick={() =>
+            goTab('vulnerabilities', { provenance: VulnerabilityProvenance.new })
+          }
         >
-          <span className="truncate text-xs text-muted-foreground">
+          <span className="truncate text-sm text-muted-foreground">
             {freshRuns.length
               ? `from ${[
                   ...new Set(
@@ -307,8 +335,10 @@ export function OverviewTab({
         <Kpi
           label="Next run"
           value={next ? dayjs(next.at).fromNow() : '—'}
+          icon={CalendarClock}
+          onClick={() => goTab('schedule')}
         >
-          <span className="truncate text-xs text-muted-foreground" title={next?.cron}>
+          <span className="truncate text-sm text-muted-foreground" title={next?.cron}>
             {next
               ? `${next.workflow} · ${formatCronLabel(next.cron, timezone) ?? next.cron}`
               : onAssetsAdded
@@ -319,8 +349,11 @@ export function OverviewTab({
       </div>
 
       <Card>
-        <CardHeader className="pb-0">
-          <CardTitle className="text-sm">New vulnerabilities per week</CardTitle>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ChartColumnStacked className="size-5 text-primary" />
+            New vulnerabilities per week
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <WeeklyChart weeks={overview.weekly} />
@@ -329,20 +362,14 @@ export function OverviewTab({
 
       <div className="grid gap-4 lg:grid-cols-5">
         <Card className="lg:col-span-3">
-          <CardHeader className="flex flex-row items-center justify-between pb-0">
-            <CardTitle className="text-sm">To fix</CardTitle>
-            <button
-              type="button"
-              className="text-xs text-primary hover:underline"
-              onClick={() =>
-                navigate({
-                  to: '/projects/$id/$tab',
-                  params: { id: projectId, tab: 'vulnerabilities' },
-                })
-              }
-            >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="flex items-center gap-2">
+              <ShieldAlert className="size-5 text-primary" />
+              To fix
+            </CardTitle>
+            <Button variant="link" size="sm" className="h-auto p-0" onClick={() => goTab('vulnerabilities')}>
               See all
-            </button>
+            </Button>
           </CardHeader>
           <CardContent className="flex flex-col divide-y">
             {(todo?.data ?? []).length === 0 ? (
@@ -355,7 +382,7 @@ export function OverviewTab({
                   <SeverityBadge severity={vuln.severity} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm">{vuln.name}</p>
-                    <p className="truncate font-mono text-xs text-muted-foreground">
+                    <p className="truncate text-sm text-muted-foreground">
                       {vuln.assetValue}
                     </p>
                   </div>
@@ -369,8 +396,11 @@ export function OverviewTab({
           </CardContent>
         </Card>
         <Card className="lg:col-span-2">
-          <CardHeader className="pb-0">
-            <CardTitle className="text-sm">Recent activity</CardTitle>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="size-5 text-primary" />
+              Recent activity
+            </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col divide-y">
             {overview.activity.length === 0 ? (
@@ -382,8 +412,8 @@ export function OverviewTab({
                   className="grid grid-cols-[88px_1fr] gap-2 py-2 text-sm"
                 >
                   <span
-                    className="text-xs tabular-nums text-muted-foreground"
-                    title={dayjs(item.at).format('DD MMM YYYY, HH:mm')}
+                    className="tabular-nums text-muted-foreground"
+                    title={dayjs(item.at).format('YYYY-MM-DD HH:mm')}
                   >
                     {dayjs(item.at).fromNow()}
                   </span>
@@ -394,15 +424,6 @@ export function OverviewTab({
           </CardContent>
         </Card>
       </div>
-      {overview.lastRun && (
-        <p className="text-xs text-muted-foreground">
-          Last run{' '}
-          <Badge variant="outline" className="font-normal">
-            {workflowLabel({ name: overview.lastRun.workflowName })}
-          </Badge>{' '}
-          {dayjs(overview.lastRun.createdAt).fromNow()}
-        </p>
-      )}
     </div>
   );
 }
