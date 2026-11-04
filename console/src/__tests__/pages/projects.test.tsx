@@ -69,8 +69,9 @@ describe('Projects list page', () => {
             {
               id: 't-1',
               projectWorkflowId: 'b-1',
-              type: 'assets_added',
+              type: 'event',
               cron: null,
+              event: 'project.assets.added',
               enabled: true,
             },
           ],

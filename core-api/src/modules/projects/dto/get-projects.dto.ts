@@ -1,5 +1,5 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
-import { ProjectTriggerType } from '@/common/enums/enum';
+import { ProjectTriggerEvent, ProjectTriggerType } from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsEnum, IsOptional, IsUUID } from 'class-validator';
@@ -40,6 +40,13 @@ export class ProjectTriggerSummaryDto {
   type: ProjectTriggerType;
   @ApiProperty({ type: String, required: false, nullable: true })
   cron: string | null;
+  @ApiProperty({
+    enum: ProjectTriggerEvent,
+    enumName: 'ProjectTriggerEvent',
+    required: false,
+    nullable: true,
+  })
+  event: ProjectTriggerEvent | null;
   @ApiProperty() enabled: boolean;
 }
 

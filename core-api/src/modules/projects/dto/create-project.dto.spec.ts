@@ -1,4 +1,8 @@
-import { ProjectScopeRuleMode, ProjectScopeRuleType } from '@/common/enums/enum';
+import {
+  ProjectScopeRuleMode,
+  ProjectScopeRuleType,
+  ProjectTriggerEvent,
+} from '@/common/enums/enum';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { CreateProjectDto } from './create-project.dto';
@@ -21,7 +25,13 @@ describe('CreateProjectDto', () => {
       ],
       tools: [{ toolId: VALID_UUID, stage: 2 }],
       schedule: '0 0 */3 * *',
-      onAssetsAdded: { windowMinutes: 10, maxAssets: 200 },
+      on: {
+        schedule: [{ cron: '0 2 * * 1' }],
+        events: [
+          { event: ProjectTriggerEvent.ASSETS_ADDED, windowMinutes: 10, maxAssets: 200 },
+          { event: ProjectTriggerEvent.VULNERABILITY_DETECTED, severity: ['critical'] },
+        ],
+      },
       runNow: true,
     });
     const errors = await validate(dto);
@@ -81,10 +91,15 @@ describe('CreateProjectDto', () => {
     expect(errors.length).toBeGreaterThan(0);
   });
 
-  it('rejects an "assets added" window over a day', async () => {
+  it.each([
+    [{ event: ProjectTriggerEvent.ASSETS_ADDED, windowMinutes: 1441 }],
+    [{ event: 'asset.discovered' }],
+    [{ event: ProjectTriggerEvent.RUN_COMPLETED, status: [] }],
+    [{ event: ProjectTriggerEvent.VULNERABILITY_DETECTED, severity: ['urgent'] }],
+  ])('rejects the event trigger %j', async (trigger) => {
     const dto = plainToInstance(CreateProjectDto, {
       name: 'Web Servers',
-      onAssetsAdded: { windowMinutes: 1441 },
+      on: { events: [trigger] },
     });
     const errors = await validate(dto);
     expect(errors.length).toBeGreaterThan(0);

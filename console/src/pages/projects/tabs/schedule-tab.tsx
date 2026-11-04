@@ -33,7 +33,11 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { CalendarClock, CalendarDays, Workflow, Zap } from 'lucide-react';
 import { useMemo } from 'react';
-import { workflowLabel } from '../project-utils';
+import {
+  eventConditionLabel,
+  TRIGGER_EVENT_LABELS,
+  workflowLabel,
+} from '../project-utils';
 
 dayjs.extend(relativeTime);
 
@@ -79,6 +83,17 @@ function useWeek(
  * runs and every trigger. Read-only: triggers are set while adding or editing
  * a workflow (they live in its file, `on:`).
  */
+/** What an event trigger waits for, and how it gathers its assets. */
+function EventCondition({ trigger }: { trigger: ProjectWorkflowTrigger }) {
+  const { title, detail } = eventConditionLabel(trigger.event, trigger.config);
+  return (
+    <span className="flex flex-col">
+      {title}
+      <span className="text-xs text-muted-foreground">{detail}</span>
+    </span>
+  );
+}
+
 export function ScheduleTab({
   projectId,
   workflows,
@@ -106,7 +121,7 @@ export function ScheduleTab({
               Next 7 days
             </CardTitle>
             <CardDescription>
-              “Assets added” triggers have no fixed time, so they are not shown here.
+              Event triggers have no fixed time, so they are not shown here.
             </CardDescription>
           </div>
           <span className="text-sm text-muted-foreground">{getTimezoneLabel(timezone)}</span>
@@ -200,7 +215,11 @@ export function ScheduleTab({
                           ) : (
                             <Zap className="size-3" />
                           )}
-                          {isCron ? 'Schedule' : 'Assets added'}
+                          {isCron
+                            ? 'Schedule'
+                            : trigger.event
+                              ? TRIGGER_EVENT_LABELS[trigger.event]
+                              : 'Event'}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -212,15 +231,7 @@ export function ScheduleTab({
                             </span>
                           </span>
                         ) : (
-                          <span className="flex flex-col">
-                            Gather {trigger.config.windowMinutes ?? 10} min · up to{' '}
-                            {trigger.config.maxAssets ?? 200} assets/run
-                            {trigger.config.targetTypes?.length ? (
-                              <span className="text-xs text-muted-foreground">
-                                only {trigger.config.targetTypes.join(', ').toLowerCase()}
-                              </span>
-                            ) : null}
-                          </span>
+                          <EventCondition trigger={trigger} />
                         )}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
@@ -231,7 +242,7 @@ export function ScheduleTab({
                           ? dayjs(next).format('YYYY-MM-DD HH:mm')
                           : isCron || !active
                             ? '—'
-                            : 'On new assets'}
+                            : 'On its event'}
                       </TableCell>
                       <TableCell>
                         {active ? (

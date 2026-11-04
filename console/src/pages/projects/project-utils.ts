@@ -3,7 +3,10 @@ import { SEVERITY_BG_CLASS, SEVERITY_TEXT_CLASS } from '@/pages/dashboard/severi
 import type { PipelineToolEntry } from '@/pages/projects/components/tool-pipeline-builder';
 import {
   JobRunType,
+  ProjectTriggerEvent,
   ProjectTriggerType,
+  RunOutcome,
+  type EventTriggerConfig,
   type ProjectToolInput,
   type SeverityCountsDto,
   type Tool,
@@ -102,14 +105,62 @@ export function nextCronRun(
     .sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
 }
 
+/** What each event a project workflow can run on is called. */
+export const TRIGGER_EVENT_LABELS: Record<ProjectTriggerEvent, string> = {
+  [ProjectTriggerEvent.projectassetsadded]: 'Assets added',
+  [ProjectTriggerEvent.projectruncompleted]: 'After a workflow',
+  [ProjectTriggerEvent.vulnerabilitydetected]: 'Vulnerability found',
+};
+
 /**
- * "Manual", "Schedule" or "Assets added" for a run. Event runs come only from
- * "assets added" triggers.
+ * "Manual", "Schedule", or the event that started a run ("Assets added",
+ * "After a workflow", "Vulnerability found").
  */
-export function runTriggerLabel(jobRunType?: string | null): string {
+export function runTriggerLabel(
+  jobRunType?: string | null,
+  triggerEvent?: string | null,
+): string {
   if (jobRunType === JobRunType.scheduled) return 'Schedule';
-  if (jobRunType === JobRunType.event) return 'Assets added';
+  if (jobRunType === JobRunType.event) {
+    return TRIGGER_EVENT_LABELS[triggerEvent as ProjectTriggerEvent] ?? 'Event';
+  }
   return 'Manual';
+}
+
+/** "critical, high" from a list of values. */
+const listOf = (values?: string[]) => (values ?? []).join(', ').toLowerCase();
+
+/**
+ * What an event trigger waits for, and how it gathers: the condition column
+ * of the Schedule tab.
+ */
+export function eventConditionLabel(
+  event: ProjectTriggerEvent | null | undefined,
+  config: EventTriggerConfig,
+): { title: string; detail: string } {
+  const window = config.windowMinutes ?? 10;
+  const gather = window === 0 ? 'starts right away' : `gathers ${window} min`;
+  const detail = [
+    gather,
+    `up to ${config.maxAssets ?? 200} assets/run`,
+    ...(config.targetTypes?.length ? [`only ${listOf(config.targetTypes)}`] : []),
+  ].join(' · ');
+  switch (event) {
+    case ProjectTriggerEvent.projectruncompleted: {
+      const status = config.status ?? [RunOutcome.success];
+      const outcome =
+        status.length === 2 ? 'finishes' : status[0] === RunOutcome.failure ? 'fails' : 'succeeds';
+      const after = config.workflows?.length ? config.workflows.join(', ') : 'any other workflow';
+      return { title: `When ${after} ${outcome}`, detail };
+    }
+    case ProjectTriggerEvent.vulnerabilitydetected:
+      return {
+        title: `On ${listOf(config.severity ?? ['critical', 'high'])} findings`,
+        detail,
+      };
+    default:
+      return { title: 'When assets join the project', detail };
+  }
 }
 
 /**

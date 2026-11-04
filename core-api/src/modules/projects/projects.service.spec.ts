@@ -35,7 +35,6 @@ function setup() {
     create: jest.fn(),
     unregisterProject: jest.fn(),
     registerProject: jest.fn(),
-    onAssetsAdded: jest.fn(),
     replaceOn: jest.fn(),
     ofWorkflow: jest.fn(),
   };
@@ -66,7 +65,6 @@ describe('ProjectsService', () => {
           ],
           tools: [{ toolId: 't-1' }],
           schedule: '0 2 * * 1',
-          onAssetsAdded: { windowMinutes: 5 },
           runNow: true,
         },
         WORKSPACE_ID,
@@ -85,18 +83,13 @@ describe('ProjectsService', () => {
         type: ProjectTriggerType.CRON,
         cron: '0 2 * * 1',
       });
-      expect(ctx.triggers.create).toHaveBeenCalledWith('p-1', WORKSPACE_ID, {
-        projectWorkflowId: 'b-1',
-        type: ProjectTriggerType.ASSETS_ADDED,
-        config: { windowMinutes: 5 },
-      });
       expect(ctx.workflows.startBindingRun).toHaveBeenCalledWith(
         { id: 'b-1' },
         { jobRunType: JobRunType.MANUAL },
       );
       // Assets picked at creation are scanned by "run now", not by the
       // "assets added" trigger.
-      expect(ctx.triggers.onAssetsAdded).not.toHaveBeenCalled();
+      expect(ctx.eventBridge.publishSafely).not.toHaveBeenCalled();
     });
 
     it('skips "run now" when the scope is still empty instead of failing', async () => {
@@ -184,13 +177,29 @@ describe('ProjectsService', () => {
   });
 
   describe('assets and scope', () => {
-    it('hands hand-picked new assets to the "assets added" triggers', async () => {
+    it('reports hand-picked new assets as project.assets.added', async () => {
       const ctx = setup();
       ctx.assets.add.mockResolvedValue(['a-2']);
 
       await ctx.service.addAssets('p-1', WORKSPACE_ID, ['a-1', 'a-2']);
 
-      expect(ctx.triggers.onAssetsAdded).toHaveBeenCalledWith('p-1', ['a-2']);
+      expect(ctx.eventBridge.publishSafely).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'project.assets.added' }),
+        expect.objectContaining({
+          workspaceId: WORKSPACE_ID,
+          resourceId: 'p-1',
+          payload: { projectId: 'p-1', assetIds: ['a-2'] },
+        }),
+        { subject: `workspace:${WORKSPACE_ID}/project:p-1` },
+      );
+    });
+
+    it('reports nothing when no asset was new', async () => {
+      const ctx = setup();
+
+      await ctx.service.addAssets('p-1', WORKSPACE_ID, ['a-1']);
+
+      expect(ctx.eventBridge.publishSafely).not.toHaveBeenCalled();
     });
 
     it('says how many assets joined or left, for the project activity', async () => {
@@ -206,9 +215,16 @@ describe('ProjectsService', () => {
       const ctx = setup();
       ctx.scope.addDiscoveredAssets.mockResolvedValue(new Map([['p-1', ['a-1', 'a-2']]]));
 
-      await ctx.service.addDiscoveredAssets(WORKSPACE_ID, ['a-1', 'a-2', 'a-3']);
+      await ctx.service.addDiscoveredAssets(WORKSPACE_ID, ['a-1', 'a-2', 'a-3'], 'r-1');
 
-      expect(ctx.triggers.onAssetsAdded).toHaveBeenCalledWith('p-1', ['a-1', 'a-2']);
+      // With the run that found them, so its triggers know the chain.
+      expect(ctx.eventBridge.publishSafely).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'project.assets.added' }),
+        expect.objectContaining({
+          payload: { projectId: 'p-1', assetIds: ['a-1', 'a-2'], jobHistoryId: 'r-1' },
+        }),
+        { subject: `workspace:${WORKSPACE_ID}/project:p-1` },
+      );
       expect(ctx.eventBridge.publishSafely).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'project.updated' }),
         expect.objectContaining({
@@ -222,13 +238,17 @@ describe('ProjectsService', () => {
       );
     });
 
-    it('hands assets a rule edit added to the triggers', async () => {
+    it('reports assets a rule edit added', async () => {
       const ctx = setup();
       ctx.scope.replaceRules.mockResolvedValue({ added: ['a-7'], removed: 2 });
 
       const result = await ctx.service.replaceScope('p-1', WORKSPACE_ID, []);
 
-      expect(ctx.triggers.onAssetsAdded).toHaveBeenCalledWith('p-1', ['a-7']);
+      expect(ctx.eventBridge.publishSafely).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'project.assets.added' }),
+        expect.objectContaining({ payload: { projectId: 'p-1', assetIds: ['a-7'] } }),
+        expect.anything(),
+      );
       expect(result).toEqual({ added: 1, removed: 2 });
     });
   });

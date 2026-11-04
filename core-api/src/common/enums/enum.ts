@@ -269,10 +269,30 @@ export enum ProjectAssetSource {
   RULE = 'rule',
 }
 
-/** When a project workflow runs on its own. */
+/** When a project workflow runs on its own: on a schedule, or on an event. */
 export enum ProjectTriggerType {
   CRON = 'cron',
-  ASSETS_ADDED = 'assets_added',
+  EVENT = 'event',
+}
+
+/**
+ * The events a project workflow can run on: the event bridge names of the
+ * project-scoped facts the projects lane turns into runs.
+ */
+export enum ProjectTriggerEvent {
+  /** Assets joined the project: picked by hand, by a rule edit or discovered. */
+  ASSETS_ADDED = 'project.assets.added',
+  /** A run of another workflow of the project finished. */
+  RUN_COMPLETED = 'project.run.completed',
+  /** A scan found new vulnerabilities on an asset of the project. */
+  VULNERABILITY_DETECTED = 'vulnerability.detected',
+}
+
+/** How a project run ended, as `project.run.completed` reports it. */
+export enum RunOutcome {
+  SUCCESS = 'success',
+  /** A step failed, or was skipped because one it needed failed. */
+  FAILURE = 'failure',
 }
 
 /**

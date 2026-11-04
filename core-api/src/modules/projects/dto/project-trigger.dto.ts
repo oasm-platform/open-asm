@@ -1,12 +1,20 @@
-import { ProjectTriggerType, TargetType } from '@/common/enums/enum';
+import {
+  ProjectTriggerEvent,
+  ProjectTriggerType,
+  RunOutcome,
+  Severity,
+  TargetType,
+} from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  ArrayNotEmpty,
   IsArray,
   IsBoolean,
   IsEnum,
   IsInt,
+  IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
@@ -16,11 +24,19 @@ import {
 } from 'class-validator';
 import { IsCronSchedule } from './cron-schedule.validator';
 
-export class AssetsAddedTriggerConfigDto {
+/**
+ * Settings of an event trigger; each filter applies to one event:
+ * `workflows` and `status` (run outcomes that start a run) to
+ * `project.run.completed`, `severity` (severities that start a run) to
+ * `vulnerability.detected`. The enum-typed ones carry no description, which
+ * the client generator would copy onto the shared enum.
+ */
+export class EventTriggerConfigDto {
   @ApiProperty({
     required: false,
     default: 10,
-    description: 'Minutes to gather new assets into one run',
+    description:
+      'Minutes to gather the assets of the event into one run; also the least time between two runs',
   })
   @IsOptional()
   @IsInt()
@@ -51,6 +67,45 @@ export class AssetsAddedTriggerConfigDto {
   @ArrayMaxSize(10)
   @IsEnum(TargetType, { each: true })
   targetTypes?: TargetType[];
+
+  @ApiProperty({
+    required: false,
+    type: [String],
+    description:
+      'project.run.completed: names of the workflows of the project to follow; empty = any other',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  workflows?: string[];
+
+  @ApiProperty({
+    required: false,
+    enum: RunOutcome,
+    enumName: 'RunOutcome',
+    isArray: true,
+    default: [RunOutcome.SUCCESS],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsEnum(RunOutcome, { each: true })
+  status?: RunOutcome[];
+
+  @ApiProperty({
+    required: false,
+    enum: Severity,
+    enumName: 'Severity',
+    isArray: true,
+    default: [Severity.CRITICAL, Severity.HIGH],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsEnum(Severity, { each: true })
+  severity?: Severity[];
 }
 
 export class CreateProjectTriggerDto {
@@ -72,11 +127,21 @@ export class CreateProjectTriggerDto {
   @IsCronSchedule()
   cron?: string;
 
-  @ApiProperty({ required: false, type: () => AssetsAddedTriggerConfigDto })
+  @ApiProperty({
+    required: false,
+    enum: ProjectTriggerEvent,
+    enumName: 'ProjectTriggerEvent',
+    description: 'The event it runs on; required for event triggers',
+  })
+  @IsOptional()
+  @IsEnum(ProjectTriggerEvent)
+  event?: ProjectTriggerEvent;
+
+  @ApiProperty({ required: false, type: () => EventTriggerConfigDto })
   @IsOptional()
   @ValidateNested()
-  @Type(() => AssetsAddedTriggerConfigDto)
-  config?: AssetsAddedTriggerConfigDto;
+  @Type(() => EventTriggerConfigDto)
+  config?: EventTriggerConfigDto;
 
   @ApiProperty({ required: false, default: true })
   @IsOptional()
@@ -91,11 +156,11 @@ export class UpdateProjectTriggerDto {
   @IsCronSchedule()
   cron?: string;
 
-  @ApiProperty({ required: false, type: () => AssetsAddedTriggerConfigDto })
+  @ApiProperty({ required: false, type: () => EventTriggerConfigDto })
   @IsOptional()
   @ValidateNested()
-  @Type(() => AssetsAddedTriggerConfigDto)
-  config?: AssetsAddedTriggerConfigDto;
+  @Type(() => EventTriggerConfigDto)
+  config?: EventTriggerConfigDto;
 
   @ApiProperty({ required: false })
   @IsOptional()

@@ -53,7 +53,7 @@ export class CreateProjectWorkflowDto {
   @ApiProperty({
     required: false,
     type: () => ProjectWorkflowOnDto,
-    description: 'When the workflow runs on its own: schedules and "assets added"',
+    description: 'When the workflow runs on its own: schedules and events',
   })
   @IsOptional()
   @ValidateNested()

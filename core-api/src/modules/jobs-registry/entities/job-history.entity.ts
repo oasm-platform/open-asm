@@ -27,6 +27,7 @@ import { Job } from './job.entity';
 @Index('IDX_job_histories_workflow', ['workflow'])
 @Index('IDX_job_histories_projectId_createdAt', ['projectId', 'createdAt'])
 @Index('IDX_job_histories_projectWorkflowId', ['projectWorkflowId'])
+@Index('IDX_job_histories_causedByRunId', ['causedByRunId'])
 export class JobHistory extends BaseEntity {
   @OneToMany(() => Job, (job) => job.jobHistory, {
     onDelete: 'CASCADE',
@@ -126,6 +127,26 @@ export class JobHistory extends BaseEntity {
   })
   @JoinColumn({ name: 'triggerId' })
   trigger?: Relation<ProjectWorkflowTrigger> | null;
+
+  /**
+   * The run whose result started this one through an event trigger (its
+   * discovered assets, its completion, its findings). Null when nothing ran
+   * before it: a manual or scheduled run, or assets picked by hand.
+   */
+  @Column({ type: 'uuid', nullable: true })
+  causedByRunId?: string | null;
+
+  @ManyToOne(() => JobHistory, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'causedByRunId' })
+  causedByRun?: Relation<JobHistory> | null;
+
+  /**
+   * Event hops from the first run of the chain: 0 unless `causedByRunId` is
+   * set, then one more than that run. Event triggers stop past
+   * `MAX_CHAIN_DEPTH`, which is what ends workflows triggering each other.
+   */
+  @Column({ type: 'int', default: 0 })
+  chainDepth: number;
 
   @Column({ nullable: true })
   jobHistoryName?: string;

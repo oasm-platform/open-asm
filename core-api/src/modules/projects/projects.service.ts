@@ -5,6 +5,7 @@ import {
   AuditOutcome,
   JobRunType,
   ProjectChange,
+  ProjectTriggerEvent,
   ProjectTriggerType,
 } from '@/common/enums/enum';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
@@ -19,6 +20,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import type { EventEnvelopeData } from '../event-bridge/contracts/event-envelope';
+import type { ProjectAssetsAddedPayload } from '../event-bridge/contracts/event-payloads';
 import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
 import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
 import type { ProjectAssetDiscovery } from '../event-bridge/sinks/projects/projects.sink';
@@ -141,10 +143,11 @@ export class ProjectsService implements ProjectAssetDiscovery {
       projectWorkflowId: string;
       type: ProjectTriggerType;
       cron: string | null;
+      event: ProjectTriggerEvent | null;
       enabled: boolean;
     }> = ids.length
       ? await this.dataSource.query(
-          `SELECT t.id, pw."projectId", t."projectWorkflowId", t.type, t.cron, t.enabled
+          `SELECT t.id, pw."projectId", t."projectWorkflowId", t.type, t.cron, t.event, t.enabled
              FROM project_workflow_triggers t
              JOIN project_workflows pw ON pw.id = t."projectWorkflowId"
             WHERE pw."projectId" = ANY($1::uuid[])
@@ -179,6 +182,7 @@ export class ProjectsService implements ProjectAssetDiscovery {
           projectWorkflowId: trigger.projectWorkflowId,
           type: trigger.type,
           cron: trigger.cron,
+          event: trigger.event,
           enabled: trigger.enabled,
         })),
     }));
@@ -220,12 +224,9 @@ export class ProjectsService implements ProjectAssetDiscovery {
       );
     }
     const hasPipeline = !!dto.tools?.length || !!dto.template;
-    if (
-      (dto.on || dto.schedule || dto.onAssetsAdded || dto.runNow) &&
-      !hasPipeline
-    ) {
+    if ((dto.on || dto.schedule || dto.runNow) && !hasPipeline) {
       throw new BadRequestException(
-        'on, schedule, onAssetsAdded and runNow need a pipeline (tools or template)',
+        'on, schedule and runNow need a pipeline (tools or template)',
       );
     }
     if (dto.on) definedTriggersOfInput(dto.on);
@@ -259,19 +260,12 @@ export class ProjectsService implements ProjectAssetDiscovery {
         if (dto.on) {
           await this.triggers.replaceOn(project.id, binding.id, dto.on);
         }
-        // Before `on` existed the API took one schedule and one config.
+        // Before `on` existed the API took one schedule.
         if (!dto.on && dto.schedule && dto.schedule !== 'disabled') {
           await this.triggers.create(project.id, workspaceId, {
             projectWorkflowId: binding.id,
             type: ProjectTriggerType.CRON,
             cron: dto.schedule,
-          });
-        }
-        if (!dto.on && dto.onAssetsAdded) {
-          await this.triggers.create(project.id, workspaceId, {
-            projectWorkflowId: binding.id,
-            type: ProjectTriggerType.ASSETS_ADDED,
-            config: dto.onAssetsAdded,
           });
         }
         // Rules that match nothing yet are a normal start: "run now" then has
@@ -360,7 +354,7 @@ export class ProjectsService implements ProjectAssetDiscovery {
     assetIds: string[],
   ): Promise<ProjectAssetsChangedDto> {
     const added = await this.assets.add(id, workspaceId, assetIds);
-    await this.triggers.onAssetsAdded(id, added);
+    await this.reportAssetsAdded(workspaceId, id, added);
     return {
       message: `${added.length} assets added to the project`,
       count: added.length,
@@ -379,7 +373,7 @@ export class ProjectsService implements ProjectAssetDiscovery {
     };
   }
 
-  /** Saves the rules, syncs the rule-added assets, notifies the triggers. */
+  /** Saves the rules, syncs the rule-added assets, reports the added ones. */
   async replaceScope(
     id: string,
     workspaceId: string,
@@ -392,21 +386,27 @@ export class ProjectsService implements ProjectAssetDiscovery {
       rules,
       autoAddAssets,
     );
-    await this.triggers.onAssetsAdded(id, result.added);
+    await this.reportAssetsAdded(workspaceId, id, result.added);
     return { added: result.added.length, removed: result.removed };
   }
 
   /**
    * A discovery batch (`asset.discovered`): joins the projects whose rules
-   * select it, and those projects' "assets added" triggers pick it up.
+   * select it, and reports what joined each for their triggers.
    */
   async addDiscoveredAssets(
     workspaceId: string,
     assetIds: string[],
+    jobHistoryId?: string,
   ): Promise<void> {
     const added = await this.scope.addDiscoveredAssets(workspaceId, assetIds);
     for (const [projectId, projectAssetIds] of added) {
-      await this.triggers.onAssetsAdded(projectId, projectAssetIds);
+      await this.reportAssetsAdded(
+        workspaceId,
+        projectId,
+        projectAssetIds,
+        jobHistoryId,
+      );
       // No request made this change, so no `@PublishEvent`: the project's
       // activity still shows it, done by the system.
       const event: EventEnvelopeData = {
@@ -490,6 +490,35 @@ export class ProjectsService implements ProjectAssetDiscovery {
     assetIds?: string[],
   ): Promise<RunStartedDto> {
     return this.workflows.runManual(id, workspaceId, bindingId, assetIds);
+  }
+
+  /**
+   * Publishes `project.assets.added`, the event the project's "assets
+   * added" triggers run on (through the projects lane), with the run whose
+   * discovery found them.
+   */
+  private async reportAssetsAdded(
+    workspaceId: string,
+    projectId: string,
+    assetIds: string[],
+    jobHistoryId?: string,
+  ): Promise<void> {
+    if (assetIds.length === 0) return;
+    await this.eventBridge.publishSafely(
+      EVENT_CATALOG.project.assets.added,
+      {
+        workspaceId,
+        outcome: AuditOutcome.Success,
+        resourceType: 'project',
+        resourceId: projectId,
+        payload: {
+          projectId,
+          assetIds,
+          ...(jobHistoryId ? { jobHistoryId } : {}),
+        } satisfies ProjectAssetsAddedPayload,
+      },
+      { subject: `workspace:${workspaceId}/project:${projectId}` },
+    );
   }
 
   private async countAssets(projectId: string): Promise<number> {

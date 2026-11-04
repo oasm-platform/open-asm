@@ -47,16 +47,40 @@ on:
   schedule:
     - cron: '0 2 * * 1'        # UTC, like GitHub Actions
     - cron: '30 14 * * *'
-  assetsAdded:                  # when assets join the project
+  project.assets.added:         # when assets join the project
     windowMinutes: 10           # gather them, then start one run
     maxAssets: 200              # more start further runs right away
     targetTypes: [DOMAIN]       # only these; empty = every asset
+  project.run.completed:        # after another workflow of the project
+    workflows: [Recon]          # empty = any other workflow
+    status: [success]           # success, failure
+  vulnerability.detected:       # on the asset a scan found something on
+    severity: [critical, high]
 jobs:
   ...
 ```
 
 - Every run, whatever started it, scans the assets of the workflow's project.
-  A schedule scans all of them; `assetsAdded` scans the ones that just joined.
+  A schedule scans all of them. An event scans what it is about:
+
+  | Event | Scans | Its own settings |
+  | --- | --- | --- |
+  | `project.assets.added` | The assets that joined: picked by hand, added by a rule edit, or discovered and selected by the rules. | none |
+  | `project.run.completed` | What the finished run scanned. Only runs of the project's other workflows count. | `workflows` (names), `status` (default `[success]`) |
+  | `vulnerability.detected` | The asset of the new findings, whichever workflow (or project) found them, if it is in the project. | `severity` (default `[critical, high]`) |
+
+- Every event takes `windowMinutes` (default 10), `maxAssets` (200) and
+  `targetTypes` (empty). The assets of the events within the window go into
+  one run. One batch is open at a time, so the window is also the least time
+  between two runs of the trigger. `0` starts a run right away.
+- An event key is the event bridge name the projects lane listens to. A
+  workflow has at most one trigger per event. `true` takes the defaults.
+- A run started by an event records the run that caused it
+  (`job_histories.causedByRunId`) and how many event hops that makes
+  (`chainDepth`). An event that would make a fourth hop starts nothing, and a
+  workflow never runs on its own completion or findings, so workflows that
+  trigger each other stop. Its own discoveries still start it, which is how a
+  recon workflow follows the subdomains it found.
 - Each workflow has its own schedules. A project with several workflows runs
   each on its own clock.
 - Turning a trigger off (its "Active" switch in the workflow editor) does not
@@ -180,7 +204,9 @@ service httpx confirmed live, and the host itself when discovery found none.
 | `core-api/src/modules/jobs-registry/step-scope.loader.ts` | Loads the assets, services and URLs of a run's scope. |
 | `core-api/src/modules/data-adapter/url-owner.ts` | Picks the service a URL found by a host-wide job is stored under. |
 | `core-api/src/modules/projects/workflow-on.ts` | Reads and writes the `on:` block of a project workflow, and plans how its trigger rows follow it. Pure. |
-| `core-api/src/modules/projects/project-triggers.service.ts` | Edits `on:`, keeps the rows and BullMQ schedulers in line, and fires the triggers. |
+| `core-api/src/modules/projects/project-triggers.service.ts` | Edits `on:`, keeps the rows and BullMQ schedulers in line, gathers the events of triggers into batches and fires them. |
+| `core-api/src/modules/event-bridge/sinks/projects/projects.sink.ts` | The projects lane: discovery batches, and the events triggers run on. |
+| `core-api/src/modules/projects/project-run-events.listener.ts` | Publishes `project.run.completed` when a project run finishes. |
 
 To add a kind: add it to `DataKind` and to `INPUT_KINDS` or `PRODUCED_KINDS`.
 Then teach `planStepInputs` what one item of it is, and load its rows in

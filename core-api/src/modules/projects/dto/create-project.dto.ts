@@ -20,7 +20,6 @@ import {
 } from 'class-validator';
 import { IsCronSchedule } from './cron-schedule.validator';
 import { ScopeRuleInputDto } from './project-scope.dto';
-import { AssetsAddedTriggerConfigDto } from './project-trigger.dto';
 import { ProjectWorkflowOnDto } from './project-workflow-on.dto';
 
 export class ProjectToolInput {
@@ -172,7 +171,7 @@ export class CreateProjectDto {
     required: false,
     type: () => ProjectWorkflowOnDto,
     description:
-      'When the pipeline runs on its own: schedules and "assets added". Requires a pipeline. Replaces schedule and onAssetsAdded.',
+      'When the pipeline runs on its own: schedules and events. Requires a pipeline. Replaces schedule.',
   })
   @IsOptional()
   @ValidateNested()
@@ -189,17 +188,6 @@ export class CreateProjectDto {
   @IsString()
   @IsCronSchedule()
   schedule?: string;
-
-  @ApiProperty({
-    required: false,
-    type: () => AssetsAddedTriggerConfigDto,
-    description:
-      'Deprecated, use on.assetsAdded. Run the pipeline on assets as they join the project. Requires a pipeline.',
-  })
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => AssetsAddedTriggerConfigDto)
-  onAssetsAdded?: AssetsAddedTriggerConfigDto;
 
   @ApiProperty({
     required: false,

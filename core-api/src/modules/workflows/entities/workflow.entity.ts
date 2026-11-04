@@ -1,7 +1,7 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { DataKind, ToolCategory } from '@/common/enums/enum';
 import { ProjectWorkflow } from '@/modules/projects/entities/project-workflow.entity';
-import { AssetsAddedTriggerConfig } from '@/modules/projects/entities/project-workflow-trigger.entity';
+import { EventTriggerConfig } from '@/modules/projects/entities/project-workflow-trigger.entity';
 import { User } from '@/modules/auth/entities/user.entity';
 import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
@@ -39,8 +39,10 @@ export class ScheduleOn {
  * When a workflow runs on its own, like GitHub Actions' `on:`.
  *
  * - `target`: target events (`domain.create`, …); workspace workflows only.
- * - `schedule` and `assetsAdded`: project workflows only; each entry runs
- *   the workflow on the project's assets. See projects/workflow-on.ts.
+ * - `schedule` and the event keys (`project.assets.added`,
+ *   `project.run.completed`, `vulnerability.detected`): project workflows
+ *   only; each entry runs the workflow on the project's assets. See
+ *   projects/workflow-on.ts.
  */
 export class On {
   @ApiProperty({ required: false, type: [String] })
@@ -57,10 +59,22 @@ export class On {
   schedule?: ScheduleOn[];
 
   /** Run when assets join the project, gathered for a window. */
-  @ApiProperty({ required: false, type: () => AssetsAddedTriggerConfig })
+  @ApiProperty({ required: false, type: () => EventTriggerConfig })
   @IsOptional()
   @IsObject()
-  assetsAdded?: AssetsAddedTriggerConfig;
+  'project.assets.added'?: EventTriggerConfig;
+
+  /** Run after another workflow of the project finished. */
+  @ApiProperty({ required: false, type: () => EventTriggerConfig })
+  @IsOptional()
+  @IsObject()
+  'project.run.completed'?: EventTriggerConfig;
+
+  /** Run on assets a scan found new vulnerabilities on. */
+  @ApiProperty({ required: false, type: () => EventTriggerConfig })
+  @IsOptional()
+  @IsObject()
+  'vulnerability.detected'?: EventTriggerConfig;
 }
 
 export class WorkflowJob {

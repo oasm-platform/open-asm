@@ -31,3 +31,26 @@ export async function claimEventOnce(
   await redis.setex(marker, DEDUP_TTL_SECONDS, '1');
   return true;
 }
+
+/**
+ * The two halves of {@link claimEventOnce}, for a sink whose effect is
+ * idempotent while it runs but not after: check before the work, mark after
+ * it. A crash part-way leaves no marker, so the redelivery redoes the work
+ * (harmless); a crash after the work but before the ack finds the marker, so
+ * the redelivery does nothing. Claiming first would lose the work instead.
+ */
+export async function wasEventHandled(
+  redis: RedisService,
+  group: string,
+  key: string,
+): Promise<boolean> {
+  return (await redis.get(`event-bus:handled:${group}:${key}`)) !== null;
+}
+
+export async function markEventHandled(
+  redis: RedisService,
+  group: string,
+  key: string,
+): Promise<void> {
+  await redis.setex(`event-bus:handled:${group}:${key}`, DEDUP_TTL_SECONDS, '1');
+}

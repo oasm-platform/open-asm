@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 import {
   ProjectStatusFilter,
   ProjectTriggerType,
+  type ProjectTriggerEvent,
   useProjectsControllerGetMany,
   type ProjectListItemDto,
 } from '@/services/apis/gen/queries';
@@ -40,7 +41,7 @@ import {
 } from 'lucide-react';
 import { memo, useEffect, useState } from 'react';
 import { SeverityBar, SeverityCounts } from './components/severity-bar';
-import { nextCronRun } from './project-utils';
+import { nextCronRun, TRIGGER_EVENT_LABELS } from './project-utils';
 
 dayjs.extend(relativeTime);
 
@@ -89,12 +90,18 @@ function Meta({ label, value, title }: { label: string; value: string; title?: s
 function TriggerChips({ project }: { project: ProjectListItemDto }) {
   const enabled = project.triggers.filter((t) => t.enabled);
   const hasCron = enabled.some((t) => t.type === ProjectTriggerType.cron);
-  const hasAssets = enabled.some((t) => t.type === ProjectTriggerType.assets_added);
+  const events = [
+    ...new Set(
+      enabled
+        .filter((t) => t.type === ProjectTriggerType.event && t.event)
+        .map((t) => t.event as ProjectTriggerEvent),
+    ),
+  ];
   const chip = 'gap-1 font-normal';
   if (project.archivedAt) {
     return <Badge variant="outline" className={chip}>Triggers off</Badge>;
   }
-  if (!hasCron && !hasAssets) {
+  if (!hasCron && events.length === 0) {
     return (
       <Badge variant="outline" className={chip}>
         <Play className="size-3" />
@@ -110,12 +117,12 @@ function TriggerChips({ project }: { project: ProjectListItemDto }) {
           Schedule
         </Badge>
       )}
-      {hasAssets && (
-        <Badge variant="outline" className={chip}>
+      {events.map((event) => (
+        <Badge key={event} variant="outline" className={chip}>
           <Zap className="size-3" />
-          Assets added
+          {TRIGGER_EVENT_LABELS[event]}
         </Badge>
-      )}
+      ))}
     </div>
   );
 }

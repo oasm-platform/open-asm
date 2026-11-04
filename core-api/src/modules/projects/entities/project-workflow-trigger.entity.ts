@@ -1,12 +1,19 @@
 import { BaseEntity } from '@/common/entities/base.entity';
-import { ProjectTriggerType } from '@/common/enums/enum';
+import { ProjectTriggerEvent, ProjectTriggerType } from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
 import { Column, Entity, Index, JoinColumn, ManyToOne, Relation } from 'typeorm';
 import { ProjectWorkflow } from './project-workflow.entity';
 
-/** Settings of an `assets_added` trigger. */
-export class AssetsAddedTriggerConfig {
-  /** Minutes to wait after the first new asset before starting one run. */
+/**
+ * Settings of an event trigger. Every event gathers the assets it brings for
+ * `windowMinutes` and starts one run per `maxAssets` of them; the filters
+ * below apply to one event each.
+ */
+export class EventTriggerConfig {
+  /**
+   * Minutes to gather assets before starting a run. One batch is open at a
+   * time, so it is also the least time between two runs of the trigger.
+   */
   @ApiProperty({ required: false, minimum: 0, maximum: 1440 })
   windowMinutes?: number;
 
@@ -17,12 +24,25 @@ export class AssetsAddedTriggerConfig {
   /** Only assets of these target types ("domain", "ip", …); empty = all. */
   @ApiProperty({ required: false, type: [String] })
   targetTypes?: string[];
+
+  /** `project.run.completed`: names of the workflows to follow; empty = any other. */
+  @ApiProperty({ required: false, type: [String] })
+  workflows?: string[];
+
+  /** `project.run.completed`: run outcomes that start a run ("success", "failure"). */
+  @ApiProperty({ required: false, type: [String] })
+  status?: string[];
+
+  /** `vulnerability.detected`: severities that start a run. */
+  @ApiProperty({ required: false, type: [String] })
+  severity?: string[];
 }
 
 /**
- * When a project workflow runs on its own: on a cron schedule, or when assets
- * join the project. Disabling keeps the settings and only unregisters the
- * BullMQ scheduler (cron) or makes the dispatcher skip it (assets added).
+ * When a project workflow runs on its own: on a cron schedule, or on an event
+ * (assets joined the project, another workflow's run finished, a
+ * vulnerability was found). Disabling keeps the settings and only unregisters
+ * the BullMQ scheduler (cron) or makes the dispatcher skip it (event).
  */
 @Entity('project_workflow_triggers')
 @Index('IDX_pwt_projectWorkflowId', ['projectWorkflowId'])
@@ -46,9 +66,19 @@ export class ProjectWorkflowTrigger extends BaseEntity {
   @Column({ type: 'varchar', nullable: true })
   cron: string | null;
 
-  @ApiProperty({ type: () => AssetsAddedTriggerConfig })
+  /** The event it runs on; set for `event` triggers only. */
+  @ApiProperty({
+    enum: ProjectTriggerEvent,
+    enumName: 'ProjectTriggerEvent',
+    required: false,
+    nullable: true,
+  })
+  @Column({ type: 'varchar', nullable: true })
+  event: ProjectTriggerEvent | null;
+
+  @ApiProperty({ type: () => EventTriggerConfig })
   @Column({ type: 'jsonb', default: () => "'{}'" })
-  config: AssetsAddedTriggerConfig;
+  config: EventTriggerConfig;
 
   @ApiProperty()
   @Column({ default: true })

@@ -1064,7 +1064,7 @@ export type ScheduleOn = {
   cron: string;
 };
 
-export type AssetsAddedTriggerConfig = {
+export type EventTriggerConfig = {
   /**
    * @minimum 0
    * @maximum 1440
@@ -1076,12 +1076,17 @@ export type AssetsAddedTriggerConfig = {
    */
   maxAssets?: number;
   targetTypes?: string[];
+  workflows?: string[];
+  status?: string[];
+  severity?: string[];
 };
 
 export type On = {
   target?: string[];
   schedule?: ScheduleOn[];
-  assetsAdded?: AssetsAddedTriggerConfig;
+  'project.assets.added'?: EventTriggerConfig;
+  'project.run.completed'?: EventTriggerConfig;
+  'vulnerability.detected'?: EventTriggerConfig;
 };
 
 /**
@@ -4541,7 +4546,16 @@ export type ProjectTriggerType =
 
 export const ProjectTriggerType = {
   cron: 'cron',
-  assets_added: 'assets_added',
+  event: 'event',
+} as const;
+
+export type ProjectTriggerEvent =
+  (typeof ProjectTriggerEvent)[keyof typeof ProjectTriggerEvent];
+
+export const ProjectTriggerEvent = {
+  projectassetsadded: 'project.assets.added',
+  projectruncompleted: 'project.run.completed',
+  vulnerabilitydetected: 'vulnerability.detected',
 } as const;
 
 export type ProjectTriggerSummaryDto = {
@@ -4550,6 +4564,7 @@ export type ProjectTriggerSummaryDto = {
   type: ProjectTriggerType;
   /** @nullable */
   cron?: string | null;
+  event?: ProjectTriggerEvent | null;
   enabled: boolean;
 };
 
@@ -4600,7 +4615,8 @@ export type ProjectWorkflowTrigger = {
   type: ProjectTriggerType;
   /** @nullable */
   cron?: string | null;
-  config: AssetsAddedTriggerConfig;
+  event?: ProjectTriggerEvent | null;
+  config: EventTriggerConfig;
   enabled: boolean;
   /** @nullable */
   lastFiredAt?: string | null;
@@ -4636,6 +4652,7 @@ export type ProjectLastRunDto = {
   workflowName: string;
   jobHistoryName: string;
   jobRunType: ProjectLastRunDtoJobRunType;
+  triggerEvent?: ProjectTriggerEvent | null;
 };
 
 export type ProjectWorkflow = {
@@ -4722,33 +4739,43 @@ export type ScheduleInputDto = {
   enabled?: boolean;
 };
 
-export type AssetsAddedInputDto = {
-  /** Minutes to gather new assets into one run */
+export type RunOutcome = (typeof RunOutcome)[keyof typeof RunOutcome];
+
+export const RunOutcome = {
+  success: 'success',
+  failure: 'failure',
+} as const;
+
+export type Severity = (typeof Severity)[keyof typeof Severity];
+
+export const Severity = {
+  info: 'info',
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+  critical: 'critical',
+} as const;
+
+export type EventTriggerInputDto = {
+  /** Minutes to gather the assets of the event into one run; also the least time between two runs */
   windowMinutes?: number;
   /** Most assets one run takes; more start further runs */
   maxAssets?: number;
   /** Only assets of these target types; empty = all */
   targetTypes?: TargetType[];
-  /** Off keeps the trigger in the workflow without running it */
+  /** project.run.completed: names of the workflows of the project to follow; empty = any other */
+  workflows?: string[];
+  status?: RunOutcome[];
+  severity?: Severity[];
+  event: ProjectTriggerEvent;
+  /** Off keeps the trigger in the workflow without running it. Omitted: a new trigger is on, an existing one keeps its state. */
   enabled?: boolean;
 };
 
 export type ProjectWorkflowOnDto = {
   schedule?: ScheduleInputDto[];
-  /**
-   * Run when assets join the project; absent or null = never
-   * @nullable
-   */
-  assetsAdded?: AssetsAddedInputDto | null;
-};
-
-export type AssetsAddedTriggerConfigDto = {
-  /** Minutes to gather new assets into one run */
-  windowMinutes?: number;
-  /** Most assets one run takes; more start further runs */
-  maxAssets?: number;
-  /** Only assets of these target types; empty = all */
-  targetTypes?: TargetType[];
+  /** Events the workflow runs on, one entry per event; absent or empty = none */
+  events?: EventTriggerInputDto[];
 };
 
 export type CreateProjectDto = {
@@ -4770,12 +4797,10 @@ export type CreateProjectDto = {
   tools?: ProjectToolInput[];
   /** Name of the pipeline */
   workflowName?: string;
-  /** When the pipeline runs on its own: schedules and "assets added". Requires a pipeline. Replaces schedule and onAssetsAdded. */
+  /** When the pipeline runs on its own: schedules and events. Requires a pipeline. Replaces schedule. */
   on?: ProjectWorkflowOnDto;
   /** Deprecated, use on.schedule. Cron schedule (UTC) of the pipeline, e.g. "0 2 * * 1". Requires a pipeline. */
   schedule?: string;
-  /** Deprecated, use on.assetsAdded. Run the pipeline on assets as they join the project. Requires a pipeline. */
-  onAssetsAdded?: AssetsAddedTriggerConfigDto;
   /** Start a run on the whole scope right after creation */
   runNow?: boolean;
 };
@@ -4900,6 +4925,8 @@ export type ProjectActivityDto = {
   runStatus?: string;
   workflowName?: string;
   jobRunType?: string;
+  /** The event of an event run */
+  triggerEvent?: string;
   newVulnerabilities?: number;
   recurringVulnerabilities?: number;
   scopeSize?: number;
@@ -5025,7 +5052,7 @@ export type CreateProjectWorkflowDto = {
   tools?: ProjectToolInput[];
   /** Project workflow (binding) of any project to copy */
   copyFromProjectWorkflowId?: string;
-  /** When the workflow runs on its own: schedules and "assets added" */
+  /** When the workflow runs on its own: schedules and events */
   on?: ProjectWorkflowOnDto;
 };
 
@@ -5054,19 +5081,34 @@ export type RunProjectWorkflowDto = {
   assetIds?: string[];
 };
 
+export type EventTriggerConfigDto = {
+  /** Minutes to gather the assets of the event into one run; also the least time between two runs */
+  windowMinutes?: number;
+  /** Most assets one run takes; more start further runs */
+  maxAssets?: number;
+  /** Only assets of these target types; empty = all */
+  targetTypes?: TargetType[];
+  /** project.run.completed: names of the workflows of the project to follow; empty = any other */
+  workflows?: string[];
+  status?: RunOutcome[];
+  severity?: Severity[];
+};
+
 export type CreateProjectTriggerDto = {
   /** Project workflow (binding) the trigger runs */
   projectWorkflowId: string;
   type: ProjectTriggerType;
   /** 5-field cron (UTC); required for cron triggers */
   cron?: string;
-  config?: AssetsAddedTriggerConfigDto;
+  /** The event it runs on; required for event triggers */
+  event?: ProjectTriggerEvent;
+  config?: EventTriggerConfigDto;
   enabled?: boolean;
 };
 
 export type UpdateProjectTriggerDto = {
   cron?: string;
-  config?: AssetsAddedTriggerConfigDto;
+  config?: EventTriggerConfigDto;
   enabled?: boolean;
 };
 
@@ -5081,6 +5123,18 @@ export type ProjectRunDto = {
   projectWorkflowId?: string | null;
   workflowName: string;
   triggerType?: ProjectTriggerType | null;
+  /** The event that started it, for an event run */
+  triggerEvent?: ProjectTriggerEvent | null;
+  /**
+   * The run whose result started this one (an event run)
+   * @nullable
+   */
+  causedByRunId?: string | null;
+  /**
+   * Workflow of the run that caused this one
+   * @nullable
+   */
+  causedByWorkflowName?: string | null;
   /** Assets in the run scope */
   scopeSize: number;
   stepsTotal: number;
@@ -5101,16 +5155,6 @@ export type GetManyProjectRunDtoDto = {
   hasNextPage: boolean;
   pageCount: number;
 };
-
-export type Severity = (typeof Severity)[keyof typeof Severity];
-
-export const Severity = {
-  info: 'info',
-  low: 'low',
-  medium: 'medium',
-  high: 'high',
-  critical: 'critical',
-} as const;
 
 export type VulnerabilityStatus =
   (typeof VulnerabilityStatus)[keyof typeof VulnerabilityStatus];
@@ -46200,7 +46244,7 @@ export const useProjectsControllerRunWorkflow = <
 };
 
 /**
- * Cron and "assets added" triggers of every workflow.
+ * Cron and event triggers of every workflow.
  * @summary Project triggers
  */
 export const projectsControllerGetTriggers = (

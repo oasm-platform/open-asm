@@ -72,7 +72,22 @@ export function RunsTab({
     {
       id: 'trigger',
       header: 'Triggered by',
-      cell: ({ row }) => runTriggerLabel(row.original.jobRunType),
+      cell: ({ row }) => (
+        <span className="flex flex-col">
+          {runTriggerLabel(row.original.jobRunType, row.original.triggerEvent)}
+          {row.original.causedByRunId && (
+            <Link
+              to="/jobs/runs/$id"
+              params={{ id: row.original.causedByRunId }}
+              className="text-xs text-muted-foreground hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              after {workflowLabel({ name: row.original.causedByWorkflowName ?? '' })} #
+              {row.original.causedByRunId.slice(0, 6)}
+            </Link>
+          )}
+        </span>
+      ),
     },
     {
       accessorKey: 'scopeSize',
@@ -156,7 +171,7 @@ export function RunsTab({
         { value: 'all', label: 'All triggers' },
         { value: JobRunType.manual, label: 'Manual', dot: 'bg-blue-500' },
         { value: JobRunType.scheduled, label: 'Schedule', dot: 'bg-purple-500' },
-        { value: JobRunType.event, label: 'Assets added', dot: 'bg-orange-500' },
+        { value: JobRunType.event, label: 'Event', dot: 'bg-orange-500' },
       ]}
     />,
   ];

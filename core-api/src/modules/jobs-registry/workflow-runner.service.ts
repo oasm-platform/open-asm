@@ -39,6 +39,9 @@ export interface StartRunInput {
   projectWorkflowId?: string;
   /** The project trigger that started it; absent for a manual run. */
   triggerId?: string;
+  /** The run whose event started it, and how many hops that makes. */
+  causedByRunId?: string;
+  chainDepth?: number;
 }
 
 export interface StartRunResult {
@@ -105,6 +108,8 @@ export class WorkflowRunnerService {
         projectId: input.projectId ?? null,
         projectWorkflowId: input.projectWorkflowId ?? null,
         triggerId: input.triggerId ?? null,
+        causedByRunId: input.causedByRunId ?? null,
+        chainDepth: input.chainDepth ?? 0,
       });
       await queryRunner.manager.save(jobHistory);
       await queryRunner.commitTransaction();

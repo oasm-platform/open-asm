@@ -8,8 +8,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import {
+  ProjectTriggerEvent,
   ProjectTriggerType,
+  RunOutcome,
+  Severity,
   TargetType,
+  type EventTriggerInputDto,
   type ProjectWorkflowOnDto,
   type ProjectWorkflowTrigger,
 } from '@/services/apis/gen/queries';
@@ -18,14 +22,16 @@ import {
   memo,
   useCallback,
   type Dispatch,
+  type ReactNode,
   type SetStateAction,
 } from 'react';
 
 /**
  * When a project workflow runs on its own, as the workflow editor and the
  * create wizard edit it. It is saved as the workflow's `on:` block
- * (docs/workflows.md): schedules, and a run when assets join the project.
- * Each entry has an "Active" switch: off keeps it without running it.
+ * (docs/workflows.md): schedules, and runs on events (assets joined the
+ * project, another workflow finished, a vulnerability was found). Each entry
+ * has an "Active" switch: off keeps it without running it.
  */
 
 export interface ScheduleDraft {
@@ -35,16 +41,29 @@ export interface ScheduleDraft {
   enabled: boolean;
 }
 
+/** One event trigger; the filters of the other events are kept but unused. */
+export interface EventDraft {
+  on: boolean;
+  enabled: boolean;
+  windowMinutes: number;
+  maxAssets: number;
+  targetTypes: TargetType[];
+  /** `project.run.completed`: workflows to follow (none = any other). */
+  workflows: string[];
+  status: RunOutcome[];
+  /** `vulnerability.detected`. */
+  severity: Severity[];
+}
+
 export interface TriggersDraft {
   schedules: ScheduleDraft[];
-  assetsAdded: {
-    on: boolean;
-    enabled: boolean;
-    windowMinutes: number;
-    maxAssets: number;
-    targetTypes: TargetType[];
-  };
+  events: Record<ProjectTriggerEvent, EventDraft>;
 }
+
+const ADDED = ProjectTriggerEvent.projectassetsadded;
+const COMPLETED = ProjectTriggerEvent.projectruncompleted;
+const DETECTED = ProjectTriggerEvent.vulnerabilitydetected;
+const EVENTS = [ADDED, COMPLETED, DETECTED] as const;
 
 const TARGET_TYPES: Array<{ value: TargetType; label: string }> = [
   { value: TargetType.DOMAIN, label: 'Domains' },
@@ -53,40 +72,63 @@ const TARGET_TYPES: Array<{ value: TargetType; label: string }> = [
   { value: TargetType.GIT_ORG, label: 'Repositories' },
 ];
 
+const OUTCOMES: Array<{ value: RunOutcome; label: string }> = [
+  { value: RunOutcome.success, label: 'Succeeded' },
+  { value: RunOutcome.failure, label: 'Failed' },
+];
+
+const SEVERITIES: Array<{ value: Severity; label: string }> = [
+  { value: Severity.critical, label: 'Critical' },
+  { value: Severity.high, label: 'High' },
+  { value: Severity.medium, label: 'Medium' },
+  { value: Severity.low, label: 'Low' },
+  { value: Severity.info, label: 'Info' },
+];
+
 let nextLocalId = 0;
 const localId = () => `new-${++nextLocalId}`;
+
+/** An event's draft from its trigger row, or the defaults when it has none. */
+function eventDraft(row: ProjectWorkflowTrigger | undefined): EventDraft {
+  const config = row?.config;
+  return {
+    on: !!row,
+    enabled: row?.enabled ?? true,
+    windowMinutes: config?.windowMinutes ?? 10,
+    maxAssets: config?.maxAssets ?? 200,
+    targetTypes: (config?.targetTypes ?? []) as TargetType[],
+    workflows: config?.workflows ?? [],
+    status: (config?.status ?? [RunOutcome.success]) as RunOutcome[],
+    severity: (config?.severity ?? [Severity.critical, Severity.high]) as Severity[],
+  };
+}
 
 /** A draft from a workflow's trigger rows (none: runs only when started). */
 export function draftFromTriggers(
   triggers: ProjectWorkflowTrigger[] | undefined,
 ): TriggersDraft {
   const rows = triggers ?? [];
-  const assets = rows.find((t) => t.type === ProjectTriggerType.assets_added);
   return {
     schedules: rows
       .filter((t) => t.type === ProjectTriggerType.cron && t.cron)
       .map((t) => ({ id: t.id, cron: t.cron ?? undefined, enabled: t.enabled })),
-    assetsAdded: {
-      on: !!assets,
-      enabled: assets?.enabled ?? true,
-      windowMinutes: assets?.config?.windowMinutes ?? 10,
-      maxAssets: assets?.config?.maxAssets ?? 200,
-      targetTypes: (assets?.config?.targetTypes ?? []) as TargetType[],
-    },
+    events: Object.fromEntries(
+      EVENTS.map((event) => [
+        event,
+        eventDraft(
+          rows.find((t) => t.type === ProjectTriggerType.event && t.event === event),
+        ),
+      ]),
+    ) as TriggersDraft['events'],
   };
 }
 
 /** A draft for a new workflow: one schedule to pick, and new assets on. */
 export function newTriggersDraft(): TriggersDraft {
+  const draft = draftFromTriggers(undefined);
   return {
     schedules: [{ id: localId(), enabled: true }],
-    assetsAdded: {
-      on: true,
-      enabled: true,
-      windowMinutes: 10,
-      maxAssets: 200,
-      targetTypes: [],
-    },
+    events: { ...draft.events, [ADDED]: { ...draft.events[ADDED], on: true } },
   };
 }
 
@@ -109,32 +151,47 @@ export function duplicateSchedules(schedules: ScheduleDraft[]): number[] {
 }
 
 /**
- * Every schedule has its own time and the "assets added" numbers are in
- * range.
+ * Every schedule has its own time, and each event that is on has its
+ * numbers in range and something to run on.
  */
 export function isTriggersDraftValid(draft: TriggersDraft): boolean {
-  const { assetsAdded } = draft;
   return (
     draft.schedules.every((s) => !!s.cron) &&
     duplicateSchedules(draft.schedules).every((earlier) => earlier < 0) &&
-    (!assetsAdded.on ||
-      (assetsAdded.windowMinutes >= 0 &&
-        assetsAdded.windowMinutes <= 1440 &&
-        assetsAdded.maxAssets >= 1 &&
-        assetsAdded.maxAssets <= 5000))
+    EVENTS.every((event) => {
+      const e = draft.events[event];
+      return (
+        !e.on ||
+        (e.windowMinutes >= 0 &&
+          e.windowMinutes <= 1440 &&
+          e.maxAssets >= 1 &&
+          e.maxAssets <= 5000 &&
+          (event !== COMPLETED || e.status.length > 0) &&
+          (event !== DETECTED || e.severity.length > 0))
+      );
+    })
   );
 }
 
-/** The API's `on` for a draft. */
+/** The API's `on` for a draft: each event that is on, with its own filters. */
 export function onInputOf(draft: TriggersDraft): ProjectWorkflowOnDto {
-  const { on, enabled, windowMinutes, maxAssets, targetTypes } = draft.assetsAdded;
   return {
     schedule: draft.schedules
       .filter((s) => s.cron)
       .map((s) => ({ cron: s.cron!, enabled: s.enabled })),
-    assetsAdded: on
-      ? { enabled, windowMinutes, maxAssets, targetTypes }
-      : null,
+    events: EVENTS.filter((event) => draft.events[event].on).map((event) => {
+      const e = draft.events[event];
+      const input: EventTriggerInputDto = {
+        event,
+        enabled: e.enabled,
+        windowMinutes: e.windowMinutes,
+        maxAssets: e.maxAssets,
+        targetTypes: e.targetTypes,
+      };
+      if (event === COMPLETED) Object.assign(input, { workflows: e.workflows, status: e.status });
+      if (event === DETECTED) Object.assign(input, { severity: e.severity });
+      return input;
+    }),
   };
 }
 
@@ -198,15 +255,161 @@ const ScheduleRow = memo(function ScheduleRow({
   );
 });
 
+/** A row of checkboxes over a list, adding and removing values. */
+function CheckboxList<T extends string>({
+  label,
+  options,
+  value,
+  disabled,
+  onChange,
+  hint,
+}: {
+  label: string;
+  options: Array<{ value: T; label: string }>;
+  value: T[];
+  disabled?: boolean;
+  onChange: (value: T[]) => void;
+  hint?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-sm">{label}</span>
+      <div className="flex flex-wrap gap-4">
+        {options.map((option) => (
+          <label key={option.value} className="flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={value.includes(option.value)}
+              disabled={disabled}
+              onCheckedChange={(checked) =>
+                onChange(
+                  checked
+                    ? [...value, option.value]
+                    : value.filter((v) => v !== option.value),
+                )
+              }
+            />
+            {option.label}
+          </label>
+        ))}
+      </div>
+      {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
+    </div>
+  );
+}
+
+/** One event: whether the workflow runs on it, and its settings when it does. */
+function EventCard({
+  title,
+  summary,
+  draft,
+  disabled,
+  unavailable,
+  onChange,
+  children,
+}: {
+  title: string;
+  /** What a run scans; shown while the event is off. */
+  summary: string;
+  draft: EventDraft;
+  disabled?: boolean;
+  /** Why the event cannot be picked yet; it can still be turned off. */
+  unavailable?: string;
+  onChange: (patch: Partial<EventDraft>) => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border p-3">
+      <div className="flex items-center gap-3">
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <Checkbox
+            checked={draft.on}
+            disabled={disabled || (!!unavailable && !draft.on)}
+            onCheckedChange={(checked) => onChange({ on: checked === true })}
+          />
+          {title}
+        </label>
+        {draft.on && (
+          <label className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
+            Active
+            <Switch
+              checked={draft.enabled}
+              disabled={disabled}
+              onCheckedChange={(enabled) => onChange({ enabled })}
+              aria-label={`${title} active`}
+            />
+          </label>
+        )}
+      </div>
+      {draft.on ? (
+        children
+      ) : (
+        <p className="text-sm text-muted-foreground">{unavailable ?? summary}</p>
+      )}
+    </div>
+  );
+}
+
+/** How long an event gathers its assets, and how many one run takes. */
+function GatherFields({
+  id,
+  draft,
+  disabled,
+  onChange,
+}: {
+  id: string;
+  draft: EventDraft;
+  disabled?: boolean;
+  onChange: (patch: Partial<EventDraft>) => void;
+}) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <div className="flex flex-col gap-2">
+        <Label htmlFor={`${id}-window`}>Gather for (minutes)</Label>
+        <Input
+          id={`${id}-window`}
+          type="number"
+          min={0}
+          max={1440}
+          disabled={disabled}
+          value={draft.windowMinutes}
+          onChange={(e) => onChange({ windowMinutes: Number(e.target.value) })}
+        />
+        <span className="text-xs text-muted-foreground">
+          Events within this window go into one run, so it is also the least
+          time between two runs.
+        </span>
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor={`${id}-max`}>Most assets per run</Label>
+        <Input
+          id={`${id}-max`}
+          type="number"
+          min={1}
+          max={5000}
+          disabled={disabled}
+          value={draft.maxAssets}
+          onChange={(e) => onChange({ maxAssets: Number(e.target.value) })}
+        />
+        <span className="text-xs text-muted-foreground">
+          More start further runs right away.
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function WorkflowTriggersForm({
   value,
   onChange,
   disabled,
+  otherWorkflows = [],
 }: {
   value: TriggersDraft;
   /** A state setter: updates are functional, so callbacks stay stable. */
   onChange: Dispatch<SetStateAction<TriggersDraft>>;
   disabled?: boolean;
+  /** Names of the project's other workflows, which this one can follow. */
+  otherWorkflows?: string[];
 }) {
   const patchSchedule = useCallback(
     (id: string, patch: Partial<ScheduleDraft>) =>
@@ -243,10 +446,19 @@ export function WorkflowTriggersForm({
       })),
     [onChange],
   );
-  const setAssets = (patch: Partial<TriggersDraft['assetsAdded']>) =>
-    onChange((prev) => ({ ...prev, assetsAdded: { ...prev.assetsAdded, ...patch } }));
-  const assets = value.assetsAdded;
+  const patchEvent = (event: ProjectTriggerEvent) => (patch: Partial<EventDraft>) =>
+    onChange((prev) => ({
+      ...prev,
+      events: { ...prev.events, [event]: { ...prev.events[event], ...patch } },
+    }));
   const duplicates = duplicateSchedules(value.schedules);
+
+  const added = value.events[ADDED];
+  const completed = value.events[COMPLETED];
+  const detected = value.events[DETECTED];
+  // A followed workflow renamed or removed since stays listed, so it can be
+  // unchecked.
+  const followable = [...new Set([...otherWorkflows, ...completed.workflows])];
 
   return (
     <div className="flex flex-col gap-4">
@@ -288,93 +500,86 @@ export function WorkflowTriggersForm({
         </Button>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-lg border p-3">
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-sm font-medium">
-            <Checkbox
-              checked={assets.on}
-              disabled={disabled}
-              onCheckedChange={(checked) => setAssets({ on: checked === true })}
-            />
-            When assets join the project
-          </label>
-          {assets.on && (
-            <label className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
-              Active
-              <Switch
-                checked={assets.enabled}
-                disabled={disabled}
-                onCheckedChange={(enabled) => setAssets({ enabled })}
-                aria-label="Assets added active"
-              />
-            </label>
-          )}
-        </div>
-        {assets.on ? (
-          <>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="assets-window">Gather for (minutes)</Label>
-                <Input
-                  id="assets-window"
-                  type="number"
-                  min={0}
-                  max={1440}
-                  disabled={disabled}
-                  value={assets.windowMinutes}
-                  onChange={(e) => setAssets({ windowMinutes: Number(e.target.value) })}
-                />
-                <span className="text-xs text-muted-foreground">
-                  Assets found within this window go into one run.
-                </span>
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="assets-max">Most assets per run</Label>
-                <Input
-                  id="assets-max"
-                  type="number"
-                  min={1}
-                  max={5000}
-                  disabled={disabled}
-                  value={assets.maxAssets}
-                  onChange={(e) => setAssets({ maxAssets: Number(e.target.value) })}
-                />
-                <span className="text-xs text-muted-foreground">
-                  More start further runs right away.
-                </span>
-              </div>
-            </div>
-            <div className="flex flex-col gap-2">
-              <span className="text-sm">Only assets of</span>
-              <div className="flex flex-wrap gap-4">
-                {TARGET_TYPES.map((t) => (
-                  <label key={t.value} className="flex items-center gap-2 text-sm">
-                    <Checkbox
-                      checked={assets.targetTypes.includes(t.value)}
-                      disabled={disabled}
-                      onCheckedChange={(checked) =>
-                        setAssets({
-                          targetTypes: checked
-                            ? [...assets.targetTypes, t.value]
-                            : assets.targetTypes.filter((v) => v !== t.value),
-                        })
-                      }
-                    />
-                    {t.label}
-                  </label>
-                ))}
-              </div>
-              <span className="text-xs text-muted-foreground">
-                None checked = every new asset.
-              </span>
-            </div>
-          </>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            Scans only the assets that joined, not the whole scope.
-          </p>
-        )}
-      </div>
+      <EventCard
+        title="When assets join the project"
+        summary="Scans only the assets that joined, not the whole scope."
+        draft={added}
+        disabled={disabled}
+        onChange={patchEvent(ADDED)}
+      >
+        <GatherFields id="assets" draft={added} disabled={disabled} onChange={patchEvent(ADDED)} />
+        <CheckboxList
+          label="Only assets of"
+          options={TARGET_TYPES}
+          value={added.targetTypes}
+          disabled={disabled}
+          onChange={(targetTypes) => patchEvent(ADDED)({ targetTypes })}
+          hint="None checked = every new asset."
+        />
+      </EventCard>
+
+      <EventCard
+        title="After another workflow of this project"
+        summary="Scans the assets that run scanned."
+        unavailable={
+          followable.length === 0
+            ? 'Add another workflow to the project to run after it.'
+            : undefined
+        }
+        draft={completed}
+        disabled={disabled}
+        onChange={patchEvent(COMPLETED)}
+      >
+        <CheckboxList
+          label="After"
+          options={followable.map((name) => ({ value: name, label: name }))}
+          value={completed.workflows}
+          disabled={disabled}
+          onChange={(workflows) => patchEvent(COMPLETED)({ workflows })}
+          hint="None checked = any other workflow."
+        />
+        <CheckboxList
+          label="When the run"
+          options={OUTCOMES}
+          value={completed.status}
+          disabled={disabled}
+          onChange={(status) => patchEvent(COMPLETED)({ status })}
+          hint={completed.status.length === 0 ? 'Pick at least one.' : undefined}
+        />
+        <GatherFields
+          id="completed"
+          draft={completed}
+          disabled={disabled}
+          onChange={patchEvent(COMPLETED)}
+        />
+      </EventCard>
+
+      <EventCard
+        title="When a vulnerability is found"
+        summary="Scans the asset it was found on, whichever workflow found it."
+        draft={detected}
+        disabled={disabled}
+        onChange={patchEvent(DETECTED)}
+      >
+        <CheckboxList
+          label="Severity"
+          options={SEVERITIES}
+          value={detected.severity}
+          disabled={disabled}
+          onChange={(severity) => patchEvent(DETECTED)({ severity })}
+          hint={
+            detected.severity.length === 0
+              ? 'Pick at least one.'
+              : "This workflow's own findings never start it again."
+          }
+        />
+        <GatherFields
+          id="detected"
+          draft={detected}
+          disabled={disabled}
+          onChange={patchEvent(DETECTED)}
+        />
+      </EventCard>
     </div>
   );
 }
