@@ -89,7 +89,7 @@ function Sighting({ runId, at }: { runId?: string | null; at: string }) {
 }
 
 /** Runs that saw (or missed) one vulnerability. */
-function TimelineSheet({
+export function TimelineSheet({
   projectId,
   vulnerabilityId,
   onClose,
@@ -392,11 +392,9 @@ export function VulnerabilitiesTab({
                 key={segment.value}
                 value={segment.value}
                 className="h-9 flex-none hover:cursor-pointer"
+                badge={segment.count ?? '–'}
               >
                 {segment.label}
-                <span className="font-normal tabular-nums text-muted-foreground">
-                  {segment.count ?? '–'}
-                </span>
               </TabsTrigger>
             ))}
           </TabsList>

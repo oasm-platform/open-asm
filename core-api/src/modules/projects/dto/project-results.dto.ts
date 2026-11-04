@@ -1,7 +1,9 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import {
+  DismissReason,
   JobRunType,
   JobStatus,
+  ProjectChange,
   ProjectTriggerType,
   Severity,
 } from '@/common/enums/enum';
@@ -35,12 +37,37 @@ export class WeeklyNewVulnerabilitiesDto {
   @ApiProperty() info: number;
 }
 
+/**
+ * One entry of a project's recent activity: a run, a change to the project
+ * (`audit`: its action, and for an update which `change`), or
+ * vulnerabilities someone dismissed.
+ */
 export class ProjectActivityDto {
-  @ApiProperty({ enum: ['run', 'audit'] })
-  kind: 'run' | 'audit';
+  @ApiProperty({ enum: ['run', 'audit', 'dismissed'] })
+  kind: 'run' | 'audit' | 'dismissed';
   @ApiProperty() at: Date;
-  @ApiProperty({ description: 'Run id or audit action' })
+  @ApiProperty({ description: 'Run id, audit action, or `dismissed`' })
   ref: string;
+  @ApiProperty({
+    required: false,
+    enum: ProjectChange,
+    enumName: 'ProjectChange',
+    description: 'What a `project.updated` audit changed',
+  })
+  change?: ProjectChange;
+  @ApiProperty({ required: false, description: 'Assets that joined' })
+  added?: number;
+  @ApiProperty({ required: false, description: 'Assets that left' })
+  removed?: number;
+  @ApiProperty({ required: false, description: 'Vulnerabilities dismissed' })
+  count?: number;
+  @ApiProperty({
+    required: false,
+    enum: DismissReason,
+    enumName: 'DismissReason',
+    description: 'Why the vulnerabilities were dismissed',
+  })
+  reason?: DismissReason;
   @ApiProperty({ required: false }) runStatus?: string;
   @ApiProperty({ required: false }) workflowName?: string;
   @ApiProperty({ required: false }) jobRunType?: string;

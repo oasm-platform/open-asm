@@ -7,8 +7,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -27,22 +25,15 @@ import { cn } from '@/lib/utils';
 import {
   ProjectTriggerType,
   useProjectsControllerGetTriggers,
-  useProjectsControllerRemoveTrigger,
-  useProjectsControllerUpdateTrigger,
   type ProjectWorkflow,
   type ProjectWorkflowTrigger,
 } from '@/services/apis/gen/queries';
+import { Link } from '@tanstack/react-router';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { CalendarClock, CalendarDays, Pencil, Plus, Trash2, Zap } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { toast } from 'sonner';
-import { TriggerDialog } from '../components/trigger-dialog';
-import {
-  apiErrorMessage,
-  useInvalidateProjects,
-  workflowLabel,
-} from '../project-utils';
+import { CalendarClock, CalendarDays, Workflow, Zap } from 'lucide-react';
+import { useMemo } from 'react';
+import { workflowLabel } from '../project-utils';
 
 dayjs.extend(relativeTime);
 
@@ -83,6 +74,11 @@ function useWeek(
   }, [triggers, names, timezone]);
 }
 
+/**
+ * When the project's workflows run on their own: the next week's scheduled
+ * runs and every trigger. Read-only: triggers are set while adding or editing
+ * a workflow (they live in its file, `on:`).
+ */
 export function ScheduleTab({
   projectId,
   workflows,
@@ -93,47 +89,12 @@ export function ScheduleTab({
   archived: boolean;
 }) {
   const timezone = getLocalTimezone();
-  const invalidate = useInvalidateProjects();
   const { data: triggers = [], isLoading } = useProjectsControllerGetTriggers(projectId);
-  const update = useProjectsControllerUpdateTrigger();
-  const remove = useProjectsControllerRemoveTrigger();
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<ProjectWorkflowTrigger | undefined>();
-  const [removing, setRemoving] = useState<ProjectWorkflowTrigger | null>(null);
-
   const names = useMemo(
     () => new Map(workflows.map((w) => [w.id, workflowLabel(w.workflow)])),
     [workflows],
   );
-  const week = useWeek(triggers, names, timezone);
-
-  const toggle = (trigger: ProjectWorkflowTrigger, enabled: boolean) =>
-    update.mutate(
-      { id: projectId, triggerId: trigger.id, data: { enabled } },
-      {
-        onSuccess: () => void invalidate(),
-        onError: (error) => toast.error(apiErrorMessage(error, 'Failed to update the trigger')),
-      },
-    );
-
-  const confirmRemove = () => {
-    if (!removing) return;
-    remove.mutate(
-      { id: projectId, triggerId: removing.id },
-      {
-        onSuccess: () => {
-          toast.success('Trigger removed');
-          void invalidate();
-        },
-        onError: (error) => toast.error(apiErrorMessage(error, 'Failed to remove the trigger')),
-      },
-    );
-  };
-
-  const open = (trigger?: ProjectWorkflowTrigger) => {
-    setEditing(trigger);
-    setDialogOpen(true);
-  };
+  const week = useWeek(archived ? [] : triggers, names, timezone);
 
   return (
     <div className="flex flex-col gap-5">
@@ -189,145 +150,104 @@ export function ScheduleTab({
               Triggers
             </CardTitle>
             <CardDescription>
-              Each workflow keeps its triggers in its file (<code>on:</code>);
-              turning one off here leaves it there. Archiving the project turns
-              every trigger off until it is reopened.
+              Set when each workflow runs while adding or editing it on the
+              Workflows tab. Archiving the project stops every trigger until it
+              is reopened.
             </CardDescription>
           </div>
-          <Button
-            variant="outline"
-            disabled={archived || workflows.length === 0}
-            onClick={() => open()}
-          >
-            <Plus className="size-4" />
-            Add trigger
+          <Button variant="outline" asChild>
+            <Link to="/projects/$id/$tab" params={{ id: projectId, tab: 'workflows' }}>
+              <Workflow className="size-4" />
+              Workflows
+            </Link>
           </Button>
         </CardHeader>
         <CardContent>
           <div className="rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Workflow</TableHead>
-                <TableHead>Runs</TableHead>
-                <TableHead>Condition</TableHead>
-                <TableHead>Last fired</TableHead>
-                <TableHead>Next</TableHead>
-                <TableHead>On</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {!isLoading && triggers.length === 0 && (
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
-                    No triggers: workflows run only when started by hand.
-                  </TableCell>
+                  <TableHead>Workflow</TableHead>
+                  <TableHead>Runs</TableHead>
+                  <TableHead>Condition</TableHead>
+                  <TableHead>Last fired</TableHead>
+                  <TableHead>Next</TableHead>
+                  <TableHead>Status</TableHead>
                 </TableRow>
-              )}
-              {triggers.map((trigger) => {
-                const isCron = trigger.type === ProjectTriggerType.cron;
-                const next =
-                  isCron && trigger.enabled && trigger.cron && !archived
-                    ? getNextRun(trigger.cron, timezone)
-                    : null;
-                return (
-                  <TableRow key={trigger.id}>
-                    <TableCell className="font-medium">
-                      {names.get(trigger.projectWorkflowId) ?? '—'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="gap-1 font-normal">
-                        {isCron ? (
-                          <CalendarClock className="size-3" />
-                        ) : (
-                          <Zap className="size-3" />
-                        )}
-                        {isCron ? 'Schedule' : 'Assets added'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {isCron ? (
-                        <span className="flex flex-col">
-                          {formatCronLabel(trigger.cron ?? '', timezone) ?? trigger.cron}
-                          <span className="text-xs text-muted-foreground">
-                            {trigger.cron} · UTC
-                          </span>
-                        </span>
-                      ) : (
-                        <span className="flex flex-col">
-                          Gather {trigger.config.windowMinutes ?? 10} min · up to{' '}
-                          {trigger.config.maxAssets ?? 200} assets/run
-                          {trigger.config.targetTypes?.length ? (
-                            <span className="text-xs text-muted-foreground">
-                              only {trigger.config.targetTypes.join(', ').toLowerCase()}
-                            </span>
-                          ) : null}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {trigger.lastFiredAt ? dayjs(trigger.lastFiredAt).fromNow() : '—'}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {next
-                        ? dayjs(next).format('YYYY-MM-DD HH:mm')
-                        : isCron
-                          ? '—'
-                          : 'On new assets'}
-                    </TableCell>
-                    <TableCell>
-                      <Switch
-                        checked={trigger.enabled}
-                        disabled={archived || update.isPending}
-                        onCheckedChange={(value) => toggle(trigger, value)}
-                        aria-label={trigger.enabled ? 'Turn off' : 'Turn on'}
-                      />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        disabled={archived}
-                        aria-label="Edit trigger"
-                        onClick={() => open(trigger)}
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        disabled={archived}
-                        aria-label="Remove trigger"
-                        onClick={() => setRemoving(trigger)}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
+              </TableHeader>
+              <TableBody>
+                {!isLoading && triggers.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
+                      No triggers: workflows run only when started by hand.
                     </TableCell>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                )}
+                {triggers.map((trigger) => {
+                  const isCron = trigger.type === ProjectTriggerType.cron;
+                  const active = trigger.enabled && !archived;
+                  const next =
+                    isCron && active && trigger.cron ? getNextRun(trigger.cron, timezone) : null;
+                  return (
+                    <TableRow key={trigger.id}>
+                      <TableCell className="font-medium">
+                        {names.get(trigger.projectWorkflowId) ?? '—'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="gap-1 font-normal">
+                          {isCron ? (
+                            <CalendarClock className="size-3" />
+                          ) : (
+                            <Zap className="size-3" />
+                          )}
+                          {isCron ? 'Schedule' : 'Assets added'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {isCron ? (
+                          <span className="flex flex-col">
+                            {formatCronLabel(trigger.cron ?? '', timezone) ?? trigger.cron}
+                            <span className="text-xs text-muted-foreground">
+                              {trigger.cron} · UTC
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="flex flex-col">
+                            Gather {trigger.config.windowMinutes ?? 10} min · up to{' '}
+                            {trigger.config.maxAssets ?? 200} assets/run
+                            {trigger.config.targetTypes?.length ? (
+                              <span className="text-xs text-muted-foreground">
+                                only {trigger.config.targetTypes.join(', ').toLowerCase()}
+                              </span>
+                            ) : null}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {trigger.lastFiredAt ? dayjs(trigger.lastFiredAt).fromNow() : '—'}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {next
+                          ? dayjs(next).format('YYYY-MM-DD HH:mm')
+                          : isCron || !active
+                            ? '—'
+                            : 'On new assets'}
+                      </TableCell>
+                      <TableCell>
+                        {active ? (
+                          <Badge variant="soft">Active</Badge>
+                        ) : (
+                          <Badge variant="secondary">{archived ? 'Archived' : 'Off'}</Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
           </div>
         </CardContent>
       </Card>
-
-      <TriggerDialog
-        projectId={projectId}
-        workflows={workflows}
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        trigger={editing}
-      />
-      <ConfirmDialog
-        open={!!removing}
-        onOpenChange={(value) => !value && setRemoving(null)}
-        title="Remove trigger"
-        description="The workflow stops running on this trigger. Its runs stay."
-        onConfirm={confirmRemove}
-        disabled={remove.isPending}
-      />
     </div>
   );
 }

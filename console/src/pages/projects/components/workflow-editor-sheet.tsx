@@ -45,10 +45,17 @@ import {
   ToolPipelineBuilder,
   type PipelineToolEntry,
 } from './tool-pipeline-builder';
+import {
+  draftFromTriggers,
+  isTriggersDraftValid,
+  onInputOf,
+  WorkflowTriggersForm,
+  type TriggersDraft,
+} from './workflow-triggers-form';
 
 type Source = 'template' | 'tools' | 'copy';
 
-/** Creates a project workflow, or edits the name and pipeline of one. */
+/** Creates a project workflow, or edits one: name, pipeline and when it runs. */
 export function WorkflowEditorSheet({
   projectId,
   open,
@@ -79,6 +86,9 @@ export function WorkflowEditorSheet({
   const [entries, setEntries] = useState<PipelineToolEntry[]>([]);
   const [copyProject, setCopyProject] = useState<string>();
   const [copyBinding, setCopyBinding] = useState<string>();
+  const [triggers, setTriggers] = useState<TriggersDraft>(() =>
+    draftFromTriggers(undefined),
+  );
   const copyWorkflows = useProjectsControllerGetWorkflows(copyProject ?? '', {
     query: { enabled: !!copyProject },
   });
@@ -97,6 +107,7 @@ export function WorkflowEditorSheet({
     setCopyProject(undefined);
     setCopyBinding(undefined);
     setEntries(binding ? entriesFromContent(binding.workflow.content, tools) : []);
+    setTriggers(draftFromTriggers(binding?.triggers));
   }, [open, binding?.id, toolKey]);
 
   const create = useProjectsControllerCreateWorkflow();
@@ -105,11 +116,12 @@ export function WorkflowEditorSheet({
 
   const byId = useMemo(() => new Map(tools.map((tool) => [tool.id, tool])), [tools]);
   const canSave =
-    source === 'template'
+    isTriggersDraftValid(triggers) &&
+    (source === 'template'
       ? !!template
       : source === 'copy'
         ? !!copyBinding
-        : entries.length > 0 && isPipelineValid(entries, byId);
+        : entries.length > 0 && isPipelineValid(entries, byId));
 
   const done = (message: string) => {
     toast.success(message);
@@ -126,7 +138,11 @@ export function WorkflowEditorSheet({
         {
           id: projectId,
           bindingId: binding.id,
-          data: { name: trimmed, tools: toToolInputs(entries) },
+          data: {
+            name: trimmed,
+            tools: toToolInputs(entries),
+            on: onInputOf(triggers),
+          },
         },
         { onSuccess: () => done('Workflow saved'), onError: failed },
       );
@@ -140,6 +156,7 @@ export function WorkflowEditorSheet({
           ...(source === 'template' ? { template } : {}),
           ...(source === 'tools' ? { tools: toToolInputs(entries) } : {}),
           ...(source === 'copy' ? { copyFromProjectWorkflowId: copyBinding } : {}),
+          on: onInputOf(triggers),
         },
       },
       { onSuccess: () => done('Workflow added'), onError: failed },
@@ -164,7 +181,8 @@ export function WorkflowEditorSheet({
           <SheetTitle>{editing ? 'Edit workflow' : 'Add workflow'}</SheetTitle>
           <SheetDescription>
             Tools of one step run together; the next step starts when they are
-            done. The workflow runs on this project's assets only.
+            done. The workflow runs on this project's assets only, when started
+            or on its own as set below.
           </SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-5 px-4">
@@ -257,6 +275,9 @@ export function WorkflowEditorSheet({
               </TabsContent>
             </Tabs>
           )}
+          <div className="border-t pt-5">
+            <WorkflowTriggersForm value={triggers} onChange={setTriggers} />
+          </div>
         </div>
         <SheetFooter className="flex-row justify-end gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>

@@ -1,3 +1,4 @@
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import {
   ProjectAssetSource,
@@ -28,6 +29,11 @@ export class ProjectAssetIdsDto {
   @ArrayUnique()
   @ArrayMaxSize(1000)
   assetIds: string[];
+}
+
+export class ProjectAssetsChangedDto extends DefaultMessageResponseDto {
+  @ApiProperty({ description: 'Assets that joined or left the project' })
+  count: number;
 }
 
 export class GetProjectAssetsQueryDto extends GetManyBaseQueryParams {

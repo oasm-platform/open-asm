@@ -165,17 +165,41 @@ function TabsList({
 
 function TabsTrigger({
   className,
+  badge,
+  badgeClassName,
+  children,
   ...props
-}: React.ComponentProps<typeof TabsPrimitive.Trigger>) {
+}: React.ComponentProps<typeof TabsPrimitive.Trigger> & {
+  /** A count or short text after the label, e.g. `12` or `3/5`. */
+  badge?: React.ReactNode;
+  badgeClassName?: string;
+}) {
   return (
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        "data-[state=active]:after:absolute data-[state=active]:after:bottom-0 data-[state=active]:after:left-1/2 data-[state=active]:after:-translate-x-1/2 data-[state=active]:after:h-0.5 data-[state=active]:after:w-5 data-[state=active]:after:bg-primary data-[state=active]:after:rounded-full data-[state=active]:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring text-muted-foreground inline-flex h-[calc(100%-1px)] items-center justify-center gap-1.5 relative px-0 py-1 text-sm font-medium whitespace-nowrap focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 cursor-pointer hover:text-foreground transition-colors",
+        // The active underline spans the whole trigger, label and badge.
+        "data-[state=active]:after:absolute data-[state=active]:after:inset-x-0 data-[state=active]:after:bottom-0 data-[state=active]:after:h-0.5 data-[state=active]:after:bg-primary data-[state=active]:after:rounded-full data-[state=active]:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring text-muted-foreground inline-flex h-[calc(100%-1px)] items-center justify-center gap-1.5 relative px-0 py-1 text-sm font-medium whitespace-nowrap focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 cursor-pointer hover:text-foreground transition-colors",
         className,
       )}
       {...props}
-    />
+    >
+      {children}
+      {badge != null && badge !== false && (
+        <>
+          {/* Not rendered in the flex row; keeps "Assets 12" as the accessible name. */}{' '}
+          <span
+            data-slot="tabs-badge"
+            className={cn(
+              'rounded-full bg-muted px-1.5 py-px text-[11px] font-medium tabular-nums text-muted-foreground',
+              badgeClassName,
+            )}
+          >
+            {badge}
+          </span>
+        </>
+      )}
+    </TabsPrimitive.Trigger>
   );
 }
 

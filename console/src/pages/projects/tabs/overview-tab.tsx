@@ -10,7 +10,11 @@ import {
 } from '@/components/ui/tooltip';
 import { formatCronLabel, getLocalTimezone, getNextRun } from '@/lib/cron-schedule';
 import { cn } from '@/lib/utils';
+import type { ProjectDetailSearch } from '@/routes/_authed/projects/$id/$tab';
 import {
+  DismissReason,
+  ProjectActivityDtoKind,
+  ProjectChange,
   ProjectTriggerType,
   VulnerabilityProvenance,
   useProjectsControllerGetOverview,
@@ -20,7 +24,7 @@ import {
   type ProjectActivityDto,
   type WeeklyNewVulnerabilitiesDto,
 } from '@/services/apis/gen/queries';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import {
@@ -35,7 +39,7 @@ import {
 } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import { SeverityCounts } from '../components/severity-bar';
-import { ProvenanceBadge } from './vulnerabilities-tab';
+import { ProvenanceBadge, TimelineSheet } from './vulnerabilities-tab';
 import {
   assetCount,
   runTriggerLabel,
@@ -46,12 +50,47 @@ import {
 
 dayjs.extend(relativeTime);
 
+/** Rows of "To fix" (as many as the API's recent activity). */
+const LIST_LIMIT = 15;
+
+/** "To fix" and "Recent activity": one height, side by side; longer lists scroll. */
+const LIST_CARD = 'h-[30rem]';
+const LIST_CONTENT = 'flex min-h-0 flex-1 flex-col divide-y overflow-y-auto';
+
 const AUDIT_LABELS: Record<string, string> = {
   'project.created': 'Project created',
-  'project.updated': 'Project changed',
   'project.archived': 'Project archived',
   'project.unarchived': 'Project reopened',
 };
+
+/** How assets joined or left, after their count. */
+const ASSET_CHANGES: Partial<Record<ProjectChange, string>> = {
+  [ProjectChange.assetsadded]: 'picked by hand',
+  [ProjectChange.assetsdiscovered]: 'discovered, matching the scope rules',
+  [ProjectChange.assetsremoved]: 'removed',
+  [ProjectChange.scope]: 'with a scope rule change',
+};
+
+/** "+3 assets", "−1 asset" or "+3 / −1 assets". */
+function assetDelta(added = 0, removed = 0): string {
+  if (added && removed) return `+${added} / −${removed} assets`;
+  return added ? `+${assetCount(added)}` : `−${assetCount(removed)}`;
+}
+
+const DISMISS_REASONS: Record<DismissReason, string> = {
+  [DismissReason.false_positive]: 'false positive',
+  [DismissReason.used_in_test]: 'used in tests',
+  [DismissReason.wont_fix]: "won't fix",
+};
+
+const WORKFLOW_CHANGES: Partial<Record<ProjectChange, string>> = {
+  [ProjectChange.workflowadded]: 'added',
+  [ProjectChange.workflowupdated]: 'edited',
+  [ProjectChange.workflowremoved]: 'removed',
+};
+
+const vulnerabilityCount = (n: number) =>
+  `${n} vulnerabilit${n === 1 ? 'y' : 'ies'}`;
 
 /** Same card as the dashboard's statistics: title and icon, then the number. */
 function Kpi({
@@ -196,14 +235,85 @@ const WeeklyChart = memo(function WeeklyChart({
   );
 });
 
+/** " by Name" after a change someone made. */
+function By({ name }: { name?: string }) {
+  return name ? <span className="text-muted-foreground"> by {name}</span> : null;
+}
+
+function TabLink({
+  projectId,
+  tab,
+  children,
+}: {
+  projectId: string;
+  tab: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      to="/projects/$id/$tab"
+      params={{ id: projectId, tab }}
+      className="font-medium hover:underline"
+    >
+      {children}
+    </Link>
+  );
+}
+
 function ActivityItem({ item, projectId }: { item: ProjectActivityDto; projectId: string }) {
-  if (item.kind === 'audit') {
+  if (item.kind === ProjectActivityDtoKind.dismissed) {
+    return (
+      <span>
+        <TabLink projectId={projectId} tab="vulnerabilities">
+          {vulnerabilityCount(item.count ?? 0)}
+        </TabLink>{' '}
+        dismissed
+        {item.reason && (
+          <span className="text-muted-foreground"> · {DISMISS_REASONS[item.reason]}</span>
+        )}
+        <By name={item.actorName} />
+      </span>
+    );
+  }
+  if (item.kind === ProjectActivityDtoKind.audit) {
+    const workflowChange = item.change && WORKFLOW_CHANGES[item.change];
+    if (workflowChange) {
+      return (
+        <span>
+          Workflow{' '}
+          <TabLink projectId={projectId} tab="workflows">
+            {workflowLabel({ name: item.workflowName })}
+          </TabLink>{' '}
+          {workflowChange}
+          <By name={item.actorName} />
+        </span>
+      );
+    }
+    const assetChange = item.change && ASSET_CHANGES[item.change];
+    if (assetChange) {
+      return (
+        <span>
+          <TabLink projectId={projectId} tab="assets">
+            {assetDelta(item.added, item.removed)}
+          </TabLink>{' '}
+          {assetChange}
+          <By name={item.actorName} />
+        </span>
+      );
+    }
     return (
       <span>
         {AUDIT_LABELS[item.ref] ?? item.ref}
-        {item.actorName ? (
-          <span className="text-muted-foreground"> by {item.actorName}</span>
+        {item.ref === 'project.created' && item.added ? (
+          <>
+            {' '}
+            with{' '}
+            <TabLink projectId={projectId} tab="assets">
+              {assetCount(item.added)}
+            </TabLink>
+          </>
         ) : null}
+        <By name={item.actorName} />
       </span>
     );
   }
@@ -247,11 +357,20 @@ export function OverviewTab({
   project: Project;
 }) {
   const navigate = useNavigate();
+  const search = useSearch({ strict: false }) as ProjectDetailSearch;
+  // The same sheet, and URL, as a row of the Vulnerabilities tab.
+  const setVulnerability = (vulnerability?: string) =>
+    void navigate({
+      to: '/projects/$id/$tab',
+      params: { id: projectId, tab: 'overview' },
+      search: { ...search, vulnerability },
+      replace: true,
+    });
   const timezone = getLocalTimezone();
   const { data: overview, isLoading } = useProjectsControllerGetOverview(projectId);
   const { data: todo } = useProjectsControllerGetVulnerabilities(projectId, {
     page: 1,
-    limit: 6,
+    limit: LIST_LIMIT,
   });
 
   // Soonest cron of any workflow, with the workflow it runs.
@@ -361,7 +480,7 @@ export function OverviewTab({
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-5">
-        <Card className="lg:col-span-3">
+        <Card className={cn(LIST_CARD, 'lg:col-span-3')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="flex items-center gap-2">
               <ShieldAlert className="size-5 text-primary" />
@@ -371,14 +490,19 @@ export function OverviewTab({
               See all
             </Button>
           </CardHeader>
-          <CardContent className="flex flex-col divide-y">
+          <CardContent className={LIST_CONTENT}>
             {(todo?.data ?? []).length === 0 ? (
               <p className="py-4 text-sm text-muted-foreground">
                 No open vulnerabilities found by this project.
               </p>
             ) : (
               (todo?.data ?? []).map((vuln) => (
-                <div key={vuln.id} className="flex items-center gap-3 py-2">
+                <button
+                  key={vuln.id}
+                  type="button"
+                  onClick={() => setVulnerability(vuln.id)}
+                  className="-mx-2 flex items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
                   <SeverityBadge severity={vuln.severity} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm">{vuln.name}</p>
@@ -390,19 +514,19 @@ export function OverviewTab({
                     provenance={vuln.provenance}
                     timesSeen={vuln.timesSeen}
                   />
-                </div>
+                </button>
               ))
             )}
           </CardContent>
         </Card>
-        <Card className="lg:col-span-2">
+        <Card className={cn(LIST_CARD, 'lg:col-span-2')}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Activity className="size-5 text-primary" />
               Recent activity
             </CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col divide-y">
+          <CardContent className={LIST_CONTENT}>
             {overview.activity.length === 0 ? (
               <p className="py-4 text-sm text-muted-foreground">Nothing yet.</p>
             ) : (
@@ -424,6 +548,12 @@ export function OverviewTab({
           </CardContent>
         </Card>
       </div>
+
+      <TimelineSheet
+        projectId={projectId}
+        vulnerabilityId={search.vulnerability}
+        onClose={() => setVulnerability(undefined)}
+      />
     </div>
   );
 }

@@ -54,7 +54,10 @@ export class WorkflowOnError extends Error {
   }
 }
 
-export const cronKey = (cron: string) => `cron:${cron.trim()}`;
+/** A cron expression with single spaces, as stored and keyed. */
+export const normalizeCron = (cron: string) => cron.trim().replace(/\s+/g, ' ');
+
+export const cronKey = (cron: string) => `cron:${normalizeCron(cron)}`;
 export const ASSETS_ADDED_KEY = 'assets_added';
 
 /** The key of a stored trigger row, to match it with the file. */
@@ -91,8 +94,9 @@ export function triggersOfOn(on: unknown): DefinedTrigger[] {
       typeof entry === 'object' && entry !== null
         ? (entry as { cron?: unknown }).cron
         : entry;
-    const cron = typeof raw === 'string' ? raw.trim().replace(/\s+/g, ' ') : '';
-    if (!isValidCronSchedule(cron)) {
+    const cron = typeof raw === 'string' ? normalizeCron(raw) : '';
+    // "disabled" is how an asset group said "no schedule"; it is no cron.
+    if (cron === 'disabled' || !isValidCronSchedule(cron)) {
       errors.push(
         `on.schedule[${i}]: ${JSON.stringify(raw ?? null)} is not a 5-field cron expression`,
       );
@@ -162,6 +166,50 @@ function assetsAddedProblems(raw: unknown): string[] {
   if (unknown.length > 0)
     problems.push(`unknown setting ${unknown.join(', ')}`);
   return problems;
+}
+
+/** `on` as the workflow editor sends it: each entry may say whether it is on. */
+export interface WorkflowOnInput {
+  schedule?: Array<{ cron: string; enabled?: boolean }>;
+  assetsAdded?:
+    | (Partial<AssetsAddedTriggerConfig> & { enabled?: boolean })
+    | null;
+}
+
+/**
+ * The triggers of an editor's `on` input. Whether an entry is on is state,
+ * not definition, so it is left to the caller.
+ *
+ * @throws WorkflowOnError listing every invalid entry.
+ */
+export function triggersOfInput(input: WorkflowOnInput): DefinedTrigger[] {
+  const added = input.assetsAdded;
+  return triggersOfOn({
+    schedule: (input.schedule ?? []).map(({ cron }) => ({ cron })),
+    ...(added
+      ? {
+          assetsAdded: {
+            ...(added.windowMinutes !== undefined ? { windowMinutes: added.windowMinutes } : {}),
+            ...(added.maxAssets !== undefined ? { maxAssets: added.maxAssets } : {}),
+            ...(added.targetTypes !== undefined ? { targetTypes: added.targetTypes } : {}),
+          },
+        }
+      : {}),
+  });
+}
+
+/** Whether each entry of an editor's input should be on, by trigger key. */
+export function enabledByKey(input: WorkflowOnInput): Map<string, boolean> {
+  const wanted = new Map<string, boolean>();
+  for (const entry of input.schedule ?? []) {
+    const key = cronKey(entry.cron);
+    // Duplicates collapse to the first entry, so its state wins.
+    if (entry.enabled !== undefined && !wanted.has(key)) wanted.set(key, entry.enabled);
+  }
+  if (input.assetsAdded?.enabled !== undefined) {
+    wanted.set(ASSETS_ADDED_KEY, input.assetsAdded.enabled);
+  }
+  return wanted;
 }
 
 /** Writes triggers back as the canonical `on:` block (undefined when none). */

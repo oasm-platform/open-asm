@@ -21,6 +21,7 @@ import {
 import { IsCronSchedule } from './cron-schedule.validator';
 import { ScopeRuleInputDto } from './project-scope.dto';
 import { AssetsAddedTriggerConfigDto } from './project-trigger.dto';
+import { ProjectWorkflowOnDto } from './project-workflow-on.dto';
 
 export class ProjectToolInput {
   @ApiProperty({ description: 'Tool ID' })
@@ -168,8 +169,19 @@ export class CreateProjectDto {
   workflowName?: string;
 
   @ApiProperty({
+    required: false,
+    type: () => ProjectWorkflowOnDto,
     description:
-      'Cron schedule (UTC) of the pipeline, e.g. "0 2 * * 1". Requires a pipeline.',
+      'When the pipeline runs on its own: schedules and "assets added". Requires a pipeline. Replaces schedule and onAssetsAdded.',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ProjectWorkflowOnDto)
+  on?: ProjectWorkflowOnDto;
+
+  @ApiProperty({
+    description:
+      'Deprecated, use on.schedule. Cron schedule (UTC) of the pipeline, e.g. "0 2 * * 1". Requires a pipeline.',
     example: '0 0 */3 * *',
     required: false,
   })
@@ -182,7 +194,7 @@ export class CreateProjectDto {
     required: false,
     type: () => AssetsAddedTriggerConfigDto,
     description:
-      'Run the pipeline on assets as they join the project. Requires a pipeline.',
+      'Deprecated, use on.assetsAdded. Run the pipeline on assets as they join the project. Requires a pipeline.',
   })
   @IsOptional()
   @ValidateNested()

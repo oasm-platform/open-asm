@@ -3,6 +3,7 @@ import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
+import { ProjectChange } from '@/common/enums/enum';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
   Body,
@@ -26,6 +27,7 @@ import {
   GetProjectAssetsQueryDto,
   ProjectAssetDto,
   ProjectAssetIdsDto,
+  ProjectAssetsChangedDto,
 } from './dto/project-assets.dto';
 import {
   GetProjectRunsQueryDto,
@@ -48,6 +50,7 @@ import {
 } from './dto/project-trigger.dto';
 import {
   CreateProjectWorkflowDto,
+  ProjectWorkflowRemovedDto,
   RunProjectWorkflowDto,
   RunStartedDto,
   UpdateProjectWorkflowDto,
@@ -66,9 +69,33 @@ import { ProjectsService } from './projects.service';
 
 const withWorkspace = { getWorkspaceId: true } as const;
 
-/** Every change to a project's settings, scope, workflows or triggers. */
-const PROJECT_UPDATED = () =>
-  PublishEvent(EVENT_CATALOG.project.updated, { resourceIdFromRoute: true });
+type EventMetadata = Record<string, string | number | boolean | string[]>;
+
+/**
+ * Every change to a project's settings, scope, workflows or triggers, with
+ * `metadata.change` saying which (and what it touched) for its activity.
+ */
+const PROJECT_UPDATED = (
+  change: ProjectChange,
+  details?: (result: unknown) => EventMetadata,
+) =>
+  PublishEvent(EVENT_CATALOG.project.updated, {
+    resourceIdFromRoute: true,
+    metadata: (_body, result) => ({
+      change,
+      ...(result ? details?.(result) : undefined),
+    }),
+  });
+
+const assetsAdded = (result: unknown) => ({
+  added: (result as ProjectAssetsChangedDto).count,
+});
+const assetsRemoved = (result: unknown) => ({
+  removed: (result as ProjectAssetsChangedDto).count,
+});
+const workflowName = (result: unknown) => ({
+  workflow: (result as ProjectWorkflow).workflow?.name ?? '',
+});
 
 @ApiTags('Projects')
 @Controller('projects')
@@ -111,6 +138,10 @@ export class ProjectsController {
     resourceId: (result) => (result as Project | undefined)?.id,
     changes: (body) => ({
       name: { after: (body as { name?: string })?.name ?? '' },
+    }),
+    // The assets it starts with, for the project's activity.
+    metadata: (_body, result) => ({
+      added: (result as Project | undefined)?.totalAssets ?? 0,
     }),
   })
   @WorkspaceAccess('project.write')
@@ -165,7 +196,7 @@ export class ProjectsController {
     response: { serialization: Project },
     request: withWorkspace,
   })
-  @PROJECT_UPDATED()
+  @PROJECT_UPDATED(ProjectChange.SETTINGS)
   @WorkspaceAccess('project.write')
   @Patch(':id')
   update(
@@ -275,10 +306,10 @@ export class ProjectsController {
     summary: 'Add assets',
     description:
       'Adds assets by hand; "assets added" triggers pick up the new ones.',
-    response: { serialization: DefaultMessageResponseDto },
+    response: { serialization: ProjectAssetsChangedDto },
     request: withWorkspace,
   })
-  @PROJECT_UPDATED()
+  @PROJECT_UPDATED(ProjectChange.ASSETS_ADDED, assetsAdded)
   @WorkspaceAccess('project.write')
   @Post(':id/assets')
   addAssets(
@@ -293,10 +324,10 @@ export class ProjectsController {
     summary: 'Remove assets',
     description:
       'Removes assets; one a rule still selects gets an exclude rule so it stays out.',
-    response: { serialization: DefaultMessageResponseDto },
+    response: { serialization: ProjectAssetsChangedDto },
     request: withWorkspace,
   })
-  @PROJECT_UPDATED()
+  @PROJECT_UPDATED(ProjectChange.ASSETS_REMOVED, assetsRemoved)
   @WorkspaceAccess('project.write')
   @Delete(':id/assets')
   removeAssets(
@@ -329,7 +360,10 @@ export class ProjectsController {
     response: { serialization: ScopeSyncResultDto },
     request: withWorkspace,
   })
-  @PROJECT_UPDATED()
+  @PROJECT_UPDATED(ProjectChange.SCOPE, (result) => {
+    const { added, removed } = result as ScopeSyncResultDto;
+    return { added, removed };
+  })
   @WorkspaceAccess('project.write')
   @Put(':id/scope-rules')
   replaceScopeRules(
@@ -369,7 +403,7 @@ export class ProjectsController {
     response: { serialization: ProjectWorkflow },
     request: withWorkspace,
   })
-  @PROJECT_UPDATED()
+  @PROJECT_UPDATED(ProjectChange.WORKFLOW_ADDED, workflowName)
   @WorkspaceAccess('project.write')
   @Post(':id/workflows')
   createWorkflow(
@@ -377,16 +411,17 @@ export class ProjectsController {
     @Body() dto: CreateProjectWorkflowDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.workflowsService.create(id, workspaceId, dto);
+    return this.projectsService.addWorkflow(id, workspaceId, dto);
   }
 
   @Doc({
     summary: 'Update workflow',
-    description: 'Renames a project workflow or replaces its pipeline.',
+    description:
+      'Renames a project workflow, replaces its pipeline and/or when it runs (on).',
     response: { serialization: ProjectWorkflow },
     request: withWorkspace,
   })
-  @PROJECT_UPDATED()
+  @PROJECT_UPDATED(ProjectChange.WORKFLOW_UPDATED, workflowName)
   @WorkspaceAccess('project.write')
   @Patch(':id/workflows/:bindingId')
   updateWorkflow(
@@ -395,17 +430,19 @@ export class ProjectsController {
     @Body() dto: UpdateProjectWorkflowDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.workflowsService.update(id, workspaceId, bindingId, dto);
+    return this.projectsService.updateWorkflow(id, workspaceId, bindingId, dto);
   }
 
   @Doc({
     summary: 'Remove workflow',
     description:
       'Deletes a project workflow with its triggers and runs.',
-    response: { serialization: DefaultMessageResponseDto },
+    response: { serialization: ProjectWorkflowRemovedDto },
     request: withWorkspace,
   })
-  @PROJECT_UPDATED()
+  @PROJECT_UPDATED(ProjectChange.WORKFLOW_REMOVED, (result) => ({
+    workflow: (result as ProjectWorkflowRemovedDto).name,
+  }))
   @WorkspaceAccess('project.write')
   @Delete(':id/workflows/:bindingId')
   removeWorkflow(
@@ -462,7 +499,7 @@ export class ProjectsController {
     response: { serialization: ProjectWorkflowTrigger },
     request: withWorkspace,
   })
-  @PROJECT_UPDATED()
+  @PROJECT_UPDATED(ProjectChange.TRIGGERS)
   @WorkspaceAccess('project.write')
   @Post(':id/triggers')
   createTrigger(
@@ -479,7 +516,7 @@ export class ProjectsController {
     response: { serialization: ProjectWorkflowTrigger },
     request: withWorkspace,
   })
-  @PROJECT_UPDATED()
+  @PROJECT_UPDATED(ProjectChange.TRIGGERS)
   @WorkspaceAccess('project.write')
   @Patch(':id/triggers/:triggerId')
   updateTrigger(
@@ -496,7 +533,7 @@ export class ProjectsController {
     response: { serialization: DefaultMessageResponseDto },
     request: withWorkspace,
   })
-  @PROJECT_UPDATED()
+  @PROJECT_UPDATED(ProjectChange.TRIGGERS)
   @WorkspaceAccess('project.write')
   @Delete(':id/triggers/:triggerId')
   async removeTrigger(

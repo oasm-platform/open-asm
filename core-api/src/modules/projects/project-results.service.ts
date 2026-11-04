@@ -1,4 +1,10 @@
-import { JobRunType, JobStatus, Severity } from '@/common/enums/enum';
+import {
+  DismissReason,
+  JobRunType,
+  JobStatus,
+  ProjectChange,
+  Severity,
+} from '@/common/enums/enum';
 import { VulnerabilityStatus } from '@/modules/vulnerabilities/dto/get-vulnerability.dto';
 import { openVulnerabilityCondition } from '@/modules/vulnerabilities/open-vulnerability';
 import { getManyResponse } from '@/utils/getManyResponse';
@@ -35,6 +41,12 @@ import {
 } from './provenance';
 
 const SEVERITIES = Object.values(Severity);
+
+/** Entries of a project's recent activity. */
+const ACTIVITY_LIMIT = 15;
+
+/** Project audit actions the activity shows as they are. */
+const LIFECYCLE_ACTIONS = ['project.created', 'project.archived', 'project.unarchived'];
 
 /** `count` rows of (severity, count) → a full severity record. */
 function severityCounts(
@@ -448,12 +460,19 @@ export class ProjectResultsService {
               FROM job_histories jh LEFT JOIN workflows w ON w.id = jh."workflowId"`;
   }
 
-  /** Recent runs and `project.*` audit entries, newest first. */
+  /**
+   * What happened to the project's assets, vulnerabilities and workflows,
+   * newest first: runs (with what they found); the project's creation,
+   * archiving, and the `project.updated` events that moved assets in or out
+   * or changed a workflow; and vulnerabilities people dismissed.
+   * Configuration (settings, triggers, a rule edit that moved no asset) stays
+   * in the audit log.
+   */
   private async activity(
     projectId: string,
     workspaceId: string,
   ): Promise<ProjectActivityDto[]> {
-    const [runs, audits] = await Promise.all([
+    const [runs, audits, dismissed] = await Promise.all([
       this.dataSource.query<Array<Record<string, unknown>>>(
         `SELECT jh.id, jh."createdAt", jh."jobRunType", jh.scope, w.name AS "workflowName",
                 ${RUN_STATUS_SQL} AS status,
@@ -464,15 +483,47 @@ export class ProjectResultsService {
                     AND pv."firstSeenJobHistoryId" IS DISTINCT FROM jh.id) AS "recurringVulnerabilities"
            FROM job_histories jh LEFT JOIN workflows w ON w.id = jh."workflowId"
           WHERE jh."projectId" = $1
-          ORDER BY jh."createdAt" DESC LIMIT 10`,
+          ORDER BY jh."createdAt" DESC LIMIT ${ACTIVITY_LIMIT}`,
         [projectId],
       ),
       this.dataSource.query<Array<Record<string, unknown>>>(
-        `SELECT action, "occurredAt", "actorName", changes
+        `SELECT action, "occurredAt", "actorName", metadata
            FROM audit_events
           WHERE "workspaceId" = $1 AND "resourceType" = 'project' AND "resourceId" = $2
-          ORDER BY "occurredAt" DESC LIMIT 10`,
-        [workspaceId, projectId],
+            AND outcome = 'success'
+            AND (action = ANY($3::text[])
+                 OR (action = 'project.updated' AND (
+                       metadata->>'change' = ANY($4::text[])
+                    OR (metadata->>'change' = ANY($5::text[])
+                        AND (COALESCE((metadata->>'added')::int, 0) > 0
+                             OR COALESCE((metadata->>'removed')::int, 0) > 0)))))
+          ORDER BY "occurredAt" DESC LIMIT ${ACTIVITY_LIMIT}`,
+        [
+          workspaceId,
+          projectId,
+          LIFECYCLE_ACTIONS,
+          [
+            ProjectChange.WORKFLOW_ADDED,
+            ProjectChange.WORKFLOW_UPDATED,
+            ProjectChange.WORKFLOW_REMOVED,
+          ],
+          [
+            ProjectChange.ASSETS_ADDED,
+            ProjectChange.ASSETS_DISCOVERED,
+            ProjectChange.ASSETS_REMOVED,
+            ProjectChange.SCOPE,
+          ],
+        ],
+      ),
+      this.dataSource.query<Array<Record<string, unknown>>>(
+        `SELECT MAX(d."createdAt") AS at, d.reason, u.name AS "actorName", COUNT(*)::int AS count
+           FROM vulnerability_dismissals d
+           JOIN project_vulnerabilities pv
+             ON pv."vulnerabilityId" = d."vulnerabilityId" AND pv."projectId" = $1
+           LEFT JOIN users u ON u.id = d."userId"
+          GROUP BY date_trunc('minute', d."createdAt"), d.reason, d."userId", u.name
+          ORDER BY at DESC LIMIT ${ACTIVITY_LIMIT}`,
+        [projectId],
       ),
     ]);
 
@@ -490,18 +541,38 @@ export class ProjectResultsService {
           scopeSize: scopeSize(run.scope as WorkflowRunScope | null),
         }),
       ),
-      ...audits.map(
-        (audit): ProjectActivityDto => ({
+      ...audits.map((audit): ProjectActivityDto => {
+        // As the projects controller and service write it.
+        const metadata = (audit.metadata ?? {}) as {
+          change?: ProjectChange;
+          added?: number;
+          removed?: number;
+          workflow?: string;
+        };
+        return {
           kind: 'audit',
           at: audit.occurredAt as Date,
           ref: audit.action as string,
           actorName: (audit.actorName as string | null) ?? undefined,
-          changes: (audit.changes as Record<string, unknown> | null) ?? undefined,
+          ...(metadata.change ? { change: metadata.change } : {}),
+          ...(metadata.added !== undefined ? { added: Number(metadata.added) } : {}),
+          ...(metadata.removed !== undefined ? { removed: Number(metadata.removed) } : {}),
+          ...(metadata.workflow ? { workflowName: metadata.workflow } : {}),
+        };
+      }),
+      ...dismissed.map(
+        (row): ProjectActivityDto => ({
+          kind: 'dismissed',
+          at: row.at as Date,
+          ref: 'dismissed',
+          count: Number(row.count),
+          reason: row.reason as DismissReason,
+          actorName: (row.actorName as string | null) ?? undefined,
         }),
       ),
     ];
     return items
       .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
-      .slice(0, 12);
+      .slice(0, ACTIVITY_LIMIT);
   }
 }

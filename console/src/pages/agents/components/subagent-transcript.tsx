@@ -211,8 +211,8 @@ export function SubagentTranscript({
           <TabsTrigger value="conversation" className={SEGMENT}>
             Conversation
           </TabsTrigger>
-          <TabsTrigger value="tools" className={SEGMENT}>
-            Tool calls{calls.length > 0 && ` (${calls.length})`}
+          <TabsTrigger value="tools" className={SEGMENT} badge={calls.length || undefined}>
+            Tool calls
           </TabsTrigger>
         </TabsList>
         {stats && (

@@ -7,27 +7,16 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  useProjectsControllerArchive,
   useProjectsControllerDelete,
   useProjectsControllerGetById,
   useProjectsControllerGetOverview,
-  useProjectsControllerUnarchive,
 } from '@/services/apis/gen/queries';
 import { useNavigate, useParams } from '@tanstack/react-router';
-import {
-  Archive,
-  ArchiveRestore,
-  ChevronDown,
-  MoreHorizontal,
-  Pencil,
-  Play,
-  Trash,
-} from 'lucide-react';
+import { ChevronDown, Play } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { RunWorkflowDialog } from './components/run-workflow-dialog';
@@ -60,8 +49,6 @@ export default function ProjectDetail() {
 
   const { data: project, isLoading } = useProjectsControllerGetById(id);
   const { data: overview } = useProjectsControllerGetOverview(id);
-  const archive = useProjectsControllerArchive();
-  const unarchive = useProjectsControllerUnarchive();
   const remove = useProjectsControllerDelete();
 
   const [runOpen, setRunOpen] = useState(false);
@@ -98,21 +85,6 @@ export default function ProjectDetail() {
   const openRun = (bindingId?: string) => {
     setRunBinding(bindingId);
     setRunOpen(true);
-  };
-
-  const toggleArchive = () => {
-    const mutation = archived ? unarchive : archive;
-    mutation.mutate(
-      { id },
-      {
-        onSuccess: () => {
-          toast.success(archived ? 'Project reopened' : 'Project archived');
-          void invalidate();
-        },
-        onError: (error) =>
-          toast.error(apiErrorMessage(error, 'Failed to update the project')),
-      },
-    );
   };
 
   const handleDelete = () =>
@@ -183,39 +155,6 @@ export default function ProjectDetail() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button
-            variant="outline"
-            disabled={archived}
-            onClick={() => goTab('settings')}
-          >
-            <Pencil className="size-4" />
-            Edit
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" aria-label="More actions">
-                <MoreHorizontal className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={toggleArchive}>
-                {archived ? (
-                  <ArchiveRestore className="size-4" />
-                ) : (
-                  <Archive className="size-4" />
-                )}
-                {archived ? 'Reopen project' : 'Archive project'}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onSelect={() => setDeleteOpen(true)}
-              >
-                <Trash className="size-4" />
-                Delete project
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </>
       }
     >
@@ -228,13 +167,9 @@ export default function ProjectDetail() {
                   key={t.value}
                   value={t.value}
                   className="h-9 flex-none hover:cursor-pointer"
+                  badge={counts[t.value]}
                 >
                   {t.label}
-                  {counts[t.value] !== undefined && (
-                    <span className="font-normal tabular-nums text-muted-foreground">
-                      {counts[t.value]}
-                    </span>
-                  )}
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -244,7 +179,7 @@ export default function ProjectDetail() {
         {archived && (
           <p className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
             This project is archived: schedules and event triggers are off and
-            it is read-only. Reopen it from the ⋯ menu to make changes.
+            it is read-only. Reopen it from the Settings tab to make changes.
           </p>
         )}
 
