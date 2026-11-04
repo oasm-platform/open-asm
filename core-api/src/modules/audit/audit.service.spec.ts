@@ -46,7 +46,7 @@ const CONTROLLER_FILES: Record<string, string> = {
   WorkspacesController: '@/modules/workspaces/workspaces.controller',
   TargetsController: '@/modules/targets/targets.controller',
   AssetsController: '@/modules/assets/assets.controller',
-  AssetGroupController: '@/modules/asset-group/asset-group.controller',
+  ProjectsController: '@/modules/projects/projects.controller',
   InternalNetworksController: '@/modules/internal-networks/internal-networks.controller',
   VulnerabilitiesController: '@/modules/vulnerabilities/vulnerabilities.controller',
   ReportsController: '@/modules/reports/reports.controller',

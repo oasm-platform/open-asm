@@ -17,7 +17,7 @@ import { freshRunSql } from './fresh-runs';
 export { parseFilterParam } from '@/common/utils/filter-tree';
 
 export type AssetFilterField =
-  | 'host' | 'port' | 'ip' | 'tech' | 'url' | 'statusCode' | 'tlsHost' | 'tag' | 'assetGroup' | 'isNew';
+  | 'host' | 'port' | 'ip' | 'tech' | 'url' | 'statusCode' | 'tlsHost' | 'tag' | 'project' | 'isNew';
 export type AssetFilterOp = FilterOp;
 export type AssetFilterLogic = FilterLogic;
 export type AssetFilterCondition = FilterCondition<AssetFilterField>;
@@ -40,7 +40,7 @@ const OPS: Record<AssetFilterField, readonly FilterOp[]> = {
   statusCode: ['eq', 'neq', 'in', 'notIn'],
   tlsHost: ['eq', 'neq', 'contains', 'in'],
   tag: ['eq', 'neq', 'contains', 'in', 'notIn'],
-  assetGroup: ['eq', 'neq', 'in', 'notIn'],
+  project: ['eq', 'neq', 'in', 'notIn'],
   isNew: ['eq'],
 };
 
@@ -48,7 +48,7 @@ const CHECKS: Partial<Record<AssetFilterField, FilterFieldSpec['check']>> = {
   ip: (v, op) => (op === 'inSubnet' ? isCidr(v) : isIP(v) && !v.includes('%')), // inet rejects zone ids -> would be a 500
   port: (v) => /^\d{1,5}$/.test(v) && Number(v) <= 65535,
   statusCode: (v) => /^\d{3}$/.test(v),
-  assetGroup: (v) => isUUID(v),
+  project: (v) => isUUID(v),
   isNew: (v) => v === 'true' || v === 'false',
 };
 
@@ -101,8 +101,8 @@ const FIELD_SQL: Record<Exclude<AssetFilterField, 'isNew'>, Pick<FilterFieldSpec
     any: (p) => `EXISTS (SELECT 1 FROM asset_services_tags ast WHERE ast."assetServiceId" = asset_service.id AND ast.tag = ANY(${p}))`,
     like: (p) => `EXISTS (SELECT 1 FROM asset_services_tags ast WHERE ast."assetServiceId" = asset_service.id AND ast.tag ILIKE ${p})`,
   },
-  assetGroup: {
-    any: (p) => `EXISTS (SELECT 1 FROM project_assets aga WHERE aga."assetId" = asset.id AND aga."projectId" = ANY(CAST(${p} AS uuid[])))`,
+  project: {
+    any: (p) => `EXISTS (SELECT 1 FROM project_assets pa WHERE pa."assetId" = asset.id AND pa."projectId" = ANY(CAST(${p} AS uuid[])))`,
   },
 };
 

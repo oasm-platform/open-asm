@@ -10,6 +10,7 @@ import { AuditSink } from './sinks/audit/audit.sink';
 import { IntegrationsSink } from './sinks/integrations/integrations.sink';
 import { NotificationsSink } from './sinks/notifications/notifications.sink';
 import { ProjectionSink } from './sinks/projection/projection.sink';
+import { ProjectsSink } from './sinks/projects/projects.sink';
 
 /**
  * Guards the one wiring mistake that is invisible everywhere else: a lane
@@ -39,7 +40,13 @@ describe('EventBridgeModule wiring', () => {
         (provider as { provide?: unknown }).provide === token,
     );
 
-  const allSinks = [AuditSink, ProjectionSink, NotificationsSink, IntegrationsSink];
+  const allSinks = [
+    AuditSink,
+    ProjectionSink,
+    NotificationsSink,
+    IntegrationsSink,
+    ProjectsSink,
+  ];
 
   it('registers every sink as a provider', () => {
     for (const sink of allSinks) {
@@ -66,6 +73,7 @@ describe('EventBridgeModule wiring', () => {
       new ProjectionSink(),
       new NotificationsSink(dummy, dummy, dummy, dummy),
       new IntegrationsSink(dummy, dummy, dummy),
+      new ProjectsSink(dummy),
     ].map((sink) => sink.group);
 
     expect(groups.sort()).toEqual(Object.values(EventBusGroup).sort());

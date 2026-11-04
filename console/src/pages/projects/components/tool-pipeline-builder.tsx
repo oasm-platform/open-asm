@@ -49,19 +49,30 @@ import {
 } from 'react';
 import { toast } from 'sonner';
 
-/** A single tool entry in the pipeline. The pipeline is an unordered set — the tools all run at once. */
+/**
+ * A single tool entry in the pipeline. Tools of one step run at once; a step
+ * starts when every tool of the previous step is done.
+ */
 export interface PipelineToolEntry {
   toolId: string;
   config?: Record<string, unknown>;
   configProfileId?: string;
   /** Category to run the tool in; omitted → the tool's first. */
   category?: ToolCategory;
+  /** Step of the pipeline, from 1; omitted → 1. */
+  stage?: number;
 }
+
+/** Highest step a tool can be moved to: one past the last used step. */
+const MAX_STAGES = 10;
+
+const stageOf = (entry: Pick<PipelineToolEntry, 'stage'>) =>
+  entry.stage && entry.stage > 0 ? entry.stage : 1;
 
 interface ToolPipelineBuilderProps {
   /** Full tool objects (with type / hasConfigProfile / isReady / logoUrl). */
   tools: Tool[];
-  /** The selected entries. Order is presentation only; they run in parallel. */
+  /** The selected entries, each with its step. */
   value: PipelineToolEntry[];
   onChange: (next: PipelineToolEntry[]) => void;
   disabled?: boolean;
@@ -324,11 +335,9 @@ const PipelineToolLogo = memo(
 );
 
 /**
- * Action panel for a selected tool: config profile, inline config, remove.
- *
- * There is no ordering control: the selected tools are saved as jobs without
- * `needs`, so they all run at once, and the map key order is not preserved by
- * jsonb anyway — a "move up" here would snap back on the next refetch.
+ * Action panel for a selected tool: step, config profile, inline config,
+ * remove. The step is saved as `needs` on the previous step's jobs, so it
+ * survives the round trip (jsonb does not keep key order, `needs` does).
  */
 const SelectedToolPanel = memo(function SelectedToolPanel({
   tool,
@@ -340,9 +349,12 @@ const SelectedToolPanel = memo(function SelectedToolPanel({
   onRemove,
   onOpenSheet,
   onProfilesLoaded,
+  stageCount,
 }: {
   tool: Tool;
   entry: PipelineToolEntry;
+  /** Steps offered: the used ones plus one more. */
+  stageCount: number;
   knownProfileIds: readonly string[] | undefined;
   disabled?: boolean;
   onClose: () => void;
@@ -382,6 +394,25 @@ const SelectedToolPanel = memo(function SelectedToolPanel({
         {usesDefault && <Badge variant="soft">Using default</Badge>}
 
       </div>
+      <Select
+        value={String(stageOf(entry))}
+        onValueChange={(value) =>
+          onPatchEntry(tool.id, { stage: Number(value) })
+        }
+        disabled={disabled}
+      >
+        <SelectTrigger aria-label="Step" className="h-8">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {Array.from({ length: stageCount }, (_, i) => i + 1).map((stage) => (
+            <SelectItem key={stage} value={String(stage)}>
+              Step {stage}
+              {stage === 1 ? ' (starts the run)' : ''}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       {tool.categories && tool.categories.length > 1 && (
         <Select
           value={entry.category ?? tool.categories[0].name}
@@ -598,6 +629,37 @@ const MissingToolPopover = memo(function MissingToolPopover({
  * The selected tools are saved as jobs with no `needs`, so they run in
  * parallel — there is deliberately no ordering control.
  */
+/** The pipeline read left to right: each step and the tools it runs. */
+function PipelineStages({
+  value,
+  tools,
+}: {
+  value: PipelineToolEntry[];
+  tools: Tool[];
+}) {
+  const names = new Map(tools.map((tool) => [tool.id, tool.name]));
+  const stages = [...new Set(value.map(stageOf))].sort((a, b) => a - b);
+  return (
+    <ol
+      className="flex flex-wrap items-center gap-2 text-xs"
+      aria-label="Pipeline order"
+    >
+      {stages.map((stage, index) => (
+        <li key={stage} className="flex items-center gap-2">
+          {index > 0 && <span className="text-muted-foreground">→</span>}
+          <span className="flex items-center gap-1 rounded-md border bg-muted/40 px-2 py-1">
+            <span className="font-medium text-muted-foreground">{index + 1}</span>
+            {value
+              .filter((entry) => stageOf(entry) === stage)
+              .map((entry) => names.get(entry.toolId) ?? 'unknown')
+              .join(', ')}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 function ToolPipelineBuilderComponent({
   tools,
   value,
@@ -636,6 +698,11 @@ function ToolPipelineBuilderComponent({
   const byId = useMemo(() => new Map(tools.map((t) => [t.id, t])), [tools]);
   const entryById = useMemo(
     () => new Map(value.map((e) => [e.toolId, e])),
+    [value],
+  );
+  // The used steps plus one more, so a tool can always move after the rest.
+  const stageCount = useMemo(
+    () => Math.min(MAX_STAGES, Math.max(1, ...value.map(stageOf)) + 1),
     [value],
   );
   const filteredTools = useMemo(() => {
@@ -805,7 +872,7 @@ function ToolPipelineBuilderComponent({
           </div>
           <span className="text-xs text-muted-foreground">
             {value.length} selected
-            {value.length > 0 ? ' · runs in parallel' : ''}
+            {value.length > 0 && stageCount <= 2 ? ' · runs in parallel' : ''}
           </span>
         </div>
 
@@ -877,6 +944,7 @@ function ToolPipelineBuilderComponent({
                   <SelectedToolPanel
                     tool={tool}
                     entry={entry}
+                    stageCount={stageCount}
                     knownProfileIds={knownProfilesByTool[tool.id]}
                     disabled={disabled}
                     onClose={handleCloseActive}
@@ -903,6 +971,7 @@ function ToolPipelineBuilderComponent({
             );
           })}
         </div>
+        {stageCount > 2 && <PipelineStages value={value} tools={tools} />}
         {tools.length > 0 && filteredTools.length === 0 && (
           <p className="text-sm text-muted-foreground">
             No tools match &quot;{search.trim()}&quot;

@@ -1,11 +1,12 @@
 import type { FilterFieldConfig, FilterOp, FilterSuggestion } from '@/components/filter-builder/filter-model';
 import {
-  type GetManyAssetGroupDto, type GetManyGetHostAssetsDTODto, type GetManyGetIpAssetsDTODto, type GetManyGetPortAssetsDTODto,
+  type GetManyGetHostAssetsDTODto, type GetManyGetIpAssetsDTODto, type GetManyGetPortAssetsDTODto,
   type GetManyGetStatusCodeAssetsDTODto, type GetManyGetTagAssetsDTODto, type GetManyGetTechnologyAssetsDTODto,
-  type GetManyGetTlsResponseDtoDto, type GetManyGetUrlAssetsDTODto,
-  useAssetGroupControllerGetAll, useAssetsControllerGetHostAssets, useAssetsControllerGetIpAssets,
+  type GetManyGetTlsResponseDtoDto, type GetManyGetUrlAssetsDTODto, type GetManyProjectListItemDtoDto,
+  useAssetsControllerGetHostAssets, useAssetsControllerGetIpAssets,
   useAssetsControllerGetPortAssets, useAssetsControllerGetStatusCodeAssets, useAssetsControllerGetTagAssets,
   useAssetsControllerGetTechnologyAssets, useAssetsControllerGetTlsAssets, useAssetsControllerGetUrlAssets,
+  useProjectsControllerGetMany,
 } from '@/services/apis/gen/queries';
 import { useAsset } from './context/asset-context';
 
@@ -65,12 +66,11 @@ export const ASSET_FILTER_FIELDS: FilterFieldConfig[] = [
   { key: 'isNew', label: 'New', operators: ['eq'],
     useSuggestions: () => ({ options: NEW_OPTIONS, isFetching: false }),
     validate: (v) => (v === 'true' || v === 'false' ? null : 'Pick true or false') },
-  // Key stays 'assetGroup' until the API filter field is renamed to 'project'.
-  { key: 'assetGroup', label: 'Project', operators: ['eq', 'neq', 'in', 'notIn'],
+  { key: 'project', label: 'Project', operators: ['eq', 'neq', 'in', 'notIn'],
     validate: (v) => (UUID.test(v) ? null : 'Pick a project from the list'),
     useSuggestions: (s, on) => {
       const { targetIds, limit, page } = useScope(s);
-      return wrap(useAssetGroupControllerGetAll({ targetIds, limit, page, search: s || undefined },
-        opts(on, (d: GetManyAssetGroupDto) => d.data.map((g) => ({ value: g.id, label: g.name })))));
+      return wrap(useProjectsControllerGetMany({ targetIds, limit, page, search: s || undefined, status: 'all' },
+        opts(on, (d: GetManyProjectListItemDtoDto) => d.data.map((g) => ({ value: g.id, label: g.name })))));
     } },
 ];

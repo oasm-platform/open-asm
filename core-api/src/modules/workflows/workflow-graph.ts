@@ -41,7 +41,7 @@ export interface WorkflowStepDefinition {
 /**
  * `content.jobs` as authored. The map form is canonical; the array form is the
  * legacy shape and is still accepted so workflows created before the switch
- * (e.g. asset-group pipelines already in the database) keep running.
+ * (e.g. project pipelines already in the database) keep running.
  */
 export type WorkflowJobsInput =
   | Record<string, WorkflowStepDefinition>

@@ -2,7 +2,6 @@ import { BullMQName } from '@/common/enums/enum';
 import { BullModule } from '@nestjs/bullmq';
 import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AssetGroupWorkflow } from '../asset-group/entities/asset-groups-workflows.entity';
 import { IssueComment } from '../issues/entities/issue-comment.entity';
 import { Issue } from '../issues/entities/issue.entity';
 import { ConnectorsModule } from '../connectors/connectors.module';
@@ -17,10 +16,7 @@ import { JobsRegistryService } from './jobs-registry.service';
 import { JobResultCleanupService } from './job-result-cleanup.service';
 import { JobRetentionService } from './job-retention.service';
 import { JobResultProcessor } from './processors/job-result.processor';
-import {
-  AssetGroupsScheduleConsumer,
-  AssetsDiscoveryScheduleConsumer,
-} from './processors/scan-schedule.processor';
+import { AssetsDiscoveryScheduleConsumer } from './processors/scan-schedule.processor';
 import { WorkflowRunReconcilerService } from './workflow-run-reconciler.service';
 import { WorkflowRunnerService } from './workflow-runner.service';
 
@@ -30,7 +26,6 @@ import { WorkflowRunnerService } from './workflow-runner.service';
     TypeOrmModule.forFeature([
       Job,
       JobHistory,
-      AssetGroupWorkflow,
       JobErrorLog,
       Issue,
       IssueComment,
@@ -52,7 +47,6 @@ import { WorkflowRunnerService } from './workflow-runner.service';
     WorkflowRunnerService,
     WorkflowRunReconcilerService,
     AssetsDiscoveryScheduleConsumer,
-    AssetGroupsScheduleConsumer,
     JobResultProcessor,
     JobResultCleanupService,
     JobRetentionService,

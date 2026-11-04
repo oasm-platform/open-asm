@@ -15,7 +15,7 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { AssetGroupWorkflow } from '../asset-group/entities/asset-groups-workflows.entity';
+import { ProjectWorkflow } from '../projects/entities/project-workflow.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { DataAdapterService } from '../data-adapter/data-adapter.service';
 import { StorageService } from '../storage/storage.service';
@@ -73,11 +73,11 @@ describe('JobsRegistryService', () => {
     save: jest.fn(),
   };
 
-  const mockAssetGroupWorkflowRepository = {
+  const mockProjectWorkflowRepository = {
     createQueryBuilder: jest.fn(),
   };
 
-  let mockAssetGroupWorkflowQB: {
+  let mockProjectWorkflowQB: {
     select: jest.Mock;
     innerJoin: jest.Mock;
     where: jest.Mock;
@@ -126,15 +126,15 @@ describe('JobsRegistryService', () => {
   };
 
   beforeEach(async () => {
-    mockAssetGroupWorkflowQB = {
+    mockProjectWorkflowQB = {
       select: jest.fn().mockReturnThis(),
       innerJoin: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
       getOne: jest.fn().mockResolvedValue(null),
     };
-    mockAssetGroupWorkflowRepository.createQueryBuilder.mockReturnValue(
-      mockAssetGroupWorkflowQB,
+    mockProjectWorkflowRepository.createQueryBuilder.mockReturnValue(
+      mockProjectWorkflowQB,
     );
 
     const module: TestingModule = await Test.createTestingModule({
@@ -152,8 +152,8 @@ describe('JobsRegistryService', () => {
           useValue: mockJobErrorLogRepository,
         },
         {
-          provide: getRepositoryToken(AssetGroupWorkflow),
-          useValue: mockAssetGroupWorkflowRepository,
+          provide: getRepositoryToken(ProjectWorkflow),
+          useValue: mockProjectWorkflowRepository,
         },
         {
           provide: DataSource,

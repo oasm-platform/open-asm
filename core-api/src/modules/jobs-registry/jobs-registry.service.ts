@@ -18,8 +18,11 @@ import {
 import bindingCommand from '@/utils/bindingCommand';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { InjectQueue } from '@nestjs/bullmq';
+import type { WrapperType } from '@/common/types/app.types';
 import {
   BadRequestException,
+  forwardRef,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -181,7 +184,11 @@ export class JobsRegistryService {
     @InjectRepository(JobErrorLog)
     public readonly jobErrorLogRepo: Repository<JobErrorLog>,
     private dataSource: DataSource,
-    @Optional() private toolsService: ToolsService,
+    // forwardRef: tools.service → workers.service → this file is a load-time
+    // cycle; a direct reference here breaks whenever tools.service loads first.
+    @Optional()
+    @Inject(forwardRef(() => ToolsService))
+    private toolsService: WrapperType<ToolsService>,
     private storageService: StorageService,
     @InjectQueue(BullMQName.JOB_RESULT) private jobResultQueue: Queue,
     private eventEmitter: EventEmitter2,

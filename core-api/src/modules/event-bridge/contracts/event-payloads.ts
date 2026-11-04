@@ -39,7 +39,21 @@ export interface VulnerabilityDetectedPayload {
   targetId: string;
   assetId: string;
   assetValue: string;
+  /** Project whose run found them; absent for runs outside a project. */
+  projectId?: string;
   vulnerabilities: DetectedVulnerability[];
+}
+
+/**
+ * `asset.discovered` — the asset rows one discovery batch created under a
+ * target (a scan's subdomains, an integration sync). Assets that already
+ * existed are not repeated.
+ */
+export interface AssetDiscoveredPayload {
+  targetId: string;
+  /** The run that found them, when a scan did. */
+  jobHistoryId?: string;
+  assetIds: string[];
 }
 
 /** `workflow.run.completed` — the run's asset deltas and unfinished steps. */
@@ -104,6 +118,7 @@ export interface VulnerabilityAnalysisCompletedPayload {
 }
 
 export interface EventPayloadMap {
+  'asset.discovered': AssetDiscoveredPayload;
   'vulnerability.detected': VulnerabilityDetectedPayload;
   'workflow.run.completed': WorkflowRunCompletedPayload;
   'vulnerability.analysis.completed': VulnerabilityAnalysisCompletedPayload;
