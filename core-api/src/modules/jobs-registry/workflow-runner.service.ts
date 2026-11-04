@@ -237,6 +237,7 @@ export class WorkflowRunnerService {
               config: step.config,
               configProfileId: step.configProfileId,
               category: step.category,
+              input: step.input,
               // Every step of a run reuses the scope captured at start, so a
               // subdomain step's newly discovered assets are picked up by the
               // next step while a project run stays inside its selection.

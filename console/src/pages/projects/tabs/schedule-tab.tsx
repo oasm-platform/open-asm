@@ -189,8 +189,9 @@ export function ScheduleTab({
               Triggers
             </CardTitle>
             <CardDescription>
-              Turning a trigger off keeps its settings. Archiving the project
-              turns every trigger off until it is reopened.
+              Each workflow keeps its triggers in its file (<code>on:</code>);
+              turning one off here leaves it there. Archiving the project turns
+              every trigger off until it is reopened.
             </CardDescription>
           </div>
           <Button

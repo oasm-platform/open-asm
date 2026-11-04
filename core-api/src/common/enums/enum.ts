@@ -52,6 +52,28 @@ export enum ToolCategory {
 }
 
 /**
+ * The kinds of data that flow through a workflow: what a step hands a tool
+ * (its inputs) and what the tool finds (what it produces). docs/workflows.md
+ * explains each kind and what a connector receives for it.
+ */
+export enum DataKind {
+  /** The asset a target was created with: the domain or IP the user added. */
+  TARGET = 'target',
+  /** A hostname or IP address (any asset of a domain, IP or CIDR target). */
+  HOST = 'host',
+  /** An open port of a host, whatever it speaks (`host:port`). */
+  SERVICE = 'service',
+  /** A service that answered HTTP(S), as its base URL (`https://host:8443`). */
+  WEB = 'web',
+  /** A URL with a path, found by URL discovery (`https://host/login`). */
+  URL = 'url',
+  /** A repository of a Git organization target. */
+  REPOSITORY = 'repository',
+  /** A security finding. Tools produce it; none takes it as input yet. */
+  VULNERABILITY = 'vulnerability',
+}
+
+/**
  * Enum representing job statuses
  */
 export enum JobStatus {
@@ -151,8 +173,10 @@ export enum ApiKeyType {
 
 export enum BullMQName {
   ASSETS_DISCOVERY_SCHEDULE = 'assets-discovery-schedule',
-  // The value predates the Projects rename and stays: renaming it would orphan
-  // the repeat schedulers already stored in Redis under the old queue.
+  // Schedules of project workflows (`on.schedule`), one job scheduler per
+  // entry: `project-trigger:<triggerId>`. The value predates the Projects
+  // rename and stays: under a new name the startup reconciliation would
+  // register every schedule again, but nothing would clear the old queue.
   PROJECT_WORKFLOW_SCHEDULE = 'asset-groups-workflow-schedule',
   /** Delayed batches of the "assets added" project trigger. */
   PROJECT_TRIGGER_EVENTS = 'project-trigger-events',

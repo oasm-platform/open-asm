@@ -1,6 +1,6 @@
 import * as fs from 'fs/promises';
 import { FindOperator, type DataSource, type Repository } from 'typeorm';
-import { TargetType, ToolCategory, WorkerType } from '@/common/enums/enum';
+import { DataKind, TargetType, ToolCategory, WorkerType } from '@/common/enums/enum';
 import { RedisLockService } from '@/services/redis/distributed-lock.service';
 import type { StorageService } from '../storage/storage.service';
 import type { Tool } from './entities/tools.entity';
@@ -280,12 +280,20 @@ describe('ToolSyncService categories synchronization', () => {
 
     await runConnectorSync(h.service);
 
+    // A manifest without inputs/produces gets each category's defaults.
     expect(h.rowByName('nmap')!.categories).toEqual([
       {
         name: ToolCategory.PORTS_SCANNER,
         targetTypes: [TargetType.DOMAIN, TargetType.IP, TargetType.CIDR],
+        inputs: [DataKind.HOST],
+        produces: [DataKind.SERVICE],
       },
-      { name: ToolCategory.VULNERABILITIES, targetTypes: [TargetType.DOMAIN] },
+      {
+        name: ToolCategory.VULNERABILITIES,
+        targetTypes: [TargetType.DOMAIN],
+        inputs: [DataKind.HOST],
+        produces: [DataKind.VULNERABILITY],
+      },
     ]);
   });
 
@@ -309,7 +317,12 @@ describe('ToolSyncService categories synchronization', () => {
 
     expect(h.rowByName('future')).toBeUndefined();
     expect(h.rowByName('gitleaks')!.categories).toEqual([
-      { name: ToolCategory.VULNERABILITIES, targetTypes: [TargetType.GIT_ORG] },
+      {
+        name: ToolCategory.VULNERABILITIES,
+        targetTypes: [TargetType.GIT_ORG],
+        inputs: [DataKind.REPOSITORY],
+        produces: [DataKind.VULNERABILITY],
+      },
     ]);
   });
 
@@ -324,7 +337,12 @@ describe('ToolSyncService categories synchronization', () => {
     await runConnectorSync(h.service);
 
     expect(h.rowByName('katana')!.categories).toEqual([
-      { name: ToolCategory.VULNERABILITIES, targetTypes: [TargetType.DOMAIN] },
+      {
+        name: ToolCategory.VULNERABILITIES,
+        targetTypes: [TargetType.DOMAIN],
+        inputs: [DataKind.HOST],
+        produces: [DataKind.VULNERABILITY],
+      },
     ]);
   });
 
@@ -356,7 +374,12 @@ describe('ToolSyncService categories synchronization', () => {
     expect(builtIns.overwrite).toContain('categories');
     expect(builtIns.overwrite).not.toContain('category');
     expect(builtIns.values.find((v) => v.name === 'subfinder')!.categories).toEqual([
-      { name: ToolCategory.SUBDOMAINS, targetTypes: [TargetType.DOMAIN] },
+      {
+        name: ToolCategory.SUBDOMAINS,
+        targetTypes: [TargetType.DOMAIN],
+        inputs: [DataKind.TARGET],
+        produces: [DataKind.HOST],
+      },
     ]);
   });
 });

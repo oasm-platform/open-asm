@@ -205,7 +205,7 @@ describe('ProjectWorkflowsService', () => {
       expect(ctx.workflowsService.updateWorkflow).not.toHaveBeenCalled();
     });
 
-    it('drops target triggers left in an old project workflow', async () => {
+    it('keeps the schedules and drops target triggers left in an old project workflow', async () => {
       const ctx = setup();
       ctx.bindingRepo.findOne.mockResolvedValue({
         ...binding,
@@ -229,6 +229,7 @@ describe('ProjectWorkflowsService', () => {
           content: {
             name: 'Renamed',
             jobs: { nuclei: { run: 'nuclei' } },
+            on: { schedule: '0 0 */3 * *' },
           },
         },
         { id: WORKSPACE_ID },

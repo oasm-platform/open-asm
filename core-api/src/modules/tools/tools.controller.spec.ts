@@ -128,7 +128,14 @@ describe('ToolsController.getConnectorBySlug', () => {
 
     expect(result.capabilities).toEqual(['vulnerabilities']);
     expect(result.categories).toEqual([
-      { name: 'vulnerabilities', targetTypes: ['DOMAIN', 'IP'], inputsSchema },
+      {
+        name: 'vulnerabilities',
+        targetTypes: ['DOMAIN', 'IP'],
+        // Not declared by the manifest: the category's defaults.
+        inputs: ['host'],
+        produces: ['vulnerability'],
+        inputsSchema,
+      },
     ]);
     expect(result).not.toHaveProperty('inputsSchema');
     expect(result).not.toHaveProperty('configSchema');

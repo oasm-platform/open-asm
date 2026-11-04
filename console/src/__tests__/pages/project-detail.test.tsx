@@ -261,6 +261,18 @@ describe('Project detail page', () => {
     expect(screen.getByRole('button', { name: /Add workflow/ })).toBeEnabled();
   });
 
+  it('shows a workflow as its file', async () => {
+    const { user } = renderWithProviders(<ProjectDetail />, at('workflows'));
+
+    await user.click(await screen.findByRole('button', { name: 'View workflow' }));
+
+    const sheet = await screen.findByRole('dialog');
+    expect(within(sheet).getByText('Workflow definition')).toBeInTheDocument();
+    expect(sheet).toHaveTextContent('name: Recon and vuln scan');
+    expect(sheet).toHaveTextContent('run: nuclei');
+    expect(sheet).toHaveTextContent('- subfinder');
+  });
+
   it('makes an archived project read-only', async () => {
     projectRef.value = { ...baseProject(), archivedAt: '2026-01-05T00:00:00Z' };
     renderWithProviders(<ProjectDetail />, at('overview'));

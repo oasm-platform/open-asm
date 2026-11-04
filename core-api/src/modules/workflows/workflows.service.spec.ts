@@ -331,6 +331,28 @@ describe('WorkflowsService', () => {
       ).rejects.toThrow('Tool "nuclei" has no category "ports_scanner" (has: vulnerabilities)');
     });
 
+    it('rejects a job input its category does not take, and accepts one it does', async () => {
+      toolRepository.find.mockResolvedValue([
+        {
+          name: 'nuclei',
+          categories: [
+            { name: 'vulnerabilities', targetTypes: [], inputs: ['host', 'web'] },
+          ],
+        },
+      ]);
+      const withInput = (input: string[]) => ({
+        name: 'Web scan',
+        content: { name: 'Web scan', jobs: { a: { run: 'nuclei', input } } },
+      });
+
+      await expect(
+        service.createWorkflow(withInput(['url']) as any, user, workspace),
+      ).rejects.toThrow('"nuclei" (vulnerabilities) takes host, web; it cannot take url');
+      await expect(
+        service.createWorkflow(withInput(['web']) as any, user, workspace),
+      ).resolves.toBeDefined();
+    });
+
     it('checks trigger target types against each step category', async () => {
       toolRepository.find.mockResolvedValue([
         {

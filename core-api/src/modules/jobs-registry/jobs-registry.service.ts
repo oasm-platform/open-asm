@@ -39,9 +39,6 @@ import {
   Repository,
   SelectQueryBuilder,
 } from 'typeorm';
-import { AssetService } from '../assets/entities/asset-services.entity';
-import { Asset } from '../assets/entities/assets.entity';
-import type { TargetType } from '@/common/enums/enum';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { StorageService } from '../storage/storage.service';
 import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
@@ -50,9 +47,12 @@ import {
   maskProfile,
 } from '../tools/validators/tool-config-profiles.crypto';
 import { resolveToolCategory } from '../tools/tool-categories';
+import { resolveStepInputs } from '../tools/tool-io';
 import { resolveToolTargetTypes } from '../tools/tool-target-types';
 import { builtInTools } from '../tools/tools-provider/built-in-tools';
 import { ToolsService } from '../tools/tools.service';
+import { planStepInputs } from './step-inputs';
+import { StepScopeLoader } from './step-scope.loader';
 import {
   normalizeNeeds,
   orderedJobEntries,
@@ -151,32 +151,11 @@ const JOB_HISTORY_STATUS_SQL = `CASE
           ELSE '${JobStatus.PENDING}'
         END`;
 
-/** Default HTTPS and HTTP ports win, then the lowest port. */
-const urlDiscoveryPortRank = (port: number): number =>
-  port === 443 ? -2 : port === 80 ? -1 : port;
-
-/**
- * Keeps one service per asset. Connector inputs carry only the host
- * (`buildConnectorInputs`), so URL_DISCOVERY jobs for two ports of the same
- * host received identical inputs and stored the same URLs once per port.
- */
-const oneServicePerAsset = (services: AssetService[]): AssetService[] => {
-  const byAsset = new Map<string, AssetService>();
-  for (const service of services) {
-    const assetId = service.asset?.id ?? service.assetId;
-    const kept = byAsset.get(assetId);
-    if (
-      !kept ||
-      urlDiscoveryPortRank(service.port) < urlDiscoveryPortRank(kept.port)
-    ) {
-      byAsset.set(assetId, service);
-    }
-  }
-  return [...byAsset.values()];
-};
-
 @Injectable()
 export class JobsRegistryService {
+  /** Loads the assets, services and URLs a step's jobs are planned over. */
+  private readonly stepScope: StepScopeLoader;
+
   constructor(
     @InjectRepository(Job) public readonly repo: Repository<Job>,
     @InjectRepository(JobHistory)
@@ -196,7 +175,9 @@ export class JobsRegistryService {
     private readonly connectorRegistry: ConnectorRegistryService,
     private readonly toolConfigProfilesService: ToolConfigProfilesService,
     private readonly workerStreamRegistry: WorkerStreamRegistry,
-  ) {}
+  ) {
+    this.stepScope = new StepScopeLoader(dataSource);
+  }
   private readonly logger = new Logger(JobsRegistryService.name);
   public async getManyJobs(
     workspaceId: string,
@@ -299,6 +280,7 @@ export class JobsRegistryService {
     configProfileId,
     config,
     category,
+    input,
   }: CreateJobs): Promise<Job[]> {
     if (!tool) {
       throw new Error('Tool is required for creating a job');
@@ -404,48 +386,32 @@ export class JobsRegistryService {
     const jobRepo = this.dataSource.getRepository(Job);
     const jobsToInsert: Job[] = [];
 
-    // A tool only ever receives assets of the target types it declares, so a
-    // host scanner never sees a repository (and vice versa) — whether the run
-    // came from a trigger, a schedule, an asset group or a manual dispatch.
-    // A step left with no eligible asset produces no job and is skipped.
-    const targetTypes = resolveToolTargetTypes(categorySpec);
+    // Which jobs to create: the step's input kinds (its own `input`, else
+    // the category's) over the run's scope. A tool only ever receives assets
+    // of the target types it declares, so a host scanner never sees a
+    // repository (and vice versa). A step with nothing to take creates no job
+    // and is skipped. See step-inputs.ts.
+    const inputs = resolveStepInputs(tool.name, categorySpec, input);
+    const loaded = await this.stepScope.load(inputs, {
+      targetIds,
+      assetIds,
+      assetServiceIds,
+      workspaceId,
+      targetTypes: resolveToolTargetTypes(categorySpec),
+    });
+    const defaultCommand = builtInTools.find(
+      (t) => t.name === tool.name,
+    )?.command;
 
-    // Step 2: find appropriate data source based on the job category
-    if (
-      jobCategory === ToolCategory.HTTP_PROBE ||
-      jobCategory === ToolCategory.SCREENSHOT ||
-      jobCategory === ToolCategory.URL_DISCOVERY
-    ) {
-      // HTTP_PROBE must probe every enabled asset_service port; SCREENSHOT and
-      // URL_DISCOVERY are HTTP-crawl follow-ups and must only target services
-      // httpx actually confirmed live.
-      const liveOnly =
-        jobCategory === ToolCategory.SCREENSHOT ||
-        jobCategory === ToolCategory.URL_DISCOVERY;
-      const services = await this.findAssetServicesForJob(
-        targetIds,
-        assetIds,
-        workspaceId,
-        liveOnly,
-        assetServiceIds,
-        targetTypes,
-      );
-      const assetServices =
-        jobCategory === ToolCategory.URL_DISCOVERY
-          ? oneServicePerAsset(services)
-          : services;
-
-      // Step 3: iterate tools and create jobs
-      const defaultCommand = builtInTools.find(
-        (t) => t.name === tool.name,
-      )?.command;
-
-      // Create jobs for each asset service
-      for (const assetService of assetServices) {
-        const job = jobRepo.create({
+    for (const planned of planStepInputs(inputs, loaded.scope)) {
+      const assetService = planned.serviceId
+        ? loaded.services.get(planned.serviceId)
+        : undefined;
+      jobsToInsert.push(
+        jobRepo.create({
           id: randomUUID(),
-          asset: assetService.asset, // Use the associated asset from asset service
-          assetService, // Store the asset service reference
+          asset: loaded.assets.get(planned.assetId),
+          assetService,
           jobName: tool.name,
           status: JobStatus.PENDING,
           category: jobCategory,
@@ -454,58 +420,14 @@ export class JobsRegistryService {
           jobHistory,
           command: isConnector
             ? undefined
-            : bindingCommand(defaultCommand ?? '', {
-                // Use the default command template for HTTP_PROBE
-                value: assetService.value,
-                port: assetService.port.toString(),
-              }),
+            : bindingCommand(defaultCommand ?? '', planned.commandValues),
+          inputs: isConnector ? planned.connectorInputs : null,
           configProfileId: isConnector ? configProfileId : undefined,
           config: isConnector ? mergedConfig ?? config ?? null : null,
           isSaveRawResult: isSaveRawResult ?? false,
           isPublishEvent,
-        } as DeepPartial<Job>);
-
-        jobsToInsert.push(job);
-      }
-    } else {
-      // For all other categories, use regular assets
-      const assets = await this.findAssetsForJob(
-        targetIds,
-        assetIds,
-        workspaceId,
-        targetTypes,
+        } as DeepPartial<Job>),
       );
-
-      const filteredAssets = this.filterAssetsByCategory(assets, jobCategory);
-
-      // Step 3: iterate tools and create jobs
-      const defaultCommand = builtInTools.find(
-        (t) => t.name === tool.name,
-      )?.command;
-
-      for (const asset of filteredAssets) {
-        const job = jobRepo.create({
-          id: randomUUID(),
-          asset,
-          jobName: tool.name,
-          status: JobStatus.PENDING,
-          category: jobCategory,
-          tool,
-          priority: priority ?? 4,
-          jobHistory,
-          command: isConnector
-            ? undefined
-            : bindingCommand(defaultCommand ?? '', {
-                value: asset.value,
-              }),
-          configProfileId: isConnector ? configProfileId : undefined,
-          config: isConnector ? mergedConfig ?? config ?? null : null,
-          isSaveRawResult: isSaveRawResult ?? false,
-          isPublishEvent,
-        } as DeepPartial<Job>);
-
-        jobsToInsert.push(job);
-      }
     }
 
     // Step 4: save all jobs
@@ -584,137 +506,6 @@ export class JobsRegistryService {
     });
 
     return failedJob;
-  }
-
-  /**
-   * Finds assets for job creation based on targetIds, assetIds, and workspaceId
-   * @param targetIds list of target IDs to filter assets
-   * @param assetIds list of asset IDs to filter assets
-   * @param workspaceId workspace ID to filter assets
-   * @param targetTypes only assets whose target has one of these types
-   * @returns Promise<Array<Asset>> list of filtered assets
-   */
-  private async findAssetsForJob(
-    targetIds: string[] | undefined,
-    assetIds: string[] | undefined,
-    workspaceId: string | undefined,
-    targetTypes: TargetType[],
-  ): Promise<Asset[]> {
-    const assetsQueryBuilder = this.dataSource
-      .getRepository(Asset)
-      .createQueryBuilder('assets')
-      .innerJoin('assets.target', 'target')
-      .where('assets.isEnabled = true')
-      .andWhere('target.type IN (:...targetTypes)', { targetTypes });
-
-    if (targetIds && targetIds.length > 0) {
-      assetsQueryBuilder.andWhere('assets.targetId IN (:...targetIds)', {
-        targetIds,
-      });
-    }
-
-    if (assetIds && assetIds.length > 0) {
-      assetsQueryBuilder.andWhere('assets.id IN (:...assetIds)', {
-        assetIds,
-      });
-    }
-
-    if (workspaceId) {
-      assetsQueryBuilder.andWhere('target.workspaceId = :workspaceId', {
-        workspaceId,
-      });
-    }
-
-    return await assetsQueryBuilder.getMany();
-  }
-
-  /**
-   * Finds asset services for HTTP_PROBE / SCREENSHOT job creation based on
-   * targetIds, assetIds, and workspaceId.
-   * @param targetIds list of target IDs to filter asset services
-   * @param assetIds list of asset IDs to filter asset services
-   * @param workspaceId workspace ID to filter asset services
-   * @param liveOnly when true, restrict to services with an http_responses
-   *   row where failed = false (i.e. httpx confirmed live). Used by
-   *   SCREENSHOT so jobs are not created for every open port naabu found.
-   *   NOTE: isErrorPage = false is NOT sufficient — a service with ZERO
-   *   http_responses rows also has isErrorPage = false (default), so the
-   *   EXISTS predicate on http_responses with failed = false is the
-   *   authoritative "httpx confirmed live" predicate.
-   * @param targetTypes only services whose asset's target has one of these types
-   * @returns Promise<Array<AssetService>> list of filtered asset services
-   */
-  private async findAssetServicesForJob(
-    targetIds: string[] | undefined,
-    assetIds: string[] | undefined,
-    workspaceId: string | undefined,
-    liveOnly: boolean | undefined,
-    assetServiceIds: string[] | undefined,
-    targetTypes: TargetType[],
-  ): Promise<AssetService[]> {
-    const assetServicesQueryBuilder = this.dataSource
-      .getRepository(AssetService)
-      .createQueryBuilder('assetServices')
-      .innerJoinAndSelect('assetServices.asset', 'asset')
-      .innerJoin('asset.target', 'target')
-      .where('asset.isEnabled = true')
-      .andWhere('target.type IN (:...targetTypes)', { targetTypes });
-
-    if (liveOnly) {
-      // EXISTS semi-join: keeps the row set unmultiplied, so no DISTINCT is
-      // needed. DISTINCT over the asset join previously failed on
-      // asset.dnsRecords (PG `json` has no equality operator). The outer alias
-      // must stay double-quoted — unquoted assetServices folds to lowercase.
-      assetServicesQueryBuilder.andWhere(
-        'EXISTS (SELECT 1 FROM http_responses hr WHERE hr."assetServiceId" = "assetServices"."id" AND hr.failed = false)',
-      );
-    }
-
-    if (targetIds && targetIds.length > 0) {
-      assetServicesQueryBuilder.andWhere('asset.targetId IN (:...targetIds)', {
-        targetIds,
-      });
-    }
-
-    if (assetIds && assetIds.length > 0) {
-      assetServicesQueryBuilder.andWhere(
-        'assetServices.assetId IN (:...assetIds)',
-        {
-          assetIds,
-        },
-      );
-    }
-
-    if (assetServiceIds && assetServiceIds.length > 0) {
-      assetServicesQueryBuilder.andWhere(
-        'assetServices.id IN (:...assetServiceIds)',
-        { assetServiceIds },
-      );
-    }
-
-    if (workspaceId) {
-      assetServicesQueryBuilder.andWhere('target.workspaceId = :workspaceId', {
-        workspaceId,
-      });
-    }
-
-    return await assetServicesQueryBuilder.getMany();
-  }
-
-  /**
-   * Filters assets based on tool category
-   * @param assets list of assets to filter
-   * @param toolCategory the category of the tool
-   * @returns filtered list of assets
-   */
-  private filterAssetsByCategory(
-    assets: Asset[],
-    toolCategory: ToolCategory,
-  ): Asset[] {
-    if (toolCategory === ToolCategory.SUBDOMAINS) {
-      return assets.filter((asset) => asset.isPrimary);
-    }
-    return assets;
   }
 
   /**
@@ -911,12 +702,14 @@ export class JobsRegistryService {
         (worker.workspace as { id?: string })?.id;
       base.configProfileId = job.configProfileId;
       base.config = job.config;
+      base.inputs = job.inputs;
     } else if (isBuiltInTools && job.tool) {
       // Connector job picked up by BUILT_IN worker
       base.tool = { id: job.tool.id!, name: job.tool.name };
       base.workspaceId = job.asset.target?.workspaceId;
       base.configProfileId = job.configProfileId;
       base.config = job.config;
+      base.inputs = job.inputs;
     }
 
     return base;

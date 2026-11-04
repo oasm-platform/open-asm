@@ -1,10 +1,12 @@
-import type { ToolCategory } from '@/common/enums/enum';
+import type { DataKind, ToolCategory } from '@/common/enums/enum';
 import type { WorkflowJob } from '../workflows/entities/workflow.entity';
 
 /** One tool of a project pipeline, resolved to its name. */
 export interface PipelineStep {
   run: string;
   category?: ToolCategory;
+  /** Input kinds, best first; omitted → the tool's own. */
+  input?: DataKind[];
   config?: Record<string, unknown>;
   configProfileId?: string;
   /**
@@ -50,6 +52,7 @@ export function buildPipelineJobs(
       const job: WorkflowJob = {
         run: step.run,
         ...(step.category ? { category: step.category } : {}),
+        ...(step.input?.length ? { input: step.input } : {}),
         ...(needs.length > 0 ? { needs } : {}),
         ...(step.config ? { config: step.config } : {}),
         ...(step.configProfileId

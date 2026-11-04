@@ -1,4 +1,4 @@
-import { ToolCategory } from '@/common/enums/enum';
+import { DataKind, ToolCategory } from '@/common/enums/enum';
 import {
   buildPipelineJobs,
   isProjectOwnedWorkflow,
@@ -21,6 +21,18 @@ describe('buildPipelineJobs', () => {
       httpx: { run: 'httpx', needs: ['naabu'] },
       nuclei: { run: 'nuclei', needs: ['httpx'] },
       screenshot: { run: 'screenshot', needs: ['httpx'] },
+    });
+  });
+
+  it("keeps a tool's chosen input on its job", () => {
+    expect(
+      buildPipelineJobs([
+        { run: 'httpx', stage: 1 },
+        { run: 'nuclei', stage: 2, input: [DataKind.WEB] },
+      ]),
+    ).toEqual({
+      httpx: { run: 'httpx' },
+      nuclei: { run: 'nuclei', input: ['web'], needs: ['httpx'] },
     });
   });
 

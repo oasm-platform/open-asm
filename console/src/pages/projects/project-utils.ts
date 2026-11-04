@@ -7,6 +7,7 @@ import {
   type ProjectToolInput,
   type SeverityCountsDto,
   type Tool,
+  type DataKind,
   type ToolCategory,
   type WorkflowContent,
 } from '@/services/apis/gen/queries';
@@ -125,6 +126,7 @@ type JobLike = {
   run: string;
   needs?: string | string[];
   category?: ToolCategory;
+  input?: DataKind[];
   config?: Record<string, unknown>;
   configProfileId?: string;
 };
@@ -189,6 +191,7 @@ export function entriesFromContent(
       {
         toolId: tool.id,
         ...(job.category ? { category: job.category } : {}),
+        ...(job.input?.length ? { input: job.input } : {}),
         ...(job.config ? { config: job.config } : {}),
         ...(job.configProfileId ? { configProfileId: job.configProfileId } : {}),
         stage: stages.get(id) ?? 1,
@@ -204,5 +207,6 @@ export const toToolInputs = (entries: PipelineToolEntry[]): ProjectToolInput[] =
     ...(entry.config ? { config: entry.config } : {}),
     ...(entry.configProfileId ? { configProfileId: entry.configProfileId } : {}),
     ...(entry.category ? { category: entry.category } : {}),
+    ...(entry.input?.length ? { input: entry.input } : {}),
     ...(entry.stage && entry.stage > 1 ? { stage: entry.stage } : {}),
   }));
