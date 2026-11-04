@@ -112,6 +112,35 @@ describe('VulnerabilitiesService', () => {
     );
   });
 
+  it('scan forwards the first job input, as a workflow run would', async () => {
+    mockToolsService.getToolByNames.mockResolvedValue([{ name: 'nuclei', priority: 4 }]);
+    mockWorkflowRepository.findOne.mockResolvedValue({
+      id: 'workflow-1',
+      content: { jobs: { vuls_scan: { run: 'nuclei', input: ['web', 'host'] } } },
+    });
+
+    await service.scan(['target-1'], 'ws-1');
+
+    expect(mockJobRegistryService.createNewJob).toHaveBeenCalledWith(
+      expect.objectContaining({ input: ['web', 'host'] }),
+    );
+  });
+
+  it('scan leaves the input to the tool when the step sets none', async () => {
+    mockToolsService.getToolByNames.mockResolvedValue([{ name: 'nuclei', priority: 4 }]);
+    mockWorkflowRepository.findOne.mockResolvedValue({
+      id: 'workflow-1',
+      content: { jobs: { vuls_scan: { run: 'nuclei' } } },
+    });
+
+    await service.scan(['target-1'], 'ws-1');
+
+    // An empty list means "the tool's own inputs" (resolveStepInputs).
+    expect(mockJobRegistryService.createNewJob).toHaveBeenCalledWith(
+      expect.objectContaining({ input: [] }),
+    );
+  });
+
   it('scan sends host targets to nuclei and Git orgs to the repository_scan workflow', async () => {
     mockTargetRepository.find.mockResolvedValue([
       { id: 'domain-1', type: TargetType.DOMAIN, value: 'example.com' },
@@ -222,6 +251,24 @@ describe('VulnerabilitiesService', () => {
     expect(new Set(job!.config?.severity)).toEqual(
       new Set(['info', 'low', 'medium', 'high', 'critical']),
     );
+  });
+
+  it('shipped vulnerability_scan_basic template scans every live web service, else the host', () => {
+    const templatePath = path.join(
+      __dirname,
+      '..',
+      'workflows',
+      'templates',
+      'vulnerability_scan_basic.yaml',
+    );
+    const doc = yaml.load(fs.readFileSync(templatePath, 'utf8')) as {
+      jobs: Record<string, { run: string; input?: string[] }>;
+    };
+
+    const job = Object.values(doc.jobs).find((j) => j.run === 'nuclei');
+    // nuclei takes [host, web] on its own; the scan prefers the URL httpx
+    // probed, so https and non-standard ports are scanned too.
+    expect(job?.input).toEqual(['web', 'host']);
   });
 
   it('shipped vulnerability_scan_basic template matches the connector defaults (interactsh on, no redirects)', () => {
