@@ -471,15 +471,40 @@ export class JobsRegistryService {
 
       const filteredAssets = this.filterAssetsByCategory(assets, jobCategory);
 
+      // Nuclei needs an explicit port per job; a bare host only probes the
+      // default web ports. Keep host-only scans for assets not yet port-scanned.
+      const servicesByAsset = new Map<string, AssetService[]>();
+      if (tool.name === 'nuclei' && jobCategory === ToolCategory.VULNERABILITIES) {
+        const services = await this.findAssetServicesForJob(
+          targetIds, assetIds, workspaceId, false, assetServiceIds, targetTypes,
+        );
+        for (const service of services) {
+          const id = service.assetId ?? service.asset.id;
+          const group = servicesByAsset.get(id) ?? [];
+          group.push(service);
+          servicesByAsset.set(id, group);
+        }
+      }
+      const scanTargets = filteredAssets.flatMap<{
+        asset: Asset;
+        assetService?: AssetService;
+      }>((asset) => {
+        const services = servicesByAsset.get(asset.id);
+        return services?.length
+          ? services.map((assetService) => ({ asset, assetService }))
+          : [{ asset, assetService: undefined }];
+      });
+
       // Step 3: iterate tools and create jobs
       const defaultCommand = builtInTools.find(
         (t) => t.name === tool.name,
       )?.command;
 
-      for (const asset of filteredAssets) {
+      for (const { asset, assetService } of scanTargets) {
         const job = jobRepo.create({
           id: randomUUID(),
           asset,
+          assetService,
           jobName: tool.name,
           status: JobStatus.PENDING,
           category: jobCategory,
@@ -892,6 +917,7 @@ export class JobsRegistryService {
       priority: job.priority,
       command: job.command,
       asset: job.asset,
+      assetService: job.assetService,
     };
 
     // Connector support: include tool metadata for non-built-in workers

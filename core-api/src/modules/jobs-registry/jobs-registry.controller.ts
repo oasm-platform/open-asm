@@ -489,6 +489,14 @@ export class JobsRegistryController {
       target?: { type?: string; integrationId?: string | null } | null;
     };
     if (!isRepositoryAsset(asset)) {
+      if (job.tool?.name === 'nuclei' && job.assetService?.port) {
+        // Leave the scheme unset so the connector probes HTTP/HTTPS while
+        // preserving host:port for network templates. Bracket IPv6 literals.
+        const host = asset.value.includes(':') && !asset.value.startsWith('[')
+          ? `[${asset.value}]`
+          : asset.value;
+        return { target: `${host}:${job.assetService.port}` };
+      }
       return buildConnectorInputs(asset);
     }
 

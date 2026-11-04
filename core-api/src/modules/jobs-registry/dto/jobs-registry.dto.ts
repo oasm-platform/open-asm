@@ -43,6 +43,7 @@ export class GetNextJobResponseDto extends PickType(Job, [
 
 /** Extended result returned by getNextJob for connector-capable workers. */
 export interface GetNextJobResult extends GetNextJobResponseDto {
+  assetService?: { port: number } | null;
   tool?: { id: string; name: string };
   workspaceId?: string;
   configProfileId?: string;

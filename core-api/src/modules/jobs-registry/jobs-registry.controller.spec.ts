@@ -146,6 +146,30 @@ describe('JobsRegistryController', () => {
       });
     });
 
+    it.each([
+      ['app.example.com', 80, 'app.example.com:80'],
+      ['app.example.com', 443, 'app.example.com:443'],
+      ['app.example.com', 8080, 'app.example.com:8080'],
+      ['192.0.2.1', 22, '192.0.2.1:22'],
+      ['2001:db8::1', 8443, '[2001:db8::1]:8443'],
+      ['[2001:db8::1]', 8443, '[2001:db8::1]:8443'],
+      ['app.example.com', undefined, 'app.example.com'],
+    ])('sends nuclei the discovered port for %s', async (host, port, target) => {
+      mockJobsRegistryService.getNextJob.mockResolvedValue({
+        id: 'j1', workspaceId: 'ws1', category: 'vulnerabilities',
+        asset: { value: host }, assetService: { port },
+        tool: { id: 'nuclei', name: 'nuclei' },
+      });
+      mockConnectorRegistry.getConnector.mockReturnValue({
+        name: 'Nuclei', slug: 'nuclei', image: 'nuclei:test',
+      });
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({});
+
+      const result = await controller.next({ id: 'worker-1' });
+
+      expect(result.inputs).toEqual({ fields: { target: { stringValue: target } } });
+    });
+
     it('sends repository inputs with the integration token for a Git organization asset', async () => {
       mockJobsRegistryService.getNextJob.mockResolvedValue({
         id: 'job-2',

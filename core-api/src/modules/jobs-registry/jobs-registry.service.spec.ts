@@ -2144,6 +2144,33 @@ describe('JobsRegistryService', () => {
       });
     });
 
+    it('creates nuclei jobs for every discovered port and keeps hosts without ports', async () => {
+      const asset = { id: 'a1', value: 'app.example.com' };
+      const unprobed = { id: 'a2', value: 'new.example.com' };
+      const services = [80, 443, 8080, 8443, 22].map((port) => ({
+        id: `svc-${port}`, assetId: asset.id, asset, value: asset.value, port,
+      }));
+      mockAssetQB.getMany.mockResolvedValue([asset, unprobed]);
+      mockAssetServiceQB.getMany.mockResolvedValue(services);
+
+      const jobs = await service.createNewJob({
+        tool: {
+          id: 'nuclei', name: 'nuclei', priority: 4,
+          categories: [{ name: ToolCategory.VULNERABILITIES, targetTypes: HOST }],
+        } as any,
+        targetIds: ['t1'], workspaceId: 'ws1',
+      });
+
+      expect(jobs).toHaveLength(6);
+      expect(jobs.slice(0, 5).map((job) => job.assetService?.port)).toEqual([80, 443, 8080, 8443, 22]);
+      expect(jobs[5].asset).toEqual(unprobed);
+      expect(jobs[5].assetService).toBeUndefined();
+      expect(existsPredicate()).toBeUndefined();
+      expect(mockAssetServiceQB.andWhere).toHaveBeenCalledWith(
+        'target.workspaceId = :workspaceId', { workspaceId: 'ws1' },
+      );
+    });
+
     it('S1: URL_DISCOVERY finds asset services (not assets) and creates one job per service with assetService + jobHistory', async () => {
       mockAssetServiceQB.getMany.mockResolvedValue([
         makeService('as-1'),
@@ -2513,6 +2540,17 @@ describe('JobsRegistryService', () => {
       expect(queryRunner.manager.update).toHaveBeenCalledTimes(1);
       expect(queryRunner.commitTransaction).toHaveBeenCalled();
       expect(queryRunner.rollbackTransaction).not.toHaveBeenCalled();
+    });
+
+    it('preserves the discovered port when a nuclei job is claimed', async () => {
+      givenWorkerAndQueue(buildWorker(), [{
+        id: 'j1', asset: { id: 'a1', value: 'app.example.com' },
+        tool: { id: 'nuclei', name: 'nuclei' }, assetService: { port: 8080 },
+      }]);
+
+      const jobs = await service.getNextJobs('worker-uuid', 1);
+
+      expect(jobs[0].assetService).toEqual({ port: 8080 });
     });
 
     it('caps the claim so a worker cannot drain the whole queue', async () => {
