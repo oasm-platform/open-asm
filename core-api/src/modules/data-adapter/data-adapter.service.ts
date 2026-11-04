@@ -8,6 +8,7 @@ import { isIP } from 'node:net';
 import { DataSource, EntityManager, InsertResult } from 'typeorm';
 import { Severity, TargetType, ToolCategory } from '../../common/enums/enum';
 import { AssetService } from '../assets/entities/asset-services.entity';
+import { serviceForUrl } from './url-owner';
 import { Asset } from '../assets/entities/assets.entity';
 import { DiscoveredUrl } from '../assets/entities/discovered-url.entity';
 import { DnsRecord } from '../assets/entities/dns-record.entity';
@@ -818,7 +819,9 @@ export class DataAdapterService {
    * URL discovery data normalization: one row per unique URL, attached to the
    * job's AssetService and JobHistory. Deduped in-app (Set) and DB-level
    * (unique constraint + orIgnore) so worker retries / workflow re-runs are
-   * idempotent.
+   * idempotent. A job that ran on a whole host (a tool taking `host`) has no
+   * service: each URL goes to the host's service it belongs to (see
+   * serviceForUrl).
    */
   public async urlDiscovery({
     data,
@@ -829,9 +832,17 @@ export class DataAdapterService {
     await queryRunner.startTransaction();
 
     try {
-      if (!job.assetServiceId) {
+      const hostServices = job.assetServiceId
+        ? []
+        : await queryRunner.manager
+            .getRepository(AssetService)
+            .find({ where: { assetId: job.asset?.id }, select: { id: true, port: true } });
+      const ownerOf = (url: string): string | undefined =>
+        job.assetServiceId ??
+        serviceForUrl(url, job.asset?.value ?? '', hostServices);
+      if (!job.assetServiceId && hostServices.length === 0) {
         this.logger.warn(
-          `urlDiscovery: job ${job.id} has no assetServiceId — skipping`,
+          `urlDiscovery: job ${job.id} has no service to attach URLs to — skipping`,
         );
         await queryRunner.commitTransaction();
         return;
@@ -863,7 +874,7 @@ export class DataAdapterService {
             .values(
               batch.map((url) => ({
                 url,
-                assetServiceId: job.assetServiceId,
+                assetServiceId: ownerOf(url),
                 jobHistoryId: job.jobHistory.id,
               })),
             )

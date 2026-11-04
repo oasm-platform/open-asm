@@ -6,26 +6,35 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  type OnApplicationBootstrap,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
 import { DataSource, EntityManager, Repository } from 'typeorm';
+import { Workflow, type WorkflowContent } from '../workflows/entities/workflow.entity';
 import type {
-  AssetsAddedTriggerConfigDto,
   CreateProjectTriggerDto,
   UpdateProjectTriggerDto,
 } from './dto/project-trigger.dto';
 import { Project } from './entities/project.entity';
 import { ProjectWorkflow } from './entities/project-workflow.entity';
-import {
-  type AssetsAddedTriggerConfig,
-  ProjectWorkflowTrigger,
-} from './entities/project-workflow-trigger.entity';
+import { ProjectWorkflowTrigger } from './entities/project-workflow-trigger.entity';
+import { isProjectOwnedWorkflow } from './pipeline';
 import { findProjectOrFail } from './project-access';
 import { ProjectWorkflowsService } from './project-workflows.service';
+import {
+  ASSETS_ADDED_KEY,
+  cronKey,
+  type DefinedTrigger,
+  DEFAULT_MAX_ASSETS,
+  keyOfRow,
+  normalizeAssetsAddedConfig,
+  onOfTriggers,
+  planTriggerSync,
+  triggersOfOn,
+  WorkflowOnError,
+} from './workflow-on';
 
-export const DEFAULT_WINDOW_MINUTES = 10;
-export const DEFAULT_MAX_ASSETS = 200;
 
 /** Payload of a cron scheduler job: the trigger, or a pre-trigger binding. */
 export interface ProjectScheduleJobData {
@@ -44,17 +53,6 @@ const queuedKey = (triggerId: string) => `project-trigger:${triggerId}:queued`;
 /** How long gathered asset ids survive if their batch job is lost. */
 const PENDING_TTL_SECONDS = 2 * 24 * 60 * 60;
 
-/** Applies the defaults and bounds of an `assets_added` config. */
-export function normalizeAssetsAddedConfig(
-  config: AssetsAddedTriggerConfigDto | AssetsAddedTriggerConfig | undefined,
-): AssetsAddedTriggerConfig {
-  return {
-    windowMinutes: config?.windowMinutes ?? DEFAULT_WINDOW_MINUTES,
-    maxAssets: config?.maxAssets ?? DEFAULT_MAX_ASSETS,
-    targetTypes: config?.targetTypes ?? [],
-  };
-}
-
 /** Splits ids into runs of at most `size`. */
 export function chunk<T>(items: T[], size: number): T[][] {
   const out: T[][] = [];
@@ -67,6 +65,8 @@ export function chunk<T>(items: T[], size: number): T[][] {
 /**
  * When project workflows run on their own.
  *
+ * A workflow's triggers are defined in its file (`on:`, see workflow-on.ts);
+ * `project_workflow_triggers` keeps one row per entry with its state.
  * Cron triggers are BullMQ job schedulers on the project schedule queue (its
  * value predates the rename; see {@link BullMQName.PROJECT_WORKFLOW_SCHEDULE}).
  * "Assets added" triggers gather the assets that joined the project in a Redis
@@ -74,7 +74,7 @@ export function chunk<T>(items: T[], size: number): T[][] {
  * subdomains must not start 500 runs.
  */
 @Injectable()
-export class ProjectTriggersService {
+export class ProjectTriggersService implements OnApplicationBootstrap {
   private readonly logger = new Logger(ProjectTriggersService.name);
 
   constructor(
@@ -107,9 +107,10 @@ export class ProjectTriggersService {
   }
 
   /**
-   * Adds a trigger to one of the project's workflows. A cron needs a cron
-   * expression; a workflow has at most one "assets added" trigger (two would
-   * scan every new asset twice).
+   * Adds a trigger to one of the project's workflows, by writing it into the
+   * workflow's `on:` block (the file is the definition, see workflow-on.ts).
+   * A cron needs a cron expression; a workflow has at most one "assets added"
+   * trigger (two would scan every new asset twice).
    */
   async create(
     projectId: string,
@@ -117,55 +118,48 @@ export class ProjectTriggersService {
     dto: CreateProjectTriggerDto,
     manager: EntityManager = this.dataSource.manager,
   ): Promise<ProjectWorkflowTrigger> {
-    const project = await findProjectOrFail(
-      manager.getRepository(Project),
-      projectId,
-      workspaceId,
-      { writable: true },
-    );
-    const binding = await manager
-      .getRepository(ProjectWorkflow)
-      .findOne({ where: { id: dto.projectWorkflowId, projectId } });
-    if (!binding) {
-      throw new NotFoundException(
-        `Project workflow "${dto.projectWorkflowId}" not found`,
-      );
-    }
+    await findProjectOrFail(manager.getRepository(Project), projectId, workspaceId, {
+      writable: true,
+    });
+    const binding = await this.bindingWithWorkflow(projectId, dto.projectWorkflowId, manager);
 
+    let added: DefinedTrigger;
     if (dto.type === ProjectTriggerType.CRON) {
       assertCron(dto.cron);
+      const cron = dto.cron!.trim();
+      added = { key: cronKey(cron), type: ProjectTriggerType.CRON, cron };
     } else {
-      const existing = await manager.getRepository(ProjectWorkflowTrigger).count({
-        where: {
-          projectWorkflowId: binding.id,
-          type: ProjectTriggerType.ASSETS_ADDED,
-        },
-      });
-      if (existing > 0) {
+      added = {
+        key: ASSETS_ADDED_KEY,
+        type: ProjectTriggerType.ASSETS_ADDED,
+        config: normalizeAssetsAddedConfig(dto.config),
+      };
+    }
+    await this.writeOn(binding, manager, (defined) => {
+      if (defined.some((t) => t.key === added.key)) {
         throw new BadRequestException(
-          'This workflow already runs when assets are added',
+          added.type === ProjectTriggerType.CRON
+            ? 'This workflow already runs on this schedule'
+            : 'This workflow already runs when assets are added',
         );
       }
-    }
+      return [...defined, added];
+    });
 
-    const trigger = await manager.getRepository(ProjectWorkflowTrigger).save(
-      manager.getRepository(ProjectWorkflowTrigger).create({
-        projectWorkflowId: binding.id,
-        type: dto.type,
-        cron: dto.type === ProjectTriggerType.CRON ? dto.cron!.trim() : null,
-        config:
-          dto.type === ProjectTriggerType.ASSETS_ADDED
-            ? normalizeAssetsAddedConfig(dto.config)
-            : {},
-        enabled: dto.enabled ?? true,
-      }),
-    );
-    if (!project.archivedAt) {
-      await this.register(trigger, manager);
+    const rows = await this.syncWorkflow(binding.id, manager);
+    const trigger = rows.find((row) => keyOfRow(row) === added.key)!;
+    if (dto.enabled === false) {
+      trigger.enabled = false;
+      await this.unregister(trigger, manager);
+      await manager.getRepository(ProjectWorkflowTrigger).save(trigger);
     }
     return trigger;
   }
 
+  /**
+   * Changes a trigger. Its schedule and settings live in the workflow file;
+   * whether it is on lives in the table, like disabling a workflow on GitHub.
+   */
   async update(
     projectId: string,
     workspaceId: string,
@@ -178,32 +172,51 @@ export class ProjectTriggersService {
       workspaceId,
       { writable: true },
     );
-    const trigger = await this.findTrigger(projectId, triggerId);
+    let trigger = await this.findTrigger(projectId, triggerId);
+    const binding = await this.bindingWithWorkflow(projectId, trigger.projectWorkflowId);
 
     if (dto.cron !== undefined) {
       if (trigger.type !== ProjectTriggerType.CRON) {
         throw new BadRequestException('Only a cron trigger has a schedule');
       }
       assertCron(dto.cron);
-      trigger.cron = dto.cron.trim();
+      const cron = dto.cron.trim();
+      const oldKey = keyOfRow(trigger);
+      await this.writeOn(binding, this.dataSource.manager, (defined) => {
+        if (cronKey(cron) !== oldKey && defined.some((t) => t.key === cronKey(cron))) {
+          throw new BadRequestException('This workflow already runs on this schedule');
+        }
+        return defined.map((t) =>
+          t.key === oldKey ? { key: cronKey(cron), type: t.type, cron } : t,
+        );
+      });
+      // The row follows its entry, so it keeps its id, state and history.
+      await this.unregister(trigger);
+      trigger.cron = cron;
+      trigger = await this.triggerRepo.save(trigger);
     }
     if (dto.config !== undefined) {
       if (trigger.type !== ProjectTriggerType.ASSETS_ADDED) {
         throw new BadRequestException('Only an "assets added" trigger has settings');
       }
-      trigger.config = normalizeAssetsAddedConfig({
-        ...trigger.config,
-        ...dto.config,
-      });
+      const config = normalizeAssetsAddedConfig({ ...trigger.config, ...dto.config });
+      await this.writeOn(binding, this.dataSource.manager, (defined) =>
+        defined.map((t) => (t.key === ASSETS_ADDED_KEY ? { ...t, config } : t)),
+      );
     }
-    if (dto.enabled !== undefined) trigger.enabled = dto.enabled;
+    if (dto.enabled !== undefined) {
+      trigger.enabled = dto.enabled;
+      trigger = await this.triggerRepo.save(trigger);
+    }
 
-    await this.unregister(trigger);
-    const saved = await this.triggerRepo.save(trigger);
+    await this.syncWorkflow(binding.id);
+    const saved = await this.findTrigger(projectId, triggerId);
+    await this.unregister(saved);
     if (!project.archivedAt) await this.register(saved);
     return saved;
   }
 
+  /** Removes a trigger from its workflow's file, and its row with it. */
   async remove(
     projectId: string,
     workspaceId: string,
@@ -213,9 +226,119 @@ export class ProjectTriggersService {
       writable: true,
     });
     const trigger = await this.findTrigger(projectId, triggerId);
-    await this.unregister(trigger);
-    await this.clearPending(trigger.id);
-    await this.triggerRepo.delete(trigger.id);
+    const binding = await this.bindingWithWorkflow(projectId, trigger.projectWorkflowId);
+    const key = keyOfRow(trigger);
+    await this.writeOn(binding, this.dataSource.manager, (defined) =>
+      defined.filter((t) => t.key !== key),
+    );
+    await this.syncWorkflow(binding.id);
+  }
+
+  /**
+   * Brings a workflow's trigger rows in line with its `on:` block: entries
+   * new to the file get a row (on) and a scheduler, rows whose entry left the
+   * file go with their scheduler, changed settings are copied. Rows that stay
+   * keep whether they are on and when they last fired.
+   *
+   * @returns the workflow's trigger rows after the sync
+   */
+  async syncWorkflow(
+    bindingId: string,
+    manager: EntityManager = this.dataSource.manager,
+  ): Promise<ProjectWorkflowTrigger[]> {
+    const binding = await manager.getRepository(ProjectWorkflow).findOne({
+      where: { id: bindingId },
+      relations: { workflow: true, project: true },
+    });
+    if (!binding) throw new NotFoundException(`Project workflow "${bindingId}" not found`);
+    const repo = manager.getRepository(ProjectWorkflowTrigger);
+    const rows = await repo.find({
+      where: { projectWorkflowId: bindingId },
+      order: { createdAt: 'ASC' },
+    });
+    const plan = planTriggerSync(rows, this.definedTriggers(binding));
+
+    for (const row of plan.remove) {
+      await this.unregister(row, manager);
+      await this.clearPending(row.id);
+      await repo.delete(row.id);
+    }
+    for (const { row, config } of plan.update) {
+      row.config = config;
+      await repo.save(row);
+    }
+    for (const defined of plan.create) {
+      const row = await repo.save(
+        repo.create({
+          projectWorkflowId: bindingId,
+          type: defined.type,
+          cron: defined.cron ?? null,
+          config: defined.config ?? {},
+          enabled: true,
+        }),
+      );
+      if (!binding.project.archivedAt) await this.register(row, manager);
+    }
+    return repo.find({
+      where: { projectWorkflowId: bindingId },
+      order: { createdAt: 'ASC' },
+    });
+  }
+
+  /**
+   * Startup check that BullMQ matches the database: every workflow's rows
+   * follow its file, every enabled cron trigger of an active project has its
+   * scheduler, and no scheduler is left without one. Lost Redis data (a flush,
+   * a new instance) would otherwise stop the schedules silently. Each step is
+   * idempotent, so replicas booting together do no harm.
+   */
+  async reconcileSchedulers(): Promise<{ registered: number; removed: number }> {
+    const bindings = await this.bindingRepo.find({ select: { id: true } });
+    for (const binding of bindings) {
+      try {
+        await this.syncWorkflow(binding.id);
+      } catch (error) {
+        this.logger.warn(
+          `Triggers of project workflow ${binding.id} not synced: ${(error as Error).message}`,
+        );
+      }
+    }
+
+    const triggers = await this.triggerRepo.find({
+      where: { type: ProjectTriggerType.CRON },
+      relations: { projectWorkflow: { project: true } },
+    });
+    const wanted = new Set<string>();
+    let registered = 0;
+    for (const trigger of triggers) {
+      if (trigger.enabled && trigger.cron && !trigger.projectWorkflow.project.archivedAt) {
+        await this.register(trigger);
+        wanted.add(trigger.schedulerId!);
+        registered++;
+      } else if (trigger.schedulerId) {
+        await this.unregister(trigger);
+      }
+    }
+
+    let removed = 0;
+    for (const scheduler of await this.scheduleQueue.getJobSchedulers(0, -1)) {
+      if (wanted.has(scheduler.key)) continue;
+      await this.scheduleQueue.removeJobScheduler(scheduler.key);
+      removed++;
+    }
+    return { registered, removed };
+  }
+
+  async onApplicationBootstrap(): Promise<void> {
+    try {
+      const { registered, removed } = await this.reconcileSchedulers();
+      this.logger.log(
+        `Project schedules: ${registered} registered, ${removed} orphaned scheduler(s) removed`,
+      );
+    } catch (error) {
+      // Best effort: a broken Redis must not stop the API from booting.
+      this.logger.warn(`Project schedules not reconciled: ${(error as Error).message}`);
+    }
   }
 
   /** Registers the cron schedulers of every enabled trigger of the project. */
@@ -432,11 +555,14 @@ export class ProjectTriggersService {
     await manager.update(ProjectWorkflowTrigger, { id: trigger.id }, { schedulerId });
   }
 
-  private async unregister(trigger: ProjectWorkflowTrigger): Promise<void> {
+  private async unregister(
+    trigger: ProjectWorkflowTrigger,
+    manager: EntityManager = this.dataSource.manager,
+  ): Promise<void> {
     if (!trigger.schedulerId) return;
     await this.scheduleQueue.removeJobScheduler(trigger.schedulerId);
     trigger.schedulerId = null;
-    await this.triggerRepo.update({ id: trigger.id }, { schedulerId: null });
+    await manager.update(ProjectWorkflowTrigger, { id: trigger.id }, { schedulerId: null });
   }
 
   private async clearPending(triggerId: string): Promise<void> {
@@ -445,6 +571,56 @@ export class ProjectTriggersService {
 
   private async markFired(triggerId: string): Promise<void> {
     await this.triggerRepo.update({ id: triggerId }, { lastFiredAt: new Date() });
+  }
+
+  /** A project's workflow with its file; only a project-owned file is edited. */
+  private async bindingWithWorkflow(
+    projectId: string,
+    bindingId: string,
+    manager: EntityManager = this.dataSource.manager,
+  ): Promise<ProjectWorkflow> {
+    const binding = await manager.getRepository(ProjectWorkflow).findOne({
+      where: { id: bindingId, projectId },
+      relations: { workflow: true },
+    });
+    if (!binding?.workflow) {
+      throw new NotFoundException(`Project workflow "${bindingId}" not found`);
+    }
+    if (!isProjectOwnedWorkflow(binding.workflow.filePath, projectId)) {
+      throw new BadRequestException(
+        'This workflow is not owned by the project: copy it into the project to give it triggers',
+      );
+    }
+    return binding;
+  }
+
+  /** The triggers a workflow's file defines (400 for an invalid `on:`). */
+  private definedTriggers(binding: ProjectWorkflow): DefinedTrigger[] {
+    try {
+      return triggersOfOn(binding.workflow?.content?.on);
+    } catch (error) {
+      if (error instanceof WorkflowOnError) {
+        throw new BadRequestException(`Invalid workflow triggers: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Rewrites the `on:` block of a workflow's file from its triggers, as
+   * changed by `mutate`. Only `on:` changes; the jobs stay as they are.
+   */
+  private async writeOn(
+    binding: ProjectWorkflow,
+    manager: EntityManager,
+    mutate: (defined: DefinedTrigger[]) => DefinedTrigger[],
+  ): Promise<void> {
+    const on = onOfTriggers(mutate(this.definedTriggers(binding)));
+    const content: WorkflowContent = { ...binding.workflow.content };
+    delete content.on;
+    if (on) content.on = on;
+    await manager.getRepository(Workflow).save({ id: binding.workflow.id, content });
+    binding.workflow.content = content;
   }
 
   private async findTrigger(

@@ -147,6 +147,17 @@ export class Job extends BaseEntity {
   config?: Record<string, unknown> | null;
 
   /**
+   * What a connector job was created for, as the `inputs` it receives: a
+   * `target` that is a host, `host:port` or URL depending on the kind of
+   * data (see step-inputs.ts). Null for built-in tools, repositories (their
+   * credentials are resolved when the job is claimed, never stored) and jobs
+   * created before this column.
+   */
+  @ApiProperty({ type: Object, required: false, nullable: true })
+  @Column({ type: 'jsonb', nullable: true })
+  inputs?: Record<string, string> | null;
+
+  /**
    * The asset service this job belongs to.
    */
   @ApiProperty()

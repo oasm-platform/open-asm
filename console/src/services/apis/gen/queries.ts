@@ -1035,21 +1035,53 @@ export const ToolCategory = {
   url_discovery: 'url_discovery',
 } as const;
 
+export type DataKind = (typeof DataKind)[keyof typeof DataKind];
+
+export const DataKind = {
+  target: 'target',
+  host: 'host',
+  service: 'service',
+  web: 'web',
+  url: 'url',
+  repository: 'repository',
+  vulnerability: 'vulnerability',
+} as const;
+
 export type WorkflowJobConfig = { [key: string]: unknown };
 
 export type WorkflowJob = {
   name?: string;
   run: string;
   category?: ToolCategory;
+  input?: DataKind[];
   needs?: string[];
   allowFailure?: boolean;
   config?: WorkflowJobConfig;
   configProfileId?: string;
 };
 
+export type ScheduleOn = {
+  cron: string;
+};
+
+export type AssetsAddedTriggerConfig = {
+  /**
+   * @minimum 0
+   * @maximum 1440
+   */
+  windowMinutes?: number;
+  /**
+   * @minimum 1
+   * @maximum 5000
+   */
+  maxAssets?: number;
+  targetTypes?: string[];
+};
+
 export type On = {
-  target: string[];
-  schedule: string;
+  target?: string[];
+  schedule?: ScheduleOn[];
+  assetsAdded?: AssetsAddedTriggerConfig;
 };
 
 /**
@@ -1536,6 +1568,8 @@ export type PortsResultDto = {
 export type ToolCategorySpec = {
   name: ToolCategory;
   targetTypes: TargetType[];
+  inputs: DataKind[];
+  produces: DataKind[];
 };
 
 export type ToolType = (typeof ToolType)[keyof typeof ToolType];
@@ -2593,6 +2627,8 @@ export type ConnectorCategoryDtoInputsSchema = { [key: string]: unknown };
 export type ConnectorCategoryDto = {
   name: ToolCategory;
   targetTypes: TargetType[];
+  inputs: DataKind[];
+  produces: DataKind[];
   /** JSON Schema of the inputs OASM passes to the connector for this category. */
   inputsSchema?: ConnectorCategoryDtoInputsSchema;
 };
@@ -4556,20 +4592,6 @@ export const ProjectStatusFilter = {
   all: 'all',
 } as const;
 
-export type AssetsAddedTriggerConfig = {
-  /**
-   * @minimum 0
-   * @maximum 1440
-   */
-  windowMinutes?: number;
-  /**
-   * @minimum 1
-   * @maximum 5000
-   */
-  maxAssets?: number;
-  targetTypes?: string[];
-};
-
 export type ProjectWorkflowTrigger = {
   id: string;
   createdAt: string;
@@ -4684,6 +4706,8 @@ export type ProjectToolInput = {
   configProfileId?: string;
   /** Category to run the tool in (default: its first) */
   category?: ToolCategory;
+  /** Kinds of data the tool takes, best first (default: its own inputs). Must be among the ones its category accepts. */
+  input?: DataKind[];
   /**
    * Pipeline stage, from 1. Tools of a stage run in parallel; the next stage waits for them. Default 1.
    * @minimum 1

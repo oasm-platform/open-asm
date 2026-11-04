@@ -220,15 +220,19 @@ export class ToolSyncService implements OnModuleInit {
         '';
       const version = (rawEntry['version'] as string) ?? '';
       const logoBase64 = rawEntry['logo'] as string | undefined;
-      const { categories, skipped, unknownTargetTypes } = parseManifestCategories(
-        rawEntry['capabilities'],
-      );
+      const { categories, skipped, unknownTargetTypes, unknownKinds } =
+        parseManifestCategories(rawEntry['capabilities']);
       if (skipped.length > 0) {
         this.logger.warn(`Connector "${slug}": skipped capabilities ${skipped.join(', ')}`);
       }
       if (unknownTargetTypes.length > 0) {
         this.logger.warn(
           `Connector "${slug}" declares target types this platform does not support yet: ${unknownTargetTypes.join(', ')}`,
+        );
+      }
+      if (unknownKinds.length > 0) {
+        this.logger.warn(
+          `Connector "${slug}" declares inputs or outputs this platform does not support yet: ${unknownKinds.join(', ')}`,
         );
       }
       if (categories.length === 0) {

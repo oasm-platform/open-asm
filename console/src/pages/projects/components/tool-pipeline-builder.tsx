@@ -28,6 +28,7 @@ import { formatCategory } from '@/pages/tools/components/format-category';
 import {
   ToolType,
   useToolConfigProfilesControllerList,
+  type DataKind,
   type Tool,
   type ToolCategory,
 } from '@/services/apis/gen/queries';
@@ -48,6 +49,7 @@ import {
   useState,
 } from 'react';
 import { toast } from 'sonner';
+import { capabilityOf, describeKinds, KIND_LABEL, pipelineHint } from './tool-io';
 
 /**
  * A single tool entry in the pipeline. Tools of one step run at once; a step
@@ -59,9 +61,14 @@ export interface PipelineToolEntry {
   configProfileId?: string;
   /** Category to run the tool in; omitted → the tool's first. */
   category?: ToolCategory;
+  /** Kinds of data the tool takes, best first; omitted → its own inputs. */
+  input?: DataKind[];
   /** Step of the pipeline, from 1; omitted → 1. */
   stage?: number;
 }
+
+/** Sentinel select value for "the tool's own inputs". */
+const DEFAULT_INPUT = 'default';
 
 /** Highest step a tool can be moved to: one past the last used step. */
 const MAX_STAGES = 10;
@@ -350,9 +357,12 @@ const SelectedToolPanel = memo(function SelectedToolPanel({
   onOpenSheet,
   onProfilesLoaded,
   stageCount,
+  ioHint,
 }: {
   tool: Tool;
   entry: PipelineToolEntry;
+  /** Why the tool may find little to scan here (see pipelineHint). */
+  ioHint?: string;
   /** Steps offered: the used ones plus one more. */
   stageCount: number;
   knownProfileIds: readonly string[] | undefined;
@@ -368,6 +378,9 @@ const SelectedToolPanel = memo(function SelectedToolPanel({
   const linked = !!entry.configProfileId && !orphan;
   const usesDefault = !custom && !linked ? getBackendHasProfile(tool) : false;
   const toolLabel = tool.name;
+  const capability = capabilityOf(tool, entry.category);
+  const accepted = capability?.inputs ?? [];
+  const produces = capability?.produces ?? [];
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
@@ -432,6 +445,44 @@ const SelectedToolPanel = memo(function SelectedToolPanel({
             ))}
           </SelectContent>
         </Select>
+      )}
+      {accepted.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Takes {describeKinds(entry.input ?? accepted)}
+          {produces.length > 0 &&
+            ` · finds ${describeKinds(produces).replace(/, else /g, ', ')}`}
+        </p>
+      )}
+      {accepted.length > 1 && (
+        <Select
+          value={entry.input?.[0] ?? DEFAULT_INPUT}
+          onValueChange={(value) =>
+            onPatchEntry(tool.id, {
+              input:
+                value === DEFAULT_INPUT ? undefined : [value as DataKind],
+            })
+          }
+          disabled={disabled}
+        >
+          <SelectTrigger aria-label="Input" className="h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={DEFAULT_INPUT}>
+              {describeKinds(accepted).replace(/^./, (c) => c.toUpperCase())}
+            </SelectItem>
+            {accepted.map((kind) => (
+              <SelectItem key={kind} value={kind}>
+                Only {KIND_LABEL[kind]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+      {ioHint && (
+        <p className="rounded-md bg-muted px-2 py-1.5 text-xs text-muted-foreground">
+          {ioHint}
+        </p>
       )}
       <ToolProfileSelect
         toolId={tool.id}
@@ -700,6 +751,23 @@ function ToolPipelineBuilderComponent({
     () => new Map(value.map((e) => [e.toolId, e])),
     [value],
   );
+  // What the tools of the earlier steps find, for each tool's hint.
+  const ioHintFor = useCallback(
+    (entry: PipelineToolEntry, tool: Tool) => {
+      const earlier = value
+        .filter((other) => stageOf(other) < stageOf(entry))
+        .flatMap((other) => {
+          const otherTool = byId.get(other.toolId);
+          return otherTool
+            ? (capabilityOf(otherTool, other.category)?.produces ?? [])
+            : [];
+        });
+      const inputs =
+        entry.input ?? capabilityOf(tool, entry.category)?.inputs ?? [];
+      return pipelineHint(inputs, earlier);
+    },
+    [value, byId],
+  );
   // The used steps plus one more, so a tool can always move after the rest.
   const stageCount = useMemo(
     () => Math.min(MAX_STAGES, Math.max(1, ...value.map(stageOf)) + 1),
@@ -952,6 +1020,7 @@ function ToolPipelineBuilderComponent({
                     onRemove={handleRemove}
                     onOpenSheet={handleOpenSheet}
                     onProfilesLoaded={handleProfilesLoaded}
+                    ioHint={ioHintFor(entry, tool)}
                   />
                 </PopoverContent>
               </Popover>

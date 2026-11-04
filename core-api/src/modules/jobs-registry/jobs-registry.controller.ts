@@ -489,7 +489,9 @@ export class JobsRegistryController {
       target?: { type?: string; integrationId?: string | null } | null;
     };
     if (!isRepositoryAsset(asset)) {
-      return buildConnectorInputs(asset);
+      // Jobs planned per service or URL carry their own inputs; older jobs
+      // (and host jobs) fall back to the asset.
+      return job.inputs ?? buildConnectorInputs(asset);
     }
 
     const integrationId = asset.target?.integrationId;

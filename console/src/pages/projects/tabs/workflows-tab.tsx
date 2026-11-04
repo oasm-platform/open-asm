@@ -2,6 +2,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import {
+  WorkflowFileSheet,
+  workflowYaml,
+} from '@/components/common/workflow-file-sheet';
 import JobStatusBadge from '@/components/ui/job-status';
 import { formatCronLabel, getLocalTimezone } from '@/lib/cron-schedule';
 import {
@@ -126,6 +130,10 @@ function WorkflowCard({
             <span>Never run</span>
           )}
           <span className="ml-auto flex gap-1">
+            <WorkflowFileSheet
+              yaml={workflowYaml(binding.workflow.content)}
+              description="What this workflow runs, as its file."
+            />
             <Button
               variant="ghost"
               size="sm"

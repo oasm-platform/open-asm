@@ -1,4 +1,4 @@
-import { TargetType, ToolCategory } from '@/common/enums/enum';
+import { DataKind, TargetType, ToolCategory } from '@/common/enums/enum';
 import {
   capabilityToCategory,
   connectorCategories,
@@ -29,9 +29,53 @@ describe('parseManifestCategories', () => {
       { name: 'vulnerabilities', targetTypes: ['domain'] },
     ]);
     expect(categories).toEqual([
-      { name: ToolCategory.PORTS_SCANNER, targetTypes: HOST },
-      { name: ToolCategory.VULNERABILITIES, targetTypes: [TargetType.DOMAIN] },
+      {
+        name: ToolCategory.PORTS_SCANNER,
+        targetTypes: HOST,
+        inputs: [DataKind.HOST],
+        produces: [DataKind.SERVICE],
+      },
+      {
+        name: ToolCategory.VULNERABILITIES,
+        targetTypes: [TargetType.DOMAIN],
+        inputs: [DataKind.HOST],
+        produces: [DataKind.VULNERABILITY],
+      },
     ]);
+  });
+
+  it('reads declared inputs and outputs, keeping the order of the inputs', () => {
+    const { categories, unknownKinds } = parseManifestCategories([
+      {
+        name: 'vulnerabilities',
+        targetTypes: ['domain', 'ip'],
+        inputs: ['web', 'HOST', 'web', 'packet'],
+        produces: ['vulnerability'],
+      },
+      { name: 'screenshot', targetTypes: ['domain'], inputs: ['web'], produces: [] },
+    ]);
+    expect(categories).toEqual([
+      {
+        name: ToolCategory.VULNERABILITIES,
+        targetTypes: [TargetType.DOMAIN, TargetType.IP],
+        inputs: [DataKind.WEB, DataKind.HOST],
+        produces: [DataKind.VULNERABILITY],
+      },
+      {
+        name: ToolCategory.SCREENSHOT,
+        targetTypes: [TargetType.DOMAIN],
+        inputs: [DataKind.WEB],
+        produces: [],
+      },
+    ]);
+    expect(unknownKinds).toEqual(['packet']);
+  });
+
+  it('gives a repository scanner repositories as its default input', () => {
+    const { categories } = parseManifestCategories([
+      { name: 'secrets', targetTypes: ['git_org'] },
+    ]);
+    expect(categories[0].inputs).toEqual([DataKind.REPOSITORY]);
   });
 
   it('merges capabilities that map to the same category', () => {
@@ -43,6 +87,8 @@ describe('parseManifestCategories', () => {
       {
         name: ToolCategory.VULNERABILITIES,
         targetTypes: [TargetType.GIT_ORG, TargetType.IP],
+        inputs: [DataKind.REPOSITORY, DataKind.HOST],
+        produces: [DataKind.VULNERABILITY],
       },
     ]);
   });
@@ -95,11 +141,15 @@ describe('connectorCategories', () => {
       {
         name: ToolCategory.PORTS_SCANNER,
         targetTypes: [TargetType.IP],
+        inputs: [DataKind.HOST],
+        produces: [DataKind.SERVICE],
         inputsSchema: schema,
       },
       {
         name: ToolCategory.VULNERABILITIES,
         targetTypes: [TargetType.GIT_ORG],
+        inputs: [DataKind.REPOSITORY],
+        produces: [DataKind.VULNERABILITY],
         inputsSchema: { type: 'string' },
       },
     ]);
@@ -164,5 +214,23 @@ describe('sameCategories', () => {
 
   it('treats null as empty', () => {
     expect(sameCategories(null, [])).toBe(true);
+  });
+
+  it('is sensitive to input order (it is the preference) but not to output order', () => {
+    const spec = (inputs: DataKind[], produces: DataKind[]) => [
+      { name: ToolCategory.VULNERABILITIES, targetTypes: [], inputs, produces },
+    ];
+    expect(
+      sameCategories(
+        spec([DataKind.WEB, DataKind.HOST], [DataKind.URL, DataKind.VULNERABILITY]),
+        spec([DataKind.WEB, DataKind.HOST], [DataKind.VULNERABILITY, DataKind.URL]),
+      ),
+    ).toBe(true);
+    expect(
+      sameCategories(
+        spec([DataKind.WEB, DataKind.HOST], []),
+        spec([DataKind.HOST, DataKind.WEB], []),
+      ),
+    ).toBe(false);
   });
 });

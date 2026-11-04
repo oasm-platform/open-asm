@@ -1255,8 +1255,11 @@ describe('DataAdapterService', () => {
       expect(mockQueryRunner.manager.orIgnore).toHaveBeenCalled();
     });
 
-    it('S2c: missing assetServiceId skips insert with warn, no throw', async () => {
+    it('S2c: a host-wide job on a host without services skips insert with warn, no throw', async () => {
       const noServiceJob = { ...mockJob, assetServiceId: undefined } as unknown as Job;
+      mockQueryRunner.manager.getRepository = jest
+        .fn()
+        .mockReturnValue({ find: jest.fn().mockResolvedValue([]) });
       const warnSpy = jest
         .spyOn((service as any).logger, 'warn')
         .mockImplementation(() => undefined);
@@ -1272,6 +1275,31 @@ describe('DataAdapterService', () => {
       expect(warnSpy).toHaveBeenCalled();
       expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
       expect(mockQueryRunner.release).toHaveBeenCalled();
+    });
+
+    it('files the URLs of a host-wide job (gau, katana) under the service of their port', async () => {
+      const hostJob = { ...mockJob, assetServiceId: undefined } as unknown as Job;
+      const find = jest.fn().mockResolvedValue([
+        { id: 's-443', port: 443 },
+        { id: 's-8443', port: 8443 },
+      ]);
+      mockQueryRunner.manager.getRepository = jest.fn().mockReturnValue({ find });
+
+      await service.urlDiscovery({
+        data: [
+          { url: 'https://example.com:8443/admin' },
+          { url: 'https://example.com/login' },
+        ] as any,
+        job: hostJob,
+      });
+
+      expect(find).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { assetId: 'asset-id' } }),
+      );
+      expect(mockQueryRunner.manager.values).toHaveBeenCalledWith([
+        { url: 'https://example.com:8443/admin', assetServiceId: 's-8443', jobHistoryId: 'history-id' },
+        { url: 'https://example.com/login', assetServiceId: 's-443', jobHistoryId: 'history-id' },
+      ]);
     });
 
     it('rolls back and rethrows on error', async () => {

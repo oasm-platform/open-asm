@@ -1,6 +1,7 @@
 import { JobRunType, ProjectTriggerType } from '@/common/enums/enum';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Project } from './entities/project.entity';
+import { Workflow } from '../workflows/entities/workflow.entity';
 import { ProjectWorkflow } from './entities/project-workflow.entity';
 import type { ProjectWorkflowTrigger } from './entities/project-workflow-trigger.entity';
 import { chunk, ProjectTriggersService } from './project-triggers.service';
@@ -308,14 +309,130 @@ describe('ProjectTriggersService', () => {
     });
   });
 
-  describe('create', () => {
-    beforeEach(() => jest.clearAllMocks());
+  describe('triggers live in the workflow file', () => {
+    /**
+     * A project with one workflow: its file (`content`) and its trigger rows,
+     * kept in memory so each test reads what the service wrote.
+     */
+    function fileSetup({
+      on,
+      rows = [],
+      archived = false,
+    }: {
+      on?: object;
+      rows?: Array<Partial<ProjectWorkflowTrigger>>;
+      archived?: boolean;
+    } = {}) {
+      const ctx = setup();
+      const project = { id: PROJECT_ID, archivedAt: archived ? new Date() : null };
+      const workflow = {
+        id: 'w-1',
+        filePath: `project-${PROJECT_ID}-1.yaml`,
+        content: { name: 'Scan', jobs: { nuclei: { run: 'nuclei' } }, ...(on ? { on } : {}) } as Record<string, unknown>,
+      };
+      const binding = { id: BINDING_ID, projectId: PROJECT_ID, workflow, project };
+      let table = rows.map((row, i) => ({
+        id: `t-${i + 1}`,
+        projectWorkflowId: BINDING_ID,
+        cron: null,
+        config: {},
+        enabled: true,
+        schedulerId: null,
+        lastFiredAt: null,
+        ...row,
+      })) as ProjectWorkflowTrigger[];
+      let nextId = table.length + 1;
+
+      ctx.projectRepo.findOne.mockResolvedValue(project);
+      ctx.bindingRepo.findOne.mockImplementation(() => Promise.resolve(binding));
+      ctx.triggerRepo.find.mockImplementation(() => Promise.resolve([...table]));
+      ctx.triggerRepo.createQueryBuilder.mockImplementation(() => {
+        const builder = qb(undefined);
+        let id: string | undefined;
+        builder.where.mockImplementation((_sql: string, params?: { triggerId?: string }) => {
+          id = params?.triggerId;
+          return builder;
+        });
+        builder.getOne.mockImplementation(() => Promise.resolve(table.find((t) => t.id === id) ?? null));
+        return builder;
+      });
+      ctx.triggerRepo.save.mockImplementation((row: ProjectWorkflowTrigger) => {
+        const saved = { ...row, id: row.id ?? `t-${nextId++}` };
+        table = [...table.filter((t) => t.id !== saved.id), saved];
+        return Promise.resolve(saved);
+      });
+      ctx.triggerRepo.delete.mockImplementation((id: string) => {
+        table = table.filter((t) => t.id !== id);
+        return Promise.resolve();
+      });
+      const workflowRepo = {
+        save: jest.fn((value: { content: Record<string, unknown> }) => {
+          workflow.content = value.content;
+          return Promise.resolve(value);
+        }),
+      };
+      const repoOf = ctx.manager.getRepository.getMockImplementation()!;
+      ctx.manager.getRepository.mockImplementation((entity: unknown) =>
+        entity === Workflow ? workflowRepo : repoOf(entity),
+      );
+      return { ...ctx, workflow, rows: () => table };
+    }
+
+    it('writes a new schedule into the file, then gives it a row and a scheduler', async () => {
+      const ctx = fileSetup();
+
+      const trigger = await ctx.service.create(PROJECT_ID, 'ws', {
+        projectWorkflowId: BINDING_ID,
+        type: ProjectTriggerType.CRON,
+        cron: ' 0 2 * * 1 ',
+      });
+
+      expect(ctx.workflow.content.on).toEqual({ schedule: [{ cron: '0 2 * * 1' }] });
+      expect(trigger).toMatchObject({ cron: '0 2 * * 1', enabled: true });
+      expect(ctx.scheduleQueue.upsertJobScheduler).toHaveBeenCalledWith(
+        `project-trigger:${trigger.id}`,
+        { pattern: '0 2 * * 1' },
+        { name: trigger.id, data: { triggerId: trigger.id } },
+      );
+    });
+
+    it('lets one workflow run on several schedules, each with its own scheduler', async () => {
+      const ctx = fileSetup({ on: { schedule: [{ cron: '0 2 * * 1' }] }, rows: [{ type: ProjectTriggerType.CRON, cron: '0 2 * * 1' }] });
+
+      await ctx.service.create(PROJECT_ID, 'ws', {
+        projectWorkflowId: BINDING_ID,
+        type: ProjectTriggerType.CRON,
+        cron: '30 14 * * *',
+      });
+
+      expect(ctx.workflow.content.on).toEqual({
+        schedule: [{ cron: '0 2 * * 1' }, { cron: '30 14 * * *' }],
+      });
+      expect(ctx.rows().map((t) => t.cron)).toEqual(['0 2 * * 1', '30 14 * * *']);
+    });
+
+    it('refuses a schedule the workflow already has, and a second "assets added"', async () => {
+      const ctx = fileSetup({
+        on: { schedule: [{ cron: '0 2 * * 1' }], assetsAdded: { windowMinutes: 5 } },
+      });
+
+      await expect(
+        ctx.service.create(PROJECT_ID, 'ws', {
+          projectWorkflowId: BINDING_ID,
+          type: ProjectTriggerType.CRON,
+          cron: '0 2 * * 1',
+        }),
+      ).rejects.toThrow('This workflow already runs on this schedule');
+      await expect(
+        ctx.service.create(PROJECT_ID, 'ws', {
+          projectWorkflowId: BINDING_ID,
+          type: ProjectTriggerType.ASSETS_ADDED,
+        }),
+      ).rejects.toThrow('This workflow already runs when assets are added');
+    });
 
     it('refuses a cron trigger without an expression', async () => {
-      const ctx = setup();
-      ctx.projectRepo.findOne.mockResolvedValue({ id: PROJECT_ID });
-      ctx.bindingRepo.findOne.mockResolvedValue({ id: BINDING_ID });
-
+      const ctx = fileSetup();
       await expect(
         ctx.service.create(PROJECT_ID, 'ws', {
           projectWorkflowId: BINDING_ID,
@@ -325,42 +442,10 @@ describe('ProjectTriggersService', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('refuses a second "assets added" trigger on one workflow', async () => {
-      const ctx = setup();
-      ctx.projectRepo.findOne.mockResolvedValue({ id: PROJECT_ID });
-      ctx.bindingRepo.findOne.mockResolvedValue({ id: BINDING_ID });
-      ctx.triggerRepo.count.mockResolvedValue(1);
-
-      await expect(
-        ctx.service.create(PROJECT_ID, 'ws', {
-          projectWorkflowId: BINDING_ID,
-          type: ProjectTriggerType.ASSETS_ADDED,
-        }),
-      ).rejects.toBeInstanceOf(BadRequestException);
-    });
-
-    it('registers a cron trigger with defaults filled in', async () => {
-      const ctx = setup();
-      ctx.projectRepo.findOne.mockResolvedValue({ id: PROJECT_ID });
-      ctx.bindingRepo.findOne.mockResolvedValue({ id: BINDING_ID });
-
-      const trigger = await ctx.service.create(PROJECT_ID, 'ws', {
-        projectWorkflowId: BINDING_ID,
-        type: ProjectTriggerType.CRON,
-        cron: ' 0 2 * * 1 ',
-      });
-
-      expect(trigger.cron).toBe('0 2 * * 1');
-      expect(ctx.scheduleQueue.upsertJobScheduler).toHaveBeenCalledWith(
-        'project-trigger:t-new',
-        { pattern: '0 2 * * 1' },
-        { name: 't-new', data: { triggerId: 't-new' } },
-      );
-    });
-
     it('does not register a schedule while the project is archived', async () => {
-      const ctx = setup();
+      const ctx = fileSetup({ archived: true });
       ctx.projectRepo.findOne.mockResolvedValue({ id: PROJECT_ID, archivedAt: new Date() });
+
       await expect(
         ctx.service.create(PROJECT_ID, 'ws', {
           projectWorkflowId: BINDING_ID,
@@ -369,6 +454,133 @@ describe('ProjectTriggersService', () => {
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(ctx.scheduleQueue.upsertJobScheduler).not.toHaveBeenCalled();
+    });
+
+    it('changes a schedule in the file and keeps the row (id, history) with it', async () => {
+      const firedAt = new Date('2026-11-01T02:00:00Z');
+      const ctx = fileSetup({
+        on: { schedule: [{ cron: '0 2 * * 1' }] },
+        rows: [{ type: ProjectTriggerType.CRON, cron: '0 2 * * 1', lastFiredAt: firedAt, schedulerId: 'project-trigger:t-1' }],
+      });
+
+      const updated = await ctx.service.update(PROJECT_ID, 'ws', 't-1', { cron: '0 3 * * 1' });
+
+      expect(ctx.workflow.content.on).toEqual({ schedule: [{ cron: '0 3 * * 1' }] });
+      expect(updated).toMatchObject({ id: 't-1', cron: '0 3 * * 1', lastFiredAt: firedAt });
+      expect(ctx.rows()).toHaveLength(1);
+      expect(ctx.scheduleQueue.upsertJobScheduler).toHaveBeenCalledWith(
+        'project-trigger:t-1',
+        { pattern: '0 3 * * 1' },
+        expect.anything(),
+      );
+    });
+
+    it('turns a trigger off in the table only: the file keeps it', async () => {
+      const ctx = fileSetup({
+        on: { schedule: [{ cron: '0 2 * * 1' }] },
+        rows: [{ type: ProjectTriggerType.CRON, cron: '0 2 * * 1', schedulerId: 'project-trigger:t-1' }],
+      });
+
+      const updated = await ctx.service.update(PROJECT_ID, 'ws', 't-1', { enabled: false });
+
+      expect(updated.enabled).toBe(false);
+      expect(ctx.workflow.content.on).toEqual({ schedule: [{ cron: '0 2 * * 1' }] });
+      expect(ctx.scheduleQueue.removeJobScheduler).toHaveBeenCalledWith('project-trigger:t-1');
+      expect(ctx.scheduleQueue.upsertJobScheduler).not.toHaveBeenCalled();
+    });
+
+    it('removes a trigger from the file, its row and its scheduler', async () => {
+      const ctx = fileSetup({
+        on: { schedule: [{ cron: '0 2 * * 1' }], assetsAdded: { windowMinutes: 10, maxAssets: 200, targetTypes: [] } },
+        rows: [
+          { type: ProjectTriggerType.CRON, cron: '0 2 * * 1', schedulerId: 'project-trigger:t-1' },
+          { type: ProjectTriggerType.ASSETS_ADDED, config: { windowMinutes: 10, maxAssets: 200, targetTypes: [] } },
+        ],
+      });
+
+      await ctx.service.remove(PROJECT_ID, 'ws', 't-1');
+
+      expect(ctx.workflow.content.on).toEqual({
+        assetsAdded: { windowMinutes: 10, maxAssets: 200, targetTypes: [] },
+      });
+      expect(ctx.rows().map((t) => t.type)).toEqual([ProjectTriggerType.ASSETS_ADDED]);
+      expect(ctx.scheduleQueue.removeJobScheduler).toHaveBeenCalledWith('project-trigger:t-1');
+    });
+
+    it('syncs rows to a file edited elsewhere', async () => {
+      const ctx = fileSetup({
+        on: { schedule: ['0 4 * * *'] },
+        rows: [{ type: ProjectTriggerType.CRON, cron: '0 2 * * 1', schedulerId: 'project-trigger:t-1' }],
+      });
+
+      const rows = await ctx.service.syncWorkflow(BINDING_ID);
+
+      expect(rows.map((t) => t.cron)).toEqual(['0 4 * * *']);
+      expect(ctx.scheduleQueue.removeJobScheduler).toHaveBeenCalledWith('project-trigger:t-1');
+      expect(ctx.scheduleQueue.upsertJobScheduler).toHaveBeenCalledWith(
+        `project-trigger:${rows[0].id}`,
+        { pattern: '0 4 * * *' },
+        expect.anything(),
+      );
+    });
+
+    it('refuses a workflow it does not own', async () => {
+      const ctx = fileSetup();
+      ctx.workflow.filePath = 'domain_discovery';
+
+      await expect(
+        ctx.service.create(PROJECT_ID, 'ws', {
+          projectWorkflowId: BINDING_ID,
+          type: ProjectTriggerType.CRON,
+          cron: '0 2 * * 1',
+        }),
+      ).rejects.toThrow('This workflow is not owned by the project');
+    });
+  });
+
+  describe('reconcileSchedulers', () => {
+    it('restores lost schedulers and removes the ones nothing uses', async () => {
+      const ctx = setup();
+      const live = {
+        id: 't-1',
+        type: ProjectTriggerType.CRON,
+        cron: '0 2 * * 1',
+        enabled: true,
+        schedulerId: null,
+        projectWorkflow: { project: { archivedAt: null } },
+      };
+      const archived = {
+        id: 't-2',
+        type: ProjectTriggerType.CRON,
+        cron: '0 3 * * 1',
+        enabled: true,
+        schedulerId: 'project-trigger:t-2',
+        projectWorkflow: { project: { archivedAt: new Date() } },
+      };
+      const syncWorkflow = jest.spyOn(ctx.service, 'syncWorkflow').mockResolvedValue([]);
+      (ctx.bindingRepo as unknown as { find: jest.Mock }).find = jest.fn().mockResolvedValue([{ id: BINDING_ID }]);
+      ctx.triggerRepo.find.mockResolvedValue([live, archived]);
+      Object.assign(ctx.scheduleQueue, {
+        getJobSchedulers: jest.fn().mockResolvedValue([
+          { key: 'project-trigger:t-1' },
+          { key: 'project-trigger:gone' },
+          { key: '33ab36101adebf9b13aabbcde93f3558' },
+        ]),
+      });
+
+      const result = await ctx.service.reconcileSchedulers();
+
+      expect(syncWorkflow).toHaveBeenCalledWith(BINDING_ID);
+      expect(ctx.scheduleQueue.upsertJobScheduler).toHaveBeenCalledWith(
+        'project-trigger:t-1',
+        { pattern: '0 2 * * 1' },
+        expect.anything(),
+      );
+      expect(ctx.scheduleQueue.removeJobScheduler).toHaveBeenCalledWith('project-trigger:t-2');
+      expect(ctx.scheduleQueue.removeJobScheduler).toHaveBeenCalledWith('project-trigger:gone');
+      expect(ctx.scheduleQueue.removeJobScheduler).toHaveBeenCalledWith('33ab36101adebf9b13aabbcde93f3558');
+      expect(ctx.scheduleQueue.removeJobScheduler).not.toHaveBeenCalledWith('project-trigger:t-1');
+      expect(result).toEqual({ registered: 1, removed: 2 });
     });
   });
 });

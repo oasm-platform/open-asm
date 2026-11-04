@@ -1,4 +1,4 @@
-import { ToolCategory } from '@/common/enums/enum';
+import { DataKind, ToolCategory } from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
@@ -53,6 +53,19 @@ export class ProjectToolInput {
   @IsOptional()
   @IsEnum(ToolCategory)
   category?: ToolCategory;
+
+  @ApiProperty({
+    required: false,
+    enum: DataKind,
+    enumName: 'DataKind',
+    isArray: true,
+    description:
+      'Kinds of data the tool takes, best first (default: its own inputs). Must be among the ones its category accepts.',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsEnum(DataKind, { each: true })
+  input?: DataKind[];
 
   @ApiProperty({
     required: false,

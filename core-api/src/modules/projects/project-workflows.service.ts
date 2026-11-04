@@ -13,6 +13,7 @@ import { ConnectorRegistryService } from '../connectors/connector-registry.servi
 import { WorkflowRunnerService } from '../jobs-registry/workflow-runner.service';
 import { Tool } from '../tools/entities/tools.entity';
 import { resolveToolCategory } from '../tools/tool-categories';
+import { resolveStepInputs } from '../tools/tool-io';
 import { ToolsService } from '../tools/tools.service';
 import {
   encryptInlineConfig,
@@ -258,11 +259,16 @@ export class ProjectWorkflowsService {
         this.dataSource.manager,
         binding.workflow.content.jobs,
       );
-      content = { name, jobs };
+      // A new pipeline keeps when the workflow runs.
+      content = { name, jobs, ...(content.on ? { on: content.on } : {}) };
     }
-    // Project workflows never trigger on target events: only their bindings
-    // decide when they run.
-    delete content.on;
+    // Project workflows never trigger on target events; their schedules and
+    // "assets added" stay (see workflow-on.ts).
+    if (content.on?.target) {
+      content.on = { ...content.on };
+      delete content.on.target;
+      if (Object.keys(content.on).length === 0) delete content.on;
+    }
 
     binding.workflow = await this.workflowsService.updateWorkflow(
       binding.workflow.id,
@@ -428,12 +434,11 @@ export class ProjectWorkflowsService {
           );
         }
       }
-      if (input.category) {
-        try {
-          resolveToolCategory(tool, input.category);
-        } catch (error) {
-          throw new BadRequestException((error as Error).message);
-        }
+      try {
+        const capability = resolveToolCategory(tool, input.category);
+        resolveStepInputs(tool.name, capability, input.input);
+      } catch (error) {
+        throw new BadRequestException((error as Error).message);
       }
 
       let config = input.config;
@@ -459,6 +464,7 @@ export class ProjectWorkflowsService {
       return {
         run: tool.name,
         ...(input.category ? { category: input.category } : {}),
+        ...(input.input?.length ? { input: input.input } : {}),
         ...(config ? { config } : {}),
         ...(input.configProfileId
           ? { configProfileId: input.configProfileId }

@@ -1,4 +1,5 @@
-import { ToolCategory } from '@/common/enums/enum';
+import { ToolCategory, type DataKind } from '@/common/enums/enum';
+import { INPUT_KINDS } from '../tools/tool-io';
 
 const KNOWN_TOOL_CATEGORIES = new Set<string>(Object.values(ToolCategory));
 
@@ -26,6 +27,11 @@ export interface WorkflowStepDefinition {
    */
   category?: string;
   needs?: string | string[];
+  /**
+   * The kinds of data the job takes, best first (`web`, or `[web, host]`).
+   * Omitted → the tool's own `inputs`. Must be among them.
+   */
+  input?: string | string[];
   /**
    * A fan-out step runs one job per asset/service, and some of those inputs are
    * routinely unroutable (they simply have nothing to scan). By default the step
@@ -56,6 +62,8 @@ export interface WorkflowStep {
   run: string;
   /** Declared category; the runner fills in the default (see withResolvedCategories). */
   category?: ToolCategory;
+  /** Declared input kinds; absent → the category's `inputs`. */
+  input?: DataKind[];
   needs: string[];
   /** Original position — fallback ordering only. */
   order: number;
@@ -156,6 +164,21 @@ export function normalizeNeeds(needs: string | string[] | undefined): string[] {
   return list
     .map((need) => String(need).trim())
     .filter((need) => need.length > 0);
+}
+
+/**
+ * Normalizes an `input` value (one kind or a list) into a deduplicated list
+ * of lowercase kinds. Unknown kinds are kept, for the caller to report.
+ */
+export function normalizeInput(input: string | string[] | undefined): DataKind[] {
+  if (!input) return [];
+  const list = Array.isArray(input) ? input : [input];
+  const kinds: DataKind[] = [];
+  for (const value of list) {
+    const kind = String(value).trim().toLowerCase() as DataKind;
+    if (kind && !kinds.includes(kind)) kinds.push(kind);
+  }
+  return kinds;
 }
 
 /**
@@ -329,6 +352,14 @@ export function buildWorkflowGraph(content: {
       errors.push(`Unknown category "${category}" for job "${id}"`);
       return;
     }
+    const input = normalizeInput(job.input);
+    const unknownInputs = input.filter((kind) => !INPUT_KINDS.includes(kind));
+    if (unknownInputs.length > 0) {
+      errors.push(
+        `Unknown input "${unknownInputs.join(', ')}" for job "${id}" (expected one of ${INPUT_KINDS.join(', ')})`,
+      );
+      return;
+    }
     const usage = runs.get(run) ?? { count: 0, implicit: false };
     runs.set(run, { count: usage.count + 1, implicit: usage.implicit || !category });
     const key = `${run}#${category ?? ''}`;
@@ -345,6 +376,7 @@ export function buildWorkflowGraph(content: {
       name: String(job.name ?? '').trim() || id,
       run,
       ...(category ? { category: category as ToolCategory } : {}),
+      ...(input.length > 0 ? { input } : {}),
       needs: normalizeNeeds(job.needs),
       order,
       // Tolerate partial failure unless the author asked for strict.
@@ -458,6 +490,7 @@ export function normalizeWorkflowContent<T extends { jobs?: WorkflowJobsInput }>
       ...(step.name !== step.id ? { name: step.name } : {}),
       run: step.run,
       ...(step.category ? { category: step.category } : {}),
+      ...(step.input ? { input: step.input } : {}),
       ...(step.needs.length > 0 ? { needs: step.needs } : {}),
       ...(step.allowFailure === false ? { allowFailure: false } : {}),
       ...(step.config !== undefined ? { config: step.config } : {}),
