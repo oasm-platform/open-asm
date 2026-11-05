@@ -6,6 +6,7 @@ import { AssetsService } from '../assets/assets.service';
 import { StatisticService } from '../statistic/statistic.service';
 import { TargetsService } from '../targets/targets.service';
 import { SearchHistory } from './entities/search-history.entity';
+import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { SearchService } from './search.service';
 
 describe('SearchService', () => {
@@ -54,6 +55,10 @@ describe('SearchService', () => {
         SearchService,
         {
           provide: getRepositoryToken(SearchHistory),
+          useValue: mockSearchHistoryRepository,
+        },
+        {
+          provide: getRepositoryToken(Vulnerability),
           useValue: mockSearchHistoryRepository,
         },
         {
