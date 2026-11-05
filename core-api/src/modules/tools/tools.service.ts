@@ -1,5 +1,4 @@
 import type { WrapperType } from '@/common/types/app.types';
-import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { ToolCategory, WorkerScope, WorkerType } from '@/common/enums/enum';
 import { getManyResponse } from '@/utils/getManyResponse';
@@ -21,7 +20,10 @@ import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity'
 import { WorkersService } from '../workers/workers.service';
 import { CreateToolDto } from './dto/create-tool.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
-import { InstallToolDto } from './dto/install-tool.dto';
+import {
+  InstallToolDto,
+  UninstallToolResponseDto,
+} from './dto/install-tool.dto';
 import { ToolsQueryDto } from './dto/tools-query.dto';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
 import { Tool } from './entities/tools.entity';
@@ -293,9 +295,18 @@ export class ToolsService {
       );
     }
 
+    // Load the tool so a bad id is a 404 rather than an FK error, and so the
+    // result carries the tool name for the `tool.installed` audit event.
+    const tool = await this.toolsRepository.findOne({
+      where: { id: dto.toolId },
+    });
+    if (!tool) {
+      throw new NotFoundException(`Tool with ID "${dto.toolId}" not found.`);
+    }
+
     // Create and save the new workspace-tool entry
     const newWorkspaceTool = this.workspaceToolRepository.create({
-      tool: { id: dto.toolId },
+      tool,
       workspace: { id: workspaceId },
     });
     return this.workspaceToolRepository.save(newWorkspaceTool);
@@ -309,12 +320,13 @@ export class ToolsService {
   async uninstallTool(
     dto: InstallToolDto,
     workspaceId: string,
-  ): Promise<DefaultMessageResponseDto> {
+  ): Promise<UninstallToolResponseDto> {
     const existingEntry = await this.workspaceToolRepository.findOne({
       where: {
         tool: { id: dto.toolId },
         workspace: { id: workspaceId },
       },
+      relations: { tool: true },
     });
 
     if (!existingEntry) {
@@ -335,6 +347,8 @@ export class ToolsService {
 
     return {
       message: 'Tool uninstalled successfully.',
+      toolId: dto.toolId,
+      toolName: existingEntry.tool?.name ?? '',
     };
   }
 

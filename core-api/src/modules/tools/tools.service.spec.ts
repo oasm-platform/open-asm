@@ -783,16 +783,24 @@ describe('uninstallTool — cascades config profile deletion', () => {
   afterEach(() => jest.restoreAllMocks());
 
   it('removes the workspace_tools row AND deletes config profiles for the (workspace, tool) pair', async () => {
-    workspaceToolRepo.findOne.mockResolvedValue({ id: 'wt-1' });
+    workspaceToolRepo.findOne.mockResolvedValue({
+      id: 'wt-1',
+      tool: { id: 'tool-001', name: 'nuclei' },
+    });
 
     const result = await service.uninstallTool(
       { toolId: 'tool-001' },
       'ws-001',
     );
 
-    expect(result).toEqual({ message: 'Tool uninstalled successfully.' });
+    expect(result).toEqual({
+      message: 'Tool uninstalled successfully.',
+      toolId: 'tool-001',
+      toolName: 'nuclei',
+    });
     expect(workspaceToolRepo.findOne).toHaveBeenCalledWith({
       where: { tool: { id: 'tool-001' }, workspace: { id: 'ws-001' } },
+      relations: { tool: true },
     });
     expect(workspaceToolRepo.manager.transaction).toHaveBeenCalledTimes(1);
     expect(txManager.remove).toHaveBeenCalledTimes(1);
@@ -814,7 +822,11 @@ describe('uninstallTool — cascades config profile deletion', () => {
       'ws-002',
     );
 
-    expect(result).toEqual({ message: 'Tool uninstalled successfully.' });
+    expect(result).toEqual({
+      message: 'Tool uninstalled successfully.',
+      toolId: 'tool-002',
+      toolName: '',
+    });
     expect(workspaceToolRepo.manager.transaction).toHaveBeenCalledTimes(1);
     expect(txManager.delete).toHaveBeenCalledTimes(1);
     expect(txManager.delete).toHaveBeenCalledWith(ToolConfigProfile, {

@@ -1,3 +1,4 @@
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsUUID } from 'class-validator';
 
@@ -10,4 +11,13 @@ export class InstallToolDto {
   })
   @IsUUID()
   toolId: string;
+}
+
+/** Uninstall result; the tool name is what the `tool.uninstalled` audit row shows. */
+export class UninstallToolResponseDto extends DefaultMessageResponseDto {
+  @ApiProperty()
+  toolId: string;
+
+  @ApiProperty()
+  toolName: string;
 }

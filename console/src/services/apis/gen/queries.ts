@@ -2615,6 +2615,12 @@ export type InstallToolDto = {
   toolId: string;
 };
 
+export type UninstallToolResponseDto = {
+  message: string;
+  toolId: string;
+  toolName: string;
+};
+
 export type GetManyToolDto = {
   data: Tool[];
   total: number;
@@ -28461,7 +28467,7 @@ export const toolsControllerUninstallTool = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
-  return orvalClient<DefaultMessageResponseDto>(
+  return orvalClient<UninstallToolResponseDto>(
     {
       url: `/api/tools/uninstall`,
       method: 'POST',

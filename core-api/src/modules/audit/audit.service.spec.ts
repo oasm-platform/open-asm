@@ -58,6 +58,7 @@ const CONTROLLER_FILES: Record<string, string> = {
   ArtifactsController: '@/modules/artifacts/artifacts.controller',
   ArtifactFoldersController: '@/modules/artifacts/artifact-folders.controller',
   AdminWorkspacesController: '@/modules/admin/workspaces/admin-workspaces.controller',
+  ToolsController: '@/modules/tools/tools.controller',
 };
 
 /**
