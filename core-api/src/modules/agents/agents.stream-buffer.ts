@@ -134,6 +134,22 @@ export class AgentsStreamBufferService {
   }
 
   /**
+   * True while a run of the conversation streams into its buffer, on any
+   * instance: the buffer exists and has no done marker yet. A run that died
+   * without one stops counting once the key's active TTL lapses. Best-effort:
+   * a Redis failure reads as not streaming.
+   */
+  async isStreaming(conversationId: string): Promise<boolean> {
+    try {
+      const last = await this.redis.xlast(this.key(conversationId));
+      return !!last && last.fields.done !== '1';
+    } catch (error) {
+      this.logger.warn(`Failed to read stream buffer: ${String(error)}`);
+      return false;
+    }
+  }
+
+  /**
    * A resumable SSE stream of the conversation's current answer, or null when
    * there is nothing to resume (no buffer and no active run — the caller then
    * answers 204). Each emitted string is a chunk's JSON, ready to write after

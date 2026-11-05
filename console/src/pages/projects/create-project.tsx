@@ -212,8 +212,8 @@ export function CreateProject() {
   return (
     <Page
       title="Create project"
+      headerClassName="mx-auto w-full max-w-4xl"
       description="Choose the assets to keep scanned, the pipeline that scans them, and when it runs"
-      isShowButtonGoBack
       permission="project.write"
     >
       <div className="h-full overflow-y-auto">

@@ -13,7 +13,9 @@ import {
   SubagentResponseDtoStatus,
   useAgentsControllerGetMessagesInfinite,
   type ConversationMetadataDto,
+  type ConversationProjectDto,
   type ConversationResponseDto,
+  type GetManyConversationResponseDtoDto,
   type SubagentResponseDto,
 } from '@/services/apis/gen/queries';
 import { orvalClient } from '@/services/apis/axios-client';
@@ -25,7 +27,7 @@ import {
   syncApprovalMode,
 } from '@/hooks/use-approval-mode';
 import { useRemoteExecuteStream } from '@/hooks/use-remote-execute-stream';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 // ---------------------------------------------------------------------------
@@ -178,6 +180,8 @@ interface UseAgentChatReturn {
   selectedModel: SelectedModel | null;
   agentMode: string;
   selectedWorkerId: string | null;
+  /** The project the chat is about: its tools stay inside it */
+  project: ConversationProjectDto | null;
   hasSentFirstMessage: boolean;
   hasMoreMessages: boolean;
   isLoadingMoreMessages: boolean;
@@ -484,6 +488,10 @@ export function useAgentChat({
   const [agentMode, setAgentMode] = useState('ask');
   const agentModeRef = useRef('ask');
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
+  // Picked on the landing page; sent with the first message only, since the
+  // server fixes a chat's project when it creates it
+  const [project, setProject] = useState<ConversationProjectDto | null>(null);
+  const projectRef = useRef<ConversationProjectDto | null>(null);
 
   const {
     state: { selectedWorkspaceId },
@@ -628,6 +636,7 @@ export function useAgentChat({
               agentMode: agentModeRef.current,
               approvalMode: getApprovalMode(),
               workerId: selectedWorkerId,
+              ...(projectRef.current && { projectId: projectRef.current.id }),
             },
           };
         },
@@ -766,6 +775,33 @@ export function useAgentChat({
     }
   }, [isStreaming, createdHereId]);
 
+  // The sidebar marks running chats from the list. Mark this one as soon as
+  // it sends, before the next list fetch can see it, and refetch once it ends.
+  const wasListBusyRef = useRef(isBusy);
+  useEffect(() => {
+    const changed = wasListBusyRef.current !== isBusy;
+    wasListBusyRef.current = isBusy;
+    if (!changed || !conversationId) return;
+    const listKey = ['/api/agents/conversations', 'infinite'];
+    if (!isBusy) {
+      void queryClient.invalidateQueries({ queryKey: listKey });
+      return;
+    }
+    queryClient.setQueriesData<
+      InfiniteData<GetManyConversationResponseDtoDto> | undefined
+    >({ queryKey: listKey }, (list) =>
+      list && {
+        ...list,
+        pages: list.pages.map((page) => ({
+          ...page,
+          data: page.data.map((c) =>
+            c.id === conversationId ? { ...c, running: true } : c,
+          ),
+        })),
+      },
+    );
+  }, [isBusy, conversationId, queryClient]);
+
   // Subagent updates only arrive on this page's stream. When the run ends
   // (or the run polled after a reload does) with one still queued/running,
   // reload the detail once to catch changes the stream did not carry.
@@ -785,6 +821,38 @@ export function useAgentChat({
       })
       .catch(() => {
         // Keeps the last known list
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isBusy, conversationId]);
+
+  // The agent can create a project during a run and link this chat to it:
+  // pick the project up once a run that called create_project ends.
+  const wasBusyForProjectRef = useRef(isBusy);
+  useEffect(() => {
+    const ended = wasBusyForProjectRef.current && !isBusy;
+    wasBusyForProjectRef.current = isBusy;
+    if (!ended || !conversationId || projectRef.current) return;
+    const last = chatMessagesRef.current.at(-1);
+    const createdProject = last?.parts.some(
+      (part) =>
+        part.type === 'tool-create_project' ||
+        (part.type === 'dynamic-tool' && part.toolName === 'create_project'),
+    );
+    if (!createdProject) return;
+    let cancelled = false;
+    orvalClient<ConversationResponseDto>({
+      url: `/api/agents/conversations/${conversationId}`,
+      method: 'GET',
+    })
+      .then((data) => {
+        if (cancelled || !data.project) return;
+        setProject(data.project);
+        projectRef.current = data.project;
+      })
+      .catch(() => {
+        // Stays without a project until the next load
       });
     return () => {
       cancelled = true;
@@ -1198,6 +1266,8 @@ export function useAgentChat({
           setConversationMeta(data.metadata ?? null);
           setGoal(data.metadata?.goal ?? null);
           setSubagents(data.subagents ?? []);
+          setProject(data.project ?? null);
+          projectRef.current = data.project ?? null;
         }
         const savedApprovalMode = (data as { approvalMode?: string })
           .approvalMode;
@@ -1242,6 +1312,7 @@ export function useAgentChat({
       selectedModel?: SelectedModel;
       agentMode?: string;
       workerId?: string | null;
+      project?: ConversationProjectDto | null;
     } | null;
     if (state?.pendingMessage && !hasAutoSentRef.current) {
       hasAutoSentRef.current = true;
@@ -1256,6 +1327,10 @@ export function useAgentChat({
       }
       if (state.workerId !== undefined) {
         setSelectedWorkerId(state.workerId);
+      }
+      if (state.project) {
+        setProject(state.project);
+        projectRef.current = state.project;
       }
       void handleSendMessageRef.current(state.pendingMessage);
       void navigate({
@@ -1282,6 +1357,7 @@ export function useAgentChat({
     selectedModel,
     agentMode,
     selectedWorkerId,
+    project,
     hasSentFirstMessage,
     hasMoreMessages: hasNextPage ?? false,
     isLoadingMoreMessages: isFetchingNextPage,

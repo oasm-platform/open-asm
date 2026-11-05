@@ -1,8 +1,13 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { Link, useLocation, useNavigate } from '@tanstack/react-router';
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useSearch,
+} from '@tanstack/react-router';
 import {
   BarChart3,
-  Bot,
+  FolderKanban,
   Loader2,
   MoreHorizontal,
   Pencil,
@@ -33,11 +38,13 @@ import {
 } from '@/components/ui/sidebar';
 import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import { cn } from '@/lib/utils';
 import {
   useAgentsControllerDeleteAllConversations,
   useAgentsControllerDeleteConversation,
   useAgentsControllerGetConversationsInfinite,
   useAgentsControllerUpdateConversation,
+  useProjectsControllerGetMany,
 } from '@/services/apis/gen/queries';
 import { AppSidebar } from './menu-bar';
 import {
@@ -50,7 +57,7 @@ const CONVERSATION_PATH_PREFIX = '/aistudio/conversations/';
 const UNTITLED = 'New conversation';
 
 interface ConversationItemProps {
-  conversation: { id: string; title?: string | null };
+  conversation: { id: string; title?: string | null; running?: boolean };
   isActive: boolean;
   onOpen: () => void;
   onRename: (title: string) => void;
@@ -69,6 +76,8 @@ function ConversationItem({
   const title = conversation.title ?? UNTITLED;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(title);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const running = !!conversation.running && !menuOpen;
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -121,12 +130,27 @@ function ConversationItem({
           <span className="truncate">{title}</span>
         </Link>
       </SidebarMenuButton>
-      <DropdownMenu modal={false}>
+      {running && (
+        // Swapped for the actions button on hover or keyboard focus. Not on
+        // mouse focus: the row just clicked keeps focus but should still spin.
+        <span
+          role="status"
+          aria-label="Running"
+          className="pointer-events-none absolute inset-e-1 top-2 hidden size-5 items-center justify-center text-muted-foreground transition-opacity group-hover/menu-item:opacity-0 group-has-[:focus-visible]/menu-item:opacity-0 group-data-[collapsible=icon]:hidden md:flex"
+        >
+          <Loader2 className="size-3.5 animate-spin" />
+        </span>
+      )}
+      <DropdownMenu modal={false} open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenuTrigger asChild>
           <SidebarMenuAction
             aria-label="Conversation actions"
-            showOnHover
-            className="text-muted-foreground transition-opacity hover:cursor-pointer peer-data-[size=default]/menu-button:top-2"
+            showOnHover={!running}
+            className={cn(
+              'text-muted-foreground transition-opacity hover:cursor-pointer peer-data-[size=default]/menu-button:top-2',
+              running &&
+                'group-hover/menu-item:opacity-100 group-has-[:focus-visible]/menu-item:opacity-100 md:opacity-0',
+            )}
           >
             <MoreHorizontal />
           </SidebarMenuAction>
@@ -160,6 +184,8 @@ function ConversationItem({
 
 export function AiStudioSidebar() {
   const { pathname } = useLocation();
+  // Set when a new chat was opened from a project (sidebar or project page)
+  const { projectId: activeProjectId } = useSearch({ strict: false });
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { setOpenMobile } = useSidebar();
@@ -188,17 +214,28 @@ export function AiStudioSidebar() {
           getNextPageParam: (lastPage) =>
             lastPage.hasNextPage ? lastPage.page + 1 : undefined,
           // A new chat is only persisted once its first message is sent, so
-          // keep polling until the open conversation shows up in the list.
-          refetchInterval: (query) =>
-            activeConversationId &&
-            !query.state.data?.pages.some((page) =>
-              page.data.some((c) => c.id === activeConversationId),
-            )
+          // keep polling until the open conversation shows up in the list,
+          // and while any chat runs, so its spinner stops when the run ends.
+          refetchInterval: (query) => {
+            const listed = query.state.data?.pages.flatMap((page) => page.data);
+            const awaitingActive =
+              !!activeConversationId &&
+              !listed?.some((c) => c.id === activeConversationId);
+            return awaitingActive || listed?.some((c) => c.running)
               ? 5_000
-              : false,
+              : false;
+          },
         },
       },
     );
+
+  // Same query as the project picker above the prompt, so they share a cache
+  const { data: projectsData } = useProjectsControllerGetMany(
+    { page: 1, limit: 100, sortBy: 'name', sortOrder: 'ASC', status: 'active' },
+    { query: { enabled: !!selectedWorkspaceId } },
+  );
+  const projects = projectsData?.data ?? [];
+  const isLandingPage = pathname === '/aistudio' || pathname === '/aistudio/';
 
   const conversations = useMemo(
     () => data?.pages.flatMap((page) => page.data) ?? [],
@@ -259,26 +296,13 @@ export function AiStudioSidebar() {
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
-                isActive={pathname === '/aistudio' || pathname === '/aistudio/'}
+                isActive={isLandingPage && !activeProjectId}
                 tooltip="New Chat"
                 className={sidebarItemClassName}
               >
                 <Link to="/aistudio" onClick={() => setOpenMobile(false)}>
                   <SquarePen />
                   <span className="truncate">New Chat</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild
-                isActive={pathname === '/aistudio/agents'}
-                tooltip="Agents"
-                className={sidebarItemClassName}
-              >
-                <Link to="/aistudio/agents" onClick={() => setOpenMobile(false)}>
-                  <Bot />
-                  <span className="truncate">Agents</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -327,6 +351,37 @@ export function AiStudioSidebar() {
           </SidebarMenu>
         </SidebarGroupContent>
       </SidebarGroup>
+
+      {projects.length > 0 && (
+        <SidebarGroup className="p-0 group-data-[collapsible=icon]:hidden">
+          <SidebarGroupContent>
+            <SidebarGroupLabel className={sidebarGroupLabelClassName}>
+              Projects
+            </SidebarGroupLabel>
+            <SidebarMenu className={sidebarMenuClassName}>
+              {projects.map((project) => (
+                <SidebarMenuItem key={project.id}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isLandingPage && project.id === activeProjectId}
+                    className={sidebarItemClassName}
+                  >
+                    {/* Same link as a project's "Chat" */}
+                    <Link
+                      to="/aistudio"
+                      search={{ projectId: project.id, mode: 'agent' }}
+                      onClick={() => setOpenMobile(false)}
+                    >
+                      <FolderKanban />
+                      <span className="truncate">{project.name}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      )}
 
       <SidebarGroup className="p-0 group-data-[collapsible=icon]:hidden">
         <SidebarGroupContent>

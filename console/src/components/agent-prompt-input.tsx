@@ -7,7 +7,8 @@ import {
   PromptInputTools,
   type PromptInputMessage,
 } from '@/components/ai-elements/prompt-input';
-import { AgentModeSelect } from '@/components/ui/agent-mode-toggle';
+import { AgentModeToggle } from '@/components/ui/agent-mode-toggle';
+import { ApprovalModeSelect } from '@/components/ui/approval-mode-select';
 import { ChatModelSwitcher } from '@/components/ui/chat-model-switcher';
 import { useState } from 'react';
 
@@ -22,7 +23,8 @@ interface AgentPromptInputProps {
   } | null;
   onSelectModel?: (provider: string, model: string, configId: string) => void;
   agentMode?: string;
-  selectedWorkerId?: string | null;
+  /** Given only where the page can switch mode; shows the ask/agent toggle. */
+  onAgentModeChange?: (mode: string) => void;
   onWorkerSelect?: (workerId: string | null) => void;
   /** False hides the agent settings gear next to the model picker. */
   showSettingsButton?: boolean;
@@ -41,7 +43,7 @@ export default function AgentPromptInput({
   selectedModel,
   onSelectModel,
   agentMode = 'ask',
-  selectedWorkerId,
+  onAgentModeChange,
   onWorkerSelect,
   showSettingsButton = true,
   placeholder = 'Ask anything about security...',
@@ -86,11 +88,14 @@ export default function AgentPromptInput({
             )}
           </PromptInputTools>
           <div className="flex items-center gap-2">
-            <AgentModeSelect
-              value={agentMode}
-              selectedWorkerId={selectedWorkerId}
-              onWorkerChange={onWorkerSelect}
-            />
+            {onAgentModeChange && (
+              <AgentModeToggle
+                value={agentMode}
+                onChange={onAgentModeChange}
+                onWorkerChange={onWorkerSelect}
+              />
+            )}
+            <ApprovalModeSelect />
             <PromptInputSubmit
               status={isSending ? 'streaming' : 'ready'}
               disabled={!input.trim() || isSending}

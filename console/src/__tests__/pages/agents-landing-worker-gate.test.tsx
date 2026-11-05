@@ -58,6 +58,26 @@ vi.mock('@/components/agent-prompt-input', () => ({
   ),
 }));
 
+// Exposes the project picker as a button that picks one.
+vi.mock('@/pages/agents/components/project-scope-select', () => ({
+  ProjectScopeSelect: ({
+    onChange,
+  }: {
+    onChange?: (project: { id: string; name: string }) => void;
+  }) => (
+    <button
+      type="button"
+      onClick={() => onChange?.({ id: 'p1', name: 'Perimeter' })}
+    >
+      Pick project
+    </button>
+  ),
+}));
+
+vi.mock('@/pages/agents/components/worker-select', () => ({
+  WorkerSelect: () => null,
+}));
+
 const { agentsControllerGetAgentModes } = await import(
   '@/services/apis/gen/queries'
 );
@@ -110,6 +130,18 @@ describe('Agents landing — worker gate on submit', () => {
     expect(mockOpenDialog).not.toHaveBeenCalled();
     expect(mockNavigate.mock.calls[0][0].state).toMatchObject({
       workerId: null,
+    });
+  });
+
+  it('starts the chat in the picked project', async () => {
+    renderLanding('ask');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Pick project' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledTimes(1));
+    expect(mockNavigate.mock.calls[0][0].state).toMatchObject({
+      project: { id: 'p1', name: 'Perimeter' },
     });
   });
 

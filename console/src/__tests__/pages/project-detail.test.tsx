@@ -286,6 +286,15 @@ describe('Project detail page', () => {
     expect(screen.getByText('New vulnerabilities per week')).toBeInTheDocument();
   });
 
+  it('opens an agent chat locked to the project', async () => {
+    renderWithProviders(<ProjectDetail />, at('overview'));
+
+    const link = await screen.findByRole('link', { name: 'Chat with agent' });
+    expect(link.getAttribute('href')).toMatch(
+      /^\/aistudio\/?\?projectId=project-1&mode=agent$/,
+    );
+  });
+
   it('says what changed in the recent activity', async () => {
     renderWithProviders(<ProjectDetail />, at('overview'));
 

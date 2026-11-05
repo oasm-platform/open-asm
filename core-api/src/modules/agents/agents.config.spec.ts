@@ -11,7 +11,7 @@ import {
 } from './agents.config';
 import { AgentConfig } from './entities/agent-config.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
-import { LLMProvider, SearchProvider } from './enums/agent.enums';
+import { LLMProvider, ReasoningEffort, SearchProvider } from './enums/agent.enums';
 
 jest.mock('@/common/utils/workspace-encryption.util', () => ({
   decryptWithDEK: (text: string) => text.replace(/^enc\((.*)\)$/, '$1'),
@@ -86,6 +86,7 @@ describe('AgentsConfigService', () => {
       maxSteps: null,
       defaultAgentMode: null,
       defaultApprovalMode: null,
+      defaultReasoningEffort: null,
       disabledTools: [],
       responseLanguage: null,
       memoryEnabled: false,
@@ -314,6 +315,41 @@ describe('withAgentConfig', () => {
     expect(resolved.contextWindow).toBeUndefined();
     expect(resolved.maxOutputTokens).toBeUndefined();
     expect(resolved.maxSteps).toBe(40);
+  });
+
+  it("runs the connection's model at its picked effort, others at their ref's", () => {
+    const picked = {
+      ...llm('a'),
+      reasoningEffort: ReasoningEffort.LOW,
+    } as AgentLLMConfig;
+    const refs = agentConfig({
+      modelsConfig: {
+        subagents: [
+          { llmConfigId: 'a', model: 'gpt-5', reasoningEffort: ReasoningEffort.HIGH },
+          { llmConfigId: 'a', model: 'gpt-5-mini', reasoningEffort: ReasoningEffort.MEDIUM },
+        ],
+      },
+    });
+    expect(withAgentConfig(picked, refs).reasoningEffort).toBe(ReasoningEffort.LOW);
+    expect(withAgentConfig(picked, refs, 'gpt-5-mini').reasoningEffort).toBe(
+      ReasoningEffort.MEDIUM,
+    );
+    expect(withAgentConfig(llm('a'), refs).reasoningEffort).toBe(ReasoningEffort.HIGH);
+  });
+
+  it("falls back to the user's default effort", () => {
+    const defaults = agentConfig({
+      defaultReasoningEffort: ReasoningEffort.MINIMAL,
+    });
+    expect(withAgentConfig(llm('a'), defaults).reasoningEffort).toBe(
+      ReasoningEffort.MINIMAL,
+    );
+    expect(
+      withAgentConfig(
+        { ...llm('a'), reasoningEffort: ReasoningEffort.HIGH } as AgentLLMConfig,
+        defaults,
+      ).reasoningEffort,
+    ).toBe(ReasoningEffort.HIGH);
   });
 });
 

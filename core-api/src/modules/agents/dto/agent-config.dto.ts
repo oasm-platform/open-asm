@@ -63,7 +63,7 @@ export class AgentModelRefDto {
 
   @ApiPropertyOptional({
     description:
-      "Reasoning effort; unset uses the provider's default (saved, not used yet)",
+      "Reasoning effort; unset uses the default effort, else the provider's",
     enum: ReasoningEffort,
     example: ReasoningEffort.MEDIUM,
   })
@@ -225,6 +225,16 @@ export class UpsertAgentConfigDto {
   defaultApprovalMode?: AgentApprovalMode | null;
 
   @ApiPropertyOptional({
+    description:
+      'Reasoning effort for models with none picked in the chat; a model that lacks the level runs at its provider default',
+    enum: ReasoningEffort,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsEnum(ReasoningEffort)
+  defaultReasoningEffort?: ReasoningEffort | null;
+
+  @ApiPropertyOptional({
     description: 'Built-in tool names the agent must not use',
     type: [String],
     example: ['execute_remote_command'],
@@ -308,6 +318,16 @@ export class AgentConfigResponseDto {
   @IsOptional()
   @IsEnum(AgentApprovalMode)
   defaultApprovalMode: AgentApprovalMode | null;
+
+  @ApiProperty({
+    description:
+      'Reasoning effort for models with none picked in the chat; a model that lacks the level runs at its provider default',
+    enum: ReasoningEffort,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsEnum(ReasoningEffort)
+  defaultReasoningEffort: ReasoningEffort | null;
 
   @ApiProperty({
     description: 'Built-in tool names the agent must not use',

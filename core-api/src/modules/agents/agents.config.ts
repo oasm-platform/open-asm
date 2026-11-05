@@ -88,6 +88,12 @@ export function withAgentConfig(
     contextWindow: ref?.contextWindow,
     maxOutputTokens: ref?.maxOutputTokens,
     maxSteps: agentConfig?.maxSteps ?? undefined,
+    // The picker's effort belongs to the connection's own model; then the
+    // model ref's, then the user's default
+    reasoningEffort:
+      (model === llmConfig.model ? llmConfig.reasoningEffort : undefined) ??
+      ref?.reasoningEffort ??
+      agentConfig?.defaultReasoningEffort,
   };
 }
 
@@ -248,6 +254,9 @@ export class AgentsConfigService {
     }
     if (dto.defaultApprovalMode !== undefined) {
       config.defaultApprovalMode = dto.defaultApprovalMode;
+    }
+    if (dto.defaultReasoningEffort !== undefined) {
+      config.defaultReasoningEffort = dto.defaultReasoningEffort;
     }
     if (dto.disabledTools !== undefined) {
       config.disabledTools = [
@@ -413,6 +422,7 @@ export class AgentsConfigService {
       maxSteps: config?.maxSteps ?? null,
       defaultAgentMode: config?.defaultAgentMode ?? null,
       defaultApprovalMode: config?.defaultApprovalMode ?? null,
+      defaultReasoningEffort: config?.defaultReasoningEffort ?? null,
       disabledTools: (config?.disabledTools ?? []).map(currentToolName),
       responseLanguage: config?.responseLanguage ?? null,
       memoryEnabled: config?.memoryEnabled ?? false,

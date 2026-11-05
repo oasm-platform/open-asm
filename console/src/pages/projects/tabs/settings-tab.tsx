@@ -18,6 +18,7 @@ import {
 import { Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { AgentContextCard } from '../components/agent-context-card';
 import { apiErrorMessage, useInvalidateProjects } from '../project-utils';
 
 function Row({
@@ -134,6 +135,8 @@ export function SettingsTab({
         </CardContent>
       </Card>
 
+      <AgentContextCard project={project} />
+
       <Card>
         <CardHeader>
           <CardTitle>Notifications</CardTitle>
@@ -169,7 +172,7 @@ export function SettingsTab({
           </Row>
           <Row
             title="Delete project"
-            description="Deletes the project's workflows and their run history. Vulnerabilities stay in the workspace."
+            description="Deletes the project's workflows, their run history and its AI Studio chats. Vulnerabilities stay in the workspace."
           >
             <Button variant="outline" onClick={onDelete}>
               <Trash2 className="size-4" />

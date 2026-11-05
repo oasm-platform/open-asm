@@ -437,7 +437,21 @@ export class AgentsController {
     @WorkspaceId() workspaceId: string,
     @UserId() userId: string,
   ) {
-    return this.agentsService.getConversations(workspaceId, userId, query);
+    const result = await this.agentsService.getConversations(
+      workspaceId,
+      userId,
+      query,
+    );
+    // Lets the chat list mark conversations whose run is still going
+    const data = await Promise.all(
+      result.data.map(async (conversation) => ({
+        ...conversation,
+        running:
+          this.agentsCompletionsService.isRunActive(conversation.id) ||
+          (await this.agentsStreamBuffer.isStreaming(conversation.id)),
+      })),
+    );
+    return { ...result, data };
   }
 
   @WorkspaceAccess('agent.read')

@@ -75,6 +75,28 @@ describe('trimCatalog', () => {
     expect(catalog.providers['filler-0']).toBeUndefined();
   });
 
+  it('keeps known effort levels in order and the budget flag', () => {
+    const catalog = trimCatalog(
+      rawCatalog({
+        openai: {
+          a: model(1_000, {
+            reasoning_options: [
+              { type: 'effort', values: ['high', 'default', 'low', 'max'] },
+              { type: 'budget_tokens', min: 1024 },
+            ],
+          }),
+          b: model(1_000, { reasoning_options: [{ type: 'toggle' }] }),
+        },
+        anthropic: {},
+      }),
+    );
+    expect(catalog.providers.openai.a.reasoning).toEqual({
+      efforts: ['low', 'high', 'max'],
+      budget: true,
+    });
+    expect(catalog.providers.openai.b.reasoning).toBeUndefined();
+  });
+
   it('keeps only the requested providers', () => {
     const catalog = trimCatalog(
       rawCatalog({

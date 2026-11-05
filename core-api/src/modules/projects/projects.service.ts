@@ -1,3 +1,4 @@
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import {
@@ -62,6 +63,18 @@ const LIST_SORT: Record<string, string> = {
   totalAssets: '"totalAssets"',
 };
 
+/**
+ * Emitted (and awaited) right before a project is deleted, while the rows that
+ * cascade from it can still be read: the agents module forgets the chats of
+ * the project, which go with it.
+ */
+export const PROJECT_DELETING_EVENT = 'project.deleting';
+
+export interface ProjectDeletingEvent {
+  projectId: string;
+  workspaceId: string;
+}
+
 @Injectable()
 export class ProjectsService implements ProjectAssetDiscovery {
   private readonly logger = new Logger(ProjectsService.name);
@@ -75,6 +88,7 @@ export class ProjectsService implements ProjectAssetDiscovery {
     private readonly workflows: ProjectWorkflowsService,
     private readonly triggers: ProjectTriggersService,
     private readonly eventBridge: EventBridgeService,
+    private readonly events: EventEmitter2,
   ) {}
 
   /** Project cards: counts, open vulnerabilities, last run and triggers. */
@@ -313,6 +327,9 @@ export class ProjectsService implements ProjectAssetDiscovery {
     if (dto.description !== undefined) {
       project.description = dto.description?.trim() || null;
     }
+    if (dto.instruction !== undefined) {
+      project.instruction = dto.instruction?.trim() || null;
+    }
     if (dto.autoAddAssets !== undefined) {
       project.autoAddAssets = dto.autoAddAssets;
     }
@@ -344,6 +361,10 @@ export class ProjectsService implements ProjectAssetDiscovery {
    */
   async delete(id: string, workspaceId: string): Promise<DefaultMessageResponseDto> {
     await findProjectOrFail(this.projectRepo, id, workspaceId);
+    await this.events.emitAsync(PROJECT_DELETING_EVENT, {
+      projectId: id,
+      workspaceId,
+    } satisfies ProjectDeletingEvent);
     await this.removeEverything(id);
     return { message: `Project "${id}" successfully deleted` };
   }

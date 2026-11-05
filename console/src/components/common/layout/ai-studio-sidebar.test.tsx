@@ -35,7 +35,7 @@ vi.mock('@/services/apis/gen/queries', async (importOriginal) => {
         pages: [
           {
             data: [
-              { id: 'c1', title: 'Scan example.com' },
+              { id: 'c1', title: 'Scan example.com', running: true },
               { id: 'c2', title: null },
             ],
           },
@@ -45,6 +45,14 @@ vi.mock('@/services/apis/gen/queries', async (importOriginal) => {
       hasNextPage: false,
       isLoading: false,
       isFetchingNextPage: false,
+    }),
+    useProjectsControllerGetMany: () => ({
+      data: {
+        data: [
+          { id: 'p1', name: 'Acme external', hexColor: '#ff0000' },
+          { id: 'p2', name: 'Beta corp', hexColor: '#00ff00' },
+        ],
+      },
     }),
     useAgentsControllerUpdateConversation: () => ({
       mutate: updateMock,
@@ -85,21 +93,41 @@ describe('AiStudioSidebar', () => {
     expect(openSettingsMock).toHaveBeenCalledWith();
   });
 
-  it('links to the connectors page', async () => {
+  it('links to the usage and connectors pages', async () => {
     setup();
 
     expect(
       await screen.findByRole('link', { name: 'Connectors' }),
     ).toHaveAttribute('href', '/aistudio/connectors');
-  });
-
-  it('links to the usage page', async () => {
-    setup();
-
     expect(await screen.findByRole('link', { name: 'Usage' })).toHaveAttribute(
       'href',
       '/aistudio/usage',
     );
+  });
+
+  it('starts every chat from New Chat, with no Agents entry', async () => {
+    setup();
+
+    expect(
+      await screen.findByRole('link', { name: 'New Chat' }),
+    ).toHaveAttribute('href', '/aistudio');
+    expect(
+      screen.queryByRole('link', { name: 'Agents' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('lists projects, each opening an agent chat in that project', async () => {
+    setup();
+
+    expect(await screen.findByText('Projects')).toBeInTheDocument();
+    const link = await screen.findByRole('link', { name: 'Acme external' });
+    const url = new URL(link.getAttribute('href') ?? '', 'http://localhost');
+    expect(url.pathname).toBe('/aistudio');
+    expect(url.searchParams.get('projectId')).toBe('p1');
+    expect(url.searchParams.get('mode')).toBe('agent');
+    expect(
+      screen.getByRole('link', { name: 'Beta corp' }),
+    ).toBeInTheDocument();
   });
 
   it('shows Chats as a plain label, not a link', async () => {
@@ -145,6 +173,36 @@ describe('AiStudioSidebar', () => {
       id: 'c1',
       data: { title: 'Recon notes' },
     });
+  });
+
+  it('shows a spinner only on running conversations, keeping their actions', async () => {
+    setup();
+
+    const spinner = await screen.findByRole('status', { name: 'Running' });
+    const runningRow = screen
+      .getByRole('link', { name: 'Scan example.com' })
+      .closest('li') as HTMLElement;
+    expect(runningRow).toContainElement(spinner);
+    expect(screen.getAllByRole('status', { name: 'Running' })).toHaveLength(1);
+    expect(
+      within(runningRow).getByRole('button', { name: 'Conversation actions' }),
+    ).toBeInTheDocument();
+  });
+
+  it('hides the spinner while the running conversation menu is open', async () => {
+    const { user } = setup();
+
+    const [firstActions] = await screen.findAllByRole('button', {
+      name: 'Conversation actions',
+    });
+    await user.click(firstActions);
+
+    expect(
+      await screen.findByRole('menuitem', { name: 'Rename' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('status', { name: 'Running' }),
+    ).not.toBeInTheDocument();
   });
 
   it('deletes one conversation from its menu after confirming', async () => {

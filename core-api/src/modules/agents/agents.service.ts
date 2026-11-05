@@ -1,3 +1,8 @@
+import { OnEvent } from '@nestjs/event-emitter';
+import {
+  PROJECT_DELETING_EVENT,
+  type ProjectDeletingEvent,
+} from '@/modules/projects/projects.service';
 import {
   GetManyBaseQueryParams,
   GetManyBaseResponseDto,
@@ -68,9 +73,23 @@ import { AgentMCPConfig } from './entities/agent-mcp-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
 import { AgentMessageToolCall } from './entities/tool-call.entity';
 import {
+  type FetchedModel,
   getLLMProviderConfig,
   llmProviderSupported,
 } from './llm-provider-supported';
+
+/** The conversation's project as the API returns it; needs `project` loaded. */
+function projectOf(
+  conversation: AgentConversation,
+): Pick<ConversationResponseDto, 'projectId' | 'project'> {
+  const { project } = conversation;
+  return {
+    projectId: conversation.projectId ?? null,
+    project: project
+      ? { id: project.id, name: project.name, hexColor: project.hexColor }
+      : null,
+  };
+}
 
 @Injectable()
 export class AgentsService {
@@ -177,6 +196,7 @@ export class AgentsService {
       provider: config.provider,
       name: config.name,
       model: config.model,
+      reasoningEffort: config.reasoningEffort ?? null,
       apiUrl: config.apiUrl,
       isPreferred: config.id === defaultLLMConfigId,
       apiKeyMasked,
@@ -312,6 +332,7 @@ export class AgentsService {
         configId: config.id,
         name: config.name,
         model: config.model,
+        reasoningEffort: config.reasoningEffort ?? null,
         apiUrl: config.apiUrl,
         isPreferred: config.id === defaultLLMConfigId,
         apiKeyMasked,
@@ -344,6 +365,9 @@ export class AgentsService {
     }
     if (dto.provider !== undefined) config.provider = dto.provider;
     if (dto.model !== undefined) config.model = dto.model;
+    if (dto.reasoningEffort !== undefined) {
+      config.reasoningEffort = dto.reasoningEffort ?? null;
+    }
     if (dto.apiUrl !== undefined) config.apiUrl = dto.apiUrl;
 
     const saved = await this.llmConfigRepository.save(config);
@@ -423,10 +447,21 @@ export class AgentsService {
     }
 
     // Try to get from cache first
+    // The cache keeps the provider's list; efforts come from the catalog
+    const withEfforts = (models: FetchedModel[]): ProviderModelDto[] =>
+      models.map((m) => ({
+        id: m.id,
+        name: m.name,
+        reasoningEfforts: this.modelsCatalog.reasoningEfforts(
+          config.provider,
+          m.id,
+        ),
+      }));
+
     try {
       const cached = await this.redisService.get(cacheKey);
       if (cached) {
-        return JSON.parse(cached) as ProviderModelDto[];
+        return withEfforts(JSON.parse(cached) as FetchedModel[]);
       }
     } catch (error) {
       this.logger.warn(`Failed to read from Redis cache: ${error}`);
@@ -450,7 +485,7 @@ export class AgentsService {
       this.logger.warn(`Failed to cache models in Redis: ${error}`);
     }
 
-    return models;
+    return withEfforts(models);
   }
 
   async getConversation(
@@ -460,6 +495,7 @@ export class AgentsService {
   ): Promise<ConversationResponseDto> {
     const conversation = await this.conversationRepository.findOne({
       where: { id, workspaceId, createdBy: userId },
+      relations: { project: true },
     });
 
     if (!conversation) {
@@ -484,6 +520,7 @@ export class AgentsService {
       title: conversation.title,
       agentMode: conversation.agentMode,
       approvalMode: conversation.approvalMode,
+      ...projectOf(conversation),
       createdAt: conversation.createdAt,
       updatedAt: conversation.updatedAt,
       todos,
@@ -573,6 +610,7 @@ export class AgentsService {
   ): Promise<GetManyBaseResponseDto<ConversationResponseDto>> {
     const qb = this.conversationRepository
       .createQueryBuilder('conversation')
+      .leftJoinAndSelect('conversation.project', 'project')
       .where('conversation.workspaceId = :workspaceId', { workspaceId })
       .andWhere('conversation.createdBy = :userId', { userId });
 
@@ -601,6 +639,7 @@ export class AgentsService {
         title: c.title,
         agentMode: c.agentMode,
         approvalMode: c.approvalMode,
+        ...projectOf(c),
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
       })),
@@ -616,6 +655,7 @@ export class AgentsService {
   ): Promise<ConversationResponseDto> {
     const conversation = await this.conversationRepository.findOne({
       where: { id, workspaceId, createdBy: userId },
+      relations: { project: true },
     });
 
     if (!conversation) {
@@ -633,6 +673,7 @@ export class AgentsService {
       title: saved.title,
       agentMode: saved.agentMode,
       approvalMode: saved.approvalMode,
+      ...projectOf(saved),
       createdAt: saved.createdAt,
       updatedAt: saved.updatedAt,
     };
@@ -676,6 +717,37 @@ export class AgentsService {
       workspaceId,
       userId,
     );
+  }
+
+  /**
+   * A deleted project takes its chats with it (FK cascade); this forgets what
+   * lives outside their rows, as deleting a chat does. Never blocks the delete.
+   */
+  @OnEvent(PROJECT_DELETING_EVENT, { promisify: true })
+  async forgetProjectConversations({
+    projectId,
+    workspaceId,
+  }: ProjectDeletingEvent): Promise<void> {
+    try {
+      const conversations = await this.conversationRepository.find({
+        where: { projectId, workspaceId },
+        select: ['id', 'createdBy'],
+      });
+      const byUser = new Map<string, string[]>();
+      for (const c of conversations) {
+        byUser.set(c.createdBy, [...(byUser.get(c.createdBy) ?? []), c.id]);
+      }
+      await Promise.all(
+        conversations.map((c) => this.agentsMemories.stmClear(c.id)),
+      );
+      for (const [userId, ids] of byUser) {
+        await this.approvals.forgetConversations(ids, workspaceId, userId);
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Could not forget the chats of project ${projectId}: ${String(error)}`,
+      );
+    }
   }
 
   async getMessages(

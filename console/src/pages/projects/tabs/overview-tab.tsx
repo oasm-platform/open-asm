@@ -318,7 +318,7 @@ function ActivityItem({ item, projectId }: { item: ProjectActivityDto; projectId
     );
   }
   return (
-    <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+    <span className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1">
       <Link
         to="/jobs/runs/$id"
         params={{ id: item.ref }}
@@ -532,12 +532,14 @@ export function OverviewTab({
               <p className="py-4 text-sm text-muted-foreground">Nothing yet.</p>
             ) : (
               overview.activity.map((item) => (
+                // Baseline: a detail that wraps keeps its first line level
+                // with the time
                 <div
                   key={`${item.kind}-${item.ref}-${item.at}`}
-                  className="grid grid-cols-[88px_1fr] gap-2 py-2 text-sm"
+                  className="grid grid-cols-[8.5rem_minmax(0,1fr)] items-baseline gap-2 py-2 text-sm"
                 >
                   <span
-                    className="tabular-nums text-muted-foreground"
+                    className="truncate whitespace-nowrap tabular-nums text-muted-foreground"
                     title={dayjs(item.at).format('YYYY-MM-DD HH:mm')}
                   >
                     {dayjs(item.at).fromNow()}

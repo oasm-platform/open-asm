@@ -4,7 +4,7 @@ import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import { Column, Entity, Index, JoinColumn, ManyToOne, Relation } from 'typeorm';
-import { LLMProvider } from '../enums/agent.enums';
+import { LLMProvider, ReasoningEffort } from '../enums/agent.enums';
 
 @Entity('agent_llm_configs')
 @Index('IDX_llm_config_workspaceId', ['workspace'])
@@ -45,6 +45,13 @@ export class AgentLLMConfig extends BaseEntity {
   @IsString()
   @Column({ type: 'varchar', length: 255 })
   model: string;
+
+  /** Effort picked for `model` in the chat model picker; unset: provider default */
+  @ApiProperty({ enum: ReasoningEffort, required: false, nullable: true })
+  @IsOptional()
+  @IsEnum(ReasoningEffort)
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  reasoningEffort?: ReasoningEffort | null;
 
   @ApiProperty({ example: 'https://api.example.com/v1', required: false })
   @IsOptional()

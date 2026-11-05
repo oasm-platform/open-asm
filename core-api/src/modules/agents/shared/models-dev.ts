@@ -1,8 +1,8 @@
-import { LLMProvider } from '../enums/agent.enums';
+import { LLMProvider, ReasoningEffort } from '../enums/agent.enums';
 
 /**
  * Pure helpers for the https://models.dev model catalog: trimming the raw
- * `api.json` down to what the agent needs (limits + cost) and resolving an
+ * `api.json` down to what the agent needs (limits, cost, reasoning) and resolving an
  * oasm `(provider, modelId)` pair to a catalog entry. No I/O here.
  */
 
@@ -24,9 +24,18 @@ export interface ModelCost {
   cacheWrite?: number;
 }
 
+/** How a model's reasoning is tuned, as published by models.dev. */
+export interface ModelReasoning {
+  /** Effort levels the model accepts, lowest first. */
+  efforts?: ReasoningEffort[];
+  /** True when it takes a thinking token budget. */
+  budget?: boolean;
+}
+
 export interface CatalogEntry {
   limit: ModelLimits;
   cost?: ModelCost;
+  reasoning?: ModelReasoning;
   /** models.dev `canonical_model_id`, e.g. `anthropic/claude-sonnet-4-5`. */
   canonical?: string;
 }
@@ -80,12 +89,30 @@ interface RawModel {
     cache_write?: unknown;
   };
   canonical_model_id?: unknown;
+  reasoning_options?: unknown;
 }
 
 const positiveInt = (v: unknown): number | undefined =>
   typeof v === 'number' && Number.isFinite(v) && v > 0
     ? Math.floor(v)
     : undefined;
+
+const EFFORT_ORDER = Object.values(ReasoningEffort);
+
+function trimReasoning(options: unknown): ModelReasoning | undefined {
+  if (!Array.isArray(options)) return undefined;
+  const reasoning: ModelReasoning = {};
+  for (const option of options as Array<{ type?: unknown; values?: unknown }>) {
+    if (option?.type === 'budget_tokens') reasoning.budget = true;
+    if (option?.type === 'effort' && Array.isArray(option.values)) {
+      const efforts = EFFORT_ORDER.filter((e) =>
+        (option.values as unknown[]).includes(e),
+      );
+      if (efforts.length > 0) reasoning.efforts = efforts;
+    }
+  }
+  return reasoning.efforts || reasoning.budget ? reasoning : undefined;
+}
 
 const price = (v: unknown): number | undefined =>
   typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined;
@@ -113,6 +140,9 @@ function trimModel(raw: RawModel): CatalogEntry | null {
     entry.cost = cost;
   }
 
+  const reasoning = trimReasoning(raw.reasoning_options);
+  if (reasoning) entry.reasoning = reasoning;
+
   if (typeof raw.canonical_model_id === 'string' && raw.canonical_model_id) {
     entry.canonical = raw.canonical_model_id.toLowerCase();
   }
@@ -121,7 +151,7 @@ function trimModel(raw: RawModel): CatalogEntry | null {
 }
 
 /**
- * Trims a raw models.dev `api.json` payload to limits + cost.
+ * Trims a raw models.dev `api.json` payload to limits, cost and reasoning.
  *
  * @param raw - Parsed `api.json`.
  * @param onlyProviders - Keep only these provider keys (used for the bundled snapshot).

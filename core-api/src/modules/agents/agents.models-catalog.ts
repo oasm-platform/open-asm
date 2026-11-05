@@ -2,11 +2,20 @@ import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { ResolvedLLMConfig } from './agents.config';
-import { LLMProvider } from './enums/agent.enums';
+import {
+  FALLBACK_REASONING_EFFORTS,
+  LLMProvider,
+  ReasoningEffort,
+} from './enums/agent.enums';
+import {
+  getReasoningProviderOptions,
+  type ProviderReasoningOptions,
+} from './llm-provider-supported';
 import type { ContextWindowSource } from './shared/conversation-metadata';
 import {
   type CatalogLookupResult,
   type ModelCost,
+  type ModelReasoning,
   ModelsCatalogIndex,
   type TrimmedCatalog,
 } from './shared/models-dev';
@@ -88,6 +97,51 @@ export class AgentsModelsCatalogService implements OnModuleInit {
       source: 'default',
       estimated: true,
     };
+  }
+
+  /** Reasoning knobs of a model; none for a guessed (bare id) match. */
+  private reasoningOf(
+    provider: LLMProvider | string,
+    model: string,
+  ): ModelReasoning | undefined {
+    const hit = this.lookup(provider, model);
+    return hit && !hit.estimated ? hit.entry.reasoning : undefined;
+  }
+
+  /** Effort levels to offer for a model: its own, else low to high. */
+  reasoningEfforts(
+    provider: LLMProvider | string,
+    model: string,
+  ): ReasoningEffort[] {
+    return (
+      this.reasoningOf(provider, model)?.efforts ?? FALLBACK_REASONING_EFFORTS
+    );
+  }
+
+  /**
+   * The picked effort, if the model offers it. A level picked for another
+   * model gives undefined: the provider default.
+   */
+  effortFor(
+    cfg: Pick<ResolvedLLMConfig, 'provider' | 'model' | 'reasoningEffort'>,
+  ): ReasoningEffort | undefined {
+    const effort = cfg.reasoningEffort;
+    return effort &&
+      this.reasoningEfforts(cfg.provider, cfg.model).includes(effort)
+      ? effort
+      : undefined;
+  }
+
+  /** Provider options that run the model at its picked effort. */
+  reasoningOptions(
+    cfg: Pick<ResolvedLLMConfig, 'provider' | 'model' | 'reasoningEffort'>,
+  ): { providerOptions?: ProviderReasoningOptions } {
+    const options = getReasoningProviderOptions(
+      cfg.provider,
+      this.effortFor(cfg),
+      this.reasoningOf(cfg.provider, cfg.model),
+    );
+    return options ? { providerOptions: options } : {};
   }
 
   /** Price per 1M tokens; undefined for self-hosted (CUSTOM) or unknown models. */

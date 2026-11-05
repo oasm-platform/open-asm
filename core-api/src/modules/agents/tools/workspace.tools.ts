@@ -2,7 +2,9 @@ import type { Tool } from 'ai';
 import { z } from 'zod';
 
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
+import type { Severity } from '@/common/enums/enum';
 import { WorkerScope } from '@/common/enums/enum';
+import type { VulnerabilityStatus } from '@/modules/vulnerabilities/dto/get-vulnerability.dto';
 import {
   detailAssetSchema,
   detailIssueSchema,
@@ -20,22 +22,44 @@ import {
   listWorkersSchema,
 } from '@/mcp/mcp.schema';
 
-import { NEWEST_FIRST, defineTool, pageOf } from './helpers';
-import type { Deps } from './types';
+import {
+  NEWEST_FIRST,
+  assetsInProject,
+  defineTool,
+  pageOf,
+  projectFor,
+  projectIdInput,
+} from './helpers';
+import type { Deps, ToolScope } from './types';
 
-// Tools over the workspace's OASM data, offered in every agent mode.
+// Tools over the workspace's OASM data, offered in every agent mode. The
+// project-aware ones take a projectId, or are locked to the conversation's.
+
+const getAssetsInput = getAssetsSchema.extend(projectIdInput);
+const getVulnerabilitiesInput = getVulnerabilitiesSchema.extend(projectIdInput);
+const listAssetsInTargetInput = listAssetsInTargetSchema.extend(projectIdInput);
+const getPortsInput = getPortsSchema.extend(projectIdInput);
+const getTechnologiesInput = getTechnologiesSchema.extend(projectIdInput);
+const getTlsInput = getTlsSchema.extend(projectIdInput);
+const statisticsInput = z.object(projectIdInput);
 
 export function getAssetsTool(
   deps: Deps<'assetsService'>,
   workspaceId: string,
+  scope: ToolScope = {},
 ): Tool {
   return defineTool({
     description:
-      'List discovered assets (domains, IPs, URLs) in the workspace. Params: page, limit, value (filter text).',
-    inputSchema: getAssetsSchema,
-    execute: async (params: z.infer<typeof getAssetsSchema>) => {
+      'List discovered assets (domains, IPs, URLs) in the workspace. Params: page, limit, value (filter text), projectId.',
+    inputSchema: getAssetsInput,
+    execute: async (params: z.infer<typeof getAssetsInput>) => {
       const response = await deps.assetsService.getManyAsssetServices(
-        { ...pageOf(params), ...NEWEST_FIRST, value: params.value },
+        {
+          ...pageOf(params),
+          ...NEWEST_FIRST,
+          value: params.value,
+          ...assetsInProject(projectFor(scope, params)),
+        },
         workspaceId,
       );
       return {
@@ -47,14 +71,44 @@ export function getAssetsTool(
 }
 
 export function getVulnerabilitiesTool(
-  deps: Deps<'vulnerabilitiesService'>,
+  deps: Deps<'vulnerabilitiesService' | 'projectResultsService'>,
   workspaceId: string,
+  scope: ToolScope = {},
 ): Tool {
   return defineTool({
     description:
-      'List security vulnerabilities with severity. Params: page, limit, q (search e.g. "XSS", "CVE-2024").',
-    inputSchema: getVulnerabilitiesSchema,
-    execute: async (params: z.infer<typeof getVulnerabilitiesSchema>) => {
+      'List security vulnerabilities with severity. Params: page, limit, q (search e.g. "XSS", "CVE-2024"), projectId. With a project: the ones its runs reported, open by default (status and severity apply).',
+    inputSchema: getVulnerabilitiesInput,
+    execute: async (params: z.infer<typeof getVulnerabilitiesInput>) => {
+      const projectId = projectFor(scope, params);
+      if (projectId) {
+        const found = await deps.projectResultsService.vulnerabilities(
+          projectId,
+          workspaceId,
+          {
+            ...pageOf(params),
+            ...NEWEST_FIRST,
+            search: params.q ?? '',
+            status: params.status as VulnerabilityStatus | undefined,
+            severity: params.severity as Severity[] | undefined,
+          },
+        );
+        return {
+          total: found.total,
+          page: found.page,
+          limit: found.limit,
+          pageCount: found.pageCount,
+          hasNextPage: found.hasNextPage,
+          data: found.data.map((i) => ({
+            id: i.id,
+            name: i.name,
+            severity: i.severity,
+            asset: i.assetValue,
+            status: i.status,
+            provenance: i.provenance,
+          })),
+        };
+      }
       const response = await deps.vulnerabilitiesService.getVulnerabilities(
         { ...pageOf(params), ...NEWEST_FIRST, q: params.q },
         workspaceId,
@@ -93,14 +147,20 @@ export function getTargetsTool(
 }
 
 export function getStatisticsTool(
-  deps: Deps<'statisticService'>,
+  deps: Deps<'statisticService' | 'projectResultsService'>,
   workspaceId: string,
+  scope: ToolScope = {},
 ): Tool {
   return defineTool({
     description:
-      'Return security dashboard summary: asset/vulnerability counts, severity breakdown, security score. No params.',
-    inputSchema: z.object({}),
-    execute: () => deps.statisticService.getStatistics(workspaceId),
+      "Return security dashboard summary: asset/vulnerability counts, severity breakdown, security score. Params: projectId (that project's overview instead: assets, open vulnerabilities by severity, runs, recent activity).",
+    inputSchema: statisticsInput,
+    execute: (params: z.infer<typeof statisticsInput>) => {
+      const projectId = projectFor(scope, params);
+      return projectId
+        ? deps.projectResultsService.overview(projectId, workspaceId)
+        : deps.statisticService.getStatistics(workspaceId);
+    },
   });
 }
 
@@ -119,18 +179,20 @@ export function detailAssetTool(
 export function listAssetsInTargetTool(
   deps: Deps<'assetsService'>,
   workspaceId: string,
+  scope: ToolScope = {},
 ): Tool {
   return defineTool({
     description:
-      'List assets discovered from a specific target by targetId. Params: targetId, page, limit, value (filter).',
-    inputSchema: listAssetsInTargetSchema,
-    execute: (params: z.infer<typeof listAssetsInTargetSchema>) =>
+      'List assets discovered from a specific target by targetId. Params: targetId, page, limit, value (filter), projectId.',
+    inputSchema: listAssetsInTargetInput,
+    execute: (params: z.infer<typeof listAssetsInTargetInput>) =>
       deps.assetsService.getManyAsssetServices(
         {
           ...pageOf(params),
           ...NEWEST_FIRST,
           targetIds: [params.targetId],
           value: params.value,
+          ...assetsInProject(projectFor(scope, params)),
         },
         workspaceId,
       ),
@@ -156,14 +218,20 @@ export function detailVulnTool(
 export function getPortsTool(
   deps: Deps<'assetsService'>,
   workspaceId: string,
+  scope: ToolScope = {},
 ): Tool {
   return defineTool({
     description:
-      'List open network ports with asset counts. Params: page, limit, value (port number filter).',
-    inputSchema: getPortsSchema,
-    execute: (params: z.infer<typeof getPortsSchema>) =>
+      'List open network ports with asset counts. Params: page, limit, value (port number filter), projectId.',
+    inputSchema: getPortsInput,
+    execute: (params: z.infer<typeof getPortsInput>) =>
       deps.assetsService.getPortAssets(
-        { ...pageOf(params), ...NEWEST_FIRST, value: params.value },
+        {
+          ...pageOf(params),
+          ...NEWEST_FIRST,
+          value: params.value,
+          ...assetsInProject(projectFor(scope, params)),
+        },
         workspaceId,
       ),
   });
@@ -172,14 +240,20 @@ export function getPortsTool(
 export function getTechnologiesTool(
   deps: Deps<'assetsService'>,
   workspaceId: string,
+  scope: ToolScope = {},
 ): Tool {
   return defineTool({
     description:
-      'List detected technologies (software, frameworks, servers). Params: page, limit, value (filter by name).',
-    inputSchema: getTechnologiesSchema,
-    execute: (params: z.infer<typeof getTechnologiesSchema>) =>
+      'List detected technologies (software, frameworks, servers). Params: page, limit, value (filter by name), projectId.',
+    inputSchema: getTechnologiesInput,
+    execute: (params: z.infer<typeof getTechnologiesInput>) =>
       deps.assetsService.getTechnologyAssets(
-        { ...pageOf(params), ...NEWEST_FIRST, value: params.value },
+        {
+          ...pageOf(params),
+          ...NEWEST_FIRST,
+          value: params.value,
+          ...assetsInProject(projectFor(scope, params)),
+        },
         workspaceId,
       ),
   });
@@ -188,18 +262,20 @@ export function getTechnologiesTool(
 export function getTlsTool(
   deps: Deps<'assetsService'>,
   workspaceId: string,
+  scope: ToolScope = {},
 ): Tool {
   return defineTool({
     description:
-      'List TLS/SSL certificates with issuer, subject, expiry. Params: page, limit, search (host name filter).',
-    inputSchema: getTlsSchema,
-    execute: (params: z.infer<typeof getTlsSchema>) =>
+      'List TLS/SSL certificates with issuer, subject, expiry. Params: page, limit, search (host name filter), projectId.',
+    inputSchema: getTlsInput,
+    execute: (params: z.infer<typeof getTlsInput>) =>
       deps.assetsService.getManyTls(
         {
           ...pageOf(params),
           sortBy: 'not_after',
           sortOrder: SortOrder.ASC,
           search: params.search,
+          ...assetsInProject(projectFor(scope, params)),
         },
         workspaceId,
       ),

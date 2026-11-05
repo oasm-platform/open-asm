@@ -3,6 +3,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsDate,
   IsDateString,
   IsEnum,
@@ -57,6 +58,18 @@ export class AgentTodoItemDto {
   })
   @IsDateString()
   updatedAt: string;
+}
+
+/** The project a conversation is about, as the chat header shows it. */
+export class ConversationProjectDto {
+  @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
+  id: string;
+
+  @ApiProperty({ example: 'External perimeter' })
+  name: string;
+
+  @ApiPropertyOptional({ example: '#78716C', nullable: true, type: String })
+  hexColor?: string | null;
 }
 
 export class CreateConversationDto {
@@ -133,6 +146,25 @@ export class ConversationResponseDto {
   @IsEnum(AgentApprovalMode)
   approvalMode: AgentApprovalMode;
 
+  @ApiPropertyOptional({
+    description: 'Project the conversation is about',
+    nullable: true,
+    type: String,
+  })
+  @IsOptional()
+  @IsUUID()
+  projectId?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Name and colour of that project (null once it is deleted)',
+    type: ConversationProjectDto,
+    nullable: true,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ConversationProjectDto)
+  project?: ConversationProjectDto | null;
+
   @ApiProperty({
     description: 'Timestamp when the conversation was created',
     example: '2025-01-01T00:00:00.000Z',
@@ -146,6 +178,15 @@ export class ConversationResponseDto {
   })
   @IsDate()
   updatedAt: Date;
+
+  @ApiPropertyOptional({
+    description:
+      'Whether an agent run of the conversation is still going (list only)',
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  running?: boolean;
 
   @ApiPropertyOptional({
     description: 'Ordered execution plan for the agent',

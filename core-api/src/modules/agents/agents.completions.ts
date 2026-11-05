@@ -23,6 +23,13 @@ import { Repository } from 'typeorm';
 import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
 import { RemoteExecuteSubscribeService } from '@/modules/workers/remote-execute-subscribe.service';
 import { WorkersService } from '@/modules/workers/workers.service';
+import { Project } from '@/modules/projects/entities/project.entity';
+import { findProjectOrFail } from '@/modules/projects/project-access';
+import { ProjectFilesService } from '@/modules/projects/project-files.service';
+
+/** Project files in the prompt: each one cut here, all of them together at the total. */
+const PROJECT_FILE_PROMPT_CHARS = 8_000;
+const PROJECT_FILES_PROMPT_CHARS = 30_000;
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import {
   APPROVAL_TIMEOUT_MS,
@@ -441,6 +448,9 @@ export class AgentsCompletionsService {
     private readonly toolCallRepository: Repository<AgentMessageToolCall>,
     @InjectRepository(AgentConversationTodo)
     private readonly todoRepository: Repository<AgentConversationTodo>,
+    @InjectRepository(Project)
+    private readonly projectRepository: Repository<Project>,
+    private readonly projectFiles: ProjectFilesService,
     private readonly agentTool: AgentTool,
     private readonly agentsMemories: AgentsMemoriesService,
     private readonly agentsMcpService: AgentsMcpService,
@@ -862,10 +872,7 @@ export class AgentsCompletionsService {
         messages: [{ role: 'user', content: prompt }],
         tools,
         ...stepLimit(20),
-        ...(() => {
-          const opts = getReasoningProviderOptions(llmConfig.provider);
-          return opts ? { providerOptions: opts } : {};
-        })(),
+        ...this.modelsCatalog.reasoningOptions(llmConfig),
         onChunk: ({ chunk }: { chunk: TextStreamPart<ToolSet> }) => {
           if (chunk.type === 'text-delta') {
             accumulatedText += chunk.text;
@@ -944,6 +951,10 @@ export class AgentsCompletionsService {
         'Worker is offline; choose an online worker or Auto',
       );
     }
+    // Its tools are locked to the project, so it must be one of this workspace
+    if (dto.projectId) {
+      await findProjectOrFail(this.projectRepository, dto.projectId, workspaceId);
+    }
     const agentConfig = await this.agentsConfig.find(workspaceId, userId);
     const newConversation = this.conversationRepository.create({
       ...(dto.conversationId ? { id: dto.conversationId } : {}),
@@ -957,6 +968,7 @@ export class AgentsCompletionsService {
         agentConfig?.defaultApprovalMode ??
         AgentApprovalMode.MANUAL,
       workerId: dto.workerId,
+      projectId: dto.projectId,
     });
     return this.conversationRepository.save(newConversation);
   }
@@ -1338,6 +1350,7 @@ export class AgentsCompletionsService {
           : Promise.resolve(null),
     ]);
     const userContext = formatUserInstructions(agentConfig);
+    const projectContext = await this.projectContext(conversation, workspaceId);
 
     const todos = await this.loadTodoItems(conversation.id);
     const planning = planningState(todos, agentMode);
@@ -1367,6 +1380,7 @@ export class AgentsCompletionsService {
       modePrompt,
       systemPrompt,
       userContext,
+      projectContext,
       opts.staticContext,
       summaryContext,
       // Memory off (the default): saved memories stay stored but out of the prompt
@@ -1376,6 +1390,36 @@ export class AgentsCompletionsService {
       planContext,
       currentTimeContext,
     ].filter((part): part is string => !!part);
+  }
+
+  /** Tells the model which project the chat is locked to; '' outside one. */
+  private async projectContext(
+    conversation: AgentConversation,
+    workspaceId: string,
+  ): Promise<string> {
+    if (!conversation.projectId) return '';
+    const project = await this.projectRepository.findOne({
+      where: { id: conversation.projectId, workspace: { id: workspaceId } },
+    });
+    if (!project) return '';
+    const files = await this.projectFiles.contextFiles(project.id, {
+      perFile: PROJECT_FILE_PROMPT_CHARS,
+      total: PROJECT_FILES_PROMPT_CHARS,
+    });
+    return [
+      `[PROJECT]: This conversation is about the project "${project.name}" (projectId ${project.id})${project.archivedAt ? ', which is archived (read-only)' : ''}.`,
+      'Every OASM data tool (assets, vulnerabilities, ports, technologies, TLS, statistics) and every project tool is locked to it: they only return and change data inside this project, whatever projectId you pass.',
+      'Answer from the project scope; say so when the user asks about something outside it.',
+      ...(project.instruction
+        ? [`[PROJECT INSTRUCTION] (set by the project's members; follow it):\n${project.instruction}`]
+        : []),
+      ...files.map((file) =>
+        [
+          `[PROJECT FILE] "${file.name}" (fileId ${file.id}, ${file.totalChars} characters${file.content.length < file.totalChars ? `, first ${file.content.length} shown: read the rest with read_project_file` : ''}):`,
+          file.content,
+        ].join('\n'),
+      ),
+    ].join('\n');
   }
 
   /**
@@ -1435,6 +1479,7 @@ export class AgentsCompletionsService {
       contextWindow: window.tokens,
       contextWindowSource: window.source,
       catalogEstimated: window.estimated,
+      reasoningEffort: this.modelsCatalog.effortFor(llmConfig) ?? null,
     };
   }
 
@@ -1804,11 +1849,8 @@ export class AgentsCompletionsService {
             ),
           }
         : {}),
-      // Enable reasoning/thinking via provider-specific options
-      ...(() => {
-        const opts = getReasoningProviderOptions(llmConfig.provider);
-        return opts ? { providerOptions: opts } : {};
-      })(),
+      // Reasoning/thinking at the picked effort, via provider-specific options
+      ...this.modelsCatalog.reasoningOptions(llmConfig),
       // AGENT mode needs more output tokens for multi-step execution
       ...(maxOutputTokens ? { maxOutputTokens } : {}),
       // Accumulate text-delta and reasoning chunks as they arrive, and track
@@ -2899,6 +2941,7 @@ export class AgentsCompletionsService {
         todosEmitter,
         conversation.id,
         approval,
+        conversation.projectId,
       ) as ToolSet),
       ...this.getPlanTools(planning, conversation.id, todosEmitter, {
         workspaceId,

@@ -42,6 +42,10 @@ describe('ProjectsController workspace permission guards', () => {
       'GET /:id/vulnerabilities/:vulnerabilityId/timeline',
       read,
     ],
+    ['getFiles', 'GET /:id/files', read],
+    ['presignFile', 'POST /:id/files/presign', write],
+    ['completeFile', 'POST /:id/files/:artifactId/complete', write],
+    ['removeFile', 'DELETE /:id/files/:artifactId', write],
   ];
 
   it.each(cases)('%s (%s) requires %j', (method, _route, keys) => {
