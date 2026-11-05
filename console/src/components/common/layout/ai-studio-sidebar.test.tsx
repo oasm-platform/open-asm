@@ -8,7 +8,6 @@ import { AiStudioSidebar } from './ai-studio-sidebar';
 const updateMock = vi.fn();
 const deleteMock = vi.fn();
 const deleteAllMock = vi.fn();
-const openSettingsMock = vi.fn();
 
 vi.mock('./menu-bar', () => ({
   AppSidebar: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -18,10 +17,6 @@ vi.mock('@/hooks/useWorkspaceSelector', () => ({
   useWorkspaceState: () => ({
     state: { selectedWorkspaceId: 'workspace-1' },
   }),
-}));
-
-vi.mock('@/hooks/useAgentSettingsDialog', () => ({
-  useAgentSettingsDialog: () => ({ open: openSettingsMock }),
 }));
 
 vi.mock('@/services/apis/gen/queries', async (importOriginal) => {
@@ -74,32 +69,23 @@ describe('AiStudioSidebar', () => {
     updateMock.mockReset();
     deleteMock.mockReset();
     deleteAllMock.mockReset();
-    openSettingsMock.mockReset();
   });
 
-  it('opens the agent settings from Settings', async () => {
-    const { user } = setup();
-
-    await user.click(await screen.findByRole('button', { name: 'Settings' }));
-
-    expect(openSettingsMock).toHaveBeenCalledWith();
-  });
-
-  it('links to the connectors page', async () => {
+  it('offers only a New Chat link beside the chats list', async () => {
     setup();
 
     expect(
-      await screen.findByRole('link', { name: 'Connectors' }),
-    ).toHaveAttribute('href', '/aistudio/connectors');
-  });
-
-  it('links to the usage page', async () => {
-    setup();
-
-    expect(await screen.findByRole('link', { name: 'Usage' })).toHaveAttribute(
-      'href',
-      '/aistudio/usage',
-    );
+      await screen.findByRole('link', { name: 'New Chat' }),
+    ).toHaveAttribute('href', '/aistudio');
+    expect(
+      screen.queryByRole('link', { name: 'Agents' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Usage' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Connectors' }),
+    ).not.toBeInTheDocument();
   });
 
   it('shows Chats as a plain label, not a link', async () => {

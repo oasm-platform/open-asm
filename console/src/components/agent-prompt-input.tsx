@@ -22,6 +22,8 @@ interface AgentPromptInputProps {
   } | null;
   onSelectModel?: (provider: string, model: string, configId: string) => void;
   agentMode?: string;
+  /** Given only where the page can switch mode; shows the ask/agent toggle. */
+  onAgentModeChange?: (mode: string) => void;
   selectedWorkerId?: string | null;
   onWorkerSelect?: (workerId: string | null) => void;
   /** False hides the agent settings gear next to the model picker. */
@@ -41,6 +43,7 @@ export default function AgentPromptInput({
   selectedModel,
   onSelectModel,
   agentMode = 'ask',
+  onAgentModeChange,
   selectedWorkerId,
   onWorkerSelect,
   showSettingsButton = true,
@@ -88,6 +91,7 @@ export default function AgentPromptInput({
           <div className="flex items-center gap-2">
             <AgentModeSelect
               value={agentMode}
+              onChange={onAgentModeChange}
               selectedWorkerId={selectedWorkerId}
               onWorkerChange={onWorkerSelect}
             />

@@ -1,13 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import {
-  BarChart3,
-  Bot,
   Loader2,
   MoreHorizontal,
   Pencil,
-  Plug,
-  Settings,
   SquarePen,
   Trash2,
 } from 'lucide-react';
@@ -31,7 +27,6 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import {
   useAgentsControllerDeleteAllConversations,
@@ -163,7 +158,6 @@ export function AiStudioSidebar() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { setOpenMobile } = useSidebar();
-  const { open: openSettings } = useAgentSettingsDialog();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -267,61 +261,6 @@ export function AiStudioSidebar() {
                   <SquarePen />
                   <span className="truncate">New Chat</span>
                 </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild
-                isActive={pathname === '/aistudio/agents'}
-                tooltip="Agents"
-                className={sidebarItemClassName}
-              >
-                <Link to="/aistudio/agents" onClick={() => setOpenMobile(false)}>
-                  <Bot />
-                  <span className="truncate">Agents</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild
-                isActive={pathname === '/aistudio/usage'}
-                tooltip="Usage"
-                className={sidebarItemClassName}
-              >
-                <Link to="/aistudio/usage" onClick={() => setOpenMobile(false)}>
-                  <BarChart3 />
-                  <span className="truncate">Usage</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild
-                isActive={pathname === '/aistudio/connectors'}
-                tooltip="Connectors"
-                className={sidebarItemClassName}
-              >
-                <Link
-                  to="/aistudio/connectors"
-                  onClick={() => setOpenMobile(false)}
-                >
-                  <Plug />
-                  <span className="truncate">Connectors</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                tooltip="Settings"
-                className={sidebarItemClassName}
-                onClick={() => {
-                  setOpenMobile(false);
-                  openSettings();
-                }}
-              >
-                <Settings />
-                <span className="truncate">Settings</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>

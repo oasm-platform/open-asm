@@ -87,17 +87,19 @@ export const AgentModeToggle = memo(function AgentModeToggle({
 
 interface AgentModeSelectProps {
   value: string;
+  /** Given only where the page can switch mode; otherwise there is no toggle. */
+  onChange?: (mode: string) => void;
   selectedWorkerId?: string | null;
   onWorkerChange?: (workerId: string | null) => void;
 }
 
 /**
- * Controls of the mode a chat runs in: the approval mode, and in agent mode
- * the worker it runs commands on. The mode itself is not switched here: each
- * one has its own route.
+ * Controls of the mode a chat runs in: the ask/agent toggle, the approval mode,
+ * and in agent mode the worker it runs commands on.
  */
 export const AgentModeSelect = memo(function AgentModeSelect({
   value,
+  onChange,
   selectedWorkerId,
   onWorkerChange,
 }: AgentModeSelectProps) {
@@ -125,6 +127,13 @@ export const AgentModeSelect = memo(function AgentModeSelect({
 
   return (
     <>
+      {onChange && (
+        <AgentModeToggle
+          value={value}
+          onChange={onChange}
+          onWorkerChange={onWorkerChange}
+        />
+      )}
       <ApprovalModeSelect />
 
       {isAgent && (

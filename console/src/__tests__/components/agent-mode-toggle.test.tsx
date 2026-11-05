@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { fireEvent } from '@testing-library/react';
 import { AgentModeSelect } from '@/components/ui/agent-mode-toggle';
-import { renderWithProviders } from '@/test/utils';
+import { renderWithProviders, screen } from '@/test/utils';
 import { toast } from 'sonner';
 
 vi.mock('@/hooks/use-live-events', () => ({
@@ -78,5 +79,22 @@ describe('AgentModeSelect worker pick', () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     expect(onWorkerChange).not.toHaveBeenCalled();
+  });
+
+  it('switches ask to agent from the toggle', async () => {
+    mockModes.mockReturnValue(modes(['w-online']));
+    const onChange = vi.fn();
+
+    renderWithProviders(
+      <AgentModeSelect
+        value="ask"
+        onChange={onChange}
+        onWorkerChange={onWorkerChange}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Agent' }));
+
+    expect(onChange).toHaveBeenCalledWith('agent');
   });
 });

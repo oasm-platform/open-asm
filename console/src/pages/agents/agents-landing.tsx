@@ -70,8 +70,8 @@ export default function AgentsLandingPage({
     model: string;
     configId: string;
   } | null>(null);
-  // Set by the route: the page has no switch for it
-  const agentMode = initialAgentMode;
+  // Route sets the opening mode; the toggle in the input switches it from here
+  const [agentMode, setAgentMode] = useState<string>(initialAgentMode);
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
   // Starter prompt under the pointer, previewed as the input placeholder
   const [previewPrompt, setPreviewPrompt] = useState<string | null>(null);
@@ -322,6 +322,7 @@ export default function AgentsLandingPage({
                   setSelectedModel({ provider, model, configId });
                 }}
                 agentMode={agentMode}
+                onAgentModeChange={setAgentMode}
                 selectedWorkerId={selectedWorkerId}
                 onWorkerSelect={setSelectedWorkerId}
                 showSettingsButton={false}
