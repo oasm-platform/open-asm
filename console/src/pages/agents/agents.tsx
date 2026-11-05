@@ -48,6 +48,7 @@ export default function AgentsChatPage() {
     selectedModel,
     agentMode,
     selectedWorkerId,
+    project,
     hasSentFirstMessage,
     hasMoreMessages,
     isLoadingMoreMessages,
@@ -176,6 +177,7 @@ export default function AgentsChatPage() {
             agentMode={agentMode}
             selectedWorkerId={selectedWorkerId}
             onWorkerSelect={onWorkerSelect}
+            project={project}
             todos={todos}
             goal={goal}
             // Large screens and mobile keep the plan in the side panel

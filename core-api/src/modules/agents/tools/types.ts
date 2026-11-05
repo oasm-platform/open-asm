@@ -6,6 +6,14 @@ import type { AssetsService } from '@/modules/assets/assets.service';
 import type { ConnectorRegistryService } from '@/modules/connectors/connector-registry.service';
 import type { IssuesService } from '@/modules/issues/issues.service';
 import type { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
+import type { ProjectAssetsService } from '@/modules/projects/project-assets.service';
+import type { ProjectFilesService } from '@/modules/projects/project-files.service';
+import type { ProjectResultsService } from '@/modules/projects/project-results.service';
+import type { ProjectScopeService } from '@/modules/projects/project-scope.service';
+import type { ProjectTriggersService } from '@/modules/projects/project-triggers.service';
+import type { ProjectWorkflowsService } from '@/modules/projects/project-workflows.service';
+import type { EventBridgeService } from '@/modules/event-bridge/publishing/event-bridge.service';
+import type { ProjectsService } from '@/modules/projects/projects.service';
 import type { RemoteExecuteService } from '@/modules/remote-execute/remote-execute.service';
 import type { StatisticService } from '@/modules/statistic/statistic.service';
 import type { TargetsService } from '@/modules/targets/targets.service';
@@ -51,6 +59,26 @@ export interface AgentToolDeps {
   redisService: RedisService;
   artifactsService: ArtifactsService;
   workspacesService: WorkspacesService;
+  projectsService: ProjectsService;
+  projectAssetsService: ProjectAssetsService;
+  projectFilesService: ProjectFilesService;
+  projectResultsService: ProjectResultsService;
+  projectScopeService: ProjectScopeService;
+  projectTriggersService: ProjectTriggersService;
+  projectWorkflowsService: ProjectWorkflowsService;
+  eventBridge: EventBridgeService;
 }
 
 export type Deps<K extends keyof AgentToolDeps> = Pick<AgentToolDeps, K>;
+
+/**
+ * What a tool set is built for. A conversation about a project locks every
+ * project-aware tool to it; elsewhere the model picks one with `projectId`.
+ */
+export interface ToolScope {
+  projectId?: string | null;
+  /** Whose run it is: write tools check this member's workspace permissions. */
+  userId?: string;
+  /** The chat a new project gets linked to. */
+  conversationId?: string;
+}

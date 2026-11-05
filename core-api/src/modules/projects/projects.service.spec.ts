@@ -39,6 +39,7 @@ function setup() {
     ofWorkflow: jest.fn(),
   };
   const eventBridge = { publishSafely: jest.fn() };
+  const events = { emitAsync: jest.fn() };
   const service = new ProjectsService(
     projectRepo as never,
     dataSource as never,
@@ -47,8 +48,9 @@ function setup() {
     workflows as never,
     triggers as never,
     eventBridge as never,
+    events as never,
   );
-  return { service, projectRepo, dataSource, assets, scope, workflows, triggers, eventBridge };
+  return { service, projectRepo, dataSource, assets, scope, workflows, triggers, eventBridge, events };
 }
 
 describe('ProjectsService', () => {
@@ -260,10 +262,16 @@ describe('ProjectsService', () => {
     ctx.triggers.unregisterProject.mockImplementation(() => order.push('unregister'));
     ctx.workflows.removeOwnedWorkflows.mockImplementation(() => order.push('workflows'));
     ctx.projectRepo.delete.mockImplementation(() => order.push('project'));
+    // The agents module forgets the project's chats while they still exist
+    ctx.events.emitAsync.mockImplementation(() => order.push('deleting'));
 
     await ctx.service.delete('p-1', WORKSPACE_ID);
 
-    expect(order).toEqual(['unregister', 'workflows', 'project']);
+    expect(order).toEqual(['deleting', 'unregister', 'workflows', 'project']);
+    expect(ctx.events.emitAsync).toHaveBeenCalledWith('project.deleting', {
+      projectId: 'p-1',
+      workspaceId: WORKSPACE_ID,
+    });
   });
   describe('workflows carry when they run (on)', () => {
     const on = { schedule: [{ cron: '0 2 * * 1' }, { cron: '30 14 * * *', enabled: false }] };

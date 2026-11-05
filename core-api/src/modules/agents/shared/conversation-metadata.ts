@@ -48,6 +48,8 @@ export interface ConversationMetadata {
   contextWindowSource?: ContextWindowSource;
   /** True when the catalog match was a guess (bare model id). */
   catalogEstimated?: boolean;
+  /** Reasoning effort the model ran at; null: provider default */
+  reasoningEffort?: string | null;
   /** Tokens in the context after the last step (prompt + response). */
   contextUsedTokens?: number;
   lastTurn?: TurnStats;

@@ -10,6 +10,14 @@ import { AssetsService } from '@/modules/assets/assets.service';
 import { ConnectorRegistryService } from '@/modules/connectors/connector-registry.service';
 import { IssuesService } from '@/modules/issues/issues.service';
 import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
+import { ProjectAssetsService } from '@/modules/projects/project-assets.service';
+import { ProjectFilesService } from '@/modules/projects/project-files.service';
+import { ProjectResultsService } from '@/modules/projects/project-results.service';
+import { ProjectScopeService } from '@/modules/projects/project-scope.service';
+import { ProjectTriggersService } from '@/modules/projects/project-triggers.service';
+import { ProjectWorkflowsService } from '@/modules/projects/project-workflows.service';
+import { EventBridgeService } from '@/modules/event-bridge/publishing/event-bridge.service';
+import { ProjectsService } from '@/modules/projects/projects.service';
 import { RemoteExecuteService } from '@/modules/remote-execute/remote-execute.service';
 import { StatisticService } from '@/modules/statistic/statistic.service';
 import { TargetsService } from '@/modules/targets/targets.service';
@@ -35,8 +43,36 @@ import { readToolOutputTool, runConnectorTool } from './tools/connector.tools';
 import { deniedMessage, stableStringify } from './tools/helpers';
 import { memoryTools } from './tools/memory.tools';
 import { planTools } from './tools/plan.tools';
+import {
+  addProjectTriggerTool,
+  addProjectWorkflowTool,
+  addTargetsTool,
+  createProjectTool,
+  installToolTool,
+  listPipelineToolsTool,
+  listWorkflowTemplatesTool,
+  removeProjectTriggerTool,
+  removeProjectWorkflowTool,
+  updateProjectInstructionTool,
+  updateProjectScopeTool,
+} from './tools/project-build.tools';
+import {
+  addAssetsToProjectTool,
+  inspectProjectTool,
+  listProjectAssetsTool,
+  listProjectRunsTool,
+  listProjectsTool,
+  readProjectFileTool,
+  removeAssetsFromProjectTool,
+  runProjectWorkflowTool,
+} from './tools/project.tools';
 import { remoteExecuteTool } from './tools/remote-execute.tool';
-import type { AgentToolDeps, ToolCallOptions, ToolType } from './tools/types';
+import type {
+  AgentToolDeps,
+  ToolCallOptions,
+  ToolScope,
+  ToolType,
+} from './tools/types';
 import { webFetchTool } from './tools/web-fetch.tool';
 import {
   detailAssetTool,
@@ -56,11 +92,14 @@ import {
   listWorkersTool,
 } from './tools/workspace.tools';
 
+type ToolBuilder = (
+  deps: AgentToolDeps,
+  workspaceId: string,
+  scope: ToolScope,
+) => Tool;
+
 /** Tools offered in both agent modes, in the order the model sees them. */
-const WORKSPACE_TOOLS: Record<
-  string,
-  (deps: AgentToolDeps, workspaceId: string) => Tool
-> = {
+const WORKSPACE_TOOLS: Record<string, ToolBuilder> = {
   enumerate_assets: getAssetsTool,
   discover_vulnerabilities: getVulnerabilitiesTool,
   retrieve_targets: getTargetsTool,
@@ -77,6 +116,29 @@ const WORKSPACE_TOOLS: Record<
   display_available_tools: listConnectorsTool,
   list_active_workers: listWorkersTool,
   review_jobs: listJobsTool,
+  list_projects: listProjectsTool,
+  inspect_project: inspectProjectTool,
+  list_project_assets: listProjectAssetsTool,
+  list_project_runs: listProjectRunsTool,
+  read_project_file: readProjectFileTool,
+  list_workflow_templates: listWorkflowTemplatesTool,
+  list_pipeline_tools: listPipelineToolsTool,
+};
+
+/** Agent mode only: they build or change projects, or start their scans. */
+const PROJECT_ACTION_TOOLS: Record<string, ToolBuilder> = {
+  create_project: createProjectTool,
+  add_targets: addTargetsTool,
+  update_project_scope: updateProjectScopeTool,
+  add_project_workflow: addProjectWorkflowTool,
+  remove_project_workflow: removeProjectWorkflowTool,
+  add_project_trigger: addProjectTriggerTool,
+  remove_project_trigger: removeProjectTriggerTool,
+  install_tool: installToolTool,
+  update_project_instruction: updateProjectInstructionTool,
+  add_assets_to_project: addAssetsToProjectTool,
+  remove_assets_from_project: removeAssetsFromProjectTool,
+  run_project_workflow: runProjectWorkflowTool,
 };
 
 /**
@@ -100,6 +162,13 @@ export const MCP_TOOLS: ReadonlySet<string> = new Set([
   'inspect_issue',
   'list_active_workers',
   'review_jobs',
+  'list_projects',
+  'inspect_project',
+  'list_project_assets',
+  'list_project_runs',
+  'read_project_file',
+  'list_workflow_templates',
+  'list_pipeline_tools',
 ]);
 
 /** Tools that gate themselves (on the raw command) instead of via withApproval. */
@@ -125,6 +194,13 @@ export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
   'display_available_tools',
   'list_active_workers',
   'review_jobs',
+  'list_projects',
+  'inspect_project',
+  'list_project_assets',
+  'list_project_runs',
+  'read_project_file',
+  'list_workflow_templates',
+  'list_pipeline_tools',
   'read_tool_output',
 ]);
 
@@ -180,6 +256,14 @@ export class AgentTool {
     private readonly redisService: RedisService,
     private readonly artifactsService: ArtifactsService,
     private readonly workspacesService: WorkspacesService,
+    private readonly projectsService: ProjectsService,
+    private readonly projectAssetsService: ProjectAssetsService,
+    private readonly projectFilesService: ProjectFilesService,
+    private readonly projectResultsService: ProjectResultsService,
+    private readonly projectScopeService: ProjectScopeService,
+    private readonly projectTriggersService: ProjectTriggersService,
+    private readonly projectWorkflowsService: ProjectWorkflowsService,
+    private readonly eventBridge: EventBridgeService,
   ) {}
 
   private get deps(): AgentToolDeps {
@@ -203,6 +287,14 @@ export class AgentTool {
       redisService: this.redisService,
       artifactsService: this.artifactsService,
       workspacesService: this.workspacesService,
+      projectsService: this.projectsService,
+      projectAssetsService: this.projectAssetsService,
+      projectFilesService: this.projectFilesService,
+      projectResultsService: this.projectResultsService,
+      projectScopeService: this.projectScopeService,
+      projectTriggersService: this.projectTriggersService,
+      projectWorkflowsService: this.projectWorkflowsService,
+      eventBridge: this.eventBridge,
     };
   }
 
@@ -241,27 +333,40 @@ export class AgentTool {
     return Object.fromEntries(
       Object.entries(WORKSPACE_TOOLS)
         .filter(([name]) => MCP_TOOLS.has(name) && READ_ONLY_TOOLS.has(name))
-        .map(([name, build]) => [name, build(deps, workspaceId)]),
+        .map(([name, build]) => [name, build(deps, workspaceId, {})]),
     );
   }
 
-  /** The built-in tools for `agentMode`, behind the approval flow when given. */
+  /**
+   * The built-in tools for `agentMode`, behind the approval flow when given.
+   * With `projectId` (the conversation's project) the project-aware tools are
+   * locked to it.
+   */
   getTools(
     workspaceId: string,
     agentMode: AgentMode,
     emitter?: EventEmitter,
     conversationId?: string,
     approval?: ApprovalSettings,
+    projectId?: string | null,
   ): Record<string, ToolType> {
     const deps = this.deps;
     const conversation = conversationId ?? '';
+    const scope: ToolScope = {
+      projectId,
+      userId: approval?.userId,
+      conversationId,
+    };
     const tools: Record<string, ToolType> = {};
 
     for (const [name, build] of Object.entries(WORKSPACE_TOOLS)) {
-      tools[name] = build(deps, workspaceId);
+      tools[name] = build(deps, workspaceId, scope);
     }
-    // AGENT-only tools act on workers
+    // AGENT-only tools act on workers and projects
     if (agentMode === AgentMode.AGENT) {
+      for (const [name, build] of Object.entries(PROJECT_ACTION_TOOLS)) {
+        tools[name] = build(deps, workspaceId, scope);
+      }
       tools.execute_remote_command = remoteExecuteTool(
         deps,
         workspaceId,

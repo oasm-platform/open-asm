@@ -8,10 +8,13 @@ import {
   IsString,
   IsUUID,
 } from 'class-validator';
+import { Project } from '@/modules/projects/entities/project.entity';
 import {
   Column,
   Entity,
   Index,
+  JoinColumn,
+  ManyToOne,
   OneToMany,
   PrimaryColumn,
   Relation,
@@ -25,6 +28,7 @@ import { AgentSubagent } from './agent-subagent.entity';
 @Entity('agent_conversations')
 @Index('IDX_agent_conv_workspaceId', ['workspaceId'])
 @Index('IDX_agent_conv_createdBy', ['createdBy'])
+@Index('IDX_agent_conv_projectId', ['projectId'])
 export class AgentConversation {
   @ApiProperty()
   @PrimaryColumn({ type: 'uuid' })
@@ -58,6 +62,20 @@ export class AgentConversation {
   @IsUUID()
   @Column({ type: 'uuid' })
   createdBy: string;
+
+  /**
+   * The project the chat is about: its data tools only read and act inside
+   * that project. Deleting the project deletes its chats too.
+   */
+  @ApiProperty({ required: false, nullable: true, type: String })
+  @IsOptional()
+  @IsUUID()
+  @Column({ type: 'uuid', nullable: true })
+  projectId?: string | null;
+
+  @ManyToOne(() => Project, { onDelete: 'CASCADE', nullable: true })
+  @JoinColumn({ name: 'projectId' })
+  project?: Relation<Project> | null;
 
   @OneToMany(() => AgentMessage, (message) => message.conversation)
   messages: Relation<AgentMessage[]>;

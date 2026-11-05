@@ -214,7 +214,7 @@ describe('AgentsSubagentsService', () => {
       conversationRepo as never,
       agentTool as never,
       agentsConfig as never,
-      { costOf: jest.fn(() => undefined) } as never,
+      { costOf: jest.fn(() => undefined), reasoningOptions: jest.fn(() => ({})) } as never,
       definitions as never,
       new AgentsSkillsService(skillRepo as never, {} as never),
     );
@@ -654,12 +654,14 @@ describe('AgentsSubagentsService', () => {
       job,
     );
 
-    // Its own emitter carries only its browser pages; no approval settings
+    // Its own emitter carries only its browser pages; no approval settings,
+    // and the conversation's project (none here)
     expect(agentTool.getTools).toHaveBeenCalledWith(
       'w1',
       'agent',
       expect.anything(),
       'c1',
+      undefined,
       undefined,
     );
     const call = (streamText as jest.Mock).mock.calls[0][0];

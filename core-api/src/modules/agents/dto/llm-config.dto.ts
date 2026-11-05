@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsBoolean,
   IsDate,
   IsEnum,
@@ -12,7 +13,7 @@ import {
   MaxLength,
   ValidateNested,
 } from 'class-validator';
-import { LLMProvider } from '../enums/agent.enums';
+import { LLMProvider, ReasoningEffort } from '../enums/agent.enums';
 
 const LOCAL_URL_OPTIONS = {
   protocols: ['http', 'https'],
@@ -142,6 +143,16 @@ export class CreateLLMConfigDto {
   @IsUrl(LOCAL_URL_OPTIONS)
   @MaxLength(500)
   apiUrl?: string;
+
+  @ApiPropertyOptional({
+    description: 'Reasoning effort for the model; null or unset uses the provider default',
+    enum: ReasoningEffort,
+    example: ReasoningEffort.MEDIUM,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsEnum(ReasoningEffort)
+  reasoningEffort?: ReasoningEffort | null;
 }
 
 export class UpdateLLMConfigDto extends PartialType(CreateLLMConfigDto) {
@@ -204,6 +215,16 @@ export class LLMConfigResponseDto {
   @MaxLength(500)
   apiUrl?: string | null;
 
+  @ApiPropertyOptional({
+    description: 'Reasoning effort picked for the model; null uses the provider default',
+    enum: ReasoningEffort,
+    example: ReasoningEffort.MEDIUM,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsEnum(ReasoningEffort)
+  reasoningEffort?: ReasoningEffort | null;
+
   @ApiProperty({
     description: 'Whether this is the default model connection',
     example: true,
@@ -249,6 +270,17 @@ export class ProviderModelDto {
   @IsString()
   @IsNotEmpty()
   name: string;
+
+  @ApiProperty({
+    description:
+      'Reasoning effort levels the model accepts, lowest first; low to high when the model publishes none',
+    enum: ReasoningEffort,
+    isArray: true,
+    example: [ReasoningEffort.LOW, ReasoningEffort.MEDIUM, ReasoningEffort.HIGH],
+  })
+  @IsArray()
+  @IsEnum(ReasoningEffort, { each: true })
+  reasoningEfforts: ReasoningEffort[];
 }
 
 export class LLMConfigWithProviderDto {
@@ -313,6 +345,16 @@ export class LLMConfigWithProviderDto {
   @IsOptional()
   @IsString()
   model?: string;
+
+  @ApiPropertyOptional({
+    description: 'Reasoning effort picked for the model; null uses the provider default',
+    enum: ReasoningEffort,
+    example: ReasoningEffort.MEDIUM,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsEnum(ReasoningEffort)
+  reasoningEffort?: ReasoningEffort | null;
 
   @ApiPropertyOptional({
     description: 'Configured custom API base URL',

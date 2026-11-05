@@ -3,7 +3,8 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
 import type { LanguageModel } from 'ai';
 import type { ProviderModelDto } from './dto/llm-config.dto';
-import { LLMProvider } from './enums/agent.enums';
+import { LLMProvider, ReasoningEffort } from './enums/agent.enums';
+import type { ModelReasoning } from './shared/models-dev';
 
 export type LLMHandler = (
   apiKey: string,
@@ -11,10 +12,13 @@ export type LLMHandler = (
   baseURL?: string,
 ) => LanguageModel;
 
+/** A model as a provider lists it; reasoning levels come from models.dev. */
+export type FetchedModel = Pick<ProviderModelDto, 'id' | 'name'>;
+
 export type LLMModelsFetcher = (
   apiKey: string,
   baseURL?: string,
-) => Promise<ProviderModelDto[]>;
+) => Promise<FetchedModel[]>;
 
 export interface LLMProviderSupported {
   id: LLMProvider;
@@ -27,7 +31,7 @@ export interface LLMProviderSupported {
 
 // --- Helpers ---
 
-const sorted = (models: ProviderModelDto[]) =>
+const sorted = (models: FetchedModel[]) =>
   models.sort((a, b) => a.name.localeCompare(b.name));
 
 const FETCH_TIMEOUT_MS = 10_000;
@@ -356,7 +360,12 @@ export const getLLMProviderConfig = (
   llmProviderSupported.find((p) => p.id === provider);
 
 type AnthropicReasoningOptions = {
-  anthropic: { thinking: { type: 'enabled'; budgetTokens: number } };
+  anthropic: {
+    thinking:
+      | { type: 'enabled'; budgetTokens: number }
+      | { type: 'adaptive' };
+    effort?: string;
+  };
 };
 
 type OpenAIReasoningOptions = {
@@ -364,53 +373,118 @@ type OpenAIReasoningOptions = {
 };
 
 type GoogleReasoningOptions = {
-  google: { thinkingConfig: { thinkingBudget: number; includeThoughts: boolean } };
+  google: {
+    thinkingConfig:
+      | { thinkingBudget: number; includeThoughts: boolean }
+      | { thinkingLevel: string; includeThoughts: boolean };
+  };
 };
 
-type ProviderReasoningOptions =
+export type ProviderReasoningOptions =
   | AnthropicReasoningOptions
   | OpenAIReasoningOptions
   | GoogleReasoningOptions;
 
 // --- Reasoning / thinking options per provider ---
 
-const REASONING_OPTIONS: Partial<Record<LLMProvider, ProviderReasoningOptions>> = {
-  [LLMProvider.ANTHROPIC]: {
-    anthropic: { thinking: { type: 'enabled', budgetTokens: 10000 } },
-  },
-  [LLMProvider.OPENAI]: {
-    openai: { reasoningEffort: 'high', reasoningSummary: 'auto' },
-  },
-  [LLMProvider.OPENROUTER]: {
-    openai: { reasoningEffort: 'high', reasoningSummary: 'auto' },
-  },
-  [LLMProvider.ORCAROUTER]: {
-    openai: { reasoningEffort: 'high', reasoningSummary: 'auto' },
-  },
-  [LLMProvider.DEEPSEEK]: {
-    openai: { reasoningEffort: 'high', reasoningSummary: 'auto' },
-  },
-  [LLMProvider.KILO_CODE]: {
-    openai: { reasoningEffort: 'high', reasoningSummary: 'auto' },
-  },
-  [LLMProvider.OPENCODE_GO]: {
-    openai: { reasoningEffort: 'high', reasoningSummary: 'auto' },
-  },
-  [LLMProvider.VERCEL]: {
-    openai: { reasoningEffort: 'high', reasoningSummary: 'auto' },
-  },
-  [LLMProvider.GEMINI]: {
-    google: {
-      thinkingConfig: { thinkingBudget: 10000, includeThoughts: true },
-    },
-  },
+const DEFAULT_THINKING_BUDGET = 10000;
+
+/** Thinking budget per effort, for models tuned by tokens. */
+const EFFORT_BUDGET: Record<ReasoningEffort, number> = {
+  [ReasoningEffort.NONE]: 0,
+  [ReasoningEffort.MINIMAL]: 1024,
+  [ReasoningEffort.LOW]: 4096,
+  [ReasoningEffort.MEDIUM]: DEFAULT_THINKING_BUDGET,
+  [ReasoningEffort.HIGH]: 16000,
+  [ReasoningEffort.XHIGH]: 24000,
+  [ReasoningEffort.MAX]: 32000,
 };
+
+const ANTHROPIC_EFFORTS = new Set<string>([
+  ReasoningEffort.LOW,
+  ReasoningEffort.MEDIUM,
+  ReasoningEffort.HIGH,
+  ReasoningEffort.XHIGH,
+  ReasoningEffort.MAX,
+]);
+
+const GEMINI_LEVELS = new Set<string>([
+  ReasoningEffort.MINIMAL,
+  ReasoningEffort.LOW,
+  ReasoningEffort.MEDIUM,
+  ReasoningEffort.HIGH,
+]);
+
+const openaiReasoning = (effort: string): OpenAIReasoningOptions => ({
+  openai: { reasoningEffort: effort, reasoningSummary: 'auto' },
+});
+
+function anthropicReasoning(
+  effort: ReasoningEffort | undefined,
+  reasoning: ModelReasoning | undefined,
+): AnthropicReasoningOptions | undefined {
+  if (effort === ReasoningEffort.NONE) return undefined;
+  const withEffort =
+    effort && reasoning?.efforts?.includes(effort) && ANTHROPIC_EFFORTS.has(effort)
+      ? { effort }
+      : {};
+  // Newer models take no token budget, only adaptive thinking + effort
+  if (reasoning?.efforts && !reasoning.budget && 'effort' in withEffort) {
+    return { anthropic: { thinking: { type: 'adaptive' }, ...withEffort } };
+  }
+  return {
+    anthropic: {
+      thinking: {
+        type: 'enabled',
+        budgetTokens: effort ? EFFORT_BUDGET[effort] : DEFAULT_THINKING_BUDGET,
+      },
+      ...withEffort,
+    },
+  };
+}
+
+function geminiReasoning(
+  effort: ReasoningEffort | undefined,
+  reasoning: ModelReasoning | undefined,
+): GoogleReasoningOptions | undefined {
+  if (effort === ReasoningEffort.NONE) return undefined;
+  if (effort && reasoning?.efforts?.includes(effort) && GEMINI_LEVELS.has(effort)) {
+    return {
+      google: { thinkingConfig: { thinkingLevel: effort, includeThoughts: true } },
+    };
+  }
+  return {
+    google: {
+      thinkingConfig: {
+        thinkingBudget: effort ? EFFORT_BUDGET[effort] : DEFAULT_THINKING_BUDGET,
+        includeThoughts: true,
+      },
+    },
+  };
+}
 
 /**
  * Returns provider-specific reasoning/thinking options for streamText.
  * Each provider has its own configuration format — the AI SDK normalizes
  * the output into a consistent `reasoning` part type on the stream.
+ *
+ * @param effort - Picked level; unset keeps the provider default (high).
+ * @param reasoning - The model's reasoning knobs from models.dev, if known.
  */
 export const getReasoningProviderOptions = (
   provider: LLMProvider,
-): ProviderReasoningOptions | undefined => REASONING_OPTIONS[provider];
+  effort?: ReasoningEffort,
+  reasoning?: ModelReasoning,
+): ProviderReasoningOptions | undefined => {
+  switch (provider) {
+    case LLMProvider.ANTHROPIC:
+      return anthropicReasoning(effort, reasoning);
+    case LLMProvider.GEMINI:
+      return geminiReasoning(effort, reasoning);
+    // Self-hosted models get reasoning options only when a level was picked
+    case LLMProvider.CUSTOM:
+      return effort ? openaiReasoning(effort) : undefined;
+    default:
+      return openaiReasoning(effort ?? ReasoningEffort.HIGH);
+  }
+};

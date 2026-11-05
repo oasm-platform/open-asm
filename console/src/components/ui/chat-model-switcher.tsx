@@ -20,6 +20,11 @@ import {
 } from './command';
 import Image from './image';
 import { Popover, PopoverContent, PopoverTrigger } from './popover';
+import {
+  FALLBACK_EFFORTS,
+  type ReasoningEffort,
+  ReasoningEffortSelect,
+} from './reasoning-effort-select';
 
 interface ChatModelSwitcherProps {
   /** configId of the currently selected LLM config */
@@ -216,6 +221,46 @@ export function ChatModelSwitcher({
 
   const isActiveConfig = activeConfig?.configId === selectedConfigId;
 
+  // The effort is saved on the connection, next to its model
+  const currentModelId =
+    isActiveConfig && selectedModel ? selectedModel : activeConfig?.model;
+  const efforts = useMemo(
+    () =>
+      (Array.isArray(models) ? models : []).find((m) => m.id === currentModelId)
+        ?.reasoningEfforts ?? FALLBACK_EFFORTS,
+    [models, currentModelId],
+  );
+  // Shown right away; the saved value takes over once the list refetches
+  const [pickedEffort, setPickedEffort] = useState<{
+    configId: string;
+    effort: ReasoningEffort | null;
+  } | null>(null);
+  const effort =
+    pickedEffort && pickedEffort.configId === configId
+      ? pickedEffort.effort
+      : (activeConfig?.reasoningEffort ?? null);
+
+  const handleEffortChange = useCallback(
+    (next: ReasoningEffort | null) => {
+      if (!configId) return;
+      setPickedEffort({ configId, effort: next });
+      updateLLMConfig.mutate(
+        { id: configId, data: { reasoningEffort: next } },
+        {
+          onSuccess: () =>
+            void queryClient.invalidateQueries({
+              queryKey: ['/api/agents/providers/connected'],
+            }),
+          onError: () => {
+            setPickedEffort(null);
+            toast.error('Failed to save reasoning effort');
+          },
+        },
+      );
+    },
+    [configId, updateLLMConfig, queryClient],
+  );
+
   if (connectedConfigs.length === 0) {
     return (
       <button
@@ -277,6 +322,12 @@ export function ChatModelSwitcher({
             </Command>
           </PopoverContent>
         </Popover>
+        <ReasoningEffortSelect
+          efforts={efforts}
+          value={effort}
+          onChange={handleEffortChange}
+          disabled={isUpdating}
+        />
         {showSettingsButton && (
           <button
             type="button"

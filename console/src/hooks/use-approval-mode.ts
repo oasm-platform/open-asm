@@ -42,8 +42,23 @@ export function syncApprovalMode(mode: ApprovalMode) {
   listeners.forEach((l) => l());
 }
 
-/** Reset to the user's last explicit choice (default: manual), e.g. for a new chat. */
+// Set in the agent settings; a new chat starts with it when set
+let defaultMode: ApprovalMode | null = null;
+
+/** The default from the agent settings; null: the user's last choice. */
+export function setDefaultApprovalMode(mode: string | null | undefined) {
+  defaultMode = isApprovalMode(mode) ? mode : null;
+}
+
+/**
+ * Reset for a new chat: the settings default, else the user's last explicit
+ * choice (default: manual).
+ */
 export function restoreApprovalMode() {
+  if (defaultMode) {
+    syncApprovalMode(defaultMode);
+    return;
+  }
   let stored: string | null = null;
   try {
     stored = localStorage.getItem(STORAGE_KEY);

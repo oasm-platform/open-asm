@@ -1,4 +1,5 @@
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
+import { UserId } from '@/common/decorators/app.decorator';
 import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
@@ -56,8 +57,14 @@ import {
   UpdateProjectWorkflowDto,
   WorkflowTemplateDto,
 } from './dto/project-workflow.dto';
+import {
+  PresignProjectFileDto,
+  PresignProjectFileResponseDto,
+  ProjectFileDto,
+} from './dto/project-files.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { Project } from './entities/project.entity';
+import { ProjectFilesService } from './project-files.service';
 import { ProjectWorkflow } from './entities/project-workflow.entity';
 import { ProjectWorkflowTrigger } from './entities/project-workflow-trigger.entity';
 import { ProjectAssetsService } from './project-assets.service';
@@ -107,6 +114,7 @@ export class ProjectsController {
     private readonly workflowsService: ProjectWorkflowsService,
     private readonly triggersService: ProjectTriggersService,
     private readonly resultsService: ProjectResultsService,
+    private readonly filesService: ProjectFilesService,
   ) {}
 
   // ─── Projects ───────────────────────────────────────────────────────────
@@ -596,5 +604,73 @@ export class ProjectsController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.resultsService.timeline(id, workspaceId, vulnerabilityId);
+  }
+
+  // ─── Files ──────────────────────────────────────────────────────────────
+
+  @Doc({
+    summary: 'Project files',
+    description: 'Files a chat about the project reads as context (at most 5).',
+    response: { serialization: ProjectFileDto, isArray: true },
+    request: withWorkspace,
+  })
+  @WorkspaceAccess('project.read')
+  @Get(':id/files')
+  getFiles(
+    @Param('id', ParseUUIDPipe) id: string,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.filesService.list(id, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Start a file upload',
+    description:
+      'Reserves workspace storage for a .md, .txt or .csv file (10 MB max) and returns the form to POST it to; finish with the complete call.',
+    response: { serialization: PresignProjectFileResponseDto },
+    request: withWorkspace,
+  })
+  @WorkspaceAccess('project.write')
+  @Post(':id/files/presign')
+  presignFile(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: PresignProjectFileDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ) {
+    return this.filesService.presign(id, workspaceId, userId, dto);
+  }
+
+  @Doc({
+    summary: 'Finish a file upload',
+    description: 'Checks the uploaded object and attaches it to the project.',
+    response: { serialization: ProjectFileDto, isArray: true },
+    request: withWorkspace,
+  })
+  @WorkspaceAccess('project.write')
+  @Post(':id/files/:artifactId/complete')
+  completeFile(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('artifactId', ParseUUIDPipe) artifactId: string,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ) {
+    return this.filesService.complete(id, workspaceId, userId, artifactId);
+  }
+
+  @Doc({
+    summary: 'Detach a file',
+    description: 'Removes the file from the project; it stays in the workspace Files.',
+    response: { serialization: ProjectFileDto, isArray: true },
+    request: withWorkspace,
+  })
+  @WorkspaceAccess('project.write')
+  @Delete(':id/files/:artifactId')
+  removeFile(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('artifactId', ParseUUIDPipe) artifactId: string,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.filesService.remove(id, workspaceId, artifactId);
   }
 }

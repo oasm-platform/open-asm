@@ -30,6 +30,17 @@ describe('approval mode', () => {
     expect(mode.getApprovalMode()).toBe('manual');
   });
 
+  it('starts a new chat with the settings default over the last choice', async () => {
+    const mode = await load('manual');
+    mode.setDefaultApprovalMode('auto');
+    mode.restoreApprovalMode();
+    expect(mode.getApprovalMode()).toBe('auto');
+
+    mode.setDefaultApprovalMode(null);
+    mode.restoreApprovalMode();
+    expect(mode.getApprovalMode()).toBe('manual');
+  });
+
   it('keeps a stored Auto choice', async () => {
     const mode = await load('auto');
     expect(mode.getApprovalMode()).toBe('auto');

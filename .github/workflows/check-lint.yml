@@ -70,4 +70,8 @@ jobs:
 
       - name: Run lint
         if: steps.filter.outputs.relevant == 'true'
+        # Type-aware lint of core-api peaks around 5 GB of heap, past Node's
+        # default limit on the runner: it ran out of memory now and then.
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
         run: pnpm --filter ${{ matrix.service }} run lint

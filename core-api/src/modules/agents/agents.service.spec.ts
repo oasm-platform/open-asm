@@ -80,3 +80,38 @@ describe('AgentsService.getConversation', () => {
     ).not.toHaveBeenCalled();
   });
 });
+
+describe('AgentsService.forgetProjectConversations', () => {
+  it("forgets each member's chats of a deleted project", async () => {
+    const approvals = { forgetConversations: jest.fn() };
+    const agentsMemories = { stmClear: jest.fn() };
+    const service = Object.assign(Object.create(AgentsService.prototype), {
+      conversationRepository: {
+        find: jest.fn().mockResolvedValue([
+          { id: 'c1', createdBy: 'u1' },
+          { id: 'c2', createdBy: 'u2' },
+          { id: 'c3', createdBy: 'u1' },
+        ]),
+      },
+      approvals,
+      agentsMemories,
+    }) as AgentsService;
+
+    await service.forgetProjectConversations({ projectId: 'p1', workspaceId: 'w1' });
+
+    expect(agentsMemories.stmClear).toHaveBeenCalledTimes(3);
+    expect(approvals.forgetConversations).toHaveBeenCalledWith(['c1', 'c3'], 'w1', 'u1');
+    expect(approvals.forgetConversations).toHaveBeenCalledWith(['c2'], 'w1', 'u2');
+  });
+
+  it('never blocks the project delete', async () => {
+    const service = Object.assign(Object.create(AgentsService.prototype), {
+      conversationRepository: { find: jest.fn().mockRejectedValue(new Error('db down')) },
+      logger: { warn: jest.fn() },
+    }) as AgentsService;
+
+    await expect(
+      service.forgetProjectConversations({ projectId: 'p1', workspaceId: 'w1' }),
+    ).resolves.toBeUndefined();
+  });
+});

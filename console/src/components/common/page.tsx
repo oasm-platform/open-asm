@@ -1,6 +1,7 @@
 import { usePermission } from '@/hooks/usePermission';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { useEffect } from 'react';
+import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
 import AccessDenied from './access-denied';
 
@@ -12,6 +13,8 @@ interface PageProps {
   action?: React.ReactNode;
   isShowButtonGoBack?: boolean;
   className?: string;
+  /** Classes of the title row, e.g. to line it up with narrower content */
+  headerClassName?: string;
   /** Permission key required to view this page. Omit to allow any member. */
   permission?: string;
 }
@@ -23,6 +26,7 @@ const Page = ({
   action,
   isShowButtonGoBack,
   className,
+  headerClassName,
   permission,
 }: PageProps) => {
   const { hasPermission, isLoading } = usePermission();
@@ -40,7 +44,12 @@ const Page = ({
 
   return (
     <div className={(className || '') + ' flex h-full flex-col gap-5'}>
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div
+        className={cn(
+          'flex flex-wrap items-end justify-between gap-3',
+          headerClassName,
+        )}
+      >
         <div className="flex items-center gap-3">
           {isShowButtonGoBack && (
             <Button

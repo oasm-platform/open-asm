@@ -35,6 +35,11 @@ export class Project extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   description: string | null;
 
+  /** What an agent chatting about the project must follow; in its prompt. */
+  @ApiProperty({ type: String, required: false, nullable: true, maxLength: 2000 })
+  @Column({ type: 'varchar', length: 2000, nullable: true })
+  instruction: string | null;
+
   /**
    * Whether assets created after the scope rules were saved (discovery,
    * integration syncs) join the project when they match a rule. Off, the rules

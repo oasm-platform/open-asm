@@ -2,6 +2,7 @@ import { BullMQName } from '@/common/enums/enum';
 import { BullModule } from '@nestjs/bullmq';
 import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ArtifactsModule } from '../artifacts/artifacts.module';
 import { Asset } from '../assets/entities/assets.entity';
 import { ConnectorsModule } from '../connectors/connectors.module';
 import {
@@ -11,6 +12,7 @@ import {
 import { Workflow } from '../workflows/entities/workflow.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import { Project } from './entities/project.entity';
+import { ProjectArtifact } from './entities/project-artifact.entity';
 import { ProjectAsset } from './entities/project-asset.entity';
 import { ProjectScopeRule } from './entities/project-scope-rule.entity';
 import { ProjectVulnerability } from './entities/project-vulnerability.entity';
@@ -21,6 +23,7 @@ import {
   ProjectTriggerEventsConsumer,
 } from './processors/project-schedule.processor';
 import { ProjectAssetsService } from './project-assets.service';
+import { ProjectFilesService } from './project-files.service';
 import { ProjectResultsService } from './project-results.service';
 import { ProjectRunEventsListener } from './project-run-events.listener';
 import { ProjectScopeService } from './project-scope.service';
@@ -39,6 +42,7 @@ import { ProjectsService } from './projects.service';
     TypeOrmModule.forFeature([
       Asset,
       Project,
+      ProjectArtifact,
       ProjectAsset,
       ProjectScopeRule,
       ProjectVulnerability,
@@ -48,11 +52,13 @@ import { ProjectsService } from './projects.service';
       Workspace,
     ]),
     ConnectorsModule,
+    ArtifactsModule,
   ],
   controllers: [ProjectsController],
   providers: [
     ProjectsService,
     ProjectAssetsService,
+    ProjectFilesService,
     ProjectScopeService,
     ProjectWorkflowsService,
     ProjectTriggersService,
@@ -69,6 +75,9 @@ import { ProjectsService } from './projects.service';
     PROJECT_ASSET_DISCOVERY,
     PROJECT_TRIGGER_EVENTS,
     ProjectsService,
+    ProjectAssetsService,
+    ProjectFilesService,
+    ProjectResultsService,
     ProjectScopeService,
     ProjectTriggersService,
     ProjectWorkflowsService,

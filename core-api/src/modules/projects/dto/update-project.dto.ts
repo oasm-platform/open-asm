@@ -35,6 +35,18 @@ export class UpdateProjectDto {
   @MaxLength(2000)
   description?: string | null;
 
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    type: String,
+    maxLength: 2000,
+    description: 'What an agent chatting about the project must follow',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  instruction?: string | null;
+
   @ApiProperty({ required: false })
   @IsOptional()
   @IsBoolean()
