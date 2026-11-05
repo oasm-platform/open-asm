@@ -1080,6 +1080,8 @@ export class JobsRegistryService {
       createdAt: Date;
       updatedAt: Date;
       totalJobs: string; // COUNT returns string in some databases
+      completedJobs: string;
+      failedJobs: string;
       status: JobStatus;
       workflowName: string;
       jobHistoryName: string;
@@ -1115,6 +1117,8 @@ export class JobsRegistryService {
         '"jobHistory"."jobRunType" as "jobRunType"',
         'COUNT(job.id) as "totalJobs"',
         `${JOB_HISTORY_STATUS_SQL} as "status"`,
+        `COUNT(*) FILTER (WHERE job.status = '${JobStatus.COMPLETED}') as "completedJobs"`,
+        `COUNT(*) FILTER (WHERE job.status = '${JobStatus.FAILED}') as "failedJobs"`,
         'COUNT(*) OVER () as "total"',
       ])
       .groupBy('jobHistory.id')
@@ -1134,16 +1138,27 @@ export class JobsRegistryService {
       rawResults.length > 0 ? parseInt(rawResults[0].total, 10) : 0;
 
     // Transform raw results to match the response DTO structure
-    const transformedData = rawResults.map((raw) => ({
-      id: raw.id,
-      createdAt: raw.createdAt,
-      updatedAt: raw.updatedAt,
-      totalJobs: parseInt(raw.totalJobs),
-      status: raw.status,
-      workflowName: raw.workflowName,
-      jobHistoryName: raw.jobHistoryName,
-      jobRunType: raw.jobRunType,
-    }));
+    const transformedData = rawResults.map((raw) => {
+      const totalJobs = parseInt(raw.totalJobs, 10) || 0;
+      const completedJobs = parseInt(raw.completedJobs, 10) || 0;
+      const failedJobs = parseInt(raw.failedJobs, 10) || 0;
+      return {
+        id: raw.id,
+        createdAt: raw.createdAt,
+        updatedAt: raw.updatedAt,
+        totalJobs,
+        completedJobs,
+        failedJobs,
+        progress:
+          totalJobs > 0
+            ? Math.round(((completedJobs + failedJobs) / totalJobs) * 100)
+            : 0,
+        status: raw.status,
+        workflowName: raw.workflowName,
+        jobHistoryName: raw.jobHistoryName,
+        jobRunType: raw.jobRunType,
+      };
+    });
 
     return getManyResponse({ query, data: transformedData, total });
   }
@@ -1230,6 +1245,27 @@ export class JobsRegistryService {
       },
     });
 
+    // Step progress is the source of truth for workflow runs; legacy histories
+    // (no steps) fall back to the tool badges.
+    const settled = new Set(['done', 'failed', 'skipped']);
+    const stepsTotal = steps.length;
+    const stepsDone = steps.filter((step) => settled.has(step.status)).length;
+    const legacyDone = tools.filter((tool) =>
+      [JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED].includes(
+        tool.status as JobStatus,
+      ),
+    ).length;
+    const progress =
+      stepsTotal > 0
+        ? Math.round((stepsDone / stepsTotal) * 100)
+        : tools.length > 0
+          ? Math.round((legacyDone / tools.length) * 100)
+          : 0;
+
+    const failureReason = activeJobsCount === 0
+      ? await this.findRunFailureReason(historyId)
+      : null;
+
     return {
       id: historyId,
       workflowName: workflow?.name,
@@ -1240,7 +1276,65 @@ export class JobsRegistryService {
       tools,
       steps,
       activeJobsCount,
+      progress,
+      stepsDone: stepsTotal > 0 ? stepsDone : legacyDone,
+      stepsTotal: stepsTotal > 0 ? stepsTotal : tools.length,
+      etaSeconds:
+        activeJobsCount > 0 && progress > 0
+          ? await this.estimateEtaSeconds(workflow?.id, historyId, progress)
+          : null,
+      failureReason,
     };
+  }
+
+  /** Latest error-log message for any job of the run, if one exists. */
+  private async findRunFailureReason(
+    historyId: string,
+  ): Promise<string | null> {
+    const row = await this.jobErrorLogRepo
+      .createQueryBuilder('log')
+      .innerJoin('log.job', 'job')
+      .where('job.jobHistoryId = :historyId', { historyId })
+      .orderBy('log.createdAt', 'DESC')
+      .select('log.logMessage', 'message')
+      .limit(1)
+      .getRawOne<{ message: string }>();
+    return row?.message?.trim() || null;
+  }
+
+  /**
+   * Remaining time from the median duration of the last 20 completed runs of
+   * the same workflow. Median rather than mean so one hung run cannot skew it.
+   */
+  private async estimateEtaSeconds(
+    workflowId: string | undefined,
+    currentId: string,
+    progress: number,
+  ): Promise<number | null> {
+    if (!workflowId) return null;
+    const rows = await this.jobHistoryRepo
+      .createQueryBuilder('history')
+      .innerJoin('history.workflow', 'workflow')
+      .where('workflow.id = :workflowId', { workflowId })
+      .andWhere('history.id != :currentId', { currentId })
+      .andWhere('history.isCompleted = true')
+      .andWhere("history.createdAt > NOW() - INTERVAL '90 days'")
+      .select(
+        'EXTRACT(EPOCH FROM (history.updatedAt - history.createdAt))',
+        'seconds',
+      )
+      .orderBy('history.updatedAt', 'DESC')
+      .limit(20)
+      .getRawMany<{ seconds: string }>();
+
+    const durations = rows
+      .map((row) => Number(row.seconds))
+      .filter((seconds) => Number.isFinite(seconds) && seconds > 0)
+      .sort((a, b) => a - b);
+    if (durations.length < 2) return null;
+
+    const median = durations[Math.floor(durations.length / 2)];
+    return Math.max(0, Math.round(median * (1 - progress / 100)));
   }
 
   /** A run step's category: the declared one, else its tool's default. */

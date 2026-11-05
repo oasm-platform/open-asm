@@ -1,5 +1,10 @@
 import { EventTriggerType, JobRunType, JobStatus } from '@/common/enums/enum';
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource, type QueryRunner } from 'typeorm';
 import { Tool } from '../tools/entities/tools.entity';
@@ -134,6 +139,47 @@ export class WorkflowRunnerService {
 
     const { dispatched } = await this.advance(jobHistory.id, context);
     return { jobHistory, dispatched };
+  }
+
+  /**
+   * Starts a fresh run from the workflow and scope of an existing run. Used by
+   * the run page's "Retry" action; the original run is left untouched so its
+   * result and log stay auditable.
+   */
+  public async retryRun(
+    workspaceId: string,
+    jobHistoryId: string,
+  ): Promise<{ jobHistoryId: string; message: string }> {
+    const history = await this.dataSource
+      .getRepository(JobHistory)
+      .createQueryBuilder('history')
+      .innerJoinAndSelect('history.workflow', 'workflow')
+      .innerJoin('workflow.workspace', 'workspace')
+      .where('history.id = :id', { id: jobHistoryId })
+      .andWhere('workspace.id = :workspaceId', { workspaceId })
+      .getOne();
+
+    if (!history) {
+      throw new NotFoundException('Job history not found in workspace');
+    }
+
+    const result = await this.startRun({
+      workflow: history.workflow,
+      workspaceId,
+      jobName: `Retry - ${history.jobHistoryName ?? history.workflow.name}`,
+      jobRunType: JobRunType.MANUAL,
+      targetIds: history.scope?.targetIds,
+      assetIds: history.scope?.assetIds,
+    });
+
+    if (!result.jobHistory) {
+      throw new BadRequestException('This workflow has no runnable steps');
+    }
+
+    return {
+      jobHistoryId: result.jobHistory.id,
+      message: `Run started with ${result.dispatched} step(s)`,
+    };
   }
 
   /**

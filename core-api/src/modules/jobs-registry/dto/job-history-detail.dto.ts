@@ -169,4 +169,30 @@ export class JobHistoryDetailResponseDto {
   /** Jobs still pending or in progress — the ones a cancel would stop. */
   @ApiProperty()
   activeJobsCount: number;
+
+  @ApiProperty({ type: Number, description: 'Percent of workflow steps settled' })
+  progress: number;
+
+  @ApiProperty({ type: Number })
+  stepsDone: number;
+
+  @ApiProperty({ type: Number })
+  stepsTotal: number;
+
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    type: Number,
+    description:
+      'Seconds left, estimated from the median duration of recent completed runs of the same workflow. Null until there is enough history.',
+  })
+  etaSeconds?: number | null;
+
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    type: String,
+    description: 'Newest error log message, when the run has failed jobs',
+  })
+  failureReason?: string | null;
 }
