@@ -1,4 +1,9 @@
-import { ProjectTriggerType, TargetType } from '@/common/enums/enum';
+import {
+  ProjectTriggerEvent,
+  ProjectTriggerType,
+  RunOutcome,
+  TargetType,
+} from '@/common/enums/enum';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import {
@@ -46,8 +51,20 @@ describe('CreateProjectTriggerDto', () => {
   it('accepts an "assets added" trigger limited to domains', async () => {
     const dto = plainToInstance(CreateProjectTriggerDto, {
       projectWorkflowId: BINDING_ID,
-      type: ProjectTriggerType.ASSETS_ADDED,
+      type: ProjectTriggerType.EVENT,
+      event: ProjectTriggerEvent.ASSETS_ADDED,
       config: { windowMinutes: 0, maxAssets: 50, targetTypes: [TargetType.DOMAIN] },
+    });
+    const errors = await validate(dto);
+    expect(errors).toHaveLength(0);
+  });
+
+  it('accepts a trigger that follows another workflow', async () => {
+    const dto = plainToInstance(CreateProjectTriggerDto, {
+      projectWorkflowId: BINDING_ID,
+      type: ProjectTriggerType.EVENT,
+      event: ProjectTriggerEvent.RUN_COMPLETED,
+      config: { workflows: ['Recon'], status: [RunOutcome.SUCCESS, RunOutcome.FAILURE] },
     });
     const errors = await validate(dto);
     expect(errors).toHaveLength(0);
@@ -58,10 +75,14 @@ describe('CreateProjectTriggerDto', () => {
     [{ maxAssets: 5001 }],
     [{ windowMinutes: -1 }],
     [{ targetTypes: ['WEBSITE'] }],
+    [{ workflows: [''] }],
+    [{ status: ['done'] }],
+    [{ severity: [] }],
   ])('rejects config %j', async (config) => {
     const dto = plainToInstance(CreateProjectTriggerDto, {
       projectWorkflowId: BINDING_ID,
-      type: ProjectTriggerType.ASSETS_ADDED,
+      type: ProjectTriggerType.EVENT,
+      event: ProjectTriggerEvent.ASSETS_ADDED,
       config,
     });
     const errors = await validate(dto);

@@ -50,9 +50,10 @@ export const SUBSCRIPTIONS = {
     'workflow',
     'integration',
   ],
-  // New assets are matched against project scope rules; the sink narrows the
-  // domain to `asset.discovered`.
-  [EventBusGroup.Projects]: ['asset'],
+  // New assets are matched against project scope rules, and the events that
+  // project triggers run on start runs; the sink narrows the domains to
+  // `asset.discovered` and those events.
+  [EventBusGroup.Projects]: ['asset', 'project', 'vulnerability'],
   // No `email` lane: it has no transport to send through, so a subscription
   // here would only promise delivery that cannot happen. Add the lane and this
   // entry together when a provider exists.

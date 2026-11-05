@@ -182,6 +182,7 @@ export class ProjectResultsService {
         `SELECT jh.id, jh."createdAt", jh."updatedAt", jh."isCompleted", jh."jobRunType",
                 jh."projectWorkflowId", jh.steps, jh.scope,
                 w.name AS "workflowName", w.content AS "workflowContent", tr.type AS "triggerType",
+                tr.event AS "triggerEvent", jh."causedByRunId", cw.name AS "causedByWorkflowName",
                 ${RUN_STATUS_SQL} AS status,
                 (SELECT COUNT(*)::int FROM project_vulnerabilities pv
                   WHERE pv."projectId" = jh."projectId" AND pv."firstSeenJobHistoryId" = jh.id) AS "newVulnerabilities",
@@ -191,6 +192,8 @@ export class ProjectResultsService {
            FROM job_histories jh
            LEFT JOIN workflows w ON w.id = jh."workflowId"
            LEFT JOIN project_workflow_triggers tr ON tr.id = jh."triggerId"
+           LEFT JOIN job_histories cause ON cause.id = jh."causedByRunId"
+           LEFT JOIN workflows cw ON cw.id = cause."workflowId"
           WHERE ${whereSql}
           ORDER BY jh."createdAt" DESC
           LIMIT ${limit} OFFSET ${offset}`,
@@ -213,6 +216,9 @@ export class ProjectResultsService {
         projectWorkflowId: (row.projectWorkflowId as string | null) ?? null,
         workflowName: (row.workflowName as string | null) ?? '',
         triggerType: (row.triggerType as ProjectRunDto['triggerType']) ?? null,
+        triggerEvent: (row.triggerEvent as ProjectRunDto['triggerEvent']) ?? null,
+        causedByRunId: (row.causedByRunId as string | null) ?? null,
+        causedByWorkflowName: (row.causedByWorkflowName as string | null) ?? null,
         scopeSize: scopeSize(row.scope as WorkflowRunScope | null),
         stepsTotal: Math.max(
           jobEntries(content?.jobs as never).length,
@@ -475,13 +481,14 @@ export class ProjectResultsService {
     const [runs, audits, dismissed] = await Promise.all([
       this.dataSource.query<Array<Record<string, unknown>>>(
         `SELECT jh.id, jh."createdAt", jh."jobRunType", jh.scope, w.name AS "workflowName",
-                ${RUN_STATUS_SQL} AS status,
+                tr.event AS "triggerEvent", ${RUN_STATUS_SQL} AS status,
                 (SELECT COUNT(*)::int FROM project_vulnerabilities pv
                   WHERE pv."projectId" = jh."projectId" AND pv."firstSeenJobHistoryId" = jh.id) AS "newVulnerabilities",
                 (SELECT COUNT(*)::int FROM project_vulnerabilities pv
                   WHERE pv."projectId" = jh."projectId" AND pv."lastSeenJobHistoryId" = jh.id
                     AND pv."firstSeenJobHistoryId" IS DISTINCT FROM jh.id) AS "recurringVulnerabilities"
            FROM job_histories jh LEFT JOIN workflows w ON w.id = jh."workflowId"
+           LEFT JOIN project_workflow_triggers tr ON tr.id = jh."triggerId"
           WHERE jh."projectId" = $1
           ORDER BY jh."createdAt" DESC LIMIT ${ACTIVITY_LIMIT}`,
         [projectId],
@@ -536,6 +543,7 @@ export class ProjectResultsService {
           runStatus: run.status as string,
           workflowName: (run.workflowName as string | null) ?? '',
           jobRunType: run.jobRunType as string,
+          ...(run.triggerEvent ? { triggerEvent: run.triggerEvent as string } : {}),
           newVulnerabilities: Number(run.newVulnerabilities ?? 0),
           recurringVulnerabilities: Number(run.recurringVulnerabilities ?? 0),
           scopeSize: scopeSize(run.scope as WorkflowRunScope | null),

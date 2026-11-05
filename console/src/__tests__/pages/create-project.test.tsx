@@ -212,7 +212,15 @@ describe('CreateProject wizard page', () => {
       autoAddAssets: true,
       tools: [{ toolId: 'tool-1' }],
       on: {
-        assetsAdded: { enabled: true, windowMinutes: 10, maxAssets: 200, targetTypes: [] },
+        events: [
+          {
+            event: 'project.assets.added',
+            enabled: true,
+            windowMinutes: 10,
+            maxAssets: 200,
+            targetTypes: [],
+          },
+        ],
       },
       runNow: true,
     });
@@ -250,7 +258,7 @@ describe('CreateProject wizard page', () => {
     const dto = createMock.mock.calls[0][0].data;
     expect(dto).toMatchObject({ template: 'vulnerability_scan_basic.yaml' });
     expect(dto.tools).toBeUndefined();
-    expect(dto.on).toEqual({ schedule: [], assetsAdded: null });
+    expect(dto.on).toEqual({ schedule: [], events: [] });
   });
 
   it('goes back to the previous step with Back and keeps entered values', async () => {

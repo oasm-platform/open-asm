@@ -1,4 +1,4 @@
-import { JobRunType, JobStatus } from '@/common/enums/enum';
+import { JobRunType, JobStatus, ProjectTriggerEvent } from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
 
 /**
@@ -30,4 +30,12 @@ export class ProjectLastRunDto {
 
   @ApiProperty({ enum: JobRunType })
   jobRunType?: JobRunType;
+
+  @ApiProperty({
+    enum: ProjectTriggerEvent,
+    enumName: 'ProjectTriggerEvent',
+    required: false,
+    nullable: true,
+  })
+  triggerEvent?: ProjectTriggerEvent | null;
 }

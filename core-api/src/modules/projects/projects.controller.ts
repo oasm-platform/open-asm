@@ -480,7 +480,7 @@ export class ProjectsController {
 
   @Doc({
     summary: 'Project triggers',
-    description: 'Cron and "assets added" triggers of every workflow.',
+    description: 'Cron and event triggers of every workflow.',
     response: { serialization: ProjectWorkflowTrigger, isArray: true },
     request: withWorkspace,
   })

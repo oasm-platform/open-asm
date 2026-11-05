@@ -55,6 +55,9 @@ export interface StartBindingRunOptions {
   /** Restrict the run to these project assets; omitted = the whole scope. */
   assetIds?: string[];
   triggerId?: string;
+  /** The run whose event started this one, and its hop count. */
+  causedByRunId?: string;
+  chainDepth?: number;
 }
 
 /**
@@ -129,10 +132,12 @@ export class ProjectWorkflowsService {
       `SELECT DISTINCT ON (jh."projectWorkflowId")
               jh."projectWorkflowId", jh.id, jh."createdAt", jh."updatedAt",
               jh."jobHistoryName", jh."jobRunType", w.name AS "workflowName",
+              tr.event AS "triggerEvent",
               (SELECT COUNT(*)::int FROM jobs WHERE "jobHistoryId" = jh.id) AS "totalJobs",
               ${RUN_STATUS_SQL} AS status
          FROM job_histories jh
          LEFT JOIN workflows w ON w.id = jh."workflowId"
+         LEFT JOIN project_workflow_triggers tr ON tr.id = jh."triggerId"
         WHERE jh."projectWorkflowId" = ANY($1::uuid[])
         ORDER BY jh."projectWorkflowId", jh."createdAt" DESC`,
       [bindingIds],
@@ -379,6 +384,8 @@ export class ProjectWorkflowsService {
       projectId: binding.projectId,
       projectWorkflowId: binding.id,
       triggerId: opts.triggerId,
+      causedByRunId: opts.causedByRunId,
+      chainDepth: opts.chainDepth,
     });
     if (!jobHistory) {
       throw new BadRequestException(

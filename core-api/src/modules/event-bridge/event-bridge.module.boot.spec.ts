@@ -73,7 +73,7 @@ describe('EventBridgeModule wiring', () => {
       new ProjectionSink(),
       new NotificationsSink(dummy, dummy, dummy, dummy),
       new IntegrationsSink(dummy, dummy, dummy),
-      new ProjectsSink(dummy),
+      new ProjectsSink(dummy, dummy, dummy),
     ].map((sink) => sink.group);
 
     expect(groups.sort()).toEqual(Object.values(EventBusGroup).sort());

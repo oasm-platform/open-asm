@@ -44,9 +44,17 @@ const tools = ['subfinder', 'nuclei'].map((name) => ({
   createdAt: '2026-01-01T00:00:00Z',
 }));
 
-const { projectRef, vulnsMock, removeAssetsMock, deleteMock, updateWorkflowMock } = vi.hoisted(
+const {
+  projectRef,
+  workflowsRef,
+  vulnsMock,
+  removeAssetsMock,
+  deleteMock,
+  updateWorkflowMock,
+} = vi.hoisted(
   () => ({
     projectRef: { value: {} as Record<string, unknown> },
+    workflowsRef: { value: [] as unknown[] },
     vulnsMock: vi.fn(),
     removeAssetsMock: vi.fn(),
     deleteMock: vi.fn(),
@@ -225,12 +233,20 @@ vi.mock('@/services/apis/gen/queries', async (importOriginal) => {
         manualAssets: 1,
       },
     }),
-    useProjectsControllerGetTriggers: () => ({ data: binding.triggers, isLoading: false }),
+    useProjectsControllerGetTriggers: () => ({
+      data: (
+        projectRef.value.projectWorkflows as Array<{ triggers: unknown[] }>
+      ).flatMap((workflow) => workflow.triggers),
+      isLoading: false,
+    }),
     // Mounted (closed) by the Workflows tab's editor sheet.
     useToolsControllerGetInstalledTools: () => ({ data: { data: tools }, isLoading: false }),
     useProjectsControllerGetWorkflowTemplates: () => ({ data: [], isLoading: false }),
     useProjectsControllerGetMany: () => ({ data: { data: [] }, isLoading: false }),
-    useProjectsControllerGetWorkflows: () => ({ data: [], isLoading: false }),
+    useProjectsControllerGetWorkflows: (id: string) => ({
+      data: id === 'project-1' ? workflowsRef.value : [],
+      isLoading: false,
+    }),
     useProjectsControllerGetAssetCandidates: () => ({ data: undefined, isLoading: false }),
     useProjectsControllerCreateWorkflow: idle,
     useProjectsControllerUpdateWorkflow: () => ({ mutate: updateWorkflowMock, isPending: false }),
@@ -249,6 +265,7 @@ vi.mock('@/services/apis/gen/queries', async (importOriginal) => {
 
 beforeEach(() => {
   projectRef.value = baseProject();
+  workflowsRef.value = [];
   vulnsMock.mockReset();
   removeAssetsMock.mockReset();
   deleteMock.mockReset();
@@ -380,7 +397,7 @@ describe('Project detail page', () => {
               { cron: '0 2 * * 1', enabled: false },
               { cron: expect.stringMatching(/^\S+ \S+ \S+ \S+ \S+$/), enabled: true },
             ],
-            assetsAdded: null,
+            events: [],
           },
         },
       },
@@ -402,6 +419,89 @@ describe('Project detail page', () => {
     await user.click(within(sheet).getByRole('button', { name: 'Remove schedule 3' }));
     expect(within(sheet).queryByText(/Same time as/)).not.toBeInTheDocument();
     expect(within(sheet).getByRole('button', { name: 'Save' })).toBeEnabled();
+  });
+
+  it('runs a workflow after another of the project', async () => {
+    const crawl = {
+      ...binding,
+      id: 'b-2',
+      workflow: { ...binding.workflow, id: 'w-2', name: 'Crawl' },
+      triggers: [],
+    };
+    workflowsRef.value = [binding, crawl];
+    const { user } = renderWithProviders(<ProjectDetail />, at('workflows'));
+
+    await user.click(await screen.findByRole('button', { name: 'Edit' }));
+    const sheet = await screen.findByRole('dialog');
+    await user.click(
+      within(sheet).getByRole('checkbox', { name: 'After another workflow of this project' }),
+    );
+    // The workflow being edited is not one it can follow.
+    expect(within(sheet).queryByRole('checkbox', { name: 'Recon and vuln scan' })).toBeNull();
+    await user.click(within(sheet).getByRole('checkbox', { name: 'Crawl' }));
+    await user.click(within(sheet).getByRole('checkbox', { name: 'Failed' }));
+    await user.click(within(sheet).getByRole('button', { name: 'Save' }));
+
+    expect(updateWorkflowMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          on: expect.objectContaining({
+            events: [
+              {
+                event: 'project.run.completed',
+                enabled: true,
+                windowMinutes: 10,
+                maxAssets: 200,
+                targetTypes: [],
+                workflows: ['Crawl'],
+                status: ['success', 'failure'],
+              },
+            ],
+          }),
+        }),
+      }),
+      expect.anything(),
+    );
+  });
+
+  it('cannot follow another workflow when the project has none', async () => {
+    const { user } = renderWithProviders(<ProjectDetail />, at('workflows'));
+
+    await user.click(await screen.findByRole('button', { name: 'Edit' }));
+    const sheet = await screen.findByRole('dialog');
+    expect(
+      within(sheet).getByRole('checkbox', { name: 'After another workflow of this project' }),
+    ).toBeDisabled();
+    expect(within(sheet).getByText(/Add another workflow to the project/)).toBeInTheDocument();
+  });
+
+  it('describes event triggers on the Schedule tab', async () => {
+    projectRef.value = {
+      ...baseProject(),
+      projectWorkflows: [
+        {
+          ...binding,
+          triggers: [
+            {
+              id: 't-2',
+              projectWorkflowId: 'b-1',
+              type: 'event',
+              cron: null,
+              event: 'vulnerability.detected',
+              enabled: true,
+              config: { windowMinutes: 0, maxAssets: 50, severity: ['critical'] },
+              createdAt: '2026-01-01T00:00:00Z',
+              updatedAt: '2026-01-01T00:00:00Z',
+            },
+          ],
+        },
+      ],
+    };
+    renderWithProviders(<ProjectDetail />, at('schedule'));
+
+    const row = await screen.findByRole('row', { name: /Vulnerability found/ });
+    expect(row).toHaveTextContent('On critical findings');
+    expect(row).toHaveTextContent('starts right away · up to 50 assets/run');
   });
 
   it('shows when workflows run on the Schedule tab, without editing there', async () => {

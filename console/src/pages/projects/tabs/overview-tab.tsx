@@ -327,7 +327,8 @@ function ActivityItem({ item, projectId }: { item: ProjectActivityDto; projectId
         {workflowLabel({ name: item.workflowName })}
       </Link>
       <span className="text-muted-foreground">
-        {runTriggerLabel(item.jobRunType)} · {assetCount(item.scopeSize ?? 0)}
+        {runTriggerLabel(item.jobRunType, item.triggerEvent)} ·{' '}
+        {assetCount(item.scopeSize ?? 0)}
       </span>
       {item.runStatus && <JobStatusBadge status={item.runStatus as JobStatus} />}
       {(item.newVulnerabilities ?? 0) > 0 && (
@@ -390,9 +391,9 @@ export function OverviewTab({
     return best;
   }, [project.projectWorkflows, timezone]);
 
-  const onAssetsAdded = (project.projectWorkflows ?? []).some((binding) =>
+  const onEvents = (project.projectWorkflows ?? []).some((binding) =>
     (binding.triggers ?? []).some(
-      (trigger) => trigger.type === ProjectTriggerType.assets_added && trigger.enabled,
+      (trigger) => trigger.type === ProjectTriggerType.event && trigger.enabled,
     ),
   );
 
@@ -460,8 +461,8 @@ export function OverviewTab({
           <span className="truncate text-sm text-muted-foreground" title={next?.cron}>
             {next
               ? `${next.workflow} · ${formatCronLabel(next.cron, timezone) ?? next.cron}`
-              : onAssetsAdded
-                ? 'When assets are added'
+              : onEvents
+                ? 'On events'
                 : 'Only when run by hand'}
           </span>
         </Kpi>

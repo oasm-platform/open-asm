@@ -4,6 +4,7 @@ import {
   JobRunType,
   JobStatus,
   ProjectChange,
+  ProjectTriggerEvent,
   ProjectTriggerType,
   Severity,
 } from '@/common/enums/enum';
@@ -71,6 +72,8 @@ export class ProjectActivityDto {
   @ApiProperty({ required: false }) runStatus?: string;
   @ApiProperty({ required: false }) workflowName?: string;
   @ApiProperty({ required: false }) jobRunType?: string;
+  @ApiProperty({ required: false, description: 'The event of an event run' })
+  triggerEvent?: string;
   @ApiProperty({ required: false }) newVulnerabilities?: number;
   @ApiProperty({ required: false }) recurringVulnerabilities?: number;
   @ApiProperty({ required: false }) scopeSize?: number;
@@ -124,6 +127,28 @@ export class ProjectRunDto {
   @ApiProperty() workflowName: string;
   @ApiProperty({ enum: ProjectTriggerType, enumName: 'ProjectTriggerType', required: false, nullable: true })
   triggerType: ProjectTriggerType | null;
+  @ApiProperty({
+    enum: ProjectTriggerEvent,
+    enumName: 'ProjectTriggerEvent',
+    required: false,
+    nullable: true,
+    description: 'The event that started it, for an event run',
+  })
+  triggerEvent: ProjectTriggerEvent | null;
+  @ApiProperty({
+    type: String,
+    required: false,
+    nullable: true,
+    description: 'The run whose result started this one (an event run)',
+  })
+  causedByRunId: string | null;
+  @ApiProperty({
+    type: String,
+    required: false,
+    nullable: true,
+    description: 'Workflow of the run that caused this one',
+  })
+  causedByWorkflowName: string | null;
   @ApiProperty({ description: 'Assets in the run scope' })
   scopeSize: number;
   @ApiProperty() stepsTotal: number;

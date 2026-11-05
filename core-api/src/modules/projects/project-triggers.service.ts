@@ -1,4 +1,10 @@
-import { BullMQName, JobRunType, ProjectTriggerType } from '@/common/enums/enum';
+import {
+  BullMQName,
+  JobRunType,
+  ProjectTriggerEvent,
+  ProjectTriggerType,
+  RunOutcome,
+} from '@/common/enums/enum';
 import { RedisService } from '@/services/redis/redis.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import {
@@ -11,7 +17,12 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
 import { DataSource, EntityManager, Repository } from 'typeorm';
+import type {
+  ProjectTriggerEvents,
+  ProjectTriggerFact,
+} from '../event-bridge/sinks/projects/projects.sink';
 import { Workflow, type WorkflowContent } from '../workflows/entities/workflow.entity';
+import type { WorkflowRunScope } from '../workflows/workflow-graph';
 import type {
   CreateProjectTriggerDto,
   UpdateProjectTriggerDto,
@@ -23,13 +34,14 @@ import { isProjectOwnedWorkflow } from './pipeline';
 import { findProjectOrFail } from './project-access';
 import { ProjectWorkflowsService } from './project-workflows.service';
 import {
-  ASSETS_ADDED_KEY,
   cronKey,
   type DefinedTrigger,
   DEFAULT_MAX_ASSETS,
   enabledByKey,
+  eventKey,
   keyOfRow,
-  normalizeAssetsAddedConfig,
+  MAX_CHAIN_DEPTH,
+  normalizeEventConfig,
   onOfTriggers,
   planTriggerSync,
   triggersOfInput,
@@ -38,7 +50,6 @@ import {
   type WorkflowOnInput,
 } from './workflow-on';
 
-
 /** Payload of a cron scheduler job: the trigger, or a pre-trigger binding. */
 export interface ProjectScheduleJobData {
   triggerId?: string;
@@ -46,13 +57,29 @@ export interface ProjectScheduleJobData {
   id?: string;
 }
 
-export interface AssetsAddedJobData {
+/** Payload of a batch job: the event trigger whose window closed. */
+export interface EventTriggerJobData {
   triggerId: string;
+}
+
+/** What one event brings to one trigger listening to it. */
+interface TriggerMatch {
+  trigger: ProjectWorkflowTrigger;
+  assetIds: string[];
+}
+
+/** The run an event came from, as far as chains of runs are concerned. */
+interface EventCause {
+  runId: string;
+  chainDepth: number;
+  projectWorkflowId: string | null;
 }
 
 const pendingKey = (triggerId: string) =>
   `project-trigger:${triggerId}:pending`;
 const queuedKey = (triggerId: string) => `project-trigger:${triggerId}:queued`;
+/** Runs that caused the gathered events, scored by the depth of the next run. */
+const causesKey = (triggerId: string) => `project-trigger:${triggerId}:causes`;
 /** How long gathered asset ids survive if their batch job is lost. */
 const PENDING_TTL_SECONDS = 2 * 24 * 60 * 60;
 
@@ -66,18 +93,68 @@ export function chunk<T>(items: T[], size: number): T[][] {
 }
 
 /**
+ * Which of the triggers listening to an event it starts, and on what. Pure:
+ * the caller loads the triggers, the asset ids the event concerns and the
+ * workflow names of the bindings.
+ *
+ * - `project.assets.added`: the assets that joined.
+ * - `project.run.completed`: the finished run's scope, for triggers of the
+ *   project's other workflows whose `workflows` and `status` accept it.
+ * - `vulnerability.detected`: the asset, for triggers whose `severity` lists
+ *   one of the severities found.
+ */
+export function matchTriggers(
+  fact: ProjectTriggerFact,
+  triggers: readonly ProjectWorkflowTrigger[],
+  assetIds: readonly string[],
+): TriggerMatch[] {
+  if (assetIds.length === 0) return [];
+  return triggers
+    .filter((trigger) => {
+      if (!trigger.event || trigger.event !== fact.event) return false;
+      const config = normalizeEventConfig(trigger.event, trigger.config);
+      switch (fact.event) {
+        case ProjectTriggerEvent.RUN_COMPLETED: {
+          if (trigger.projectWorkflowId === fact.projectWorkflowId) return false;
+          const followed = (config.workflows ?? []).map((name) =>
+            name.trim().toLowerCase(),
+          );
+          return (
+            (config.status ?? []).includes(fact.outcome) &&
+            (followed.length === 0 ||
+              followed.includes(fact.workflowName.trim().toLowerCase()))
+          );
+        }
+        case ProjectTriggerEvent.VULNERABILITY_DETECTED:
+          return fact.severities.some((s) => (config.severity ?? []).includes(s));
+        default:
+          return true;
+      }
+    })
+    .map((trigger) => ({ trigger, assetIds: [...assetIds] }));
+}
+
+/**
  * When project workflows run on their own.
  *
  * A workflow's triggers are defined in its file (`on:`, see workflow-on.ts);
  * `project_workflow_triggers` keeps one row per entry with its state.
  * Cron triggers are BullMQ job schedulers on the project schedule queue (its
  * value predates the rename; see {@link BullMQName.PROJECT_WORKFLOW_SCHEDULE}).
- * "Assets added" triggers gather the assets that joined the project in a Redis
- * set and start one run when the window closes: discovery that finds 500
- * subdomains must not start 500 runs.
+ * Event triggers gather the assets their events bring in a Redis set and
+ * start one run when the window closes: discovery that finds 500 subdomains
+ * must not start 500 runs. The projects lane of the event bridge hands the
+ * events over (`onTriggerEvent`).
+ *
+ * Runs that trigger runs form a chain. Each run records the run that caused
+ * it and its depth; an event past {@link MAX_CHAIN_DEPTH}, or one a run of the
+ * listening workflow caused, starts nothing, so workflows cannot keep
+ * triggering each other.
  */
 @Injectable()
-export class ProjectTriggersService implements OnApplicationBootstrap {
+export class ProjectTriggersService
+  implements OnApplicationBootstrap, ProjectTriggerEvents
+{
   private readonly logger = new Logger(ProjectTriggersService.name);
 
   constructor(
@@ -90,7 +167,7 @@ export class ProjectTriggersService implements OnApplicationBootstrap {
     @InjectQueue(BullMQName.PROJECT_WORKFLOW_SCHEDULE)
     private readonly scheduleQueue: Queue<ProjectScheduleJobData>,
     @InjectQueue(BullMQName.PROJECT_TRIGGER_EVENTS)
-    private readonly eventsQueue: Queue<AssetsAddedJobData>,
+    private readonly eventsQueue: Queue<EventTriggerJobData>,
     private readonly redis: RedisService,
     private readonly dataSource: DataSource,
     private readonly workflows: ProjectWorkflowsService,
@@ -112,8 +189,9 @@ export class ProjectTriggersService implements OnApplicationBootstrap {
   /**
    * Adds a trigger to one of the project's workflows, by writing it into the
    * workflow's `on:` block (the file is the definition, see workflow-on.ts).
-   * A cron needs a cron expression; a workflow has at most one "assets added"
-   * trigger (two would scan every new asset twice).
+   * A cron needs a cron expression and an event trigger its event; a
+   * workflow has at most one trigger per event (two would start every run
+   * twice).
    */
   async create(
     projectId: string,
@@ -132,10 +210,14 @@ export class ProjectTriggersService implements OnApplicationBootstrap {
       const cron = dto.cron!.trim();
       added = { key: cronKey(cron), type: ProjectTriggerType.CRON, cron };
     } else {
+      if (!dto.event) {
+        throw new BadRequestException('An event trigger needs an event');
+      }
       added = {
-        key: ASSETS_ADDED_KEY,
-        type: ProjectTriggerType.ASSETS_ADDED,
-        config: normalizeAssetsAddedConfig(dto.config),
+        key: eventKey(dto.event),
+        type: ProjectTriggerType.EVENT,
+        event: dto.event,
+        config: normalizeEventConfig(dto.event, dto.config),
       };
     }
     await this.writeOn(binding, manager, (defined) => {
@@ -143,7 +225,7 @@ export class ProjectTriggersService implements OnApplicationBootstrap {
         throw new BadRequestException(
           added.type === ProjectTriggerType.CRON
             ? 'This workflow already runs on this schedule'
-            : 'This workflow already runs when assets are added',
+            : `This workflow already runs on ${added.event}`,
         );
       }
       return [...defined, added];
@@ -199,12 +281,13 @@ export class ProjectTriggersService implements OnApplicationBootstrap {
       trigger = await this.triggerRepo.save(trigger);
     }
     if (dto.config !== undefined) {
-      if (trigger.type !== ProjectTriggerType.ASSETS_ADDED) {
-        throw new BadRequestException('Only an "assets added" trigger has settings');
+      const event = trigger.event;
+      if (trigger.type !== ProjectTriggerType.EVENT || !event) {
+        throw new BadRequestException('Only an event trigger has settings');
       }
-      const config = normalizeAssetsAddedConfig({ ...trigger.config, ...dto.config });
+      const config = normalizeEventConfig(event, { ...trigger.config, ...dto.config });
       await this.writeOn(binding, this.dataSource.manager, (defined) =>
-        defined.map((t) => (t.key === ASSETS_ADDED_KEY ? { ...t, config } : t)),
+        defined.map((t) => (t.key === eventKey(event) ? { ...t, config } : t)),
       );
     }
     if (dto.enabled !== undefined) {
@@ -229,9 +312,9 @@ export class ProjectTriggersService implements OnApplicationBootstrap {
 
   /**
    * Replaces the `on:` block of a workflow with what the workflow editor
-   * sends: its schedules and "assets added", each possibly turned off.
-   * Entries that stay keep their row (state, history, scheduler); one sent
-   * without `enabled` keeps its state, a new one is on. The caller checks the
+   * sends: its schedules and events, each possibly turned off. Entries that
+   * stay keep their row (state, history, scheduler); one sent without
+   * `enabled` keeps its state, a new one is on. The caller checks the
    * project is writable.
    *
    * @returns the workflow's trigger rows after the change
@@ -319,6 +402,7 @@ export class ProjectTriggersService implements OnApplicationBootstrap {
           projectWorkflowId: bindingId,
           type: defined.type,
           cron: defined.cron ?? null,
+          event: defined.event ?? null,
           config: defined.config ?? {},
           enabled: true,
         }),
@@ -453,68 +537,65 @@ export class ProjectTriggersService implements OnApplicationBootstrap {
   }
 
   /**
-   * Assets joined the project (by hand, by a rule edit or by discovery).
-   * Each enabled "assets added" trigger gathers them and, when no batch is
-   * open yet, opens one that closes after its window.
+   * An event a project trigger can run on (from the projects lane). Each
+   * enabled trigger listening to it gathers the assets it concerns and, when
+   * no batch is open yet, opens one that closes after its window. Skipped:
+   * a trigger of the workflow whose own run caused the event (it would
+   * trigger itself), and any trigger once the chain is past its depth.
    */
-  async onAssetsAdded(projectId: string, assetIds: string[]): Promise<void> {
-    if (assetIds.length === 0) return;
-    const triggers = await this.triggerRepo
-      .createQueryBuilder('trigger')
-      .innerJoin('trigger.projectWorkflow', 'binding')
-      .innerJoin('binding.project', 'project')
-      .where('binding.projectId = :projectId', { projectId })
-      .andWhere('trigger.type = :type', { type: ProjectTriggerType.ASSETS_ADDED })
-      .andWhere('trigger.enabled = true')
-      .andWhere('project.archivedAt IS NULL')
-      .getMany();
+  async onTriggerEvent(fact: ProjectTriggerFact): Promise<void> {
+    const [triggers, cause] = await Promise.all([
+      this.listeningTriggers(fact),
+      this.causeOf(fact),
+    ]);
+    if (triggers.length === 0) return;
+    const matches = matchTriggers(fact, triggers, await this.assetsOf(fact));
+    if (matches.length === 0) return;
 
-    for (const trigger of triggers) {
-      const config = normalizeAssetsAddedConfig(trigger.config);
-      const delay = (config.windowMinutes ?? 0) * 60_000;
-      await this.redis.client
-        .multi()
-        .sadd(pendingKey(trigger.id), ...assetIds)
-        .expire(pendingKey(trigger.id), PENDING_TTL_SECONDS)
-        .exec();
-      // One open batch per trigger: the flag outlives the window, and the
-      // batch clears it before draining, so ids added while it drains open
-      // the next batch instead of being stranded.
-      const opened = await this.redis.client.set(
-        queuedKey(trigger.id),
-        '1',
-        'EX',
-        Math.ceil(delay / 1000) + 3600,
-        'NX',
+    const chainDepth = cause ? cause.chainDepth + 1 : 0;
+    if (chainDepth > MAX_CHAIN_DEPTH) {
+      this.logger.log(
+        `${fact.event} from run ${cause?.runId} starts nothing: the chain is past ${MAX_CHAIN_DEPTH} runs`,
       );
-      if (opened !== 'OK') continue;
-      await this.eventsQueue.add(
-        'assets-added',
-        { triggerId: trigger.id },
-        { delay, removeOnComplete: true, removeOnFail: 100 },
-      );
+      return;
+    }
+    for (const { trigger, assetIds } of matches) {
+      // Finding assets for itself is how discovery keeps the project current
+      // (the depth still bounds it); a run reacting to its own completion or
+      // findings would only loop.
+      if (
+        cause?.projectWorkflowId === trigger.projectWorkflowId &&
+        fact.event !== ProjectTriggerEvent.ASSETS_ADDED
+      ) {
+        continue;
+      }
+      await this.gather(trigger, assetIds, cause ? { runId: cause.runId, chainDepth } : null);
     }
   }
 
   /**
    * A batch window closed: drains the gathered assets and starts one run per
    * `maxAssets` of them that are still in the project (and of the configured
-   * target types).
+   * target types). The runs record the deepest run that caused the batch.
    */
-  async fireAssetsAdded(triggerId: string): Promise<void> {
+  async fireEvent(triggerId: string): Promise<void> {
     await this.redis.client.del(queuedKey(triggerId));
     const result = await this.redis.client
       .multi()
       .smembers(pendingKey(triggerId))
       .del(pendingKey(triggerId))
+      .zrevrange(causesKey(triggerId), 0, 0, 'WITHSCORES')
+      .del(causesKey(triggerId))
       .exec();
     const gathered = (result?.[0]?.[1] as string[] | undefined) ?? [];
+    const [causeRunId, causeDepth] =
+      (result?.[2]?.[1] as string[] | undefined) ?? [];
 
     const trigger = await this.triggerRepo.findOne({
       where: { id: triggerId },
       relations: { projectWorkflow: true },
     });
-    if (!trigger?.enabled || trigger.type !== ProjectTriggerType.ASSETS_ADDED) {
+    if (!trigger?.enabled || trigger.type !== ProjectTriggerType.EVENT || !trigger.event) {
       return;
     }
     const binding = await this.workflows.findBinding(
@@ -523,7 +604,7 @@ export class ProjectTriggersService implements OnApplicationBootstrap {
     );
     if (binding.project.archivedAt || gathered.length === 0) return;
 
-    const config = normalizeAssetsAddedConfig(trigger.config);
+    const config = normalizeEventConfig(trigger.event, trigger.config);
     const rows: Array<{ assetId: string }> = await this.dataSource.query(
       `SELECT pa."assetId"
          FROM project_assets pa
@@ -544,12 +625,15 @@ export class ProjectTriggersService implements OnApplicationBootstrap {
           jobRunType: JobRunType.EVENT,
           triggerId: trigger.id,
           assetIds: ids,
+          ...(causeRunId
+            ? { causedByRunId: causeRunId, chainDepth: Number(causeDepth) }
+            : {}),
         });
       } catch (error) {
         // One unrunnable batch (a root tool uninstalled since) must not drop
         // the others: log it, the run list shows nothing started.
         this.logger.warn(
-          `Assets-added run of trigger ${trigger.id} not started: ${(error as Error).message}`,
+          `${trigger.event} run of trigger ${trigger.id} not started: ${(error as Error).message}`,
         );
       }
     }
@@ -558,6 +642,119 @@ export class ProjectTriggersService implements OnApplicationBootstrap {
   /** Drops a scheduler nothing resolves to any more. */
   async removeScheduler(schedulerId: string): Promise<void> {
     await this.scheduleQueue.removeJobScheduler(schedulerId);
+  }
+
+  /** Adds assets to a trigger's batch, opening one when none is. */
+  private async gather(
+    trigger: ProjectWorkflowTrigger,
+    assetIds: string[],
+    cause: { runId: string; chainDepth: number } | null,
+  ): Promise<void> {
+    const config = normalizeEventConfig(trigger.event!, trigger.config);
+    const delay = (config.windowMinutes ?? 0) * 60_000;
+    const tx = this.redis.client
+      .multi()
+      .sadd(pendingKey(trigger.id), ...assetIds)
+      .expire(pendingKey(trigger.id), PENDING_TTL_SECONDS);
+    if (cause) {
+      tx.zadd(causesKey(trigger.id), 'GT', cause.chainDepth, cause.runId).expire(
+        causesKey(trigger.id),
+        PENDING_TTL_SECONDS,
+      );
+    }
+    await tx.exec();
+    // One open batch per trigger: the flag outlives the window, and the
+    // batch clears it before draining, so ids added while it drains open
+    // the next batch instead of being stranded.
+    const opened = await this.redis.client.set(
+      queuedKey(trigger.id),
+      '1',
+      'EX',
+      Math.ceil(delay / 1000) + 3600,
+      'NX',
+    );
+    if (opened !== 'OK') return;
+    await this.eventsQueue.add(
+      'event-trigger',
+      { triggerId: trigger.id },
+      { delay, removeOnComplete: true, removeOnFail: 100 },
+    );
+  }
+
+  /** The enabled triggers of active projects that listen to the event. */
+  private listeningTriggers(
+    fact: ProjectTriggerFact,
+  ): Promise<ProjectWorkflowTrigger[]> {
+    const qb = this.triggerRepo
+      .createQueryBuilder('trigger')
+      .innerJoin('trigger.projectWorkflow', 'binding')
+      .innerJoin('binding.project', 'project')
+      .where('trigger.type = :type', { type: ProjectTriggerType.EVENT })
+      .andWhere('trigger.event = :event', { event: fact.event })
+      .andWhere('trigger.enabled = true')
+      .andWhere('project.archivedAt IS NULL')
+      .andWhere('project."workspaceId" = :workspaceId', {
+        workspaceId: fact.workspaceId,
+      });
+    if (fact.event === ProjectTriggerEvent.VULNERABILITY_DETECTED) {
+      // Every project the asset belongs to, whichever run found it.
+      qb.andWhere(
+        `EXISTS (SELECT 1 FROM project_assets pa
+                  WHERE pa."projectId" = binding."projectId" AND pa."assetId" = :assetId)`,
+        { assetId: fact.assetId },
+      );
+    } else {
+      qb.andWhere('binding.projectId = :projectId', { projectId: fact.projectId });
+    }
+    return qb.getMany();
+  }
+
+  /** The assets an event concerns; a finished run's are its scope. */
+  private async assetsOf(fact: ProjectTriggerFact): Promise<string[]> {
+    switch (fact.event) {
+      case ProjectTriggerEvent.ASSETS_ADDED:
+        return fact.assetIds;
+      case ProjectTriggerEvent.VULNERABILITY_DETECTED:
+        return [fact.assetId];
+      case ProjectTriggerEvent.RUN_COMPLETED: {
+        const [row]: Array<{ scope: WorkflowRunScope | null }> =
+          await this.dataSource.query(
+            `SELECT scope FROM job_histories WHERE id = $1`,
+            [fact.runId],
+          );
+        return row?.scope?.assetIds ?? [];
+      }
+    }
+  }
+
+  /** The run an event came from, if a run caused it. */
+  private async causeOf(fact: ProjectTriggerFact): Promise<EventCause | null> {
+    const rows: Array<{
+      id: string;
+      chainDepth: number;
+      projectWorkflowId: string | null;
+    }> =
+      fact.event === ProjectTriggerEvent.VULNERABILITY_DETECTED
+        ? await this.dataSource.query(
+            `SELECT jh.id, jh."chainDepth", jh."projectWorkflowId"
+               FROM jobs j JOIN job_histories jh ON jh.id = j."jobHistoryId"
+              WHERE j.id = $1`,
+            [fact.jobId],
+          )
+        : fact.runId
+          ? await this.dataSource.query(
+              `SELECT id, "chainDepth", "projectWorkflowId" FROM job_histories WHERE id = $1`,
+              [fact.runId],
+            )
+          : [];
+    const row = rows[0];
+    return row
+      ? {
+          runId: row.id,
+          chainDepth: Number(row.chainDepth ?? 0),
+          projectWorkflowId: row.projectWorkflowId,
+        }
+      : null;
   }
 
   private async resolveCronTrigger(
@@ -612,7 +809,11 @@ export class ProjectTriggersService implements OnApplicationBootstrap {
   }
 
   private async clearPending(triggerId: string): Promise<void> {
-    await this.redis.client.del(pendingKey(triggerId), queuedKey(triggerId));
+    await this.redis.client.del(
+      pendingKey(triggerId),
+      queuedKey(triggerId),
+      causesKey(triggerId),
+    );
   }
 
   private async markFired(triggerId: string): Promise<void> {
@@ -717,4 +918,17 @@ export function definedTriggersOfInput(input: WorkflowOnInput): DefinedTrigger[]
     }
     throw error;
   }
+}
+
+/** How a finished run ended, from its step states. */
+export function runOutcomeOf(
+  steps: Record<string, { status?: string; reason?: string }> | null | undefined,
+): RunOutcome {
+  return Object.values(steps ?? {}).some(
+    (state) =>
+      state.status === 'failed' ||
+      (state.status === 'skipped' && state.reason === 'blocked-by-failure'),
+  )
+    ? RunOutcome.FAILURE
+    : RunOutcome.SUCCESS;
 }

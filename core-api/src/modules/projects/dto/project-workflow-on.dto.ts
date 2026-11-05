@@ -1,15 +1,17 @@
+import { ProjectTriggerEvent } from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
   IsBoolean,
+  IsEnum,
   IsOptional,
   IsString,
   MaxLength,
   ValidateNested,
 } from 'class-validator';
-import { AssetsAddedTriggerConfigDto } from './project-trigger.dto';
+import { EventTriggerConfigDto } from './project-trigger.dto';
 
 /** One schedule of a workflow, as the workflow editor sends it. */
 export class ScheduleInputDto {
@@ -32,12 +34,17 @@ export class ScheduleInputDto {
   enabled?: boolean;
 }
 
-/** The "assets added" trigger of a workflow, as the workflow editor sends it. */
-export class AssetsAddedInputDto extends AssetsAddedTriggerConfigDto {
+/** One event trigger of a workflow, as the workflow editor sends it. */
+export class EventTriggerInputDto extends EventTriggerConfigDto {
+  @ApiProperty({ enum: ProjectTriggerEvent, enumName: 'ProjectTriggerEvent' })
+  @IsEnum(ProjectTriggerEvent)
+  event: ProjectTriggerEvent;
+
   @ApiProperty({
     required: false,
     default: true,
-    description: 'Off keeps the trigger in the workflow without running it',
+    description:
+      'Off keeps the trigger in the workflow without running it. Omitted: a new trigger is on, an existing one keeps its state.',
   })
   @IsOptional()
   @IsBoolean()
@@ -59,12 +66,13 @@ export class ProjectWorkflowOnDto {
 
   @ApiProperty({
     required: false,
-    nullable: true,
-    type: () => AssetsAddedInputDto,
-    description: 'Run when assets join the project; absent or null = never',
+    type: [EventTriggerInputDto],
+    description: 'Events the workflow runs on, one entry per event; absent or empty = none',
   })
   @IsOptional()
-  @ValidateNested()
-  @Type(() => AssetsAddedInputDto)
-  assetsAdded?: AssetsAddedInputDto | null;
+  @IsArray()
+  @ArrayMaxSize(Object.values(ProjectTriggerEvent).length)
+  @ValidateNested({ each: true })
+  @Type(() => EventTriggerInputDto)
+  events?: EventTriggerInputDto[];
 }

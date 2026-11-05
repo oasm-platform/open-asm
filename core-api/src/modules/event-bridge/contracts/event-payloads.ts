@@ -1,4 +1,4 @@
-import type { Severity } from '@/common/enums/enum';
+import type { RunOutcome, Severity } from '@/common/enums/enum';
 import type { EventName } from './event-catalog';
 import type { ConsumedEvent } from './event-envelope';
 
@@ -54,6 +54,29 @@ export interface AssetDiscoveredPayload {
   /** The run that found them, when a scan did. */
   jobHistoryId?: string;
   assetIds: string[];
+}
+
+/**
+ * `project.assets.added` — the assets one change put into a project: picked
+ * by hand, selected by a rule edit, or discovered and selected by the rules.
+ * Only assets that were not in the project yet.
+ */
+export interface ProjectAssetsAddedPayload {
+  projectId: string;
+  assetIds: string[];
+  /** The run whose discovery found them, when one did. */
+  jobHistoryId?: string;
+}
+
+/** `project.run.completed` — a run of a project workflow finished. */
+export interface ProjectRunCompletedPayload {
+  projectId: string;
+  /** The project workflow (binding) the run belongs to. */
+  projectWorkflowId: string;
+  workflowName: string;
+  jobHistoryId: string;
+  /** `failure` when a step failed or was skipped because one it needed did. */
+  outcome: RunOutcome;
 }
 
 /** `workflow.run.completed` — the run's asset deltas and unfinished steps. */
@@ -123,6 +146,8 @@ export interface EventPayloadMap {
   'workflow.run.completed': WorkflowRunCompletedPayload;
   'vulnerability.analysis.completed': VulnerabilityAnalysisCompletedPayload;
   'asset.url.discovered': UrlDiscoveredPayload;
+  'project.assets.added': ProjectAssetsAddedPayload;
+  'project.run.completed': ProjectRunCompletedPayload;
 }
 
 export type PayloadEventName = keyof EventPayloadMap & EventName;

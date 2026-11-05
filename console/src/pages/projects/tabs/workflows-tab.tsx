@@ -34,6 +34,7 @@ import {
   apiErrorMessage,
   pipelineSteps,
   runTriggerLabel,
+  TRIGGER_EVENT_LABELS,
   useInvalidateProjects,
   workflowLabel,
 } from '../project-utils';
@@ -107,7 +108,7 @@ function WorkflowCard({
             ) : (
               <Badge key={trigger.id} variant="outline" className="gap-1 font-normal">
                 <Zap className="size-3" />
-                Assets added
+                {trigger.event ? TRIGGER_EVENT_LABELS[trigger.event] : 'Event'}
                 {!trigger.enabled && ' (off)'}
               </Badge>
             ),
@@ -124,7 +125,7 @@ function WorkflowCard({
               >
                 {dayjs(lastRun.createdAt).fromNow()}
               </Link>
-              <span>· {runTriggerLabel(lastRun.jobRunType)}</span>
+              <span>· {runTriggerLabel(lastRun.jobRunType, lastRun.triggerEvent)}</span>
             </>
           ) : (
             <span>Never run</span>

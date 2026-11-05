@@ -92,6 +92,17 @@ export function WorkflowEditorSheet({
   const copyWorkflows = useProjectsControllerGetWorkflows(copyProject ?? '', {
     query: { enabled: !!copyProject },
   });
+  // The ones this workflow can run after: every other workflow of the project.
+  const projectWorkflows = useProjectsControllerGetWorkflows(projectId, {
+    query: { enabled: open },
+  });
+  const otherWorkflows = useMemo(
+    () =>
+      (projectWorkflows.data ?? [])
+        .filter((other) => other.id !== binding?.id && other.workflow?.name)
+        .map((other) => other.workflow.name),
+    [projectWorkflows.data, binding?.id],
+  );
 
   // Reset on open (and once the tools arrive) only: keyed by ids, so a
   // background refetch does not wipe a pipeline being edited.
@@ -276,7 +287,11 @@ export function WorkflowEditorSheet({
             </Tabs>
           )}
           <div className="border-t pt-5">
-            <WorkflowTriggersForm value={triggers} onChange={setTriggers} />
+            <WorkflowTriggersForm
+              value={triggers}
+              onChange={setTriggers}
+              otherWorkflows={otherWorkflows}
+            />
           </div>
         </div>
         <SheetFooter className="flex-row justify-end gap-2">

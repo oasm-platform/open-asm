@@ -4,7 +4,10 @@ import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { ConnectorsModule } from '../connectors/connectors.module';
-import { PROJECT_ASSET_DISCOVERY } from '../event-bridge/sinks/projects/projects.sink';
+import {
+  PROJECT_ASSET_DISCOVERY,
+  PROJECT_TRIGGER_EVENTS,
+} from '../event-bridge/sinks/projects/projects.sink';
 import { Workflow } from '../workflows/entities/workflow.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import { Project } from './entities/project.entity';
@@ -19,6 +22,7 @@ import {
 } from './processors/project-schedule.processor';
 import { ProjectAssetsService } from './project-assets.service';
 import { ProjectResultsService } from './project-results.service';
+import { ProjectRunEventsListener } from './project-run-events.listener';
 import { ProjectScopeService } from './project-scope.service';
 import { ProjectTriggersService } from './project-triggers.service';
 import { ProjectWorkflowsService } from './project-workflows.service';
@@ -55,11 +59,15 @@ import { ProjectsService } from './projects.service';
     ProjectResultsService,
     ProjectScheduleConsumer,
     ProjectTriggerEventsConsumer,
-    // The event bridge's projects lane hands discovery batches here.
+    ProjectRunEventsListener,
+    // The event bridge's projects lane hands discovery batches and the
+    // events of triggers here.
     { provide: PROJECT_ASSET_DISCOVERY, useExisting: ProjectsService },
+    { provide: PROJECT_TRIGGER_EVENTS, useExisting: ProjectTriggersService },
   ],
   exports: [
     PROJECT_ASSET_DISCOVERY,
+    PROJECT_TRIGGER_EVENTS,
     ProjectsService,
     ProjectScopeService,
     ProjectTriggersService,

@@ -3,7 +3,7 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger, NotFoundException } from '@nestjs/common';
 import { Job } from 'bullmq';
 import {
-  type AssetsAddedJobData,
+  type EventTriggerJobData,
   type ProjectScheduleJobData,
   ProjectTriggersService,
 } from '../project-triggers.service';
@@ -40,14 +40,14 @@ export class ProjectScheduleConsumer extends WorkerHost {
   }
 }
 
-/** "Assets added" batches whose window closed. */
+/** Event trigger batches whose window closed. */
 @Processor(BullMQName.PROJECT_TRIGGER_EVENTS)
 export class ProjectTriggerEventsConsumer extends WorkerHost {
   constructor(private readonly triggers: ProjectTriggersService) {
     super();
   }
 
-  async process(job: Job<AssetsAddedJobData>): Promise<void> {
-    await this.triggers.fireAssetsAdded(job.data.triggerId);
+  async process(job: Job<EventTriggerJobData>): Promise<void> {
+    await this.triggers.fireEvent(job.data.triggerId);
   }
 }
