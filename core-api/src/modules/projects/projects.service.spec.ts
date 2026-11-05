@@ -1,0 +1,336 @@
+import { JobRunType, ProjectTriggerType } from '@/common/enums/enum';
+import { BadRequestException } from '@nestjs/common';
+import { ProjectsService } from './projects.service';
+
+const WORKSPACE_ID = 'ws-1';
+
+function setup() {
+  const projectRepo = {
+    findOne: jest.fn().mockResolvedValue(null),
+    create: jest.fn((value: object) => value),
+    save: jest.fn((value: object) => Promise.resolve({ id: 'p-1', ...value })),
+    delete: jest.fn(),
+  };
+  const dataSource = {
+    // Asset count of the project ("run now" needs something to scan).
+    query: jest.fn().mockResolvedValue([{ count: 3 }]),
+    manager: { findOneBy: jest.fn().mockResolvedValue({ id: WORKSPACE_ID }) },
+  };
+  const assets = { add: jest.fn().mockResolvedValue([]), remove: jest.fn() };
+  const scope = {
+    normalizeRules: jest.fn().mockResolvedValue([]),
+    replaceRules: jest.fn().mockResolvedValue({ added: [], removed: 0 }),
+    addDiscoveredAssets: jest.fn().mockResolvedValue(new Map()),
+  };
+  const workflows = {
+    create: jest.fn().mockResolvedValue({ id: 'b-1' }),
+    findBinding: jest.fn().mockResolvedValue({ id: 'b-1' }),
+    startBindingRun: jest.fn().mockResolvedValue({ jobHistoryId: 'r-1', assets: 3 }),
+    removeOwnedWorkflows: jest.fn(),
+    remove: jest.fn(),
+    update: jest.fn(),
+    list: jest.fn().mockResolvedValue([]),
+  };
+  const triggers = {
+    create: jest.fn(),
+    unregisterProject: jest.fn(),
+    registerProject: jest.fn(),
+    replaceOn: jest.fn(),
+    ofWorkflow: jest.fn(),
+  };
+  const eventBridge = { publishSafely: jest.fn() };
+  const service = new ProjectsService(
+    projectRepo as never,
+    dataSource as never,
+    assets as never,
+    scope as never,
+    workflows as never,
+    triggers as never,
+    eventBridge as never,
+  );
+  return { service, projectRepo, dataSource, assets, scope, workflows, triggers, eventBridge };
+}
+
+describe('ProjectsService', () => {
+  describe('create', () => {
+    it('builds scope, pipeline and triggers, then runs it', async () => {
+      const ctx = setup();
+
+      const project = await ctx.service.create(
+        {
+          name: 'Acme',
+          hostIds: ['a-1'],
+          scopeRules: [
+            { mode: 'include', type: 'hostname', value: '*.acme.io' } as never,
+          ],
+          tools: [{ toolId: 't-1' }],
+          schedule: '0 2 * * 1',
+          runNow: true,
+        },
+        WORKSPACE_ID,
+      );
+
+      expect(ctx.assets.add).toHaveBeenCalledWith('p-1', WORKSPACE_ID, ['a-1']);
+      expect(ctx.scope.replaceRules).toHaveBeenCalled();
+      // What it starts with, for the project.created event.
+      expect(project.totalAssets).toBe(3);
+      expect(ctx.workflows.create).toHaveBeenCalledWith('p-1', WORKSPACE_ID, {
+        name: undefined,
+        tools: [{ toolId: 't-1' }],
+      });
+      expect(ctx.triggers.create).toHaveBeenCalledWith('p-1', WORKSPACE_ID, {
+        projectWorkflowId: 'b-1',
+        type: ProjectTriggerType.CRON,
+        cron: '0 2 * * 1',
+      });
+      expect(ctx.workflows.startBindingRun).toHaveBeenCalledWith(
+        { id: 'b-1' },
+        { jobRunType: JobRunType.MANUAL },
+      );
+      // Assets picked at creation are scanned by "run now", not by the
+      // "assets added" trigger.
+      expect(ctx.eventBridge.publishSafely).not.toHaveBeenCalled();
+    });
+
+    it('skips "run now" when the scope is still empty instead of failing', async () => {
+      const ctx = setup();
+      ctx.dataSource.query.mockResolvedValue([{ count: 0 }]);
+
+      await ctx.service.create(
+        { name: 'Acme', tools: [{ toolId: 't-1' }], runNow: true },
+        WORKSPACE_ID,
+      );
+
+      expect(ctx.workflows.startBindingRun).not.toHaveBeenCalled();
+      expect(ctx.projectRepo.delete).not.toHaveBeenCalled();
+    });
+
+    it('refuses a duplicate name before writing anything', async () => {
+      const ctx = setup();
+      ctx.projectRepo.findOne.mockResolvedValue({ id: 'other' });
+      await expect(
+        ctx.service.create({ name: 'Acme' }, WORKSPACE_ID),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(ctx.projectRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('refuses a schedule without a pipeline', async () => {
+      const ctx = setup();
+      await expect(
+        ctx.service.create({ name: 'Acme', schedule: '0 2 * * 1' }, WORKSPACE_ID),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(ctx.projectRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('removes everything it created when a later step fails', async () => {
+      const ctx = setup();
+      const failure = new BadRequestException('Tool "nuclei" is not installed');
+      ctx.workflows.startBindingRun.mockRejectedValue(failure);
+
+      await expect(
+        ctx.service.create(
+          { name: 'Acme', tools: [{ toolId: 't-1' }], runNow: true },
+          WORKSPACE_ID,
+        ),
+      ).rejects.toBe(failure);
+
+      expect(ctx.triggers.unregisterProject).toHaveBeenCalledWith('p-1');
+      expect(ctx.workflows.removeOwnedWorkflows).toHaveBeenCalledWith('p-1');
+      expect(ctx.projectRepo.delete).toHaveBeenCalledWith('p-1');
+    });
+  });
+
+  describe('archive / unarchive', () => {
+    it('archiving unregisters every schedule and stamps the project', async () => {
+      const ctx = setup();
+      ctx.projectRepo.findOne.mockResolvedValue({ id: 'p-1', archivedAt: null });
+
+      const archived = await ctx.service.archive('p-1', WORKSPACE_ID);
+
+      expect(ctx.triggers.unregisterProject).toHaveBeenCalledWith('p-1');
+      expect(archived.archivedAt).toBeInstanceOf(Date);
+    });
+
+    it('reopening registers the schedules again', async () => {
+      const ctx = setup();
+      ctx.projectRepo.findOne.mockResolvedValue({
+        id: 'p-1',
+        archivedAt: new Date(),
+      });
+
+      const reopened = await ctx.service.unarchive('p-1', WORKSPACE_ID);
+
+      expect(reopened.archivedAt).toBeNull();
+      expect(ctx.triggers.registerProject).toHaveBeenCalledWith('p-1');
+    });
+
+    it('refuses edits while archived', async () => {
+      const ctx = setup();
+      ctx.projectRepo.findOne.mockResolvedValue({
+        id: 'p-1',
+        archivedAt: new Date(),
+      });
+      await expect(
+        ctx.service.update('p-1', { name: 'x' }, WORKSPACE_ID),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('assets and scope', () => {
+    it('reports hand-picked new assets as project.assets.added', async () => {
+      const ctx = setup();
+      ctx.assets.add.mockResolvedValue(['a-2']);
+
+      await ctx.service.addAssets('p-1', WORKSPACE_ID, ['a-1', 'a-2']);
+
+      expect(ctx.eventBridge.publishSafely).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'project.assets.added' }),
+        expect.objectContaining({
+          workspaceId: WORKSPACE_ID,
+          resourceId: 'p-1',
+          payload: { projectId: 'p-1', assetIds: ['a-2'] },
+        }),
+        { subject: `workspace:${WORKSPACE_ID}/project:p-1` },
+      );
+    });
+
+    it('reports nothing when no asset was new', async () => {
+      const ctx = setup();
+
+      await ctx.service.addAssets('p-1', WORKSPACE_ID, ['a-1']);
+
+      expect(ctx.eventBridge.publishSafely).not.toHaveBeenCalled();
+    });
+
+    it('says how many assets joined or left, for the project activity', async () => {
+      const ctx = setup();
+      ctx.assets.add.mockResolvedValue(['a-2']);
+      ctx.assets.remove.mockResolvedValue(3);
+
+      expect(await ctx.service.addAssets('p-1', WORKSPACE_ID, ['a-1', 'a-2'])).toMatchObject({ count: 1 });
+      expect(await ctx.service.removeAssets('p-1', WORKSPACE_ID, ['a-1'])).toMatchObject({ count: 3 });
+    });
+
+    it('records discovered assets that joined a project, as done by the system', async () => {
+      const ctx = setup();
+      ctx.scope.addDiscoveredAssets.mockResolvedValue(new Map([['p-1', ['a-1', 'a-2']]]));
+
+      await ctx.service.addDiscoveredAssets(WORKSPACE_ID, ['a-1', 'a-2', 'a-3'], 'r-1');
+
+      // With the run that found them, so its triggers know the chain.
+      expect(ctx.eventBridge.publishSafely).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'project.assets.added' }),
+        expect.objectContaining({
+          payload: { projectId: 'p-1', assetIds: ['a-1', 'a-2'], jobHistoryId: 'r-1' },
+        }),
+        { subject: `workspace:${WORKSPACE_ID}/project:p-1` },
+      );
+      expect(ctx.eventBridge.publishSafely).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'project.updated' }),
+        expect.objectContaining({
+          workspaceId: WORKSPACE_ID,
+          actor: { type: 'system' },
+          resourceType: 'project',
+          resourceId: 'p-1',
+          metadata: { change: 'assets.discovered', added: 2 },
+        }),
+        { subject: `workspace:${WORKSPACE_ID}/project:p-1` },
+      );
+    });
+
+    it('reports assets a rule edit added', async () => {
+      const ctx = setup();
+      ctx.scope.replaceRules.mockResolvedValue({ added: ['a-7'], removed: 2 });
+
+      const result = await ctx.service.replaceScope('p-1', WORKSPACE_ID, []);
+
+      expect(ctx.eventBridge.publishSafely).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'project.assets.added' }),
+        expect.objectContaining({ payload: { projectId: 'p-1', assetIds: ['a-7'] } }),
+        expect.anything(),
+      );
+      expect(result).toEqual({ added: 1, removed: 2 });
+    });
+  });
+
+  it('delete unregisters schedules before removing workflows and the project', async () => {
+    const ctx = setup();
+    ctx.projectRepo.findOne.mockResolvedValue({ id: 'p-1' });
+    const order: string[] = [];
+    ctx.triggers.unregisterProject.mockImplementation(() => order.push('unregister'));
+    ctx.workflows.removeOwnedWorkflows.mockImplementation(() => order.push('workflows'));
+    ctx.projectRepo.delete.mockImplementation(() => order.push('project'));
+
+    await ctx.service.delete('p-1', WORKSPACE_ID);
+
+    expect(order).toEqual(['unregister', 'workflows', 'project']);
+  });
+  describe('workflows carry when they run (on)', () => {
+    const on = { schedule: [{ cron: '0 2 * * 1' }, { cron: '30 14 * * *', enabled: false }] };
+    const withOn = () => {
+      const ctx = setup();
+      ctx.triggers.replaceOn.mockResolvedValue([{ id: 't-1' }]);
+      ctx.triggers.ofWorkflow.mockResolvedValue([{ id: 't-1' }]);
+      ctx.projectRepo.findOne.mockResolvedValue({ id: 'p-1', archivedAt: null, workspace: { id: WORKSPACE_ID } });
+      return ctx;
+    };
+
+    it('creates a project whose first workflow gets every trigger of on', async () => {
+      const ctx = withOn();
+      ctx.projectRepo.findOne.mockResolvedValueOnce(null);
+
+      await ctx.service.create({ name: 'Web', template: 'vulnerability_scan_basic.yaml', on }, WORKSPACE_ID);
+
+      expect(ctx.triggers.replaceOn).toHaveBeenCalledWith('p-1', 'b-1', on);
+      expect(ctx.triggers.create).not.toHaveBeenCalled();
+    });
+
+    it('refuses an invalid schedule before creating anything', async () => {
+      const ctx = withOn();
+      ctx.projectRepo.findOne.mockResolvedValueOnce(null);
+
+      await expect(
+        ctx.service.create({ name: 'Web', template: 'vulnerability_scan_basic.yaml', on: { schedule: [{ cron: 'every day' }] } }, WORKSPACE_ID),
+      ).rejects.toThrow('Invalid workflow triggers: on.schedule[0]: "every day" is not a 5-field cron expression');
+      expect(ctx.projectRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('adds a workflow with its triggers, checked first', async () => {
+      const ctx = withOn();
+
+      const binding = await ctx.service.addWorkflow('p-1', WORKSPACE_ID, { template: 'x.yaml', on });
+
+      expect(ctx.workflows.create).toHaveBeenCalledWith('p-1', WORKSPACE_ID, { template: 'x.yaml' });
+      expect(ctx.triggers.replaceOn).toHaveBeenCalledWith('p-1', 'b-1', on);
+      expect(binding.triggers).toEqual([{ id: 't-1' }]);
+
+      await expect(
+        ctx.service.addWorkflow('p-1', WORKSPACE_ID, { template: 'x.yaml', on: { schedule: [{ cron: 'disabled' }] } }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(ctx.workflows.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('names the workflow it removed, for the project activity', async () => {
+      const ctx = withOn();
+      ctx.workflows.remove.mockResolvedValue({ id: 'b-1', workflow: { name: 'Web scan' } });
+
+      const result = await ctx.service.removeWorkflow('p-1', WORKSPACE_ID, 'b-1');
+
+      expect(ctx.triggers.unregisterProject).toHaveBeenCalledWith('p-1', 'b-1');
+      expect(result).toEqual({ message: 'Workflow removed from the project', name: 'Web scan' });
+    });
+
+    it('edits only what it is sent', async () => {
+      const ctx = withOn();
+
+      await ctx.service.updateWorkflow('p-1', WORKSPACE_ID, 'b-1', { on });
+      expect(ctx.workflows.update).not.toHaveBeenCalled();
+      expect(ctx.triggers.replaceOn).toHaveBeenCalledWith('p-1', 'b-1', on);
+
+      const binding = await ctx.service.updateWorkflow('p-1', WORKSPACE_ID, 'b-1', { name: 'Renamed' });
+      expect(ctx.workflows.update).toHaveBeenCalledWith('p-1', WORKSPACE_ID, 'b-1', { name: 'Renamed' });
+      expect(ctx.triggers.replaceOn).toHaveBeenCalledTimes(1);
+      expect(binding.triggers).toEqual([{ id: 't-1' }]);
+    });
+  });
+});

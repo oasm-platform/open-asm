@@ -24,7 +24,7 @@ import {
 } from '../artifacts/artifacts.service';
 import type { ArtifactDto } from '../artifacts/dto/artifacts.dto';
 import { Artifact } from '../artifacts/entities/artifact.entity';
-import { AssetGroupAsset } from '../asset-group/entities/asset-groups-assets.entity';
+import { ProjectAsset } from '../projects/entities/project-asset.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { StorageService } from '../storage/storage.service';
 import { ToolsService } from '../tools/tools.service';
@@ -80,8 +80,8 @@ export class TemplatesService {
     private readonly artifacts: ArtifactsService,
     private readonly folders: ArtifactFoldersService,
     private readonly storage: StorageService,
-    @InjectRepository(AssetGroupAsset)
-    private readonly groupAssetRepo: Repository<AssetGroupAsset>,
+    @InjectRepository(ProjectAsset)
+    private readonly groupAssetRepo: Repository<ProjectAsset>,
     private readonly tools: ToolsService,
     private readonly jobs: JobsRegistryService,
   ) {}
@@ -195,7 +195,7 @@ export class TemplatesService {
   }
 
   /**
-   * Scans the chosen targets, assets or asset groups with nuclei running only
+   * Scans the chosen targets, assets or projects with nuclei running only
    * these templates. Jobs carry template ids; the registry presigns them when a
    * worker claims the job, so edits saved before then are what runs.
    */
@@ -204,23 +204,23 @@ export class TemplatesService {
     userId: string,
     dto: RunTemplatesDto,
   ): Promise<DefaultMessageResponseDto> {
-    const { targetIds, assetIds, assetGroupIds } = dto;
+    const { targetIds, assetIds, projectIds } = dto;
     // findAssetsForJob ANDs targetIds with assetIds, and treats an empty list
     // as "no filter" — so exactly one non-empty scope, never zero.
-    const scopes = [targetIds, assetIds, assetGroupIds].filter((ids) => ids?.length);
+    const scopes = [targetIds, assetIds, projectIds].filter((ids) => ids?.length);
     if (scopes.length !== 1) {
       throw new BadRequestException(
-        'Choose exactly one of targetIds, assetIds or assetGroupIds',
+        'Choose exactly one of targetIds, assetIds or projectIds',
       );
     }
     const templateIds = [...new Set(dto.templateIds)];
     const templates = await this.findTemplates(workspaceId, userId, templateIds);
 
-    const scopedAssetIds = assetGroupIds?.length
-      ? await this.groupAssetIds(workspaceId, assetGroupIds)
+    const scopedAssetIds = projectIds?.length
+      ? await this.groupAssetIds(workspaceId, projectIds)
       : assetIds;
-    if (assetGroupIds?.length && !scopedAssetIds?.length) {
-      throw new BadRequestException('The selected asset groups have no assets');
+    if (projectIds?.length && !scopedAssetIds?.length) {
+      throw new BadRequestException('The selected projects have no assets');
     }
 
     const [nuclei] = await this.tools.getToolByNames({ names: ['nuclei'] });
@@ -252,7 +252,7 @@ export class TemplatesService {
 
   private async groupAssetIds(workspaceId: string, groupIds: string[]): Promise<string[]> {
     const rows = await this.groupAssetRepo.find({
-      where: { assetGroup: { id: In(groupIds), workspace: { id: workspaceId } } },
+      where: { project: { id: In(groupIds), workspace: { id: workspaceId } } },
       relations: { asset: true },
       select: { id: true, asset: { id: true } },
     });

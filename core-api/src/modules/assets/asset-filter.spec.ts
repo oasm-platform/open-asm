@@ -19,7 +19,7 @@ describe('validateAssetFilter', () => {
     ['ip inSubnet v4+v6', root(cond('ip', 'inSubnet', ['10.0.0.0/8', '2001:db8::/32']))],
     ['ip eq', root(cond('ip', 'eq', '1.2.3.4'))],
     ['statusCode neq', root(cond('statusCode', 'neq', '404'))],
-    ['assetGroup in', root(cond('assetGroup', 'in', ['3f1c2a8e-6c1b-4d5e-9f00-0a1b2c3d4e5f']))],
+    ['project in', root(cond('project', 'in', ['3f1c2a8e-6c1b-4d5e-9f00-0a1b2c3d4e5f']))],
     ['isNew true', root(cond('isNew', 'eq', 'true'))],
     ['isNew false', root(cond('isNew', 'eq', 'false'))],
     ['or group', root(cond('host', 'eq', 'a'), { logic: 'or', conditions: [cond('tech', 'eq', 'nginx'), cond('tag', 'contains', 'prod')] })],
@@ -47,7 +47,7 @@ describe('validateAssetFilter', () => {
     ['ipv6 zone id in cidr', root(cond('ip', 'inSubnet', ['fe80::1%eth0/64']))],
     ['bad port', root(cond('port', 'eq', '70000'))],
     ['bad status code', root(cond('statusCode', 'eq', '20'))],
-    ['bad uuid', root(cond('assetGroup', 'eq', 'abc'))],
+    ['bad uuid', root(cond('project', 'eq', 'abc'))],
     ['nested group', root({ logic: 'or', conditions: [{ logic: 'and', conditions: [cond('host', 'eq', 'a')] }] })],
     ['empty group', root({ logic: 'or', conditions: [] })],
     ['51 values', root(cond('host', 'in', Array.from({ length: 51 }, (_, i) => `h${i}`)))],
@@ -109,9 +109,9 @@ describe('compileAssetFilter', () => {
     expect(r?.sql).toContain('io."ip" <<= ANY(CAST(:af0 AS inet[]))');
   });
 
-  it('tag and assetGroup use their join tables', () => {
+  it('tag and project use their join tables', () => {
     expect(compile(cond('tag', 'eq', 'prod'))?.sql).toContain('FROM asset_services_tags ast');
-    expect(compile(cond('assetGroup', 'eq', 'x'))?.sql).toContain('FROM assets_group_assets aga');
+    expect(compile(cond('project', 'eq', 'x'))?.sql).toContain('FROM project_assets pa');
   });
 
   it('combines a root AND with an OR group and numbers params uniquely', () => {

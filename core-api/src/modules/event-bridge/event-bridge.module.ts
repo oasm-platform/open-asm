@@ -16,6 +16,7 @@ import { AuditSink } from './sinks/audit/audit.sink';
 import { IntegrationsSink } from './sinks/integrations/integrations.sink';
 import { NotificationsSink } from './sinks/notifications/notifications.sink';
 import { ProjectionSink } from './sinks/projection/projection.sink';
+import { ProjectsSink } from './sinks/projects/projects.sink';
 
 /**
  * Every lane, one per `EventBusGroup`. Adding a lane = a sink class here plus
@@ -27,6 +28,7 @@ export const SINKS = [
   ProjectionSink,
   NotificationsSink,
   IntegrationsSink,
+  ProjectsSink,
 ] as const;
 
 /**

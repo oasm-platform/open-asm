@@ -26,7 +26,7 @@ export class WorkspacePermission extends BaseEntity {
   name: string;
 
   @ApiProperty({
-    example: ['group.read', 'target.read'],
+    example: ['project.read', 'target.read'],
     description:
       'Permission keys granted by this group. Wildcard "*" grants everything (system Admin group only).',
   })

@@ -5,6 +5,7 @@ import { In, Repository } from 'typeorm';
 import { Tool } from '../tools/entities/tools.entity';
 import { resolveToolCategory } from '../tools/tool-categories';
 import type { ToolCategorySpec } from '../tools/tool-categories';
+import { resolveStepInputs } from '../tools/tool-io';
 import {
   resolveToolTargetTypes,
   triggerTargetType,
@@ -16,6 +17,7 @@ import { CreateWorkflowDto } from './dto/create-workflow.dto';
 import { GetManyWorkflowsQueryDto } from './dto/get-many-workflows.dto';
 import {
   jobEntries,
+  normalizeInput,
   normalizeWorkflowContent,
   WorkflowGraphError,
 } from './workflow-graph';
@@ -113,7 +115,7 @@ export class WorkflowsService {
   /**
    * Validates the step graph and returns it in its canonical stored shape
    * (`jobs` as a map keyed by job id). It also accepts the legacy array form —
-   * the template loader and the asset-group workflow writer both normalize
+   * the template loader and the project workflow writer both normalize
    * before saving, so the database converges on one shape with no data
    * migration, and every read path goes through the tolerant graph helpers.
    *
@@ -138,7 +140,8 @@ export class WorkflowsService {
 
   /**
    * Rejects a workflow in which a job names a category its tool does not
-   * declare, or in which a job's category can scan NONE of the target types its
+   * declare, an `input` that category does not take, or in which a job's
+   * category can scan NONE of the target types its
    * triggers fire for (e.g. `subfinder` — domains only — in a workflow that only
    * triggers on `ip.create`): that job could never produce work.
    *
@@ -180,6 +183,7 @@ export class WorkflowsService {
       let spec: ToolCategorySpec;
       try {
         spec = resolveToolCategory(tool, job.category);
+        resolveStepInputs(tool.name, spec, normalizeInput(job.input));
       } catch (error) {
         return [(error as Error).message];
       }

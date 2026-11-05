@@ -7,7 +7,7 @@ describe('ASSET_FILTER_FIELDS validation', () => {
     conditionError({ field, op: op as never, value }, ASSET_FILTER_FIELDS);
   it('mirrors the server operator matrix', () => {
     expect(ASSET_FILTER_FIELDS.map((f) => f.key)).toEqual(
-      ['host', 'port', 'ip', 'tech', 'url', 'statusCode', 'tlsHost', 'tag', 'isNew', 'assetGroup']);
+      ['host', 'port', 'ip', 'tech', 'url', 'statusCode', 'tlsHost', 'tag', 'isNew', 'project']);
     expect(err('port', 'contains', '80')).toBe('Operator not supported');
   });
   it('validates ip, cidr, port and status code values', () => {
@@ -20,11 +20,11 @@ describe('ASSET_FILTER_FIELDS validation', () => {
     expect(err('port', 'eq', '70000')).toMatch(/port/i);
     expect(err('statusCode', 'eq', '20')).toMatch(/status/i);
   });
-  it('allows url in/notIn and requires a group uuid', () => {
+  it('allows url in/notIn and requires a project uuid', () => {
     expect(err('url', 'in', ['https://a/x'])).toBeNull();
     expect(err('url', 'notIn', ['https://a/x'])).toBeNull();
-    expect(err('assetGroup', 'eq', 'my group')).toBe('Pick a group from the list');
-    expect(err('assetGroup', 'eq', '123e4567-e89b-12d3-a456-426614174000')).toBeNull();
+    expect(err('project', 'eq', 'my project')).toBe('Pick a project from the list');
+    expect(err('project', 'eq', '123e4567-e89b-12d3-a456-426614174000')).toBeNull();
   });
   it('offers New as a true/false equality only', () => {
     expect(err('isNew', 'eq', 'true')).toBeNull();

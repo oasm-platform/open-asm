@@ -46,7 +46,7 @@ const CONTROLLER_FILES: Record<string, string> = {
   WorkspacesController: '@/modules/workspaces/workspaces.controller',
   TargetsController: '@/modules/targets/targets.controller',
   AssetsController: '@/modules/assets/assets.controller',
-  AssetGroupController: '@/modules/asset-group/asset-group.controller',
+  ProjectsController: '@/modules/projects/projects.controller',
   InternalNetworksController: '@/modules/internal-networks/internal-networks.controller',
   VulnerabilitiesController: '@/modules/vulnerabilities/vulnerabilities.controller',
   ReportsController: '@/modules/reports/reports.controller',
@@ -396,7 +396,7 @@ describe('AuditService', () => {
           ipAddress: '10.0.0.1',
           userAgent: 'old-agent',
         },
-        ip: '203.0.113.7',
+        socket: { remoteAddress: '203.0.113.7' },
         headers: { 'user-agent': 'new-agent' },
         requestId: 'req-1',
       } as unknown as RequestWithMetadata;

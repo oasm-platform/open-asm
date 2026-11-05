@@ -102,6 +102,47 @@ func acceptingConnect(
 	}
 }
 
+func TestRunWorkerStream_CoalescesJobsAvailableHints(t *testing.T) {
+	client, _ := newStreamTestClient(t, acceptingConnect(t, true, func(
+		srv grpc.BidiStreamingServer[workers.WorkerToCore, workers.CoreToWorker],
+	) error {
+		// A burst must neither block the receive loop nor queue one claim each.
+		for i := 0; i < 3; i++ {
+			if err := srv.Send(&workers.CoreToWorker{
+				Payload: &workers.CoreToWorker_JobsAvailable{JobsAvailable: &workers.JobsAvailable{}},
+			}); err != nil {
+				return err
+			}
+		}
+		return srv.Send(&workers.CoreToWorker{
+			Payload: &workers.CoreToWorker_Cancel{Cancel: &workers.CancelRequest{JobId: "after-hints"}},
+		})
+	}))
+
+	afterHints := make(chan struct{}, 1)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	go func() {
+		_ = client.RunWorkerStream(ctx, func(string, string) { afterHints <- struct{}{} })
+	}()
+
+	select {
+	case <-afterHints:
+	case <-time.After(3 * time.Second):
+		t.Fatal("frames after the hints were never processed")
+	}
+	select {
+	case <-client.JobsAvailable():
+	default:
+		t.Fatal("a jobs-available hint must be pending")
+	}
+	select {
+	case <-client.JobsAvailable():
+		t.Fatal("a burst of hints must coalesce into one pending wake-up")
+	default:
+	}
+}
+
 func TestRunWorkerStream_DeliversCancelToHandler(t *testing.T) {
 	registered := make(chan struct{})
 	client, _ := newStreamTestClient(t, acceptingConnect(t, true, func(

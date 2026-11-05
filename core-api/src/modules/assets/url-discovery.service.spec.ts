@@ -120,7 +120,7 @@ describe('UrlDiscoveryService', () => {
       );
     });
 
-    it('bounds an asset-group run by its assets', async () => {
+    it('bounds a project run by its assets', async () => {
       await service.handleRunEnd(
         runEnd('url_discovery.yaml', { assetIds: ['asset-1'] }),
       );

@@ -8,6 +8,7 @@ import { isIP } from 'node:net';
 import { DataSource, EntityManager, InsertResult } from 'typeorm';
 import { Severity, TargetType, ToolCategory } from '../../common/enums/enum';
 import { AssetService } from '../assets/entities/asset-services.entity';
+import { serviceForUrl } from './url-owner';
 import { Asset } from '../assets/entities/assets.entity';
 import { DiscoveredUrl } from '../assets/entities/discovered-url.entity';
 import { DnsRecord } from '../assets/entities/dns-record.entity';
@@ -21,6 +22,7 @@ import { IssuesService } from '../issues/issues.service';
 import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
 import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
 import type {
+  AssetDiscoveredPayload,
   DetectedVulnerability,
   VulnerabilityDetectedPayload,
 } from '../event-bridge/contracts/event-payloads';
@@ -520,6 +522,24 @@ export class DataAdapterService {
       const workspaceConfigs =
         await this.workspaceService.getWorkspaceConfigValue(workspaceId!);
 
+      // Which values are new to the target, read before the insert: with
+      // replaceDnsRecords the insert also RETURNs the rows it updated, so its
+      // identifiers cannot tell a new asset from a refreshed one.
+      const batchValues = uniqueData.map((asset) => asset.value);
+      const existingValues = new Set(
+        batchValues.length
+          ? (
+              await queryRunner.manager
+                .createQueryBuilder()
+                .select('asset.value', 'value')
+                .from(Asset, 'asset')
+                .where('asset.targetId = :targetId', { targetId })
+                .andWhere('asset.value IN (:...batchValues)', { batchValues })
+                .getRawMany<{ value: string }>()
+            ).map((row) => row.value)
+          : [],
+      );
+
       // Insert Assets. Default: orIgnore (re-runs are idempotent; subdomain
       // rows are only ever created). replaceDnsRecords: orUpdate on
       // (value, targetId) so existing rows' dnsRecords are refreshed while
@@ -576,6 +596,25 @@ export class DataAdapterService {
       await this.syncDnsFacets(queryRunner.manager, dnsWrites);
 
       await queryRunner.commitTransaction();
+
+      const discoveredIds = uniqueData
+        .filter((asset) => !existingValues.has(asset.value))
+        .map((asset) => idByValue.get(asset.value))
+        .filter((id): id is string => !!id);
+      if (workspaceId && discoveredIds.length > 0) {
+        // After the commit: a consumer that reads the ids must find the rows.
+        await this.eventBridge.publishSafely(EVENT_CATALOG.asset.discovered, {
+          workspaceId,
+          outcome: 'success',
+          resourceType: 'asset',
+          payload: {
+            targetId,
+            ...(opts?.jobHistoryId ? { jobHistoryId: opts.jobHistoryId } : {}),
+            assetIds: discoveredIds,
+          } satisfies AssetDiscoveredPayload,
+        });
+      }
+
       return insertedIds.size;
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -780,7 +819,9 @@ export class DataAdapterService {
    * URL discovery data normalization: one row per unique URL, attached to the
    * job's AssetService and JobHistory. Deduped in-app (Set) and DB-level
    * (unique constraint + orIgnore) so worker retries / workflow re-runs are
-   * idempotent.
+   * idempotent. A job that ran on a whole host (a tool taking `host`) has no
+   * service: each URL goes to the host's service it belongs to (see
+   * serviceForUrl).
    */
   public async urlDiscovery({
     data,
@@ -791,9 +832,17 @@ export class DataAdapterService {
     await queryRunner.startTransaction();
 
     try {
-      if (!job.assetServiceId) {
+      const hostServices = job.assetServiceId
+        ? []
+        : await queryRunner.manager
+            .getRepository(AssetService)
+            .find({ where: { assetId: job.asset?.id }, select: { id: true, port: true } });
+      const ownerOf = (url: string): string | undefined =>
+        job.assetServiceId ??
+        serviceForUrl(url, job.asset?.value ?? '', hostServices);
+      if (!job.assetServiceId && hostServices.length === 0) {
         this.logger.warn(
-          `urlDiscovery: job ${job.id} has no assetServiceId — skipping`,
+          `urlDiscovery: job ${job.id} has no service to attach URLs to — skipping`,
         );
         await queryRunner.commitTransaction();
         return;
@@ -825,7 +874,7 @@ export class DataAdapterService {
             .values(
               batch.map((url) => ({
                 url,
-                assetServiceId: job.assetServiceId,
+                assetServiceId: ownerOf(url),
                 jobHistoryId: job.jobHistory.id,
               })),
             )
@@ -1022,6 +1071,32 @@ export class DataAdapterService {
         insertedVulnerabilities.push(...(result.raw as Vulnerability[]));
       }
 
+      // Provenance for project runs: one row per (project, vulnerability),
+      // first/last run that reported it. RETURNING yields inserted AND
+      // updated rows, so a re-found vulnerability refreshes its last sighting.
+      // timesSeen counts runs, not reports: a second job of the same run that
+      // reports it again finds lastSeen already pointing at this run.
+      const projectId = job.jobHistory?.projectId;
+      if (projectId && insertedVulnerabilities.length > 0) {
+        await manager.query(
+          `INSERT INTO "project_vulnerabilities"
+                  ("projectId", "vulnerabilityId", "firstSeenJobHistoryId", "lastSeenJobHistoryId", "firstSeenAt", "lastSeenAt", "timesSeen")
+           SELECT $1, v.id, $2, $2, now(), now(), 1
+             FROM unnest($3::uuid[]) AS v(id)
+           ON CONFLICT ("projectId", "vulnerabilityId") DO UPDATE
+              SET "timesSeen" = "project_vulnerabilities"."timesSeen"
+                    + CASE WHEN "project_vulnerabilities"."lastSeenJobHistoryId" IS DISTINCT FROM EXCLUDED."lastSeenJobHistoryId" THEN 1 ELSE 0 END,
+                  "lastSeenJobHistoryId" = EXCLUDED."lastSeenJobHistoryId",
+                  "lastSeenAt" = EXCLUDED."lastSeenAt",
+                  "updatedAt" = now()`,
+          [
+            projectId,
+            job.jobHistory.id,
+            insertedVulnerabilities.map((vuln) => vuln.id),
+          ],
+        );
+      }
+
       // Only send notifications for truly new vulnerabilities,
       // not for existing ones that were just updated
       const vulsForAlert = insertedVulnerabilities.filter(
@@ -1068,6 +1143,7 @@ export class DataAdapterService {
             targetId: job.asset.target.id,
             assetId: job.asset.id,
             assetValue: job.asset.value,
+            ...(projectId ? { projectId } : {}),
             vulnerabilities: vulsForAlert.map(toDetectedVulnerability),
           } satisfies VulnerabilityDetectedPayload,
         });

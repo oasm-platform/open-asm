@@ -17,7 +17,7 @@ import type { StorageService } from '../storage/storage.service';
 import { TemplatesService } from './templates.service';
 import type { Artifact } from '../artifacts/entities/artifact.entity';
 import type { Repository } from 'typeorm';
-import type { AssetGroupAsset } from '../asset-group/entities/asset-groups-assets.entity';
+import type { ProjectAsset } from '../projects/entities/project-asset.entity';
 import type { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import type { ToolsService } from '../tools/tools.service';
 import { JobRunType } from '@/common/enums/enum';
@@ -94,7 +94,7 @@ describe('TemplatesService', () => {
       artifacts as unknown as ArtifactsService,
       folders as unknown as ArtifactFoldersService,
       storage as unknown as StorageService,
-      groupAssets as unknown as Repository<AssetGroupAsset>,
+      groupAssets as unknown as Repository<ProjectAsset>,
       tools as unknown as ToolsService,
       jobs as unknown as JobsRegistryService,
     );
@@ -265,18 +265,18 @@ describe('TemplatesService', () => {
       expect(res.message).toBe('Running 2 template(s) on 2 asset(s)');
     });
 
-    it('expands asset groups into their assets', async () => {
+    it('expands projects into their assets', async () => {
       groupAssets.find.mockResolvedValue([
         { asset: { id: 'as1' } },
         { asset: { id: 'as2' } },
         { asset: { id: 'as1' } },
       ]);
 
-      await service.run(WS, ME, { templateIds: [T1], assetGroupIds: ['g1'] });
+      await service.run(WS, ME, { templateIds: [T1], projectIds: ['g1'] });
 
       expect(groupAssets.find).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { assetGroup: { id: expect.anything(), workspace: { id: WS } } },
+          where: { project: { id: expect.anything(), workspace: { id: WS } } },
         }),
       );
       expect(jobs.createNewJob).toHaveBeenCalledWith(
@@ -286,7 +286,7 @@ describe('TemplatesService', () => {
 
     it('rejects an empty group instead of scanning every asset', async () => {
       await expect(
-        service.run(WS, ME, { templateIds: [T1], assetGroupIds: ['g1'] }),
+        service.run(WS, ME, { templateIds: [T1], projectIds: ['g1'] }),
       ).rejects.toThrow(BadRequestException);
       expect(jobs.createNewJob).not.toHaveBeenCalled();
     });

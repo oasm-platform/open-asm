@@ -1,11 +1,18 @@
-import { TargetType, ToolCategory } from '@/common/enums/enum';
+import { DataKind, TargetType, ToolCategory } from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
+import {
+  defaultInputs,
+  defaultProduces,
+  INPUT_KINDS,
+  parseKinds,
+  PRODUCED_KINDS,
+} from './tool-io';
 import { parseManifestTargetTypes, sameTargetTypes } from './tool-target-types';
 
 /**
- * One mode a tool can run in, and the target types that mode may scan.
- * `tools.categories` holds these in order; the first one is the default a
- * workflow step gets when it names no category.
+ * One mode a tool can run in: the target types it may scan, the data it
+ * takes and the data it finds. `tools.categories` holds these in order; the
+ * first one is the default a workflow step gets when it names no category.
  */
 export class ToolCategorySpec {
   @ApiProperty({ enum: ToolCategory, enumName: 'ToolCategory' })
@@ -13,12 +20,39 @@ export class ToolCategorySpec {
 
   @ApiProperty({ enum: TargetType, enumName: 'TargetType', isArray: true })
   targetTypes: TargetType[];
+
+  /** Kinds of data the tool accepts, best first (see tool-io.ts). */
+  @ApiProperty({ enum: DataKind, enumName: 'DataKind', isArray: true })
+  inputs: DataKind[];
+
+  /** Kinds of data its results add, for the steps after it. */
+  @ApiProperty({ enum: DataKind, enumName: 'DataKind', isArray: true })
+  produces: DataKind[];
 }
 
-/** One manifest capability: `{ name, targetTypes, inputsSchema? }`. */
+/**
+ * A category with its inputs and outputs filled in: the declared ones, else
+ * the category's defaults. Every writer of `tools.categories` goes through it.
+ */
+export function categorySpec(
+  name: ToolCategory,
+  targetTypes: TargetType[],
+  io: { inputs?: DataKind[]; produces?: DataKind[] } = {},
+): ToolCategorySpec {
+  return {
+    name,
+    targetTypes,
+    inputs: io.inputs?.length ? io.inputs : defaultInputs(name, targetTypes),
+    produces: io.produces ?? defaultProduces(name),
+  };
+}
+
+/** One manifest capability: `{ name, targetTypes, inputs?, produces?, inputsSchema? }`. */
 export type ManifestCapability = {
   name: string;
   targetTypes: string[];
+  inputs?: string[];
+  produces?: string[];
   inputsSchema?: Record<string, unknown>;
 };
 
@@ -59,10 +93,12 @@ function parseCapabilities(capabilities: unknown): {
   parsed: ParsedCapability[];
   skipped: string[];
   unknownTargetTypes: string[];
+  unknownKinds: string[];
 } {
   const parsed: ParsedCapability[] = [];
   const skipped: string[] = [];
   const unknownTargetTypes = new Set<string>();
+  const unknownKinds = new Set<string>();
 
   const entries: unknown[] = Array.isArray(capabilities) ? capabilities : [];
   for (const entry of entries) {
@@ -82,22 +118,40 @@ function parseCapabilities(capabilities: unknown): {
       continue;
     }
 
+    const inputs = parseKinds(raw.inputs, INPUT_KINDS);
+    const produces = parseKinds(raw.produces, PRODUCED_KINDS);
+    [...inputs.unknown, ...produces.unknown].forEach((k) => unknownKinds.add(k));
+    const spec = categorySpec(name, [...targetTypes], {
+      inputs: inputs.kinds,
+      // An absent list means "not declared"; an empty one means "nothing".
+      produces: Array.isArray(raw.produces) ? produces.kinds : undefined,
+    });
+
     const existing = parsed.find((p) => p.spec.name === name);
     if (existing) {
-      for (const t of targetTypes) {
-        if (!existing.spec.targetTypes.includes(t)) {
-          existing.spec.targetTypes.push(t);
-        }
-      }
+      // Capabilities sharing a category (secrets, sca → vulnerabilities)
+      // merge: target types, inputs and outputs add up.
+      union(existing.spec.targetTypes, spec.targetTypes);
+      union(existing.spec.inputs, spec.inputs);
+      union(existing.spec.produces, spec.produces);
       existing.inputsSchema ??= raw.inputsSchema;
     } else {
-      parsed.push({
-        spec: { name, targetTypes: [...targetTypes] },
-        inputsSchema: raw.inputsSchema,
-      });
+      parsed.push({ spec, inputsSchema: raw.inputsSchema });
     }
   }
-  return { parsed, skipped, unknownTargetTypes: [...unknownTargetTypes] };
+  return {
+    parsed,
+    skipped,
+    unknownTargetTypes: [...unknownTargetTypes],
+    unknownKinds: [...unknownKinds],
+  };
+}
+
+/** Appends the values of `extra` that `into` lacks, keeping order. */
+function union<T>(into: T[], extra: readonly T[]): void {
+  for (const value of extra) {
+    if (!into.includes(value)) into.push(value);
+  }
 }
 
 /** Manifest `capabilities` → ordered category specs for `tools.categories`. */
@@ -105,10 +159,16 @@ export function parseManifestCategories(capabilities: unknown): {
   categories: ToolCategorySpec[];
   skipped: string[];
   unknownTargetTypes: string[];
+  unknownKinds: string[];
 } {
-  const { parsed, skipped, unknownTargetTypes } =
+  const { parsed, skipped, unknownTargetTypes, unknownKinds } =
     parseCapabilities(capabilities);
-  return { categories: parsed.map((p) => p.spec), skipped, unknownTargetTypes };
+  return {
+    categories: parsed.map((p) => p.spec),
+    skipped,
+    unknownTargetTypes,
+    unknownKinds,
+  };
 }
 
 /** Categories of a manifest entry with each one's inputs schema (for the API). */
@@ -148,7 +208,10 @@ export function resolveToolCategory(
   return found;
 }
 
-/** Order-sensitive on categories (order decides the default), not on target types. */
+/**
+ * Order-sensitive on categories (order decides the default) and on inputs
+ * (order is the preference), not on target types or outputs.
+ */
 export function sameCategories(
   a: readonly ToolCategorySpec[] | null | undefined,
   b: readonly ToolCategorySpec[] | null | undefined,
@@ -160,7 +223,9 @@ export function sameCategories(
     left.every(
       (c, i) =>
         c.name === right[i].name &&
-        sameTargetTypes(c.targetTypes, right[i].targetTypes),
+        sameTargetTypes(c.targetTypes, right[i].targetTypes) &&
+        (c.inputs ?? []).join() === (right[i].inputs ?? []).join() &&
+        sameTargetTypes(c.produces ?? [], right[i].produces ?? []),
     )
   );
 }

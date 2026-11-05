@@ -71,26 +71,8 @@ function TabLabel({ children }: { children: ReactNode }) {
   return <span className="sr-only xl:not-sr-only">{children}</span>;
 }
 
-function TabCount({
-  children,
-  active = false,
-}: {
-  children: ReactNode;
-  active?: boolean;
-}) {
-  return (
-    <span
-      className={cn(
-        'rounded-full px-1.5 py-px text-[11px] font-medium tabular-nums',
-        active
-          ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
-          : 'bg-muted text-muted-foreground',
-      )}
-    >
-      {children}
-    </span>
-  );
-}
+/** Tab badge while something in that tab is still running */
+const RUNNING_BADGE = 'bg-sky-500/10 text-sky-600 dark:text-sky-400';
 
 function EmptyTab({
   icon: Icon,
@@ -184,39 +166,41 @@ export function ChatSidePanel({
           out */}
       <div className="flex h-14 shrink-0 items-center gap-3 border-b pl-5 pr-4 md:pr-6">
         <TabsList className="no-scrollbar h-full min-w-0 justify-start gap-4 overflow-x-auto xl:gap-6">
-          <TabsTrigger value="plan" title="Plan">
+          <TabsTrigger
+            value="plan"
+            title="Plan"
+            badge={todos?.length ? `${completed}/${todos.length}` : undefined}
+          >
             <ListChecks />
             <TabLabel>Plan</TabLabel>
-            {!!todos?.length && (
-              <TabCount>
-                {completed}/{todos.length}
-              </TabCount>
-            )}
           </TabsTrigger>
-          <TabsTrigger value="subagents" title="Subagents">
+          <TabsTrigger
+            value="subagents"
+            title="Subagents"
+            badge={
+              subagents.length > 0 ? (running > 0 ? running : subagents.length) : undefined
+            }
+            badgeClassName={running > 0 ? RUNNING_BADGE : undefined}
+          >
             <Network />
             <TabLabel>Subagents</TabLabel>
-            {subagents.length > 0 && (
-              <TabCount active={running > 0}>
-                {running > 0 ? running : subagents.length}
-              </TabCount>
-            )}
           </TabsTrigger>
-          <TabsTrigger value="browser" title="Browser">
+          <TabsTrigger
+            value="browser"
+            title="Browser"
+            badge={browserScreenshots.length > 1 ? browserScreenshots.length : undefined}
+          >
             <Globe />
             <TabLabel>Browser</TabLabel>
-            {browserScreenshots.length > 1 && (
-              <TabCount>{browserScreenshots.length}</TabCount>
-            )}
           </TabsTrigger>
-          <TabsTrigger value="tools" title="Tool calls">
+          <TabsTrigger
+            value="tools"
+            title="Tool calls"
+            badge={toolCalls.length > 0 ? `${toolCallsDone}/${toolCalls.length}` : undefined}
+            badgeClassName={toolCallsRunning > 0 ? RUNNING_BADGE : undefined}
+          >
             <Wrench />
             <TabLabel>Tool calls</TabLabel>
-            {toolCalls.length > 0 && (
-              <TabCount active={toolCallsRunning > 0}>
-                {toolCallsDone}/{toolCalls.length}
-              </TabCount>
-            )}
           </TabsTrigger>
           <TabsTrigger value="stats" title="Stats">
             <BarChart3 />

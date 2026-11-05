@@ -1,16 +1,22 @@
 /* eslint-disable */
 
-import { JobPriority, ToolCategory } from '@/common/enums/enum';
+import { DataKind, JobPriority, ToolCategory } from '@/common/enums/enum';
 import { randomUUID } from 'crypto';
 import { Asset } from '../../assets/entities/assets.entity';
 import { TargetType } from '@/common/enums/enum';
 import { Tool } from '../entities/tools.entity';
+import { categorySpec } from '../tool-categories';
 
 export const builtInTools: Tool[] = [
   {
     name: 'subfinder',
     // Subdomain enumeration only makes sense for a domain.
-    categories: [{ name: ToolCategory.SUBDOMAINS, targetTypes: [TargetType.DOMAIN] }],
+    categories: [
+      categorySpec(ToolCategory.SUBDOMAINS, [TargetType.DOMAIN], {
+        inputs: [DataKind.TARGET],
+        produces: [DataKind.HOST],
+      }),
+    ],
     description:
       'Subfinder is a subdomain discovery tool that returns valid subdomains for websites, using passive online sources.',
     logoUrl: '/static/images/subfinder.png',
@@ -40,7 +46,13 @@ export const builtInTools: Tool[] = [
   },
   {
     name: 'httpx',
-    categories: [{ name: ToolCategory.HTTP_PROBE, targetTypes: [TargetType.DOMAIN, TargetType.IP, TargetType.CIDR] }],
+    // Probes every open port; the ones that answer HTTP become web services.
+    categories: [
+      categorySpec(ToolCategory.HTTP_PROBE, [TargetType.DOMAIN, TargetType.IP, TargetType.CIDR], {
+        inputs: [DataKind.SERVICE],
+        produces: [DataKind.WEB],
+      }),
+    ],
     description:
       'Httpx is a fast and multi-purpose HTTP toolkit that allows running multiple probes using the retryable http library. It is designed to maintain result reliability with an increased number of threads.',
     logoUrl: '/static/images/httpx.png',
@@ -52,7 +64,12 @@ export const builtInTools: Tool[] = [
   },
   {
     name: 'screenshot',
-    categories: [{ name: ToolCategory.SCREENSHOT, targetTypes: [TargetType.DOMAIN, TargetType.IP, TargetType.CIDR] }],
+    categories: [
+      categorySpec(ToolCategory.SCREENSHOT, [TargetType.DOMAIN, TargetType.IP, TargetType.CIDR], {
+        inputs: [DataKind.WEB],
+        produces: [],
+      }),
+    ],
     description: 'Take a screenshot of a website.',
     logoUrl: '/static/images/screenshot.png',
     parser: JSON.parse,
@@ -62,7 +79,12 @@ export const builtInTools: Tool[] = [
   },
   {
     name: 'naabu',
-    categories: [{ name: ToolCategory.PORTS_SCANNER, targetTypes: [TargetType.DOMAIN, TargetType.IP, TargetType.CIDR] }],
+    categories: [
+      categorySpec(ToolCategory.PORTS_SCANNER, [TargetType.DOMAIN, TargetType.IP, TargetType.CIDR], {
+        inputs: [DataKind.HOST],
+        produces: [DataKind.SERVICE],
+      }),
+    ],
     description:
       'A fast port scanner written in go with a focus on reliability and simplicity. Designed to be used in combination with other tools for attack surface discovery in bug bounties and pentests.',
     logoUrl: '/static/images/naabu.png',

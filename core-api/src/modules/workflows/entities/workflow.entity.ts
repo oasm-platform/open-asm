@@ -1,6 +1,7 @@
 import { BaseEntity } from '@/common/entities/base.entity';
-import { ToolCategory } from '@/common/enums/enum';
-import { AssetGroupWorkflow } from '@/modules/asset-group/entities/asset-groups-workflows.entity';
+import { DataKind, ToolCategory } from '@/common/enums/enum';
+import { ProjectWorkflow } from '@/modules/projects/entities/project-workflow.entity';
+import { EventTriggerConfig } from '@/modules/projects/entities/project-workflow-trigger.entity';
 import { User } from '@/modules/auth/entities/user.entity';
 import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
@@ -16,7 +17,7 @@ import {
   IsUUID,
   ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   Column,
   Entity,
@@ -27,14 +28,53 @@ import {
   Relation,
 } from 'typeorm';
 
+/** One schedule of a workflow: a 5-field cron expression, in UTC. */
+export class ScheduleOn {
+  @ApiProperty({ example: '0 2 * * 1' })
+  @IsString()
+  cron: string;
+}
+
+/**
+ * When a workflow runs on its own, like GitHub Actions' `on:`.
+ *
+ * - `target`: target events (`domain.create`, …); workspace workflows only.
+ * - `schedule` and the event keys (`project.assets.added`,
+ *   `project.run.completed`, `vulnerability.detected`): project workflows
+ *   only; each entry runs the workflow on the project's assets. See
+ *   projects/workflow-on.ts.
+ */
 export class On {
-  @ApiProperty()
-  target?: string[];
-  // Plain string: arbitrary 5-field cron expressions are written into this
-  // JSONB content field (e.g. from asset-group workflow creation).
-  @ApiProperty({ example: '0 0 * * *' })
+  @ApiProperty({ required: false, type: [String] })
   @IsOptional()
-  schedule?: string;
+  @IsArray()
+  @IsString({ each: true })
+  target?: string[];
+
+  @ApiProperty({ required: false, type: [ScheduleOn] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ScheduleOn)
+  schedule?: ScheduleOn[];
+
+  /** Run when assets join the project, gathered for a window. */
+  @ApiProperty({ required: false, type: () => EventTriggerConfig })
+  @IsOptional()
+  @IsObject()
+  'project.assets.added'?: EventTriggerConfig;
+
+  /** Run after another workflow of the project finished. */
+  @ApiProperty({ required: false, type: () => EventTriggerConfig })
+  @IsOptional()
+  @IsObject()
+  'project.run.completed'?: EventTriggerConfig;
+
+  /** Run on assets a scan found new vulnerabilities on. */
+  @ApiProperty({ required: false, type: () => EventTriggerConfig })
+  @IsOptional()
+  @IsObject()
+  'vulnerability.detected'?: EventTriggerConfig;
 }
 
 export class WorkflowJob {
@@ -60,6 +100,26 @@ export class WorkflowJob {
   @IsOptional()
   @IsEnum(ToolCategory)
   category?: ToolCategory;
+
+  /**
+   * The kinds of data the job takes, best first (`[web, host]`): for each
+   * asset, the first kind that has something is used. Omitted → the tool's
+   * own `inputs`. A single kind may be written without the list. See
+   * docs/workflows.md.
+   */
+  @ApiProperty({
+    required: false,
+    enum: DataKind,
+    enumName: 'DataKind',
+    isArray: true,
+  })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? [value] : value,
+  )
+  @IsArray()
+  @IsEnum(DataKind, { each: true })
+  input?: DataKind[];
 
   /**
    * Ids of the jobs that must reach a terminal state before this one is
@@ -100,8 +160,7 @@ export class WorkflowJob {
  */
 @ApiExtraModels(WorkflowJob)
 export class WorkflowContent {
-  /** Trigger conditions. Absent in a plain workflow — only scheduled ones
-   * carry `on`. */
+  /** When the workflow runs on its own. Absent: only when started. */
   @ApiProperty({ type: On, required: false })
   @ValidateNested()
   @Type(() => On)
@@ -129,6 +188,7 @@ export class WorkflowContent {
 @Index(['filePath', 'workspace'], { unique: true })
 @Index('IDX_workflows_workspaceId', ['workspace'])
 export class Workflow extends BaseEntity {
+  @ApiProperty()
   @Column()
   name: string;
 
@@ -136,6 +196,7 @@ export class Workflow extends BaseEntity {
   @Column({ type: 'jsonb' })
   content: WorkflowContent;
 
+  @ApiProperty()
   @Column()
   filePath: string;
 
@@ -154,10 +215,10 @@ export class Workflow extends BaseEntity {
   })
   jobHistories?: JobHistory[];
 
-  @OneToMany(() => AssetGroupWorkflow, (agt) => agt.workflow, {
+  @OneToMany(() => ProjectWorkflow, (binding) => binding.workflow, {
     onDelete: 'CASCADE',
   })
-  assetGroupWorkflows?: Relation<AssetGroupWorkflow[]>;
+  projectWorkflows?: Relation<ProjectWorkflow[]>;
 
   @ApiProperty()
   @Column({ default: true })

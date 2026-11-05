@@ -20,7 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import { TargetPicker } from '@/pages/vulnerabilities/components/fast-scan-dialog';
 import {
-  useAssetGroupControllerGetAll,
+  useProjectsControllerGetMany,
   useAssetsControllerGetAssetsInWorkspace,
   useTemplatesControllerGetMany,
   useTemplatesControllerRun,
@@ -34,7 +34,7 @@ type Scope = 'targets' | 'assets' | 'groups';
 const SCOPE_FIELD = {
   targets: 'targetIds',
   assets: 'assetIds',
-  groups: 'assetGroupIds',
+  groups: 'projectIds',
 } as const;
 
 const emptySelection = (): Record<Scope, Set<string>> => ({
@@ -49,7 +49,7 @@ interface RunTemplatesDialogProps {
   disabled?: boolean;
 }
 
-/** Runs saved templates with nuclei on targets, assets or asset groups. */
+/** Runs saved templates with nuclei on targets, assets or projects. */
 export function RunTemplatesDialog({ templateId, disabled }: RunTemplatesDialogProps) {
   const [open, setOpen] = useState(false);
   const [templateIds, setTemplateIds] = useState<Set<string>>(new Set());
@@ -235,7 +235,7 @@ function AssetPicker(props: PickerProps) {
 function GroupPicker(props: PickerProps) {
   const { filter, setFilter, tableParams, tableHandlers } = usePickerTable();
   const { page, pageSize, sortBy, sortOrder } = tableParams;
-  const { data, isLoading } = useAssetGroupControllerGetAll({
+  const { data, isLoading } = useProjectsControllerGetMany({
     page,
     limit: pageSize,
     sortBy,
@@ -248,8 +248,8 @@ function GroupPicker(props: PickerProps) {
     <DataTable
       columns={[
         selectColumn(rows, props),
-        { accessorKey: 'name', header: 'Group' },
-        { accessorKey: 'totalAssets', header: 'Assets', enableSorting: false },
+        { accessorKey: 'name', header: 'Project' },
+        { accessorKey: 'assetCount', header: 'Assets', enableSorting: false },
       ]}
       data={rows}
       isLoading={isLoading}
@@ -262,13 +262,13 @@ function GroupPicker(props: PickerProps) {
       filterValue={filter}
       onFilterChange={setFilter}
       filterColumnKey="name"
-      filterPlaceholder="Search groups"
+      filterPlaceholder="Search projects"
       onPageChange={tableHandlers.setPage}
       onPageSizeChange={tableHandlers.setPageSize}
       onRowClick={(row) =>
         props.onSelectedChange(toggled(props.selected, [row.id], !props.selected.has(row.id)))
       }
-      emptyMessage="No asset groups"
+      emptyMessage="No projects"
     />
   );
 }

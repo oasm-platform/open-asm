@@ -148,12 +148,13 @@ describe('event bus subscriptions', () => {
       // `workspace`, `member` and `api_key` are here because there is no email
       // lane: with no outbound channel they are audit-only today, and the moment
       // one is added this list must shrink. Asserting it exactly makes that
-      // trade-off visible instead of silent.
+      // trade-off visible instead of silent. `project` is not here: the
+      // projects lane reads its two trigger facts (`project.assets.added`,
+      // `project.run.completed`), never the audited changes.
       expect(unclaimed).toEqual(
         [
           'api_key',
           'artifact',
-          'asset_group',
           'audit',
           'member',
           'network',

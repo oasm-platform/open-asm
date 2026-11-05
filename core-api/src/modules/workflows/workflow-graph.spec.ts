@@ -441,6 +441,38 @@ describe('step category', () => {
   });
 });
 
+describe('step input', () => {
+  it('reads one kind or a list, stores the list', () => {
+    const graph = buildWorkflowGraph(
+      content({ one: { run: 'nuclei', input: 'web' }, two: { run: 'nikto', input: ['web', 'HOST', 'web'] } }),
+    );
+
+    expect(graph.byId.get('one')?.input).toEqual(['web']);
+    expect(graph.byId.get('two')?.input).toEqual(['web', 'host']);
+    expect(
+      normalizeWorkflowContent(content({ scan: { run: 'nuclei', input: 'web' } })).jobs,
+    ).toEqual({ scan: { run: 'nuclei', input: ['web'] } });
+  });
+
+  it("leaves input undefined when omitted: the tool's own inputs apply", () => {
+    const jobs = { scan: { run: 'nuclei' } };
+
+    expect(buildWorkflowGraph(content(jobs)).steps[0].input).toBeUndefined();
+    expect(normalizeWorkflowContent(content(jobs)).jobs).toEqual(jobs);
+  });
+
+  it('rejects an unknown kind, and a kind that is never an input', () => {
+    expect(
+      validateWorkflowGraph(content({ scan: { run: 'nuclei', input: ['web', 'packet'] } })),
+    ).toEqual([
+      'Unknown input "packet" for job "scan" (expected one of target, host, service, web, url, repository)',
+    ]);
+    expect(
+      validateWorkflowGraph(content({ scan: { run: 'nuclei', input: 'vulnerability' } })),
+    ).toHaveLength(1);
+  });
+});
+
 describe('same tool in several steps', () => {
   it('allows one tool twice with distinct explicit categories', () => {
     const graph = buildWorkflowGraph(

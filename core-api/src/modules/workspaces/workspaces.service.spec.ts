@@ -631,7 +631,7 @@ describe('WorkspacesService', () => {
   describe('permission groups', () => {
     const holderMembership = {
       memberPermissions: [
-        { permission: { permissions: ['group.read', 'target.read'] } },
+        { permission: { permissions: ['project.read', 'target.read'] } },
       ],
     };
 
@@ -644,7 +644,7 @@ describe('WorkspacesService', () => {
         testWorkspaceId,
         {
           name: 'Viewer',
-          permissions: ['group.read', 'target.read'],
+          permissions: ['project.read', 'target.read'],
         },
         testUserId,
       );
@@ -652,7 +652,7 @@ describe('WorkspacesService', () => {
       expect(result).toEqual(
         expect.objectContaining({
           name: 'Viewer',
-          permissions: ['group.read', 'target.read'],
+          permissions: ['project.read', 'target.read'],
           isSystem: false,
         }),
       );
@@ -687,7 +687,7 @@ describe('WorkspacesService', () => {
           testWorkspaceId,
           {
             name: 'Sneaky',
-            permissions: ['group.read', 'target.own'],
+            permissions: ['project.read', 'target.own'],
           },
           testUserId,
         ),
@@ -695,9 +695,9 @@ describe('WorkspacesService', () => {
     });
 
     it('should forbid granting permission keys the creator does not hold', async () => {
-      // Creator only holds group.read, tries to grant member.write too.
+      // Creator only holds project.read, tries to grant member.write too.
       (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue({
-        memberPermissions: [{ permission: { permissions: ['group.read'] } }],
+        memberPermissions: [{ permission: { permissions: ['project.read'] } }],
       });
 
       await expect(
@@ -705,7 +705,7 @@ describe('WorkspacesService', () => {
           testWorkspaceId,
           {
             name: 'Escalator',
-            permissions: ['group.read', 'member.write'],
+            permissions: ['project.read', 'member.write'],
           },
           testUserId,
         ),
@@ -744,7 +744,7 @@ describe('WorkspacesService', () => {
           testWorkspaceId,
           {
             name: 'Viewer',
-            permissions: ['group.read'],
+            permissions: ['project.read'],
           },
           testUserId,
         ),
@@ -762,7 +762,7 @@ describe('WorkspacesService', () => {
           testWorkspaceId,
           {
             name: 'Viewer',
-            permissions: ['group.read'],
+            permissions: ['project.read'],
           },
           testUserId,
         ),
@@ -843,7 +843,7 @@ describe('WorkspacesService', () => {
         id: randomUUID(),
         name: 'Viewer',
         isSystem: false,
-        permissions: ['group.read'],
+        permissions: ['project.read'],
       });
 
       await expect(
@@ -873,7 +873,7 @@ describe('WorkspacesService', () => {
       id: memberId,
       user: { id: anotherUserId, name: 'Other', image: null },
       memberPermissions: [
-        { permission: { isSystem: false, permissions: ['group.read'] } },
+        { permission: { isSystem: false, permissions: ['project.read'] } },
       ],
       ...overrides,
     });
@@ -881,7 +881,7 @@ describe('WorkspacesService', () => {
     it('should aggregate permission keys across groups', async () => {
       (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue({
         memberPermissions: [
-          { permission: { permissions: ['group.read'] } },
+          { permission: { permissions: ['project.read'] } },
           { permission: { permissions: ['target.read', '*'] } },
         ],
       });
@@ -893,7 +893,7 @@ describe('WorkspacesService', () => {
 
       expect(result.permissionKeys.sort()).toEqual([
         '*',
-        'group.read',
+        'project.read',
         'target.read',
       ]);
     });
@@ -913,7 +913,7 @@ describe('WorkspacesService', () => {
         (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue(
           {
             memberPermissions: [
-              { permission: { permissions: ['group.read'] } },
+              { permission: { permissions: ['project.read'] } },
               { permission: { permissions: ['target.read', '*'] } },
             ],
           },
@@ -926,7 +926,7 @@ describe('WorkspacesService', () => {
 
         expect(result.currentPermission.sort()).toEqual([
           '*',
-          'group.read',
+          'project.read',
           'target.read',
         ]);
       });
@@ -964,11 +964,11 @@ describe('WorkspacesService', () => {
         .mockResolvedValueOnce(makeMember())
         .mockResolvedValueOnce({
           memberPermissions: [
-            { permission: { permissions: ['group.read'] } },
+            { permission: { permissions: ['project.read'] } },
           ],
         });
       (mockPermissionRepository.find as jest.Mock).mockResolvedValue([
-        { id: permissionId, permissions: ['group.read'] },
+        { id: permissionId, permissions: ['project.read'] },
       ]);
 
       await service.updateMemberPermissions(
@@ -1035,7 +1035,7 @@ describe('WorkspacesService', () => {
         makeMember(),
       );
       (mockPermissionRepository.find as jest.Mock).mockResolvedValue([
-        { id: validId, permissions: ['group.read'] },
+        { id: validId, permissions: ['project.read'] },
       ]);
 
       await expect(
@@ -1055,9 +1055,9 @@ describe('WorkspacesService', () => {
       (mockWorkspaceMembersRepository.findOne as jest.Mock)
         .mockResolvedValueOnce(makeMember())
         .mockResolvedValueOnce({
-          // Assigner only holds group.read
+          // Assigner only holds project.read
           memberPermissions: [
-            { permission: { permissions: ['group.read'] } },
+            { permission: { permissions: ['project.read'] } },
           ],
         });
       (mockPermissionRepository.find as jest.Mock).mockResolvedValue([
@@ -1165,7 +1165,7 @@ describe('WorkspacesService', () => {
       id: memberId,
       user: { id: removedUserId, name: 'Removed', image: null },
       memberPermissions: [
-        { permission: { isSystem: false, permissions: ['group.read'] } },
+        { permission: { isSystem: false, permissions: ['project.read'] } },
       ],
       ...overrides,
     });
@@ -1332,7 +1332,7 @@ describe('WorkspacesService', () => {
                 permission: {
                   id: oldGroupId,
                   isSystem: false,
-                  permissions: ['group.read'],
+                  permissions: ['project.read'],
                 },
               },
             ],
@@ -1345,7 +1345,7 @@ describe('WorkspacesService', () => {
         })
         .mockResolvedValueOnce(makeMember());
       (mockPermissionRepository.find as jest.Mock).mockResolvedValue([
-        { id: newGroupId, permissions: ['group.read'] },
+        { id: newGroupId, permissions: ['project.read'] },
       ]);
 
       await service.updateMemberPermissions(
@@ -1378,7 +1378,7 @@ describe('WorkspacesService', () => {
 
       const result = await service.createPermissionGroup(
         testWorkspaceId,
-        { name: 'Viewer', permissions: ['group.read'] },
+        { name: 'Viewer', permissions: ['project.read'] },
         testUserId,
         auditContext,
       );
@@ -1394,7 +1394,7 @@ describe('WorkspacesService', () => {
           resourceType: 'permission_group',
           changes: {
             name: { after: 'Viewer' },
-            permissions: { after: ['group.read'] },
+            permissions: { after: ['project.read'] },
           },
           actorId: testUserId,
         }),
@@ -1406,7 +1406,7 @@ describe('WorkspacesService', () => {
         id: randomUUID(),
         name: 'Viewer',
         isSystem: false,
-        permissions: ['group.read'],
+        permissions: ['project.read'],
       };
       (mockPermissionRepository.findOne as jest.Mock).mockResolvedValue(group);
       // The updater holds "*" so the privilege-subset guard passes
@@ -1417,7 +1417,7 @@ describe('WorkspacesService', () => {
       await service.updatePermissionGroup(
         testWorkspaceId,
         group.id,
-        { permissions: ['group.read', 'target.read'] },
+        { permissions: ['project.read', 'target.read'] },
         testUserId,
         auditContext,
       );
@@ -1431,8 +1431,8 @@ describe('WorkspacesService', () => {
           resourceId: group.id,
           changes: {
             permissions: {
-              before: ['group.read'],
-              after: ['group.read', 'target.read'],
+              before: ['project.read'],
+              after: ['project.read', 'target.read'],
             },
           },
           actorId: testUserId,
@@ -1445,7 +1445,7 @@ describe('WorkspacesService', () => {
         id: randomUUID(),
         name: 'Viewer',
         isSystem: false,
-        permissions: ['group.read'],
+        permissions: ['project.read'],
       };
       (mockPermissionRepository.findOne as jest.Mock).mockResolvedValue(group);
 
@@ -1642,9 +1642,9 @@ describe('WorkspacesService', () => {
         id: testWorkspaceId,
         name: 'Test Workspace',
       });
-      // Inviter only holds group.read, group grants member.write
+      // Inviter only holds project.read, group grants member.write
       (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue({
-        memberPermissions: [{ permission: { permissions: ['group.read'] } }],
+        memberPermissions: [{ permission: { permissions: ['project.read'] } }],
       });
       (mockPermissionRepository.find as jest.Mock).mockResolvedValue([
         { id: randomUUID(), name: 'Powerful', permissions: ['member.write'] },

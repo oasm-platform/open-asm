@@ -130,6 +130,9 @@ export class TriggerWorkflowService implements OnModuleInit {
         action,
       })
       .andWhere('workspace.id = :workspaceId', { workspaceId })
+      // A project's workflows run on its assets, by its own triggers.
+      .andWhere("workflow.filePath NOT LIKE 'project-%'")
+      .andWhere("workflow.filePath NOT LIKE 'group-%'")
       .getOne();
   }
 }

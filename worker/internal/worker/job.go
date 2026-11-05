@@ -197,8 +197,22 @@ func processJob(ctx context.Context, job *pb.Job, grpcClient *grpcclient.Client,
 	// Connector path: image-based execution via Docker runtime.
 	// processJob returns immediately after Submit; cleanup runs asynchronously
 	// in handleConnectorResult when the container exits or connector signals Done.
-	if img := job.GetImage(); img != "" && mgr != nil {
-		return processConnectorJob(ctx, job, grpcClient, events, mgr, proxy, releaseSem, startTime, category)
+	if img := job.GetImage(); img != "" {
+		if mgr != nil {
+			return processConnectorJob(ctx, job, grpcClient, events, mgr, proxy, releaseSem, startTime, category)
+		}
+		// The Docker runtime failed at startup (logged there); the legacy path
+		// would only report a missing command and hide that cause.
+		msg := fmt.Sprintf("container engine unavailable on this worker, cannot run %s: check the worker startup log for the Docker error (on native Linux, usually a docker.sock group mismatch)", img)
+		Emit(events, TuiEvent{
+			Type:     EventJobCompleted,
+			JobID:    job.Id,
+			Success:  false,
+			ErrorMsg: msg,
+			Duration: time.Since(startTime),
+		})
+		submitCategoryError(ctx, grpcClient, events, job.Id, category, msg)
+		return true, false
 	}
 
 	// Legacy path: command-based execution (screenshot or shell).

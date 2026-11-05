@@ -36,7 +36,7 @@ import {
   Cpu,
   FileChartPie,
   FileCode,
-  Group,
+  FolderKanban,
   LayoutDashboard,
   Plug,
   Plus,
@@ -89,6 +89,12 @@ export const menu: NavGroup[] = [
         url: '/aistudio',
         permission: 'agent.read',
       },
+      {
+        title: 'Projects',
+        icon: <FolderKanban />,
+        url: '/projects',
+        permission: 'project.read',
+      },
     ],
   },
   {
@@ -100,13 +106,6 @@ export const menu: NavGroup[] = [
         icon: <Target />,
         url: '/targets',
         permission: 'target.read',
-      },
-      {
-        title: 'Groups',
-        icon: <Group />,
-        url: '/groups',
-        isNew: false,
-        permission: 'group.read',
       },
       {
         title: 'Assets',
@@ -311,11 +310,11 @@ export function AppSidebar({
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <Link
-                          to="/groups/create"
+                          to="/projects/create"
                           onClick={() => setOpenMobile(false)}
                         >
-                          <Group />
-                          Group
+                          <FolderKanban />
+                          Project
                         </Link>
                       </DropdownMenuItem>
                       {/* Join keys require workspace.apikey on the API. */}

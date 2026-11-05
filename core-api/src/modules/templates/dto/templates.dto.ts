@@ -76,7 +76,7 @@ export class RunTemplatesDto {
   @IsUUID('4', { each: true })
   templateIds: string[];
 
-  @ApiProperty({ type: [String], required: false, description: 'Scan these targets. Set exactly one of targetIds, assetIds, assetGroupIds.' })
+  @ApiProperty({ type: [String], required: false, description: 'Scan these targets. Set exactly one of targetIds, assetIds, projectIds.' })
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(100)
@@ -95,5 +95,5 @@ export class RunTemplatesDto {
   @IsArray()
   @ArrayMaxSize(100)
   @IsUUID('4', { each: true })
-  assetGroupIds?: string[];
+  projectIds?: string[];
 }

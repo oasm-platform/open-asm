@@ -1,4 +1,8 @@
-import { parseTrustedProxies, resolveClientIp } from './trusted-proxies';
+import {
+  parseTrustedProxies,
+  requestClientIp,
+  resolveClientIp,
+} from './trusted-proxies';
 
 describe('parseTrustedProxies', () => {
   it('parses csv, trims and drops empty entries', () => {
@@ -64,5 +68,34 @@ describe('resolveClientIp', () => {
     expect(
       resolveClientIp('172.19.0.5', '203.0.113.7', ['not-an-ip', '10.0.0.0/99']),
     ).toBe('172.19.0.5');
+  });
+});
+
+describe('requestClientIp', () => {
+  const originalTrustedProxies = process.env.TRUSTED_PROXIES;
+  afterEach(() => {
+    if (originalTrustedProxies === undefined) delete process.env.TRUSTED_PROXIES;
+    else process.env.TRUSTED_PROXIES = originalTrustedProxies;
+  });
+
+  const request = (remoteAddress: string, forwardedFor?: string) =>
+    ({
+      socket: { remoteAddress },
+      headers: forwardedFor ? { 'x-forwarded-for': forwardedFor } : {},
+    }) as unknown as Parameters<typeof requestClientIp>[0];
+
+  it('returns the socket address when TRUSTED_PROXIES is unset', () => {
+    delete process.env.TRUSTED_PROXIES;
+    expect(requestClientIp(request('127.0.0.1', '203.0.113.7'))).toBe(
+      '127.0.0.1',
+    );
+  });
+
+  it('reads X-Forwarded-For behind a proxy listed in TRUSTED_PROXIES', () => {
+    process.env.TRUSTED_PROXIES = '127.0.0.1';
+    // A dual-stack listener reports an IPv4 peer as IPv4-mapped IPv6
+    expect(requestClientIp(request('::ffff:127.0.0.1', '203.0.113.7'))).toBe(
+      '203.0.113.7',
+    );
   });
 });

@@ -3,6 +3,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 
 import { CodeBlock } from '@/components/common/code-block';
 import Page from '@/components/common/page';
+import { WorkflowFileSheet } from '@/components/common/workflow-file-sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardTitle } from '@/components/ui/card';
@@ -16,15 +17,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import JobStatusBadge from '@/components/ui/job-status';
 import { OpenLink } from '@/components/ui/open-link';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
-import { Skeleton } from '@/components/ui/skeleton';
 import ToolLogo from '@/components/ui/tool-logo';
 import RunWorkflowGraph from './components/run-workflow-graph';
 import { useBugReportUrl } from '@/hooks/use-bug-report-url';
@@ -55,7 +47,6 @@ import {
   ChevronRight,
   Clock,
   MoreHorizontal,
-  Code2,
   TriangleAlert,
 } from 'lucide-react';
 import {
@@ -532,36 +523,14 @@ export default function Runs() {
           <CardContent className="px-2 py-2 md:px-4">
             <div className="mb-3 flex items-center justify-between gap-2">
               <CardTitle>Workflow</CardTitle>
-              <Sheet open={isCodeOpen} onOpenChange={setCodeOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="sm">
-                    <Code2 className="h-4 w-4" />
-                    View workflow
-                  </Button>
-                </SheetTrigger>
-                <SheetContent
-                  side="right"
-                  className="w-full gap-0 overflow-y-auto sm:max-w-2xl"
-                >
-                  <SheetHeader>
-                    <SheetTitle>Workflow definition</SheetTitle>
-                    <SheetDescription>
-                      The workflow this run was created from.
-                    </SheetDescription>
-                  </SheetHeader>
-                  <div className="px-4 pb-4">
-                    {isLoadingWorkflow ? (
-                      <Skeleton className="h-72 w-full" />
-                    ) : runWorkflow?.yaml ? (
-                      <CodeBlock language="yaml" showLine value={runWorkflow.yaml} />
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        This run has no workflow attached.
-                      </p>
-                    )}
-                  </div>
-                </SheetContent>
-              </Sheet>
+              <WorkflowFileSheet
+                open={isCodeOpen}
+                onOpenChange={setCodeOpen}
+                yaml={runWorkflow?.yaml ?? ''}
+                isLoading={isLoadingWorkflow}
+                description="The workflow this run was created from."
+                emptyMessage="This run has no workflow attached."
+              />
             </div>
             <RunWorkflowGraph
               steps={steps}

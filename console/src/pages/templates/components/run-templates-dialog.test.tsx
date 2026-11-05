@@ -31,7 +31,7 @@ vi.mock('@/services/apis/gen/queries', async (importOriginal) => ({
   useTemplatesControllerRun: () => ({ mutate, isPending: false }),
   useTargetsControllerGetTargetsInWorkspace: () => page([{ id: 'tg1', value: 'example.com', type: 'DOMAIN' }]),
   useAssetsControllerGetAssetsInWorkspace: () => page([{ id: 'as1', value: 'a.example.com' }]),
-  useAssetGroupControllerGetAll: () => page([{ id: 'g1', name: 'Prod', totalAssets: 3 }]),
+  useProjectsControllerGetMany: () => page([{ id: 'g1', name: 'Prod', assetCount: 3 }]),
 }));
 
 async function openDialog() {
@@ -58,7 +58,7 @@ describe('RunTemplatesDialog', () => {
     expect(runButton()).toBeDisabled();
   });
 
-  it('runs the chosen templates on the chosen asset groups', async () => {
+  it('runs the chosen templates on the chosen projects', async () => {
     const user = await openDialog();
 
     await user.click(screen.getByRole('checkbox', { name: /shared\.yaml/ }));
@@ -68,7 +68,7 @@ describe('RunTemplatesDialog', () => {
 
     await waitFor(() =>
       expect(mutate).toHaveBeenCalledWith(
-        { data: { templateIds: ['t1', 't3'], assetGroupIds: ['g1'] } },
+        { data: { templateIds: ['t1', 't3'], projectIds: ['g1'] } },
         expect.anything(),
       ),
     );

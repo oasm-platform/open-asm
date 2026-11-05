@@ -49,9 +49,12 @@ export const AUDIT_ACTION_CATALOG = [
   { action: 'target.deleted', label: 'Deleted scan target', controller: 'TargetsController', method: 'deleteTarget' },
   // assets (16)
   { action: 'asset.deleted', label: 'Deleted asset', controller: 'AssetsController', method: 'deleteAsset' },
-  // asset groups (17–18)
-  { action: 'asset_group.created', label: 'Created asset group', controller: 'AssetGroupController', method: 'create' },
-  { action: 'asset_group.deleted', label: 'Deleted asset group', controller: 'AssetGroupController', method: 'delete' },
+  // projects (17–18, plus the update/archive actions)
+  { action: 'project.created', label: 'Created project', controller: 'ProjectsController', method: 'create' },
+  { action: 'project.updated', label: 'Updated project', controller: 'ProjectsController', method: 'update' },
+  { action: 'project.archived', label: 'Archived project', controller: 'ProjectsController', method: 'archive' },
+  { action: 'project.unarchived', label: 'Reopened project', controller: 'ProjectsController', method: 'unarchive' },
+  { action: 'project.deleted', label: 'Deleted project', controller: 'ProjectsController', method: 'delete' },
   // internal networks (19–20)
   { action: 'network.created', label: 'Created network', controller: 'InternalNetworksController', method: 'createInternalNetwork' },
   { action: 'network.deleted', label: 'Deleted network', controller: 'InternalNetworksController', method: 'deleteInternalNetwork' },

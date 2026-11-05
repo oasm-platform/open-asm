@@ -169,9 +169,29 @@ export const EVENT_CATALOG = {
       },
     },
   },
-  asset_group: {
-    created: { name: 'asset_group.created', summary: 'Asset group created' },
-    deleted: { name: 'asset_group.deleted', summary: 'Asset group deleted' },
+  project: {
+    created: { name: 'project.created', summary: 'Project created' },
+    updated: {
+      name: 'project.updated',
+      summary: 'Project settings, scope, workflows or triggers changed',
+    },
+    archived: { name: 'project.archived', summary: 'Project archived' },
+    unarchived: { name: 'project.unarchived', summary: 'Project reopened' },
+    deleted: { name: 'project.deleted', summary: 'Project deleted' },
+    // Runtime facts the projects lane turns into event-triggered runs, not
+    // audit actions: `project.updated` already records who changed what.
+    assets: {
+      added: {
+        name: 'project.assets.added',
+        summary: 'Assets joined a project (picked, selected by a rule or discovered)',
+      },
+    },
+    run: {
+      completed: {
+        name: 'project.run.completed',
+        summary: 'A run of a project workflow finished',
+      },
+    },
   },
   network: {
     created: { name: 'network.created', summary: 'Internal network created' },
