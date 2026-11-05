@@ -346,7 +346,7 @@ describe('withAgentConfig', () => {
     );
     expect(
       withAgentConfig(
-        { ...llm('a'), reasoningEffort: ReasoningEffort.HIGH } as AgentLLMConfig,
+        { ...llm('a'), reasoningEffort: ReasoningEffort.HIGH },
         defaults,
       ).reasoningEffort,
     ).toBe(ReasoningEffort.HIGH);

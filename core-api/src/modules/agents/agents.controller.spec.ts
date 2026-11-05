@@ -143,7 +143,9 @@ describe('AgentsController.resumeStream', () => {
 describe('AgentsController.getConversations', () => {
   it('marks conversations whose run is live here or streams elsewhere', async () => {
     const isRunActive = jest.fn((id: string) => id === 'local');
-    const isStreaming = jest.fn(async (id: string) => id === 'remote');
+    const isStreaming = jest.fn((id: string) =>
+      Promise.resolve(id === 'remote'),
+    );
     const controller = Object.assign(
       Object.create(AgentsController.prototype) as AgentsController,
       {
@@ -158,7 +160,10 @@ describe('AgentsController.getConversations', () => {
       },
     );
 
-    const result = await controller.getConversations({}, 'w1', 'u1');
+    const result = (await controller.getConversations({}, 'w1', 'u1')) as {
+      data: { id: string; running: boolean }[];
+      total: number;
+    };
 
     expect(result.data.map((c) => [c.id, c.running])).toEqual([
       ['local', true],
