@@ -11,6 +11,7 @@ import { WorkersService } from '../workers/workers.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { JobsRegistryController } from './jobs-registry.controller';
 import { JobsRegistryService } from './jobs-registry.service';
+import { WorkflowRunnerService } from './workflow-runner.service';
 
 describe('JobsRegistryController', () => {
   // ── Existing decorator tests ────────────────────────────────────────
@@ -90,6 +91,7 @@ describe('JobsRegistryController', () => {
           { provide: ConnectorRegistryService, useValue: mockConnectorRegistry },
           { provide: ToolConfigProfilesService, useValue: mockToolConfigProfilesService },
           { provide: IntegrationsService, useValue: mockIntegrationsService },
+          { provide: WorkflowRunnerService, useValue: { retryRun: jest.fn() } },
           { provide: WorkspacesService, useValue: { getWorkspace: jest.fn() } },
           { provide: WorkersService, useValue: { validateWorkerToken: jest.fn() } },
           { provide: GrpcWorkerContext, useValue: { setWorker: jest.fn() } },
@@ -274,6 +276,7 @@ describe('JobsRegistryController', () => {
             provide: ToolConfigProfilesService,
             useValue: { resolveConfigForJob: jest.fn() },
           },
+          { provide: WorkflowRunnerService, useValue: { retryRun: jest.fn() } },
           { provide: WorkspacesService, useValue: { getWorkspace: jest.fn() } },
           { provide: WorkersService, useValue: { validateWorkerToken: jest.fn() } },
           { provide: GrpcWorkerContext, useValue: { setWorker: jest.fn() } },
@@ -387,6 +390,7 @@ describe('JobsRegistryController', () => {
             provide: ToolConfigProfilesService,
             useValue: { resolveConfigForJob: jest.fn() },
           },
+          { provide: WorkflowRunnerService, useValue: { retryRun: jest.fn() } },
           { provide: WorkspacesService, useValue: { getWorkspace: jest.fn() } },
           { provide: WorkersService, useValue: { validateWorkerToken: jest.fn() } },
           { provide: GrpcWorkerContext, useValue: { setWorker: jest.fn() } },

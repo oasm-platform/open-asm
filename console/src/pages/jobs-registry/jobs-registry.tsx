@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { DataTable } from '@/components/ui/data-table';
 import { DatePickerWithRange } from '@/components/ui/date-picker-range';
 import JobStatusBadge from '@/components/ui/job-status';
+import { Progress } from '@/components/ui/progress';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import {
   type JobHistoryResponseDto,
@@ -141,6 +142,21 @@ const JobsRegistryPage = () => {
         return (
           <div>
             <b>{row.original.totalJobs}</b> jobs
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'progress',
+      header: 'Progress',
+      cell: ({ row }) => {
+        const { progress = 0, failedJobs = 0 } = row.original;
+        return (
+          <div className="flex w-28 flex-col gap-1">
+            <Progress value={progress} aria-label="Run progress" />
+            <span className="text-xs tabular-nums text-muted-foreground">
+              {progress}%{failedJobs > 0 ? ` · ${failedJobs} failed` : ''}
+            </span>
           </div>
         );
       },

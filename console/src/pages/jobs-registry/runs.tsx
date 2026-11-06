@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import JobStatusBadge from '@/components/ui/job-status';
+import { Progress } from '@/components/ui/progress';
 import { OpenLink } from '@/components/ui/open-link';
 import ToolLogo from '@/components/ui/tool-logo';
 import RunWorkflowGraph from './components/run-workflow-graph';
@@ -35,10 +36,12 @@ import {
   useJobsRegistryControllerDeleteJob,
   useJobsRegistryControllerGetJobHistoryDetail,
   useJobsRegistryControllerGetManyJobs,
+  useJobsRegistryControllerRetryJobHistory,
 } from '@/services/apis/gen/queries';
 import type { BugReport } from '@/utils/bug-report-url';
 import { useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
+import { toast } from 'sonner';
 import {
   ArrowRight,
   Ban,
@@ -47,6 +50,7 @@ import {
   ChevronRight,
   Clock,
   MoreHorizontal,
+  RotateCcw,
   TriangleAlert,
 } from 'lucide-react';
 import {
@@ -59,6 +63,15 @@ import {
 } from 'react';
 
 const NO_STEPS: WorkflowStepStatusDto[] = [];
+
+const formatEta = (seconds?: number | null): string | null => {
+  if (seconds == null) return null;
+  if (seconds < 60) return `~${seconds}s left`;
+  const minutes = Math.round(seconds / 60);
+  return minutes < 60
+    ? `~${minutes}m left`
+    : `~${Math.floor(minutes / 60)}h ${minutes % 60}m left`;
+};
 
 const formatDate = (value?: string) =>
   value && dayjs(value).isValid()
@@ -260,6 +273,21 @@ export default function Runs() {
     mutate: cancelRunMutate,
     isPending: isCancellingRun,
   } = useJobsRegistryControllerCancelJobHistory();
+  const { mutate: retryRunMutate, isPending: isRetryingRun } =
+    useJobsRegistryControllerRetryJobHistory({
+      mutation: {
+        onSuccess: (result) => {
+          toast.success('Retry started', {
+            description: `New run ${result.jobHistoryId.slice(0, 8)}`,
+          });
+          queryClient.invalidateQueries({
+            queryKey: getJobsRegistryControllerGetJobHistoryDetailQueryKey(
+              result.jobHistoryId,
+            ),
+          });
+        },
+      },
+    });
 
   const { tableParams, tableHandlers } = useServerDataTable({
     defaultPage: 1,
@@ -496,26 +524,75 @@ export default function Runs() {
         'Job History Detail'
       }
       action={
-        activeJobsCount > 0 &&
-        hasPermission('job.write') && (
-          <ConfirmDialog
-            title="Cancel this run?"
-            description={`Stops the ${activeJobsCount} job(s) still pending or running and prevents the workflow from starting any further step. Jobs that already finished keep their result.`}
-            confirmText="Cancel run"
-            disabled={isCancellingRun}
-            onConfirm={() =>
-              cancelRunMutate({ id: jobHistoryId || '' }, { onSuccess: refresh })
-            }
-            trigger={
-              <Button variant="outline" disabled={isCancellingRun}>
-                <Ban className="h-4 w-4" />
-                Cancel run
-              </Button>
-            }
-          />
-        )
+        <div className="flex flex-wrap items-center gap-2">
+          {activeJobsCount > 0 && hasPermission('job.write') && (
+            <ConfirmDialog
+              title="Cancel this run?"
+              description={`Stops the ${activeJobsCount} job(s) still pending or running and prevents the workflow from starting any further step. Jobs that already finished keep their result.`}
+              confirmText="Cancel run"
+              disabled={isCancellingRun}
+              onConfirm={() =>
+                cancelRunMutate(
+                  { id: jobHistoryId || '' },
+                  { onSuccess: refresh },
+                )
+              }
+              trigger={
+                <Button variant="outline" disabled={isCancellingRun}>
+                  <Ban className="h-4 w-4" />
+                  Cancel run
+                </Button>
+              }
+            />
+          )}
+          {activeJobsCount === 0 && hasPermission('job.write') && steps.length > 0 && (
+            <Button
+              variant="outline"
+              disabled={isRetryingRun}
+              onClick={() => retryRunMutate({ id: jobHistoryId || '' })}
+            >
+              <RotateCcw className="mr-1 h-4 w-4" aria-hidden />
+              Retry run
+            </Button>
+          )}
+        </div>
       }
     >
+      {jobHistoryDetail && (
+        <Card className="mb-4 py-2">
+          <CardContent className="flex flex-col gap-2 px-2 py-2 md:px-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="font-medium">
+                  {jobHistoryDetail.stepsDone}/{jobHistoryDetail.stepsTotal} steps
+                </span>
+                <span className="text-muted-foreground">
+                  {jobHistoryDetail.progress}%
+                </span>
+                {formatEta(jobHistoryDetail.etaSeconds) && (
+                  <span className="text-muted-foreground">
+                    · {formatEta(jobHistoryDetail.etaSeconds)}
+                  </span>
+                )}
+              </div>
+              <span className="text-xs text-muted-foreground">
+                {activeJobsCount > 0
+                  ? `${activeJobsCount} active job(s)`
+                  : 'Run finished'}
+              </span>
+            </div>
+            <Progress
+              value={jobHistoryDetail.progress}
+              aria-label="Run progress"
+            />
+            {jobHistoryDetail.failureReason && (
+              <p className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive">
+                {jobHistoryDetail.failureReason}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
       {/* Workflow steps (DAG) — falls back to the tool list for runs created
           before the workflow engine existed. */}
       {steps.length ? (

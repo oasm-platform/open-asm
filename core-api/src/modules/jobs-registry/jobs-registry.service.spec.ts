@@ -838,6 +838,13 @@ describe('JobsRegistryService', () => {
         jobHistoryName: 'test-job-history',
         createdAt: mockJobHistory.createdAt,
         updatedAt: mockJobHistory.updatedAt,
+        activeJobsCount: undefined,
+        jobRunType: undefined,
+        progress: 100,
+        stepsDone: 1,
+        stepsTotal: 1,
+        etaSeconds: null,
+        failureReason: null,
         tools: [
           {
             id: 'tool-uuid',
@@ -931,6 +938,13 @@ describe('JobsRegistryService', () => {
         jobHistoryName: 'test-job-history',
         createdAt: mockJobHistory.createdAt,
         updatedAt: mockJobHistory.updatedAt,
+        activeJobsCount: undefined,
+        jobRunType: undefined,
+        progress: 0,
+        stepsDone: 0,
+        stepsTotal: 1,
+        etaSeconds: null,
+        failureReason: null,
         tools: [
           {
             id: 'tool-uuid',
@@ -1777,6 +1791,9 @@ describe('JobsRegistryService', () => {
         createdAt: expect.any(Date),
         updatedAt: expect.any(Date),
         totalJobs: 5,
+        completedJobs: 0,
+        failedJobs: 0,
+        progress: 0,
         status: JobStatus.COMPLETED,
         workflowName: 'workflow-1',
         jobHistoryName: 'name-1',
