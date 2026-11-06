@@ -2,7 +2,7 @@ import { ArtifactStatus } from '@/common/enums/enum';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, IsNull, Repository } from 'typeorm';
-import { ArtifactsService } from './artifacts.service';
+import { ArtifactsService, TEMPLATES_FOLDER_NAME } from './artifacts.service';
 import type {
   ArtifactFolderDetailDto,
   ArtifactFolderDto,
@@ -11,6 +11,13 @@ import type {
 } from './dto/artifacts.dto';
 import { ArtifactFolder } from './entities/artifact-folder.entity';
 import { Artifact } from './entities/artifact.entity';
+
+/** A user root folder with this name would be mistaken for the templates folder once its owner is deleted. */
+function assertNotReservedRoot(name: string, parentFolderId: string | null | undefined): void {
+  if (!parentFolderId && name === TEMPLATES_FOLDER_NAME) {
+    throw new BadRequestException(`"${TEMPLATES_FOLDER_NAME}" is reserved at the root`);
+  }
+}
 
 /** Guards the recursive walks against a corrupted (cyclic) tree. */
 const MAX_FOLDER_DEPTH = 100;
@@ -34,14 +41,18 @@ export class ArtifactFoldersService {
     parentFolderId?: string,
   ): Promise<ArtifactFolderDto[]> {
     if (parentFolderId) {
-      await this.artifactsService.findOwnedFolder(workspaceId, userId, parentFolderId);
+      await this.artifactsService.findReadableFolder(workspaceId, userId, parentFolderId);
     }
+    const own = {
+      workspaceId,
+      createdByUserId: userId,
+      parentFolderId: parentFolderId ?? IsNull(),
+    };
+    if (!parentFolderId) await this.ensureTemplatesFolder(workspaceId);
     const folders = await this.folderRepo.find({
-      where: {
-        workspaceId,
-        createdByUserId: userId,
-        parentFolderId: parentFolderId ?? IsNull(),
-      },
+      where: parentFolderId
+        ? own
+        : [own, { workspaceId, parentFolderId: IsNull(), createdByUserId: IsNull(), name: TEMPLATES_FOLDER_NAME }],
       order: { name: 'ASC' },
     });
     return folders.map((folder) => this.toDto(folder));
@@ -52,7 +63,7 @@ export class ArtifactFoldersService {
     userId: string,
     id: string,
   ): Promise<ArtifactFolderDetailDto> {
-    const folder = await this.artifactsService.findOwnedFolder(workspaceId, userId, id);
+    const folder = await this.artifactsService.findReadableFolder(workspaceId, userId, id);
     const path = await this.dataSource.query<{ id: string; name: string }[]>(
       `WITH RECURSIVE path AS (
          SELECT id, name, "parentFolderId", 0 AS depth FROM artifact_folders WHERE id = $1
@@ -67,11 +78,41 @@ export class ArtifactFoldersService {
     return { ...this.toDto(folder), path };
   }
 
+  /** The workspace-owned root folder for custom templates; created on first use. */
+  async ensureTemplatesFolder(workspaceId: string): Promise<ArtifactFolder> {
+    const where = {
+      workspaceId,
+      parentFolderId: IsNull(),
+      createdByUserId: IsNull(),
+      name: TEMPLATES_FOLDER_NAME,
+    };
+    const order = { createdAt: 'ASC' } as const;
+    // Lock-free fast path; only a miss pays for the transaction + advisory lock.
+    const found = await this.folderRepo.findOne({ where, order });
+    if (found) return found;
+    return this.dataSource.transaction(async (manager) => {
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `artifact-folders:templates:${workspaceId}`,
+      ]);
+      const existing = await manager.findOne(ArtifactFolder, { where, order });
+      if (existing) return existing;
+      return manager.save(
+        this.folderRepo.create({
+          workspaceId,
+          createdByUserId: null,
+          parentFolderId: null,
+          name: TEMPLATES_FOLDER_NAME,
+        }),
+      );
+    });
+  }
+
   async create(
     workspaceId: string,
     userId: string,
     dto: CreateArtifactFolderDto,
   ): Promise<ArtifactFolderDto> {
+    assertNotReservedRoot(dto.name, dto.parentFolderId);
     if (dto.parentFolderId) {
       await this.artifactsService.findOwnedFolder(workspaceId, userId, dto.parentFolderId);
     }
@@ -97,6 +138,7 @@ export class ArtifactFoldersService {
     const target = dto.parentFolderId;
     if (dto.name !== undefined) folder.name = dto.name;
     if (target !== undefined) folder.parentFolderId = target;
+    assertNotReservedRoot(folder.name, folder.parentFolderId);
 
     if (!target) {
       return this.toDto(await this.folderRepo.save(folder));

@@ -80,6 +80,9 @@ func WithTLS() grpc.DialOption {
 	return grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12}))
 }
 
+// maxRecvMsgBytes mirrors core-api's maxSendMessageLength (core-api/src/main.ts).
+const maxRecvMsgBytes = 64 * 1024 * 1024
+
 // NewClient validates the required configuration and creates a lazily-dialing
 // gRPC client for the core-api server. A worker token persisted by a previous
 // run is loaded here (before Connect) so the first Join can rejoin with the
@@ -102,6 +105,9 @@ func NewClient(apiKey, grpcHost, toolPath string, logger Logger, dialOpts ...grp
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithPerRPCCredentials(auth),
+		// Match core-api's 64 MB send limit: a claimed batch of custom-template
+		// jobs (presigned URLs per job) outgrows gRPC's 4 MB default.
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxRecvMsgBytes)),
 	}
 	opts = append(opts, dialOpts...)
 

@@ -33,6 +33,6 @@ import { PublicArtifactsController } from './public-artifacts.controller';
     ArtifactQuotaService,
     ArtifactSweepService,
   ],
-  exports: [ArtifactsService, ArtifactQuotaService],
+  exports: [ArtifactsService, ArtifactFoldersService, ArtifactQuotaService],
 })
 export class ArtifactsModule {}

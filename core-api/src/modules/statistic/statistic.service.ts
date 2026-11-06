@@ -1485,12 +1485,13 @@ export class StatisticService {
 
   @OnEvent(EventTriggerType.WORKFLOW_START)
   async handleWorkflowStart(job: CreateJobs) {
+    const filePath = job.workflow?.filePath;
     if (
-      job.workflow?.filePath &&
+      filePath &&
       [
         DefaultWorkflow.DOMAIN_DISCOVERY,
         DefaultWorkflow.IP_ADDRESS_DISCOVERY,
-      ].includes(job.workflow.filePath as DefaultWorkflow) &&
+      ].includes(filePath as DefaultWorkflow) &&
       job.targetIds
     ) {
       //Take snapshot
@@ -1499,7 +1500,7 @@ export class StatisticService {
           const snapshotPayload =
             await this.takeSnapshotStatisticTarget(targetId);
           await this.redisService.setex(
-            `snapshot:${job.workflow.filePath}:${targetId}`,
+            `snapshot:${filePath}:${targetId}`,
             86400,
             JSON.stringify(snapshotPayload),
           );

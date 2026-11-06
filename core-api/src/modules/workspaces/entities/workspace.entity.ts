@@ -2,7 +2,6 @@ import { BaseEntity } from '@/common/entities/base.entity';
 import { ApiKey } from '@/modules/apikeys/entities/apikey.entity';
 import { User } from '@/modules/auth/entities/user.entity';
 import { Statistic } from '@/modules/statistic/entities/statistic.entity';
-import { Template } from '@/modules/templates/entities/templates.entity';
 import { WorkspaceTool } from '@/modules/tools/entities/workspace_tools.entity';
 import { WorkerInstance } from '@/modules/workers/entities/worker.entity';
 import { Workflow } from '@/modules/workflows/entities/workflow.entity';
@@ -78,9 +77,6 @@ export class Workspace extends BaseEntity {
   @OneToOne(() => ApiKey)
   @JoinColumn({ name: 'apiKeyId', referencedColumnName: 'id' })
   apiKey: Relation<ApiKey>;
-
-  @OneToMany(() => Template, (template) => template.workspace)
-  templates: Relation<Template[]>;
 
   @OneToMany(() => Statistic, (statistic) => statistic.workspace)
   statistics: Relation<Statistic[]>;

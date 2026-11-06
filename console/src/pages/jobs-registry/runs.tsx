@@ -318,7 +318,10 @@ export default function Runs() {
 
   // Check if any tools are still active via API status. Workflow runs carry
   // their own per-step state; runs created before the engine only have tools.
+  // Runs without a workflow (custom-template runs) have neither, so the job
+  // count is what keeps them polling.
   const hasActiveJobs = useMemo(() => {
+    if ((jobHistoryDetail?.activeJobsCount ?? 0) > 0) return true;
     const steps = jobHistoryDetail?.steps ?? [];
     if (steps.length > 0) {
       return steps.some(
@@ -331,7 +334,11 @@ export default function Runs() {
         tool.status === JobStatus.pending ||
         tool.status === JobStatus.in_progress,
     );
-  }, [jobHistoryDetail?.steps, jobHistoryDetail?.tools]);
+  }, [
+    jobHistoryDetail?.activeJobsCount,
+    jobHistoryDetail?.steps,
+    jobHistoryDetail?.tools,
+  ]);
 
   useEffect(() => {
     hasActiveJobsRef.current = hasActiveJobs;

@@ -809,7 +809,7 @@ describe('JobsRegistryService', () => {
 
       mockJobHistoryRepository.findOne.mockResolvedValue(mockJobHistory);
       mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
-        innerJoin: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         getExists: jest.fn().mockResolvedValue(true),
@@ -880,7 +880,7 @@ describe('JobsRegistryService', () => {
     it('should report a tool as cancelled rather than completed once the run was cancelled', async () => {
       mockJobHistoryRepository.findOne.mockResolvedValue(mockJobHistory);
       mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
-        innerJoin: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         getExists: jest.fn().mockResolvedValue(true),
@@ -916,7 +916,7 @@ describe('JobsRegistryService', () => {
 
       mockJobHistoryRepository.findOne.mockResolvedValue(mockJobHistory);
       mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
-        innerJoin: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         getExists: jest.fn().mockResolvedValue(true),
@@ -1016,7 +1016,7 @@ describe('JobsRegistryService', () => {
       };
       mockJobHistoryRepository.findOne.mockResolvedValue(dagHistory);
       mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
-        innerJoin: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         getExists: jest.fn().mockResolvedValue(true),
@@ -1085,7 +1085,7 @@ describe('JobsRegistryService', () => {
         },
       });
       mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
-        innerJoin: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         getExists: jest.fn().mockResolvedValue(true),
@@ -1130,7 +1130,7 @@ describe('JobsRegistryService', () => {
     it('should throw NotFoundException when job history not in workspace', async () => {
       mockJobHistoryRepository.findOne.mockResolvedValue(mockJobHistory);
       mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
-        innerJoin: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         getExists: jest.fn().mockResolvedValue(false),
@@ -1147,7 +1147,7 @@ describe('JobsRegistryService', () => {
         workflow: null,
       });
       mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
-        innerJoin: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         getExists: jest.fn().mockResolvedValue(true),
@@ -1189,7 +1189,7 @@ describe('JobsRegistryService', () => {
       jest.clearAllMocks();
       mockJobHistoryRepository.findOne.mockResolvedValue(mockJobHistory);
       mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
-        innerJoin: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         getExists: jest.fn().mockResolvedValue(true),
@@ -1305,7 +1305,7 @@ describe('JobsRegistryService', () => {
 
     it('should throw NotFoundException when the run is not in the workspace', async () => {
       mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
-        innerJoin: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         getExists: jest.fn().mockResolvedValue(false),
@@ -2232,6 +2232,130 @@ describe('JobsRegistryService', () => {
       givenWorkerAndQueue(buildWorker(), []);
 
       await expect(service.getNextJob('worker-uuid')).resolves.toBeNull();
+    });
+
+    it('does not roll back a committed claim when attaching templates fails', async () => {
+      const { queryRunner } = givenWorkerAndQueue(buildWorker(), [
+        { id: 'job-1', asset: { id: 'a1', value: 'x' } },
+      ]);
+      (queryRunner as any).isTransactionActive = true;
+      queryRunner.commitTransaction.mockImplementation(() => {
+        (queryRunner as any).isTransactionActive = false;
+      });
+      jest
+        .spyOn(service as any, 'attachCustomTemplates')
+        .mockRejectedValue(new Error('boom'));
+
+      await expect(service.getNextJobs('worker-uuid', 1)).resolves.toEqual([]);
+
+      expect(queryRunner.commitTransaction).toHaveBeenCalled();
+      expect(queryRunner.rollbackTransaction).not.toHaveBeenCalled();
+    });
+
+    it('rolls back and returns [] when the claim fails before commit', async () => {
+      const { queryRunner } = givenWorkerAndQueue(buildWorker(), [
+        { id: 'job-1', asset: { id: 'a1', value: 'x' } },
+      ]);
+      (queryRunner as any).isTransactionActive = true;
+      queryRunner.manager.update.mockRejectedValue(new Error('update failed'));
+
+      await expect(service.getNextJobs('worker-uuid', 1)).resolves.toEqual([]);
+
+      expect(queryRunner.commitTransaction).not.toHaveBeenCalled();
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+    });
+
+    describe('custom templates', () => {
+      const templateJob = (id: string) => ({
+        id,
+        retryCount: 0,
+        tool: { id: 'tool-1', name: 'nuclei' },
+        asset: { id: `a-${id}`, value: 'x', target: { workspaceId: 'ws-1' } },
+        config: { rateLimit: 10, customTemplateIds: ['t1', 't2'] },
+      });
+
+      const givenTemplates = (rows: unknown[]) => {
+        const artifactRepo = { find: jest.fn().mockResolvedValue(rows) };
+        mockDataSource.getRepository.mockImplementation((entity: unknown) =>
+          entity === WorkerInstance
+            ? { findOne: jest.fn().mockResolvedValue(buildWorker()) }
+            : artifactRepo,
+        );
+        return artifactRepo;
+      };
+
+      beforeEach(() => {
+        (mockStorageService as Record<string, jest.Mock>).getPresignedDownloadUrl =
+          jest.fn(({ key }: { key: string }) =>
+            Promise.resolve({ url: `http://rustfs:9000/${key}?sig`, expiresIn: 3600 }),
+          );
+      });
+
+      it('swaps template ids for presigned urls, signing each run once', async () => {
+        givenWorkerAndQueue(buildWorker(), [templateJob('j1'), templateJob('j2')]);
+        const artifactRepo = givenTemplates([
+          { id: 't2', bucket: 'artifacts', objectKey: 'k2', updatedAt: new Date(7) },
+          { id: 't1', bucket: 'artifacts', objectKey: 'k1', updatedAt: new Date(5) },
+        ]);
+
+        const result = await service.getNextJobs('worker-uuid', 2);
+
+        expect(result).toHaveLength(2);
+        expect(result[0].config).toEqual({
+          rateLimit: 10,
+          customTemplates: [
+            { url: 'http://rustfs:9000/k1?sig', cacheKey: 't1-5' },
+            { url: 'http://rustfs:9000/k2?sig', cacheKey: 't2-7' },
+          ],
+        });
+        expect(artifactRepo.find).toHaveBeenCalledTimes(1);
+        expect(artifactRepo.find).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ workspaceId: 'ws-1' }),
+          }),
+        );
+        expect(
+          (mockStorageService as Record<string, jest.Mock>).getPresignedDownloadUrl,
+        ).toHaveBeenCalledWith(expect.objectContaining({ absolute: true }));
+      });
+
+      it('fails a job whose template is gone instead of dispatching it', async () => {
+        givenWorkerAndQueue(buildWorker(), [templateJob('j1')]);
+        givenTemplates([
+          { id: 't1', bucket: 'artifacts', objectKey: 'k1', updatedAt: new Date(5) },
+        ]);
+        mockJobRepository.update.mockClear();
+
+        const result = await service.getNextJobs('worker-uuid', 1);
+
+        expect(result).toEqual([]);
+        expect(mockJobRepository.update).toHaveBeenCalledWith(
+          { id: 'j1', status: JobStatus.IN_PROGRESS },
+          expect.objectContaining({ status: JobStatus.FAILED }),
+        );
+        expect(mockJobErrorLogRepository.save).toHaveBeenCalledWith(
+          expect.objectContaining({
+            logMessage: 'A custom template of this run no longer exists',
+          }),
+        );
+      });
+
+      it('still dispatches the rest of the batch when failing a job throws', async () => {
+        givenWorkerAndQueue(buildWorker(), [
+          templateJob('j1'),
+          { id: 'j2', retryCount: 0, tool: { id: 'tool-1', name: 'nuclei' }, asset: { id: 'a-j2', value: 'x' }, config: {} },
+        ]);
+        givenTemplates([
+          { id: 't1', bucket: 'artifacts', objectKey: 'k1', updatedAt: new Date(5) },
+        ]);
+        jest
+          .spyOn(service as any, 'handleJobError')
+          .mockRejectedValue(new Error('db down'));
+
+        const result = await service.getNextJobs('worker-uuid', 2);
+
+        expect(result.map((j) => (j as { id: string }).id)).toEqual(['j2']);
+      });
     });
   });
 

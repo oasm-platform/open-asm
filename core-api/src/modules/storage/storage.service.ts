@@ -42,7 +42,6 @@ type BucketAccess =
 const BUCKET_ACCESS = {
   system: 'public',
   screenshot: 'tenant',
-  'nuclei-templates': 'tenant',
   'job-results': 'private',
   'cached-static': 'authenticated',
   reports: 'private',
@@ -327,17 +326,6 @@ export class StorageService implements OnModuleInit {
       );
       return [...new Set(rows.map((row) => row.workspaceId))];
     }
-    if (bucket === 'nuclei-templates') {
-      const dotIndex = key.lastIndexOf('.');
-      const templateId = dotIndex > 0 ? key.slice(0, dotIndex) : key;
-      const rows: Array<{ workspaceId: string }> = await this.dataSource.query(
-        `SELECT templates."workspaceId" AS "workspaceId"
-         FROM templates
-         WHERE templates.id = $1`,
-        [templateId],
-      );
-      return [...new Set(rows.map((row) => row.workspaceId))];
-    }
     return [];
   }
 
@@ -546,8 +534,10 @@ export class StorageService implements OnModuleInit {
     expiresIn?: number;
     fileName?: string;
     contentType?: string;
+    /** Keep the signed absolute URL for non-browser clients (connectors). */
+    absolute?: boolean;
   }): Promise<{ url: string; expiresIn: number }> {
-    const { bucket, key, expiresIn, fileName, contentType } = opts;
+    const { bucket, key, expiresIn, fileName, contentType, absolute } = opts;
 
     this.assertValidLocation(bucket, key);
 
@@ -566,7 +556,10 @@ export class StorageService implements OnModuleInit {
 
     const url = await this.signCommand(command, clampedTtl);
 
-    return { url: this.toBrowserUrl(url), expiresIn: clampedTtl };
+    return {
+      url: absolute ? url : this.toBrowserUrl(url),
+      expiresIn: clampedTtl,
+    };
   }
 
   /**

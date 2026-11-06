@@ -13,6 +13,7 @@ import {
   useArtifactsControllerGetUsage,
   useArtifactsControllerRemove,
   type ArtifactDto,
+  type ArtifactFolderDto,
   type ArtifactsControllerGetManyScope,
 } from '@/services/apis/gen/queries';
 import { formatBytes } from '@/utils/format-bytes';
@@ -20,14 +21,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { type ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import {
-  Bot,
-  Download,
-  FileText,
-  Folder,
-  Share2,
-  Trash2,
-} from 'lucide-react';
+import { Bot, Download, FileText, Folder, Share2, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { FolderBreadcrumb } from './components/folder-breadcrumb';
@@ -36,6 +30,16 @@ import { StorageUsage } from './components/storage-usage';
 import { useFolderPath, useFolders } from './components/use-folders';
 
 dayjs.extend(relativeTime);
+
+// Folders are listed as rows above the files, S3-style.
+// `..` is a folder row whose id is the parent (null = root) and has no date.
+type FolderRow = Pick<ArtifactFolderDto, 'name'> & {
+  isFolder: true;
+  id: string | null;
+  updatedAt?: string;
+};
+type Row = ArtifactDto | FolderRow;
+const isFolder = (row: Row): row is FolderRow => 'isFolder' in row;
 
 const ACCESS_LABEL: Record<ArtifactDto['shareType'], string> = {
   private: 'Private',
@@ -127,50 +131,98 @@ export function Files() {
     }
   };
 
-  const columns: ColumnDef<ArtifactDto>[] = [
+  // Files are paginated server-side; folders aren't, so they lead page 1 only.
+  const folderRows: FolderRow[] =
+    showFolders && page === 1
+      ? (folders.data ?? []).map(({ id, name, updatedAt }) => ({
+          isFolder: true,
+          id,
+          name,
+          updatedAt,
+        }))
+      : [];
+  // `path` ends with the current folder; wait for it so `..` never jumps to root early.
+  if (showFolders && currentFolderId && path.length > 0)
+    folderRows.unshift({
+      isFolder: true,
+      id: path.at(-2)?.id ?? null,
+      name: '..',
+    });
+
+  const columns: ColumnDef<Row>[] = [
     {
       accessorKey: 'name',
       header: 'Name',
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2 font-medium">
-          <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <span className="truncate">{row.original.name}</span>
-          {row.original.source === 'agent' && (
-            <Badge variant="secondary" className="gap-1">
-              <Bot className="h-3 w-3" />
-              Agent
-            </Badge>
-          )}
-        </div>
-      ),
+      cell: ({ row }) => {
+        const item = row.original;
+        if (isFolder(item))
+          return (
+            <button
+              type="button"
+              className="flex min-w-0 items-center gap-2 font-medium hover:underline"
+              aria-label={item.name === '..' ? 'Parent folder' : undefined}
+              onClick={() => openFolder(item.id)}
+            >
+              <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="truncate">{item.name}</span>
+            </button>
+          );
+        return (
+          <div className="flex items-center gap-2 font-medium">
+            <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <span className="truncate">{item.name}</span>
+            {item.source === 'agent' && (
+              <Badge variant="secondary" className="gap-1">
+                <Bot className="h-3 w-3" />
+                Agent
+              </Badge>
+            )}
+          </div>
+        );
+      },
     },
     {
       accessorKey: 'sizeBytes',
       header: 'Size',
       cell: ({ row }) =>
-        row.original.sizeBytes ? formatBytes(row.original.sizeBytes) : '0 B',
+        isFolder(row.original)
+          ? '—'
+          : row.original.sizeBytes
+            ? formatBytes(row.original.sizeBytes)
+            : '0 B',
     },
     {
       accessorKey: 'shareType',
       header: 'Access',
       enableSorting: false,
-      cell: ({ row }) => (
-        <Badge variant="outline">{ACCESS_LABEL[row.original.shareType]}</Badge>
-      ),
+      cell: ({ row }) =>
+        isFolder(row.original) ? (
+          '—'
+        ) : (
+          <Badge variant="outline">
+            {ACCESS_LABEL[row.original.shareType]}
+          </Badge>
+        ),
     },
     {
       id: 'owner',
       header: 'Owner',
       enableSorting: false,
       cell: ({ row }) =>
-        row.original.isOwner ? 'You' : (row.original.createdBy?.name ?? '—'),
+        isFolder(row.original)
+          ? '—'
+          : row.original.isOwner
+            ? 'You'
+            : (row.original.createdBy?.name ?? '—'),
     },
     {
       accessorKey: 'updatedAt',
       header: 'Modified',
       cell: ({ row }) => (
         <span className="text-muted-foreground">
-          {dayjs(row.original.updatedAt).fromNow()}
+          {row.original.updatedAt
+            ? dayjs(row.original.updatedAt).fromNow()
+            : '—'}
         </span>
       ),
     },
@@ -179,6 +231,7 @@ export function Files() {
       header: '',
       cell: ({ row }) => {
         const file = row.original;
+        if (isFolder(file)) return null;
         // `all` lists other members' files for managers: metadata only.
         const canDownload = scope !== 'all' || file.isOwner;
         return (
@@ -251,29 +304,10 @@ export function Files() {
       {currentFolderId && (
         <FolderBreadcrumb path={path} onNavigate={openFolder} />
       )}
-      {showFolders && !!folders.data?.length && (
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          {folders.data.map((folder) => (
-            <div
-              key={folder.id}
-              className="flex items-center rounded-lg border px-3 hover:bg-muted/50"
-            >
-              <button
-                type="button"
-                className="flex min-w-0 flex-1 items-center gap-2 py-2 text-left text-sm font-medium"
-                onClick={() => openFolder(folder.id)}
-              >
-                <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <span className="truncate">{folder.name}</span>
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
       <DataTable
-        data={data?.data ?? []}
+        data={[...folderRows, ...(data?.data ?? [])]}
         columns={columns}
-        isLoading={isLoading}
+        isLoading={isLoading || (showFolders && folders.isLoading)}
         page={page}
         pageSize={pageSize}
         onPageChange={setPage}

@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 import type { RemoteExecuteService } from '@/modules/remote-execute/remote-execute.service';
+import { validateTemplate } from '@/modules/templates/templates.service';
 
 import { defineTool, errorMessage } from './helpers';
 import type { Deps, ToolCallOptions } from './types';
@@ -19,6 +20,11 @@ const AGENT_TOOL_OUTPUT_PAGE = 8 * 1024;
 /** Full output kept for read_tool_output: Redis only, never the database. */
 const AGENT_TOOL_OUTPUT_STORE_MAX = 10 * 1024 * 1024;
 const AGENT_TOOL_OUTPUT_TTL_SECONDS = 3600;
+/**
+ * Inline templates ride in the container's OASM_CONFIG env, and Linux caps one
+ * env string at 128 KB.
+ */
+const AGENT_TEMPLATES_MAX_BYTES = 64 * 1024;
 
 const toolOutputKey = (conversationId: string, runId: string) =>
   `agent:tool-output:${conversationId}:${runId}`;
@@ -184,6 +190,13 @@ export function runConnectorTool(
       .min(1)
       .describe('Target passed to the tool: domain, IP, host:port or URL'),
     configProfileId: z.string().uuid().optional(),
+    templates: z
+      .array(z.string().min(1))
+      .max(20)
+      .optional()
+      .describe(
+        `nuclei only: Nuclei template YAML documents to run instead of the built-in templates (each needs an "id"; ${AGENT_TEMPLATES_MAX_BYTES / 1024}KB total). Not saved.`,
+      ),
   });
   const catalog = connectors
     .map(
@@ -198,7 +211,7 @@ export function runConnectorTool(
       'Nothing is saved: results are not stored as assets or vulnerabilities.',
       `Waits up to ${AGENT_TOOL_RUN_TIMEOUT_MS / 60_000} minutes. Output: stdout (first ${AGENT_TOOL_OUTPUT_PAGE / 1024}KB), exitCode, error, timedOut, truncated, totalLines.`,
       'When truncated is true the full output is kept for 1 hour: read it with read_tool_output(runId), filtering with pattern instead of paging through everything.',
-      'Params: tool (slug), target, optional configProfileId.',
+      'Params: tool (slug), target, optional configProfileId, optional templates (nuclei only: your own template YAML, run instead of the built-in set).',
       'Tools:',
       catalog,
     ].join('\n'),
@@ -207,7 +220,25 @@ export function runConnectorTool(
       params: z.infer<typeof inputSchema>,
       options: ToolCallOptions,
     ) => {
-      const { tool: slug, target, configProfileId } = params;
+      const { tool: slug, target, configProfileId, templates } = params;
+      if (templates?.length) {
+        if (slug !== 'nuclei') {
+          return { error: 'templates only apply to the nuclei tool.' };
+        }
+        const bytes = templates.reduce((n, t) => n + Buffer.byteLength(t, 'utf8'), 0);
+        if (bytes > AGENT_TEMPLATES_MAX_BYTES) {
+          return {
+            error: `templates total ${bytes} bytes; the limit is ${AGENT_TEMPLATES_MAX_BYTES}.`,
+          };
+        }
+        for (const [i, content] of templates.entries()) {
+          try {
+            validateTemplate(undefined, content);
+          } catch (error) {
+            return { error: `templates[${i}]: ${errorMessage(error)}` };
+          }
+        }
+      }
       const entry = deps.connectorRegistry.getConnector(slug);
       // Tool.name IS the connector slug; getToolById sets isInstalled from
       // an enabled workspace_tools row, so a connector of another workspace
@@ -242,6 +273,12 @@ export function runConnectorTool(
         );
       } catch (error) {
         return { error: errorMessage(error) };
+      }
+      if (templates?.length) {
+        config = {
+          ...config,
+          customTemplates: templates.map((content) => ({ content })),
+        };
       }
       const missing = missingRequiredConfig(entry.configSchema, config);
       if (missing.length > 0) {

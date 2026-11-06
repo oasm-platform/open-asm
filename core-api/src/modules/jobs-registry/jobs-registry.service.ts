@@ -6,6 +6,8 @@ import {
   WORKER_CLAIM_CACHE_MS,
 } from '@/common/constants/app.constants';
 import {
+  ArtifactSource,
+  ArtifactStatus,
   BullMQName,
   EventTriggerType,
   JobPriority,
@@ -39,6 +41,7 @@ import {
   Repository,
   SelectQueryBuilder,
 } from 'typeorm';
+import { Artifact } from '../artifacts/entities/artifact.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { StorageService } from '../storage/storage.service';
 import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
@@ -150,6 +153,27 @@ const JOB_HISTORY_STATUS_SQL = `CASE
           WHEN COUNT(*) FILTER (WHERE job.status = '${JobStatus.SKIPPED}') = COUNT(*) AND COUNT(*) > 0 THEN '${JobStatus.SKIPPED}'
           ELSE '${JobStatus.PENDING}'
         END`;
+
+/** Long enough to outlast the worker's local wait for a container slot. */
+const CUSTOM_TEMPLATE_URL_TTL_SECONDS = 3600;
+
+/** Platform-set config keys: from TemplatesService.run and claim-time signing only. */
+const TEMPLATE_CONFIG_KEYS = ['customTemplateIds', 'customTemplates'];
+
+function withoutTemplateKeys(
+  config: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  if (!config || !TEMPLATE_CONFIG_KEYS.some((key) => key in config)) return config;
+  const rest = { ...config };
+  for (const key of TEMPLATE_CONFIG_KEYS) delete rest[key];
+  return rest;
+}
+
+/** What the nuclei connector downloads for one saved template. */
+interface CustomTemplateRef {
+  url: string;
+  cacheKey: string;
+}
 
 @Injectable()
 export class JobsRegistryService {
@@ -278,10 +302,15 @@ export class JobsRegistryService {
     isPublishEvent,
     jobRunType,
     configProfileId,
-    config,
+    config: inlineConfig,
     category,
+    customTemplateIds,
     input,
   }: CreateJobs): Promise<Job[]> {
+    // A workflow's inline config is author-controlled and never schema-checked:
+    // template keys there would run templates the author cannot read, or seed
+    // a shared connector cache. Only the explicit customTemplateIds may set them.
+    const config = withoutTemplateKeys(inlineConfig);
     if (!tool) {
       throw new Error('Tool is required for creating a job');
     }
@@ -345,6 +374,9 @@ export class JobsRegistryService {
           message,
         });
         throw error;
+      }
+      if (customTemplateIds?.length) {
+        mergedConfig = { ...mergedConfig, customTemplateIds };
       }
     }
 
@@ -659,7 +691,8 @@ export class JobsRegistryService {
 
       await queryRunner.commitTransaction();
 
-      return jobs.map((job) =>
+      const dispatchable = await this.attachCustomTemplates(jobs);
+      return dispatchable.map((job) =>
         this.toGetNextJobResult(worker, isBuiltInTools, job),
       );
     } catch (error) {
@@ -667,11 +700,94 @@ export class JobsRegistryService {
         'Error in getNextJobs',
         error instanceof Error ? error : new Error(String(error)),
       );
-      await queryRunner.rollbackTransaction();
+      // attachCustomTemplates runs after commit; nothing left to roll back then
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
       return [];
     } finally {
       await queryRunner.release();
     }
+  }
+
+  /**
+   * Swaps each job's `customTemplateIds` for short-lived presigned URLs at
+   * claim time, so no credential is ever stored on a job and a re-run gets
+   * fresh ones. A job whose templates are gone is failed, not dispatched:
+   * without them nuclei would run its whole baked collection instead.
+   */
+  private async attachCustomTemplates(jobs: Job[]): Promise<Job[]> {
+    // Jobs of one run share a template set: resolve and sign it once.
+    const signed = new Map<string, Promise<CustomTemplateRef[] | null>>();
+    const dispatchable: Job[] = [];
+    for (const job of jobs) {
+      const ids = job.config?.customTemplateIds;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        dispatchable.push(job);
+        continue;
+      }
+      const workspaceId = job.asset.target?.workspaceId ?? '';
+      const key = `${workspaceId}:${ids.join(',')}`;
+      if (!signed.has(key)) {
+        signed.set(key, this.signCustomTemplates(workspaceId, ids as string[]));
+      }
+      try {
+        const templates = await signed.get(key);
+        if (!templates) {
+          throw new Error('A custom template of this run no longer exists');
+        }
+        const rest = { ...job.config };
+        delete rest.customTemplateIds;
+        job.config = { ...rest, customTemplates: templates };
+        dispatchable.push(job);
+      } catch (error) {
+        try {
+          await this.handleJobError(
+            { jobId: job.id, data: {} as UpdateResultDto['data'] },
+            job,
+            error instanceof Error ? error : new Error(String(error)),
+          );
+        } catch (failError) {
+          // Drop this job but keep dispatching the rest of the committed claim.
+          this.logger.error(
+            `Failed to mark job ${job.id} failed after custom template error`,
+            failError instanceof Error ? failError.stack : String(failError),
+          );
+        }
+      }
+    }
+    return dispatchable;
+  }
+
+  /** null when any id is not a ready template of the workspace. */
+  private async signCustomTemplates(
+    workspaceId: string,
+    ids: string[],
+  ): Promise<CustomTemplateRef[] | null> {
+    const rows = await this.dataSource.getRepository(Artifact).find({
+      where: {
+        id: In(ids),
+        workspaceId,
+        source: ArtifactSource.TEMPLATE,
+        status: ArtifactStatus.READY,
+      },
+      select: { id: true, bucket: true, objectKey: true, updatedAt: true },
+    });
+    if (rows.length !== new Set(ids).size) return null;
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    return Promise.all(
+      ids.map(async (id) => {
+        const row = byId.get(id)!;
+        const { url } = await this.storageService.getPresignedDownloadUrl({
+          bucket: row.bucket,
+          key: row.objectKey,
+          expiresIn: CUSTOM_TEMPLATE_URL_TTL_SECONDS,
+          absolute: true,
+        });
+        // Changes on every save, so connectors never serve a stale cached copy.
+        return { url, cacheKey: `${row.id}-${row.updatedAt.getTime()}` };
+      }),
+    );
   }
 
   /**
@@ -1184,9 +1300,8 @@ export class JobsRegistryService {
 
   /**
    * Loads a run with its workflow, proving workspace ownership. The check joins
-   * through the workflow: the previous path went jobs → asset → target, which
-   * returns nothing for histories whose jobs were all deleted (the empty join
-   * yields no rows), wrongly producing a 404 for a valid history.
+   * through the workflow first: going only jobs → asset → target returns
+   * nothing for histories whose jobs were all deleted, wrongly producing a 404.
    */
   private async loadJobHistoryInWorkspace(
     workspaceId: string,
@@ -1205,12 +1320,21 @@ export class JobsRegistryService {
       throw new NotFoundException('Job history not found');
     }
 
+    // Histories created outside a workflow (e.g. custom-template runs) have no
+    // workflow, so fall back to the targets of their jobs — same check as
+    // cancelJobHistory.
     const belongsToWorkspace = await this.jobHistoryRepo
       .createQueryBuilder('jobHistory')
-      .innerJoin('jobHistory.workflow', 'workflow')
-      .innerJoin('workflow.workspace', 'workspace')
+      .leftJoin('jobHistory.workflow', 'workflow')
+      .leftJoin('workflow.workspace', 'workflowWorkspace')
+      .leftJoin('jobHistory.jobs', 'job')
+      .leftJoin('job.asset', 'asset')
+      .leftJoin('asset.target', 'target')
       .where('jobHistory.id = :id', { id })
-      .andWhere('workspace.id = :workspaceId', { workspaceId })
+      .andWhere(
+        '(workflowWorkspace.id = :workspaceId OR target.workspaceId = :workspaceId)',
+        { workspaceId },
+      )
       .getExists();
 
     if (!belongsToWorkspace) {

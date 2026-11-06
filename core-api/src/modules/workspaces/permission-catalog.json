@@ -80,13 +80,6 @@
     ]
   },
   {
-    "resource": "template",
-    "actions": [
-      { "action": "read", "description": "View templates" },
-      { "action": "write", "description": "Create and edit templates" }
-    ]
-  },
-  {
     "resource": "agent",
     "actions": [
       { "action": "read", "description": "View agents" },
