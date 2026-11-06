@@ -1300,9 +1300,8 @@ export class JobsRegistryService {
 
   /**
    * Loads a run with its workflow, proving workspace ownership. The check joins
-   * through the workflow: the previous path went jobs → asset → target, which
-   * returns nothing for histories whose jobs were all deleted (the empty join
-   * yields no rows), wrongly producing a 404 for a valid history.
+   * through the workflow first: going only jobs → asset → target returns
+   * nothing for histories whose jobs were all deleted, wrongly producing a 404.
    */
   private async loadJobHistoryInWorkspace(
     workspaceId: string,
@@ -1321,12 +1320,21 @@ export class JobsRegistryService {
       throw new NotFoundException('Job history not found');
     }
 
+    // Histories created outside a workflow (e.g. custom-template runs) have no
+    // workflow, so fall back to the targets of their jobs — same check as
+    // cancelJobHistory.
     const belongsToWorkspace = await this.jobHistoryRepo
       .createQueryBuilder('jobHistory')
-      .innerJoin('jobHistory.workflow', 'workflow')
-      .innerJoin('workflow.workspace', 'workspace')
+      .leftJoin('jobHistory.workflow', 'workflow')
+      .leftJoin('workflow.workspace', 'workflowWorkspace')
+      .leftJoin('jobHistory.jobs', 'job')
+      .leftJoin('job.asset', 'asset')
+      .leftJoin('asset.target', 'target')
       .where('jobHistory.id = :id', { id })
-      .andWhere('workspace.id = :workspaceId', { workspaceId })
+      .andWhere(
+        '(workflowWorkspace.id = :workspaceId OR target.workspaceId = :workspaceId)',
+        { workspaceId },
+      )
       .getExists();
 
     if (!belongsToWorkspace) {

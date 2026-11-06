@@ -809,7 +809,7 @@ describe('JobsRegistryService', () => {
 
       mockJobHistoryRepository.findOne.mockResolvedValue(mockJobHistory);
       mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
-        innerJoin: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         getExists: jest.fn().mockResolvedValue(true),
@@ -880,7 +880,7 @@ describe('JobsRegistryService', () => {
     it('should report a tool as cancelled rather than completed once the run was cancelled', async () => {
       mockJobHistoryRepository.findOne.mockResolvedValue(mockJobHistory);
       mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
-        innerJoin: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         getExists: jest.fn().mockResolvedValue(true),
@@ -916,7 +916,7 @@ describe('JobsRegistryService', () => {
 
       mockJobHistoryRepository.findOne.mockResolvedValue(mockJobHistory);
       mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
-        innerJoin: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         getExists: jest.fn().mockResolvedValue(true),
@@ -1016,7 +1016,7 @@ describe('JobsRegistryService', () => {
       };
       mockJobHistoryRepository.findOne.mockResolvedValue(dagHistory);
       mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
-        innerJoin: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         getExists: jest.fn().mockResolvedValue(true),
@@ -1085,7 +1085,7 @@ describe('JobsRegistryService', () => {
         },
       });
       mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
-        innerJoin: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         getExists: jest.fn().mockResolvedValue(true),
@@ -1130,7 +1130,7 @@ describe('JobsRegistryService', () => {
     it('should throw NotFoundException when job history not in workspace', async () => {
       mockJobHistoryRepository.findOne.mockResolvedValue(mockJobHistory);
       mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
-        innerJoin: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         getExists: jest.fn().mockResolvedValue(false),
@@ -1147,7 +1147,7 @@ describe('JobsRegistryService', () => {
         workflow: null,
       });
       mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
-        innerJoin: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         getExists: jest.fn().mockResolvedValue(true),
@@ -1189,7 +1189,7 @@ describe('JobsRegistryService', () => {
       jest.clearAllMocks();
       mockJobHistoryRepository.findOne.mockResolvedValue(mockJobHistory);
       mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
-        innerJoin: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         getExists: jest.fn().mockResolvedValue(true),
@@ -1305,7 +1305,7 @@ describe('JobsRegistryService', () => {
 
     it('should throw NotFoundException when the run is not in the workspace', async () => {
       mockJobHistoryRepository.createQueryBuilder.mockReturnValue({
-        innerJoin: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         getExists: jest.fn().mockResolvedValue(false),
