@@ -1643,6 +1643,22 @@ export const VulnerabilitySeverity = {
   critical: 'critical',
 } as const;
 
+export type VulnerabilityTriageStatus =
+  (typeof VulnerabilityTriageStatus)[keyof typeof VulnerabilityTriageStatus];
+
+export const VulnerabilityTriageStatus = {
+  new: 'new',
+  acknowledged: 'acknowledged',
+  in_progress: 'in_progress',
+  fixed: 'fixed',
+  verified: 'verified',
+} as const;
+
+export type RiskFactorDto = {
+  label: string;
+  points: number;
+};
+
 export type VulnerabilityAnalyzeStatus =
   (typeof VulnerabilityAnalyzeStatus)[keyof typeof VulnerabilityAnalyzeStatus];
 
@@ -1709,6 +1725,20 @@ export type Vulnerability = {
   /** @nullable */
   fixedVersion?: string | null;
   vulnerabilityDismissal: VulnerabilityDismissal;
+  triageStatus: VulnerabilityTriageStatus;
+  /** @nullable */
+  assignee?: User | null;
+  /** @nullable */
+  assigneeId?: string | null;
+  /**
+   * Remediation deadline; severity default when not set
+   * @nullable
+   */
+  dueAt?: string | null;
+  /** Risk score 0-10 (computed) */
+  riskScore?: number;
+  /** Breakdown of the risk score */
+  riskFactors?: RiskFactorDto[];
   analyzeStatus: VulnerabilityAnalyzeStatus;
   analyzeResult: string;
 };
@@ -1811,6 +1841,12 @@ export type JobHistoryResponseDto = {
   createdAt: string;
   updatedAt: string;
   totalJobs: number;
+  /** Jobs that finished successfully */
+  completedJobs: number;
+  /** Jobs that ended failed */
+  failedJobs: number;
+  /** Percent of jobs in a terminal state */
+  progress: number;
   status: JobHistoryResponseDtoStatus;
   workflowName: string;
   jobHistoryName: string;
@@ -1904,6 +1940,20 @@ export type JobHistoryDetailResponseDto = {
   /** How the run was started: by a user (manual) or by a schedule */
   jobRunType?: JobHistoryDetailResponseDtoJobRunType;
   activeJobsCount: number;
+  /** Percent of workflow steps settled */
+  progress: number;
+  stepsDone: number;
+  stepsTotal: number;
+  /**
+   * Seconds left, estimated from the median duration of recent completed runs of the same workflow. Null until there is enough history.
+   * @nullable
+   */
+  etaSeconds?: number | null;
+  /**
+   * Newest error log message, when the run has failed jobs
+   * @nullable
+   */
+  failureReason?: string | null;
 };
 
 export type JobHistoryWorkflowResponseDto = {
@@ -1913,6 +1963,11 @@ export type JobHistoryWorkflowResponseDto = {
   workflowName?: string;
   content?: WorkflowContent;
   steps: WorkflowStepStatusDto[];
+};
+
+export type RetryRunResponseDto = {
+  jobHistoryId: string;
+  message: string;
 };
 
 export type PickToolIdName = {
@@ -2694,6 +2749,8 @@ export type UpdateProfileDto = {
 export type SearchData = {
   assets: Asset[];
   targets: Target[];
+  /** Top matching findings, newest first */
+  vulnerabilities: Vulnerability[];
 };
 
 export type SearchResponseDto = {
@@ -2917,6 +2974,86 @@ export type GetVulnerabilitiesStatisticsResponseDto = {
 export type AnalyzeVulnerabilityDto = {
   /** Force rerun analysis even if already analyzed */
   forceRerun?: boolean;
+};
+
+export type UpdateVulnerabilityTriageDtoTriageStatus =
+  (typeof UpdateVulnerabilityTriageDtoTriageStatus)[keyof typeof UpdateVulnerabilityTriageDtoTriageStatus];
+
+export const UpdateVulnerabilityTriageDtoTriageStatus = {
+  new: 'new',
+  acknowledged: 'acknowledged',
+  in_progress: 'in_progress',
+  fixed: 'fixed',
+  verified: 'verified',
+} as const;
+
+export type UpdateVulnerabilityTriageDto = {
+  triageStatus?: UpdateVulnerabilityTriageDtoTriageStatus;
+  /**
+   * Workspace member to own the finding; null unassigns
+   * @nullable
+   */
+  assigneeId?: string | null;
+  /**
+   * Remediation deadline; null clears it
+   * @nullable
+   */
+  dueAt?: string | null;
+  /** Optional note appended to the triage timeline */
+  note?: string;
+};
+
+export type AddVulnerabilityNoteDto = {
+  note: string;
+};
+
+export type VulnerabilityActivityType =
+  (typeof VulnerabilityActivityType)[keyof typeof VulnerabilityActivityType];
+
+export const VulnerabilityActivityType = {
+  status_changed: 'status_changed',
+  assigned: 'assigned',
+  due_changed: 'due_changed',
+  note: 'note',
+} as const;
+
+export type VulnerabilityActivityPayload = { [key: string]: unknown };
+
+export type VulnerabilityActivity = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  actor?: User;
+  type: VulnerabilityActivityType;
+  payload?: VulnerabilityActivityPayload;
+};
+
+export type BulkUpdateVulnerabilityTriageDtoTriageStatus =
+  (typeof BulkUpdateVulnerabilityTriageDtoTriageStatus)[keyof typeof BulkUpdateVulnerabilityTriageDtoTriageStatus];
+
+export const BulkUpdateVulnerabilityTriageDtoTriageStatus = {
+  new: 'new',
+  acknowledged: 'acknowledged',
+  in_progress: 'in_progress',
+  fixed: 'fixed',
+  verified: 'verified',
+} as const;
+
+export type BulkUpdateVulnerabilityTriageDto = {
+  triageStatus?: BulkUpdateVulnerabilityTriageDtoTriageStatus;
+  /**
+   * Workspace member to own the finding; null unassigns
+   * @nullable
+   */
+  assigneeId?: string | null;
+  /**
+   * Remediation deadline; null clears it
+   * @nullable
+   */
+  dueAt?: string | null;
+  /** Optional note appended to the triage timeline */
+  note?: string;
+  ids: string[];
 };
 
 export type BulkDismissVulnerabilitiesDtoReason =
@@ -6381,7 +6518,22 @@ export type SearchControllerSearchAssetsTargetsParams = {
   sortOrder?: string;
   value: string;
   isSaveHistory?: boolean;
+  /**
+   * Only return findings with these severities
+   */
+  severity?: SearchControllerSearchAssetsTargetsSeverityItem[];
 };
+
+export type SearchControllerSearchAssetsTargetsSeverityItem =
+  (typeof SearchControllerSearchAssetsTargetsSeverityItem)[keyof typeof SearchControllerSearchAssetsTargetsSeverityItem];
+
+export const SearchControllerSearchAssetsTargetsSeverityItem = {
+  info: 'info',
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+  critical: 'critical',
+} as const;
 
 export type SearchControllerGetSearchHistoryParams = {
   search?: string;
@@ -6425,7 +6577,19 @@ export type VulnerabilitiesControllerGetVulnerabilitiesParams = {
    */
   targetId?: string;
   /**
-   * JSON filter tree, e.g. {"logic":"and","items":[{"field":"severity","op":"in","value":["high","critical"]},{"logic":"or","conditions":[{"field":"cve","op":"contains","value":"2024"},{"field":"cvssScore","op":"gte","value":"7"}]}]}. Fields: name, severity, tag, host, ip, port, cve, cwe, target, tool, affectedUrl, cvssScore, epssScore. Ops: eq, neq, contains, notContains, in, notIn, gt, gte, lt, lte.
+   * Filter by triage lifecycle status
+   */
+  triageStatus?: VulnerabilitiesControllerGetVulnerabilitiesTriageStatusItem[];
+  /**
+   * Only findings assigned to this workspace member
+   */
+  assigneeId?: string;
+  /**
+   * Only findings whose due date has passed
+   */
+  overdue?: boolean;
+  /**
+   * JSON filter tree, e.g. {"logic":"and","items":[{"field":"severity","op":"in","value":["high","critical"]},{"logic":"or","conditions":[{"field":"cve","op":"contains","value":"2024"},{"field":"cvssScore","op":"gte","value":"7"}]}]}. Fields: name, severity, tag, host, ip, port, cve, cwe, target, tool, affectedUrl, cvssScore, epssScore, riskScore. Ops: eq, neq, contains, notContains, in, notIn, gt, gte, lt, lte.
    */
   filter?: string;
 };
@@ -6448,6 +6612,17 @@ export const VulnerabilitiesControllerGetVulnerabilitiesSeverityItem = {
   medium: 'medium',
   high: 'high',
   critical: 'critical',
+} as const;
+
+export type VulnerabilitiesControllerGetVulnerabilitiesTriageStatusItem =
+  (typeof VulnerabilitiesControllerGetVulnerabilitiesTriageStatusItem)[keyof typeof VulnerabilitiesControllerGetVulnerabilitiesTriageStatusItem];
+
+export const VulnerabilitiesControllerGetVulnerabilitiesTriageStatusItem = {
+  new: 'new',
+  acknowledged: 'acknowledged',
+  in_progress: 'in_progress',
+  fixed: 'fixed',
+  verified: 'verified',
 } as const;
 
 export type VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams = {
@@ -22987,6 +23162,98 @@ export const useJobsRegistryControllerCancelJobHistory = <
 };
 
 /**
+ * Starts a new run from the same workflow and scope as an existing run, leaving the original run untouched.
+ * @summary Retry a run
+ */
+export const jobsRegistryControllerRetryJobHistory = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<RetryRunResponseDto>(
+    {
+      url: `/api/jobs-registry/histories/${id}/re-run`,
+      method: 'POST',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getJobsRegistryControllerRetryJobHistoryMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof jobsRegistryControllerRetryJobHistory>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof jobsRegistryControllerRetryJobHistory>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['jobsRegistryControllerRetryJobHistory'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof jobsRegistryControllerRetryJobHistory>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return jobsRegistryControllerRetryJobHistory(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type JobsRegistryControllerRetryJobHistoryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof jobsRegistryControllerRetryJobHistory>>
+>;
+
+export type JobsRegistryControllerRetryJobHistoryMutationError = unknown;
+
+/**
+ * @summary Retry a run
+ */
+export const useJobsRegistryControllerRetryJobHistory = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof jobsRegistryControllerRetryJobHistory>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof jobsRegistryControllerRetryJobHistory>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getJobsRegistryControllerRetryJobHistoryMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
  * Delete a job by its ID in the specified workspace
  * @summary Delete a job
  */
@@ -34196,6 +34463,468 @@ export const useVulnerabilitiesControllerDeleteVulnerabilityAnalysis = <
     getVulnerabilitiesControllerDeleteVulnerabilityAnalysisMutationOptions(
       options,
     ),
+    queryClient,
+  );
+};
+
+/**
+ * Sets the triage status, owner, due date or appends a note for one finding. Every change is recorded in the finding activity timeline.
+ * @summary Update vulnerability triage
+ */
+export const vulnerabilitiesControllerUpdateTriage = (
+  id: string,
+  updateVulnerabilityTriageDto: UpdateVulnerabilityTriageDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    {
+      url: `/api/vulnerabilities/${id}/triage`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateVulnerabilityTriageDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getVulnerabilitiesControllerUpdateTriageMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerUpdateTriage>>,
+    TError,
+    { id: string; data: UpdateVulnerabilityTriageDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof vulnerabilitiesControllerUpdateTriage>>,
+  TError,
+  { id: string; data: UpdateVulnerabilityTriageDto },
+  TContext
+> => {
+  const mutationKey = ['vulnerabilitiesControllerUpdateTriage'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerUpdateTriage>>,
+    { id: string; data: UpdateVulnerabilityTriageDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return vulnerabilitiesControllerUpdateTriage(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type VulnerabilitiesControllerUpdateTriageMutationResult = NonNullable<
+  Awaited<ReturnType<typeof vulnerabilitiesControllerUpdateTriage>>
+>;
+export type VulnerabilitiesControllerUpdateTriageMutationBody =
+  UpdateVulnerabilityTriageDto;
+export type VulnerabilitiesControllerUpdateTriageMutationError = unknown;
+
+/**
+ * @summary Update vulnerability triage
+ */
+export const useVulnerabilitiesControllerUpdateTriage = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof vulnerabilitiesControllerUpdateTriage>>,
+      TError,
+      { id: string; data: UpdateVulnerabilityTriageDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof vulnerabilitiesControllerUpdateTriage>>,
+  TError,
+  { id: string; data: UpdateVulnerabilityTriageDto },
+  TContext
+> => {
+  return useMutation(
+    getVulnerabilitiesControllerUpdateTriageMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Appends a note to the finding activity timeline.
+ * @summary Add a triage note
+ */
+export const vulnerabilitiesControllerAddNote = (
+  id: string,
+  addVulnerabilityNoteDto: AddVulnerabilityNoteDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    {
+      url: `/api/vulnerabilities/${id}/notes`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: addVulnerabilityNoteDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getVulnerabilitiesControllerAddNoteMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerAddNote>>,
+    TError,
+    { id: string; data: AddVulnerabilityNoteDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof vulnerabilitiesControllerAddNote>>,
+  TError,
+  { id: string; data: AddVulnerabilityNoteDto },
+  TContext
+> => {
+  const mutationKey = ['vulnerabilitiesControllerAddNote'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerAddNote>>,
+    { id: string; data: AddVulnerabilityNoteDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return vulnerabilitiesControllerAddNote(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type VulnerabilitiesControllerAddNoteMutationResult = NonNullable<
+  Awaited<ReturnType<typeof vulnerabilitiesControllerAddNote>>
+>;
+export type VulnerabilitiesControllerAddNoteMutationBody =
+  AddVulnerabilityNoteDto;
+export type VulnerabilitiesControllerAddNoteMutationError = unknown;
+
+/**
+ * @summary Add a triage note
+ */
+export const useVulnerabilitiesControllerAddNote = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof vulnerabilitiesControllerAddNote>>,
+      TError,
+      { id: string; data: AddVulnerabilityNoteDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof vulnerabilitiesControllerAddNote>>,
+  TError,
+  { id: string; data: AddVulnerabilityNoteDto },
+  TContext
+> => {
+  return useMutation(
+    getVulnerabilitiesControllerAddNoteMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Returns the newest first triage timeline for a finding: status, owner, due date changes and notes.
+ * @summary List vulnerability triage activity
+ */
+export const vulnerabilitiesControllerGetActivities = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<VulnerabilityActivity[]>(
+    { url: `/api/vulnerabilities/${id}/activities`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getVulnerabilitiesControllerGetActivitiesQueryKey = (
+  id: string,
+) => {
+  return [`/api/vulnerabilities/${id}/activities`] as const;
+};
+
+export const getVulnerabilitiesControllerGetActivitiesQueryOptions = <
+  TData = Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivities>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivities>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getVulnerabilitiesControllerGetActivitiesQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivities>>
+  > = ({ signal }) =>
+    vulnerabilitiesControllerGetActivities(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivities>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type VulnerabilitiesControllerGetActivitiesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivities>>
+>;
+export type VulnerabilitiesControllerGetActivitiesQueryError = unknown;
+
+export function useVulnerabilitiesControllerGetActivities<
+  TData = Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivities>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivities>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivities>>,
+          TError,
+          Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivities>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useVulnerabilitiesControllerGetActivities<
+  TData = Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivities>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivities>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivities>>,
+          TError,
+          Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivities>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useVulnerabilitiesControllerGetActivities<
+  TData = Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivities>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivities>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List vulnerability triage activity
+ */
+
+export function useVulnerabilitiesControllerGetActivities<
+  TData = Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivities>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivities>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getVulnerabilitiesControllerGetActivitiesQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Applies the same triage fields to many findings, used by the list bulk action bar.
+ * @summary Bulk update vulnerability triage
+ */
+export const vulnerabilitiesControllerBulkUpdateTriage = (
+  bulkUpdateVulnerabilityTriageDto: BulkUpdateVulnerabilityTriageDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    {
+      url: `/api/vulnerabilities/bulk-triage`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: bulkUpdateVulnerabilityTriageDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getVulnerabilitiesControllerBulkUpdateTriageMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerBulkUpdateTriage>>,
+    TError,
+    { data: BulkUpdateVulnerabilityTriageDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof vulnerabilitiesControllerBulkUpdateTriage>>,
+  TError,
+  { data: BulkUpdateVulnerabilityTriageDto },
+  TContext
+> => {
+  const mutationKey = ['vulnerabilitiesControllerBulkUpdateTriage'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerBulkUpdateTriage>>,
+    { data: BulkUpdateVulnerabilityTriageDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return vulnerabilitiesControllerBulkUpdateTriage(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type VulnerabilitiesControllerBulkUpdateTriageMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerBulkUpdateTriage>>
+  >;
+export type VulnerabilitiesControllerBulkUpdateTriageMutationBody =
+  BulkUpdateVulnerabilityTriageDto;
+export type VulnerabilitiesControllerBulkUpdateTriageMutationError = unknown;
+
+/**
+ * @summary Bulk update vulnerability triage
+ */
+export const useVulnerabilitiesControllerBulkUpdateTriage = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof vulnerabilitiesControllerBulkUpdateTriage>>,
+      TError,
+      { data: BulkUpdateVulnerabilityTriageDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof vulnerabilitiesControllerBulkUpdateTriage>>,
+  TError,
+  { data: BulkUpdateVulnerabilityTriageDto },
+  TContext
+> => {
+  return useMutation(
+    getVulnerabilitiesControllerBulkUpdateTriageMutationOptions(options),
     queryClient,
   );
 };

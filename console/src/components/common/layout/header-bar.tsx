@@ -5,7 +5,7 @@ import AppLogo from '@/components/ui/app-logo';
 import { NavUser } from '@/components/ui/nav-user';
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
-import { SearchForm } from '../../ui/search-form';
+import { CommandPalette } from '../../common/command-palette';
 import { ThemeSwitch } from '@/components/ui/theme-switch-icon';
 import { cn } from '@/lib/utils';
 
@@ -31,7 +31,7 @@ export function HeaderBar({ className }: HeaderBarProps) {
             {isMobile && <AppLogo type="small" />}
           </div>
           <div className="flex flex-1 justify-center">
-            <SearchForm className="w-full max-w-xl" />
+            <CommandPalette />
           </div>
           <div className="flex items-center gap-1">
             <ThemeSwitch />
