@@ -231,10 +231,10 @@ export default function StartDiscovery() {
     <Page
       title="Start discovery"
       description="Add a target and scan it to discover its assets"
-      isShowButtonGoBack
+      headerClassName="mx-auto w-full max-w-4xl"
       permission="target.write"
     >
-      <div className="max-w-4xl mx-auto py-6">
+      <div className="max-w-4xl mx-auto pb-6">
         <div className={`bg-card rounded-lg border ${targetTypeBg[targetType]} p-4`}>
           <div className="mb-6">
             <p className="text-muted-foreground mt-2">

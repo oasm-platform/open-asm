@@ -4,7 +4,11 @@ import TypewriterText from '@/components/typewriter-text';
 
 import BorderBeam from '@/components/ui/border-beam';
 import { Button } from '@/components/ui/button';
-import { restoreApprovalMode } from '@/hooks/use-approval-mode';
+import {
+  getApprovalModeVersion,
+  restoreApprovalMode,
+  setDefaultApprovalMode,
+} from '@/hooks/use-approval-mode';
 import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
@@ -14,6 +18,9 @@ import {
   agentsControllerGetAgentModes,
   getAgentsControllerGetAgentModesQueryKey,
   SendMessageDtoAgentMode,
+  useAgentsControllerGetAgentConfig,
+  useProjectsControllerGetById,
+  type ConversationProjectDto,
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
@@ -29,7 +36,9 @@ import {
   ASK_PROMPT_GROUPS,
   CONVERSATION_STARTERS,
 } from './components/landing-constants';
+import { ProjectScopeSelect } from './components/project-scope-select';
 import { PromptGroups } from './components/prompt-groups';
+import { WorkerSelect } from './components/worker-select';
 
 const WORKER_READY_POLL_MS = 500;
 const WORKER_READY_TIMEOUT_MS = 10_000;
@@ -63,16 +72,39 @@ export default function AgentsLandingPage({
   const navigate = useNavigate();
   const { open: openSettings } = useAgentSettingsDialog();
   // Shared by the /aistudio and /aistudio/agents routes, which both take ?text=
-  const { text: queryText } = useSearch({ strict: false });
+  // ?projectId= comes from a project's "Chat with Agent"
+  const { text: queryText, projectId: queryProjectId } = useSearch({
+    strict: false,
+  });
   const [isSending, setIsSending] = useState(false);
   const [selectedModel, setSelectedModel] = useState<{
     provider: string;
     model: string;
     configId: string;
   } | null>(null);
-  // Set by the route: the page has no switch for it
-  const agentMode = initialAgentMode;
+  // Route sets the opening mode; the toggle in the input switches it from here
+  const [agentMode, setAgentMode] = useState<string>(initialAgentMode);
+  // The page stays mounted when only the search changes (sidebar project links)
+  useEffect(() => {
+    setAgentMode(initialAgentMode);
+  }, [initialAgentMode]);
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
+  // The new chat's project: its tools then stay inside it
+  const [project, setProject] = useState<ConversationProjectDto | null>(null);
+  const { data: linkedProject } = useProjectsControllerGetById(
+    queryProjectId ?? '',
+    { query: { enabled: !!queryProjectId } },
+  );
+  useEffect(() => {
+    // Back to a plain New Chat: drop the project the link had picked
+    if (!queryProjectId) setProject(null);
+  }, [queryProjectId]);
+  useEffect(() => {
+    if (linkedProject) {
+      const { id, name, hexColor } = linkedProject;
+      setProject({ id, name, hexColor });
+    }
+  }, [linkedProject]);
   // Starter prompt under the pointer, previewed as the input placeholder
   const [previewPrompt, setPreviewPrompt] = useState<string | null>(null);
   // The halo behind the input appears once the load-time border beam ends
@@ -115,6 +147,7 @@ export default function AgentsLandingPage({
         ...(selectedModel && { selectedModel }),
         agentMode: mode,
         workerId,
+        project,
       };
       void navigate({
         to: '/aistudio/conversations/$conversationId',
@@ -122,7 +155,7 @@ export default function AgentsLandingPage({
         state: navState,
       });
     },
-    [navigate, selectedModel],
+    [navigate, selectedModel, project],
   );
   // The resume after a worker joins runs later; it must use the latest one.
   const startConversationRef = useRef(startConversation);
@@ -190,10 +223,20 @@ export default function AgentsLandingPage({
     ],
   );
 
-  // A new chat starts from the user's last explicit choice, not a past conversation's
+  // A new chat starts from the settings default, else the user's last
+  // explicit choice, never a past conversation's
+  const { data: agentConfig } = useAgentsControllerGetAgentConfig({
+    query: { enabled: !!selectedWorkspaceId },
+  });
+  const defaultApprovalMode = agentConfig?.defaultApprovalMode;
+  const approvalVersionAtMount = useRef(getApprovalModeVersion());
   useEffect(() => {
-    restoreApprovalMode();
-  }, []);
+    setDefaultApprovalMode(defaultApprovalMode);
+    // A pick made here before the settings loaded wins
+    if (getApprovalModeVersion() === approvalVersionAtMount.current) {
+      restoreApprovalMode();
+    }
+  }, [defaultApprovalMode]);
 
   // Once per ?text= value: a submit held for a worker leaves isSending false,
   // and re-running would open the connect dialog again.
@@ -300,7 +343,7 @@ export default function AgentsLandingPage({
         <div className="flex h-full flex-col items-center justify-center pb-24">
           <div className="relative w-full max-w-2xl md:w-2/3 lg:w-1/2">
             {/* Hero */}
-            <div className="absolute inset-x-0 bottom-full mb-8 flex flex-col items-center gap-3 text-center">
+            <div className="absolute inset-x-0 bottom-full mb-12 flex flex-col items-center gap-3 text-center">
               <TypewriterText
                 texts={
                   isAgentMode
@@ -314,6 +357,16 @@ export default function AgentsLandingPage({
             {/* Input area: rounder box and a round send button. A gradient beam
                 runs once around the box when it first appears. */}
             <div ref={inputWrapperRef} className="relative rounded-2xl">
+              {/* Above the box, out of the flow so the input stays centred */}
+              <div className="absolute bottom-full left-1 mb-1 flex items-center gap-1">
+                <ProjectScopeSelect value={project} onChange={setProject} />
+                {isAgentMode && (
+                  <WorkerSelect
+                    value={selectedWorkerId}
+                    onChange={setSelectedWorkerId}
+                  />
+                )}
+              </div>
               <AgentPromptInput
                 onSubmit={handleSendMessage}
                 isSending={isSending}
@@ -322,7 +375,7 @@ export default function AgentsLandingPage({
                   setSelectedModel({ provider, model, configId });
                 }}
                 agentMode={agentMode}
-                selectedWorkerId={selectedWorkerId}
+                onAgentModeChange={setAgentMode}
                 onWorkerSelect={setSelectedWorkerId}
                 showSettingsButton={false}
                 placeholder={previewPrompt ?? undefined}

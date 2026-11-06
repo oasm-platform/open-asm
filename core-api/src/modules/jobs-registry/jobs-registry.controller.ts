@@ -30,6 +30,7 @@ import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity'
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
+import { WorkflowRunnerService } from './workflow-runner.service';
 import {
   buildConnectorInputs,
   isRepositoryAsset,
@@ -38,6 +39,7 @@ import {
 import { GetManyJobHistoriesRequestDto } from './dto/get-many-job-histories-dto';
 import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
 import { JobListItemDto } from './dto/job-list-item.dto';
+import { RetryRunResponseDto } from './dto/retry-run-response.dto';
 import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
 import { JobHistoryResponseDto } from './dto/job-history.dto';
 import { JobHistoryWorkflowResponseDto } from './dto/job-history-workflow.dto';
@@ -114,6 +116,7 @@ export class JobsRegistryController {
     private readonly connectorRegistry: ConnectorRegistryService,
     private readonly toolConfigProfilesService: ToolConfigProfilesService,
     private readonly integrationsService: IntegrationsService,
+    private readonly workflowRunnerService: WorkflowRunnerService,
   ) {}
 
   @WorkspaceAccess('job.read')
@@ -410,6 +413,26 @@ export class JobsRegistryController {
     @Param() params: IdQueryParamDto,
   ) {
     return this.jobsRegistryService.cancelJobHistory(workspaceId, params.id);
+  }
+
+  @WorkspaceAccess('job.write')
+  @Doc({
+    summary: 'Retry a run',
+    description:
+      'Starts a new run from the same workflow and scope as an existing run, leaving the original run untouched.',
+    response: {
+      serialization: RetryRunResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @Post('/histories/:id/re-run')
+  retryJobHistory(
+    @WorkspaceId() workspaceId: string,
+    @Param() params: IdQueryParamDto,
+  ): Promise<RetryRunResponseDto> {
+    return this.workflowRunnerService.retryRun(workspaceId, params.id);
   }
 
   @WorkspaceAccess('job.delete')

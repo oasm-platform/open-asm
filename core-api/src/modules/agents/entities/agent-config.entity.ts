@@ -70,6 +70,10 @@ export class AgentConfig extends BaseEntity {
   @Column({ type: 'varchar', nullable: true })
   defaultApprovalMode?: AgentApprovalMode | null;
 
+  /** Effort for a model with none picked; unset: the provider default */
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  defaultReasoningEffort?: ReasoningEffort | null;
+
   /** Built-in tool names the agent must not get */
   @Column({ type: 'jsonb', default: [] })
   disabledTools: string[];

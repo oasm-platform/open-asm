@@ -1,10 +1,10 @@
 import { tool, type Tool } from 'ai';
-import type { z } from 'zod';
+import { z } from 'zod';
 
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 
 import type { ApprovalDecision } from '../agents.approvals';
-import type { ToolCallOptions } from './types';
+import type { ToolCallOptions, ToolScope } from './types';
 
 export interface ToolConfig {
   description: string;
@@ -47,6 +47,34 @@ export const NEWEST_FIRST = {
   sortBy: 'createdAt',
   sortOrder: SortOrder.DESC,
 } as const;
+
+/** The optional `projectId` input of the project-aware tools. */
+export const projectIdInput = {
+  projectId: z
+    .string()
+    .uuid()
+    .optional()
+    .describe(
+      'Only return data inside this project (from list_projects). Ignored in a conversation about a project: the tool is locked to it.',
+    ),
+};
+
+/** The project a call reads: the conversation's lock wins over the model's pick. */
+export const projectFor = (
+  scope: ToolScope,
+  params: { projectId?: string },
+): string | undefined => scope.projectId ?? params.projectId ?? undefined;
+
+/** Asset-service queries restricted to the assets of `projectId`, if any. */
+export const assetsInProject = (projectId: string | undefined) =>
+  projectId
+    ? {
+        filter: {
+          logic: 'and' as const,
+          items: [{ field: 'project' as const, op: 'eq' as const, value: projectId }],
+        },
+      }
+    : {};
 
 export function rejectionMessage(what: string, feedback?: string): string {
   const base = `${what} was not approved by the user and was not executed.`;

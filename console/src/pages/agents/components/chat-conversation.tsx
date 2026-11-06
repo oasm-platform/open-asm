@@ -9,6 +9,7 @@ import {
 } from '@/components/ai-elements/conversation';
 import { ShieldAlert } from 'lucide-react';
 import type { RemoteExecuteStreamEvent } from '@/hooks/use-remote-execute-stream';
+import type { ConversationProjectDto } from '@/services/apis/gen/queries';
 import type { UIMessage } from 'ai';
 import { motion } from 'framer-motion';
 import type { StickToBottomContext } from 'use-stick-to-bottom';
@@ -21,6 +22,8 @@ import {
   type ReactNode,
 } from 'react';
 import { ChatMessage } from './chat-message';
+import { ProjectScopeSelect } from './project-scope-select';
+import { WorkerSelect } from './worker-select';
 import { LoadingSkeleton } from './chat-skeletons';
 import { StreamError } from './chat-stream-error';
 import { ThinkingLabel, TypingDots, getTextContent } from './chat-helpers';
@@ -57,6 +60,8 @@ interface ChatConversationProps {
   approvalPrompt?: ReactNode;
   selectedWorkerId?: string | null;
   onWorkerSelect?: (workerId: string | null) => void;
+  /** The project the chat is about, shown above the input */
+  project?: ConversationProjectDto | null;
   todos?: AgentTodoItem[];
   /** Goal of the plan, pinned in the todo panel */
   goal?: string | null;
@@ -90,6 +95,7 @@ export const ChatConversation = ({
   approvalPrompt,
   selectedWorkerId,
   onWorkerSelect,
+  project = null,
   todos,
   goal,
   showTodoAboveInput = true,
@@ -343,6 +349,15 @@ export const ChatConversation = ({
 
       <div className="shrink-0 px-4 pb-4">
         <div className="max-w-3xl mx-auto w-full flex flex-col">
+          <div className="mb-1.5 flex items-center gap-2 px-3">
+            <ProjectScopeSelect value={project} />
+            {agentMode === 'agent' && onWorkerSelect && (
+              <WorkerSelect
+                value={selectedWorkerId ?? null}
+                onChange={onWorkerSelect}
+              />
+            )}
+          </div>
           {/* Starts folded on small screens: the input keeps the room */}
           {showTodoAboveInput && ((todos && todos.length > 0) || goal) && (
             <AgentTodoPanel
@@ -371,8 +386,6 @@ export const ChatConversation = ({
               }
               onSelectModel={onSelectModel}
               agentMode={agentMode}
-              selectedWorkerId={selectedWorkerId}
-              onWorkerSelect={onWorkerSelect}
               showSettingsButton={false}
               placeholder={
                 isStreaming

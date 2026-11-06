@@ -21,6 +21,16 @@ export default function TypewriterText({
   const [currentIndex, setCurrentIndex] = useState(() =>
     Math.floor(Math.random() * texts.length),
   );
+  // A new list (e.g. ask/agent switch) can be shorter than the old index:
+  // start over on a text from the new list.
+  const [prevTexts, setPrevTexts] = useState(texts);
+  if (texts !== prevTexts) {
+    setPrevTexts(texts);
+    setDisplayText('');
+    setCharIndex(0);
+    setIsDeleting(false);
+    setCurrentIndex(Math.floor(Math.random() * texts.length));
+  }
 
   useEffect(() => {
     const currentText = texts[currentIndex];

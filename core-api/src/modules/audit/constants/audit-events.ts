@@ -88,6 +88,9 @@ export const AUDIT_ACTION_CATALOG = [
   { action: 'artifact.unshared', label: 'Unshared file', controller: 'ArtifactsController', method: 'removeShare' },
   { action: 'artifact.deleted', label: 'Deleted file', controller: 'ArtifactsController', method: 'remove' },
   { action: 'storage.quota.updated', label: 'Changed storage quota', controller: 'AdminWorkspacesController', method: 'updateStorageQuota' },
+  // tools (43–44)
+  { action: 'tool.installed', label: 'Installed tool', controller: 'ToolsController', method: 'installTool' },
+  { action: 'tool.uninstalled', label: 'Uninstalled tool', controller: 'ToolsController', method: 'uninstallTool' },
 ] as const satisfies readonly AuditActionEntry[];
 
 /** Union of every catalog action key — the type for the audit DTOs' `@IsIn`. */

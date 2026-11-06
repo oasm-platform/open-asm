@@ -20,11 +20,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  EFFORT_LABELS,
+  type ReasoningEffort,
+} from '@/components/ui/reasoning-effort-select';
+import { setDefaultApprovalMode } from '@/hooks/use-approval-mode';
 import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import {
   AgentModelRefDtoReasoningEffort,
+  type UpsertAgentConfigDto,
   getAgentsControllerGetAgentConfigQueryKey,
   getAgentsControllerGetConnectedProvidersQueryKey,
   getAgentsControllerGetProviderModelsQueryOptions,
@@ -45,13 +51,20 @@ type ModelRef = AgentModelRefDto;
 type Effort = AgentModelRefDto['reasoningEffort'];
 
 /** Radix Select cannot hold an empty value, so "not set" gets a token. */
-const EFFORT_UNSET = 'unset';
+const UNSET = 'unset';
 
 const EFFORT_OPTIONS: Array<{ value: NonNullable<Effort>; label: string }> = [
   { value: AgentModelRefDtoReasoningEffort.low, label: 'Low' },
   { value: AgentModelRefDtoReasoningEffort.medium, label: 'Medium' },
   { value: AgentModelRefDtoReasoningEffort.high, label: 'High' },
 ];
+
+const DEFAULT_EFFORTS = Object.keys(EFFORT_LABELS) as ReasoningEffort[];
+
+const APPROVAL_OPTIONS = [
+  { value: 'manual', label: 'Manual' },
+  { value: 'auto', label: 'Auto' },
+] as const;
 
 /**
  * The ref to save when the user picks `picked`. Picking the same model keeps
@@ -290,6 +303,29 @@ export function ModelsManager() {
     [config, upsert, queryClient],
   );
 
+  // New chat defaults: a partial upsert, so it never touches modelsConfig
+  const saveDefaults = (
+    patch: Pick<
+      UpsertAgentConfigDto,
+      'defaultReasoningEffort' | 'defaultApprovalMode'
+    >,
+  ) => {
+    upsert.mutate(
+      { data: patch },
+      {
+        onSuccess: (saved) => {
+          queryClient.setQueryData(
+            getAgentsControllerGetAgentConfigQueryKey(),
+            saved,
+          );
+          setDefaultApprovalMode(saved.defaultApprovalMode);
+          toast.success('Defaults updated');
+        },
+        onError: () => toast.error('Failed to update defaults'),
+      },
+    );
+  };
+
   // The row stands for all subagent models: unset clears them all
   const setSubagent = (ref: ModelRef | undefined) => {
     const rest = models.subagents?.slice(1) ?? [];
@@ -391,13 +427,13 @@ export function ModelsManager() {
           onChange={(picked) => setSubagent(nextRef(subagent, picked))}
         />
         <Select
-          value={subagent?.reasoningEffort ?? EFFORT_UNSET}
+          value={subagent?.reasoningEffort ?? UNSET}
           disabled={!subagent}
           onValueChange={(effort) => {
             if (!subagent) return;
             const { reasoningEffort: _old, ...ref } = subagent;
             setSubagent(
-              effort === EFFORT_UNSET
+              effort === UNSET
                 ? ref
                 : { ...ref, reasoningEffort: effort as NonNullable<Effort> },
             );
@@ -411,10 +447,76 @@ export function ModelsManager() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent align="end">
-            <SelectItem value={EFFORT_UNSET}>
+            <SelectItem value={UNSET}>
               Not Set (Use Provider Default)
             </SelectItem>
             {EFFORT_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </SettingRow>
+      <SettingRow
+        title="Default Reasoning Effort"
+        description="Effort a new chat starts with when none is picked in the chat. A model without the level runs at its provider default."
+      >
+        <Select
+          value={config.defaultReasoningEffort ?? UNSET}
+          onValueChange={(effort) =>
+            saveDefaults({
+              defaultReasoningEffort:
+                effort === UNSET ? null : (effort as ReasoningEffort),
+            })
+          }
+        >
+          <SelectTrigger
+            size="sm"
+            aria-label="Default reasoning effort"
+            className="border-0 bg-transparent shadow-none"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="end">
+            <SelectItem value={UNSET}>
+              Not Set (Use Provider Default)
+            </SelectItem>
+            {DEFAULT_EFFORTS.map((effort) => (
+              <SelectItem key={effort} value={effort}>
+                {EFFORT_LABELS[effort]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </SettingRow>
+      <SettingRow
+        title="Default Approval Mode"
+        description="How commands run when a new chat starts. Manual asks before each new command; Auto runs them all."
+      >
+        <Select
+          value={config.defaultApprovalMode ?? UNSET}
+          onValueChange={(mode) =>
+            saveDefaults({
+              defaultApprovalMode:
+                mode === UNSET
+                  ? null
+                  : (mode as (typeof APPROVAL_OPTIONS)[number]['value']),
+            })
+          }
+        >
+          <SelectTrigger
+            size="sm"
+            aria-label="Default approval mode"
+            className="border-0 bg-transparent shadow-none"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="end">
+            <SelectItem value={UNSET}>
+              Not Set (Use Last Choice)
+            </SelectItem>
+            {APPROVAL_OPTIONS.map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}
               </SelectItem>

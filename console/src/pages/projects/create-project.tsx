@@ -7,6 +7,7 @@ import {
   type PipelineToolEntry,
 } from '@/pages/projects/components/tool-pipeline-builder';
 import { NoInstalledToolsState } from '@/pages/projects/components/no-installed-tools-state';
+import { usePipelineTools } from '@/pages/projects/components/use-pipeline-tools';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -30,7 +31,6 @@ import {
   useAssetsControllerGetHostAssets,
   useProjectsControllerCreate,
   useProjectsControllerGetWorkflowTemplates,
-  useToolsControllerGetInstalledTools,
   type CreateProjectDto,
   type Project,
 } from '@/services/apis/gen/queries';
@@ -104,9 +104,9 @@ export function CreateProject() {
     { page, limit: pageSize, sortBy, sortOrder, value: filter },
     { query: { queryKey: ['create-project-hosts', page, pageSize, sortBy, sortOrder, filter] } },
   );
-  const toolsQuery = useToolsControllerGetInstalledTools();
+  const toolsQuery = usePipelineTools();
   const templatesQuery = useProjectsControllerGetWorkflowTemplates();
-  const tools = useMemo(() => toolsQuery.data?.data ?? [], [toolsQuery.data?.data]);
+  const { tools, installableTools } = toolsQuery;
   const toolsById = useMemo(() => new Map(tools.map((tool) => [tool.id, tool])), [tools]);
 
   const { mutate: createProject, isPending } = useProjectsControllerCreate();
@@ -212,8 +212,8 @@ export function CreateProject() {
   return (
     <Page
       title="Create project"
+      headerClassName="mx-auto w-full max-w-4xl"
       description="Choose the assets to keep scanned, the pipeline that scans them, and when it runs"
-      isShowButtonGoBack
       permission="project.write"
     >
       <div className="h-full overflow-y-auto">
@@ -371,11 +371,12 @@ export function CreateProject() {
                         <LoaderCircleIcon className="size-4 animate-spin" />
                         Loading installed tools...
                       </div>
-                    ) : tools.length === 0 ? (
+                    ) : tools.length === 0 && installableTools.length === 0 ? (
                       <NoInstalledToolsState />
                     ) : (
                       <ToolPipelineBuilder
                         tools={tools}
+                        installableTools={installableTools}
                         value={pipeline}
                         onChange={setPipeline}
                       />

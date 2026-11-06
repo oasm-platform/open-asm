@@ -255,4 +255,26 @@ describe('ModelsManager', () => {
 
     expect(mutate.mock.calls[0][0].data.modelsConfig.subagents).toEqual([]);
   });
+
+  it('saves the new chat defaults on their own, without the models', async () => {
+    const user = userEvent.setup();
+    await setup({ default: DEFAULT });
+
+    await user.click(
+      await screen.findByRole('combobox', { name: 'Default reasoning effort' }),
+    );
+    await user.click(await screen.findByRole('option', { name: 'Extra high' }));
+    expect(mutate.mock.calls[0][0]).toEqual({
+      data: { defaultReasoningEffort: 'xhigh' },
+    });
+
+    await user.click(
+      screen.getByRole('combobox', { name: 'Default approval mode' }),
+    );
+    await user.click(await screen.findByRole('option', { name: 'Auto' }));
+    await waitFor(() => expect(mutate).toHaveBeenCalledTimes(2));
+    expect(mutate.mock.calls[1][0]).toEqual({
+      data: { defaultApprovalMode: 'auto' },
+    });
+  });
 });

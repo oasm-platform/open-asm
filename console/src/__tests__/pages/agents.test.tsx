@@ -30,6 +30,11 @@ vi.mock('@/hooks/use-llm-configs', () => ({
   })),
 }));
 
+vi.mock('@/services/apis/gen/queries', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/services/apis/gen/queries')>()),
+  useAgentsControllerGetAgentConfig: () => ({ data: undefined }),
+}));
+
 vi.mock('@/components/typewriter-text', () => ({
   default: ({ texts }: { texts: string[] }) => (
     <div data-testid="typewriter-text">{texts[0]}</div>
@@ -38,6 +43,14 @@ vi.mock('@/components/typewriter-text', () => ({
 
 vi.mock('@/components/agent-prompt-input', () => ({
   default: () => <div data-testid="agent-prompt-input">AgentPromptInput</div>,
+}));
+
+vi.mock('@/pages/agents/components/project-scope-select', () => ({
+  ProjectScopeSelect: () => null,
+}));
+
+vi.mock('@/pages/agents/components/worker-select', () => ({
+  WorkerSelect: () => null,
 }));
 
 // framer-motion never finishes animations under jsdom, so the test ends the

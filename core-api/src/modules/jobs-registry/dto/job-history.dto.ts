@@ -71,6 +71,15 @@ export class JobHistoryResponseDto {
   @ApiProperty({ type: Number })
   totalJobs: number;
 
+  @ApiProperty({ type: Number, description: 'Jobs that finished successfully' })
+  completedJobs?: number;
+
+  @ApiProperty({ type: Number, description: 'Jobs that ended failed' })
+  failedJobs?: number;
+
+  @ApiProperty({ type: Number, description: 'Percent of jobs in a terminal state' })
+  progress?: number;
+
   @ApiProperty({ enum: JobStatus })
   status: JobStatus;
 

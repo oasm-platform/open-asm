@@ -78,15 +78,16 @@ describe('event catalog', () => {
     // The tree is the authored source; EVENT_DEFINITIONS is derived. If the
     // walk ever stops matching the shape, these fail rather than the bridge
     // publishing half a catalog.
-    it('exposes 98 leaves', () => {
+    it('exposes 100 leaves', () => {
       // 96 = the 85 left once `worker.alive` was removed (a heartbeat is read
       // from `workers.lastSeenAt`, not streamed, and on the shared stream it
       // would be the entry MAXLEN evicts first), plus `asset.url.discovered`,
       // the 7 artifact/storage-quota audit events and the 3 project
       // update/archive/unarchive audit events, plus the 2 project trigger
-      // facts (`project.assets.added`, `project.run.completed`). Asserting the
+      // facts (`project.assets.added`, `project.run.completed`), plus the 2
+      // tool install/uninstall audit events. Asserting the
       // count means the removal cannot be half-reverted without failing here.
-      expect(EVENT_DEFINITIONS).toHaveLength(98);
+      expect(EVENT_DEFINITIONS).toHaveLength(100);
     });
 
     it('has no worker.alive leaf, so nothing can publish a heartbeat', () => {
@@ -184,7 +185,7 @@ describe('event catalog', () => {
     });
 
     it('carries the audit action count', () => {
-      expect(AUDIT_ACTION_CATALOG).toHaveLength(45);
+      expect(AUDIT_ACTION_CATALOG).toHaveLength(47);
     });
   });
 

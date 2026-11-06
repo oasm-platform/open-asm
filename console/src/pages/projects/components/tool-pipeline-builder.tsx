@@ -23,6 +23,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { ToolConnectorConfigSheet } from '@/components/tools/tool-connector-config-sheet';
+import { ToolInstallConfirmDialog } from '@/components/tools/tool-install-confirm-dialog';
 import { cn } from '@/lib/utils';
 import { formatCategory } from '@/pages/tools/components/format-category';
 import {
@@ -34,6 +35,8 @@ import {
 } from '@/services/apis/gen/queries';
 import {
   CheckIcon,
+  Download,
+  LoaderCircle,
   Pencil,
   Plus,
   Search,
@@ -50,6 +53,11 @@ import {
 } from 'react';
 import { toast } from 'sonner';
 import { capabilityOf, describeKinds, KIND_LABEL, pipelineHint } from './tool-io';
+import useDebounce from '@/hooks/use-debounce';
+import {
+  useInstallableToolSearch,
+  useInstallPipelineTool,
+} from './use-pipeline-tools';
 
 /**
  * A single tool entry in the pipeline. Tools of one step run at once; a step
@@ -84,6 +92,8 @@ interface ToolPipelineBuilderProps {
   onChange: (next: PipelineToolEntry[]) => void;
   disabled?: boolean;
   emptyMessage?: string;
+  /** Tools not installed yet; each can be installed from the picker. */
+  installableTools?: Tool[];
 }
 
 const BLOCKED_MESSAGE = 'This tool needs configuration — add it first, then configure from the panel.';
@@ -340,6 +350,142 @@ const PipelineToolLogo = memo(
     );
   }),
 );
+
+/**
+ * A tool that is not installed yet: opens the install dialog, and once the
+ * install lands the tool moves to the installed row with its panel open.
+ */
+function InstallableToolLogo({
+  tool,
+  disabled,
+  onInstalled,
+}: {
+  tool: Tool;
+  disabled?: boolean;
+  onInstalled: (toolId: string) => void;
+}) {
+  const install = useInstallPipelineTool();
+  const [installing, setInstalling] = useState(false);
+
+  const handleConfirm = () => {
+    setInstalling(true);
+    install(tool)
+      .then(() => onInstalled(tool.id))
+      .catch(() => undefined)
+      .finally(() => setInstalling(false));
+  };
+
+  return (
+    <ToolInstallConfirmDialog
+      tool={tool}
+      onConfirm={handleConfirm}
+      trigger={
+        <button
+          type="button"
+          className={cn(
+            'group flex cursor-pointer flex-col items-center gap-2',
+            (disabled || installing) && 'cursor-not-allowed opacity-50',
+          )}
+          disabled={disabled || installing}
+          aria-label={`Install ${tool.name}`}
+        >
+          <div className="relative">
+            <div className="grayscale opacity-40 transition-all duration-300 group-hover:grayscale-0 group-hover:opacity-100">
+              <ToolLogo
+                name={tool.name}
+                logoUrl={tool.logoUrl}
+                size={40}
+                className="rounded-full border-2 border-dashed border-muted-foreground/40"
+              />
+            </div>
+            <div
+              className={cn(
+                'absolute inset-0 flex items-center justify-center rounded-full bg-black/60 transition-opacity duration-300',
+                installing ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+              )}
+            >
+              {installing ? (
+                <LoaderCircle className="size-5 animate-spin text-white" />
+              ) : (
+                <Download className="size-5 text-white" />
+              )}
+            </div>
+          </div>
+          <span className="text-center text-xs font-medium capitalize text-muted-foreground">
+            {tool.name}
+          </span>
+        </button>
+      }
+    />
+  );
+}
+
+/**
+ * The not-installed row, with its own search: it runs on the server, so it
+ * still finds a tool once the catalog outgrows the first page.
+ */
+function InstallableToolsSection({
+  tools,
+  installedIds,
+  disabled,
+  onInstalled,
+}: {
+  tools: Tool[];
+  installedIds: ReadonlySet<string>;
+  disabled?: boolean;
+  onInstalled: (toolId: string) => void;
+}) {
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search.trim(), 300);
+  const { results, isFetching } = useInstallableToolSearch(
+    debouncedSearch,
+    installedIds,
+  );
+  const shown = debouncedSearch ? results : tools;
+
+  return (
+    <div className="flex flex-col gap-3 border-t pt-4">
+      {/* Same layout as the installed row's search above. */}
+      <div className="flex items-center gap-3">
+        <div className="relative max-w-xs flex-1">
+          <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search tools to install..."
+            aria-label="Search tools to install"
+            className="pl-8"
+            disabled={disabled}
+          />
+          {isFetching && (
+            <LoaderCircle className="absolute right-2.5 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+          )}
+        </div>
+        <span className="text-xs text-muted-foreground">
+          Not installed · click to install in this workspace
+        </span>
+      </div>
+      {shown.length > 0 ? (
+        <div className="flex flex-wrap gap-5">
+          {shown.map((tool) => (
+            <InstallableToolLogo
+              key={tool.id}
+              tool={tool}
+              disabled={disabled}
+              onInstalled={onInstalled}
+            />
+          ))}
+        </div>
+      ) : (
+        !isFetching && (
+          <p className="text-xs text-muted-foreground">
+            No tools to install match &quot;{debouncedSearch}&quot;
+          </p>
+        )
+      )}
+    </div>
+  );
+}
 
 /**
  * Action panel for a selected tool: step, config profile, inline config,
@@ -717,6 +863,7 @@ function ToolPipelineBuilderComponent({
   onChange,
   disabled = false,
   emptyMessage = 'No scanning tools installed',
+  installableTools = [],
 }: ToolPipelineBuilderProps) {
   const [search, setSearch] = useState('');
   // Only one selected-tool panel open at a time (tool id).
@@ -778,6 +925,10 @@ function ToolPipelineBuilderComponent({
     if (!query) return tools;
     return tools.filter((t) => t.name.toLowerCase().includes(query));
   }, [tools, search]);
+  const installedIds = useMemo(
+    () => new Set(tools.map((t) => t.id)),
+    [tools],
+  );
 
   // Selected entries whose tool is no longer in the installed list —
   // still rendered (as fallback circles) so they stay removable.
@@ -933,7 +1084,7 @@ function ToolPipelineBuilderComponent({
                 setSearch(e.target.value);
                 setActiveId(null);
               }}
-              placeholder="Search tools..."
+              placeholder="Search installed tools..."
               className="pl-8"
               disabled={disabled}
             />
@@ -945,7 +1096,11 @@ function ToolPipelineBuilderComponent({
         </div>
 
         {tools.length === 0 && (
-          <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+          <p className="text-sm text-muted-foreground">
+            {installableTools.length > 0
+              ? 'No tools installed yet. Install one below to add it.'
+              : emptyMessage}
+          </p>
         )}
         <div className="flex flex-wrap gap-5">
           {filteredTools.map((tool) => {
@@ -1040,6 +1195,14 @@ function ToolPipelineBuilderComponent({
             );
           })}
         </div>
+        {installableTools.length > 0 && (
+          <InstallableToolsSection
+            tools={installableTools}
+            installedIds={installedIds}
+            disabled={disabled}
+            onInstalled={setActiveId}
+          />
+        )}
         {stageCount > 2 && <PipelineStages value={value} tools={tools} />}
         {tools.length > 0 && filteredTools.length === 0 && (
           <p className="text-sm text-muted-foreground">

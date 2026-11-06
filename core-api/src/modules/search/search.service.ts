@@ -6,12 +6,15 @@ import { AssetsService } from '../assets/assets.service';
 import { User } from '../auth/entities/user.entity';
 import { StatisticService } from '../statistic/statistic.service';
 import { TargetsService } from '../targets/targets.service';
+import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import {
   GetManySearchHistoryDto,
   SearchAssetsTargetsDto,
   SearchResponseDto,
 } from './dto/search.dto';
 import { SearchHistory } from './entities/search-history.entity';
+
+const VULNERABILITY_SEARCH_LIMIT = 5;
 
 /**
  * Service for managing search operations and search history.
@@ -23,6 +26,9 @@ export class SearchService {
   constructor(
     @InjectRepository(SearchHistory)
     private readonly searchHistoryRepo: Repository<SearchHistory>,
+
+    @InjectRepository(Vulnerability)
+    private readonly vulnerabilityRepo: Repository<Vulnerability>,
 
     private readonly assetService: AssetsService,
     private readonly targetService: TargetsService,
@@ -54,7 +60,7 @@ export class SearchService {
     );
 
     // Fetch the actual data with calculated limits
-    const [assets, targets] = await Promise.all([
+    const [assets, targets, vulnerabilities] = await Promise.all([
       assetsLimit > 0
         ? this.assetService.getManyAsssetServices(
             {
@@ -73,20 +79,25 @@ export class SearchService {
             workspaceId,
           )
         : { data: [], total: 0, page: 1, pageCount: 0 },
+      this.searchVulnerabilities(query, workspaceId),
     ]);
 
     // Combine and sort by relevance (you might want to adjust sorting based on your needs)
     const combinedResults = {
       assets: assets.data || [],
       targets: targets.data || [],
+      vulnerabilities,
     };
+
+    const combinedTotal =
+      (assets.total || 0) + (targets.total || 0) + vulnerabilities.length;
 
     const response = {
       data: combinedResults,
-      total: (assets.total || 0) + (targets.total || 0),
+      total: combinedTotal,
       page: +query.page,
       limit: +query.limit,
-      pageCount: Math.ceil((assets.total + targets.total) / query.limit),
+      pageCount: Math.ceil(combinedTotal / query.limit),
       hasNextPage: query.page * query.limit < totalItems,
     };
 
@@ -114,6 +125,42 @@ export class SearchService {
       }
     }
     return response as unknown as SearchResponseDto;
+  }
+
+  /** Top findings matching name, CVE or affected URL, scoped to the workspace. */
+  private async searchVulnerabilities(
+    query: SearchAssetsTargetsDto,
+    workspaceId: string,
+  ): Promise<Vulnerability[]> {
+    const value = query.value?.trim();
+    const hasSeverity = Array.isArray(query.severity) && query.severity.length > 0;
+    if (!value && !hasSeverity) return [];
+
+    const qb = this.vulnerabilityRepo
+      .createQueryBuilder('v')
+      .leftJoin('v.asset', 'assets')
+      .addSelect(['assets.id', 'assets.value'])
+      .leftJoin('assets.target', 'targets')
+      .where('targets.workspaceId = :workspaceId', { workspaceId })
+      .orderBy('v.createdAt', 'DESC')
+      .take(VULNERABILITY_SEARCH_LIMIT);
+
+    if (value) {
+      qb.andWhere(
+        `(v.name ILIKE :q OR COALESCE(v."affectedUrl", '') ILIKE :q OR EXISTS (
+          SELECT 1 FROM unnest(COALESCE(v."cveId", '{}'::text[])) cve WHERE cve ILIKE :q
+        ))`,
+        { q: `%${value}%` },
+      );
+    }
+
+    if (hasSeverity) {
+      qb.andWhere('v.severity IN (:...severity)', {
+        severity: query.severity,
+      });
+    }
+
+    return qb.getMany();
   }
 
   private calculateLimits(

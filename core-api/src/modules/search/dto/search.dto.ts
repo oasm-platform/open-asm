@@ -1,10 +1,13 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
+import { Severity } from '@/common/enums/enum';
 import { Asset } from '@/modules/assets/entities/assets.entity';
 import { Target } from '@/modules/targets/entities/target.entity';
+import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   IsBoolean,
+  IsEnum,
   IsNumber,
   IsOptional,
   IsString,
@@ -30,6 +33,19 @@ export class SearchAssetsTargetsDto extends GetManyBaseQueryParams {
   @IsBoolean()
   @Transform(({ value }) => value === 'true')
   isSaveHistory: boolean;
+
+  @ApiProperty({
+    required: false,
+    isArray: true,
+    enum: Severity,
+    description: 'Only return findings with these severities',
+  })
+  @IsOptional()
+  @IsEnum(Severity, { each: true })
+  @Transform(
+    ({ value }) => (Array.isArray(value) ? value : [value]) as Severity[],
+  )
+  severity?: Severity[];
 }
 export class SearchData {
   @ApiProperty({ type: [Asset] })
@@ -37,6 +53,12 @@ export class SearchData {
 
   @ApiProperty({ type: [Target] })
   targets: Target[];
+
+  @ApiProperty({
+    type: [Vulnerability],
+    description: 'Top matching findings, newest first',
+  })
+  vulnerabilities: Vulnerability[];
 }
 
 export class SearchResponseDto {

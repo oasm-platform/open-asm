@@ -23,11 +23,23 @@ export enum LLMProvider {
   CUSTOM = 'custom',
 }
 
+/** Reasoning effort levels, lowest first (models.dev names). */
 export enum ReasoningEffort {
+  NONE = 'none',
+  MINIMAL = 'minimal',
   LOW = 'low',
   MEDIUM = 'medium',
   HIGH = 'high',
+  XHIGH = 'xhigh',
+  MAX = 'max',
 }
+
+/** Levels offered for a model that publishes none of its own. */
+export const FALLBACK_REASONING_EFFORTS = [
+  ReasoningEffort.LOW,
+  ReasoningEffort.MEDIUM,
+  ReasoningEffort.HIGH,
+];
 
 export enum SearchProvider {
   EXA = 'exa',

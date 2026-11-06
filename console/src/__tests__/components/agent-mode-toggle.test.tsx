@@ -1,14 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { AgentModeSelect } from '@/components/ui/agent-mode-toggle';
-import { renderWithProviders } from '@/test/utils';
-import { toast } from 'sonner';
+import { fireEvent } from '@testing-library/react';
+import { AgentModeToggle } from '@/components/ui/agent-mode-toggle';
+import { renderWithProviders, screen } from '@/test/utils';
 
 vi.mock('@/hooks/use-live-events', () => ({
   useLiveEvents: vi.fn(),
 }));
 
-vi.mock('@/components/ui/approval-mode-select', () => ({
-  ApprovalModeSelect: () => null,
+const mockOpenDialog = vi.fn();
+vi.mock('@/hooks/useConnectWorkerState', () => ({
+  useConnectWorkerState: () => ({ openDialog: mockOpenDialog }),
 }));
 
 vi.mock('@/services/apis/gen/queries', async (importOriginal) => {
@@ -29,54 +30,56 @@ const { useAgentsControllerGetAgentModes } = await import(
 );
 const mockModes = vi.mocked(useAgentsControllerGetAgentModes);
 
-const modes = (workerIds: string[], isFetching = false) =>
+const modes = (workerIds: string[]) =>
   ({
     data: { modes: [], workers: workerIds.map((id) => ({ id, name: id })) },
     isSuccess: true,
-    isFetching,
+    isFetching: false,
     refetch: vi.fn(),
   }) as unknown as ReturnType<typeof useAgentsControllerGetAgentModes>;
 
-describe('AgentModeSelect worker pick', () => {
-  const onWorkerChange = vi.fn();
-
+describe('AgentModeToggle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  const render = (selectedWorkerId: string | null) =>
+  it('switches ask to agent from the toggle', async () => {
+    mockModes.mockReturnValue(modes(['w-online']));
+    const onChange = vi.fn();
+
+    renderWithProviders(<AgentModeToggle value="ask" onChange={onChange} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Agent' }));
+
+    expect(onChange).toHaveBeenCalledWith('agent');
+  });
+
+  it('opens the connect dialog instead of switching when no worker is online', async () => {
+    mockModes.mockReturnValue(modes([]));
+    const onChange = vi.fn();
+
+    renderWithProviders(<AgentModeToggle value="ask" onChange={onChange} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Agent' }));
+
+    expect(mockOpenDialog).toHaveBeenCalled();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('clears the picked worker when switching back to ask', async () => {
+    mockModes.mockReturnValue(modes(['w-online']));
+    const onWorkerChange = vi.fn();
+
     renderWithProviders(
-      <AgentModeSelect
+      <AgentModeToggle
         value="agent"
-        selectedWorkerId={selectedWorkerId}
+        onChange={vi.fn()}
         onWorkerChange={onWorkerChange}
       />,
     );
 
-  it('falls back to Auto when the selected worker is no longer online', async () => {
-    mockModes.mockReturnValue(modes(['w-online']));
+    fireEvent.click(await screen.findByRole('button', { name: 'Agent' }));
 
-    render('w-gone');
-
-    await vi.waitFor(() => expect(onWorkerChange).toHaveBeenCalledWith(null));
-    expect(toast.info).toHaveBeenCalled();
-  });
-
-  it('keeps a selected worker that is still online', async () => {
-    mockModes.mockReturnValue(modes(['w-online']));
-
-    render('w-online');
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    expect(onWorkerChange).not.toHaveBeenCalled();
-  });
-
-  it('waits for a refetch in flight before deciding', async () => {
-    mockModes.mockReturnValue(modes([], true));
-
-    render('w-online');
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    expect(onWorkerChange).not.toHaveBeenCalled();
+    expect(onWorkerChange).toHaveBeenCalledWith(null);
   });
 });

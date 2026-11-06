@@ -14,14 +14,18 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
-import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
+import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
+import { PublishEvent } from '../event-bridge/publishing/publish-event.decorator';
 import { ConnectorDto } from './dto/connector.dto';
 import { connectorCategories } from './tool-categories';
 import { GetConnectorBySlugDto } from './dto/get-connector-by-slug.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
 import { GetToolByIdDto } from './dto/get-tool-by-id.dto';
-import { InstallToolDto } from './dto/install-tool.dto';
+import {
+  InstallToolDto,
+  UninstallToolResponseDto,
+} from './dto/install-tool.dto';
 import { ToolsQueryDto } from './dto/tools-query.dto';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
 import { Tool } from './entities/tools.entity';
@@ -80,6 +84,12 @@ export class ToolsController {
       serialization: WorkspaceTool,
     },
   })
+  @PublishEvent(EVENT_CATALOG.tool.installed, {
+    resourceId: (result) => (result as WorkspaceTool | undefined)?.tool?.id,
+    changes: (_body, result) => ({
+      tool: { after: (result as WorkspaceTool | undefined)?.tool?.name ?? '' },
+    }),
+  })
   @WorkspaceAccess('workspace.write')
   @Post('install')
   async installTool(@Body() dto: InstallToolDto, @WorkspaceId() workspaceId: string) {
@@ -91,8 +101,16 @@ export class ToolsController {
     description:
       'Removes a security tool from a specific workspace by deleting its association record.',
     response: {
-      serialization: DefaultMessageResponseDto,
+      serialization: UninstallToolResponseDto,
     },
+  })
+  @PublishEvent(EVENT_CATALOG.tool.uninstalled, {
+    resourceId: (result) => (result as UninstallToolResponseDto | undefined)?.toolId,
+    changes: (_body, result) => ({
+      tool: {
+        before: (result as UninstallToolResponseDto | undefined)?.toolName ?? '',
+      },
+    }),
   })
   @WorkspaceAccess('workspace.write')
   @Post('uninstall')

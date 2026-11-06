@@ -106,6 +106,24 @@ describe('AgentsStreamBufferService', () => {
     expect(redis.entries.map((e) => e.fields)).toEqual([{ begin: '1' }]);
   });
 
+  it('reads a buffer as streaming until its done marker', async () => {
+    const { service } = build();
+    expect(await service.isStreaming('c1')).toBe(false);
+
+    await service.reset('c1');
+    await service.append('c1', '{"n":0}');
+    expect(await service.isStreaming('c1')).toBe(true);
+
+    await service.finish('c1');
+    expect(await service.isStreaming('c1')).toBe(false);
+  });
+
+  it('reads a Redis failure as not streaming', async () => {
+    const { redis, service } = build();
+    redis.xlast.mockRejectedValueOnce(new Error('down'));
+    expect(await service.isStreaming('c1')).toBe(false);
+  });
+
   it('has nothing to resume with no buffer and no active run', async () => {
     const { service } = build();
     const stream = await service.createResumeStream('c1', () => false);

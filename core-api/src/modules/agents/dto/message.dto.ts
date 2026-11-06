@@ -79,6 +79,15 @@ export class SendMessageDto {
   @IsOptional()
   @IsUUID()
   workerId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Project a new conversation is about; its data tools then stay inside that project. Ignored for an existing conversation.',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @IsOptional()
+  @IsUUID()
+  projectId?: string;
 }
 
 export class ToolCallResponseDto {

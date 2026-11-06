@@ -525,6 +525,42 @@ describe('useAgentChat subagents', () => {
     expect(mocks.orvalClient).toHaveBeenCalledTimes(1);
   });
 
+  it('picks up the project the agent created and linked during the run', async () => {
+    const project = { id: 'p1', name: 'Perimeter', hexColor: '#000' };
+    mocks.orvalClient
+      .mockResolvedValueOnce({ id: 'c1', subagents: [] })
+      .mockResolvedValueOnce({ id: 'c1', subagents: [], project });
+    const { result, rerender } = renderHook(() =>
+      useAgentChat({ conversationId: 'c1' }),
+    );
+    await flush();
+    expect(result.current.project).toBeNull();
+
+    mocks.chatMessages = [
+      {
+        id: 'm1',
+        role: 'assistant',
+        parts: [
+          {
+            type: 'dynamic-tool',
+            toolName: 'create_project',
+            toolCallId: 't1',
+            state: 'output-available',
+            input: {},
+            output: { projectId: 'p1' },
+          },
+        ],
+      } as UIMessage,
+    ];
+    mocks.status = 'ready';
+    rerender();
+    await flush();
+
+    expect(mocks.orvalClient).toHaveBeenCalledTimes(2);
+    expect(result.current.project).toEqual(project);
+    mocks.chatMessages = [];
+  });
+
   it('marks queued and running subagents cancelled when the user stops', async () => {
     mocks.orvalClient.mockResolvedValueOnce({
       id: 'c1',

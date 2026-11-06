@@ -164,6 +164,7 @@ describe('event bus subscriptions', () => {
           'storage',
           'system_config',
           'target',
+          'tool',
           'workspace',
         ].sort(),
       );
