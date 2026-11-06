@@ -201,7 +201,7 @@ export default function ToolDetail() {
   };
 
   return (
-    <Page isShowButtonGoBack>
+    <Page>
       <div className="mb-4 space-y-4">
         {/* Hero: logo, name, badges, meta + install CTA */}
         <Card>

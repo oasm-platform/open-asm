@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import type { Severity } from '@/common/enums/enum';
 import { WorkerScope } from '@/common/enums/enum';
+import type { IssueStatus, IssueType } from '@/common/enums/enum';
 import type { VulnerabilityStatus } from '@/modules/vulnerabilities/dto/get-vulnerability.dto';
 import {
   detailAssetSchema,
@@ -287,17 +288,21 @@ export function listIssuesTool(
   workspaceId: string,
 ): Tool {
   return defineTool({
-    description:
-      'List security issues with status. Params: page, limit, search, status (OPEN/IN_PROGRESS/RESOLVED).',
+    description: [
+      'List issues (work items) of the workspace, most recently updated first.',
+      'Params: page, limit, search (title or #number), status (open, in_progress, resolved, closed), type (vulnerability_remediation, task, asset_review, scan_failure).',
+      'Each item: id, no, title, type, status, priority, resolution, dueAt, assignee, linkCount, progress ({done,total} of linked findings, or null).',
+    ].join('\n'),
     inputSchema: listIssuesSchema,
     execute: async (params: z.infer<typeof listIssuesSchema>) => {
       const response = await deps.issuesService.getMany(
         {
           ...pageOf(params),
-          ...NEWEST_FIRST,
+          sortBy: 'updatedAt',
+          sortOrder: SortOrder.DESC,
           search: params.search,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
-          status: params.status as any,
+          status: params.status?.map((s) => s as IssueStatus),
+          type: params.type?.map((t) => t as IssueType),
         },
         workspaceId,
       );
@@ -305,9 +310,17 @@ export function listIssuesTool(
         ...response,
         data: response.data.map((i) => ({
           id: i.id,
+          no: i.no,
           title: i.title,
+          type: i.type,
           status: i.status,
+          priority: i.priority,
+          resolution: i.resolution,
+          dueAt: i.dueAt,
+          assignee: i.assignee,
           tags: i.tags,
+          linkCount: i.linkCount,
+          progress: i.progress,
         })),
       };
     },
@@ -319,7 +332,8 @@ export function detailIssueTool(
   workspaceId: string,
 ): Tool {
   return defineTool({
-    description: 'Get full details of a single issue by issueId.',
+    description:
+      'Get one issue by issueId: fields, progress, and its links (resourceType, resourceId and a summary of each linked vulnerability, asset, target, project or run; missing=true when deleted).',
     inputSchema: detailIssueSchema,
     execute: (params: z.infer<typeof detailIssueSchema>) =>
       deps.issuesService.getById(params.issueId, workspaceId),

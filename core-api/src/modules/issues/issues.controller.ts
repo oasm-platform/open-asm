@@ -1,9 +1,8 @@
 import { UserContext } from '@/common/decorators/app.decorator';
-import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
+import { WorkspaceId } from '@/common/decorators/workspace-id.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
-import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
-import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import {
@@ -12,22 +11,115 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { CreateIssueCommentDto } from './dto/create-issue-comment.dto';
 import { GetManyIssuesDto } from './dto/get-many-issues.dto';
+import { AddIssueLinksDto } from './dto/issue-link.dto';
+import {
+  CreateIssueRuleDto,
+  IssueRuleDto,
+  UpdateIssueRuleDto,
+} from './dto/issue-rule.dto';
 import {
   ChangeIssueStatusDto,
   CreateIssueDto,
+  IssueDetailDto,
+  IssueListItemDto,
   UpdateIssueDto,
 } from './dto/issue.dto';
-import { UpdateIssueCommentDto } from './dto/update-issue-comment.dto';
-import { IssueComment } from './entities/issue-comment.entity';
-import { Issue } from './entities/issue.entity';
 import { IssuesService } from './issues.service';
+import { IssueRulesService } from './rules/issue-rules.service';
+
+const idParam = [{ name: 'id', type: String, description: 'Issue ID' }];
+const ruleIdParam = [{ name: 'id', type: String, description: 'Rule ID' }];
+
+/**
+ * Issue rules. A separate controller registered BEFORE {@link IssuesController}
+ * so `/issues/rules` is not taken for `/issues/:id`.
+ */
+@ApiTags('Issues')
+@Controller('issues/rules')
+export class IssueRulesController {
+  constructor(private readonly rulesService: IssueRulesService) {}
+
+  @Doc({
+    summary: 'List issue rules',
+    description: 'Rules that open issues from events, oldest first.',
+    response: { serialization: IssueRuleDto, isArray: true },
+    request: { getWorkspaceId: true },
+  })
+  @WorkspaceAccess('workspace.read')
+  @Get()
+  listRules(@WorkspaceId() workspaceId: string) {
+    return this.rulesService.list(workspaceId);
+  }
+
+  @Doc({
+    summary: 'Create issue rule',
+    description: 'Adds a rule that opens or extends issues from an event.',
+    response: { serialization: IssueRuleDto },
+    request: { getWorkspaceId: true },
+  })
+  @WorkspaceAccess('workspace.write')
+  @Post()
+  createRule(
+    @Body() dto: CreateIssueRuleDto,
+    @UserContext() user: UserContextPayload,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.rulesService.create(dto, workspaceId, user.id);
+  }
+
+  @Doc({
+    summary: 'Install default issue rules',
+    description:
+      'Creates the default rule ("Critical & High": high and critical findings open one remediation issue per vulnerability name) unless it exists. Returns every rule.',
+    response: { serialization: IssueRuleDto, isArray: true },
+    request: { getWorkspaceId: true },
+  })
+  @WorkspaceAccess('workspace.write')
+  @Post('defaults')
+  createDefaultRules(
+    @UserContext() user: UserContextPayload,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.rulesService.createDefaults(workspaceId, user.id);
+  }
+
+  @Doc({
+    summary: 'Update issue rule',
+    response: { serialization: IssueRuleDto },
+    request: { getWorkspaceId: true, params: ruleIdParam },
+  })
+  @WorkspaceAccess('workspace.write')
+  @Patch(':id')
+  updateRule(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateIssueRuleDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.rulesService.update(id, dto, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Delete issue rule',
+    description: 'Issues the rule opened stay; they no longer point at it.',
+    response: { serialization: DefaultMessageResponseDto },
+    request: { getWorkspaceId: true, params: ruleIdParam },
+  })
+  @WorkspaceAccess('workspace.write')
+  @Delete(':id')
+  deleteRule(
+    @Param('id', ParseUUIDPipe) id: string,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.rulesService.delete(id, workspaceId);
+  }
+}
 
 @ApiTags('Issues')
 @Controller('issues')
@@ -35,218 +127,142 @@ export class IssuesController {
   constructor(private readonly issuesService: IssuesService) {}
 
   @Doc({
-    summary: 'Get all issues',
-    description: 'Retrieve a list of all issues with pagination and filtering.',
-    response: {
-      serialization: GetManyResponseDto(Issue),
-    },
-    request: {
-      getWorkspaceId: true,
-    },
+    summary: 'List issues',
+    description:
+      'Issues of the workspace with filters (status, type, priority, assignee, mine, overdue, linked resource, search on title or number) and progress per item.',
+    response: { serialization: GetManyResponseDto(IssueListItemDto) },
+    request: { getWorkspaceId: true },
   })
   @WorkspaceAccess('workspace.read')
   @Get()
   getMany(
     @Query() query: GetManyIssuesDto,
+    @UserContext() user: UserContextPayload,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.issuesService.getMany(query, workspaceId);
+    return this.issuesService.getMany(query, workspaceId, user.id);
   }
 
   @Doc({
     summary: 'Create issue',
-    description: 'Create a new issue linked to a source (e.g. vulnerability).',
-    response: {
-      serialization: Issue,
-    },
-    request: {
-      getWorkspaceId: true,
-    },
+    description: 'Creates an issue, optionally linked to resources of the workspace.',
+    response: { serialization: IssueDetailDto },
+    request: { getWorkspaceId: true },
   })
   @WorkspaceAccess('workspace.write')
   @Post()
   create(
-    @Body() createIssueDto: CreateIssueDto,
-    @WorkspaceId() workspaceId: string,
+    @Body() dto: CreateIssueDto,
     @UserContext() user: UserContextPayload,
+    @WorkspaceId() workspaceId: string,
   ) {
-    return this.issuesService.createIssue(createIssueDto, workspaceId, user.id);
+    return this.issuesService.createIssue(dto, workspaceId, user.id);
   }
 
   @Doc({
-    summary: 'Get issue by ID',
-    description: 'Retrieve details of a specific issue.',
-    response: {
-      serialization: Issue,
-    },
-    request: {
-      getWorkspaceId: true,
-      params: [
-        {
-          name: 'id',
-          type: String,
-          description: 'Issue ID',
-        },
-      ],
-    },
+    summary: 'Get issue',
+    description: 'An issue with its linked resources summarised and its progress.',
+    response: { serialization: IssueDetailDto },
+    request: { getWorkspaceId: true, params: idParam },
   })
   @WorkspaceAccess('workspace.read')
   @Get(':id')
-  getById(@Param('id') id: string, @WorkspaceId() workspaceId: string) {
+  getById(
+    @Param('id', ParseUUIDPipe) id: string,
+    @WorkspaceId() workspaceId: string,
+  ) {
     return this.issuesService.getById(id, workspaceId);
   }
 
   @Doc({
     summary: 'Update issue',
-    description: 'Update issue title and tags.',
-    response: {
-      serialization: Issue,
-    },
-    request: {
-      params: [
-        {
-          name: 'id',
-          type: String,
-          description: 'Issue ID',
-        },
-      ],
-    },
+    description:
+      'Updates title, description, tags, priority, due date or assignee (a workspace member).',
+    response: { serialization: IssueDetailDto },
+    request: { getWorkspaceId: true, params: idParam },
   })
   @WorkspaceAccess('workspace.write')
   @Patch(':id')
   update(
-    @Param('id') id: string,
-    @Body() updateIssueDto: UpdateIssueDto,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateIssueDto,
     @UserContext() user: UserContextPayload,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.issuesService.update(id, updateIssueDto, user.id, workspaceId);
+    return this.issuesService.update(id, dto, user.id, workspaceId);
   }
 
   @Doc({
     summary: 'Change issue status',
-    description: 'Change the status of an issue.',
-    response: {
-      serialization: Issue,
-    },
+    description:
+      'Moves an issue between open, in_progress, resolved and closed. Resolved and closed need a resolution. Writes a system comment.',
+    response: { serialization: IssueDetailDto },
+    request: { getWorkspaceId: true, params: idParam },
   })
   @WorkspaceAccess('workspace.write')
   @Patch(':id/status')
   changeStatus(
-    @Param() param: IdQueryParamDto,
-    @Body() changeIssueStatusDto: ChangeIssueStatusDto,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ChangeIssueStatusDto,
     @UserContext() user: UserContextPayload,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.issuesService.changeStatus(
-      param.id,
-      changeIssueStatusDto,
-      user.id,
-      workspaceId,
-    );
+    return this.issuesService.changeStatus(id, dto, user.id, workspaceId);
   }
 
   @Doc({
-    summary: 'Create comment for issue',
-    description: 'Create a new comment for a specific issue.',
-    response: {
-      serialization: IssueComment,
-    },
+    summary: 'Link resources to issue',
+    description:
+      'Links vulnerabilities, assets, targets, projects or runs of the workspace. Already linked resources are skipped.',
+    response: { serialization: IssueDetailDto },
+    request: { getWorkspaceId: true, params: idParam },
   })
   @WorkspaceAccess('workspace.write')
-  @Post(':issueId/comments')
-  createComment(
-    @Param('issueId') issueId: string,
-    @Body() createCommentDto: CreateIssueCommentDto,
+  @Post(':id/links')
+  addLinks(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AddIssueLinksDto,
     @UserContext() user: UserContextPayload,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.issuesService.createComment(
-      createCommentDto,
-      issueId,
-      user.id,
-      workspaceId,
-    );
+    return this.issuesService.addLinks(id, dto, user.id, workspaceId);
   }
 
   @Doc({
-    summary: 'Get comments by issue ID',
-    description: 'Retrieve paginated comments for a specific issue.',
-    response: {
-      serialization: GetManyResponseDto(IssueComment),
-    },
-  })
-  @WorkspaceAccess('workspace.read')
-  @Get(':issueId/comments')
-  getCommentsByIssueId(
-    @Param('issueId') issueId: string,
-    @Query() query: GetManyBaseQueryParams,
-    @WorkspaceId() workspaceId: string,
-  ) {
-    return this.issuesService.getCommentsByIssueId(
-      issueId,
-      query,
-      workspaceId,
-    );
-  }
-
-  @Doc({
-    summary: 'Update comment by ID',
-    description:
-      'Update a comment by its ID. Only the creator of the comment can update it.',
-    response: {
-      serialization: IssueComment,
-    },
+    summary: 'Unlink resource from issue',
+    response: { serialization: IssueDetailDto },
     request: {
+      getWorkspaceId: true,
       params: [
-        {
-          name: 'id',
-          type: String,
-          description: 'Comment ID',
-        },
+        ...idParam,
+        { name: 'linkId', type: String, description: 'Link ID' },
       ],
     },
   })
   @WorkspaceAccess('workspace.write')
-  @Patch('comments/:id')
-  updateCommentById(
-    @Param('id') id: string,
-    @Body() updateCommentDto: UpdateIssueCommentDto,
+  @Delete(':id/links/:linkId')
+  removeLink(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('linkId', ParseUUIDPipe) linkId: string,
     @UserContext() user: UserContextPayload,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.issuesService.updateCommentById(
-      id,
-      updateCommentDto,
-      user.id,
-      workspaceId,
-    );
+    return this.issuesService.removeLink(id, linkId, user.id, workspaceId);
   }
 
   @Doc({
-    summary: 'Delete comment by ID',
-    description:
-      'Delete a comment by its ID. Only the creator of the comment can delete it.',
-    response: {
-      serialization: Object,
-    },
-    request: {
-      params: [
-        {
-          name: 'id',
-          type: String,
-          description: 'Comment ID',
-        },
-      ],
-    },
+    summary: 'Delete issue',
+    description: 'Deletes the issue with its links and comments.',
+    response: { serialization: DefaultMessageResponseDto },
+    request: { getWorkspaceId: true, params: idParam },
   })
   @WorkspaceAccess('workspace.write')
-  @Delete('comments/:id')
-  deleteCommentById(
-    @Param('id') id: string,
+  @Delete(':id')
+  delete(
+    @Param('id', ParseUUIDPipe) id: string,
     @UserContext() user: UserContextPayload,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.issuesService.deleteCommentById(id, user.id, workspaceId);
+    return this.issuesService.delete(id, user.id, workspaceId);
   }
 }

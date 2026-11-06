@@ -1,6 +1,6 @@
 {
   "WORKSPACE_CREATED": "/settings/workspaces",
-  "VULNERABILITY_ANALYSIS_COMPLETED": "/vulnerabilities/{id}",
+  "VULNERABILITY_ANALYSIS_COMPLETED": "/vulnerabilities/{id}?tab=analysis",
   "ASSET_NEW_DETECT": "/targets/{targetId}/inventory?isNew=true",
   "NEW_VULNERABILITY_FOUND": "/targets/{targetId}/vulnerabilities",
   "WORKSPACE_INVITATION": "{action, select, created {/invite/{token}} accepted {/settings/members} declined {/settings/members} other {/invite/{token}}}",

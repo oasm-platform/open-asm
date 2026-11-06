@@ -60,7 +60,8 @@ import { HttpModule } from '@nestjs/axios';
     ArtifactsModule,
     TargetsModule,
     forwardRef(() => VulnerabilitiesModule),
-    StatisticModule,
+    // Statistic → Vulnerabilities → Agents → Statistic is an import cycle.
+    forwardRef(() => StatisticModule),
     RemoteExecuteModule,
     HttpModule,
     WorkersModule,

@@ -18,6 +18,13 @@ describe('splitNotificationUrl', () => {
     });
   });
 
+  it('opens a finding on its AI Analysis tab', () => {
+    expect(splitNotificationUrl('/vulnerabilities/v-1?tab=analysis')).toEqual({
+      to: '/vulnerabilities/v-1',
+      search: { tab: 'analysis' },
+    });
+  });
+
   it('leaves a plain path alone', () => {
     expect(splitNotificationUrl('/targets/t-1/vulnerabilities')).toEqual({
       to: '/targets/t-1/vulnerabilities',

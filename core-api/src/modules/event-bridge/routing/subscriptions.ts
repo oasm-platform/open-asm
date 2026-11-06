@@ -54,6 +54,10 @@ export const SUBSCRIPTIONS = {
   // project triggers run on start runs; the sink narrows the domains to
   // `asset.discovered` and those events.
   [EventBusGroup.Projects]: ['asset', 'project', 'vulnerability'],
+  // Issue rules open issues for detected findings, and the remediation
+  // handler resolves/reopens issues as their findings are fixed/resurface; the
+  // sink narrows the domain to those three events.
+  [EventBusGroup.Issues]: ['vulnerability'],
   // No `email` lane: it has no transport to send through, so a subscription
   // here would only promise delivery that cannot happen. Add the lane and this
   // entry together when a provider exists.

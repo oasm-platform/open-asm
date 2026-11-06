@@ -12,31 +12,29 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { VulnerabilitiesControllerGetVulnerabilitiesStatus } from '@/services/apis/gen/queries';
+import { VulnerabilityStatus } from '@/services/apis/gen/queries';
 
 /** Status filter options with display labels */
 const STATUS_OPTIONS = [
   {
-    value: VulnerabilitiesControllerGetVulnerabilitiesStatus.open,
+    value: VulnerabilityStatus.open,
     label: 'Open',
   },
   {
-    value: VulnerabilitiesControllerGetVulnerabilitiesStatus.dismissed,
+    value: VulnerabilityStatus.dismissed,
     label: 'Dismissed',
   },
   {
-    value: VulnerabilitiesControllerGetVulnerabilitiesStatus.all,
+    value: VulnerabilityStatus.all,
     label: 'All',
   },
 ] as const;
 
 interface StatusFilterProps {
   /** Current selected status value */
-  value: VulnerabilitiesControllerGetVulnerabilitiesStatus;
+  value: VulnerabilityStatus;
   /** Callback when status selection changes */
-  onValueChange: (
-    value: VulnerabilitiesControllerGetVulnerabilitiesStatus,
-  ) => void;
+  onValueChange: (value: VulnerabilityStatus) => void;
 }
 
 /**
@@ -47,9 +45,7 @@ export function StatusFilter({ value, onValueChange }: StatusFilterProps) {
   return (
     <Select
       value={value}
-      onValueChange={(val) =>
-        onValueChange(val as VulnerabilitiesControllerGetVulnerabilitiesStatus)
-      }
+      onValueChange={(val) => onValueChange(val as VulnerabilityStatus)}
     >
       <SelectTrigger className="border-dashed text-xs py-0">
         <SelectValue placeholder="Status" />

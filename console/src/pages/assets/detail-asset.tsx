@@ -87,7 +87,7 @@ export default function DetailAsset() {
 
   if (isLoading) {
     return (
-      <Page isShowButtonGoBack permission="asset.read">
+      <Page permission="asset.read">
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin" />
         </div>
@@ -97,7 +97,7 @@ export default function DetailAsset() {
 
   if (error || !data) {
     return (
-      <Page isShowButtonGoBack permission="asset.read">
+      <Page permission="asset.read">
         <div className="text-center py-12">
           <h2 className="text-xl font-semibold">Asset not found</h2>
           <p className="text-muted-foreground mt-2">
@@ -188,7 +188,7 @@ export default function DetailAsset() {
     <Page
       title={assetTitle}
       header={assetHeader}
-      isShowButtonGoBack
+     
       permission="asset.read"
     >
       <div className="space-y-6">

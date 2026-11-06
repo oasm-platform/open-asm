@@ -264,13 +264,17 @@ export const listIssuesSchema = z
     search: z
       .string()
       .optional()
-      .describe('Search query to filter issues by title or their content.'),
+      .describe('Search issues by title, or by number (e.g. "#12").'),
     status: z
-      .array(z.string())
+      .array(z.enum(['open', 'in_progress', 'resolved', 'closed']))
       .optional()
-      .describe(
-        'Filter issues by their status (e.g., OPEN, IN_PROGRESS, RESOLVED).',
-      ),
+      .describe('Only issues in these statuses.'),
+    type: z
+      .array(
+        z.enum(['vulnerability_remediation', 'task', 'asset_review', 'scan_failure']),
+      )
+      .optional()
+      .describe('Only issues of these types.'),
   })
   .extend(getManyBaseRequestSchema.shape);
 

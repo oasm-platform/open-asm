@@ -43,7 +43,7 @@ export default function InternalNetworkDetail() {
   return (
     <Page
       title={network.name}
-      isShowButtonGoBack
+     
       action={
         <div className="flex items-center gap-2">
           <EditInternalNetworkDialog

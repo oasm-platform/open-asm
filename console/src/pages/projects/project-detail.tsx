@@ -59,7 +59,7 @@ export default function ProjectDetail() {
 
   if (!project) {
     return (
-      <Page isShowButtonGoBack permission="project.read">
+      <Page permission="project.read">
         <div className="py-12 text-center">
           <h2 className="text-xl font-semibold">Project not found</h2>
           <p className="mt-2 text-muted-foreground">
@@ -128,7 +128,7 @@ export default function ProjectDetail() {
 
   return (
     <Page
-      isShowButtonGoBack
+     
       permission="project.read"
       title={
         <span className="flex min-w-0 items-center gap-2.5">

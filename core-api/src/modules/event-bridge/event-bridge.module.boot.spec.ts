@@ -8,6 +8,7 @@ import { EventPublishInterceptor } from './publishing/event-publish.interceptor'
 import { SUBSCRIPTIONS } from './routing/subscriptions';
 import { AuditSink } from './sinks/audit/audit.sink';
 import { IntegrationsSink } from './sinks/integrations/integrations.sink';
+import { IssuesSink } from './sinks/issues/issues.sink';
 import { NotificationsSink } from './sinks/notifications/notifications.sink';
 import { ProjectionSink } from './sinks/projection/projection.sink';
 import { ProjectsSink } from './sinks/projects/projects.sink';
@@ -46,6 +47,7 @@ describe('EventBridgeModule wiring', () => {
     NotificationsSink,
     IntegrationsSink,
     ProjectsSink,
+    IssuesSink,
   ];
 
   it('registers every sink as a provider', () => {
@@ -74,6 +76,7 @@ describe('EventBridgeModule wiring', () => {
       new NotificationsSink(dummy, dummy, dummy, dummy),
       new IntegrationsSink(dummy, dummy, dummy),
       new ProjectsSink(dummy, dummy, dummy),
+      new IssuesSink(dummy, dummy),
     ].map((sink) => sink.group);
 
     expect(groups.sort()).toEqual(Object.values(EventBusGroup).sort());

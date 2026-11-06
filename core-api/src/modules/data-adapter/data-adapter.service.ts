@@ -6,7 +6,16 @@ import { validate } from 'class-validator';
 import * as crypto from 'crypto';
 import { isIP } from 'node:net';
 import { DataSource, EntityManager, InsertResult } from 'typeorm';
-import { Severity, TargetType, ToolCategory } from '../../common/enums/enum';
+import {
+  Severity,
+  TargetType,
+  ToolCategory,
+  VulnerabilityDetectionStatus,
+  VulnerabilityDiscoveredBy,
+  VulnerabilityEventType,
+  VulnerabilityReviewStatus,
+  VulnerabilitySourceKind,
+} from '../../common/enums/enum';
 import { AssetService } from '../assets/entities/asset-services.entity';
 import { serviceForUrl } from './url-owner';
 import { Asset } from '../assets/entities/assets.entity';
@@ -18,17 +27,28 @@ import { HttpStatusCode } from '../assets/entities/http-status-code.entity';
 import { IpObservation } from '../assets/entities/ip-observation.entity';
 import { Port } from '../assets/entities/ports.entity';
 import { TlsCertificate } from '../assets/entities/tls-certificate.entity';
-import { IssuesService } from '../issues/issues.service';
 import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
 import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
 import type {
   AssetDiscoveredPayload,
-  DetectedVulnerability,
   VulnerabilityDetectedPayload,
 } from '../event-bridge/contracts/event-payloads';
 import { StorageService } from '../storage/storage.service';
+import { toDetectedVulnerability } from '../vulnerabilities/detected-vulnerability';
+import { VulnerabilityEvent } from '../vulnerabilities/entities/vulnerability-event.entity';
+import { VulnerabilitySource } from '../vulnerabilities/entities/vulnerability-source.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
+import {
+  insertInChunks,
+  loadVulnerabilitySettings,
+  scanScopeKey,
+} from '../vulnerabilities/vulnerability-lifecycle';
+import {
+  computeDueAt,
+  resolveVulnerabilitySettings,
+} from '../vulnerabilities/vulnerability-settings';
 import { WorkspacesService } from '../workspaces/workspaces.service';
+import type { Job } from '../jobs-registry/entities/job.entity';
 import { DataAdapterInput } from './data-adapter.interface';
 
 /**
@@ -106,9 +126,10 @@ export function toDnsFacetRows(
 
 /**
  * Scanner-derived vulnerability columns refreshed from the incoming finding on
- * a fingerprint conflict. `firstDetectedDate`, `isArchived` and the `analyze*`
- * fields are deliberately excluded so a re-scan cannot reset provenance,
- * triage, or AI-analysis state.
+ * a fingerprint conflict. `firstDetectedDate`, the lifecycle/review columns and
+ * the `analyze*` fields are deliberately excluded so a re-scan cannot reset
+ * provenance, triage, or AI-analysis state (the lifecycle columns move through
+ * {@link rescanConflictClause} instead).
  */
 const RESCAN_OVERWRITE_COLUMNS = [
   'updatedAt',
@@ -215,6 +236,77 @@ const RESCAN_PRESERVE_COLUMNS = RESCAN_OVERWRITE_COLUMNS.filter(
 );
 
 /**
+ * Lifecycle and review columns. A connector payload never sets them: they are
+ * stripped from the incoming finding and stamped by the ingest.
+ */
+const LIFECYCLE_FIELDS = [
+  'detectionStatus',
+  'timesDetected',
+  'resurfacedCount',
+  'missedScans',
+  'scanScopeKey',
+  'lastSeenJobHistoryId',
+  'fixedAt',
+  'fixedByJobHistoryId',
+  'fixClaimedAt',
+  'fixClaimedById',
+  'dueAt',
+  'reviewStatus',
+  'reviewedById',
+  'reviewedAt',
+  'reviewNote',
+  'discoveredBy',
+  'sources',
+  'vulnerabilityDismissal',
+  'analyzeStatus',
+  'analyzeResult',
+] as const;
+
+/**
+ * ON CONFLICT clause of the vulnerability upsert. On a re-detection it
+ * refreshes the scanner columns and the last sighting (run, scope, date),
+ * resets the missed-scan counter, counts the run once (same rule as
+ * `project_vulnerabilities.timesSeen`) and moves the lifecycle:
+ *
+ * - new → active, resurfaced → active: seen again in a different run;
+ * - fixed → resurfaced: the fix did not hold. The fix (and any fix claim) is
+ *   cleared, `resurfacedCount` grows, and with `restartSlaOnResurface` the SLA
+ *   deadline restarts from now (EXCLUDED."dueAt" was computed from now).
+ *
+ * Every right-hand side reads the row as it was before the update, so the
+ * CASEs agree with each other. Rows under review (AI proposals) are never
+ * touched — their `ai-` fingerprints cannot collide with a scan's anyway.
+ */
+export function rescanConflictClause(restartSlaOnResurface: boolean): string {
+  const v = '"vulnerabilities"';
+  const newRun = `${v}."lastSeenJobHistoryId" IS DISTINCT FROM EXCLUDED."lastSeenJobHistoryId"`;
+  const wasFixed = `${v}."detectionStatus" = '${VulnerabilityDetectionStatus.FIXED}'`;
+  const clearedOnResurface = (column: string) =>
+    `"${column}" = CASE WHEN ${wasFixed} THEN NULL ELSE ${v}."${column}" END`;
+  const set = [
+    ...RESCAN_OVERWRITE_COLUMNS.map((column) => `"${column}" = EXCLUDED."${column}"`),
+    `"lastSeenJobHistoryId" = EXCLUDED."lastSeenJobHistoryId"`,
+    `"scanScopeKey" = EXCLUDED."scanScopeKey"`,
+    `"missedScans" = 0`,
+    `"timesDetected" = ${v}."timesDetected" + CASE WHEN ${newRun} THEN 1 ELSE 0 END`,
+    `"detectionStatus" = CASE
+       WHEN ${wasFixed} THEN '${VulnerabilityDetectionStatus.RESURFACED}'
+       WHEN ${v}."detectionStatus" IN ('${VulnerabilityDetectionStatus.NEW}', '${VulnerabilityDetectionStatus.RESURFACED}') AND ${newRun}
+         THEN '${VulnerabilityDetectionStatus.ACTIVE}'
+       ELSE ${v}."detectionStatus" END`,
+    `"resurfacedCount" = ${v}."resurfacedCount" + CASE WHEN ${wasFixed} THEN 1 ELSE 0 END`,
+    clearedOnResurface('fixedAt'),
+    clearedOnResurface('fixedByJobHistoryId'),
+    clearedOnResurface('fixClaimedAt'),
+    clearedOnResurface('fixClaimedById'),
+    restartSlaOnResurface
+      ? `"dueAt" = CASE WHEN ${wasFixed} THEN EXCLUDED."dueAt" ELSE ${v}."dueAt" END`
+      : `"dueAt" = ${v}."dueAt"`,
+  ];
+  return `("fingerprint") DO UPDATE SET ${set.join(', ')} WHERE ${v}."reviewStatus" = '${VulnerabilityReviewStatus.APPROVED}'`;
+}
+
+/**
  * Rows per INSERT statement for the vulnerability upsert. Postgres' extended
  * query protocol caps a prepared statement at 65535 parameters; a row here is
  * ~45 columns, so a bulk insert of a couple thousand findings overflows the
@@ -304,31 +396,6 @@ const HTTP_RESPONSE_FACET_KEYS = [
   'chain_status_codes',
 ] as const;
 
-/**
- * A stored vulnerability row as the `vulnerability.detected` contract carries
- * it. Long free text (description, solution, extractor output) stays out: it
- * lives in the database, and copying it into every stream entry would let one
- * noisy scan crowd the bounded stream.
- */
-function toDetectedVulnerability(vuln: Vulnerability): DetectedVulnerability {
-  return {
-    id: vuln.id,
-    name: vuln.name,
-    severity: vuln.severity,
-    synopsis: vuln.synopsis ?? undefined,
-    cvssScore: vuln.cvssScore ?? undefined,
-    cvssMetric: vuln.cvssMetric ?? undefined,
-    epssScore: vuln.epssScore ?? undefined,
-    cveId: vuln.cveId ?? undefined,
-    cweId: vuln.cweId ?? undefined,
-    tags: vuln.tags ?? undefined,
-    host: vuln.host ?? undefined,
-    ipAddress: vuln.ipAddress ?? undefined,
-    ports: vuln.ports ?? undefined,
-    affectedUrl: vuln.affectedUrl ?? undefined,
-  };
-}
-
 @Injectable()
 export class DataAdapterService {
   private readonly logger = new Logger(DataAdapterService.name);
@@ -336,7 +403,6 @@ export class DataAdapterService {
   constructor(
     private readonly dataSource: DataSource,
     private workspaceService: WorkspacesService,
-    private issuesService: IssuesService,
     private storageService: StorageService,
     private readonly eventBridge: EventBridgeService,
   ) {}
@@ -958,19 +1024,35 @@ export class DataAdapterService {
   }
 
   /**
-   * Vulnerabilities data normalization
-   * @param param0
-   * @returns
+   * Vulnerability ingest of one scan job. New findings are inserted with
+   * their lifecycle (new, SLA deadline, scan scope); findings the scan reports
+   * again are refreshed and moved along new → active, resurfaced → active and
+   * fixed → resurfaced (see {@link rescanConflictClause}). Every new finding
+   * and every transition writes a timeline event; truly new findings publish
+   * `vulnerability.detected`, reopened ones `vulnerability.resurfaced`.
    */
   public async vulnerabilities({
     data,
     job,
   }: DataAdapterInput<Vulnerability[]>): Promise<void> {
-    await this.dataSource.transaction(async (manager) => {
-      if (data.length === 0) {
-        return;
-      }
+    if (data.length === 0) {
+      return;
+    }
 
+    const workspaceId = await this.resolveJobWorkspaceId(job);
+    const settings = workspaceId
+      ? await loadVulnerabilitySettings(this.dataSource, workspaceId)
+      : resolveVulnerabilitySettings(undefined);
+    const scopeKey = scanScopeKey(job);
+    const runId = job.jobHistory?.id ?? null;
+    const projectId = job.jobHistory?.projectId;
+
+    // Filled inside the transaction, published once it committed.
+    const newRows: Vulnerability[] = [];
+    const resurfacedRows: Vulnerability[] = [];
+    let dedupedCount = 0;
+
+    await this.dataSource.transaction(async (manager) => {
       const now = new Date();
       const isRepositoryAsset =
         job.asset.target?.type === TargetType.GIT_ORG;
@@ -984,13 +1066,17 @@ export class DataAdapterService {
         });
         const vulnValues = { ...vuln } as unknown as Record<string, string | number | boolean | object | null>;
         delete vulnValues.id;
+        // The lifecycle and review state belong to the platform, never to
+        // what a connector reports.
+        for (const field of LIFECYCLE_FIELDS) delete vulnValues[field];
+        const severity =
+          typeof vulnValues.severity === 'string'
+            ? (vulnValues.severity.toLowerCase() as Severity)
+            : Severity.INFO;
         return {
           ...vulnValues,
           ...normalizeCodeFields(vulnValues),
-          severity:
-            typeof vulnValues.severity === 'string'
-              ? (vulnValues.severity.toLowerCase() as Severity)
-              : Severity.INFO,
+          severity,
           fingerprint,
           assetId: job.asset.id,
           toolId: job.tool.id,
@@ -1001,6 +1087,15 @@ export class DataAdapterService {
           modificationDate: normalizeTimestamp(vulnValues.modificationDate),
           firstDetectedDate: now,
           lastSeenDate: now,
+          lastSeenJobHistoryId: runId,
+          scanScopeKey: scopeKey,
+          detectionStatus: VulnerabilityDetectionStatus.NEW,
+          timesDetected: 1,
+          missedScans: 0,
+          resurfacedCount: 0,
+          reviewStatus: VulnerabilityReviewStatus.APPROVED,
+          discoveredBy: VulnerabilityDiscoveredBy.TOOL,
+          dueAt: computeDueAt(severity, now, settings),
         };
       });
 
@@ -1008,16 +1103,18 @@ export class DataAdapterService {
       const uniqueValues = Array.from(
         new Map(values.map((v) => [v.fingerprint, v])).values(),
       );
+      dedupedCount = uniqueValues.length;
 
       // Pre-check: load the stored rows for the fingerprints about to be
-      // upserted, both to avoid notifications for updated vulns and to reuse
-      // their enrichment values below.
+      // upserted, to tell new findings from re-detections (and transitions),
+      // and to reuse their enrichment values below.
       const existingRows: Array<Record<string, unknown>> = await manager
         .createQueryBuilder()
         .select('v.fingerprint', 'fingerprint')
         .addSelect(
           RESCAN_PRESERVE_COLUMNS.map((column) => `v.${column} AS ${column}`),
         )
+        .addSelect('v.detectionStatus', 'detectionStatus')
         .from(Vulnerability, 'v')
         .where('v.fingerprint IN (:...fingerprints)', {
           fingerprints: uniqueValues.map((v) => v.fingerprint),
@@ -1041,13 +1138,12 @@ export class DataAdapterService {
         }
       }
 
-      const existingFingerprints = new Set<string>(
-        existingByFingerprint.keys(),
-      );
-
       // Chunk the upsert so no single statement exceeds Postgres' 65535
       // parameter ceiling — see VULNERABILITY_INSERT_CHUNK_SIZE.
-      const insertedVulnerabilities: Vulnerability[] = [];
+      const conflictClause = rescanConflictClause(
+        settings.slaRestartOnResurface,
+      );
+      const upserted: Vulnerability[] = [];
       for (
         let offset = 0;
         offset < uniqueValues.length;
@@ -1062,22 +1158,70 @@ export class DataAdapterService {
           .insert()
           .into(Vulnerability)
           .values(chunk)
-          .orUpdate({
-            conflict_target: ['fingerprint'],
-            overwrite: [...RESCAN_OVERWRITE_COLUMNS],
-          })
+          .onConflict(conflictClause)
           .returning('*')
           .execute();
-        insertedVulnerabilities.push(...(result.raw as Vulnerability[]));
+        upserted.push(...((result.raw as Vulnerability[] | undefined) ?? []));
       }
+
+      // Timeline + provenance: a DETECTED event and a tool source for every
+      // new finding, a STATUS_CHANGED event for every transition.
+      const events: Array<Partial<VulnerabilityEvent>> = [];
+      const sources: Array<Partial<VulnerabilitySource>> = [];
+      for (const row of upserted) {
+        const previous = row.fingerprint
+          ? existingByFingerprint.get(row.fingerprint)
+          : undefined;
+        if (!previous) {
+          if (row.severity) newRows.push(row);
+          sources.push({
+            vulnerabilityId: row.id,
+            kind: VulnerabilitySourceKind.TOOL,
+            toolId: job.tool.id ?? null,
+            jobHistoryId: runId,
+          });
+          if (workspaceId) {
+            events.push({
+              vulnerabilityId: row.id,
+              workspaceId,
+              type: VulnerabilityEventType.DETECTED,
+              toStatus: row.detectionStatus ?? VulnerabilityDetectionStatus.NEW,
+              jobHistoryId: runId,
+              data: { jobId: job.id, toolId: job.tool.id ?? null },
+              occurredAt: now,
+            });
+          }
+          continue;
+        }
+        const from = previous.detectionStatus as string | undefined;
+        if (!from || !row.detectionStatus || from === (row.detectionStatus as string)) {
+          continue;
+        }
+        if (row.detectionStatus === VulnerabilityDetectionStatus.RESURFACED) {
+          resurfacedRows.push(row);
+        }
+        if (workspaceId) {
+          events.push({
+            vulnerabilityId: row.id,
+            workspaceId,
+            type: VulnerabilityEventType.STATUS_CHANGED,
+            fromStatus: from,
+            toStatus: row.detectionStatus,
+            jobHistoryId: runId,
+            data: { jobId: job.id, reason: 'detected_by_scan' },
+            occurredAt: now,
+          });
+        }
+      }
+      await insertInChunks(manager, VulnerabilitySource, sources);
+      await insertInChunks(manager, VulnerabilityEvent, events);
 
       // Provenance for project runs: one row per (project, vulnerability),
       // first/last run that reported it. RETURNING yields inserted AND
       // updated rows, so a re-found vulnerability refreshes its last sighting.
       // timesSeen counts runs, not reports: a second job of the same run that
       // reports it again finds lastSeen already pointing at this run.
-      const projectId = job.jobHistory?.projectId;
-      if (projectId && insertedVulnerabilities.length > 0) {
+      if (projectId && upserted.length > 0) {
         await manager.query(
           `INSERT INTO "project_vulnerabilities"
                   ("projectId", "vulnerabilityId", "firstSeenJobHistoryId", "lastSeenJobHistoryId", "firstSeenAt", "lastSeenAt", "timesSeen")
@@ -1089,70 +1233,75 @@ export class DataAdapterService {
                   "lastSeenJobHistoryId" = EXCLUDED."lastSeenJobHistoryId",
                   "lastSeenAt" = EXCLUDED."lastSeenAt",
                   "updatedAt" = now()`,
-          [
-            projectId,
-            job.jobHistory.id,
-            insertedVulnerabilities.map((vuln) => vuln.id),
-          ],
-        );
-      }
-
-      // Only send notifications for truly new vulnerabilities,
-      // not for existing ones that were just updated
-      const vulsForAlert = insertedVulnerabilities.filter(
-        (vuln) =>
-          vuln.fingerprint &&
-          !existingFingerprints.has(vuln.fingerprint) &&
-          vuln.severity,
-      );
-
-      if (vulsForAlert.length > 0) {
-        this.logger.log(
-          `Found ${vulsForAlert.length} new vulns for job ${job.id}, looking up workspace`,
-        );
-
-        const members =
-          await this.workspaceService.getMemberOfWorkspaceByJobId(job.id);
-
-        if (members.length === 0) {
-          this.logger.warn(
-            `No workspace resolved for job ${job.id}, skipping the event`,
-          );
-          return;
-        }
-
-        const workspaceId = members[0].workspace.id;
-
-        this.logger.log(
-          `Publishing vulnerability.detected for ${vulsForAlert.length} vulns in workspace ${workspaceId}`,
-        );
-
-        // Report the FINDINGS, not a notification decision: who is told about
-        // them, how they are counted and ranked, and in what wording all
-        // belong to the consumers. The asset identity travels as payload
-        // because a consumer cannot re-derive it from the workspace alone.
-        //
-        // One event for the whole batch, not one per vulnerability: a scan that
-        // finds 200 issues must not push 200 notifications.
-        await this.eventBridge.publishSafely(EVENT_CATALOG.vulnerability.detected, {
-          workspaceId,
-          outcome: 'success',
-          resourceType: 'vulnerability',
-          payload: {
-            jobId: job.id,
-            targetId: job.asset.target.id,
-            assetId: job.asset.id,
-            assetValue: job.asset.value,
-            ...(projectId ? { projectId } : {}),
-            vulnerabilities: vulsForAlert.map(toDetectedVulnerability),
-          } satisfies VulnerabilityDetectedPayload,
-        });
-      } else {
-        this.logger.log(
-          `No new vulns to alert for job ${job.id} (${uniqueValues.length} total deduped, ${existingFingerprints.size} already existed)`,
+          [projectId, job.jobHistory.id, upserted.map((vuln) => vuln.id)],
         );
       }
     });
+
+    if (newRows.length === 0 && resurfacedRows.length === 0) {
+      this.logger.log(
+        `No new vulns to alert for job ${job.id} (${dedupedCount} total deduped)`,
+      );
+      return;
+    }
+    if (!workspaceId) {
+      this.logger.warn(
+        `No workspace resolved for job ${job.id}, skipping the event`,
+      );
+      return;
+    }
+
+    // Report the FINDINGS, not a notification decision: who is told about
+    // them, how they are counted and ranked, and in what wording all belong
+    // to the consumers. The asset identity travels as payload because a
+    // consumer cannot re-derive it from the workspace alone.
+    //
+    // One event for the whole batch, not one per vulnerability: a scan that
+    // finds 200 issues must not push 200 notifications.
+    const payloadOf = (rows: Vulnerability[]): VulnerabilityDetectedPayload => ({
+      jobId: job.id,
+      targetId: job.asset.target.id,
+      assetId: job.asset.id,
+      assetValue: job.asset.value,
+      ...(projectId ? { projectId } : {}),
+      vulnerabilities: rows.map(toDetectedVulnerability),
+    });
+    if (newRows.length > 0) {
+      this.logger.log(
+        `Publishing vulnerability.detected for ${newRows.length} vulns in workspace ${workspaceId}`,
+      );
+      await this.eventBridge.publishSafely(EVENT_CATALOG.vulnerability.detected, {
+        workspaceId,
+        outcome: 'success',
+        resourceType: 'vulnerability',
+        payload: payloadOf(newRows),
+      });
+    }
+    if (resurfacedRows.length > 0) {
+      this.logger.log(
+        `Publishing vulnerability.resurfaced for ${resurfacedRows.length} vulns in workspace ${workspaceId}`,
+      );
+      await this.eventBridge.publishSafely(
+        EVENT_CATALOG.vulnerability.resurfaced,
+        {
+          workspaceId,
+          outcome: 'success',
+          resourceType: 'vulnerability',
+          payload: payloadOf(resurfacedRows),
+        },
+      );
+    }
+  }
+
+  /**
+   * The workspace a job writes into: the target's own column when the
+   * relation is loaded, else a lookup by target id.
+   */
+  private async resolveJobWorkspaceId(job: Job): Promise<string | null> {
+    const target = job.asset?.target;
+    if (target?.workspaceId) return target.workspaceId;
+    if (!target?.id) return null;
+    return this.workspaceService.getWorkspaceIdByTargetId(target.id);
   }
 
   public async screenshot({

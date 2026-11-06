@@ -2,8 +2,6 @@ import { BullMQName } from '@/common/enums/enum';
 import { BullModule } from '@nestjs/bullmq';
 import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { IssueComment } from '../issues/entities/issue-comment.entity';
-import { Issue } from '../issues/entities/issue.entity';
 import { ConnectorsModule } from '../connectors/connectors.module';
 import { IntegrationsModule } from '../integrations/integrations.module';
 import { ToolConfigProfile } from '../tools/entities/tool-config-profiles.entity';
@@ -27,8 +25,6 @@ import { WorkflowRunnerService } from './workflow-runner.service';
       Job,
       JobHistory,
       JobErrorLog,
-      Issue,
-      IssueComment,
       ToolConfigProfile,
     ]),
     ConnectorsModule,
@@ -37,9 +33,6 @@ import { WorkflowRunnerService } from './workflow-runner.service';
     BullModule.registerQueue({
       name: BullMQName.JOB_RESULT,
     }),
-    // BullModule.registerQueue({
-    //   name: BullMQName.ISSUE_CREATION,
-    // }),
   ],
   controllers: [JobsRegistryController],
   providers: [
@@ -50,7 +43,6 @@ import { WorkflowRunnerService } from './workflow-runner.service';
     JobResultProcessor,
     JobResultCleanupService,
     JobRetentionService,
-    // IssueCreationProcessor,
   ],
   exports: [JobsRegistryService, WorkflowRunnerService],
 })

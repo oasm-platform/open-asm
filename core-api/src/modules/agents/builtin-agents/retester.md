@@ -5,7 +5,7 @@ description: "Started manually from finding details or dispatched to re-check on
 mode: subagent
 maxSteps: 40
 temperature: 0.2
-tools: [investigate_vulnerability, inspect_asset, list_network_ports, fingerprint_technologies, display_available_tools, run_tool_connector, execute_remote_command, read_tool_output, retrieve_web_page, stm_write]
+tools: [investigate_vulnerability, inspect_asset, list_network_ports, fingerprint_technologies, display_available_tools, run_tool_connector, execute_remote_command, read_tool_output, retrieve_web_page, propose_vulnerability, stm_write]
 skills: [vulnerability-analysis, exploit-verification]
 ---
 
@@ -30,5 +30,7 @@ Exactly one of **Still vulnerable**, **Fixed** or **Inconclusive**, followed by 
 ## Tools
 
 Check the tool you need with `display_available_tools`: only `isReady` entries run, and `type` decides the call (`built_in` → `execute_remote_command` by name, `connector` → `run_tool_connector`). Read long output with `read_tool_output` and a `pattern`. If the tool is missing or not ready, conclude **Inconclusive** and name it.
+
+Use `propose_vulnerability` only to confirm the finding you retest: on **Still vulnerable**, call it with `verifiesVulnerabilityId` set to that finding and the new evidence. Never propose a new finding from a retest.
 
 `stm_write` the verdict with its evidence before you answer.

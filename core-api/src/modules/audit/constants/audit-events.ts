@@ -61,6 +61,10 @@ export const AUDIT_ACTION_CATALOG = [
   // vulnerabilities (21–22)
   { action: 'vulnerability.status.updated', label: 'Changed vulnerability status', controller: 'VulnerabilitiesController', method: 'bulkDismissVulnerabilities' },
   { action: 'vulnerability.bulk_updated', label: 'Bulk updated vulnerabilities', controller: 'VulnerabilitiesController', method: 'bulkReopenVulnerabilities' },
+  { action: 'vulnerability.review.approved', label: 'Approved AI vulnerability proposal', controller: 'VulnerabilitiesController', method: 'approveProposal' },
+  { action: 'vulnerability.review.rejected', label: 'Rejected AI vulnerability proposal', controller: 'VulnerabilitiesController', method: 'rejectProposal' },
+  { action: 'vulnerability.review.merged', label: 'Merged AI vulnerability proposal', controller: 'VulnerabilitiesController', method: 'mergeProposal' },
+  { action: 'vulnerability.settings.updated', label: 'Updated vulnerability settings', controller: 'VulnerabilitiesController', method: 'updateSettings' },
   // reports (23–25)
   { action: 'report.generated', label: 'Generated report', controller: 'ReportsController', method: 'generateSummaryReport' },
   { action: 'report.exported', label: 'Exported report', controller: 'ReportsController', method: 'previewSummaryReport' },

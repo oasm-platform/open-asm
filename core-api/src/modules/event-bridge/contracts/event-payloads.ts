@@ -35,13 +35,34 @@ export interface DetectedVulnerability {
 
 /** `vulnerability.detected` — every NEW vulnerability one job produced. */
 export interface VulnerabilityDetectedPayload {
-  jobId: string;
+  /** Scan job that found them; absent when a person approved an AI proposal. */
+  jobId?: string;
   targetId: string;
   assetId: string;
   assetValue: string;
   /** Project whose run found them; absent for runs outside a project. */
   projectId?: string;
   vulnerabilities: DetectedVulnerability[];
+}
+
+/**
+ * `vulnerability.fixed` — findings a covering scan (or a verified retest) no
+ * longer reports. One event per scan job, not per finding.
+ */
+export interface VulnerabilityFixedPayload {
+  vulnerabilityIds: string[];
+  /** Scan job / run that verified the fix; absent for a manual close. */
+  jobId?: string;
+  jobHistoryId?: string;
+  assetId?: string;
+  targetId?: string;
+}
+
+/** `vulnerability.proposed` — AI proposals waiting for review. */
+export interface VulnerabilityProposedPayload {
+  vulnerabilityIds: string[];
+  agentConversationId?: string;
+  agentName?: string;
 }
 
 /**
@@ -143,6 +164,10 @@ export interface VulnerabilityAnalysisCompletedPayload {
 export interface EventPayloadMap {
   'asset.discovered': AssetDiscoveredPayload;
   'vulnerability.detected': VulnerabilityDetectedPayload;
+  /** Same shape as detected: the findings a job saw again after their fix. */
+  'vulnerability.resurfaced': VulnerabilityDetectedPayload;
+  'vulnerability.fixed': VulnerabilityFixedPayload;
+  'vulnerability.proposed': VulnerabilityProposedPayload;
   'workflow.run.completed': WorkflowRunCompletedPayload;
   'vulnerability.analysis.completed': VulnerabilityAnalysisCompletedPayload;
   'asset.url.discovered': UrlDiscoveredPayload;

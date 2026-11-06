@@ -181,7 +181,6 @@ export enum BullMQName {
   /** Delayed batches of the "assets added" project trigger. */
   PROJECT_TRIGGER_EVENTS = 'project-trigger-events',
   JOB_RESULT = 'job-result',
-  ISSUE_CREATION = 'issue-creation',
   VULNERABILITY_ANALYSIS = 'vulnerability-analysis',
   INTEGRATION_SYNC_SCHEDULE = 'integration-sync-schedule',
   REPOSITORY_SYNC = 'repository-sync',
@@ -220,23 +219,107 @@ export enum Language {
 
 export enum IssueStatus {
   OPEN = 'open',
+  IN_PROGRESS = 'in_progress',
+  RESOLVED = 'resolved',
   CLOSED = 'closed',
 }
 
-export enum IssueSourceType {
+/** What kind of work an issue tracks; each type has its own handler. */
+export enum IssueType {
+  VULNERABILITY_REMEDIATION = 'vulnerability_remediation',
+  TASK = 'task',
+  ASSET_REVIEW = 'asset_review',
+  SCAN_FAILURE = 'scan_failure',
+}
+
+export enum IssuePriority {
+  P1 = 'p1',
+  P2 = 'p2',
+  P3 = 'p3',
+  P4 = 'p4',
+}
+
+export enum IssueResolution {
+  FIXED = 'fixed',
+  ACCEPTED = 'accepted',
+  DUPLICATE = 'duplicate',
+  WONT_FIX = 'wont_fix',
+  OTHER = 'other',
+}
+
+/** Kinds of resources an issue can link to (issue_links.resourceType). */
+export enum IssueLinkResourceType {
   VULNERABILITY = 'vulnerability',
+  ASSET = 'asset',
+  TARGET = 'target',
+  PROJECT = 'project',
+  JOB_HISTORY = 'job_history',
+}
+
+/** How an issue rule groups matching resources into one open issue. */
+export enum IssueRuleGroupBy {
+  NONE = 'none',
+  VULNERABILITY_NAME = 'vulnerability_name',
+  ASSET = 'asset',
+  TARGET = 'target',
 }
 
 export enum IssueCommentType {
   CONTENT = 'content',
   OPEN = 'open',
   CLOSED = 'closed',
+  SYSTEM = 'system',
 }
 
 export enum DismissReason {
   FALSE_POSITIVE = 'false_positive',
   USED_IN_TEST = 'used_in_test',
   WONT_FIX = 'wont_fix',
+  /** Accepted until `expiresAt`; reopens automatically afterwards. */
+  RISK_ACCEPTED = 'risk_accepted',
+}
+
+/** Scanner-driven lifecycle of a finding. Users never set it directly. */
+export enum VulnerabilityDetectionStatus {
+  NEW = 'new',
+  ACTIVE = 'active',
+  FIXED = 'fixed',
+  RESURFACED = 'resurfaced',
+}
+
+/** Review gate: AI proposals stay pending until a person approves them. */
+export enum VulnerabilityReviewStatus {
+  PENDING_REVIEW = 'pending_review',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
+}
+
+export enum VulnerabilityDiscoveredBy {
+  TOOL = 'tool',
+  AI = 'ai',
+  AI_TOOL = 'ai_tool',
+  MANUAL = 'manual',
+}
+
+export enum VulnerabilitySourceKind {
+  TOOL = 'tool',
+  AI_AGENT = 'ai_agent',
+  USER = 'user',
+}
+
+export enum VulnerabilityEventType {
+  DETECTED = 'detected',
+  STATUS_CHANGED = 'status_changed',
+  FIX_CLAIMED = 'fix_claimed',
+  DISMISSED = 'dismissed',
+  REOPENED = 'reopened',
+  RISK_EXPIRED = 'risk_expired',
+  PROPOSED = 'proposed',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
+  MERGED = 'merged',
+  VERIFIED_BY_AI = 'verified_by_ai',
+  ISSUE_LINKED = 'issue_linked',
 }
 
 export enum JobRunType {
@@ -408,6 +491,8 @@ export enum EventBusGroup {
   Integrations = 'integrations',
   /** Project scope rules and the "assets added" trigger. */
   Projects = 'projects',
+  /** Issue rules and the automation of issue types (auto-resolve, reopen). */
+  Issues = 'issues',
 }
 
 export enum TelegramConnectStatus {

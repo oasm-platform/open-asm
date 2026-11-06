@@ -13,6 +13,7 @@ import {
   SearchResponseDto,
 } from './dto/search.dto';
 import { SearchHistory } from './entities/search-history.entity';
+import { approvedVulnerabilityCondition } from '../vulnerabilities/open-vulnerability';
 
 const VULNERABILITY_SEARCH_LIMIT = 5;
 
@@ -142,6 +143,8 @@ export class SearchService {
       .addSelect(['assets.id', 'assets.value'])
       .leftJoin('assets.target', 'targets')
       .where('targets.workspaceId = :workspaceId', { workspaceId })
+      // AI proposals under review (or rejected) are not findings yet
+      .andWhere(approvedVulnerabilityCondition('v'))
       .orderBy('v.createdAt', 'DESC')
       .take(VULNERABILITY_SEARCH_LIMIT);
 

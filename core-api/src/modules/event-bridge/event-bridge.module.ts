@@ -14,6 +14,7 @@ import { EventBridgeService } from './publishing/event-bridge.service';
 import { EventPublishInterceptor } from './publishing/event-publish.interceptor';
 import { AuditSink } from './sinks/audit/audit.sink';
 import { IntegrationsSink } from './sinks/integrations/integrations.sink';
+import { IssuesSink } from './sinks/issues/issues.sink';
 import { NotificationsSink } from './sinks/notifications/notifications.sink';
 import { ProjectionSink } from './sinks/projection/projection.sink';
 import { ProjectsSink } from './sinks/projects/projects.sink';
@@ -29,6 +30,7 @@ export const SINKS = [
   NotificationsSink,
   IntegrationsSink,
   ProjectsSink,
+  IssuesSink,
 ] as const;
 
 /**

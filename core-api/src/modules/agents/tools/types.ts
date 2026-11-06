@@ -20,6 +20,7 @@ import type { TargetsService } from '@/modules/targets/targets.service';
 import type { ToolConfigProfilesService } from '@/modules/tools/tool-config-profiles.service';
 import type { ToolsService } from '@/modules/tools/tools.service';
 import type { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilities.service';
+import type { VulnerabilityReviewService } from '@/modules/vulnerabilities/vulnerability-review.service';
 import type { RemoteExecuteSubscribeService } from '@/modules/workers/remote-execute-subscribe.service';
 import type { WorkersService } from '@/modules/workers/workers.service';
 import type { WorkspacesService } from '@/modules/workspaces/workspaces.service';
@@ -43,6 +44,7 @@ export interface AgentToolDeps {
   assetsService: AssetsService;
   targetsService: TargetsService;
   vulnerabilitiesService: WrapperType<VulnerabilitiesService>;
+  vulnerabilityReviewService: WrapperType<VulnerabilityReviewService>;
   statisticService: StatisticService;
   issuesService: WrapperType<IssuesService>;
   toolsService: WrapperType<ToolsService>;
@@ -81,4 +83,6 @@ export interface ToolScope {
   userId?: string;
   /** The chat a new project gets linked to. */
   conversationId?: string;
+  /** Agent definition running the tools (a subagent's name); unset = main. */
+  agentName?: string;
 }

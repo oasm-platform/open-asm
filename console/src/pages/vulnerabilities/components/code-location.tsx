@@ -3,24 +3,44 @@ import { OpenLink } from '@/components/ui/open-link';
 import type { Vulnerability } from '@/services/apis/gen/queries';
 import { ExternalLink } from 'lucide-react';
 
+/** The fields a code finding is located by (list, detail and entity shapes all carry them). */
+export type CodeFinding = Pick<
+  Vulnerability,
+  | 'asset'
+  | 'filePath'
+  | 'commit'
+  | 'lineStart'
+  | 'lineEnd'
+  | 'packageName'
+  | 'installedVersion'
+  | 'fixedVersion'
+>;
+
 /**
  * Link to the exact lines of a code finding, when the asset is a synced
  * repository (its metadata carries the provider and the repository URL).
  */
-export function codeFindingUrl(vulnerability: Vulnerability): string | null {
+export function codeFindingUrl(vulnerability: CodeFinding): string | null {
   const meta = (vulnerability.asset?.metadata ?? {}) as Record<string, unknown>;
-  const repoUrl = typeof meta.url === 'string' ? meta.url.replace(/\/+$/, '') : '';
+  const repoUrl =
+    typeof meta.url === 'string' ? meta.url.replace(/\/+$/, '') : '';
   const { filePath, commit, lineStart, lineEnd } = vulnerability;
   if (!repoUrl || !filePath) return null;
 
-  const ref = commit || (typeof meta.defaultBranch === 'string' ? meta.defaultBranch : 'HEAD');
+  const ref =
+    commit ||
+    (typeof meta.defaultBranch === 'string' ? meta.defaultBranch : 'HEAD');
   const path = filePath.split('/').map(encodeURIComponent).join('/');
   const isGitlab = meta.provider === 'gitlab';
-  const blob = isGitlab ? `${repoUrl}/-/blob/${ref}/${path}` : `${repoUrl}/blob/${ref}/${path}`;
+  const blob = isGitlab
+    ? `${repoUrl}/-/blob/${ref}/${path}`
+    : `${repoUrl}/blob/${ref}/${path}`;
   if (!lineStart) return blob;
   const end = lineEnd && lineEnd !== lineStart ? lineEnd : null;
   if (!end) return `${blob}#L${lineStart}`;
-  return isGitlab ? `${blob}#L${lineStart}-${end}` : `${blob}#L${lineStart}-L${end}`;
+  return isGitlab
+    ? `${blob}#L${lineStart}-${end}`
+    : `${blob}#L${lineStart}-L${end}`;
 }
 
 /** File / line / commit / dependency details of a repository finding. */
@@ -28,11 +48,18 @@ export function CodeLocation({
   vulnerability,
   labelClassName,
 }: {
-  vulnerability: Vulnerability;
+  vulnerability: CodeFinding;
   labelClassName: string;
 }) {
-  const { filePath, lineStart, lineEnd, commit, packageName, installedVersion, fixedVersion } =
-    vulnerability;
+  const {
+    filePath,
+    lineStart,
+    lineEnd,
+    commit,
+    packageName,
+    installedVersion,
+    fixedVersion,
+  } = vulnerability;
   const url = codeFindingUrl(vulnerability);
   const lines =
     lineStart && lineEnd && lineEnd !== lineStart
@@ -76,7 +103,9 @@ export function CodeLocation({
           <span className={labelClassName}>Dependency</span>
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="font-mono">{packageName}</span>
-            {installedVersion && <Badge variant="secondary">{installedVersion}</Badge>}
+            {installedVersion && (
+              <Badge variant="secondary">{installedVersion}</Badge>
+            )}
             {fixedVersion && (
               <span className="text-muted-foreground">
                 fixed in <Badge variant="outline">{fixedVersion}</Badge>

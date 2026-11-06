@@ -166,7 +166,7 @@ export function DetailProvider() {
   return (
     <Page
       permission="agent.read"
-      isShowButtonGoBack
+     
       header={
         <div className="flex items-center gap-3 justify-between">
           <div className="flex items-center gap-3">

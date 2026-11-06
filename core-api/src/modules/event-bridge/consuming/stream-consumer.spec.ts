@@ -43,7 +43,7 @@ describe('StreamConsumer', () => {
       accepts,
       handle,
       ...sink,
-    } as EventSink);
+    });
 
   beforeEach(() => {
     xreadgroup = jest.fn().mockResolvedValue([]);

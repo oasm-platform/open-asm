@@ -24,6 +24,7 @@ import { TargetsService } from '@/modules/targets/targets.service';
 import { ToolConfigProfilesService } from '@/modules/tools/tool-config-profiles.service';
 import { ToolsService } from '@/modules/tools/tools.service';
 import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilities.service';
+import { VulnerabilityReviewService } from '@/modules/vulnerabilities/vulnerability-review.service';
 import { RemoteExecuteSubscribeService } from '@/modules/workers/remote-execute-subscribe.service';
 import { WorkersService } from '@/modules/workers/workers.service';
 import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
@@ -73,6 +74,7 @@ import type {
   ToolScope,
   ToolType,
 } from './tools/types';
+import { proposeVulnerabilityTool } from './tools/vulnerability-proposal.tool';
 import { webFetchTool } from './tools/web-fetch.tool';
 import {
   detailAssetTool,
@@ -139,6 +141,8 @@ const PROJECT_ACTION_TOOLS: Record<string, ToolBuilder> = {
   add_assets_to_project: addAssetsToProjectTool,
   remove_assets_from_project: removeAssetsFromProjectTool,
   run_project_workflow: runProjectWorkflowTool,
+  // Records a proven finding for human review; nothing counts until approved
+  propose_vulnerability: proposeVulnerabilityTool,
 };
 
 /**
@@ -264,6 +268,8 @@ export class AgentTool {
     private readonly projectTriggersService: ProjectTriggersService,
     private readonly projectWorkflowsService: ProjectWorkflowsService,
     private readonly eventBridge: EventBridgeService,
+    @Inject(forwardRef(() => VulnerabilityReviewService))
+    private readonly vulnerabilityReviewService: WrapperType<VulnerabilityReviewService>,
   ) {}
 
   private get deps(): AgentToolDeps {
@@ -271,6 +277,7 @@ export class AgentTool {
       assetsService: this.assetsService,
       targetsService: this.targetsService,
       vulnerabilitiesService: this.vulnerabilitiesService,
+      vulnerabilityReviewService: this.vulnerabilityReviewService,
       statisticService: this.statisticService,
       issuesService: this.issuesService,
       toolsService: this.toolsService,
@@ -340,7 +347,8 @@ export class AgentTool {
   /**
    * The built-in tools for `agentMode`, behind the approval flow when given.
    * With `projectId` (the conversation's project) the project-aware tools are
-   * locked to it.
+   * locked to it. `agentName` names the agent definition running them (a
+   * subagent); tools that record provenance (propose_vulnerability) use it.
    */
   getTools(
     workspaceId: string,
@@ -349,6 +357,7 @@ export class AgentTool {
     conversationId?: string,
     approval?: ApprovalSettings,
     projectId?: string | null,
+    agentName?: string,
   ): Record<string, ToolType> {
     const deps = this.deps;
     const conversation = conversationId ?? '';
@@ -356,6 +365,7 @@ export class AgentTool {
       projectId,
       userId: approval?.userId,
       conversationId,
+      agentName,
     };
     const tools: Record<string, ToolType> = {};
 
