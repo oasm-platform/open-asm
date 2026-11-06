@@ -4,6 +4,7 @@ import { useNavigate, useParams } from '@tanstack/react-router';
 import { useEffect, useMemo, type JSX } from 'react';
 import {
   Building2,
+  FileCode,
   FolderOpen,
   KeyRound,
   Loader2,
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react';
 import ApiKeysSettings from './components/api-keys-settings';
 import { Files } from '@/pages/files/files';
+import Templates from '@/pages/templates/templates';
 import AuditLogSettings from './components/audit-log-settings';
 import McpConnect from './components/mcp-connect';
 import MembersSettings from './components/members-settings';
@@ -115,6 +117,18 @@ export const settingsTabGroups: SettingsTabGroup[] = [
             'Files saved by agents in this workspace, shared with members or by link',
         },
         component: <Files />,
+        permission: 'artifact.read',
+      },
+      {
+        id: 'templates',
+        label: 'Templates',
+        path: '/settings/templates',
+        icon: <FileCode />,
+        content: {
+          title: 'Templates',
+          description: 'Custom nuclei templates for this workspace',
+        },
+        component: <Templates />,
         permission: 'artifact.read',
       },
     ],
@@ -238,9 +252,11 @@ const Settings = ({ defaultTab = 'general' }: SettingsProps) => {
   return (
     <div
       className={
-        activeTab?.id === 'audit' || activeTab?.id === 'files'
-          ? 'mx-auto w-full sm:w-5/6 xl:w-2/3'
-          : 'mx-auto w-full sm:w-3/4 xl:w-1/2'
+        activeTab?.id === 'templates'
+          ? 'w-full'
+          : activeTab?.id === 'audit' || activeTab?.id === 'files'
+            ? 'mx-auto w-full sm:w-5/6 xl:w-2/3'
+            : 'mx-auto w-full sm:w-3/4 xl:w-1/2'
       }
     >
       {activeTab && (
