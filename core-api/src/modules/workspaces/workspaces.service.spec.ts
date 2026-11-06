@@ -811,7 +811,7 @@ describe('WorkspacesService', () => {
         id: randomUUID(),
         name: 'Viewer',
         isSystem: false,
-        permissions: ['group.read'],
+        permissions: ['project.read'],
       });
 
       await expect(
@@ -831,11 +831,11 @@ describe('WorkspacesService', () => {
 
       const result = await service.createPermissionGroup(
         testWorkspaceId,
-        { name: 'Viewer', permissions: ['group.read', 'template.read'] },
+        { name: 'Viewer', permissions: ['project.read', 'template.read'] },
         testUserId,
       );
 
-      expect(result.permissions).toEqual(['group.read']);
+      expect(result.permissions).toEqual(['project.read']);
     });
 
     it('should reject an empty update body', async () => {
@@ -998,10 +998,10 @@ describe('WorkspacesService', () => {
         .mockResolvedValueOnce(makeMember())
         .mockResolvedValueOnce(makeMember())
         .mockResolvedValueOnce({
-          memberPermissions: [{ permission: { permissions: ['group.read'] } }],
+          memberPermissions: [{ permission: { permissions: ['project.read'] } }],
         });
       (mockPermissionRepository.find as jest.Mock).mockResolvedValue([
-        { id: legacyGroupId, permissions: ['group.read', 'template.read'] },
+        { id: legacyGroupId, permissions: ['project.read', 'template.read'] },
       ]);
 
       await service.updateMemberPermissions(
