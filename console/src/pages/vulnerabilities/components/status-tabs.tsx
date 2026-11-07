@@ -32,7 +32,6 @@ export function VulnerabilityStatusTabs({ value, onValueChange, counts }: Status
               active
                 ? 'border-primary font-medium text-foreground'
                 : 'border-transparent text-muted-foreground hover:text-foreground',
-              tab.value === 'pending_review' && 'text-amber-700 dark:text-amber-300',
             )}
           >
             {tab.label}

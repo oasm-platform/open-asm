@@ -6,8 +6,9 @@ import type {
   VulnerabilitySourceDetailDto,
   VulnerabilityTimelineEventDto,
 } from '@/services/apis/gen/queries';
+import { cn } from '@/lib/utils';
 import { parseCVSS } from '@/utils/cvssVectorParser';
-import { useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { format } from 'date-fns';
 import { ToolLogo } from '@/components/ui/tool-logo';
 import { Bot, Tag, User } from 'lucide-react';
@@ -141,6 +142,29 @@ export function LifecycleCard({
   );
 }
 
+/** Opens the tool's detail page; plain content when the tool id is unknown. */
+function ToolLink({
+  toolId,
+  className,
+  children,
+}: {
+  toolId?: string | null;
+  className?: string;
+  children: ReactNode;
+}) {
+  if (!toolId) return <span className={className}>{children}</span>;
+  return (
+    <Link
+      to="/tools/$id"
+      params={{ id: toolId }}
+      className={cn('hover:underline underline-offset-4', className)}
+      data-testid="tool-link"
+    >
+      {children}
+    </Link>
+  );
+}
+
 function SourceRow({
   source,
   aiVerified,
@@ -191,18 +215,23 @@ function SourceRow({
   }
   return (
     <li className="flex items-center gap-3" data-source-kind="tool">
-      <ToolLogo
-        name={source.tool?.name ?? 'Scanner'}
-        logoUrl={source.tool?.logoUrl ?? fallbackLogoUrl}
-        size={32}
-        className="shrink-0 rounded-md"
-        alt=""
-      />
+      <ToolLink toolId={source.tool?.id} className="shrink-0">
+        <ToolLogo
+          name={source.tool?.name ?? 'Scanner'}
+          logoUrl={source.tool?.logoUrl ?? fallbackLogoUrl}
+          size={32}
+          className="shrink-0 rounded-md"
+          alt=""
+        />
+      </ToolLink>
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className="flex flex-wrap items-center gap-1.5">
-          <span className="font-medium capitalize">
+          <ToolLink
+            toolId={source.tool?.id}
+            className="font-medium capitalize"
+          >
             {source.tool?.name ?? 'Scanner'}
-          </span>
+          </ToolLink>
           {source.agentConversationId && (
             <span className="text-xs text-muted-foreground">run by AI</span>
           )}
@@ -228,7 +257,7 @@ export function SourcesList({ data }: { data: VulnerabilityDetailDto }) {
     <div className="text-sm" data-testid="sources-card">
       {sources.length === 0 ? (
         data.tool?.name ? (
-          <div className="flex items-center gap-3">
+          <ToolLink toolId={data.tool.id} className="flex w-fit items-center gap-3">
             <ToolLogo
               name={data.tool.name}
               logoUrl={data.tool.logoUrl}
@@ -237,7 +266,7 @@ export function SourcesList({ data }: { data: VulnerabilityDetailDto }) {
               alt=""
             />
             <span className="font-medium capitalize">{data.tool.name}</span>
-          </div>
+          </ToolLink>
         ) : (
           <p className="text-muted-foreground">No sources recorded.</p>
         )

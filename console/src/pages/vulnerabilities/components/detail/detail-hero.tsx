@@ -22,7 +22,7 @@ import {
 import { Link } from '@tanstack/react-router';
 import { differenceInCalendarDays, format, subDays } from 'date-fns';
 import { CalendarClock, ClipboardList, Globe, MapPin } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { CreateIssueDialog } from '../create-issue-dialog';
 import { SourcesList } from './side-cards';
 
@@ -384,11 +384,18 @@ export function DetailHero({
           label="CVSS"
           sub={
             data.cvssMetric ? (
-              <span
-                className="block truncate font-mono"
-                title={data.cvssMetric}
-              >
-                {data.cvssMetric}
+              <span className="block break-words font-mono">
+                {/* Wrap between metrics rather than cut the vector off. */}
+                {data.cvssMetric.split('/').map((part, i, all) => (
+                  <Fragment key={i}>
+                    {part}
+                    {i < all.length - 1 && (
+                      <>
+                        /<wbr />
+                      </>
+                    )}
+                  </Fragment>
+                ))}
               </span>
             ) : (
               'No vector reported'
