@@ -28,6 +28,8 @@ export type GraphNodeData = {
   staggerIndex?: number;
   /** View-injected: opens the detail sheet for a node (keyboard a11y). */
   onOpenDetail?: (nodeId: string) => void;
+  /** View-injected: target family key (cluster layout hulls). */
+  familyId?: string;
 };
 
 /** Edge data shape from the API. */
@@ -106,14 +108,369 @@ export type LayoutOutputEdge = {
   data?: GraphEdgeData;
 };
 
-/** Result of the layout pass. */
+/**
+ * Result of the layout pass. Positions are node CENTERS: the view renders
+ * with `nodeOrigin={[0.5, 0.5]}`, so differently sized badges line up.
+ * `groupOf` (cluster layout only) maps a node id to its target family key.
+ */
 export type LayoutResult = {
   nodes: LayoutOutputNode[];
   edges: LayoutOutputEdge[];
+  groupOf?: Record<string, string>;
 };
 
-/** Approximate node bounding box used for layout spacing. */
-const NODE_BOX = 96;
+/**
+ * On-canvas footprint of a node around its center: badge plus the label
+ * rendered below it. `up`/`down` are distances from the center to the top
+ * and bottom edge (the label hangs below, so the box is not symmetric).
+ */
+export type Footprint = { w: number; up: number; down: number };
+
+export function nodeFootprint(type: NodeType, label: string): Footprint {
+  const labelW = Math.min(label.length, 24) * 6 + 8;
+  switch (type) {
+    case 'target':
+    case 'technology':
+      // Pill with the label inside, nothing below.
+      return { w: Math.min(124, labelW + 30), up: 16, down: 16 };
+    case 'asset':
+      return { w: Math.min(128, Math.max(44, labelW)), up: 16, down: 30 };
+    case 'statusCode':
+      return { w: Math.max(28, labelW), up: 14, down: 30 };
+    default:
+      // ip / service / tls circles (56px) with a label below.
+      return { w: Math.min(128, Math.max(60, labelW)), up: 30, down: 46 };
+  }
+}
+
+/**
+ * Place each movable node on the free spot nearest to where it wants to be,
+ * searching outwards on a spiral. Unlike push-apart, this cannot oscillate
+ * between fixed neighbours, so new nodes (expanded services, nodes from a
+ * poll) never land on top of what is already on canvas. Movable nodes are
+ * placed in input order and become obstacles for the ones after them.
+ * Mutates `positions`.
+ */
+export function placeInFreeSpots(
+  items: Array<{ id: string; fp: Footprint }>,
+  positions: Map<string, { x: number; y: number }>,
+  isFixed: (id: string) => boolean,
+  gap = 14,
+): void {
+  const CELL = 160;
+  const grid = new Map<string, Array<{ x: number; y: number; fp: Footprint }>>();
+  const keyOf = (x: number, y: number) => `${Math.floor(x / CELL)},${Math.floor(y / CELL)}`;
+  const occupy = (p: { x: number; y: number }, fp: Footprint) => {
+    const key = keyOf(p.x, p.y);
+    grid.set(key, [...(grid.get(key) ?? []), { ...p, fp }]);
+  };
+  const collides = (p: { x: number; y: number }, fp: Footprint) => {
+    const cx = Math.floor(p.x / CELL);
+    const cy = Math.floor(p.y / CELL);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (const o of grid.get(`${cx + dx},${cy + dy}`) ?? []) {
+          if (
+            Math.abs(o.x - p.x) < (o.fp.w + fp.w) / 2 + gap &&
+            p.y - fp.up < o.y + o.fp.down + gap &&
+            o.y - o.fp.up < p.y + fp.down + gap
+          ) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  };
+  for (const it of items) {
+    if (isFixed(it.id)) occupy(positions.get(it.id)!, it.fp);
+  }
+  for (const it of items) {
+    if (isFixed(it.id)) continue;
+    const want = positions.get(it.id)!;
+    let spot = want;
+    search: for (let r = 0; r <= 3000; r += 20) {
+      const steps = r === 0 ? 1 : Math.max(8, Math.round((2 * Math.PI * r) / 20));
+      for (let k = 0; k < steps; k++) {
+        const angle = (2 * Math.PI * k) / steps;
+        const candidate = { x: want.x + Math.cos(angle) * r, y: want.y + Math.sin(angle) * r };
+        if (!collides(candidate, it.fp)) {
+          spot = candidate;
+          break search;
+        }
+      }
+    }
+    positions.set(it.id, spot);
+    occupy(spot, it.fp);
+  }
+}
+
+/**
+ * Cluster ("attack-surface map") layout, the default arrangement.
+ *
+ * Each target is the hub of its own family: its domains sit on staggered
+ * concentric ellipses around it (inner rings first, so a family is compact),
+ * ordered by their primary IP so domains sharing an address are adjacent.
+ * IPs used by one family sit on an outer ring at the circular mean angle of
+ * their domains, which keeps resolves_to wires short and mostly radial. IPs
+ * shared by several families are placed between those families afterwards.
+ * Families are packed greedily (largest first), each one next to the
+ * families it shares IPs with. A final footprint-aware pass guarantees no
+ * badge or label overlaps. Deterministic for a given input order.
+ */
+export function applyClusterLayout(graphData: {
+  nodes: LayoutInputNode[];
+  edges: LayoutInputEdge[];
+}): LayoutResult {
+  const { nodes, edges } = dedupeGraph(graphData);
+  if (nodes.length === 0) return { nodes: [], edges: [], groupOf: {} };
+
+  const ORPHAN = '__ungrouped__';
+  const SLOT = 136; // tangential spacing between neighbours on one ring
+  const RING_GAP = 62;
+  const ELLIPSE_X = 1.3; // labels are wide: give rings more horizontal room
+  const IP_GAP = 120;
+  const IP_SLOT = 96;
+  const FAMILY_GAP = 90;
+
+  const byId = new Map(nodes.map((nd) => [nd.id, nd]));
+  const order = new Map(nodes.map((nd, i) => [nd.id, i]));
+  const targetOf = new Map<string, string>();
+  const ipsOf = new Map<string, string[]>();
+  const assetsOfIp = new Map<string, string[]>();
+  for (const e of edges) {
+    const s = byId.get(e.source);
+    const t = byId.get(e.target);
+    if (!s || !t) continue;
+    if (s.type === 'target' && t.type === 'asset' && !targetOf.has(t.id)) {
+      targetOf.set(t.id, s.id);
+    } else if (t.type === 'ip' && s.type !== 'ip') {
+      ipsOf.set(s.id, [...(ipsOf.get(s.id) ?? []), t.id]);
+      assetsOfIp.set(t.id, [...(assetsOfIp.get(t.id) ?? []), s.id]);
+    }
+  }
+
+  // ── Families: one per target, plus one for ungrouped members ──────────
+  type Family = {
+    key: string;
+    members: string[]; // ring members (domains, or loose nodes)
+    ownIps: string[];
+    local: Map<string, { x: number; y: number }>;
+    radius: number;
+    center: { x: number; y: number };
+  };
+  const families = new Map<string, Family>();
+  const familyOf = new Map<string, string>();
+  const ensureFamily = (key: string) => {
+    let f = families.get(key);
+    if (!f) {
+      f = { key, members: [], ownIps: [], local: new Map(), radius: 0, center: { x: 0, y: 0 } };
+      families.set(key, f);
+    }
+    return f;
+  };
+  for (const nd of nodes) {
+    if (nd.type === 'target') {
+      ensureFamily(nd.id);
+      familyOf.set(nd.id, nd.id);
+    }
+  }
+  for (const nd of nodes) {
+    if (nd.type === 'target') continue;
+    if (nd.type === 'ip' && assetsOfIp.has(nd.id)) continue; // placed below
+    const key = targetOf.get(nd.id) ?? ORPHAN;
+    ensureFamily(key).members.push(nd.id);
+    familyOf.set(nd.id, key);
+  }
+
+  // IPs: owned by a family when every domain resolving to them is in it.
+  const sharedIps: string[] = [];
+  for (const nd of nodes) {
+    if (nd.type !== 'ip' || !assetsOfIp.has(nd.id)) continue;
+    const keys = new Set(assetsOfIp.get(nd.id)!.map((a) => familyOf.get(a) ?? ORPHAN));
+    if (keys.size === 1) {
+      const key = [...keys][0];
+      ensureFamily(key).ownIps.push(nd.id);
+      familyOf.set(nd.id, key);
+    } else {
+      sharedIps.push(nd.id);
+    }
+  }
+
+  const ellipse = (angle: number, r: number) => ({
+    x: Math.cos(angle) * r * ELLIPSE_X,
+    y: Math.sin(angle) * r,
+  });
+
+  // ── Local layout of each family around its hub at (0, 0) ──────────────
+  const angleOf = new Map<string, number>();
+  for (const f of families.values()) {
+    const primaryIp = (id: string) =>
+      Math.min(...(ipsOf.get(id) ?? []).map((ip) => order.get(ip) ?? 0), Infinity);
+    const labelOf = (id: string) => byId.get(id)?.data.label ?? id;
+    f.members.sort(
+      (a, b) =>
+        primaryIp(a) - primaryIp(b) || labelOf(a).localeCompare(labelOf(b)),
+    );
+    const count = f.members.length;
+    const rings = count <= 10 ? 1 : Math.min(4, Math.ceil(count / 18));
+    const r0 = Math.max(140, (count * SLOT) / (2 * Math.PI * rings * ELLIPSE_X));
+    f.members.forEach((id, i) => {
+      const angle = -Math.PI / 2 + (2 * Math.PI * i) / Math.max(count, 1);
+      angleOf.set(id, angle);
+      f.local.set(id, ellipse(angle, r0 + (i % rings) * RING_GAP));
+    });
+    let outer = count > 0 ? r0 + (rings - 1) * RING_GAP : 40;
+
+    if (f.ownIps.length > 0) {
+      const ipR = outer + IP_GAP;
+      const withAngles = f.ownIps.map((ip) => {
+        const assets = assetsOfIp.get(ip)!;
+        let sx = 0;
+        let sy = 0;
+        for (const a of assets) {
+          const ang = angleOf.get(a) ?? 0;
+          sx += Math.cos(ang);
+          sy += Math.sin(ang);
+        }
+        // Resultant length: ~1 when the domains sit together on the ring,
+        // ~0 when they are spread all around it. Spread-out or very widely
+        // shared IPs (CDN / shared hosting) are family hubs.
+        const spread = Math.hypot(sx, sy) / assets.length;
+        const hub =
+          assets.length > 2 && (spread < 0.6 || assets.length >= count * 0.25);
+        return { ip, angle: Math.atan2(sy, sx), hub };
+      });
+      // Hub IPs go on an inner ring next to the target: their wires stay
+      // radial instead of cutting across the whole family.
+      const hubs = withAngles.filter((p) => p.hub);
+      const innerR = Math.max(70, r0 * 0.5);
+      hubs.forEach(({ ip }, k) => {
+        const angle = -Math.PI / 2 + (2 * Math.PI * (k + 0.5)) / hubs.length;
+        f.local.set(ip, ellipse(angle, hubs.length === 1 ? innerR * 0.8 : innerR));
+      });
+      const placed = withAngles
+        .filter((p) => !p.hub)
+        .sort((a, b) => a.angle - b.angle);
+      const minStep = IP_SLOT / (ipR * ELLIPSE_X);
+      for (let k = 1; k < placed.length; k++) {
+        placed[k].angle = Math.max(placed[k].angle, placed[k - 1].angle + minStep);
+      }
+      // Too many IPs for one ring: alternate between two radii.
+      const crowded = placed.length * minStep > 2 * Math.PI;
+      placed.forEach(({ ip, angle }, k) => {
+        f.local.set(ip, ellipse(angle, ipR + (crowded && k % 2 ? 80 : 0)));
+      });
+      if (placed.length > 0) outer = ipR + (crowded ? 80 : 0);
+    }
+    f.radius = outer * ELLIPSE_X + 70;
+  }
+
+  // ── Pack families: largest first, next to the ones they share IPs with ─
+  const affinity = new Map<string, Map<string, number>>();
+  for (const ip of sharedIps) {
+    const keys = [...new Set(assetsOfIp.get(ip)!.map((a) => familyOf.get(a) ?? ORPHAN))];
+    for (const a of keys) {
+      for (const b of keys) {
+        if (a === b) continue;
+        const m = affinity.get(a) ?? new Map<string, number>();
+        m.set(b, (m.get(b) ?? 0) + 1);
+        affinity.set(a, m);
+      }
+    }
+  }
+  const familyList = [...families.values()].sort(
+    (a, b) => b.radius - a.radius || a.key.localeCompare(b.key),
+  );
+  const placedFamilies: Family[] = [];
+  for (const f of familyList) {
+    if (placedFamilies.length === 0) {
+      placedFamilies.push(f);
+      continue;
+    }
+    // Where this family wants to be: weighted centroid of related families.
+    let wx = 0;
+    let wy = 0;
+    let wt = 0;
+    for (const p of placedFamilies) {
+      const w = affinity.get(f.key)?.get(p.key) ?? 0;
+      wx += p.center.x * w;
+      wy += p.center.y * w;
+      wt += w;
+    }
+    const goal = wt > 0 ? { x: wx / wt, y: wy / wt } : { x: 0, y: 0 };
+    let best: { x: number; y: number } | null = null;
+    let bestScore = Infinity;
+    // Bound the candidate search for very large target counts.
+    const anchors = placedFamilies.length > 60 ? placedFamilies.slice(-60) : placedFamilies;
+    for (const p of anchors) {
+      for (let s = 0; s < 16; s++) {
+        const ang = (2 * Math.PI * s) / 16;
+        const dist = p.radius + f.radius + FAMILY_GAP;
+        const c = { x: p.center.x + Math.cos(ang) * dist, y: p.center.y + Math.sin(ang) * dist * 0.8 };
+        const clear = placedFamilies.every(
+          (q) => Math.hypot(q.center.x - c.x, q.center.y - c.y) >= q.radius + f.radius + FAMILY_GAP - 1,
+        );
+        if (!clear) continue;
+        const score = Math.hypot(c.x - goal.x, c.y - goal.y);
+        if (score < bestScore) {
+          bestScore = score;
+          best = c;
+        }
+      }
+    }
+    f.center = best ?? { x: 0, y: placedFamilies.length * (f.radius * 2 + FAMILY_GAP) };
+    placedFamilies.push(f);
+  }
+
+  // ── Absolute positions ───────────────────────────────────────────────
+  const positions = new Map<string, { x: number; y: number }>();
+  for (const f of families.values()) {
+    if (byId.has(f.key)) positions.set(f.key, { ...f.center });
+    for (const [id, p] of f.local) {
+      positions.set(id, { x: f.center.x + p.x, y: f.center.y + p.y });
+    }
+  }
+  for (const ip of sharedIps) {
+    let sx = 0;
+    let sy = 0;
+    const assets = assetsOfIp.get(ip)!;
+    for (const a of assets) {
+      const p = positions.get(a) ?? { x: 0, y: 0 };
+      sx += p.x;
+      sy += p.y;
+    }
+    positions.set(ip, { x: sx / assets.length, y: sy / assets.length });
+    familyOf.set(ip, `shared:${ip}`);
+  }
+
+  placeInFreeSpots(
+    nodes.map((nd) => ({ id: nd.id, fp: nodeFootprint(nd.type, nd.data.label) })),
+    positions,
+    (id) => byId.get(id)?.type === 'target',
+  );
+
+  const groupOf: Record<string, string> = {};
+  for (const [id, key] of familyOf) {
+    if (key !== ORPHAN && !key.startsWith('shared:')) groupOf[id] = key;
+  }
+
+  return {
+    nodes: nodes.map((nd) => ({
+      id: nd.id,
+      type: nd.type,
+      position: positions.get(nd.id)!,
+      data: nd.data,
+    })),
+    edges: edges.map((e) => ({
+      id: `e-${e.source}-${e.target}`,
+      source: e.source,
+      target: e.target,
+      data: e.data,
+    })),
+    groupOf,
+  };
+}
 
 /**
  * Dedupe nodes by id and edges by (source, target) pair, dropping edges with
@@ -506,11 +863,7 @@ export function applyForceLayout(
     return {
       id: node.id,
       type: node.type,
-      // React Flow positions by top-left corner; NODE_BOX approximates size.
-      position: {
-        x: p.x + offsetX - NODE_BOX / 2,
-        y: p.y + offsetY - NODE_BOX / 2,
-      },
+      position: { x: p.x + offsetX, y: p.y + offsetY },
       data: node.data,
     };
   });
@@ -526,18 +879,17 @@ export function applyForceLayout(
 }
 
 /**
- * Hierarchical (layered) layout via dagre, the default graph arrangement.
+ * Hierarchical (layered) layout via dagre: Target → Domain → IP lanes.
  *
  * Edges are added without labels and only for layering purposes; the actual
- * edge visuals are applied later by the graph view. Positions are computed
- * for the ~96px NODE_BOX and converted from dagre's center-anchored
- * coordinates to React Flow's top-left anchored ones.
+ * edge visuals are applied later by the graph view. Each node is sized by its
+ * real footprint (badge + label), so lanes never overlap.
  */
 export function applyDagreLayout(
   graphData: { nodes: LayoutInputNode[]; edges: LayoutInputEdge[] },
   options: { rankdir?: 'TB' | 'LR' | 'BT' | 'RL' } = {},
 ): LayoutResult {
-  const rankdir = options.rankdir ?? 'TB';
+  const rankdir = options.rankdir ?? 'LR';
 
   // ── Dedupe nodes / edges (shared with the force layout) ─────────────
   const { nodes, edges } = dedupeGraph(graphData);
@@ -546,37 +898,40 @@ export function applyDagreLayout(
   const g = new graphlib.Graph();
   g.setGraph({
     rankdir,
-    nodesep: 60,
-    ranksep: 140,
+    nodesep: 18,
+    ranksep: 220,
     marginx: 40,
     marginy: 40,
   });
   g.setDefaultEdgeLabel(() => ({}));
   for (const node of nodes) {
-    g.setNode(node.id, { width: NODE_BOX, height: NODE_BOX });
+    const fp = nodeFootprint(node.type, node.data.label);
+    g.setNode(node.id, { width: fp.w, height: fp.up + fp.down });
   }
   for (const edge of edges) {
     g.setEdge(edge.source, edge.target);
   }
   dagreLayout(g, {});
 
-  const positionedNodes: LayoutOutputNode[] = nodes.map((node) => {
-    const pos = g.node(node.id) as {
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-    };
-    return {
-      id: node.id,
-      type: node.type,
-      position: {
-        x: pos.x - pos.width / 2,
-        y: pos.y - pos.height / 2,
-      },
-      data: node.data,
-    };
-  });
+  const fpById = new Map(
+    nodes.map((nd) => [nd.id, nodeFootprint(nd.type, nd.data.label)]),
+  );
+  // dagre centers the whole box; the badge sits above the label.
+  const centers = new Map(
+    nodes.map((nd) => {
+      const pos = g.node(nd.id) as { x: number; y: number };
+      const fp = fpById.get(nd.id)!;
+      return [nd.id, { x: pos.x, y: pos.y - (fp.down - fp.up) / 2 }];
+    }),
+  );
+  if (rankdir === 'LR') wrapLongRanks(nodes, fpById, centers);
+
+  const positionedNodes: LayoutOutputNode[] = nodes.map((node) => ({
+    id: node.id,
+    type: node.type,
+    position: centers.get(node.id)!,
+    data: node.data,
+  }));
 
   const positionedEdges: LayoutOutputEdge[] = edges.map((edge) => ({
     id: `e-${edge.source}-${edge.target}`,
@@ -586,4 +941,52 @@ export function applyDagreLayout(
   }));
 
   return { nodes: positionedNodes, edges: positionedEdges };
+}
+
+/**
+ * A left-to-right rank with dozens of domains becomes one lane thousands of
+ * pixels tall. Wrap each long rank into sub-columns (column-major, keeping
+ * dagre's crossing-minimised order) so the diagram stays roughly as wide as
+ * it is tall, and re-center every rank vertically. Mutates `centers`.
+ */
+function wrapLongRanks(
+  nodes: LayoutInputNode[],
+  fpById: Map<string, Footprint>,
+  centers: Map<string, { x: number; y: number }>,
+): void {
+  const ROW_GAP = 14;
+  const COL_GAP = 28;
+  const RANK_GAP = 200;
+  // Ranks: dagre does not give every node of a rank the exact same x
+  // (widths differ), so bucket by proximity along the x axis.
+  const byX = nodes
+    .map((nd) => nd.id)
+    .sort((a, b) => centers.get(a)!.x - centers.get(b)!.x);
+  const ranks: string[][] = [];
+  let rankStart = -Infinity;
+  for (const id of byX) {
+    const x = centers.get(id)!.x;
+    if (x - rankStart > 100) {
+      ranks.push([]);
+      rankStart = x;
+    }
+    ranks[ranks.length - 1].push(id);
+  }
+  let cursor = 0;
+  for (const rank of ranks) {
+    const ids = rank.sort((a, b) => centers.get(a)!.y - centers.get(b)!.y);
+    const rows = Math.max(14, Math.ceil(Math.sqrt(ids.length * 2)));
+    const colW = Math.max(...ids.map((id) => fpById.get(id)!.w)) + COL_GAP;
+    const cols = Math.ceil(ids.length / rows);
+    for (let c = 0; c < cols; c++) {
+      const column = ids.slice(c * rows, (c + 1) * rows);
+      const heights = column.map((id) => fpById.get(id)!.up + fpById.get(id)!.down + ROW_GAP);
+      let y = -heights.reduce((sum, h) => sum + h, 0) / 2;
+      column.forEach((id, k) => {
+        centers.set(id, { x: cursor + c * colW + colW / 2, y: y + fpById.get(id)!.up });
+        y += heights[k];
+      });
+    }
+    cursor += cols * colW + RANK_GAP;
+  }
 }
