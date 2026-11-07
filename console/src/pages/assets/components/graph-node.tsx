@@ -271,7 +271,7 @@ function GraphNodeComponentImpl({ data, id, selected }: NodeProps) {
         )}
       </div>
       {showLabelBelow && labelVisible && (
-        <div className="pointer-events-none absolute left-1/2 top-full z-10 mt-1 max-w-[110px] -translate-x-1/2 text-center text-[10px] font-medium leading-tight text-foreground/80">
+        <div className="pointer-events-none absolute left-1/2 top-full z-10 mt-1 max-w-[124px] -translate-x-1/2 truncate whitespace-nowrap text-center text-[10px] font-medium leading-tight text-foreground/80">
           {truncatedLabel}
         </div>
       )}
@@ -281,3 +281,23 @@ function GraphNodeComponentImpl({ data, id, selected }: NodeProps) {
 
 /** Memoized node component: stable per poll, avoids re-renders on hover etc. */
 export const GraphNodeComponent = memo(GraphNodeComponentImpl);
+
+/**
+ * Soft "territory" drawn behind a target family in the cluster layout, tinted
+ * with the target's color. Purely decorative: no handles, no pointer events.
+ */
+function GraphHullComponentImpl({ data }: NodeProps) {
+  const color = (data as { color?: string }).color ?? 'var(--color-graph-edge)';
+  return (
+    <div
+      aria-hidden
+      className="size-full rounded-[48px] border border-dashed"
+      style={{
+        backgroundColor: `color-mix(in srgb, ${color} 7%, transparent)`,
+        borderColor: `color-mix(in srgb, ${color} 35%, transparent)`,
+      }}
+    />
+  );
+}
+
+export const GraphHullComponent = memo(GraphHullComponentImpl);

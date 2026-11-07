@@ -32,7 +32,11 @@ import {
   type AssetGraphResponseDto,
 } from '@/services/apis/gen/queries';
 import {
+  applyClusterLayout,
+  applyDagreLayout,
   applyForceLayout,
+  nodeFootprint,
+  placeInFreeSpots,
   CLUSTER_COLORS,
   NODE_TYPE_COLORS,
   type LayoutInputNode,
@@ -40,7 +44,11 @@ import {
   type LayoutResult,
   type GraphNodeData,
 } from './graph-types';
-import { GraphNodeComponent, resolveNodeType } from './graph-node';
+import {
+  GraphHullComponent,
+  GraphNodeComponent,
+  resolveNodeType,
+} from './graph-node';
 import { GraphLegend } from './graph-legend';
 import { GraphNodeSearch } from './graph-node-search';
 import AssetDetailSheet from './asset-detail-sheet';
@@ -56,7 +64,19 @@ const nodeTypes = {
   technology: GraphNodeComponent,
   tls: GraphNodeComponent,
   statusCode: GraphNodeComponent,
+  hull: GraphHullComponent,
 };
+
+type LayoutMode = 'cluster' | 'hierarchy' | 'organic';
+
+const LAYOUT_MODES: Array<{ value: LayoutMode; label: string; title: string }> = [
+  { value: 'cluster', label: 'Clusters', title: 'Group domains and IPs around each target' },
+  { value: 'hierarchy', label: 'Hierarchy', title: 'Target → Domain → IP lanes, left to right' },
+  { value: 'organic', label: 'Organic', title: 'Force-directed layout' },
+];
+
+/** Positions are node centers, so badges of different sizes line up. */
+const NODE_ORIGIN: [number, number] = [0.5, 0.5];
 
 interface SelectedGraphNode {
   id: string;
@@ -116,6 +136,7 @@ const LABEL_LOD_ZOOM = 0.5;
 function buildRfEdges(
   inputEdges: LayoutInputEdge[],
   colorById: Map<string, string>,
+  faintMembership = false,
 ): Edge[] {
   return inputEdges.map((e) => {
     const typeOverrides = EDGE_TYPE_STYLES[e.data?.type ?? ''] ?? {};
@@ -132,7 +153,11 @@ function buildRfEdges(
       style: {
         stroke: colorById.get(e.source) ?? 'var(--color-graph-edge)',
         strokeWidth: typeOverrides.strokeWidth ?? 1.2,
-        opacity: typeOverrides.opacity ?? 0.55,
+        // Cluster hulls already show membership: target spokes recede.
+        opacity:
+          faintMembership && e.data?.type === 'belongs_to'
+            ? 0.18
+            : (typeOverrides.opacity ?? 0.55),
         ...(typeOverrides.strokeDasharray
           ? { strokeDasharray: typeOverrides.strokeDasharray }
           : {}),
@@ -154,6 +179,7 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [layoutLocked, setLayoutLocked] = useState(false);
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>('cluster');
 
   // Domain nodes expand their child services on click: the per-asset
   // endpoint result is merged into the layout until toggled off again.
@@ -363,7 +389,8 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
       }
     }
 
-    // ── Layout: force-directed always. Positions are merged per node id:
+    // ── Layout: cluster (default), hierarchy or organic, per the toolbar
+    // switch. Positions are merged per node id:
     // nodes already on canvas keep their position across polls (user
     // pan/zoom/drags survive refetches); only genuinely new nodes take the
     // freshly computed position. When the layout is locked, the engine is
@@ -381,7 +408,13 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
       !layoutLocked || hasNewNodes || forceRecomputeRef.current;
     let layoutResult: LayoutResult | null = null;
     if (shouldRunLayout) {
-      layoutResult = applyForceLayout({ nodes: mergedNodes, edges: inputEdges });
+      const input = { nodes: mergedNodes, edges: inputEdges };
+      layoutResult =
+        layoutMode === 'hierarchy'
+          ? applyDagreLayout(input)
+          : layoutMode === 'organic'
+            ? applyForceLayout(input)
+            : applyClusterLayout(input);
       forceRecomputeRef.current = false;
     }
     const layoutPositionById = new Map(
@@ -439,29 +472,44 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
     const labelVisible = zoomRef.current >= LABEL_LOD_ZOOM;
     const glowEnabled = !reducedMotionRef.current && labelVisible;
 
-    // Expanded services hug their domain: pin each one on a small ring around
-    // the owning asset's current position instead of letting FR scatter them
-    // far from the node that was clicked.
-    const serviceRingById = new Map<string, { x: number; y: number }>();
-    {
-      const ringRadius = 130;
-      const angleStep = 2.399963229728653; // golden angle
-      const ringIndexByAsset = new Map<string, number>();
-      for (const edge of expandedEdges) {
-        if (edge.data?.type !== 'runs_on') continue;
-        const assetPos =
-          prevPositions.get(edge.source) ??
-          layoutPositionById.get(edge.source);
-        if (!assetPos) continue;
-        const idx = ringIndexByAsset.get(edge.source) ?? 0;
-        ringIndexByAsset.set(edge.source, idx + 1);
-        const angle = idx * angleStep;
-        serviceRingById.set(edge.target, {
-          x: assetPos.x + Math.cos(angle) * ringRadius,
-          y: assetPos.y + Math.sin(angle) * ringRadius,
-        });
+    // Expanded services fan out from their domain, pointing away from the
+    // domain's target (outwards from the cluster) instead of a full ring
+    // that lands on top of neighbouring domains.
+    const posOf = (id: string) =>
+      prevPositions.get(id) ?? layoutPositionById.get(id);
+    const targetOfAsset = new Map<string, string>();
+    for (const edge of inputEdges) {
+      if (edge.data?.type === 'belongs_to') {
+        targetOfAsset.set(edge.target, edge.source);
       }
     }
+    const servicesByAsset = new Map<string, string[]>();
+    for (const edge of expandedEdges) {
+      if (edge.data?.type !== 'runs_on') continue;
+      servicesByAsset.set(edge.source, [
+        ...(servicesByAsset.get(edge.source) ?? []),
+        edge.target,
+      ]);
+    }
+    const serviceRingById = new Map<string, { x: number; y: number }>();
+    for (const [assetId, services] of servicesByAsset) {
+      const assetPos = posOf(assetId);
+      if (!assetPos) continue;
+      const parentPos = posOf(targetOfAsset.get(assetId) ?? '');
+      const base = parentPos
+        ? Math.atan2(assetPos.y - parentPos.y, assetPos.x - parentPos.x)
+        : 0;
+      const step = Math.min(0.55, (2 * Math.PI) / services.length);
+      services.forEach((serviceId, k) => {
+        const angle = base + (k - (services.length - 1) / 2) * step;
+        const radius = 150 + Math.floor(k / 12) * 90;
+        serviceRingById.set(serviceId, {
+          x: assetPos.x + Math.cos(angle) * radius,
+          y: assetPos.y + Math.sin(angle) * radius,
+        });
+      });
+    }
+    const groupOf = layoutResult?.groupOf;
 
     const rfNodes: Node[] = mergedNodes.map((node, index) => {
       const previous = prevPositions.get(node.id);
@@ -489,17 +537,43 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
             node.data.alert === true &&
             severityByService.get(node.id) === 'danger',
           staggerIndex: index,
+          // Family membership drives the cluster hulls; kept across polls
+          // that skip the layout engine.
+          familyId: groupOf
+            ? groupOf[node.id]
+            : (nodesRef.current.find((n) => n.id === node.id)?.data as
+                | GraphNodeData
+                | undefined)?.familyId,
           onOpenDetail: openDetailForNode,
         },
       };
     });
 
+    // Newly placed nodes (polls, expansions) are nudged off the nodes already
+    // on canvas, which keep their (possibly dragged) spot.
+    if (hasNewNodes && prevPositions.size > 0) {
+      const positions = new Map(rfNodes.map((n) => [n.id, { ...n.position }]));
+      placeInFreeSpots(
+        mergedNodes.map((n) => ({
+          id: n.id,
+          fp: nodeFootprint(n.type, n.data.label),
+        })),
+        positions,
+        (id) => prevPositions.has(id),
+      );
+      for (const n of rfNodes) n.position = positions.get(n.id)!;
+    }
+
     // ── Edge rendering: per-type defaults + animated alert `returns` edges.
-    const rfEdges: Edge[] = buildRfEdges(inputEdges, colorById);
+    const rfEdges: Edge[] = buildRfEdges(
+      inputEdges,
+      colorById,
+      layoutMode === 'cluster',
+    );
 
     setNodes(rfNodes);
     setEdges(rfEdges);
-  }, [graphData, layoutLocked, openDetailForNode, expandedServices, setNodes, setEdges]);
+  }, [graphData, layoutLocked, layoutMode, openDetailForNode, expandedServices, setNodes, setEdges]);
 
   useEffect(() => {
     applyLayout();
@@ -526,7 +600,7 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
     if (!fitRequestedRef.current) return;
     fitRequestedRef.current = false;
     requestAnimationFrame(() => {
-      fitView({ padding: 0.25 });
+      void fitView({ padding: 0.15 });
     });
   }, [graphData, fitView]);
 
@@ -571,17 +645,61 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
     return ids;
   }, [selectedNodeId, edges]);
 
+  // ── Cluster hulls: a soft "territory" behind each target family (cluster
+  // layout only), recomputed from live positions so it follows drags.
+  const hullNodes = useMemo((): Node[] => {
+    if (layoutMode !== 'cluster') return [];
+    const boxes = new Map<
+      string,
+      { minX: number; minY: number; maxX: number; maxY: number; color?: string }
+    >();
+    for (const n of nodes) {
+      const data = n.data as GraphNodeData;
+      if (!data.familyId) continue;
+      const fp = nodeFootprint(resolveNodeType(n.id), data.label ?? '');
+      const b = boxes.get(data.familyId) ?? {
+        minX: Infinity,
+        minY: Infinity,
+        maxX: -Infinity,
+        maxY: -Infinity,
+      };
+      b.minX = Math.min(b.minX, n.position.x - fp.w / 2);
+      b.maxX = Math.max(b.maxX, n.position.x + fp.w / 2);
+      b.minY = Math.min(b.minY, n.position.y - fp.up);
+      b.maxY = Math.max(b.maxY, n.position.y + fp.down);
+      if (n.id === data.familyId) b.color = data.clusterColor;
+      boxes.set(data.familyId, b);
+    }
+    const pad = 36;
+    return [...boxes.entries()].map(([key, b]) => ({
+      id: `hull|${key}`,
+      type: 'hull',
+      position: { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 },
+      data: { color: b.color },
+      width: b.maxX - b.minX + pad * 2,
+      height: b.maxY - b.minY + pad * 2,
+      style: { pointerEvents: 'none' },
+      draggable: false,
+      selectable: false,
+      focusable: false,
+      zIndex: -1,
+    }));
+  }, [nodes, layoutMode]);
+
   const displayNodes = useMemo(() => {
     const focusSet = connectedNodeIds ?? selectedConnectedIds;
-    if (!focusSet) return nodes;
+    if (!focusSet) return [...hullNodes, ...nodes];
     const dimClass = connectedNodeIds
       ? 'opacity-40 transition-opacity'
       : 'opacity-35 transition-opacity';
-    return nodes.map((n) => ({
-      ...n,
-      className: focusSet.has(n.id) ? '' : dimClass,
-    }));
-  }, [nodes, connectedNodeIds, selectedConnectedIds]);
+    return [
+      ...hullNodes,
+      ...nodes.map((n) => ({
+        ...n,
+        className: focusSet.has(n.id) ? '' : dimClass,
+      })),
+    ];
+  }, [nodes, hullNodes, connectedNodeIds, selectedConnectedIds]);
 
   const displayEdges = useMemo(() => {
     const focusId = hoveredNodeId ?? selectedNodeId;
@@ -637,24 +755,44 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
     fPrevRef.current = fPressed;
   }, [fPressed, fitView]);
 
+  // Explicit re-layout (`r` key, layout mode switch): discard preserved
+  // positions so nodes actually move, then fit once they are committed.
+  // Double rAF: the first frame commits the new positions to React Flow,
+  // the second fits to those fresh bounds (a single rAF reads stale ones).
+  const relayoutRequestedRef = useRef(false);
+  const requestRelayout = useCallback(() => {
+    forceRecomputeRef.current = true;
+    preservePositionsRef.current = false;
+    relayoutRequestedRef.current = true;
+  }, []);
+  useEffect(() => {
+    if (!relayoutRequestedRef.current) return;
+    relayoutRequestedRef.current = false;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        void fitView({ duration: 500, padding: 0.15 });
+      });
+    });
+  }, [nodes, fitView]);
+
+  const changeLayoutMode = useCallback(
+    (mode: LayoutMode) => {
+      if (mode === layoutMode) return;
+      requestRelayout();
+      setLayoutMode(mode);
+    },
+    [layoutMode, requestRelayout],
+  );
+
   const rPressed = useKeyPress('r');
   const rPrevRef = useRef(false);
   useEffect(() => {
     if (rPressed && !rPrevRef.current) {
-      forceRecomputeRef.current = true;
-      preservePositionsRef.current = false;
+      requestRelayout();
       applyLayout();
-      // Double rAF: first frame commits the new node positions to React
-      // Flow, second frame fits the view to those fresh bounds. A single
-      // rAF reads stale positions and lands the graph off-center.
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          fitView({ duration: 500 });
-        });
-      });
     }
     rPrevRef.current = rPressed;
-  }, [rPressed, applyLayout, fitView]);
+  }, [rPressed, applyLayout, requestRelayout]);
 
   const escPressed = useKeyPress('Escape');
   const escPrevRef = useRef(false);
@@ -674,7 +812,10 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
   );
 
   const miniMapNodeColor = useCallback(
-    (node: Node) => NODE_TYPE_COLORS[resolveNodeType(node.id)] ?? '#94a3b8',
+    (node: Node) =>
+      node.type === 'hull'
+        ? 'transparent'
+        : (NODE_TYPE_COLORS[resolveNodeType(node.id)] ?? '#94a3b8'),
     [],
   );
 
@@ -722,7 +863,7 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-start gap-2">
+      <div className="flex flex-wrap items-center justify-start gap-2">
         {!targetId && (
           <TargetFilter
             value={filterTargetId}
@@ -730,6 +871,26 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
           />
         )}
         <GraphNodeSearch nodes={nodes} onSelect={handleNodeSearchSelect} />
+        <div
+          role="radiogroup"
+          aria-label="Graph layout"
+          className="flex items-center rounded-md border border-dashed p-0.5"
+        >
+          {LAYOUT_MODES.map((m) => (
+            <Button
+              key={m.value}
+              variant={layoutMode === m.value ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-7 px-2.5"
+              role="radio"
+              aria-checked={layoutMode === m.value}
+              title={m.title}
+              onClick={() => changeLayoutMode(m.value)}
+            >
+              {m.label}
+            </Button>
+          ))}
+        </div>
         <Button
           variant="outline"
           size="sm"
@@ -839,7 +1000,8 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
             setSelectedNodeId(null);
           }}
           fitView
-          fitViewOptions={{ padding: 0.25 }}
+          fitViewOptions={{ padding: 0.15 }}
+          nodeOrigin={NODE_ORIGIN}
           minZoom={0.1}
           maxZoom={4}
           proOptions={{ hideAttribution: true }}
