@@ -15,6 +15,7 @@ import {
   Timer,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { SEVERITY_TEXT_CLASS } from '../../dashboard/severity';
 
 interface StatsStripProps {
   stats?: GetVulnerabilitiesStatisticsResponseDto;
@@ -32,7 +33,7 @@ function Stat({
   label: string;
   icon: ReactNode;
   value: string | number;
-  hint?: string;
+  hint?: ReactNode;
   tone?: string;
 }) {
   return (
@@ -106,7 +107,17 @@ export function VulnerabilityStatsStrip({ stats, isLoading }: StatsStripProps) {
         label="Open"
         icon={<ShieldAlert />}
         value={open}
-        hint={`${bySeverity.critical ?? 0} critical · ${bySeverity.high ?? 0} high`}
+        hint={
+          <>
+            <span className={cn('font-medium', SEVERITY_TEXT_CLASS.critical)}>
+              {bySeverity.critical ?? 0} critical
+            </span>
+            {' · '}
+            <span className={cn('font-medium', SEVERITY_TEXT_CLASS.high)}>
+              {bySeverity.high ?? 0} high
+            </span>
+          </>
+        }
       />
       <Stat
         label="Resurfaced"

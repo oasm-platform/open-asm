@@ -159,7 +159,9 @@ describe('Vulnerabilities Page', () => {
       expect(screen.getAllByText('High').length).toBeGreaterThanOrEqual(1);
     });
     expect(screen.getByText('New (7 days)')).toBeInTheDocument();
-    expect(screen.getByText('1 critical · 1 high')).toBeInTheDocument();
+    // Each count is its own span, coloured by severity
+    expect(screen.getByText('1 critical')).toBeInTheDocument();
+    expect(screen.getByText('1 high')).toBeInTheDocument();
     expect(screen.getByText('MTTR high')).toBeInTheDocument();
     expect(screen.getByText('12 d')).toBeInTheDocument();
   });
