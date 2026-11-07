@@ -682,9 +682,6 @@ export class AssetsService {
     workspaceId: string,
   ): Promise<GetManyBaseResponseDto<GetIpAssetsDTO>> {
     const offset = (query.page - 1) * query.limit;
-    if (!(query.sortBy in GetIpAssetsDTO)) {
-      query.sortBy = '"assetCount"';
-    }
 
     // Asset IPs are the DNS A/AAAA records of the asset (as in the legacy
     // ip_assets_view); assetCount = distinct filtered services on those
@@ -722,11 +719,14 @@ export class AssetsService {
       .select('t.ip AS ip, t."assetCount" AS "assetCount"')
       .from('(' + groupedSql + ')', 't')
       .setParameters(params)
+      // Whitelist: unknown sortBy values fall back to the aggregate column.
+      // Addresses sort as inet (numeric, IPv4 before IPv6), not as text
+      // where "104.x" < "64.x"; the address is also the unique tiebreaker.
       .orderBy(
-        query.sortBy === 'ip' ? 't.ip' : 't."assetCount"',
+        query.sortBy === 'ip' ? 't.ip::inet' : 't."assetCount"',
         query.sortOrder,
       )
-      .addOrderBy('t.ip', query.sortOrder)
+      .addOrderBy('t.ip::inet', query.sortOrder)
       .limit(query.limit)
       .offset(offset)
       .getRawMany();
@@ -893,9 +893,10 @@ export class AssetsService {
     workspaceId: string,
   ): Promise<GetManyBaseResponseDto<GetPortAssetsDTO>> {
     const offset = (query.page - 1) * query.limit;
-    if (!(query.sortBy in GetIpAssetsDTO)) {
-      query.sortBy = '"assetCount"';
-    }
+    // Whitelist: unknown sortBy values fall back to the aggregate column.
+    // (`sortBy in SomeDto` is always false: a class has no instance keys.)
+    const sortColumn =
+      query.sortBy === 'port' ? 'asset_service.port' : '"assetCount"';
 
     const queryBuilder = this.buildBaseQuery(query, workspaceId)
       .select([
@@ -918,7 +919,9 @@ export class AssetsService {
       .getRawOne<{ count: number }>();
 
     const list = await queryBuilder
-      .orderBy(query.sortBy, query.sortOrder)
+      .orderBy(sortColumn, query.sortOrder)
+      // Unique tiebreaker: equal counts must not shuffle between pages.
+      .addOrderBy('asset_service.port', query.sortOrder)
       .limit(query.limit)
       .offset(offset)
       .getRawMany();
@@ -1083,9 +1086,11 @@ export class AssetsService {
     workspaceId: string,
   ): Promise<GetManyBaseResponseDto<GetTechnologyAssetsDTO>> {
     const offset = (query.page - 1) * query.limit;
-    if (!(query.sortBy in GetTechnologyAssetsDTO)) {
-      query.sortBy = '"assetCount"';
-    }
+    // Whitelist: unknown sortBy values fall back to the aggregate column.
+    // Description/category come from enrichment after the query, so they
+    // are not sortable here.
+    const sortColumn =
+      query.sortBy === 'technology' ? '"technology"' : '"assetCount"';
 
     const queryBuilder = this.buildBaseQuery(query, workspaceId)
       .innerJoin(
@@ -1117,7 +1122,10 @@ export class AssetsService {
       .getRawOne<{ count: number }>();
 
     const list = await queryBuilder
-      .orderBy(query.sortBy, query.sortOrder)
+      .orderBy(sortColumn, query.sortOrder)
+      // Unique tiebreaker (group key): equal counts keep a stable page order.
+      .addOrderBy('hrt.name', query.sortOrder)
+      .addOrderBy('hrt.version', query.sortOrder)
       .limit(query.limit)
       .offset(offset)
       .getRawMany();
@@ -1180,9 +1188,9 @@ export class AssetsService {
     workspaceId: string,
   ): Promise<GetManyBaseResponseDto<GetStatusCodeAssetsDTO>> {
     const offset = (query.page - 1) * query.limit;
-    if (!(query.sortBy in GetIpAssetsDTO)) {
-      query.sortBy = '"assetCount"';
-    }
+    // Whitelist: unknown sortBy values fall back to the aggregate column.
+    const sortColumn =
+      query.sortBy === 'statusCode' ? 'hsc."statusCode"' : '"assetCount"';
 
     const queryBuilder = this.buildBaseQuery(query, workspaceId)
       .innerJoin(
@@ -1212,7 +1220,9 @@ export class AssetsService {
       .getRawOne<{ count: number }>();
 
     const list = await queryBuilder
-      .orderBy(query.sortBy, query.sortOrder)
+      .orderBy(sortColumn, query.sortOrder)
+      // Unique tiebreaker: equal counts must not shuffle between pages.
+      .addOrderBy('hsc."statusCode"', query.sortOrder)
       .limit(query.limit)
       .offset(offset)
       .getRawMany();

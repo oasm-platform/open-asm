@@ -22,6 +22,7 @@ import { IpObservation } from './entities/ip-observation.entity';
 import { TlsCertificate } from './entities/tls-certificate.entity';
 import { AgentConfig } from '../agents/entities/agent-config.entity';
 import { AgentLLMConfig } from '../agents/entities/agent-llm-config.entity';
+import type { GetAssetsQueryDto } from './dto/assets.dto';
 
 describe('AssetsService', () => {
   let service: AssetsService;
@@ -590,7 +591,7 @@ describe('AssetsService', () => {
     beforeEach(() => {
       jest.clearAllMocks();
       const repo = mockAssetServiceRepository as any;
-      for (const fn of ['groupBy', 'addGroupBy', 'addSelect', 'orderBy', 'limit', 'offset']) {
+      for (const fn of ['groupBy', 'addGroupBy', 'addSelect', 'orderBy', 'addOrderBy', 'limit', 'offset']) {
         repo[fn] = jest.fn().mockReturnThis();
       }
       repo.getQuery = jest.fn().mockReturnValue('SELECT 1');
@@ -637,6 +638,63 @@ describe('AssetsService', () => {
         'asset_service.port IN (:...pagePorts)',
         { pagePorts: [8443, 443, 22] },
       );
+    });
+  });
+
+  describe('aggregate tab sorting (port, status code, technology, ip)', () => {
+    // Read lazily: the outer beforeEach creates these mocks.
+    let repo: any;
+    let ds: any;
+    const query = (sortBy: string): GetAssetsQueryDto =>
+      ({ page: 1, limit: 10, sortBy, sortOrder: 'ASC' }) as GetAssetsQueryDto;
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      repo = mockAssetServiceRepository as any;
+      ds = mockDataSource as any;
+      for (const fn of [
+        'select', 'addSelect', 'innerJoin', 'andWhere', 'groupBy', 'addGroupBy',
+        'orderBy', 'addOrderBy', 'limit', 'offset',
+      ]) {
+        repo[fn] = jest.fn().mockReturnThis();
+      }
+      repo.getQuery = jest.fn().mockReturnValue('SELECT 1');
+      repo.getParameters = jest.fn().mockReturnValue({});
+      repo.getRawMany = jest.fn().mockResolvedValue([]);
+      for (const fn of ['select', 'from', 'setParameters', 'orderBy', 'addOrderBy', 'limit', 'offset']) {
+        ds[fn] = jest.fn().mockReturnThis();
+      }
+      ds.getRawOne = jest.fn().mockResolvedValue({ count: '0' });
+      ds.getRawMany = jest.fn().mockResolvedValue([]);
+    });
+
+    it.each([
+      ['getPortAssets', 'port', 'asset_service.port'],
+      ['getStatusCodeAssets', 'statusCode', 'hsc."statusCode"'],
+      ['getTechnologyAssets', 'technology', '"technology"'],
+    ] as const)('%s sorts by its own column when sortBy=%s', async (method, sortBy, column) => {
+      await service[method](query(sortBy), 'workspace-uuid');
+      expect(repo.orderBy).toHaveBeenCalledWith(column, 'ASC');
+    });
+
+    it.each(['getPortAssets', 'getStatusCodeAssets', 'getTechnologyAssets'] as const)(
+      '%s falls back to assetCount and adds a unique tiebreaker',
+      async (method) => {
+        await service[method](query('bogus'), 'workspace-uuid');
+        expect(repo.orderBy).toHaveBeenCalledWith('"assetCount"', 'ASC');
+        expect(repo.addOrderBy).toHaveBeenCalled();
+      },
+    );
+
+    it('getIpAssets sorts addresses as inet, not text', async () => {
+      await service.getIpAssets(query('ip'), 'workspace-uuid');
+      expect(ds.orderBy).toHaveBeenCalledWith('t.ip::inet', 'ASC');
+    });
+
+    it('getIpAssets falls back to assetCount for unknown sortBy values', async () => {
+      await service.getIpAssets(query('bogus'), 'workspace-uuid');
+      expect(ds.orderBy).toHaveBeenCalledWith('t."assetCount"', 'ASC');
+      expect(ds.addOrderBy).toHaveBeenCalledWith('t.ip::inet', 'ASC');
     });
   });
 

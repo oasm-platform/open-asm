@@ -68,6 +68,8 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
     accessorKey: 'screenshotPath',
     header: 'Screenshot',
     enableHiding: false,
+    // Not a server-side sort key: the API would silently fall back.
+    enableSorting: false,
     size: 500,
     cell: ({ row }) => {
       const data = row.original;

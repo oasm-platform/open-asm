@@ -56,6 +56,8 @@ export const technologyAssetsColumn: ColumnDef<GetTechnologyAssetsDTO>[] = [
     accessorKey: 'description',
     header: 'Description',
     enableHiding: false,
+    // Enriched after the query, so the API cannot sort by it.
+    enableSorting: false,
     cell: ({ row }) => {
       const data = row.original;
       return (
