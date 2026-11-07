@@ -1,5 +1,15 @@
 import z from 'zod';
 
+import {
+  IssueLinkResourceType,
+  IssuePriority,
+  IssueStatus,
+  IssueType,
+  Severity,
+  VulnerabilityDiscoveredBy,
+} from '@/common/enums/enum';
+import { VulnerabilityStatus } from '@/modules/vulnerabilities/vulnerability-status';
+
 /**
  * The base request schema for get many resources.
  */
@@ -142,24 +152,40 @@ export const getVulnerabilitiesSchema = z
       .optional()
       .describe('Filter vulnerabilities by specific target IDs (UUID format).'),
     status: z
-      .enum(['open', 'dismissed', 'all'])
+      .nativeEnum(VulnerabilityStatus)
       .optional()
-      .describe('Filter by vulnerability status: open, dismissed, or all.'),
+      .describe(
+        'Lifecycle filter, default open. open: approved, still detected (new/active/resurfaced) and not dismissed. new/active/resurfaced: open findings in that state. fixed: closed by a covering scan. dismissed: risk accepted or dismissed (unexpired). pending_review/rejected: AI proposals awaiting or failing review. all: every approved finding.',
+      ),
     severity: z
-      .array(z.enum(['info', 'low', 'medium', 'high', 'critical']))
+      .array(z.nativeEnum(Severity))
       .optional()
       .describe('Filter by severity levels (e.g., ["critical", "high"]).'),
+    overdue: z
+      .boolean()
+      .optional()
+      .describe('Only open findings whose SLA deadline (dueAt) has passed.'),
+    discoveredBy: z
+      .array(z.nativeEnum(VulnerabilityDiscoveredBy))
+      .optional()
+      .describe(
+        'How the finding was found: tool (scanner), ai (AI agent), ai_tool (both), manual (added by a person).',
+      ),
+    tags: z
+      .array(z.string())
+      .optional()
+      .describe('Only findings carrying any of these tags.'),
     createdFrom: z
       .string()
       .optional()
       .describe(
-        'Filter by creation date from (ISO 8601 format, e.g., "2026-01-01").',
+        'First detected on or after this date (ISO 8601, e.g., "2026-01-01").',
       ),
     createdTo: z
       .string()
       .optional()
       .describe(
-        'Filter by creation date to (ISO 8601 format, e.g., "2026-01-31").',
+        'First detected on or before this date (ISO 8601, e.g., "2026-01-31").',
       ),
   })
   .extend(getManyBaseRequestSchema.shape);
@@ -266,15 +292,43 @@ export const listIssuesSchema = z
       .optional()
       .describe('Search issues by title, or by number (e.g. "#12").'),
     status: z
-      .array(z.enum(['open', 'in_progress', 'resolved', 'closed']))
+      .array(z.nativeEnum(IssueStatus))
       .optional()
       .describe('Only issues in these statuses.'),
     type: z
-      .array(
-        z.enum(['vulnerability_remediation', 'task', 'asset_review', 'scan_failure']),
-      )
+      .array(z.nativeEnum(IssueType))
       .optional()
       .describe('Only issues of these types.'),
+    priority: z
+      .array(z.nativeEnum(IssuePriority))
+      .optional()
+      .describe('Only issues with these priorities (p1 = most urgent).'),
+    assigneeId: z
+      .string()
+      .uuid()
+      .optional()
+      .describe('Only issues assigned to this user ID.'),
+    mine: z
+      .boolean()
+      .optional()
+      .describe(
+        'Only issues assigned to the user running this conversation.',
+      ),
+    overdue: z
+      .boolean()
+      .optional()
+      .describe('Only open or in-progress issues past their due date.'),
+    resourceType: z
+      .nativeEnum(IssueLinkResourceType)
+      .optional()
+      .describe(
+        'With resourceId: only issues linked to this resource (e.g. vulnerability).',
+      ),
+    resourceId: z
+      .string()
+      .uuid()
+      .optional()
+      .describe('With resourceType: ID of the linked resource.'),
   })
   .extend(getManyBaseRequestSchema.shape);
 

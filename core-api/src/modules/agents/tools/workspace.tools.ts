@@ -2,10 +2,7 @@ import type { Tool } from 'ai';
 import { z } from 'zod';
 
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
-import type { Severity } from '@/common/enums/enum';
 import { WorkerScope } from '@/common/enums/enum';
-import type { IssueStatus, IssueType } from '@/common/enums/enum';
-import type { VulnerabilityStatus } from '@/modules/vulnerabilities/dto/get-vulnerability.dto';
 import {
   detailAssetSchema,
   detailIssueSchema,
@@ -77,8 +74,12 @@ export function getVulnerabilitiesTool(
   scope: ToolScope = {},
 ): Tool {
   return defineTool({
-    description:
-      'List security vulnerabilities with severity. Params: page, limit, q (search e.g. "XSS", "CVE-2024"), projectId. With a project: the ones its runs reported, open by default (status and severity apply).',
+    description: [
+      'List security vulnerabilities, most severe first. Only open findings unless status says otherwise (AI proposals show only under pending_review/rejected).',
+      'Params: page, limit, q (search e.g. "XSS", "CVE-2024"), status, severity, overdue, discoveredBy, tags, targetIds, createdFrom/createdTo (first detected), projectId.',
+      'With a project: the ones its runs reported (q, status and severity apply).',
+      'Each item: id, name, severity, asset, detectionStatus (new/active/fixed/resurfaced), reviewStatus, discoveredBy, dueAt (SLA), timesDetected, firstDetectedDate, lastSeenDate, cveId, cvssScore, dismissal ({reason, expiresAt} or null), openIssue ({id, no, status} or null).',
+    ].join('\n'),
     inputSchema: getVulnerabilitiesInput,
     execute: async (params: z.infer<typeof getVulnerabilitiesInput>) => {
       const projectId = projectFor(scope, params);
@@ -90,8 +91,8 @@ export function getVulnerabilitiesTool(
             ...pageOf(params),
             ...NEWEST_FIRST,
             search: params.q ?? '',
-            status: params.status as VulnerabilityStatus | undefined,
-            severity: params.severity as Severity[] | undefined,
+            status: params.status,
+            severity: params.severity,
           },
         );
         return {
@@ -107,11 +108,26 @@ export function getVulnerabilitiesTool(
             asset: i.assetValue,
             status: i.status,
             provenance: i.provenance,
+            cveId: i.cveId,
+            tool: i.toolName,
           })),
         };
       }
       const response = await deps.vulnerabilitiesService.getVulnerabilities(
-        { ...pageOf(params), ...NEWEST_FIRST, q: params.q },
+        {
+          ...pageOf(params),
+          sortBy: 'severity',
+          sortOrder: SortOrder.DESC,
+          q: params.q,
+          status: params.status,
+          severity: params.severity,
+          overdue: params.overdue,
+          discoveredBy: params.discoveredBy,
+          tags: params.tags,
+          targetIds: params.targetIds,
+          createdFrom: params.createdFrom,
+          createdTo: params.createdTo,
+        },
         workspaceId,
       );
       return {
@@ -120,6 +136,20 @@ export function getVulnerabilitiesTool(
           id: i.id,
           name: i.name,
           severity: i.severity,
+          asset: i.asset?.value ?? null,
+          detectionStatus: i.detectionStatus,
+          reviewStatus: i.reviewStatus,
+          discoveredBy: i.discoveredBy,
+          dueAt: i.dueAt ?? null,
+          timesDetected: i.timesDetected,
+          firstDetectedDate: i.firstDetectedDate ?? null,
+          lastSeenDate: i.lastSeenDate ?? null,
+          cveId: i.cveId ?? null,
+          cvssScore: i.cvssScore ?? null,
+          dismissal: i.dismissal
+            ? { reason: i.dismissal.reason, expiresAt: i.dismissal.expiresAt ?? null }
+            : null,
+          openIssue: i.openIssue,
         })),
       };
     },
@@ -206,7 +236,7 @@ export function detailVulnTool(
 ): Tool {
   return defineTool({
     description:
-      'Get full vulnerability report with CVSS, PoC, remediation steps. Params: vulnId.',
+      'Get full vulnerability report: CVSS/EPSS, PoC, remediation, code location, lifecycle (detectionStatus, timesDetected, resurfacedCount, fixedAt, fixClaimedAt, dueAt), review (reviewStatus, reviewNote), discoveredBy, every source (tool run or AI agent, with evidence), dismissal and the open remediation issue. Params: vulnId.',
     inputSchema: detailVulnSchema,
     execute: (params: z.infer<typeof detailVulnSchema>) =>
       deps.vulnerabilitiesService.getVulnerability(
@@ -286,25 +316,40 @@ export function getTlsTool(
 export function listIssuesTool(
   deps: Deps<'issuesService'>,
   workspaceId: string,
+  scope: ToolScope = {},
 ): Tool {
   return defineTool({
     description: [
       'List issues (work items) of the workspace, most recently updated first.',
-      'Params: page, limit, search (title or #number), status (open, in_progress, resolved, closed), type (vulnerability_remediation, task, asset_review, scan_failure).',
-      'Each item: id, no, title, type, status, priority, resolution, dueAt, assignee, linkCount, progress ({done,total} of linked findings, or null).',
+      'Params: page, limit, search (title or #number), status (open, in_progress, resolved, closed), type (vulnerability_remediation, task, asset_review, scan_failure), priority (p1-p4), assigneeId, mine, overdue, resourceType + resourceId (issues linked to e.g. a vulnerability).',
+      'Each item: id, no, title, type, status, priority, resolution, dueAt, assignee, tags, linkCount, ruleId (set when a rule opened it), progress ({done,total} of linked findings, or null).',
     ].join('\n'),
     inputSchema: listIssuesSchema,
     execute: async (params: z.infer<typeof listIssuesSchema>) => {
+      // MCP calls run without a user, so "mine" has no one to mean
+      if (params.mine && !scope.userId) {
+        return {
+          success: false,
+          message: '"mine" is not available here: pass assigneeId instead.',
+        };
+      }
       const response = await deps.issuesService.getMany(
         {
           ...pageOf(params),
           sortBy: 'updatedAt',
           sortOrder: SortOrder.DESC,
           search: params.search,
-          status: params.status?.map((s) => s as IssueStatus),
-          type: params.type?.map((t) => t as IssueType),
+          status: params.status,
+          type: params.type,
+          priority: params.priority,
+          assigneeId: params.assigneeId,
+          mine: params.mine,
+          overdue: params.overdue,
+          resourceType: params.resourceType,
+          resourceId: params.resourceId,
         },
         workspaceId,
+        scope.userId,
       );
       return {
         ...response,
@@ -320,6 +365,7 @@ export function listIssuesTool(
           assignee: i.assignee,
           tags: i.tags,
           linkCount: i.linkCount,
+          ruleId: i.ruleId,
           progress: i.progress,
         })),
       };
