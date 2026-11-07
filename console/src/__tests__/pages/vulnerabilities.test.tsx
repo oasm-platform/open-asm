@@ -110,9 +110,8 @@ vi.mock('@/hooks/usePermission', () => ({
 }));
 
 vi.mock('@/services/apis/gen/queries', async (importOriginal) => {
-  const actual = await importOriginal<
-    typeof import('@/services/apis/gen/queries')
-  >();
+  const actual =
+    await importOriginal<typeof import('@/services/apis/gen/queries')>();
   return {
     ...actual,
     useVulnerabilitiesControllerGetVulnerabilities: () => ({
@@ -129,6 +128,13 @@ vi.mock('@/services/apis/gen/queries', async (importOriginal) => {
           { severity: 'low', count: 0 },
           { severity: 'info', count: 0 },
         ],
+        byDetectionStatus: { new: 1, active: 1, resurfaced: 0, fixed: 3 },
+        newLast7Days: 1,
+        resurfacedLast30Days: 0,
+        fixedLast30Days: 3,
+        overdue: 0,
+        pendingReview: 0,
+        mttr: [{ severity: 'high', days: 12, count: 2 }],
       },
       isLoading: false,
     }),
@@ -145,13 +151,16 @@ describe('Vulnerabilities Page', () => {
     });
   });
 
-  it('shows severity badges', async () => {
+  it('shows severity badges and the lifecycle stats strip', async () => {
     renderWithProviders(<Vulnerabilities />);
 
     await waitFor(() => {
-      const severityBadges = screen.getAllByText('Critical');
-      expect(severityBadges.length).toBeGreaterThanOrEqual(2);
-      expect(screen.getAllByText('High').length).toBeGreaterThanOrEqual(2);
+      expect(screen.getAllByText('Critical').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText('High').length).toBeGreaterThanOrEqual(1);
     });
+    expect(screen.getByText('New (7 days)')).toBeInTheDocument();
+    expect(screen.getByText('1 critical · 1 high')).toBeInTheDocument();
+    expect(screen.getByText('MTTR high')).toBeInTheDocument();
+    expect(screen.getByText('12 d')).toBeInTheDocument();
   });
 });

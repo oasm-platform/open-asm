@@ -89,7 +89,6 @@ export function DetailTarget() {
           currentTargetLogo={target.logo}
         />
       }
-      isShowButtonGoBack
       header={
         <div className="flex items-center gap-3 justify-between">
           <div className="flex items-center gap-3">

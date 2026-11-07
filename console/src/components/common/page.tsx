@@ -1,8 +1,7 @@
 import { usePermission } from '@/hooks/usePermission';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { Button } from '../ui/button';
 import AccessDenied from './access-denied';
 
 interface PageProps {
@@ -11,7 +10,6 @@ interface PageProps {
   description?: string;
   header?: React.ReactNode;
   action?: React.ReactNode;
-  isShowButtonGoBack?: boolean;
   className?: string;
   /** Classes of the title row, e.g. to line it up with narrower content */
   headerClassName?: string;
@@ -24,7 +22,6 @@ const Page = ({
   description,
   header,
   action,
-  isShowButtonGoBack,
   className,
   headerClassName,
   permission,
@@ -50,17 +47,7 @@ const Page = ({
           headerClassName,
         )}
       >
-        <div className="flex items-center gap-3">
-          {isShowButtonGoBack && (
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => window.history.back()}
-              className="size-9 shrink-0"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          )}
+        <div className="flex min-w-0 items-center gap-3">
           <div className="flex min-w-0 flex-col gap-1">
             {title && (
               <span className="text-2xl font-semibold tracking-tight text-foreground">

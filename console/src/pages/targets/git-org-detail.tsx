@@ -77,7 +77,7 @@ export function GitOrgDetail({
           currentTargetLogo={target.logo}
         />
       }
-      isShowButtonGoBack
+     
       header={
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">

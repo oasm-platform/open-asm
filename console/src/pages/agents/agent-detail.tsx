@@ -97,7 +97,7 @@ export function AgentDetail() {
   return (
     <Page
       permission="agent.read"
-      isShowButtonGoBack
+     
       header={
         <div className="flex items-center gap-2 justify-end">
           {!agent.isPreferred && (

@@ -1,8 +1,14 @@
-import { BullMQName, JobStatus, WorkerType } from '@/common/enums/enum';
+import {
+  BullMQName,
+  JobStatus,
+  ToolCategory,
+  WorkerType,
+} from '@/common/enums/enum';
 import { JobDataResultType } from '@/common/types/app.types';
 import { DataAdapterService } from '@/modules/data-adapter/data-adapter.service';
 import { StorageService } from '@/modules/storage/storage.service';
 import { builtInTools } from '@/modules/tools/tools-provider/built-in-tools';
+import { VulnerabilityLifecycleService } from '@/modules/vulnerabilities/vulnerability-lifecycle.service';
 import { RedisService } from '@/services/redis/redis.service';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
@@ -101,6 +107,7 @@ export class JobResultProcessor extends WorkerHost {
     private readonly storageService: StorageService,
     @InjectRepository(Job)
     private readonly jobRepo: Repository<Job>,
+    private readonly vulnerabilityLifecycle: VulnerabilityLifecycleService,
   ) {
     super();
   }
@@ -234,7 +241,11 @@ export class JobResultProcessor extends WorkerHost {
         }
       }
 
-      if (job.isSaveData && dataForSync !== undefined) {
+      // Taken before the sync: a finding this job reports gets a lastSeenDate
+      // at or after it, so the auto-close can tell what it did not report.
+      const syncStartedAt = new Date();
+      const synced = Boolean(job.isSaveData) && dataForSync !== undefined;
+      if (synced) {
         await this.dataAdapterService.syncData({
           data: dataForSync,
           job,
@@ -267,6 +278,26 @@ export class JobResultProcessor extends WorkerHost {
       }
 
       const completedJob = { ...job, status: JobStatus.COMPLETED, completedAt };
+
+      // A vulnerability scan that really ran (its result was synced, even an
+      // empty one) closes the findings of the same scope it no longer
+      // reports. A "nothing to scan" outcome proves nothing, so it does not.
+      if (
+        synced &&
+        !benignReason &&
+        (job.category as string) === (ToolCategory.VULNERABILITIES as string)
+      ) {
+        try {
+          await this.vulnerabilityLifecycle.onScanJobCompleted(
+            job,
+            syncStartedAt,
+          );
+        } catch (error) {
+          this.logger.error(
+            `Auto-close after job ${job.id} failed: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
 
       // Hand the terminal job to the workflow engine: it dispatches every step
       // whose `needs` are now satisfied and marks the run done when nothing is

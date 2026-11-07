@@ -17,11 +17,15 @@ import type { Job } from '../jobs-registry/entities/job.entity';
 import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
 import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
 import { StorageService } from '../storage/storage.service';
+import { VulnerabilityEvent } from '../vulnerabilities/entities/vulnerability-event.entity';
+import { VulnerabilitySource } from '../vulnerabilities/entities/vulnerability-source.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
+import { scanScopeKey } from '../vulnerabilities/vulnerability-lifecycle';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import {
   DataAdapterService,
   mergeDnsRecords,
+  rescanConflictClause,
   splitTechString,
   toDnsFacetRows,
   toTlsCertificateRow,
@@ -1511,10 +1515,11 @@ describe('DataAdapterService', () => {
 
   describe('vulnerabilities', () => {
     const mockJob = {
+      id: 'job-id',
       asset: {
         id: 'asset-id',
         value: 'example.com',
-        target: { id: 'target-id' },
+        target: { id: 'target-id', workspaceId: 'workspace-id' },
         targetId: 'target-id',
         isEnabled: true,
         dnsRecords: [],
@@ -1575,7 +1580,7 @@ describe('DataAdapterService', () => {
         insert: jest.fn().mockReturnThis(),
         into: jest.fn().mockReturnThis(),
         values: jest.fn().mockReturnThis(),
-        orUpdate: jest.fn().mockReturnThis(),
+        onConflict: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({
           raw: mockVulnerabilities,
@@ -1603,7 +1608,9 @@ describe('DataAdapterService', () => {
       expect(mockQueryBuilder.insert).toHaveBeenCalled();
       expect(mockQueryBuilder.into).toHaveBeenCalledWith(Vulnerability);
       expect(mockQueryBuilder.values).toHaveBeenCalled();
-      expect(mockQueryBuilder.orUpdate).toHaveBeenCalled();
+      expect(mockQueryBuilder.onConflict).toHaveBeenCalledWith(
+        expect.stringContaining('("fingerprint") DO UPDATE SET'),
+      );
       expect(mockQueryBuilder.returning).toHaveBeenCalledWith('*');
       expect(mockQueryBuilder.execute).toHaveBeenCalled();
     });
@@ -1635,7 +1642,7 @@ describe('DataAdapterService', () => {
         insert: jest.fn().mockReturnThis(),
         into: jest.fn().mockReturnThis(),
         values: jest.fn().mockReturnThis(),
-        orUpdate: jest.fn().mockReturnThis(),
+        onConflict: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({ raw: [], identifiers: [] }),
       };
@@ -1688,7 +1695,7 @@ describe('DataAdapterService', () => {
         insert: jest.fn().mockReturnThis(),
         into: jest.fn().mockReturnThis(),
         values: jest.fn().mockReturnThis(),
-        orUpdate: jest.fn().mockReturnThis(),
+        onConflict: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({
           raw: [incoming],
@@ -1734,7 +1741,7 @@ describe('DataAdapterService', () => {
         insert: jest.fn().mockReturnThis(),
         into: jest.fn().mockReturnThis(),
         values: jest.fn().mockReturnThis(),
-        orUpdate: jest.fn().mockReturnThis(),
+        onConflict: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({
           raw: mockVulnerabilities,
@@ -1771,7 +1778,8 @@ describe('DataAdapterService', () => {
         job: mockJob,
       });
 
-      expect(mockDataSource.transaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
+      expect(mockEventBridge.publishSafely).not.toHaveBeenCalled();
     });
 
     it('should send notification for all new vulnerabilities (all severities)', async () => {
@@ -1813,7 +1821,7 @@ describe('DataAdapterService', () => {
         insert: jest.fn().mockReturnThis(),
         into: jest.fn().mockReturnThis(),
         values: jest.fn().mockReturnThis(),
-        orUpdate: jest.fn().mockReturnThis(),
+        onConflict: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({
           raw: [newVuln, existingVuln],
@@ -1871,7 +1879,7 @@ describe('DataAdapterService', () => {
         insert: jest.fn().mockReturnThis(),
         into: jest.fn().mockReturnThis(),
         values: jest.fn().mockReturnThis(),
-        orUpdate: jest.fn().mockReturnThis(),
+        onConflict: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({
           raw: [existingVuln],
@@ -1922,7 +1930,7 @@ describe('DataAdapterService', () => {
         insert: jest.fn().mockReturnThis(),
         into: jest.fn().mockReturnThis(),
         values: jest.fn().mockReturnThis(),
-        orUpdate: jest.fn().mockReturnThis(),
+        onConflict: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({
           raw: [lowVuln],
@@ -1971,7 +1979,7 @@ describe('DataAdapterService', () => {
         insert: jest.fn().mockReturnThis(),
         into: jest.fn().mockReturnThis(),
         values: jest.fn().mockReturnThis(),
-        orUpdate: jest.fn().mockReturnThis(),
+        onConflict: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({ raw: [found], identifiers: [] }),
       });
@@ -2019,7 +2027,7 @@ describe('DataAdapterService', () => {
         insert: jest.fn().mockReturnThis(),
         into: jest.fn().mockReturnThis(),
         values: jest.fn().mockReturnThis(),
-        orUpdate: jest.fn().mockReturnThis(),
+        onConflict: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
         execute: jest
           .fn()
@@ -2029,6 +2037,212 @@ describe('DataAdapterService', () => {
       await service.vulnerabilities({ data: [mockVulnerabilities[0]], job: mockJob });
 
       expect(query).not.toHaveBeenCalled();
+    });
+
+    describe('lifecycle', () => {
+      /** Pre-check returns `existing`; the upsert RETURNs `returned`. */
+      const arrange = (
+        existing: Array<Record<string, unknown>>,
+        returned: Array<Record<string, unknown>>,
+      ) => {
+        mockDataSource.transaction.mockImplementation(
+          async (callback: (manager: any) => Promise<any>) => {
+            await callback(mockQueryRunner.manager);
+            return undefined;
+          },
+        );
+        const qb = {
+          select: jest.fn().mockReturnThis(),
+          addSelect: jest.fn().mockReturnThis(),
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          getRawMany: jest.fn().mockResolvedValue(existing),
+          insert: jest.fn().mockReturnThis(),
+          into: jest.fn().mockReturnThis(),
+          values: jest.fn().mockReturnThis(),
+          onConflict: jest.fn().mockReturnThis(),
+          returning: jest.fn().mockReturnThis(),
+          execute: jest.fn().mockResolvedValue({ raw: returned, identifiers: [] }),
+        };
+        mockQueryRunner.manager.createQueryBuilder.mockReturnValue(qb);
+        return qb;
+      };
+      /** Rows inserted into `entity` through manager.insert. */
+      const insertedInto = (entity: unknown) =>
+        (mockQueryRunner.manager.insert.mock.calls as Array<[unknown, unknown[]]>)
+          .filter(([target]) => target === entity)
+          .flatMap(([, rows]) => rows) as Array<Record<string, unknown>>;
+
+      it('stamps new findings with their lifecycle and ignores lifecycle fields a connector sends', async () => {
+        const qb = arrange([], [
+          { id: 'v-new', fingerprint: 'fp-new', severity: Severity.HIGH, detectionStatus: 'new', name: 'X' },
+        ]);
+        const before = Date.now();
+
+        await service.vulnerabilities({
+          data: [
+            {
+              name: 'X',
+              severity: Severity.HIGH,
+              detectionStatus: 'fixed',
+              reviewStatus: 'rejected',
+              timesDetected: 99,
+            } as unknown as Vulnerability,
+          ],
+          job: mockJob,
+        });
+
+        const [row] = qb.values.mock.calls[0][0] as Array<Record<string, unknown>>;
+        expect(row).toMatchObject({
+          detectionStatus: 'new',
+          reviewStatus: 'approved',
+          discoveredBy: 'tool',
+          timesDetected: 1,
+          missedScans: 0,
+          resurfacedCount: 0,
+          lastSeenJobHistoryId: 'history-id',
+          scanScopeKey: scanScopeKey(mockJob),
+        });
+        // Default SLA for high: 30 days from now.
+        const due = (row.dueAt as Date).getTime();
+        expect(due - before).toBeGreaterThanOrEqual(30 * 86_400_000 - 1000);
+        expect(due - before).toBeLessThan(30 * 86_400_000 + 60_000);
+
+        expect(insertedInto(VulnerabilitySource)).toEqual([
+          expect.objectContaining({
+            vulnerabilityId: 'v-new',
+            kind: 'tool',
+            toolId: 'tool-id',
+            jobHistoryId: 'history-id',
+          }),
+        ]);
+        expect(insertedInto(VulnerabilityEvent)).toEqual([
+          expect.objectContaining({
+            vulnerabilityId: 'v-new',
+            workspaceId: 'workspace-id',
+            type: 'detected',
+            toStatus: 'new',
+            jobHistoryId: 'history-id',
+          }),
+        ]);
+      });
+
+      it('upserts through the lifecycle conflict clause', async () => {
+        const qb = arrange([], []);
+
+        await service.vulnerabilities({ data: [mockVulnerabilities[0]], job: mockJob });
+
+        const clause = qb.onConflict.mock.calls[0][0] as string;
+        expect(clause).toBe(rescanConflictClause(true));
+        expect(clause).toContain(`WHERE "vulnerabilities"."reviewStatus" = 'approved'`);
+        expect(clause).toContain('"missedScans" = 0');
+        expect(clause).toContain(
+          `"timesDetected" = "vulnerabilities"."timesDetected" + CASE WHEN "vulnerabilities"."lastSeenJobHistoryId" IS DISTINCT FROM EXCLUDED."lastSeenJobHistoryId" THEN 1 ELSE 0 END`,
+        );
+        expect(clause).toContain(`WHEN "vulnerabilities"."detectionStatus" = 'fixed' THEN 'resurfaced'`);
+        expect(clause).toContain(
+          `"resurfacedCount" = "vulnerabilities"."resurfacedCount" + CASE WHEN "vulnerabilities"."detectionStatus" = 'fixed' THEN 1 ELSE 0 END`,
+        );
+        for (const column of ['fixedAt', 'fixedByJobHistoryId', 'fixClaimedAt', 'fixClaimedById']) {
+          expect(clause).toContain(
+            `"${column}" = CASE WHEN "vulnerabilities"."detectionStatus" = 'fixed' THEN NULL ELSE "vulnerabilities"."${column}" END`,
+          );
+        }
+        // Restart on resurface (the default): the fresh deadline wins.
+        expect(clause).toContain(
+          `"dueAt" = CASE WHEN "vulnerabilities"."detectionStatus" = 'fixed' THEN EXCLUDED."dueAt" ELSE "vulnerabilities"."dueAt" END`,
+        );
+      });
+
+      it('keeps the SLA deadline on resurface when the workspace turned restart off', async () => {
+        mockDataSource.query.mockResolvedValue([
+          { value: { slaRestartOnResurface: false } },
+        ]);
+        const qb = arrange([], []);
+
+        await service.vulnerabilities({ data: [mockVulnerabilities[0]], job: mockJob });
+
+        const clause = qb.onConflict.mock.calls[0][0] as string;
+        expect(clause).toContain('"dueAt" = "vulnerabilities"."dueAt"');
+        expect(clause).not.toContain('EXCLUDED."dueAt"');
+      });
+
+      it.each([
+        ['new', 'active'],
+        ['resurfaced', 'active'],
+      ])('records %s → %s seen in another run, without a detected event', async (from, to) => {
+        arrange(
+          [{ fingerprint: 'fp-1', detectionStatus: from }],
+          [{ id: 'v-1', fingerprint: 'fp-1', severity: Severity.HIGH, detectionStatus: to, name: 'X' }],
+        );
+
+        await service.vulnerabilities({ data: [mockVulnerabilities[0]], job: mockJob });
+
+        expect(insertedInto(VulnerabilityEvent)).toEqual([
+          expect.objectContaining({
+            vulnerabilityId: 'v-1',
+            type: 'status_changed',
+            fromStatus: from,
+            toStatus: to,
+            jobHistoryId: 'history-id',
+          }),
+        ]);
+        expect(insertedInto(VulnerabilitySource)).toEqual([]);
+        expect(mockEventBridge.publishSafely).not.toHaveBeenCalled();
+      });
+
+      it('writes no event when the same run reports a finding again', async () => {
+        arrange(
+          [{ fingerprint: 'fp-1', detectionStatus: 'active' }],
+          [{ id: 'v-1', fingerprint: 'fp-1', severity: Severity.HIGH, detectionStatus: 'active', name: 'X' }],
+        );
+
+        await service.vulnerabilities({ data: [mockVulnerabilities[0]], job: mockJob });
+
+        expect(insertedInto(VulnerabilityEvent)).toEqual([]);
+        expect(mockEventBridge.publishSafely).not.toHaveBeenCalled();
+      });
+
+      it('reopens a fixed finding: status event and vulnerability.resurfaced', async () => {
+        arrange(
+          [{ fingerprint: 'fp-1', detectionStatus: 'fixed' }],
+          [{ id: 'v-1', fingerprint: 'fp-1', severity: Severity.CRITICAL, detectionStatus: 'resurfaced', name: 'Back' }],
+        );
+
+        await service.vulnerabilities({ data: [mockVulnerabilities[0]], job: mockJob });
+
+        expect(insertedInto(VulnerabilityEvent)).toEqual([
+          expect.objectContaining({ fromStatus: 'fixed', toStatus: 'resurfaced' }),
+        ]);
+        expect(mockEventBridge.publishSafely).toHaveBeenCalledTimes(1);
+        expect(mockEventBridge.publishSafely).toHaveBeenCalledWith(
+          EVENT_CATALOG.vulnerability.resurfaced,
+          expect.objectContaining({
+            workspaceId: 'workspace-id',
+            payload: expect.objectContaining({
+              jobId: 'job-id',
+              assetId: 'asset-id',
+              vulnerabilities: [expect.objectContaining({ id: 'v-1', name: 'Back' })],
+            }),
+          }),
+        );
+      });
+
+      it('resolves the workspace by target id when the relation lacks the column', async () => {
+        mockWorkspacesService.getWorkspaceIdByTargetId.mockResolvedValue('ws-lookup');
+        arrange([], [{ id: 'v-1', fingerprint: 'fp-1', severity: Severity.LOW, detectionStatus: 'new', name: 'X' }]);
+
+        await service.vulnerabilities({
+          data: [mockVulnerabilities[0]],
+          job: { ...mockJob, asset: { ...mockJob.asset, target: { id: 'target-id' } } } as unknown as Job,
+        });
+
+        expect(mockWorkspacesService.getWorkspaceIdByTargetId).toHaveBeenCalledWith('target-id');
+        expect(mockEventBridge.publishSafely).toHaveBeenCalledWith(
+          EVENT_CATALOG.vulnerability.detected,
+          expect.objectContaining({ workspaceId: 'ws-lookup' }),
+        );
+      });
     });
   });
 

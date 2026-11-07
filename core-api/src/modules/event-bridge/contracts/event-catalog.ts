@@ -220,6 +220,44 @@ export const EVENT_CATALOG = {
       name: 'vulnerability.detected',
       summary: 'New vulnerability found',
     },
+    resurfaced: {
+      name: 'vulnerability.resurfaced',
+      summary: 'Fixed vulnerability detected again',
+    },
+    fixed: {
+      name: 'vulnerability.fixed',
+      summary: 'Vulnerability no longer detected by a covering scan',
+    },
+    proposed: {
+      name: 'vulnerability.proposed',
+      summary: 'AI agent proposed a vulnerability for review',
+    },
+    review: {
+      approved: {
+        name: 'vulnerability.review.approved',
+        summary: 'AI vulnerability proposal approved',
+      },
+      rejected: {
+        name: 'vulnerability.review.rejected',
+        summary: 'AI vulnerability proposal rejected',
+      },
+      merged: {
+        name: 'vulnerability.review.merged',
+        summary: 'AI vulnerability proposal merged into a finding',
+      },
+    },
+    settings: {
+      updated: {
+        name: 'vulnerability.settings.updated',
+        summary: 'Vulnerability management settings updated',
+      },
+    },
+    comment: {
+      created: {
+        name: 'vulnerability.comment.created',
+        summary: 'Comment added to a vulnerability',
+      },
+    },
     analysis: {
       started: { name: 'vulnerability.analysis.started', summary: 'AI analysis started' },
       completed: {
@@ -415,6 +453,20 @@ export const EVENT_CATALOG = {
     created: { name: 'issue.created', summary: 'Issue created' },
     opened: { name: 'issue.opened', summary: 'Issue reopened' },
     closed: { name: 'issue.closed', summary: 'Issue closed' },
+    updated: { name: 'issue.updated', summary: 'Issue fields changed' },
+    resolved: { name: 'issue.resolved', summary: 'Issue resolved' },
+    assigned: { name: 'issue.assigned', summary: 'Issue assignee changed' },
+    deleted: { name: 'issue.deleted', summary: 'Issue deleted' },
+    link: {
+      added: {
+        name: 'issue.link.added',
+        summary: 'Resources linked to an issue',
+      },
+      removed: {
+        name: 'issue.link.removed',
+        summary: 'Resource unlinked from an issue',
+      },
+    },
     comment: {
       created: {
         name: 'issue.comment.created',

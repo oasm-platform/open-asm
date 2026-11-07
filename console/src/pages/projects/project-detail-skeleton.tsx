@@ -5,7 +5,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 export function ProjectDetailSkeleton() {
   return (
     <Page
-      isShowButtonGoBack
       permission="project.read"
       title={<Skeleton className="h-7 w-48" />}
     >

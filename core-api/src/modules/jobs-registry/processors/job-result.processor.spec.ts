@@ -10,6 +10,7 @@ import { Job } from '@/modules/jobs-registry/entities/job.entity';
 import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
 import { JobResultProcessor } from '@/modules/jobs-registry/processors/job-result.processor';
 import { WorkflowRunnerService } from '@/modules/jobs-registry/workflow-runner.service';
+import { VulnerabilityLifecycleService } from '@/modules/vulnerabilities/vulnerability-lifecycle.service';
 
 describe('JobResultProcessor', () => {
   let processor: JobResultProcessor;
@@ -39,6 +40,10 @@ describe('JobResultProcessor', () => {
 
   const mockJobRepository = {
     update: jest.fn(),
+  };
+
+  const mockLifecycle = {
+    onScanJobCompleted: jest.fn(),
   };
 
   const baseBullJob = {
@@ -94,6 +99,10 @@ describe('JobResultProcessor', () => {
         {
           provide: getRepositoryToken(Job),
           useValue: mockJobRepository,
+        },
+        {
+          provide: VulnerabilityLifecycleService,
+          useValue: mockLifecycle,
         },
       ],
     }).compile();
@@ -407,6 +416,109 @@ describe('JobResultProcessor', () => {
         'job-1-1710000000000.json',
         'job-results',
       );
+    });
+  });
+
+  describe('auto-close after a vulnerability scan', () => {
+    const vulnJob = (overrides: Partial<Job> = {}) =>
+      ({
+        ...baseJob,
+        tool: {
+          name: 'nuclei',
+          type: WorkerType.PROVIDER,
+          categories: [{ name: ToolCategory.VULNERABILITIES, targetTypes: [] }],
+        },
+        category: ToolCategory.VULNERABILITIES,
+        ...overrides,
+      }) as unknown as Job;
+
+    it('closes what the scan no longer reports once it completed, even with no findings', async () => {
+      const job = vulnJob();
+      mockJobsRegistryService.findJobForUpdate.mockResolvedValue(job);
+      mockStorageService.readJsonFile.mockResolvedValue({ error: false, raw: null, payload: [] });
+      const before = Date.now();
+
+      await processor.process(baseBullJob);
+
+      expect(mockDataAdapterService.syncData).toHaveBeenCalledWith({ data: [], job });
+      expect(mockLifecycle.onScanJobCompleted).toHaveBeenCalledTimes(1);
+      const [calledJob, syncStartedAt] = mockLifecycle.onScanJobCompleted.mock.calls[0] as [Job, Date];
+      expect(calledJob).toBe(job);
+      expect(syncStartedAt.getTime()).toBeGreaterThanOrEqual(before);
+      expect(mockLifecycle.onScanJobCompleted.mock.invocationCallOrder[0]).toBeGreaterThan(
+        mockJobRepository.update.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('does not close anything when no result was synced', async () => {
+      mockJobsRegistryService.findJobForUpdate.mockResolvedValue(vulnJob());
+      mockStorageService.readJsonFile.mockResolvedValue({ error: false, raw: null, payload: null });
+
+      await processor.process(baseBullJob);
+
+      expect(mockLifecycle.onScanJobCompleted).not.toHaveBeenCalled();
+    });
+
+    it('does not close anything when the job does not save data', async () => {
+      mockJobsRegistryService.findJobForUpdate.mockResolvedValue(vulnJob({ isSaveData: false }));
+      mockStorageService.readJsonFile.mockResolvedValue({ error: false, raw: null, payload: [] });
+
+      await processor.process(baseBullJob);
+
+      expect(mockLifecycle.onScanJobCompleted).not.toHaveBeenCalled();
+    });
+
+    it('does not close anything when the scan failed', async () => {
+      mockJobsRegistryService.findJobForUpdate.mockResolvedValue(vulnJob());
+      mockStorageService.readJsonFile.mockResolvedValue({ error: true, raw: 'nuclei crashed', payload: [] });
+      const lastAttemptBullJob = {
+        ...baseBullJob,
+        attemptsMade: 2,
+      } as unknown as Parameters<JobResultProcessor['process']>[0];
+
+      await expect(processor.process(lastAttemptBullJob)).rejects.toThrow('nuclei crashed');
+
+      expect(mockLifecycle.onScanJobCompleted).not.toHaveBeenCalled();
+    });
+
+    it('does not close anything when the job was cancelled mid-flight', async () => {
+      mockJobsRegistryService.findJobForUpdate.mockResolvedValue(vulnJob());
+      mockStorageService.readJsonFile.mockResolvedValue({ error: false, raw: null, payload: [] });
+      mockJobRepository.update.mockResolvedValue({ affected: 0 });
+
+      await processor.process(baseBullJob);
+
+      expect(mockLifecycle.onScanJobCompleted).not.toHaveBeenCalled();
+    });
+
+    it('does not run for other categories or a benign "nothing to scan"', async () => {
+      mockJobsRegistryService.findJobForUpdate.mockResolvedValue(baseJob);
+      mockStorageService.readJsonFile.mockResolvedValue({ error: false, raw: null, payload: [] });
+      await processor.process(baseBullJob);
+
+      mockJobsRegistryService.findJobForUpdate.mockResolvedValue({
+        ...baseJob,
+        tool: { name: 'naabu', type: WorkerType.BUILT_IN, categories: [] },
+        category: ToolCategory.PORTS_SCANNER,
+      });
+      mockStorageService.readJsonFile.mockResolvedValue({
+        error: true,
+        raw: 'no valid ipv4 or ipv6 targets were found',
+      });
+      await processor.process(baseBullJob);
+
+      expect(mockLifecycle.onScanJobCompleted).not.toHaveBeenCalled();
+    });
+
+    it('logs an auto-close failure instead of failing the job', async () => {
+      mockJobsRegistryService.findJobForUpdate.mockResolvedValue(vulnJob());
+      mockStorageService.readJsonFile.mockResolvedValue({ error: false, raw: null, payload: [] });
+      mockLifecycle.onScanJobCompleted.mockRejectedValueOnce(new Error('db down'));
+
+      await expect(processor.process(baseBullJob)).resolves.toBeUndefined();
+
+      expect(mockWorkflowRunnerService.onJobTerminal).toHaveBeenCalled();
+      expect(mockJobsRegistryService.handleJobError).not.toHaveBeenCalled();
     });
   });
 });

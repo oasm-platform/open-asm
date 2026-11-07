@@ -43,7 +43,7 @@ export default function WorkerDetail() {
 
   if (error || !worker) {
     return (
-      <Page isShowButtonGoBack permission="worker.read">
+      <Page permission="worker.read">
         <div className="flex h-full items-center justify-center">
           <div className="text-lg text-red-500">
             Error loading worker details
@@ -108,7 +108,7 @@ export default function WorkerDetail() {
   );
 
   return (
-    <Page isShowButtonGoBack permission="worker.read">
+    <Page permission="worker.read">
       <div className="space-y-6">
         <WorkerTelemetry
           telemetry={worker.telemetry}

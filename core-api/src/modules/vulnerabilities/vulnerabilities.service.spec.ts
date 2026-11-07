@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as yaml from 'js-yaml';
 import { NotFoundException } from '@nestjs/common';
 import type { Queue } from 'bullmq';
-import type { Repository } from 'typeorm';
+import type { DataSource, Repository } from 'typeorm';
 import { TargetType } from '@/common/enums/enum';
 import type { AgentsCompletionsService } from '../agents/agents.completions';
 import type { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
@@ -48,6 +48,7 @@ describe('VulnerabilitiesService', () => {
       {} as NotificationsService,
       mockTargetRepository as unknown as Repository<Target>,
       mockWorkflowRunnerService as unknown as WorkflowRunnerService,
+      {} as DataSource,
     );
   });
 

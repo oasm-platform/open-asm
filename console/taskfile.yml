@@ -21,6 +21,8 @@ tasks:
     cmds:
       - pnpm install
   lint: pnpm run lint
+  # Type-check the app sources (tsconfig.app.json already sets noEmit).
+  typecheck: pnpm exec tsc -p tsconfig.app.json
   # Run tests
   # Executes unit and integration tests for the console application
   test:

@@ -10,6 +10,7 @@ import {
   Loader2,
   Plug,
   ScrollText,
+  ShieldAlert,
   ShieldCheck,
   SlidersHorizontal,
   Users,
@@ -22,6 +23,7 @@ import McpConnect from './components/mcp-connect';
 import MembersSettings from './components/members-settings';
 import Preferences from './components/preferences';
 import SecuritySettings from './components/security-settings';
+import VulnerabilityManagementSettings from './components/vulnerability-management-settings';
 import WorkspaceSettings from './components/workspace-settings';
 
 interface TabContentProps {
@@ -131,6 +133,19 @@ export const settingsTabGroups: SettingsTabGroup[] = [
         component: <Templates />,
         permission: 'artifact.read',
       },
+      {
+        id: 'vulnerability-management',
+        label: 'Vulnerability management',
+        path: '/settings/vulnerability-management',
+        icon: <ShieldAlert />,
+        content: {
+          title: 'Vulnerability management',
+          description:
+            'SLA per severity, auto-close, risk acceptance and the rules that open issues',
+        },
+        component: <VulnerabilityManagementSettings />,
+        permission: 'vulnerability.read',
+      },
     ],
   },
   // Group: Account Settings
@@ -195,7 +210,8 @@ export function filterTabGroups(
       ...group,
       tabs: group.tabs.filter(
         (tab) =>
-          !tab.permission || (hasPermission ? hasPermission(tab.permission) : false),
+          !tab.permission ||
+          (hasPermission ? hasPermission(tab.permission) : false),
       ),
     }))
     .filter(
@@ -221,7 +237,9 @@ const Settings = ({ defaultTab = 'general' }: SettingsProps) => {
       filterTabGroups(settingsTabGroups, {
         userRole: data?.user.role,
         hasPermission,
-      }).flatMap((group) => group.tabs.map((t) => ({ ...t, group: group.name }))),
+      }).flatMap((group) =>
+        group.tabs.map((t) => ({ ...t, group: group.name })),
+      ),
     [data?.user.role, hasPermission],
   );
 
@@ -239,7 +257,8 @@ const Settings = ({ defaultTab = 'general' }: SettingsProps) => {
   }, [tab, defaultTab, navigate, visibleTabs, isLoading]);
 
   const currentTab = tab || defaultTab;
-  const activeTab = visibleTabs.find((t) => t.id === currentTab) || visibleTabs[0];
+  const activeTab =
+    visibleTabs.find((t) => t.id === currentTab) || visibleTabs[0];
 
   if (isLoading) {
     return (

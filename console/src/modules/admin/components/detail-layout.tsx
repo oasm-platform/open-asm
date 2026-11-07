@@ -74,7 +74,7 @@ export function DetailFields({ children }: { children: ReactNode }) {
 /** Loading state mirroring hero + tabs + field grid. */
 export function DetailSkeleton() {
   return (
-    <Page isShowButtonGoBack>
+    <Page>
       <div className="mb-4 space-y-4">
         <Card>
           <CardContent>

@@ -1,24 +1,37 @@
+import type { WrapperType } from '@/common/types/app.types';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
-import { SortOrder } from '@/common/dtos/get-many-base.dto';
+import {
+  type GetManyBaseResponseDto,
+  SortOrder,
+} from '@/common/dtos/get-many-base.dto';
 import {
   BullMQName,
+  DismissReason,
+  IssueLinkResourceType,
+  IssueStatus,
   JobRunType,
   Severity,
   TargetType,
   ToolCategory,
   VulnerabilityAnalyzeStatus,
+  VulnerabilityDetectionStatus,
+  VulnerabilityEventType,
+  VulnerabilityReviewStatus,
+  VulnerabilitySourceKind,
 } from '@/common/enums/enum';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { InjectQueue } from '@nestjs/bullmq';
 import {
   BadRequestException,
+  Inject,
+  forwardRef,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
-import { In, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { AgentsCompletionsService } from '../agents/agents.completions';
 import { User } from '../auth/entities/user.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
@@ -28,18 +41,78 @@ import { Target } from '../targets/entities/target.entity';
 import { ToolsService } from '../tools/tools.service';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { normalizeInput, orderedJobEntries } from '../workflows/workflow-graph';
-import {
+import type {
   GetVulnerabilitiesStatisticsQueryDto,
-  VulnerabilityStatisticsDto,
+  GetVulnerabilitiesStatisticsResponseDto,
 } from './dto/get-vulnerability-statistics.dto';
-import {
-  GetVulnerabilitiesQueryDto,
-  VulnerabilityStatus,
-} from './dto/get-vulnerability.dto';
+import type { GetVulnerabilitiesQueryDto } from './dto/get-vulnerability.dto';
+import type {
+  ClaimFixResponseDto,
+  ReopenVulnerabilitiesResponseDto,
+  VulnerabilityDetailDto,
+  VulnerabilityDismissalInfoDto,
+  VulnerabilityListItemDto,
+  VulnerabilityOpenIssueDto,
+  VulnerabilitySourceSummaryDto,
+  VulnerabilityTimelineResponseDto,
+  VulnerabilityUserRefDto,
+} from './dto/vulnerability-response.dto';
 import { VulnerabilityDismissal } from './entities/vulnerability-dismissal.entity';
+import { VulnerabilityEvent } from './entities/vulnerability-event.entity';
 import { Vulnerability } from './entities/vulnerability.entity';
 import { openVulnerabilityCondition } from './open-vulnerability';
 import { compileVulnerabilityFilter } from './vulnerability-filter';
+import {
+  insertInChunks,
+  loadVulnerabilitySettings,
+} from './vulnerability-lifecycle';
+import { vulnerabilityStatusCondition } from './vulnerability-status';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const ALL_SEVERITIES: Severity[] = [
+  Severity.INFO,
+  Severity.LOW,
+  Severity.MEDIUM,
+  Severity.HIGH,
+  Severity.CRITICAL,
+];
+
+/** Sort columns that may be NULL: their NULLs go last either way. */
+const NULLABLE_SORT_COLUMNS = new Set([
+  'dueAt',
+  'firstDetectedDate',
+  'lastSeenDate',
+  'fixedAt',
+  'cvssScore',
+  'epssScore',
+]);
+
+const OPEN_DETECTION_STATUSES = new Set<VulnerabilityDetectionStatus>([
+  VulnerabilityDetectionStatus.NEW,
+  VulnerabilityDetectionStatus.ACTIVE,
+  VulnerabilityDetectionStatus.RESURFACED,
+]);
+
+/** A dismissal as responses expose it (the user as id/name/image only). */
+function toDismissalInfo(
+  dismissal: VulnerabilityDismissal | null | undefined,
+): VulnerabilityDismissalInfoDto | null {
+  if (!dismissal) return null;
+  return {
+    reason: dismissal.reason,
+    comment: dismissal.comment ?? null,
+    expiresAt: dismissal.expiresAt ?? null,
+    createdAt: dismissal.createdAt,
+    user: dismissal.user
+      ? {
+          id: dismissal.user.id,
+          name: dismissal.user.name,
+          image: dismissal.user.image ?? null,
+        }
+      : null,
+  };
+}
 
 @Injectable()
 export class VulnerabilitiesService {
@@ -55,11 +128,14 @@ export class VulnerabilitiesService {
     private jobRegistryService: JobsRegistryService,
     private toolsService: ToolsService,
     private workflowService: WorkflowsService,
-    private agentsCompletionsService: AgentsCompletionsService,
+    // agents ↔ vulnerabilities import each other (tools ↔ analysis).
+    @Inject(forwardRef(() => AgentsCompletionsService))
+    private agentsCompletionsService: WrapperType<AgentsCompletionsService>,
     private notificationsService: NotificationsService,
     @InjectRepository(Target)
     private targetRepository: Repository<Target>,
     private workflowRunnerService: WorkflowRunnerService,
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -147,16 +223,15 @@ export class VulnerabilitiesService {
   }
 
   /**
-   * Retrieves a paginated list of vulnerabilities associated with a specified workspace.
-   *
-   * @param query - The query parameters to filter and paginate the vulnerabilities,
-   *                including page, limit, sortOrder, targetIds, workspaceId, and optional search query 'q'.
-   * @returns A promise that resolves to a paginated list of vulnerabilities, including total count and pagination information.
+   * Lists the workspace's vulnerabilities. `status` defaults to open; every
+   * status but pending_review/rejected implies an approved finding, so AI
+   * proposals never show up as findings. Each row carries its dismissal, a
+   * compact source summary and the issue still tracking it.
    */
   async getVulnerabilities(
     query: GetVulnerabilitiesQueryDto,
     workspaceId: string,
-  ) {
+  ): Promise<GetManyBaseResponseDto<VulnerabilityListItemDto>> {
     const {
       limit,
       page,
@@ -170,6 +245,8 @@ export class VulnerabilitiesService {
       tags,
       targetId,
       filter,
+      overdue,
+      discoveredBy,
     } = query;
 
     const { sortBy } = query;
@@ -179,11 +256,12 @@ export class VulnerabilitiesService {
       .leftJoin('vulnerabilities.asset', 'assets')
       .addSelect(['assets.id', 'assets.value'])
       .leftJoin('assets.target', 'targets')
-      .leftJoin('targets.workspace', 'workspaces')
       .leftJoinAndSelect('vulnerabilities.tool', 'tools')
-      .leftJoin('vulnerabilities.jobHistory', 'jobHistory')
       .leftJoinAndSelect('vulnerabilities.vulnerabilityDismissal', 'dismissal')
-      .where('workspaces.id = :workspaceId', { workspaceId })
+      .leftJoin('dismissal.user', 'dismissalUser')
+      .addSelect(['dismissalUser.id', 'dismissalUser.name', 'dismissalUser.image'])
+      .where('targets.workspaceId = :workspaceId', { workspaceId })
+      .andWhere(vulnerabilityStatusCondition(status, 'vulnerabilities'))
       .skip((page - 1) * limit)
       .take(limit);
 
@@ -192,7 +270,11 @@ export class VulnerabilitiesService {
       const { select, orderBy } = this.buildSeverityOrderQuery(sortOrder);
       queryBuilder.addSelect(select, 'severity_order').orderBy(orderBy, 'ASC');
     } else {
-      queryBuilder.orderBy(`vulnerabilities.${sortBy}`, sortOrder);
+      queryBuilder.orderBy(
+        `vulnerabilities.${sortBy}`,
+        sortOrder,
+        NULLABLE_SORT_COLUMNS.has(sortBy) ? 'NULLS LAST' : undefined,
+      );
     }
 
     if (targetIds) {
@@ -205,17 +287,22 @@ export class VulnerabilitiesService {
 
     // Add search query if provided
     if (q) {
-      queryBuilder.andWhere('"vulnerabilities"."name" ILIKE :q   ', {
+      queryBuilder.andWhere('"vulnerabilities"."name" ILIKE :q', {
         q: `%${q}%`,
-        qArray: `%${q}%`,
       });
     }
 
-    // Filter by status
-    if (status === VulnerabilityStatus.OPEN) {
-      queryBuilder.andWhere(openVulnerabilityCondition('vulnerabilities'));
-    } else if (status === VulnerabilityStatus.DISMISSED) {
-      queryBuilder.andWhere('dismissal.vulnerabilityId IS NOT NULL');
+    if (overdue) {
+      queryBuilder
+        .andWhere(openVulnerabilityCondition('vulnerabilities'))
+        .andWhere('vulnerabilities.dueAt < now()');
+    }
+
+    if (Array.isArray(discoveredBy) && discoveredBy.length > 0) {
+      queryBuilder.andWhere(
+        'vulnerabilities.discoveredBy IN (:...discoveredBy)',
+        { discoveredBy },
+      );
     }
 
     // Filter by severity levels
@@ -225,9 +312,10 @@ export class VulnerabilitiesService {
       });
     }
 
-    // Filter by creation date range
+    // Date range on the first detection (an approved AI proposal is
+    // "detected" when it was approved).
     if (createdFrom) {
-      queryBuilder.andWhere('vulnerabilities.createdAt >= :createdFrom', {
+      queryBuilder.andWhere('vulnerabilities.firstDetectedDate >= :createdFrom', {
         createdFrom: new Date(createdFrom),
       });
     }
@@ -235,7 +323,7 @@ export class VulnerabilitiesService {
       // Set time to end of day (23:59:59.999) to include the entire day
       const endDate = new Date(createdTo);
       endDate.setHours(23, 59, 59, 999);
-      queryBuilder.andWhere('vulnerabilities.createdAt <= :createdTo', {
+      queryBuilder.andWhere('vulnerabilities.firstDetectedDate <= :createdTo', {
         createdTo: endDate,
       });
     }
@@ -256,32 +344,44 @@ export class VulnerabilitiesService {
     if (compiled) queryBuilder.andWhere(compiled.sql, compiled.params);
 
     const [vulnerabilities, total] = await queryBuilder.getManyAndCount();
+    const ids = vulnerabilities.map((v) => v.id);
+    const [sources, openIssues] = await Promise.all([
+      this.sourceSummaries(ids),
+      this.openIssues(ids),
+    ]);
 
-    return getManyResponse({ query, data: vulnerabilities, total });
+    const data = vulnerabilities.map(
+      (vulnerability): VulnerabilityListItemDto => ({
+        ...(vulnerability as Omit<Vulnerability, 'sources'>),
+        sources: sources.get(vulnerability.id) ?? [],
+        dismissal: toDismissalInfo(vulnerability.vulnerabilityDismissal),
+        openIssue: openIssues.get(vulnerability.id) ?? null,
+      }),
+    );
+
+    return getManyResponse({ query, data, total });
   }
 
   /**
-   * Retrieves a vulnerability by id
-   *
-   * @param id - The ID of the vulnerability to retrieve.
-   * @param workspaceId - The ID of the workspace to which the vulnerability belongs.
-   * @returns A promise that resolves to the vulnerability entity.
+   * One vulnerability of the workspace, AI proposals included (a reviewer
+   * opens them here), with every source and its evidence.
    */
-  async getVulnerability(id: string, workspaceId: string) {
-    const queryBuilder = this.vulnerabilitiesRepository
+  async getVulnerability(
+    id: string,
+    workspaceId: string,
+  ): Promise<VulnerabilityDetailDto> {
+    const vulnerability = await this.vulnerabilitiesRepository
       .createQueryBuilder('vulnerabilities')
       .leftJoin('vulnerabilities.asset', 'assets')
       .addSelect(['assets.id', 'assets.value'])
       .leftJoin('assets.target', 'targets')
-      .leftJoin('targets.workspace', 'workspaces')
       .leftJoinAndSelect('vulnerabilities.tool', 'tools')
-      .leftJoin('vulnerabilities.jobHistory', 'jobHistory')
       .leftJoinAndSelect('vulnerabilities.vulnerabilityDismissal', 'dismissal')
-      .leftJoinAndSelect('dismissal.user', 'user')
-      .where('workspaces.id = :workspaceId', { workspaceId })
-      .andWhere('vulnerabilities.id = :id', { id });
-
-    const vulnerability = await queryBuilder.getOne();
+      .leftJoin('dismissal.user', 'user')
+      .addSelect(['user.id', 'user.name', 'user.image'])
+      .where('targets.workspaceId = :workspaceId', { workspaceId })
+      .andWhere('vulnerabilities.id = :id', { id })
+      .getOne();
 
     if (!vulnerability) {
       throw new NotFoundException(
@@ -289,74 +389,201 @@ export class VulnerabilitiesService {
       );
     }
 
-    return vulnerability;
+    const [sourceRows, openIssues, users] = await Promise.all([
+      this.dataSource.query<Array<Record<string, unknown>>>(
+        `SELECT s.id, s.kind, s."toolId", t.name AS "toolName", t."logoUrl" AS "toolLogoUrl", s."jobHistoryId",
+                s."agentName", s."agentConversationId", s."toolCallIds", s.evidence,
+                s."createdAt", u.id AS "userId", u.name AS "userName", u.image AS "userImage"
+           FROM "vulnerability_sources" s
+           LEFT JOIN "tools" t ON t.id = s."toolId"
+           LEFT JOIN "users" u ON u.id = s."createdById"
+          WHERE s."vulnerabilityId" = $1
+          ORDER BY s."createdAt" ASC`,
+        [id],
+      ),
+      this.openIssues([id]),
+      this.userRefs(
+        [vulnerability.reviewedById, vulnerability.fixClaimedById].filter(
+          (v): v is string => Boolean(v),
+        ),
+      ),
+    ]);
+
+    return {
+      ...(vulnerability as Omit<Vulnerability, 'sources'>),
+      sources: sourceRows.map((row) => ({
+        id: row.id as string,
+        kind: row.kind as VulnerabilitySourceKind,
+        tool: row.toolId
+          ? {
+              id: row.toolId as string,
+              name: (row.toolName as string) ?? '',
+              logoUrl: (row.toolLogoUrl as string | null) ?? null,
+            }
+          : null,
+        jobHistoryId: (row.jobHistoryId as string | null) ?? null,
+        agentName: (row.agentName as string | null) ?? null,
+        agentConversationId: (row.agentConversationId as string | null) ?? null,
+        toolCallIds: (row.toolCallIds as string[] | null) ?? null,
+        evidence: (row.evidence as Record<string, unknown> | null) ?? null,
+        createdBy: row.userId
+          ? {
+              id: row.userId as string,
+              name: row.userName as string,
+              image: (row.userImage as string | null) ?? null,
+            }
+          : null,
+        createdAt: row.createdAt as Date,
+      })),
+      dismissal: toDismissalInfo(vulnerability.vulnerabilityDismissal),
+      openIssue: openIssues.get(id) ?? null,
+      reviewedByUser: vulnerability.reviewedById
+        ? (users.get(vulnerability.reviewedById) ?? null)
+        : null,
+      fixClaimedByUser: vulnerability.fixClaimedById
+        ? (users.get(vulnerability.fixClaimedById) ?? null)
+        : null,
+    };
+  }
+
+  /** Timeline of a finding, newest first. */
+  async getVulnerabilityTimeline(
+    id: string,
+    workspaceId: string,
+  ): Promise<VulnerabilityTimelineResponseDto> {
+    await this.assertInWorkspace([id], workspaceId);
+    const rows = await this.dataSource.query<Array<Record<string, unknown>>>(
+      `SELECT e.id, e.type, e."fromStatus", e."toStatus", e."jobHistoryId", e.data,
+              e."occurredAt", u.id AS "actorId", u.name AS "actorName", u.image AS "actorImage"
+         FROM "vulnerability_events" e
+         LEFT JOIN "users" u ON u.id = e."actorId"
+        WHERE e."vulnerabilityId" = $1 AND e."workspaceId" = $2
+        ORDER BY e."occurredAt" DESC, e."createdAt" DESC
+        LIMIT 500`,
+      [id, workspaceId],
+    );
+    return {
+      data: rows.map((row) => ({
+        id: row.id as string,
+        type: row.type as VulnerabilityEventType,
+        fromStatus: (row.fromStatus as string | null) ?? null,
+        toStatus: (row.toStatus as string | null) ?? null,
+        jobHistoryId: (row.jobHistoryId as string | null) ?? null,
+        actor: row.actorId
+          ? {
+              id: row.actorId as string,
+              name: row.actorName as string,
+              image: (row.actorImage as string | null) ?? null,
+            }
+          : null,
+        data: (row.data as Record<string, unknown> | null) ?? null,
+        occurredAt: row.occurredAt as Date,
+      })),
+    };
   }
 
   /**
-   * Retrieves statistics of vulnerabilities by severity level for a specified workspace.
-   *
-   * @param query - The query parameters to filter vulnerabilities, with optional targetIds.
-   * @param workspaceId - The ID of the workspace.
-   * @returns A promise that resolves to an array of vulnerability counts by severity level.
+   * Open findings per severity, plus lifecycle counts: per detection state,
+   * new in 7 days, resurfaced and fixed in 30 days, overdue, AI proposals
+   * waiting for review, and mean time to remediate per severity over the
+   * findings fixed in the last 90 days.
    */
   async getVulnerabilitiesStatistics(
     query: GetVulnerabilitiesStatisticsQueryDto,
     workspaceId: string,
-  ) {
+  ): Promise<GetVulnerabilitiesStatisticsResponseDto> {
     const { targetIds } = query;
-
-    const queryBuilder = this.vulnerabilitiesRepository
-      .createQueryBuilder('vulnerabilities')
-      .select('vulnerabilities.severity', 'severity')
-      .addSelect('COUNT(vulnerabilities.severity)', 'count')
-      .leftJoin('vulnerabilities.asset', 'assets')
-      .leftJoin('assets.target', 'targets')
-      .leftJoin('targets.workspace', 'workspaces')
-      .leftJoin('vulnerabilities.jobHistory', 'jobHistory')
-      .where('workspaces.id = :workspaceId', { workspaceId })
-      .andWhere(openVulnerabilityCondition('vulnerabilities'))
-      .groupBy('vulnerabilities.severity');
-
-    if (targetIds) {
-      queryBuilder.andWhere('targets.id IN (:...targetIds)', { targetIds });
+    const params: unknown[] = [workspaceId];
+    let targetFilter = '';
+    if (targetIds?.length) {
+      params.push(targetIds);
+      targetFilter = ` AND t.id = ANY($2::uuid[])`;
     }
+    const from = `FROM "vulnerabilities" v
+                  JOIN "assets" a ON a.id = v."assetId"
+                  JOIN "targets" t ON t.id = a."targetId"
+                 WHERE t."workspaceId" = $1${targetFilter}`;
+    const open = openVulnerabilityCondition('v');
 
-    const result = await queryBuilder.getRawMany();
+    const [severityRows, counts, resurfaced, mttrRows] = await Promise.all([
+      this.dataSource.query<Array<{ severity: Severity; count: string }>>(
+        `SELECT v.severity, COUNT(*) AS count ${from} AND ${open} GROUP BY v.severity`,
+        params,
+      ),
+      this.dataSource.query<Array<Record<string, string>>>(
+        `SELECT
+           COUNT(*) FILTER (WHERE v."reviewStatus" = 'approved' AND v."detectionStatus" = 'new') AS "new",
+           COUNT(*) FILTER (WHERE v."reviewStatus" = 'approved' AND v."detectionStatus" = 'active') AS "active",
+           COUNT(*) FILTER (WHERE v."reviewStatus" = 'approved' AND v."detectionStatus" = 'resurfaced') AS "resurfaced",
+           COUNT(*) FILTER (WHERE v."reviewStatus" = 'approved' AND v."detectionStatus" = 'fixed') AS "fixed",
+           COUNT(*) FILTER (WHERE ${open} AND v."firstDetectedDate" >= now() - interval '7 days') AS "newLast7Days",
+           COUNT(*) FILTER (WHERE v."reviewStatus" = 'approved' AND v."detectionStatus" = 'fixed'
+                              AND v."fixedAt" >= now() - interval '30 days') AS "fixedLast30Days",
+           COUNT(*) FILTER (WHERE ${open} AND v."dueAt" < now()) AS "overdue",
+           COUNT(*) FILTER (WHERE v."reviewStatus" = 'pending_review') AS "pendingReview"
+         ${from}`,
+        params,
+      ),
+      this.dataSource.query<Array<{ count: string }>>(
+        `SELECT COUNT(DISTINCT e."vulnerabilityId") AS count
+           FROM "vulnerability_events" e
+           JOIN "vulnerabilities" v ON v.id = e."vulnerabilityId"
+           JOIN "assets" a ON a.id = v."assetId"
+           JOIN "targets" t ON t.id = a."targetId"
+          WHERE t."workspaceId" = $1${targetFilter}
+            AND v."reviewStatus" = 'approved'
+            AND e.type = '${VulnerabilityEventType.STATUS_CHANGED}'
+            AND e."toStatus" = '${VulnerabilityDetectionStatus.RESURFACED}'
+            AND e."occurredAt" >= now() - interval '30 days'`,
+        params,
+      ),
+      this.dataSource.query<
+        Array<{ severity: Severity; days: string | null; count: string }>
+      >(
+        `SELECT v.severity,
+                AVG(EXTRACT(EPOCH FROM (v."fixedAt" - COALESCE(v."firstDetectedDate", v."createdAt"))) / 86400) AS days,
+                COUNT(*) AS count
+         ${from}
+           AND v."reviewStatus" = 'approved'
+           AND v."detectionStatus" = 'fixed'
+           AND v."fixedAt" >= now() - interval '90 days'
+         GROUP BY v.severity`,
+        params,
+      ),
+    ]);
 
-    // Convert the result to a map for easy lookup
-    const severityCounts = new Map<Severity, number>();
-    result.forEach((item: { severity: Severity; count: string }) => {
-      severityCounts.set(item.severity, parseInt(item.count, 10));
-    });
-
-    // Ensure all severity levels are included, even with zero counts
-    const allSeverities: Severity[] = [
-      Severity.INFO,
-      Severity.LOW,
-      Severity.MEDIUM,
-      Severity.HIGH,
-      Severity.CRITICAL,
-    ];
-
-    const statistics: VulnerabilityStatisticsDto[] = allSeverities.map(
-      (severity) => ({
-        severity,
-        count: severityCounts.get(severity) || 0,
-      }),
+    const toInt = (value: unknown): number =>
+      Number.parseInt(typeof value === 'number' || typeof value === 'string' ? String(value) : '0', 10) || 0;
+    const severityCounts = new Map(
+      severityRows.map((row) => [row.severity, toInt(row.count)]),
     );
+    const mttr = new Map(mttrRows.map((row) => [row.severity, row]));
+    const c = counts[0] ?? {};
 
-    return { data: statistics };
-  }
-
-  /**
-   * Updates the isArchived status of a vulnerability.
-   *
-   * @param id - The ID of the vulnerability to update.
-   * @param isArchived - The new boolean value for isArchived.
-   * @returns A promise that resolves when the update is complete.
-   */
-  async markIsArchived(id: string, isArchived: boolean): Promise<void> {
-    await this.vulnerabilitiesRepository.update({ id }, { isArchived });
+    return {
+      data: ALL_SEVERITIES.map((severity) => ({
+        severity,
+        count: severityCounts.get(severity) ?? 0,
+      })),
+      byDetectionStatus: {
+        new: toInt(c.new),
+        active: toInt(c.active),
+        resurfaced: toInt(c.resurfaced),
+        fixed: toInt(c.fixed),
+      },
+      newLast7Days: toInt(c.newLast7Days),
+      resurfacedLast30Days: toInt(resurfaced[0]?.count),
+      fixedLast30Days: toInt(c.fixedLast30Days),
+      overdue: toInt(c.overdue),
+      pendingReview: toInt(c.pendingReview),
+      mttr: ALL_SEVERITIES.map((severity) => {
+        const row = mttr.get(severity);
+        const days = row?.days === null || row?.days === undefined
+          ? null
+          : Math.round(Number(row.days) * 10) / 10;
+        return { severity, days, count: toInt(row?.count) };
+      }),
+    };
   }
 
   /**
@@ -380,61 +607,120 @@ export class VulnerabilitiesService {
     };
   }
 
+  /**
+   * Dismisses approved findings. `risk_accepted` needs an `expiresAt` within
+   * the workspace's `riskAcceptMaxDays`; the other reasons take none. An
+   * expired risk acceptance still on record is replaced.
+   */
   async bulkDismissVulnerabilities(
     ids: string[],
     workspaceId: string,
     user: User,
-    dismiss: { reason: VulnerabilityDismissal['reason']; comment?: string },
+    dismiss: {
+      reason: VulnerabilityDismissal['reason'];
+      comment?: string;
+      expiresAt?: string;
+    },
   ) {
-    // Validate all vulnerabilities exist and belong to the workspace
-    const vulnerabilities = await this.vulnerabilitiesRepository.find({
-      where: {
-        id: In(ids),
-        asset: {
-          target: { workspaceId },
-        },
-      },
-    });
-
-    const foundIds = vulnerabilities.map((v) => v.id);
-    const notFoundIds = ids.filter((id) => !foundIds.includes(id));
-    if (notFoundIds.length > 0) {
-      throw new NotFoundException(
-        `Vulnerabilities not found: ${notFoundIds.join(', ')}`,
+    const now = new Date();
+    let expiresAt: Date | null = null;
+    if (dismiss.reason === DismissReason.RISK_ACCEPTED) {
+      if (!dismiss.expiresAt) {
+        throw new BadRequestException(
+          'expiresAt is required when accepting a risk',
+        );
+      }
+      expiresAt = new Date(dismiss.expiresAt);
+      if (Number.isNaN(expiresAt.getTime()) || expiresAt <= now) {
+        throw new BadRequestException('expiresAt must be in the future');
+      }
+      const settings = await loadVulnerabilitySettings(
+        this.dataSource,
+        workspaceId,
+      );
+      const max = new Date(now.getTime() + settings.riskAcceptMaxDays * DAY_MS);
+      if (expiresAt > max) {
+        throw new BadRequestException(
+          `A risk acceptance may last at most ${settings.riskAcceptMaxDays} days`,
+        );
+      }
+    } else if (dismiss.expiresAt) {
+      throw new BadRequestException(
+        'expiresAt only applies to the risk_accepted reason',
       );
     }
 
-    // Check which are already dismissed
-    const alreadyDismissed = await this.dismissRepo.find({
-      where: {
-        vulnerabilityId: In(ids),
-      },
-    });
+    const unique = [...new Set(ids)];
+    const vulnerabilities = await this.assertInWorkspace(unique, workspaceId);
+    const notApproved = vulnerabilities.filter(
+      (v) => v.reviewStatus !== VulnerabilityReviewStatus.APPROVED,
+    );
+    if (notApproved.length > 0) {
+      throw new BadRequestException(
+        `Only approved findings can be dismissed: ${notApproved.map((v) => v.id).join(', ')}`,
+      );
+    }
 
+    const existing = await this.dismissRepo.find({
+      where: { vulnerabilityId: In(unique) },
+    });
+    const alreadyDismissed = existing.filter(
+      (d) => !d.expiresAt || d.expiresAt > now,
+    );
     if (alreadyDismissed.length > 0) {
       throw new BadRequestException(
         `Vulnerabilities already dismissed: ${alreadyDismissed.map((d) => d.vulnerabilityId).join(', ')}`,
       );
     }
 
-    // Create dismissal records for all
-    const dismissals = ids.map((id) =>
-      this.dismissRepo.create({
-        vulnerabilityId: id,
-        userId: user.id,
-        reason: dismiss.reason,
-        comment: dismiss.comment,
-      }),
-    );
-
-    await this.dismissRepo.save(dismissals);
-    return dismissals;
+    return this.dataSource.transaction(async (manager) => {
+      const expired = existing.map((d) => d.id);
+      if (expired.length > 0) {
+        await manager.delete(VulnerabilityDismissal, { id: In(expired) });
+      }
+      const dismissals = unique.map((id) =>
+        manager.create(VulnerabilityDismissal, {
+          vulnerabilityId: id,
+          userId: user.id,
+          reason: dismiss.reason,
+          comment: dismiss.comment,
+          expiresAt,
+        }),
+      );
+      const saved = await manager.save(VulnerabilityDismissal, dismissals);
+      await insertInChunks(
+        manager,
+        VulnerabilityEvent,
+        unique.map((id) => ({
+          vulnerabilityId: id,
+          workspaceId,
+          type: VulnerabilityEventType.DISMISSED,
+          actorId: user.id,
+          data: {
+            reason: dismiss.reason,
+            comment: dismiss.comment ?? null,
+            expiresAt: expiresAt ? expiresAt.toISOString() : null,
+          },
+          occurredAt: now,
+        })),
+      );
+      return saved;
+    });
   }
 
-  async bulkReopenVulnerabilities(ids: string[], workspaceId: string) {
+  /**
+   * Removes the dismissal of each finding (ids are VULNERABILITY ids). Every
+   * id must be a dismissed finding of the workspace.
+   */
+  async bulkReopenVulnerabilities(
+    ids: string[],
+    workspaceId: string,
+    user?: User,
+  ): Promise<ReopenVulnerabilitiesResponseDto> {
+    const unique = [...new Set(ids)];
     const dismissals = await this.dismissRepo.find({
       where: {
-        id: In(ids),
+        vulnerabilityId: In(unique),
         vulnerability: {
           asset: {
             target: { workspaceId },
@@ -443,15 +729,191 @@ export class VulnerabilitiesService {
       },
     });
 
-    const foundIds = dismissals.map((d) => d.id);
-    const notFoundIds = ids.filter((id) => !foundIds.includes(id));
+    const found = new Set(dismissals.map((d) => d.vulnerabilityId));
+    const notFoundIds = unique.filter((id) => !found.has(id));
     if (notFoundIds.length > 0) {
       throw new NotFoundException(
         `Dismissed vulnerabilities not found: ${notFoundIds.join(', ')}`,
       );
     }
 
-    await this.dismissRepo.delete({ id: In(ids) });
+    const now = new Date();
+    await this.dataSource.transaction(async (manager) => {
+      await manager.delete(VulnerabilityDismissal, {
+        id: In(dismissals.map((d) => d.id)),
+      });
+      await insertInChunks(
+        manager,
+        VulnerabilityEvent,
+        dismissals.map((d) => ({
+          vulnerabilityId: d.vulnerabilityId,
+          workspaceId,
+          type: VulnerabilityEventType.REOPENED,
+          actorId: user?.id ?? null,
+          data: {
+            previousReason: d.reason,
+            expiresAt: d.expiresAt ? new Date(d.expiresAt).toISOString() : null,
+          },
+          occurredAt: now,
+        })),
+      );
+    });
+    return { reopened: dismissals.length };
+  }
+
+  /**
+   * Records that a person fixed the findings. Nothing closes yet: the next
+   * scan of the same scope that no longer reports a finding closes it as
+   * usual, and that close notes the claim was verified. Findings no scanner
+   * covers (AI, legacy) cannot be verified that way; the event says so.
+   */
+  async claimFix(
+    vulnerabilityIds: string[],
+    workspaceId: string,
+    user: User,
+    note?: string,
+  ): Promise<ClaimFixResponseDto> {
+    const unique = [...new Set(vulnerabilityIds)];
+    const vulnerabilities = await this.assertInWorkspace(unique, workspaceId);
+    const notOpen = vulnerabilities.filter(
+      (v) =>
+        v.reviewStatus !== VulnerabilityReviewStatus.APPROVED ||
+        !OPEN_DETECTION_STATUSES.has(v.detectionStatus),
+    );
+    if (notOpen.length > 0) {
+      throw new BadRequestException(
+        `Only open, approved findings can be claimed fixed: ${notOpen.map((v) => v.id).join(', ')}`,
+      );
+    }
+
+    const now = new Date();
+    await this.dataSource.transaction(async (manager) => {
+      await manager.update(
+        Vulnerability,
+        { id: In(unique) },
+        { fixClaimedAt: now, fixClaimedById: user.id },
+      );
+      await insertInChunks(
+        manager,
+        VulnerabilityEvent,
+        vulnerabilities.map((v) => ({
+          vulnerabilityId: v.id,
+          workspaceId,
+          type: VulnerabilityEventType.FIX_CLAIMED,
+          actorId: user.id,
+          data: {
+            note: note ?? null,
+            // The next covering scan that misses it closes it as usual.
+            verification: v.scanScopeKey
+              ? 'next_covering_scan'
+              : 'not_verifiable_by_scan',
+          },
+          occurredAt: now,
+        })),
+      );
+    });
+    return { updated: unique.length };
+  }
+
+  /**
+   * Loads the findings by id, scoped to the workspace; 404 naming the ids
+   * that are not there.
+   */
+  private async assertInWorkspace(
+    ids: string[],
+    workspaceId: string,
+  ): Promise<Vulnerability[]> {
+    const vulnerabilities = await this.vulnerabilitiesRepository.find({
+      where: {
+        id: In(ids),
+        asset: {
+          target: { workspaceId },
+        },
+      },
+    });
+    const found = new Set(vulnerabilities.map((v) => v.id));
+    const notFoundIds = ids.filter((id) => !found.has(id));
+    if (notFoundIds.length > 0) {
+      throw new NotFoundException(
+        `Vulnerabilities not found: ${notFoundIds.join(', ')}`,
+      );
+    }
+    return vulnerabilities;
+  }
+
+  /** Distinct (kind, tool, agent) sources per finding, for list rows. */
+  private async sourceSummaries(
+    ids: string[],
+  ): Promise<Map<string, VulnerabilitySourceSummaryDto[]>> {
+    const result = new Map<string, VulnerabilitySourceSummaryDto[]>();
+    if (ids.length === 0) return result;
+    const rows = await this.dataSource.query<
+      Array<{
+        vulnerabilityId: string;
+        kind: VulnerabilitySourceKind;
+        toolName: string | null;
+        agentName: string | null;
+      }>
+    >(
+      `SELECT DISTINCT s."vulnerabilityId", s.kind, t.name AS "toolName", s."agentName"
+         FROM "vulnerability_sources" s
+         LEFT JOIN "tools" t ON t.id = s."toolId"
+        WHERE s."vulnerabilityId" = ANY($1::uuid[])`,
+      [ids],
+    );
+    for (const row of rows) {
+      const list = result.get(row.vulnerabilityId) ?? [];
+      list.push({
+        kind: row.kind,
+        toolName: row.toolName ?? null,
+        agentName: row.agentName ?? null,
+      });
+      result.set(row.vulnerabilityId, list);
+    }
+    return result;
+  }
+
+  /** The most recent not-closed issue linked to each finding. */
+  private async openIssues(
+    ids: string[],
+  ): Promise<Map<string, VulnerabilityOpenIssueDto>> {
+    const result = new Map<string, VulnerabilityOpenIssueDto>();
+    if (ids.length === 0) return result;
+    const rows = await this.dataSource.query<
+      Array<{ resourceId: string; id: string; no: number; status: IssueStatus }>
+    >(
+      `SELECT DISTINCT ON (l."resourceId") l."resourceId", i.id, i.no, i.status
+         FROM "issue_links" l
+         JOIN "issues" i ON i.id = l."issueId"
+        WHERE l."resourceType" = '${IssueLinkResourceType.VULNERABILITY}'
+          AND l."resourceId" = ANY($1::uuid[])
+          AND i.status IN ('${IssueStatus.OPEN}', '${IssueStatus.IN_PROGRESS}', '${IssueStatus.RESOLVED}')
+        ORDER BY l."resourceId", i."createdAt" DESC`,
+      [ids],
+    );
+    for (const row of rows) {
+      result.set(row.resourceId, {
+        id: row.id,
+        no: Number(row.no),
+        status: row.status,
+      });
+    }
+    return result;
+  }
+
+  /** `{id, name, image}` of each user id. */
+  private async userRefs(
+    ids: string[],
+  ): Promise<Map<string, VulnerabilityUserRefDto>> {
+    const result = new Map<string, VulnerabilityUserRefDto>();
+    if (ids.length === 0) return result;
+    const rows = await this.dataSource.query<
+      Array<{ id: string; name: string; image: string | null }>
+    >(`SELECT id, name, image FROM "users" WHERE id = ANY($1::uuid[])`, [ids]);
+    for (const row of rows) {
+      result.set(row.id, { id: row.id, name: row.name, image: row.image ?? null });
+    }
+    return result;
   }
 
   async analyzeVulnerability(
@@ -617,7 +1079,7 @@ export class VulnerabilitiesService {
       publicationDate: vulnerability.publicationDate,
       modificationDate: vulnerability.modificationDate,
       filePath: vulnerability.filePath,
-      isArchived: vulnerability.isArchived,
+      detectionStatus: vulnerability.detectionStatus,
       fingerprint: vulnerability.fingerprint,
     };
   }
@@ -635,8 +1097,9 @@ export class VulnerabilitiesService {
       throw new NotFoundException(`Vulnerability with id ${id} not found`);
     }
 
-    const workspace = vulnerability.asset?.target?.workspace;
-    if (!workspace || workspace.id !== workspaceId) {
+    // Only asset.target is loaded: compare its workspaceId column (reading
+    // target.workspace, a relation never loaded here, made every call 404).
+    if (vulnerability.asset?.target?.workspaceId !== workspaceId) {
       throw new NotFoundException(
         `Vulnerability with id ${id} not found in workspace`,
       );

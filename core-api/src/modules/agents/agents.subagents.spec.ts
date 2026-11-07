@@ -663,6 +663,7 @@ describe('AgentsSubagentsService', () => {
       'c1',
       undefined,
       undefined,
+      'researcher',
     );
     const call = (streamText as jest.Mock).mock.calls[0][0];
     const toolNames = Object.keys(call.tools);

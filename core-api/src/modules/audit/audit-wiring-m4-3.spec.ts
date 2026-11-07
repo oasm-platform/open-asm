@@ -51,6 +51,11 @@ describe('M4.3 audit wiring (projects / internal-networks / vulnerabilities)', (
         'bulkReopenVulnerabilities',
         'vulnerability.bulk_updated',
       ],
+      [VulnerabilitiesController, 'approveProposal', 'vulnerability.review.approved'],
+      [VulnerabilitiesController, 'rejectProposal', 'vulnerability.review.rejected'],
+      [VulnerabilitiesController, 'mergeProposal', 'vulnerability.review.merged'],
+      [VulnerabilitiesController, 'updateSettings', 'vulnerability.settings.updated'],
+      [VulnerabilitiesController, 'claimFix', 'vulnerability.status.updated'],
     ] as const)('%s.%s is wired to the %s event', (controller, method, action) => {
       expect(auditConfig(controller, method)).toEqual(
         expect.objectContaining({
@@ -69,6 +74,8 @@ describe('M4.3 audit wiring (projects / internal-networks / vulnerabilities)', (
         [InternalNetworksController, 'createTargetsFromInterfaces'],
         [VulnerabilitiesController, 'scan'],
         [VulnerabilitiesController, 'getVulnerabilities'],
+        [VulnerabilitiesController, 'getVulnerabilityTimeline'],
+        [VulnerabilitiesController, 'getProposalDuplicates'],
       ] as const) {
         expect(auditConfig(controller, method)).toBeUndefined();
       }
@@ -155,7 +162,12 @@ describe('M4.3 audit wiring (projects / internal-networks / vulnerabilities)', (
           { ids: ['v-1', 'v-2', 'v-3'], reason: 'NOT_APPLICABLE' },
           undefined,
         ),
-      ).toEqual({ action: 'dismiss', count: 3 });
+      ).toEqual({
+        action: 'dismiss',
+        count: 3,
+        ids: ['v-1', 'v-2', 'v-3'],
+        reason: 'NOT_APPLICABLE',
+      });
     });
 
     it('has no changes (before/after status is not derivable from the body)', () => {
@@ -175,7 +187,7 @@ describe('M4.3 audit wiring (projects / internal-networks / vulnerabilities)', (
       );
       expect(
         config.metadata?.({ ids: ['v-4', 'v-5'] }, undefined),
-      ).toEqual({ action: 'reopen', count: 2 });
+      ).toEqual({ action: 'reopen', count: 2, ids: ['v-4', 'v-5'] });
     });
   });
 });

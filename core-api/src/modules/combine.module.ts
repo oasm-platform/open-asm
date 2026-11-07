@@ -3,6 +3,7 @@ import { ApiKeysModule } from './apikeys/apikeys.module';
 import { ProjectsModule } from './projects/projects.module';
 import { AssetsModule } from './assets/assets.module';
 import { AuthModule } from './auth/auth.module';
+import { CommentsModule } from './comments/comments.module';
 import { ConnectorsModule } from './connectors/connectors.module';
 import { DataAdapterModule } from './data-adapter/data-adapter.module';
 import { EventsModule } from './events/events.module';
@@ -55,6 +56,7 @@ import { ArtifactsModule } from './artifacts/artifacts.module';
     TemplatesModule,
     ProjectsModule,
     IssuesModule,
+    CommentsModule,
     AdminModule,
     InternalNetworksModule,
     AgentsModule,

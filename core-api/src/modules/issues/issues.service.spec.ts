@@ -1,795 +1,464 @@
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
-import { BullMQName, IssueSourceType, IssueStatus } from '@/common/enums/enum';
-import { getQueueToken } from '@nestjs/bullmq';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
-import type { TestingModule } from '@nestjs/testing';
-import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { IssueComment } from './entities/issue-comment.entity';
-import { Issue } from './entities/issue.entity';
-import { VulnerabilitySourceHandler } from './handlers/vulnerability-source.handler';
+import {
+  IssueCommentType,
+  IssueLinkResourceType,
+  IssuePriority,
+  IssueResolution,
+  IssueStatus,
+  IssueType,
+} from '@/common/enums/enum';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
+import { QueryFailedError } from 'typeorm';
+import type { Issue } from './entities/issue.entity';
+import { nextIssueNo } from './issue-activity';
 import { IssuesService } from './issues.service';
 
-jest.mock('./handlers/vulnerability-source.handler', () => ({
-  VulnerabilitySourceHandler: class {
-    onStatusChange = jest.fn();
-  },
-}));
+const WS = 'ws-1';
+const USER = 'user-1';
+const LINK_A = { resourceType: IssueLinkResourceType.ASSET, resourceId: 'a-1' };
+const LINK_V = {
+  resourceType: IssueLinkResourceType.VULNERABILITY,
+  resourceId: 'v-1',
+};
+
+function queryBuilder(terminal: Record<string, jest.Mock>) {
+  const calls: Record<string, jest.Mock> = {};
+  const proxy: Record<string, unknown> = new Proxy(calls, {
+    get(target, prop: string) {
+      if (prop === 'then') return undefined;
+      if (prop in terminal) return terminal[prop];
+      target[prop] ??= jest.fn(() => proxy);
+      return target[prop];
+    },
+  });
+  return { qb: proxy, calls };
+}
+
+const uniqueViolation = () =>
+  new QueryFailedError(
+    'INSERT',
+    [],
+    Object.assign(new Error('duplicate key'), { code: '23505' }),
+  );
+
+function issue(overrides: Partial<Issue> = {}): Issue {
+  return {
+    id: 'i-1',
+    no: 7,
+    title: 'SQLi',
+    type: IssueType.VULNERABILITY_REMEDIATION,
+    status: IssueStatus.OPEN,
+    priority: IssuePriority.P2,
+    resolution: null,
+    resolvedAt: null,
+    dueAt: null,
+    assigneeId: null,
+    workspaceId: WS,
+    tags: [],
+    links: [],
+    createdAt: new Date('2026-01-01'),
+    updatedAt: new Date('2026-01-02'),
+    ...overrides,
+  } as Issue;
+}
+
+function setup() {
+  const current = issue();
+  const insert = queryBuilder({
+    execute: jest.fn().mockResolvedValue({ raw: [{ id: 'l-1' }] }),
+  });
+  const commentRepo = {
+    create: jest.fn((x: unknown) => x),
+    save: jest.fn(),
+  };
+  const manager = {
+    query: jest.fn((sql: string) =>
+      Promise.resolve(sql.includes('issue_counters') ? [{ lastNo: 8 }] : []),
+    ),
+    create: jest.fn((_: unknown, data: object) => data),
+    save: jest.fn((x: object) => Promise.resolve({ id: 'i-new', ...x })),
+    getRepository: jest.fn(() => commentRepo),
+    createQueryBuilder: jest.fn(() => insert.qb),
+  };
+  const dataSource = {
+    transaction: jest.fn((work: (m: typeof manager) => unknown) => work(manager)),
+    // Membership check: a row means "is a member".
+    query: jest.fn().mockResolvedValue([{ '?column?': 1 }]),
+  };
+  const list = queryBuilder({
+    getManyAndCount: jest.fn().mockResolvedValue([[current], 1]),
+  });
+  const issuesRepository = {
+    findOne: jest.fn().mockResolvedValue(current),
+    createQueryBuilder: jest.fn(() => list.qb),
+    save: jest.fn((x: unknown) => Promise.resolve(x)),
+    delete: jest.fn(),
+  };
+  const linksRepository = { findOne: jest.fn(), delete: jest.fn() };
+  const links = {
+    assertInWorkspace: jest.fn(),
+    summarize: jest.fn((l: unknown[]) => Promise.resolve(l.map(() => ({ value: 'x' })))),
+  };
+  const handlers = {
+    progress: jest.fn((issues: { id: string }[]) =>
+      Promise.resolve(new Map(issues.map((i) => [i.id, { done: 1, total: 2 }]))),
+    ),
+    get: jest.fn(() => ({
+      progress: (ids: string[]) =>
+        Promise.resolve(new Map(ids.map((id) => [id, { done: 1, total: 2 }]))),
+    })),
+  };
+  const events = { publish: jest.fn() };
+  const service = new IssuesService(
+    issuesRepository as never,
+    linksRepository as never,
+    dataSource as never,
+    links as never,
+    handlers as never,
+    events as never,
+  );
+  return {
+    service,
+    current,
+    manager,
+    dataSource,
+    insert,
+    list,
+    issuesRepository,
+    linksRepository,
+    links,
+    events,
+    commentRepo,
+  };
+}
+
+const published = (events: { publish: jest.Mock }) =>
+  events.publish.mock.calls.map((c: [{ name: string }]) => c[0].name);
 
 describe('IssuesService', () => {
-  let service: IssuesService;
-  let repository: Repository<Issue>;
-  let commentRepository: Repository<IssueComment>;
-  // let vulnerabilityHandler: VulnerabilitySourceHandler;
-
-  const mockIssue = {
-    id: '123e4567-e89b-12d3-a456-426614174000',
-    title: 'Test Issue',
-    status: IssueStatus.OPEN,
-    workspaceId: '123e4567-e89b-12d3-a456-426614174001',
-    createdBy: { id: '123e4567-e89b-12d3-a456-426614174002' },
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    no: 1,
-  };
-
-  const mockIssueComment = {
-    id: '123e4567-e89b-12d3-a456-426614174003',
-    content: 'Test Comment',
-    issue: { id: '123e4567-e89b-12d3-a456-426614174000' },
-    createdBy: { id: '123e4567-e89b-12d3-a456-426614174002' },
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-
-  beforeEach(async () => {
-    const mockJob = {
-      id: 'mock-job-id',
-      returnvalue: mockIssue,
-      getState: jest
-        .fn()
-        .mockResolvedValueOnce('active')
-        .mockResolvedValueOnce('completed'),
-    };
-
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        IssuesService,
-        {
-          provide: getRepositoryToken(Issue),
-          useClass: Repository,
-        },
-        {
-          provide: getRepositoryToken(IssueComment),
-          useClass: Repository,
-        },
-        {
-          provide: getQueueToken(BullMQName.ISSUE_CREATION),
-          useValue: {
-            add: jest.fn().mockResolvedValue(mockJob),
-            getJob: jest.fn().mockResolvedValue(mockJob),
-          },
-        },
-        {
-          provide: VulnerabilitySourceHandler,
-          useValue: {
-            onStatusChange: jest.fn(),
-          },
-        },
-      ],
-    })
-      .overrideProvider(getRepositoryToken(Issue))
-      .useValue({
-        findOne: jest.fn(),
-        find: jest.fn(),
-        save: jest.fn(),
-        remove: jest.fn(),
-        create: jest.fn(),
-        manager: {
-          transaction: jest.fn(),
-        },
-      })
-      .overrideProvider(getRepositoryToken(IssueComment))
-      .useValue({
-        findOne: jest.fn(),
-        find: jest.fn(),
-        save: jest.fn(),
-        remove: jest.fn(),
-        softDelete: jest.fn(),
-        create: jest.fn(),
-        getManyAndCount: jest.fn(),
-        createQueryBuilder: jest.fn(() => ({
-          withDeleted: jest.fn().mockReturnThis(),
-          leftJoinAndSelect: jest.fn().mockReturnThis(),
-          leftJoin: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          andWhere: jest.fn().mockReturnThis(),
-          select: jest.fn().mockReturnThis(),
-          orderBy: jest.fn().mockReturnThis(),
-          skip: jest.fn().mockReturnThis(),
-          take: jest.fn().mockReturnThis(),
-          getManyAndCount: jest.fn(),
-        })),
-      })
-      .overrideProvider(VulnerabilitySourceHandler)
-      .useValue({
-        onStatusChange: jest.fn(),
-      })
-      .compile();
-
-    service = module.get<IssuesService>(IssuesService);
-    repository = module.get<Repository<Issue>>(getRepositoryToken(Issue));
-    commentRepository = module.get<Repository<IssueComment>>(
-      getRepositoryToken(IssueComment),
-    );
-    // vulnerabilityHandler = module.get<VulnerabilitySourceHandler>(
-    //   VulnerabilitySourceHandler,
-    // );
-  });
-
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
-
-  describe('findExistingOpenIssueBySource', () => {
-    it('should return existing open issue when found', async () => {
-      const existingIssue = {
-        ...mockIssue,
-        sourceId: 'vuln-123',
-        sourceType: IssueSourceType.VULNERABILITY,
+  describe('numbering', () => {
+    it('bumps the workspace counter in one upsert', async () => {
+      const manager = {
+        query: jest.fn().mockResolvedValueOnce([{ lastNo: '13' }]),
       };
+      await expect(nextIssueNo(manager as never, WS)).resolves.toBe(13);
+      expect(manager.query).toHaveBeenCalledTimes(1);
+      const [sql, params] = manager.query.mock.calls[0] as [string, string[]];
+      expect(sql).toContain('INSERT INTO "issue_counters"');
+      expect(sql).toContain('ON CONFLICT ("workspaceId")');
+      expect(sql).toContain('RETURNING "lastNo"');
+      expect(params).toEqual([WS]);
+    });
 
-      jest
-        .spyOn(repository, 'findOne')
-        .mockResolvedValue(existingIssue as Issue);
-
-      const result = await service.findExistingOpenIssueBySource(
-        'vuln-123',
-        IssueSourceType.VULNERABILITY,
-        mockIssue.workspaceId,
+    it('numbers a new issue inside the transaction and links its resources', async () => {
+      const { service, manager, insert, events, links } = setup();
+      await service.createIssue(
+        { title: 'Patch', links: [LINK_A, LINK_A, LINK_V] },
+        WS,
+        USER,
       );
-
-      expect(result).toEqual(existingIssue);
-      expect(repository.findOne).toHaveBeenCalledWith({
-        where: {
-          sourceId: 'vuln-123',
-          sourceType: IssueSourceType.VULNERABILITY,
-          workspaceId: mockIssue.workspaceId,
+      expect(links.assertInWorkspace).toHaveBeenCalledWith([LINK_A, LINK_V], WS);
+      expect(manager.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          no: 8,
+          type: IssueType.TASK,
+          priority: IssuePriority.P3,
           status: IssueStatus.OPEN,
-        },
-      });
+          workspaceId: WS,
+          createdById: USER,
+        }),
+      );
+      expect(insert.calls.values).toHaveBeenCalledWith([
+        expect.objectContaining({ issueId: 'i-new', ...LINK_A, addedById: USER }),
+        expect.objectContaining({ issueId: 'i-new', ...LINK_V, addedById: USER }),
+      ]);
+      expect(insert.calls.orIgnore).toHaveBeenCalled();
+      expect(published(events)).toEqual(['issue.created']);
     });
 
-    it('should return null when no existing open issue found', async () => {
-      jest.spyOn(repository, 'findOne').mockResolvedValue(null);
-
-      const result = await service.findExistingOpenIssueBySource(
-        'vuln-456',
-        IssueSourceType.VULNERABILITY,
-        mockIssue.workspaceId,
-      );
-
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('createIssue', () => {
-    it('should return existing open issue instead of creating duplicate', async () => {
-      const createIssueDto = {
-        title: 'Test Issue',
-        description: 'Test Description',
-        sourceId: 'vuln-123',
-        sourceType: IssueSourceType.VULNERABILITY,
-      };
-      const userId = '123e4567-e89b-12d3-a456-426614174002';
-      const workspaceId = '123e4567-e89b-12d3-a456-426614174001';
-
-      const existingIssue = {
-        ...mockIssue,
-        sourceId: 'vuln-123',
-        sourceType: IssueSourceType.VULNERABILITY,
-      };
-
-      // First call: check for existing issue → returns existing
-      // Second call (inside timeout fallback): also returns existing
-      jest
-        .spyOn(repository, 'findOne')
-        .mockResolvedValue(existingIssue as Issue);
-
-      const result = await service.createIssue(
-        createIssueDto,
-        workspaceId,
-        userId,
-      );
-
-      expect(result).toEqual(existingIssue);
-      // Queue add should NOT be called since we short-circuit
+    it('refuses links to resources outside the workspace before writing', async () => {
+      const { service, links, dataSource } = setup();
+      links.assertInWorkspace.mockRejectedValue(new NotFoundException());
+      await expect(
+        service.createIssue({ title: 'x', links: [LINK_V] }, WS, USER),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(dataSource.transaction).not.toHaveBeenCalled();
     });
 
-    it('should create a new issue when no duplicate exists', async () => {
-      const createIssueDto = {
-        title: 'Test Issue',
-        description: 'Test Description',
-      };
-      const userId = '123e4567-e89b-12d3-a456-426614174002';
-      const workspaceId = '123e4567-e89b-12d3-a456-426614174001';
-
-      jest.spyOn(repository, 'findOne').mockImplementation((options: any) => {
-        if (options.where && options.where.id) {
-          return Promise.resolve(mockIssue as Issue);
-        }
-        return Promise.resolve(null);
-      });
-
-      const result = await service.createIssue(
-        createIssueDto,
-        workspaceId,
-        userId,
-      );
-      expect(result).toEqual(mockIssue);
-    });
-
-    it('should create a new issue with tags', async () => {
-      const createIssueDto = {
-        title: 'Test Issue',
-        description: 'Test Description',
-        tags: ['tag1', 'tag2', 'tag3'],
-      };
-      const userId = '123e4567-e89b-12d3-a456-42661417402';
-      const workspaceId = '123e4567-e89b-12d3-a456-426614174001';
-
-      const mockIssueWithTags = {
-        ...mockIssue,
-        tags: ['tag1', 'tag2', 'tag3'],
-      };
-
-      jest.spyOn(repository, 'findOne').mockImplementation((options: any) => {
-        if (options.where && options.where.id) {
-          return Promise.resolve(mockIssueWithTags as Issue);
-        }
-        return Promise.resolve(null);
-      });
-
-      const result = await service.createIssue(
-        createIssueDto,
-        workspaceId,
-        userId,
-      );
-      expect(result).toEqual(mockIssueWithTags);
-      expect(result.tags).toEqual(['tag1', 'tag2', 'tag3']);
-    });
-
-    it('should create a new issue when source has no match', async () => {
-      const createIssueDto = {
-        title: 'Test Issue',
-        description: 'Test Description',
-        sourceId: 'vuln-new',
-        sourceType: IssueSourceType.VULNERABILITY,
-      };
-      const userId = '123e4567-e89b-12d3-a456-426614174002';
-      const workspaceId = '123e4567-e89b-12d3-a456-426614174001';
-
-      jest.spyOn(repository, 'findOne').mockImplementation((options: any) => {
-        if (options.where && options.where.id) {
-          return Promise.resolve(mockIssue as Issue);
-        }
-        return Promise.resolve(null);
-      });
-
-      const result = await service.createIssue(
-        createIssueDto,
-        workspaceId,
-        userId,
-      );
-      expect(result).toEqual(mockIssue);
+    it('refuses an assignee who is not a member', async () => {
+      const { service, dataSource } = setup();
+      dataSource.query.mockResolvedValue([]);
+      await expect(
+        service.createIssue({ title: 'x', assigneeId: 'stranger' }, WS, USER),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(dataSource.transaction).not.toHaveBeenCalled();
     });
   });
 
   describe('getMany', () => {
-    it('should return paginated issues', async () => {
-      const query = {
-        limit: 10,
-        page: 1,
-        sortOrder: SortOrder.ASC,
-        sortBy: 'createdAt',
-      };
-      const workspaceId = '123e4567-e89b-12d3-a456-426614174001';
-      const mockIssues = [mockIssue];
-
-      const queryBuilder: any = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
-        getManyAndCount: jest.fn().mockResolvedValue([mockIssues, 1]),
-      };
-
-      repository.createQueryBuilder = jest.fn().mockReturnValue(queryBuilder);
-
-      const result = await service.getMany(query, workspaceId);
-      expect(result.data).toEqual(mockIssues);
-      expect(result.total).toBe(1);
+    it('applies every filter and returns progress, link count and assignee', async () => {
+      const { service, list, current } = setup();
+      Object.assign(current, {
+        linkCount: 3,
+        assignee: { id: 'u2', name: 'Bob', image: null, email: 'hidden' },
+      });
+      const result = await service.getMany(
+        {
+          page: 1,
+          limit: 10,
+          status: [IssueStatus.OPEN],
+          type: [IssueType.TASK],
+          priority: [IssuePriority.P1],
+          assigneeId: 'u2',
+          mine: true,
+          overdue: true,
+          resourceType: IssueLinkResourceType.VULNERABILITY,
+          resourceId: 'v-1',
+          search: '#12',
+          sortBy: 'dueAt',
+          sortOrder: SortOrder.ASC,
+        },
+        WS,
+        USER,
+      );
+      const where = list.calls.andWhere.mock.calls.map((c: unknown[]) => c[0]);
+      expect(list.calls.where).toHaveBeenCalledWith(
+        'issue.workspaceId = :workspaceId',
+        { workspaceId: WS },
+      );
+      expect(where).toEqual(
+        expect.arrayContaining([
+          'issue.status IN (:...status)',
+          'issue.type IN (:...type)',
+          'issue.priority IN (:...priority)',
+          'issue.assigneeId = :assigneeId',
+          'issue.assigneeId = :me',
+          'issue.dueAt < now()',
+          'issue.status IN (:...active)',
+          expect.stringContaining('"issue_links" rl'),
+        ]),
+      );
+      expect(list.calls.orderBy).toHaveBeenCalledWith('issue.dueAt', 'ASC', 'NULLS LAST');
+      expect(result.data[0]).toEqual(
+        expect.objectContaining({
+          linkCount: 3,
+          progress: { done: 1, total: 2 },
+          assignee: { id: 'u2', name: 'Bob', image: null },
+        }),
+      );
     });
 
-    it('should filter issues by status', async () => {
-      const query = {
-        limit: 10,
-        page: 1,
-        sortOrder: SortOrder.ASC,
-        sortBy: 'createdAt',
-        status: [IssueStatus.OPEN],
-      };
-      const workspaceId = '123e4567-e89b-12d3-a456-426614174001';
-      const mockIssues = [mockIssue];
-
-      const queryBuilder: any = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
-        getManyAndCount: jest.fn().mockResolvedValue([mockIssues, 1]),
-      };
-
-      repository.createQueryBuilder = jest.fn().mockReturnValue(queryBuilder);
-
-      const result = await service.getMany(query, workspaceId);
-      expect(queryBuilder.andWhere).toHaveBeenCalledWith(
-        'issues.status IN (:...status)',
-        { status: [IssueStatus.OPEN] },
+    it('falls back to updatedAt DESC for an unknown sort column', async () => {
+      const { service, list } = setup();
+      await service.getMany(
+        { page: 1, limit: 10, sortBy: 'title', sortOrder: undefined },
+        WS,
       );
-      expect(result.data).toEqual(mockIssues);
+      expect(list.calls.orderBy).toHaveBeenCalledWith(
+        'issue.updatedAt',
+        'DESC',
+        'NULLS LAST',
+      );
     });
 
-    it('should filter issues by search term', async () => {
-      const query = {
-        limit: 10,
-        page: 1,
-        sortOrder: SortOrder.ASC,
-        sortBy: 'createdAt',
-        search: 'test search',
-      };
-      const workspaceId = '123e4567-e89b-12d3-a456-426614174001';
-      const mockIssues = [mockIssue];
-
-      const queryBuilder: any = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
-        getManyAndCount: jest.fn().mockResolvedValue([mockIssues, 1]),
-      };
-
-      repository.createQueryBuilder = jest.fn().mockReturnValue(queryBuilder);
-
-      const result = await service.getMany(query, workspaceId);
-      expect(queryBuilder.andWhere).toHaveBeenCalledWith(
-        '(issues.title ILIKE :search OR issues.description ILIKE :search)',
-        { search: '%test search%' },
-      );
-      expect(result.data).toEqual(mockIssues);
-    });
-
-    it('should filter issues by both status and search term', async () => {
-      const query = {
-        limit: 10,
-        page: 1,
-        sortOrder: SortOrder.ASC,
-        sortBy: 'createdAt',
-        status: [IssueStatus.OPEN, IssueStatus.CLOSED],
-        search: 'test search',
-      };
-      const workspaceId = '123e4567-e89b-12d3-a456-426614174001';
-      const mockIssues = [mockIssue];
-
-      const queryBuilder: any = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
-        getManyAndCount: jest.fn().mockResolvedValue([mockIssues, 1]),
-      };
-
-      repository.createQueryBuilder = jest.fn().mockReturnValue(queryBuilder);
-
-      const result = await service.getMany(query, workspaceId);
-      expect(queryBuilder.andWhere).toHaveBeenCalledWith(
-        'issues.status IN (:...status)',
-        { status: [IssueStatus.OPEN, IssueStatus.CLOSED] },
-      );
-      expect(queryBuilder.andWhere).toHaveBeenCalledWith(
-        '(issues.title ILIKE :search OR issues.description ILIKE :search)',
-        { search: '%test search%' },
-      );
-      expect(result.data).toEqual(mockIssues);
+    it('needs resourceType and resourceId together', async () => {
+      const { service } = setup();
+      await expect(
+        service.getMany({ page: 1, limit: 10, resourceId: 'v-1' } as never, WS),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 
   describe('getById', () => {
-    it('should return an issue by id when workspaceId matches', async () => {
-      jest.spyOn(repository, 'findOne').mockResolvedValue(mockIssue as Issue);
-
-      const result = await service.getById(mockIssue.id, mockIssue.workspaceId);
-      expect(result).toEqual(mockIssue);
+    it('404s outside the workspace', async () => {
+      const { service, issuesRepository } = setup();
+      issuesRepository.findOne.mockResolvedValue(null);
+      await expect(service.getById('i-1', 'ws-2')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(issuesRepository.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'i-1', workspaceId: 'ws-2' } }),
+      );
     });
 
-    it('should throw ForbiddenException when workspaceId does not match', async () => {
-      jest.spyOn(repository, 'findOne').mockResolvedValue(mockIssue as Issue);
-
-      await expect(
-        service.getById(mockIssue.id, 'different-workspace-id'),
-      ).rejects.toThrow(ForbiddenException);
-    });
-
-    it('should throw NotFoundException if issue not found', async () => {
-      jest.spyOn(repository, 'findOne').mockResolvedValue(null);
-
-      await expect(
-        service.getById('non-existent', mockIssue.workspaceId),
-      ).rejects.toThrow(NotFoundException);
+    it('summarises every link', async () => {
+      const { service, current } = setup();
+      current.links = [
+        { id: 'l-1', ...LINK_V, createdAt: new Date() },
+      ] as Issue['links'];
+      const detail = await service.getById('i-1', WS);
+      expect(detail.links).toEqual([
+        expect.objectContaining({ id: 'l-1', ...LINK_V, resource: { value: 'x' } }),
+      ]);
+      expect(detail.progress).toEqual({ done: 1, total: 2 });
     });
   });
 
   describe('update', () => {
-    it('should update issue title when user is the creator', async () => {
-      const updateIssueDto = { title: 'Updated Title' };
-      const userId = '123e4567-e89b-12d3-a456-426614174002';
-
-      jest.spyOn(repository, 'findOne').mockResolvedValue(mockIssue as Issue);
-      jest.spyOn(repository, 'save').mockResolvedValue({
-        ...mockIssue,
-        title: 'Updated Title',
-      } as Issue);
-
-      const result = await service.update(
-        '123e4567-e89b-12d3-a456-426614174000',
-        updateIssueDto,
-        userId,
-        mockIssue.workspaceId,
+    it('lets any member change fields and publishes updated + assigned', async () => {
+      const { service, issuesRepository, events, current } = setup();
+      current.createdById = 'someone-else';
+      await service.update(
+        'i-1',
+        { title: 'New', priority: IssuePriority.P1, assigneeId: 'u2' },
+        USER,
+        WS,
       );
-      expect(result.title).toBe('Updated Title');
+      expect(issuesRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'New',
+          priority: IssuePriority.P1,
+          assigneeId: 'u2',
+        }),
+      );
+      expect(published(events)).toEqual(['issue.updated', 'issue.assigned']);
     });
 
-    it('should update issue tags when user is the creator', async () => {
-      const updateIssueDto = { tags: ['new-tag1', 'new-tag2'] };
-      const userId = '123e4567-e89b-12d3-a456-426614174002';
-
-      const issueWithTags = {
-        ...mockIssue,
-        tags: ['existing-tag'],
-      };
-
-      jest
-        .spyOn(repository, 'findOne')
-        .mockResolvedValue(issueWithTags as Issue);
-      jest.spyOn(repository, 'save').mockResolvedValue({
-        ...issueWithTags,
-        tags: ['new-tag1', 'new-tag2'],
-      } as Issue);
-
-      const result = await service.update(
-        '123e4567-e89b-12d3-a456-426614174000',
-        updateIssueDto,
-        userId,
-        mockIssue.workspaceId,
-      );
-      expect(result.tags).toEqual(['new-tag1', 'new-tag2']);
-    });
-
-    it('should update both title and tags when user is the creator', async () => {
-      const updateIssueDto = {
-        title: 'Updated Title',
-        tags: ['updated-tag1', 'updated-tag2'],
-      };
-      const userId = '123e4567-e89b-12d3-a456-426614174002';
-
-      const issueWithTags = {
-        ...mockIssue,
-        tags: ['existing-tag'],
-      };
-
-      jest
-        .spyOn(repository, 'findOne')
-        .mockResolvedValue(issueWithTags as Issue);
-      jest.spyOn(repository, 'save').mockResolvedValue({
-        ...issueWithTags,
-        title: 'Updated Title',
-        tags: ['updated-tag1', 'updated-tag2'],
-      } as Issue);
-
-      const result = await service.update(
-        '123e4567-e89b-12d3-a456-426614174000',
-        updateIssueDto,
-        userId,
-        mockIssue.workspaceId,
-      );
-      expect(result.title).toBe('Updated Title');
-      expect(result.tags).toEqual(['updated-tag1', 'updated-tag2']);
-    });
-
-    it('should throw ForbiddenException when user is not the creator', async () => {
-      const updateIssueDto = { title: 'Updated Title' };
-      const userId = 'different-user';
-
-      jest.spyOn(repository, 'findOne').mockResolvedValue(mockIssue as Issue);
-
+    it('refuses an assignee outside the workspace', async () => {
+      const { service, dataSource, issuesRepository } = setup();
+      dataSource.query.mockResolvedValue([]);
       await expect(
-        service.update(
-          '123e4567-e89b-12d3-a456-426614174000',
-          updateIssueDto,
-          userId,
-          mockIssue.workspaceId,
-        ),
-      ).rejects.toThrow(ForbiddenException);
+        service.update('i-1', { assigneeId: 'stranger' }, USER, WS),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(issuesRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when nothing changes', async () => {
+      const { service, issuesRepository, events } = setup();
+      await service.update('i-1', { title: 'SQLi' }, USER, WS);
+      expect(issuesRepository.save).not.toHaveBeenCalled();
+      expect(events.publish).not.toHaveBeenCalled();
     });
   });
 
   describe('changeStatus', () => {
-    it('should change issue status when user is the creator', async () => {
-      const changeIssueStatusDto = { status: IssueStatus.CLOSED };
-      const userId = '123e4567-e89b-12d3-a456-426614174002';
-
-      jest.spyOn(repository, 'findOne').mockResolvedValue(mockIssue as Issue);
-      jest.spyOn(repository, 'save').mockResolvedValue({
-        ...mockIssue,
-        status: IssueStatus.CLOSED,
-      } as Issue);
-
-      const result = await service.changeStatus(
-        '123e4567-e89b-12d3-a456-426614174000',
-        changeIssueStatusDto,
-        userId,
-        mockIssue.workspaceId,
-      );
-      expect(result.status).toBe(IssueStatus.CLOSED);
-    });
-
-    it('should throw ForbiddenException when user is not the creator', async () => {
-      const changeIssueStatusDto = { status: IssueStatus.CLOSED };
-      const userId = 'different-user';
-
-      jest.spyOn(repository, 'findOne').mockResolvedValue(mockIssue as Issue);
-
+    it('needs a resolution to resolve or close', async () => {
+      const { service } = setup();
       await expect(
-        service.changeStatus(
-          '123e4567-e89b-12d3-a456-426614174000',
-          changeIssueStatusDto,
-          userId,
-          mockIssue.workspaceId,
-        ),
-      ).rejects.toThrow(ForbiddenException);
+        service.changeStatus('i-1', { status: IssueStatus.RESOLVED }, USER, WS),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(
+        service.changeStatus('i-1', { status: IssueStatus.CLOSED }, USER, WS),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('should trigger handler when status changes and source exists', async () => {
-      const changeIssueStatusDto = { status: IssueStatus.CLOSED };
-      const userId = '123e4567-e89b-12d3-a456-426614174002';
-      const issueWithSource = {
-        ...mockIssue,
-        sourceType: IssueSourceType.VULNERABILITY,
-        sourceId: '123e4567-e89b-12d3-a456-426614174004',
-        status: IssueStatus.OPEN,
-      };
-
-      jest
-        .spyOn(repository, 'findOne')
-        .mockResolvedValue(issueWithSource as Issue);
-      jest.spyOn(repository, 'save').mockResolvedValue({
-        ...issueWithSource,
-        status: IssueStatus.CLOSED,
-      } as Issue);
-
+    it('resolves with a resolution, a system comment and issue.resolved', async () => {
+      const { service, manager, commentRepo, events } = setup();
       await service.changeStatus(
-        '123e4567-e89b-12d3-a456-426614174000',
-        changeIssueStatusDto,
-        userId,
-        issueWithSource.workspaceId,
+        'i-1',
+        { status: IssueStatus.RESOLVED, resolution: IssueResolution.FIXED },
+        USER,
+        WS,
       );
-
-      // expect(vulnerabilityHandler.onStatusChange).toHaveBeenCalledWith(
-      //   '123e4567-e89b-12d3-a456-426614174004',
-      //   IssueStatus.CLOSED,
-      // );
-    });
-  });
-
-  describe('delete', () => {
-    it('should delete an issue', async () => {
-      jest.spyOn(repository, 'findOne').mockResolvedValue(mockIssue as Issue);
-      jest.spyOn(repository, 'remove').mockResolvedValue(mockIssue as Issue);
-
-      const result = await service.delete('1', mockIssue.workspaceId);
-      expect(result.message).toBe('Issue deleted successfully');
-    });
-  });
-
-  describe('createComment', () => {
-    it('should create a comment for an issue', async () => {
-      const createCommentDto = { content: 'Test Comment' };
-      const issueId = '1';
-      const userId = 'user-1';
-
-      // createComment loads the parent issue first to enforce the tenant boundary
-      jest.spyOn(repository, 'findOne').mockResolvedValue(mockIssue as Issue);
-      jest
-        .spyOn(commentRepository, 'create')
-        .mockReturnValue(mockIssueComment as IssueComment);
-      jest
-        .spyOn(commentRepository, 'save')
-        .mockResolvedValue(mockIssueComment as IssueComment);
-
-      const result = await service.createComment(
-        createCommentDto,
-        issueId,
-        userId,
-        mockIssue.workspaceId,
+      expect(manager.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: IssueStatus.RESOLVED,
+          resolution: IssueResolution.FIXED,
+          resolvedAt: expect.any(Date),
+        }),
       );
-      expect(result).toEqual(mockIssueComment);
+      expect(commentRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          issueId: 'i-1',
+          type: IssueCommentType.CLOSED,
+          createdById: USER,
+          isCanEdit: false,
+          isCanDelete: false,
+          content: expect.stringContaining('open to resolved (fixed)'),
+        }),
+      );
+      expect(published(events)).toEqual(['issue.resolved']);
     });
 
-    it('should refuse to comment on an issue in another workspace', async () => {
-      jest.spyOn(repository, 'findOne').mockResolvedValue(mockIssue as Issue);
-      jest.spyOn(commentRepository, 'save').mockResolvedValue(
-        mockIssueComment as IssueComment,
+    it('reopening clears the resolution and publishes issue.opened', async () => {
+      const { service, manager, events, current } = setup();
+      Object.assign(current, {
+        status: IssueStatus.CLOSED,
+        resolution: IssueResolution.WONT_FIX,
+        resolvedAt: new Date(),
+      });
+      await service.changeStatus('i-1', { status: IssueStatus.OPEN }, USER, WS);
+      expect(manager.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: IssueStatus.OPEN,
+          resolution: null,
+          resolvedAt: null,
+        }),
       );
+      expect(published(events)).toEqual(['issue.opened']);
+    });
 
+    it('moving to in progress publishes issue.updated', async () => {
+      const { service, events } = setup();
+      await service.changeStatus('i-1', { status: IssueStatus.IN_PROGRESS }, USER, WS);
+      expect(published(events)).toEqual(['issue.updated']);
+    });
+
+    it('is a no-op for the current status', async () => {
+      const { service, dataSource, events } = setup();
+      await service.changeStatus('i-1', { status: IssueStatus.OPEN }, USER, WS);
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+      expect(events.publish).not.toHaveBeenCalled();
+    });
+
+    it('reports a reopen that collides with another open issue of the group', async () => {
+      const { service, dataSource, events, current } = setup();
+      Object.assign(current, {
+        status: IssueStatus.RESOLVED,
+        resolution: IssueResolution.FIXED,
+        groupKey: 'vuln:sqli',
+      });
+      dataSource.transaction.mockRejectedValue(uniqueViolation());
       await expect(
-        service.createComment(
-          { content: 'x' },
-          mockIssue.id,
-          'user-1',
-          'a-different-workspace',
-        ),
-      ).rejects.toThrow(ForbiddenException);
-      expect(commentRepository.save).not.toHaveBeenCalled();
+        service.changeStatus('i-1', { status: IssueStatus.OPEN }, USER, WS),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(events.publish).not.toHaveBeenCalled();
     });
   });
 
-  describe('getCommentsByIssueId', () => {
-    it('should return paginated comments for an issue', async () => {
-      const issueId = '1';
-      const query = {
-        limit: 10,
-        page: 1,
-        sortBy: 'createdAt',
-        sortOrder: SortOrder.ASC,
-      };
-
-      jest.spyOn(commentRepository, 'createQueryBuilder').mockReturnValue({
-        withDeleted: jest.fn().mockReturnThis(),
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        leftJoin: jest.fn().mockReturnThis(),
-        innerJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
-        getManyAndCount: jest.fn().mockResolvedValue([[mockIssueComment], 1]),
-      } as any);
-
-      const result = await service.getCommentsByIssueId(
-        issueId,
-        query,
-        mockIssue.workspaceId,
-      );
-      expect(result.data.length).toBe(1);
+  describe('links', () => {
+    it('validates, de-duplicates and publishes issue.link.added', async () => {
+      const { service, links, insert, events } = setup();
+      await service.addLinks('i-1', { links: [LINK_V, LINK_V] }, USER, WS);
+      expect(links.assertInWorkspace).toHaveBeenCalledWith([LINK_V], WS);
+      expect(insert.calls.values).toHaveBeenCalledWith([
+        expect.objectContaining(LINK_V),
+      ]);
+      expect(published(events)).toEqual(['issue.link.added']);
     });
 
-    it('should scope the comment query to the caller workspace', async () => {
-      const andWhere = jest.fn().mockReturnThis();
-      jest.spyOn(commentRepository, 'createQueryBuilder').mockReturnValue({
-        withDeleted: jest.fn().mockReturnThis(),
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        leftJoin: jest.fn().mockReturnThis(),
-        innerJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere,
-        select: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
-        getManyAndCount: jest.fn().mockResolvedValue([[mockIssueComment], 1]),
-      } as any);
-
-      await service.getCommentsByIssueId(
-        mockIssue.id,
-        { limit: 10, page: 1 },
-        mockIssue.workspaceId,
-      );
-
-      // The tenant predicate must be present — without it the endpoint reads
-      // every issue's comments platform-wide.
-      expect(andWhere).toHaveBeenCalledWith(
-        'issue.workspaceId = :workspaceId',
-        { workspaceId: mockIssue.workspaceId },
-      );
-    });
-  });
-
-  describe('updateCommentById', () => {
-    it('should update a comment when user is the creator', async () => {
-      const updateCommentDto = { content: 'Updated Comment' };
-      const userId = 'user-1';
-
-      jest.spyOn(commentRepository, 'findOne').mockResolvedValue({
-        ...mockIssueComment,
-        createdBy: { id: userId },
-      } as IssueComment);
-      jest.spyOn(commentRepository, 'save').mockResolvedValue({
-        ...mockIssueComment,
-        content: 'Updated Comment',
-      } as IssueComment);
-
-      const result = await service.updateCommentById(
-        '1',
-        updateCommentDto,
-        userId,
-        mockIssue.workspaceId,
-      );
-      expect(result.content).toBe('Updated Comment');
+    it('publishes nothing when every link already existed', async () => {
+      const { service, insert, events } = setup();
+      (insert.qb.execute as jest.Mock).mockResolvedValue({ raw: [] });
+      await service.addLinks('i-1', { links: [LINK_V] }, USER, WS);
+      expect(events.publish).not.toHaveBeenCalled();
     });
 
-    it('should throw ForbiddenException when user is not the creator of the comment', async () => {
-      const updateCommentDto = { content: 'Updated Comment' };
-      const userId = 'different-user';
-
-      jest.spyOn(commentRepository, 'findOne').mockResolvedValue({
-        ...mockIssueComment,
-        createdBy: { id: 'another-user' },
-      } as IssueComment);
-
+    it('removes a link of the issue only', async () => {
+      const { service, linksRepository, events } = setup();
+      linksRepository.findOne.mockResolvedValue(null);
       await expect(
-        service.updateCommentById(
-          '1',
-          updateCommentDto,
-          userId,
-          mockIssue.workspaceId,
-        ),
-      ).rejects.toThrow(ForbiddenException);
+        service.removeLink('i-1', 'l-x', USER, WS),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(linksRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 'l-x', issueId: 'i-1' },
+      });
+
+      linksRepository.findOne.mockResolvedValue({ id: 'l-1', ...LINK_V });
+      await service.removeLink('i-1', 'l-1', USER, WS);
+      expect(linksRepository.delete).toHaveBeenCalledWith({ id: 'l-1' });
+      expect(published(events)).toEqual(['issue.link.removed']);
     });
   });
 
-  describe('deleteCommentById', () => {
-    it('should delete a comment when user is the creator', async () => {
-      const userId = 'user-1';
-
-      jest.spyOn(commentRepository, 'findOne').mockResolvedValue({
-        ...mockIssueComment,
-        createdBy: { id: userId },
-      } as IssueComment);
-      jest.spyOn(commentRepository, 'softDelete').mockResolvedValue({} as any);
-
-      const result = await service.deleteCommentById(
-        '1',
-        userId,
-        mockIssue.workspaceId,
-      );
-      expect(result.message).toBe('Comment deleted successfully');
-    });
-
-    it('should throw error when user is not the creator of the comment', async () => {
-      const userId = 'different-user';
-
-      jest.spyOn(commentRepository, 'findOne').mockResolvedValue({
-        ...mockIssueComment,
-        createdBy: { id: 'another-user' },
-      } as IssueComment);
-
-      await expect(
-        service.deleteCommentById('1', userId, mockIssue.workspaceId),
-      ).rejects.toThrow(ForbiddenException);
-    });
+  it('deletes an issue of the workspace and publishes issue.deleted', async () => {
+    const { service, issuesRepository, events } = setup();
+    await service.delete('i-1', USER, WS);
+    expect(issuesRepository.delete).toHaveBeenCalledWith({ id: 'i-1' });
+    expect(published(events)).toEqual(['issue.deleted']);
   });
 });

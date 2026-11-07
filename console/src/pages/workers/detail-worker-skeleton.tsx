@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
  * connected-tools graph. */
 export function WorkerDetailSkeleton() {
   return (
-    <Page isShowButtonGoBack permission="worker.read">
+    <Page permission="worker.read">
       <div className="space-y-6">
         <Card className="gap-0 overflow-hidden py-0">
           <div className="flex items-center gap-4 border-b border-border/60 p-6">

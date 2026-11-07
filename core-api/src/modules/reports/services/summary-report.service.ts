@@ -1,13 +1,17 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Brackets, Repository } from 'typeorm';
 import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.entity';
 import { Target } from '@/modules/targets/entities/target.entity';
 import { AssetService } from '@/modules/assets/entities/asset-services.entity';
 import { AssetTag } from '@/modules/assets/entities/asset-tags.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { StatisticService } from '@/modules/statistic/statistic.service';
-import { openVulnerabilityCondition } from '@/modules/vulnerabilities/open-vulnerability';
+import {
+  approvedVulnerabilityCondition,
+  fixedVulnerabilityCondition,
+  openVulnerabilityCondition,
+} from '@/modules/vulnerabilities/open-vulnerability';
 import { Severity, VulnerabilityAnalyzeStatus, JobStatus } from '@/common/enums/enum';
 import type { TargetType } from '@/modules/targets/entities/target.entity';
 import type { ReportData } from '../types/report-data.type';
@@ -275,10 +279,20 @@ export class SummaryReportService {
       .leftJoin('target.workspace', 'workspace')
       .leftJoin('v.vulnerabilityDismissal', 'dismissal')
       .where('workspace.id = :workspaceId', { workspaceId })
-      .andWhere('v.isArchived = :isArchived', { isArchived: false })
-      .andWhere('dismissal.id IS NOT NULL')
-      .andWhere('dismissal.createdAt >= :startDate', { startDate })
-      .andWhere('dismissal.createdAt <= :endDate', { endDate })
+      .andWhere(approvedVulnerabilityCondition('v'))
+      // Resolved in the period: dismissed then, or fixed (a covering scan
+      // stopped reporting it) then.
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where(
+            'dismissal.id IS NOT NULL AND dismissal.createdAt >= :startDate AND dismissal.createdAt <= :endDate',
+            { startDate, endDate },
+          ).orWhere(
+            `(${fixedVulnerabilityCondition('v')}) AND v.fixedAt >= :startDate AND v.fixedAt <= :endDate`,
+            { startDate, endDate },
+          );
+        }),
+      )
       .getCount();
   }
 
@@ -336,6 +350,7 @@ export class SummaryReportService {
       .leftJoin('target.workspace', 'workspace')
       .leftJoinAndSelect('v.vulnerabilityDismissal', 'dismissal')
       .where('workspace.id = :workspaceId', { workspaceId })
+      .andWhere(approvedVulnerabilityCondition('v'))
       .andWhere('dismissal.id IS NOT NULL')
       .orderBy('dismissal.createdAt', 'DESC')
       .limit(limit);
@@ -354,32 +369,33 @@ export class SummaryReportService {
 
     const dismissedVulns = await dismissedQb.getMany();
 
-    const archivedQb = this.vulnRepo
+    // Fixed: a covering scan no longer reports them.
+    const fixedQb = this.vulnRepo
       .createQueryBuilder('v')
       .leftJoinAndSelect('v.asset', 'asset')
       .leftJoin('asset.target', 'target')
       .leftJoin('target.workspace', 'workspace')
       .where('workspace.id = :workspaceId', { workspaceId })
-      .andWhere('v.isArchived = :isArchived', { isArchived: true })
-      .orderBy('v.updatedAt', 'DESC')
+      .andWhere(fixedVulnerabilityCondition('v'))
+      .orderBy('v.fixedAt', 'DESC', 'NULLS LAST')
       .limit(limit);
 
     if (options?.startDate) {
-      archivedQb.andWhere('v.updatedAt >= :startDate', { startDate: options.startDate });
+      fixedQb.andWhere('v.fixedAt >= :startDate', { startDate: options.startDate });
     }
     if (options?.endDate) {
-      archivedQb.andWhere('v.updatedAt <= :endDate', { endDate: options.endDate });
+      fixedQb.andWhere('v.fixedAt <= :endDate', { endDate: options.endDate });
     }
     if (options?.targetIds?.length) {
-      archivedQb.andWhere('target.id IN (:...targetIds)', {
+      fixedQb.andWhere('target.id IN (:...targetIds)', {
         targetIds: options.targetIds,
       });
     }
 
-    const archivedVulns = await archivedQb.getMany();
+    const fixedVulns = await fixedQb.getMany();
 
     const allVulns = new Map<string, Vulnerability>();
-    for (const v of [...dismissedVulns, ...archivedVulns]) {
+    for (const v of [...dismissedVulns, ...fixedVulns]) {
       if (!allVulns.has(v.id)) {
         allVulns.set(v.id, v);
       }
@@ -389,7 +405,8 @@ export class SummaryReportService {
     return Array.from(allVulns.values())
       .slice(0, limit)
       .map((v) => {
-        const resolvedDate = v.vulnerabilityDismissal?.createdAt || v.updatedAt;
+        const resolvedDate =
+          v.vulnerabilityDismissal?.createdAt || v.fixedAt || v.updatedAt;
         const daysOpen = Math.max(
           0,
           Math.floor((now.getTime() - v.createdAt.getTime()) / (1000 * 60 * 60 * 24)),
@@ -498,7 +515,7 @@ export class SummaryReportService {
       )
       .addSelect('COUNT(v.id)', 'total')
       .where('workspace.id = :workspaceId', { workspaceId })
-      .andWhere('v.isArchived = :isArchived', { isArchived: false })
+      .andWhere(openVulnerabilityCondition('v'))
       .groupBy('t.id')
       .addGroupBy('t.value')
       .addGroupBy('t.type')
@@ -566,7 +583,8 @@ export class SummaryReportService {
       .createQueryBuilder('t')
       .leftJoin('t.workspace', 'workspace')
       .leftJoin('t.assets', 'asset')
-      .leftJoin('asset.vulnerabilities', 'v')
+      // Open findings only, in the join so targets without any still list
+      .leftJoin('asset.vulnerabilities', 'v', openVulnerabilityCondition('v'))
       .select('t.value', 'identifier')
       .addSelect('t.createdAt', 'discovered')
       .addSelect('COUNT(v.id)', 'vulnCount')
@@ -599,7 +617,11 @@ export class SummaryReportService {
       .leftJoin('as.asset', 'asset')
       .leftJoin('asset.target', 'target')
       .leftJoin('target.workspace', 'workspace')
-      .leftJoin('asset.vulnerabilities', 'v', 'v.ports @> ARRAY["as".port::text]')
+      .leftJoin(
+        'asset.vulnerabilities',
+        'v',
+        `v.ports @> ARRAY["as".port::text] AND ${openVulnerabilityCondition('v')}`,
+      )
       .select('as.port', 'port')
       .addSelect('as.value', 'service')
       .addSelect('as.createdAt', 'discovered')

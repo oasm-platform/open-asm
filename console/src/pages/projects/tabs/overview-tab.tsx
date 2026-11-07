@@ -8,7 +8,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { formatCronLabel, getLocalTimezone, getNextRun } from '@/lib/cron-schedule';
+import {
+  formatCronLabel,
+  getLocalTimezone,
+  getNextRun,
+} from '@/lib/cron-schedule';
 import { cn } from '@/lib/utils';
 import type { ProjectDetailSearch } from '@/routes/_authed/projects/$id/$tab';
 import {
@@ -81,6 +85,7 @@ const DISMISS_REASONS: Record<DismissReason, string> = {
   [DismissReason.false_positive]: 'false positive',
   [DismissReason.used_in_test]: 'used in tests',
   [DismissReason.wont_fix]: "won't fix",
+  [DismissReason.risk_accepted]: 'risk accepted',
 };
 
 const WORKFLOW_CHANGES: Partial<Record<ProjectChange, string>> = {
@@ -108,7 +113,10 @@ function Kpi({
 }) {
   return (
     <Card
-      className={cn('gap-2', onClick && 'cursor-pointer transition-colors hover:bg-accent/70')}
+      className={cn(
+        'gap-2',
+        onClick && 'cursor-pointer transition-colors hover:bg-accent/70',
+      )}
       onClick={onClick}
     >
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -161,7 +169,10 @@ const WeeklyChart = memo(function WeeklyChart({
           <div className="relative grid flex-1 grid-cols-8 gap-2">
             <div className="pointer-events-none absolute inset-x-0 top-0 bottom-5 flex flex-col justify-between">
               {ticks.map((tick) => (
-                <span key={tick} className="border-t border-dashed border-border" />
+                <span
+                  key={tick}
+                  className="border-t border-dashed border-border"
+                />
               ))}
             </div>
             {weeks.map((week, i) => (
@@ -192,10 +203,14 @@ const WeeklyChart = memo(function WeeklyChart({
                   </TooltipTrigger>
                   <TooltipContent side="top">
                     <p className="font-medium">
-                      Week of {dayjs(week.week).format('DD MMM YYYY')} · {totals[i]} new
+                      Week of {dayjs(week.week).format('DD MMM YYYY')} ·{' '}
+                      {totals[i]} new
                     </p>
                     {SEVERITIES.map((s) => (
-                      <p key={s.key} className="flex items-center gap-1.5 tabular-nums">
+                      <p
+                        key={s.key}
+                        className="flex items-center gap-1.5 tabular-nums"
+                      >
                         <span className={cn('size-2 rounded-sm', s.bar)} />
                         {s.label}: {week[s.key]}
                       </p>
@@ -237,7 +252,9 @@ const WeeklyChart = memo(function WeeklyChart({
 
 /** " by Name" after a change someone made. */
 function By({ name }: { name?: string }) {
-  return name ? <span className="text-muted-foreground"> by {name}</span> : null;
+  return name ? (
+    <span className="text-muted-foreground"> by {name}</span>
+  ) : null;
 }
 
 function TabLink({
@@ -260,7 +277,13 @@ function TabLink({
   );
 }
 
-function ActivityItem({ item, projectId }: { item: ProjectActivityDto; projectId: string }) {
+function ActivityItem({
+  item,
+  projectId,
+}: {
+  item: ProjectActivityDto;
+  projectId: string;
+}) {
   if (item.kind === ProjectActivityDtoKind.dismissed) {
     return (
       <span>
@@ -269,7 +292,10 @@ function ActivityItem({ item, projectId }: { item: ProjectActivityDto; projectId
         </TabLink>{' '}
         dismissed
         {item.reason && (
-          <span className="text-muted-foreground"> · {DISMISS_REASONS[item.reason]}</span>
+          <span className="text-muted-foreground">
+            {' '}
+            · {DISMISS_REASONS[item.reason]}
+          </span>
         )}
         <By name={item.actorName} />
       </span>
@@ -330,7 +356,9 @@ function ActivityItem({ item, projectId }: { item: ProjectActivityDto; projectId
         {runTriggerLabel(item.jobRunType, item.triggerEvent)} ·{' '}
         {assetCount(item.scopeSize ?? 0)}
       </span>
-      {item.runStatus && <JobStatusBadge status={item.runStatus as JobStatus} />}
+      {item.runStatus && (
+        <JobStatusBadge status={item.runStatus as JobStatus} />
+      )}
       {(item.newVulnerabilities ?? 0) > 0 && (
         <Link
           to="/projects/$id/$tab"
@@ -368,7 +396,8 @@ export function OverviewTab({
       replace: true,
     });
   const timezone = getLocalTimezone();
-  const { data: overview, isLoading } = useProjectsControllerGetOverview(projectId);
+  const { data: overview, isLoading } =
+    useProjectsControllerGetOverview(projectId);
   const { data: todo } = useProjectsControllerGetVulnerabilities(projectId, {
     page: 1,
     limit: LIST_LIMIT,
@@ -379,12 +408,20 @@ export function OverviewTab({
     let best: { at: Date; workflow: string; cron: string } | null = null;
     for (const binding of project.projectWorkflows ?? []) {
       for (const trigger of binding.triggers ?? []) {
-        if (trigger.type !== ProjectTriggerType.cron || !trigger.enabled || !trigger.cron) {
+        if (
+          trigger.type !== ProjectTriggerType.cron ||
+          !trigger.enabled ||
+          !trigger.cron
+        ) {
           continue;
         }
         const at = getNextRun(trigger.cron, timezone);
         if (at && (!best || at < best.at)) {
-          best = { at, workflow: workflowLabel(binding.workflow), cron: trigger.cron };
+          best = {
+            at,
+            workflow: workflowLabel(binding.workflow),
+            cron: trigger.cron,
+          };
         }
       }
     }
@@ -401,7 +438,10 @@ export function OverviewTab({
     return (
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="h-24 animate-pulse rounded-xl border bg-muted/40" />
+          <div
+            key={i}
+            className="h-24 animate-pulse rounded-xl border bg-muted/40"
+          />
         ))}
       </div>
     );
@@ -411,7 +451,11 @@ export function OverviewTab({
   const freshRuns = overview.newVulnerabilityRuns;
 
   const goTab = (tab: string, search?: Record<string, string>) =>
-    navigate({ to: '/projects/$id/$tab', params: { id: projectId, tab }, search });
+    navigate({
+      to: '/projects/$id/$tab',
+      params: { id: projectId, tab },
+      search,
+    });
 
   return (
     <div className="flex flex-col gap-4">
@@ -432,23 +476,32 @@ export function OverviewTab({
           icon={Bug}
           onClick={() => goTab('vulnerabilities')}
         >
-          <SeverityCounts counts={overview.openVulnerabilities} empty="Nothing open" />
+          <SeverityCounts
+            counts={overview.openVulnerabilities}
+            empty="Nothing open"
+          />
         </Kpi>
         <Kpi
           label="New in 7 days"
           value={`+${overview.newVulnerabilities}`}
           icon={TrendingUp}
           onClick={() =>
-            goTab('vulnerabilities', { provenance: VulnerabilityProvenance.new })
+            goTab('vulnerabilities', {
+              provenance: VulnerabilityProvenance.new,
+            })
           }
         >
           <span className="truncate text-sm text-muted-foreground">
             {freshRuns.length
               ? `from ${[
                   ...new Set(
-                    freshRuns.map((run) => workflowLabel({ name: run.workflowName })),
+                    freshRuns.map((run) =>
+                      workflowLabel({ name: run.workflowName }),
+                    ),
                   ),
-                ].join(', ')} · ${freshRuns.length} run${freshRuns.length === 1 ? '' : 's'}`
+                ].join(
+                  ', ',
+                )} · ${freshRuns.length} run${freshRuns.length === 1 ? '' : 's'}`
               : 'No new findings'}
           </span>
         </Kpi>
@@ -458,7 +511,10 @@ export function OverviewTab({
           icon={CalendarClock}
           onClick={() => goTab('schedule')}
         >
-          <span className="truncate text-sm text-muted-foreground" title={next?.cron}>
+          <span
+            className="truncate text-sm text-muted-foreground"
+            title={next?.cron}
+          >
             {next
               ? `${next.workflow} · ${formatCronLabel(next.cron, timezone) ?? next.cron}`
               : onEvents
@@ -487,7 +543,12 @@ export function OverviewTab({
               <ShieldAlert className="size-5 text-primary" />
               To fix
             </CardTitle>
-            <Button variant="link" size="sm" className="h-auto p-0" onClick={() => goTab('vulnerabilities')}>
+            <Button
+              variant="link"
+              size="sm"
+              className="h-auto p-0"
+              onClick={() => goTab('vulnerabilities')}
+            >
               See all
             </Button>
           </CardHeader>

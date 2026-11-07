@@ -31,6 +31,7 @@ import {
   ArrowLeft,
   Bug,
   ChevronDown,
+  CircleDot,
   CirclePlay,
   CloudCheck,
   Cpu,
@@ -129,11 +130,12 @@ export const menu: NavGroup[] = [
         url: '/vulnerabilities',
         permission: 'vulnerability.read',
       },
-      // {
-      //   title: 'Issues',
-      //   icon: <CircleDot />,
-      //   url: '/issues',
-      // },
+      {
+        title: 'Issues',
+        icon: <CircleDot />,
+        url: '/issues',
+        permission: 'workspace.read',
+      },
       {
         title: 'Reports',
         icon: <FileChartPie />,

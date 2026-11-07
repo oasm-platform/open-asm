@@ -117,7 +117,6 @@ export default function AgentConversationsPage() {
   return (
     <Page
       title="Conversations"
-      isShowButtonGoBack
       // max-md:pt-10 clears the sidebar trigger floating at the top-left
       className="w-full md:w-2/3 lg:w-1/2 mx-auto max-md:pt-10"
       permission="agent.read"

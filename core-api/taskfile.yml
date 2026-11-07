@@ -16,6 +16,8 @@ tasks:
       NODE_ENV: 'production'
   install: pnpm install
   lint: pnpm run lint
+  # Type-check without emitting (no dist/ writes, safe next to a running build).
+  typecheck: pnpm exec tsc --noEmit -p tsconfig.build.json
   # Regenerate the Go gRPC stubs for core-api/src/proto/*.proto into
   # worker/internal/gen/**. There is no Node-side `proto:generate` script (the old
   # ts-proto one was dropped with the Go worker rewrite), so delegate to the root

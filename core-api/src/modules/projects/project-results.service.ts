@@ -7,6 +7,10 @@ import {
 } from '@/common/enums/enum';
 import { VulnerabilityStatus } from '@/modules/vulnerabilities/dto/get-vulnerability.dto';
 import { openVulnerabilityCondition } from '@/modules/vulnerabilities/open-vulnerability';
+import {
+  activeDismissalCondition,
+  vulnerabilityStatusCondition,
+} from '@/modules/vulnerabilities/vulnerability-status';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -250,13 +254,8 @@ export class ProjectResultsService {
       params.push(value);
       return `$${params.length}`;
     };
-    if (query.status === VulnerabilityStatus.OPEN || !query.status) {
-      where.push(openVulnerabilityCondition('v'));
-    } else if (query.status === VulnerabilityStatus.DISMISSED) {
-      where.push(
-        `EXISTS (SELECT 1 FROM vulnerability_dismissals vd WHERE vd."vulnerabilityId" = v.id)`,
-      );
-    }
+    // Same statuses, same SQL as the workspace vulnerability list.
+    where.push(vulnerabilityStatusCondition(query.status, 'v'));
     if (query.search) {
       const term = add(`%${query.search}%`);
       where.push(
@@ -422,8 +421,9 @@ export class ProjectResultsService {
   private vulnerabilityRowsSql(where: string[]): string {
     return `SELECT v.id, v.name, v.severity, v."cveId", v."affectedUrl", v."assetId", v."toolId",
                    a.value AS "assetValue", tool.name AS "toolName",
-                   CASE WHEN EXISTS (SELECT 1 FROM vulnerability_dismissals vd WHERE vd."vulnerabilityId" = v.id)
-                        THEN 'dismissed' ELSE 'open' END AS status,
+                   CASE WHEN v."detectionStatus" = 'fixed' THEN 'fixed'
+                        WHEN ${activeDismissalCondition('v')} THEN 'dismissed'
+                        ELSE 'open' END AS status,
                    pv."timesSeen", pv."firstSeenJobHistoryId", pv."firstSeenAt",
                    pv."lastSeenJobHistoryId", pv."lastSeenAt",
                    ${PROVENANCE_SQL} AS provenance,
