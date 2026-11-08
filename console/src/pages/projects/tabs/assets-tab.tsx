@@ -295,7 +295,7 @@ export function AssetsTab({ projectId, archived }: { projectId: string; archived
   ];
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <ScopeCard projectId={projectId} archived={archived} />
       <DataTable
         columns={columns}

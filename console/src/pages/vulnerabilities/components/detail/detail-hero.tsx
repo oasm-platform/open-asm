@@ -24,51 +24,31 @@ import { differenceInCalendarDays, format, subDays } from 'date-fns';
 import { CalendarClock, ClipboardList, Globe, MapPin } from 'lucide-react';
 import { Fragment, type ReactNode } from 'react';
 import { CreateIssueDialog } from '../create-issue-dialog';
+import { SEVERITIES } from '../../../projects/project-utils';
 import { SourcesList } from './side-cards';
 
 const fmt = (d?: string | null) =>
   d ? format(new Date(d), 'dd MMM yyyy') : '—';
 
-/** Accent per severity: the bar on the panel's edge and the severity pill. */
-const SEVERITY_STYLES: Record<string, { bar: string; pill: string }> = {
-  critical: {
-    bar: 'bg-red-500',
-    pill: 'bg-red-500/10 text-red-700 ring-red-500/30 dark:text-red-300',
-  },
-  high: {
-    bar: 'bg-orange-500',
-    pill: 'bg-orange-500/10 text-orange-700 ring-orange-500/30 dark:text-orange-300',
-  },
-  medium: {
-    bar: 'bg-amber-400',
-    pill: 'bg-amber-400/15 text-amber-800 ring-amber-500/30 dark:text-amber-200',
-  },
-  low: {
-    bar: 'bg-sky-500',
-    pill: 'bg-sky-500/10 text-sky-700 ring-sky-500/30 dark:text-sky-300',
-  },
-  info: {
-    bar: 'bg-slate-400',
-    pill: 'bg-slate-500/10 text-slate-700 ring-slate-500/25 dark:text-slate-300',
-  },
-};
+type SeverityKey = (typeof SEVERITIES)[number]['key'];
 
-const severityKey = (severity?: string | null) => {
+/** The finding's entry in the shared severity scale; unknown values read as info. */
+const severityOf = (severity?: string | null) => {
   const key = (severity ?? 'info').toLowerCase();
-  return key in SEVERITY_STYLES ? key : 'info';
+  return SEVERITIES.find((s) => s.key === key) ?? SEVERITIES[SEVERITIES.length - 1];
 };
 
 function SeverityPill({ severity }: { severity?: string | null }) {
-  const key = severityKey(severity);
+  const s = severityOf(severity);
   return (
     <span
       className={cn(
-        'inline-flex h-6 items-center gap-1.5 rounded-md px-2 text-xs font-semibold uppercase tracking-wide ring-1 ring-inset',
-        SEVERITY_STYLES[key].pill,
+        'inline-flex h-6 items-center gap-1.5 rounded-md bg-muted/60 px-2 text-xs font-semibold uppercase tracking-wide ring-1 ring-inset ring-border',
+        s.text,
       )}
     >
-      <span className={cn('size-1.5 rounded-full', SEVERITY_STYLES[key].bar)} />
-      {key}
+      <span className={cn('size-1.5 rounded-full', s.bar)} />
+      {s.label}
     </span>
   );
 }
@@ -138,9 +118,7 @@ function Metric({
 function SlaMetric({ data }: { data: VulnerabilityDetailDto }) {
   const { data: settings, isLoading } =
     useVulnerabilitiesControllerGetSettings();
-  const severity = severityKey(data.severity) as keyof NonNullable<
-    typeof settings
-  >['slaDays'];
+  const severity: SeverityKey = severityOf(data.severity).key;
   const policyDays = settings?.slaDays?.[severity] ?? null;
   const paused = isRiskAccepted(data.dismissal);
   const label = `SLA · ${severity.charAt(0).toUpperCase()}${severity.slice(1)}${
@@ -297,14 +275,12 @@ function IssueMetric({
  */
 export function DetailHero({
   data,
-  actions,
   onChange,
 }: {
   data: VulnerabilityDetailDto;
-  actions?: ReactNode;
   onChange?: () => void;
 }) {
-  const key = severityKey(data.severity);
+  const severity = severityOf(data.severity);
   const location =
     data.affectedUrl ||
     [data.host, data.ports?.length ? data.ports.join(', ') : null]
@@ -319,7 +295,7 @@ export function DetailHero({
     >
       <div className="flex">
         <div
-          className={cn('w-1 shrink-0', SEVERITY_STYLES[key].bar)}
+          className={cn('w-1 shrink-0', severity.bar)}
           aria-hidden
         />
         <div className="flex min-w-0 flex-1 flex-col gap-3 p-5">
@@ -373,9 +349,6 @@ export function DetailHero({
               </div>
               <SourcesList data={data} />
             </div>
-            {actions && (
-              <div className="w-full sm:w-auto sm:shrink-0">{actions}</div>
-            )}
           </div>
         </div>
       </div>

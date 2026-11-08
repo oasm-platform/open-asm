@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { VulnerabilityStatus } from '@/services/apis/gen/queries';
 import { STATUS_TABS } from '../vulnerability-status';
 
@@ -11,38 +11,27 @@ interface StatusTabsProps {
 /** Status tabs of the vulnerability list, each with its count when known. */
 export function VulnerabilityStatusTabs({ value, onValueChange, counts }: StatusTabsProps) {
   return (
-    <div
-      role="tablist"
-      aria-label="Vulnerability status"
-      className="flex w-full gap-1 overflow-x-auto border-b"
+    <Tabs
+      value={value}
+      onValueChange={(next) => onValueChange(next as VulnerabilityStatus)}
     >
-      {STATUS_TABS.map((tab) => {
-        const active = tab.value === value;
-        const count = counts[tab.value];
-        return (
-          <button
-            key={tab.value}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            data-value={tab.value}
-            onClick={() => onValueChange(tab.value)}
-            className={cn(
-              '-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm whitespace-nowrap transition-colors',
-              active
-                ? 'border-primary font-medium text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {tab.label}
-            {count !== undefined && (
-              <span className="rounded-full bg-muted px-1.5 text-xs tabular-nums text-muted-foreground">
-                {count}
-              </span>
-            )}
-          </button>
-        );
-      })}
-    </div>
+      <div className="w-full overflow-x-auto scrollbar-hide">
+        <TabsList
+          aria-label="Vulnerability status"
+          className="flex w-max flex-nowrap rounded-none bg-transparent p-0"
+        >
+          {STATUS_TABS.map((tab) => (
+            <TabsTrigger
+              key={tab.value}
+              value={tab.value}
+              className="h-9 flex-none"
+              badge={counts[tab.value]}
+            >
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </div>
+    </Tabs>
   );
 }

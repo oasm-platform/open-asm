@@ -348,6 +348,7 @@ export default function Reports() {
             setTab(v);
             setPage(1);
           }}
+          className="gap-4"
         >
           <TabsList>
             <TabsTrigger value="all">All</TabsTrigger>
