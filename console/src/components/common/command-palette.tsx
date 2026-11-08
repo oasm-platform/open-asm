@@ -122,7 +122,7 @@ export function CommandPalette() {
                     go(() =>
                       navigate({
                         to: '/targets/$id/$tab',
-                        params: { id: target.id, tab: 'inventory' },
+                        params: { id: target.id, tab: 'overview' },
                       }),
                     )
                   }

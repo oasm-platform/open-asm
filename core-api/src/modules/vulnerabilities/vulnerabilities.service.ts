@@ -53,10 +53,16 @@ import type {
   VulnerabilityDismissalInfoDto,
   VulnerabilityListItemDto,
   VulnerabilityOpenIssueDto,
+  VulnerabilityProjectSightingDto,
   VulnerabilitySourceSummaryDto,
   VulnerabilityTimelineResponseDto,
   VulnerabilityUserRefDto,
 } from './dto/vulnerability-response.dto';
+import {
+  PROVENANCE_SQL,
+  REFERENCE_RUN_JOIN,
+  VulnerabilityProvenance,
+} from '../projects/provenance';
 import { VulnerabilityDismissal } from './entities/vulnerability-dismissal.entity';
 import { VulnerabilityEvent } from './entities/vulnerability-event.entity';
 import { Vulnerability } from './entities/vulnerability.entity';
@@ -247,6 +253,9 @@ export class VulnerabilitiesService {
       filter,
       overdue,
       discoveredBy,
+      projectId,
+      provenance,
+      jobHistoryId,
     } = query;
 
     const { sortBy } = query;
@@ -343,11 +352,33 @@ export class VulnerabilitiesService {
     const compiled = filter && compileVulnerabilityFilter(filter, 'vf');
     if (compiled) queryBuilder.andWhere(compiled.sql, compiled.params);
 
+    if (projectId) {
+      // Findings the project reported, narrowed to a provenance or a run.
+      const conditions = ['pv."projectId" = :projectId'];
+      if (provenance) conditions.push(`(${PROVENANCE_SQL}) = :provenance`);
+      if (jobHistoryId) {
+        conditions.push(
+          '(pv."firstSeenJobHistoryId" = :jobHistoryId OR pv."lastSeenJobHistoryId" = :jobHistoryId)',
+        );
+      }
+      queryBuilder.andWhere(
+        `vulnerabilities.id IN (
+          SELECT pv."vulnerabilityId" FROM project_vulnerabilities pv
+            JOIN vulnerabilities v ON v.id = pv."vulnerabilityId"
+            ${provenance ? REFERENCE_RUN_JOIN : ''}
+           WHERE ${conditions.join(' AND ')})`,
+        { projectId, provenance, jobHistoryId },
+      );
+    }
+
     const [vulnerabilities, total] = await queryBuilder.getManyAndCount();
     const ids = vulnerabilities.map((v) => v.id);
-    const [sources, openIssues] = await Promise.all([
+    const [sources, openIssues, sightings] = await Promise.all([
       this.sourceSummaries(ids),
       this.openIssues(ids),
+      projectId
+        ? this.projectSightings(projectId, ids)
+        : Promise.resolve(new Map<string, VulnerabilityProjectSightingDto>()),
     ]);
 
     const data = vulnerabilities.map(
@@ -356,6 +387,9 @@ export class VulnerabilitiesService {
         sources: sources.get(vulnerability.id) ?? [],
         dismissal: toDismissalInfo(vulnerability.vulnerabilityDismissal),
         openIssue: openIssues.get(vulnerability.id) ?? null,
+        ...(projectId
+          ? { projectSighting: sightings.get(vulnerability.id) ?? null }
+          : {}),
       }),
     );
 
@@ -492,12 +526,16 @@ export class VulnerabilitiesService {
     query: GetVulnerabilitiesStatisticsQueryDto,
     workspaceId: string,
   ): Promise<GetVulnerabilitiesStatisticsResponseDto> {
-    const { targetIds } = query;
+    const { targetIds, projectId } = query;
     const params: unknown[] = [workspaceId];
     let targetFilter = '';
     if (targetIds?.length) {
       params.push(targetIds);
-      targetFilter = ` AND t.id = ANY($2::uuid[])`;
+      targetFilter = ` AND t.id = ANY($${params.length}::uuid[])`;
+    }
+    if (projectId) {
+      params.push(projectId);
+      targetFilter += ` AND v.id IN (SELECT "vulnerabilityId" FROM project_vulnerabilities WHERE "projectId" = $${params.length}::uuid)`;
     }
     const from = `FROM "vulnerabilities" v
                   JOIN "assets" a ON a.id = v."assetId"
@@ -505,7 +543,7 @@ export class VulnerabilitiesService {
                  WHERE t."workspaceId" = $1${targetFilter}`;
     const open = openVulnerabilityCondition('v');
 
-    const [severityRows, counts, resurfaced, mttrRows] = await Promise.all([
+    const [severityRows, counts, resurfaced, mttrRows, provenanceRows] = await Promise.all([
       this.dataSource.query<Array<{ severity: Severity; count: string }>>(
         `SELECT v.severity, COUNT(*) AS count ${from} AND ${open} GROUP BY v.severity`,
         params,
@@ -550,6 +588,19 @@ export class VulnerabilitiesService {
          GROUP BY v.severity`,
         params,
       ),
+      projectId
+        ? this.dataSource.query<Array<{ provenance: VulnerabilityProvenance; count: string }>>(
+            `SELECT ${PROVENANCE_SQL} AS provenance, COUNT(*) AS count
+               FROM project_vulnerabilities pv
+               JOIN vulnerabilities v ON v.id = pv."vulnerabilityId"
+               JOIN assets a ON a.id = v."assetId"
+               JOIN targets t ON t.id = a."targetId"
+               ${REFERENCE_RUN_JOIN}
+              WHERE pv."projectId" = $2::uuid AND t."workspaceId" = $1 AND ${open}
+              GROUP BY 1`,
+            [workspaceId, projectId],
+          )
+        : Promise.resolve(null),
     ]);
 
     const toInt = (value: unknown): number =>
@@ -583,6 +634,19 @@ export class VulnerabilitiesService {
           : Math.round(Number(row.days) * 10) / 10;
         return { severity, days, count: toInt(row?.count) };
       }),
+      ...(provenanceRows
+        ? {
+            provenanceCounts: {
+              new: toInt(provenanceRows.find((r) => r.provenance === VulnerabilityProvenance.NEW)?.count),
+              recurring: toInt(
+                provenanceRows.find((r) => r.provenance === VulnerabilityProvenance.RECURRING)?.count,
+              ),
+              notSeen: toInt(
+                provenanceRows.find((r) => r.provenance === VulnerabilityProvenance.NOT_SEEN)?.count,
+              ),
+            },
+          }
+        : {}),
     };
   }
 
@@ -839,6 +903,42 @@ export class VulnerabilitiesService {
       );
     }
     return vulnerabilities;
+  }
+
+  /** How the project saw each finding: provenance, sightings, first and last run. */
+  private async projectSightings(
+    projectId: string,
+    ids: string[],
+  ): Promise<Map<string, VulnerabilityProjectSightingDto>> {
+    if (ids.length === 0) return new Map();
+    const rows = await this.dataSource.query<Array<Record<string, unknown>>>(
+      `SELECT pv."vulnerabilityId" AS id, pv."timesSeen",
+              pv."firstSeenJobHistoryId", pv."firstSeenAt",
+              pv."lastSeenJobHistoryId", pv."lastSeenAt",
+              ${PROVENANCE_SQL} AS provenance
+         FROM project_vulnerabilities pv
+         JOIN vulnerabilities v ON v.id = pv."vulnerabilityId"
+         ${REFERENCE_RUN_JOIN}
+        WHERE pv."projectId" = $1 AND pv."vulnerabilityId" = ANY($2::uuid[])`,
+      [projectId, ids],
+    );
+    return new Map(
+      rows.map((row) => [
+        row.id as string,
+        {
+          provenance: row.provenance as VulnerabilityProvenance,
+          timesSeen: Number(row.timesSeen ?? 1),
+          firstSeen: {
+            runId: (row.firstSeenJobHistoryId as string | null) ?? null,
+            at: row.firstSeenAt as Date,
+          },
+          lastSeen: {
+            runId: (row.lastSeenJobHistoryId as string | null) ?? null,
+            at: row.lastSeenAt as Date,
+          },
+        },
+      ]),
+    );
   }
 
   /** Distinct (kind, tool, agent) sources per finding, for list rows. */

@@ -5,8 +5,10 @@ import {
   CronSchedule,
   IntegrationType,
   JobStatus,
+  Severity,
   TargetScopeType,
 } from '@/common/enums/enum';
+import { openVulnerabilityCondition } from '@/modules/vulnerabilities/open-vulnerability';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { getManyResponse } from '@/utils/getManyResponse';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -50,6 +52,7 @@ import {
   parseCidr,
 } from './cidr';
 import { resolveTargetLogo } from './target-logo';
+import { STALE_DAYS } from './target-overview.service';
 import { TargetSourceDto, toTargetSourceDto } from './target-source.dto';
 
 /** Rows per INSERT — 4 bind params each, well under PostgreSQL's 65535 limit. */
@@ -363,6 +366,8 @@ export class TargetsService implements OnModuleInit {
         'targets.scanSchedule as "scanSchedule"',
         'targets.integrationId as "integrationId"',
         'targets.settings as settings',
+        'targets.internalNetworkId as "internalNetworkId"',
+        'targets.createdAt as "createdAt"',
         `CASE
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.PENDING}' THEN 1 END) > 0 THEN '${JobStatus.PENDING}'
@@ -371,7 +376,7 @@ export class TargetsService implements OnModuleInit {
       END AS status`,
       ])
       .groupBy(
-        'targets.id, targets.value, targets.type, targets.source, targets.lastDiscoveredAt, targets.scanSchedule, targets.integrationId, targets.settings',
+        'targets.id, targets.value, targets.type, targets.source, targets.lastDiscoveredAt, targets.scanSchedule, targets.integrationId, targets.settings, targets.internalNetworkId, targets.createdAt',
       )
       .getRawOne()) as Target;
 
@@ -762,8 +767,18 @@ export class TargetsService implements OnModuleInit {
       }
     >
   > {
-    const { limit, page, sortBy, sortOrder, value, type, status, scope } =
-      query;
+    const {
+      limit,
+      page,
+      sortBy,
+      sortOrder,
+      value,
+      type,
+      status,
+      scope,
+      hasCritical,
+      stale,
+    } = query;
 
     const offset = (page - 1) * limit;
 
@@ -831,6 +846,22 @@ export class TargetsService implements OnModuleInit {
       } else {
         queryBuilder.andWhere('targets.internalNetworkId IS NULL');
       }
+    }
+
+    if (hasCritical) {
+      queryBuilder.andWhere(
+        `EXISTS (SELECT 1 FROM vulnerabilities crit_v
+          JOIN assets crit_a ON crit_a.id = crit_v."assetId"
+         WHERE crit_a."targetId" = targets.id AND crit_v.severity = :critical
+           AND ${openVulnerabilityCondition('crit_v')})`,
+        { critical: Severity.CRITICAL },
+      );
+    }
+
+    if (stale) {
+      queryBuilder.andWhere(
+        `(targets.lastDiscoveredAt IS NULL OR targets.lastDiscoveredAt < LOCALTIMESTAMP - interval '${STALE_DAYS} days')`,
+      );
     }
 
     if (sortBy === 'totalAssetServices' || sortBy === 'duration') {

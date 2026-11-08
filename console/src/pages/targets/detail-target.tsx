@@ -1,6 +1,8 @@
 import Page from '@/components/common/page';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import JobStatusBadge from '@/components/ui/job-status';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   JobStatus,
   TargetType,
@@ -8,24 +10,32 @@ import {
 } from '@/services/apis/gen/queries';
 import { getRouteApi, useNavigate, useParams } from '@tanstack/react-router';
 import dayjs from 'dayjs';
-import { Loader2 } from 'lucide-react';
+import { CalendarClock, Loader2 } from 'lucide-react';
 import { useEffect } from 'react';
 import AssetProvider from '../assets/context/asset-context';
 import { DiscoverUrlsDialog } from '../assets/components/discover-urls-dialog';
 import { ListAssets } from '../assets/list-assets';
 import { FastScanDialog } from '../vulnerabilities/components/fast-scan-dialog';
-import { ListVulnerabilities } from '../vulnerabilities/list-vulnerabilitys';
-import VulnerabilitiesStatistic from '../vulnerabilities/vulnerabilites-statistic';
+import { VulnerabilitiesView } from '../vulnerabilities/vulnerabilities-view';
 import AssetsDiscovering from './assets-discovering';
 import { GitOrgDetail } from './git-org-detail';
 import { TargetSwitcher } from './components/target-switcher';
-import SettingTarget from './setting-target';
+import { TargetActivityTab } from './tabs/activity-tab';
+import { TargetOverviewTab } from './tabs/overview-tab';
+import { TargetSettingsTab } from './tabs/settings-tab';
+import {
+  TARGET_TABS,
+  isScheduled,
+  isTargetTab,
+  scheduleLabel,
+  targetTabRedirect,
+} from './target-utils';
 
 const routeApi = getRouteApi('/_authed/targets/$id/$tab');
 
 export function DetailTarget() {
   const { id, tab } = useParams({ from: '/_authed/targets/$id/$tab' });
-  const { animation } = routeApi.useSearch();
+  const search = routeApi.useSearch();
   const navigate = useNavigate({ from: '/targets/$id/$tab' });
 
   const {
@@ -37,19 +47,23 @@ export function DetailTarget() {
     query: { enabled: !!id, refetchInterval: 5000 },
   });
 
-  // Vulnerabilities used to be its own path tab; it now lives in the asset tab
-  // row (`?tab=vulnerabilities`). Git orgs still use the path tab.
-  const isLegacyVulnPath =
-    !!target && target.type !== TargetType.GIT_ORG && tab === 'vulnerabilities';
+  // Old path tabs (`inventory`, `asset-services`), the old vulnerabilities
+  // asset tab and unknown ones land on their tab today, keeping the query
+  // (notification links carry `?tab=urls`). Git orgs keep their own tabs.
+  const isGitOrg = target?.type === TargetType.GIT_ORG;
+  const redirect =
+    !target || isGitOrg ? null : targetTabRedirect(tab, search.tab);
+  const redirectTab = redirect?.tab ?? null;
+  const redirectInner = redirect?.innerTab;
   useEffect(() => {
-    if (!isLegacyVulnPath) return;
+    if (!redirectTab) return;
     navigate({
       to: '/targets/$id/$tab',
-      params: { id, tab: 'inventory' },
-      search: { tab: 'vulnerabilities' },
+      params: { id, tab: redirectTab },
+      search: { ...search, tab: redirectInner },
       replace: true,
     });
-  }, [isLegacyVulnPath, id, navigate]);
+  }, [redirectTab, redirectInner, id, navigate, search]);
 
   if (isLoading) {
     return (
@@ -75,52 +89,21 @@ export function DetailTarget() {
   }
 
   // A Git organization has repositories, not a host inventory.
-  if (target.type === TargetType.GIT_ORG) {
+  if (isGitOrg) {
     return <GitOrgDetail target={target} tab={tab} refetch={refetch} />;
   }
+  if (redirectTab || !isTargetTab(tab)) return null;
 
-  return (
-    <Page
-      permission="target.read"
-      title={
-        <TargetSwitcher
-          currentTargetId={target.id}
-          currentTargetValue={target.value}
-          currentTargetLogo={target.logo}
-        />
-      }
-      header={
-        <div className="flex items-center gap-3 justify-between">
-          <div className="flex items-center gap-3">
-            <JobStatusBadge
-              status={target.status}
-              onClick={() => {
-                const showAnimation =
-                  target.status === JobStatus.pending ||
-                  target.status === JobStatus.in_progress;
-                navigate({
-                  search: {
-                    animation: showAnimation ? 'true' : undefined,
-                  },
-                  replace: true,
-                });
-              }}
-            />
-          </div>
-          <div className="flex items-center gap-3">
-            <p className="text-muted-foreground hidden md:block">
-              {dayjs(target.lastDiscoveredAt).fromNow()}
-            </p>
-            <SettingTarget target={target} refetch={refetch} />
-          </div>
-        </div>
-      }
-    >
-      {animation &&
-        (target.status === JobStatus.in_progress ||
-          target.status === JobStatus.pending) && (
-          <AssetsDiscovering targetId={target.id} />
-        )}
+  const scanning =
+    target.status === JobStatus.pending ||
+    target.status === JobStatus.in_progress;
+
+  const goTab = (value: string) =>
+    navigate({ to: '/targets/$id/$tab', params: { id, tab: value }, search: {} });
+
+  const tabs = {
+    overview: <TargetOverviewTab target={target} />,
+    assets: (
       <AssetProvider
         targetId={target.id}
         refetchInterval={
@@ -137,28 +120,83 @@ export function DetailTarget() {
               />
             ) : null
           }
-          extraTabs={[
-            {
-              value: 'vulnerabilities',
-              text: 'Vulnerabilities',
-              tab: (
-                <div className="flex flex-col gap-5">
-                  <VulnerabilitiesStatistic targetId={target.id} />
-                  <ListVulnerabilities
-                    targetId={target.id}
-                    actions={
-                      <FastScanDialog
-                        target={{ id: target.id, value: target.value }}
-                        disabled={target.status !== JobStatus.completed}
-                      />
-                    }
-                  />
-                </div>
-              ),
-            },
-          ]}
         />
       </AssetProvider>
+    ),
+    vulnerabilities: (
+      <VulnerabilitiesView
+        targetId={target.id}
+        actions={
+          <FastScanDialog
+            target={{ id: target.id, value: target.value }}
+            disabled={target.status !== JobStatus.completed}
+          />
+        }
+      />
+    ),
+    activity: <TargetActivityTab targetId={target.id} />,
+    settings: <TargetSettingsTab target={target} refetch={refetch} />,
+  };
+
+  return (
+    <Page
+      permission="target.read"
+      title={
+        <TargetSwitcher
+          currentTargetId={target.id}
+          currentTargetValue={target.value}
+          currentTargetLogo={target.logo}
+        />
+      }
+      header={
+        <div className="flex flex-wrap items-center gap-3">
+          <JobStatusBadge
+            status={target.status}
+            onClick={() =>
+              navigate({
+                search: { ...search, animation: scanning ? 'true' : undefined },
+                replace: true,
+              })
+            }
+          />
+          <Badge
+            variant="outline"
+            className="cursor-pointer gap-1.5 font-normal"
+            onClick={() => goTab('settings')}
+            title="Scan schedule"
+          >
+            <CalendarClock className="size-3.5" />
+            {isScheduled(target.scanSchedule)
+              ? scheduleLabel(target.scanSchedule)
+              : 'Manual'}
+          </Badge>
+          <p className="text-sm text-muted-foreground hidden md:block">
+            Discovered {dayjs(target.lastDiscoveredAt).fromNow()}
+          </p>
+        </div>
+      }
+    >
+      {search.animation && scanning && (
+        <AssetsDiscovering targetId={target.id} />
+      )}
+      <div className="flex flex-col gap-4">
+        <Tabs value={tab} onValueChange={goTab}>
+          <div className="w-full overflow-x-auto scrollbar-hide">
+            <TabsList className="flex w-max flex-nowrap rounded-none bg-transparent p-0">
+              {TARGET_TABS.map((t) => (
+                <TabsTrigger
+                  key={t.value}
+                  value={t.value}
+                  className="h-9 flex-none hover:cursor-pointer"
+                >
+                  {t.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
+        </Tabs>
+        {tabs[tab]}
+      </div>
     </Page>
   );
 }

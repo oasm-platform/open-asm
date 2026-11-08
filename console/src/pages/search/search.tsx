@@ -305,7 +305,7 @@ export default function Search() {
                   onClick={() =>
                     navigate({
                       to: '/targets/$id/$tab',
-                      params: { id: target.id, tab: 'inventory' },
+                      params: { id: target.id, tab: 'overview' },
                     })
                   }
                   className={cn(

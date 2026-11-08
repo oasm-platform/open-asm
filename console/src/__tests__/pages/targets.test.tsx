@@ -43,7 +43,8 @@ describe('Targets Page', () => {
     });
 
     expect(screen.getByText('Target')).toBeInTheDocument();
-    expect(screen.getByText('Services')).toBeInTheDocument();
+    expect(screen.getByText('Surface')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Open vulnerabilities' })).toBeInTheDocument();
     // Type is a badge column; Source is an icon next to the target, not a column
     expect(screen.getByText('Type')).toBeInTheDocument();
     expect(screen.getByText('Domain')).toBeInTheDocument();
@@ -89,5 +90,18 @@ describe('Targets Page', () => {
     await waitFor(() => {
       expect(searchInput).toHaveValue('example');
     });
+  });
+
+  it('shows the workspace summary above the list', async () => {
+    renderWithProviders(<Targets />, {
+      routePath: '/_authed/targets/',
+      initialEntries: ['/_authed/targets/'],
+    });
+
+    const critical = await screen.findByRole('button', { name: /With critical/ });
+    expect(critical).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: /^Targets/ })).toHaveAttribute('aria-pressed', 'true');
+    // Open vulnerabilities are counted on the Vulnerabilities page, not here.
+    expect(screen.queryByText('Open vulns')).not.toBeInTheDocument();
   });
 });

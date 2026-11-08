@@ -55,7 +55,7 @@ export function TargetSwitcher({
       }
       navigate({
         to: '/targets/$id/$tab',
-        params: { id: targetId, tab: tab ?? 'inventory' },
+        params: { id: targetId, tab: tab ?? 'overview' },
       });
       setOpen(false);
       setSearchQuery('');

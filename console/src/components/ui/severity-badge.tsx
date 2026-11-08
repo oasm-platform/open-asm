@@ -2,6 +2,12 @@ import { Badge } from './badge';
 
 interface SeverityBadgeProps {
   severity: string;
+  /**
+   * `outline` (default): coloured pill with background and border.
+   * `text`: the coloured word alone, for dense feeds; it takes the font
+   * size of the surrounding text.
+   */
+  variant?: 'outline' | 'text';
 }
 
 interface SeverityColor {
@@ -38,19 +44,27 @@ const severityColors: Record<string, SeverityColor> = {
   },
 };
 
-export function SeverityBadge({ severity }: SeverityBadgeProps) {
+export function SeverityBadge({
+  severity,
+  variant = 'outline',
+}: SeverityBadgeProps) {
   const normalizedSeverity = severity.toLowerCase();
   const {
     color,
     text,
     border = '',
   } = severityColors[normalizedSeverity] || severityColors['info'];
+  const label = severity.charAt(0).toUpperCase() + severity.slice(1);
+
+  if (variant === 'text') {
+    return <span className={`${text} font-medium`}>{label}</span>;
+  }
 
   return (
     <Badge
       className={`${color} ${text} ${border} px-2 h-7 py-0.5 rounded-full text-xs font-medium`}
     >
-      {severity.charAt(0).toUpperCase() + severity.slice(1)}
+      {label}
     </Badge>
   );
 }

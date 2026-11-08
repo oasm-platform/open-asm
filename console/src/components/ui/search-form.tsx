@@ -213,7 +213,7 @@ const DropdownCard = React.memo(
                 <div
                   key={target.id}
                   className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent cursor-pointer transition-colors group"
-                  onClick={() => navigate({ to: '/targets/$id/$tab', params: { id: target.id, tab: 'inventory' } })}
+                  onClick={() => navigate({ to: '/targets/$id/$tab', params: { id: target.id, tab: 'overview' } })}
                 >
                   <Target className="size-3 text-gray-400 group-hover:text-gray-600" />
                   <span className="text-gray-700 dark:text-gray-300 text-sm truncate">

@@ -2,6 +2,7 @@ import { createFileRoute, stripSearchParams } from '@tanstack/react-router';
 import { z } from 'zod';
 import { tableSearch } from '@/lib/table-search';
 import DetailTarget from '@/pages/targets/detail-target';
+import { VulnerabilityDiscoveredBy } from '@/services/apis/gen/queries';
 
 const legacyParam = z
   .union([z.string(), z.number(), z.array(z.union([z.string(), z.number()]))])
@@ -20,6 +21,12 @@ const targetDetailSearchSchema = z.object({
   createdFrom: z.string().optional(),
   createdTo: z.string().optional(),
   targetId: z.string().optional(),
+  // Filters of the Vulnerabilities tab (stat cards, source picker).
+  overdue: z.boolean().optional().catch(undefined),
+  discoveredBy: z
+    .enum(Object.values(VulnerabilityDiscoveredBy) as [string, ...string[]])
+    .optional()
+    .catch(undefined),
   ipAddresses: legacyParam,
   ports: legacyParam,
   urls: legacyParam,
