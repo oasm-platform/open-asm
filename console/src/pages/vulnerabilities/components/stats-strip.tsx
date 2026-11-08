@@ -1,10 +1,12 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { NumberAnimate } from '@/components/ui/number-animate';
-import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
+import {
+  StatCard,
+  StatCardSkeleton,
+  StatNote,
+} from '@/components/common/stat-card';
 import {
   useVulnerabilitiesControllerGetSettings,
   type GetVulnerabilitiesStatisticsResponseDto,
+  type SeverityCountsDto,
 } from '@/services/apis/gen/queries';
 import {
   AlarmClock,
@@ -14,70 +16,38 @@ import {
   Sparkles,
   Timer,
 } from 'lucide-react';
-import type { ReactNode } from 'react';
 import { SEVERITY_TEXT_CLASS } from '../../dashboard/severity';
+import { SeverityBreakdown } from '../../projects/components/severity-bar';
+
+/** A view of the list a card opens: `open`, findings new in 7 days, or overdue ones. */
+export type StatsView = 'open' | 'new' | 'overdue';
 
 interface StatsStripProps {
   stats?: GetVulnerabilitiesStatisticsResponseDto;
   isLoading?: boolean;
+  /** Opens the list view a card counts; cards without an exact view are not clickable. */
+  onSelect?: (view: StatsView) => void;
 }
 
-/** Number card styled like the dashboard totals: title and icon, then a large figure. */
-function Stat({
-  label,
-  icon,
-  value,
-  hint,
-  tone,
-}: {
-  label: string;
-  icon: ReactNode;
-  value: string | number;
-  hint?: ReactNode;
-  tone?: string;
-}) {
-  return (
-    <Card className="gap-2">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle>{label}</CardTitle>
-        <span className="text-primary [&>svg]:size-5">{icon}</span>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-1">
-        <p className={cn('text-4xl font-bold font-mono', tone)}>
-          {typeof value === 'number' ? <NumberAnimate value={value} /> : value}
-        </p>
-        <span className="min-h-4 truncate text-xs text-muted-foreground">
-          {hint}
-        </span>
-      </CardContent>
-    </Card>
-  );
-}
+/** One row of compact cards on wide screens, like the dashboard totals. */
+const GRID = 'grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6';
 
 /**
  * Lifecycle numbers above the list: new in 7 days, open, resurfaced and fixed
  * in 30 days, overdue, and mean time to remediate high findings.
  */
-export function VulnerabilityStatsStrip({ stats, isLoading }: StatsStripProps) {
+export function VulnerabilityStatsStrip({
+  stats,
+  isLoading,
+  onSelect,
+}: StatsStripProps) {
   const { data: settings } = useVulnerabilitiesControllerGetSettings();
 
   if (isLoading) {
     return (
-      <div
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4"
-        data-testid="vuln-stats-loading"
-      >
+      <div className={GRID} data-testid="vuln-stats-loading">
         {Array.from({ length: 6 }).map((_, i) => (
-          <Card key={i} className="gap-2">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="size-5 rounded-md" />
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2">
-              <Skeleton className="h-10 w-16" />
-              <Skeleton className="h-3 w-24" />
-            </CardContent>
-          </Card>
+          <StatCardSkeleton key={i} />
         ))}
       </div>
     );
@@ -85,63 +55,77 @@ export function VulnerabilityStatsStrip({ stats, isLoading }: StatsStripProps) {
 
   if (!stats) {
     return (
-      <p className="text-sm text-muted-foreground">No statistics available.</p>
+      <p className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
+        Statistics are not available right now.
+      </p>
     );
   }
 
   const bySeverity = Object.fromEntries(
     (stats.data ?? []).map((s) => [s.severity, s.count]),
-  );
+  ) as Partial<SeverityCountsDto>;
+  const counts: SeverityCountsDto = {
+    critical: bySeverity.critical ?? 0,
+    high: bySeverity.high ?? 0,
+    medium: bySeverity.medium ?? 0,
+    low: bySeverity.low ?? 0,
+    info: bySeverity.info ?? 0,
+  };
   const open = (stats.data ?? []).reduce((sum, s) => sum + s.count, 0);
   const mttrHigh = stats.mttr?.find((m) => m.severity === 'high');
   const slaHigh = settings?.slaDays.high;
+  const select = (view: StatsView) =>
+    onSelect ? () => onSelect(view) : undefined;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-      <Stat
-        label="New (7 days)"
-        icon={<Sparkles />}
+    <div className={GRID}>
+      <StatCard
+        label="New"
+        icon={Sparkles}
         value={stats.newLast7Days}
+        aside={<StatNote title="First detected in the last 7 days, still open">7d</StatNote>}
+        onClick={select('new')}
       />
-      <Stat
+      <StatCard
         label="Open"
-        icon={<ShieldAlert />}
+        icon={ShieldAlert}
         value={open}
-        hint={
-          <>
-            <span className={cn('font-medium', SEVERITY_TEXT_CLASS.critical)}>
-              {bySeverity.critical ?? 0} critical
-            </span>
-            {' · '}
-            <span className={cn('font-medium', SEVERITY_TEXT_CLASS.high)}>
-              {bySeverity.high ?? 0} high
-            </span>
-          </>
-        }
-      />
-      <Stat
+        onClick={select('open')}
+      >
+        <SeverityBreakdown counts={counts} />
+      </StatCard>
+      <StatCard
         label="Resurfaced"
-        icon={<RotateCcw />}
+        icon={RotateCcw}
         value={stats.resurfacedLast30Days}
-        hint="in 30 days"
+        aside={<StatNote title="In the last 30 days">30d</StatNote>}
       />
-      <Stat
+      <StatCard
         label="Fixed"
-        icon={<CircleCheck />}
+        icon={CircleCheck}
         value={stats.fixedLast30Days}
-        hint="in 30 days"
+        aside={<StatNote title="In the last 30 days">30d</StatNote>}
       />
-      <Stat
+      <StatCard
         label="SLA overdue"
-        icon={<AlarmClock />}
+        icon={AlarmClock}
         value={stats.overdue}
-        tone={stats.overdue > 0 ? 'text-red-600 dark:text-red-400' : undefined}
+        tone={stats.overdue > 0 ? SEVERITY_TEXT_CLASS.critical : undefined}
+        onClick={select('overdue')}
       />
-      <Stat
+      <StatCard
         label="MTTR high"
-        icon={<Timer />}
+        icon={Timer}
         value={mttrHigh?.days != null ? `${Math.round(mttrHigh.days)} d` : '—'}
-        hint={slaHigh ? `SLA ${slaHigh} days` : 'last 90 days'}
+        aside={
+          slaHigh ? (
+            <StatNote title={`SLA for high findings: ${slaHigh} days`}>
+              SLA {slaHigh}d
+            </StatNote>
+          ) : (
+            <StatNote title="Fixed in the last 90 days">90d</StatNote>
+          )
+        }
       />
     </div>
   );

@@ -110,7 +110,7 @@ export default function ProjectDetail() {
   const tabs: Record<ProjectTab, ReactNode> = {
     overview: <OverviewTab projectId={id} project={project} />,
     assets: <AssetsTab projectId={id} archived={archived} />,
-    vulnerabilities: <VulnerabilitiesTab projectId={id} workflows={workflows} />,
+    vulnerabilities: <VulnerabilitiesTab projectId={id} />,
     workflows: (
       <WorkflowsTab
         projectId={id}
@@ -170,7 +170,7 @@ export default function ProjectDetail() {
         </>
       }
     >
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-4">
         <Tabs value={tab} onValueChange={goTab}>
           <div className="w-full overflow-x-auto scrollbar-hide">
             <TabsList className="flex w-max flex-nowrap rounded-none bg-transparent p-0">

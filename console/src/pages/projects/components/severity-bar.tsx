@@ -69,3 +69,41 @@ export const SeverityCounts = memo(function SeverityCounts({
     </div>
   );
 });
+
+/**
+ * Open vulnerabilities under a number card: every severity as its coloured
+ * dot and count, worst first. Zeros stay, muted, so cards line up; each
+ * count names its severity for hover and screen readers.
+ */
+export const SeverityBreakdown = memo(function SeverityBreakdown({
+  counts,
+  className,
+}: {
+  counts?: SeverityCountsDto | null;
+  className?: string;
+}) {
+  return (
+    <ul
+      className={cn('flex flex-wrap items-center gap-x-3 gap-y-1 text-sm', className)}
+      aria-label="Open vulnerabilities by severity"
+    >
+      {SEVERITIES.map((s) => {
+        const count = counts?.[s.key] ?? 0;
+        return (
+          <li key={s.key} className="flex items-center gap-1.5" title={s.label}>
+            <span className={cn('size-2 shrink-0 rounded-full', s.bar)} aria-hidden />
+            <span
+              className={cn(
+                'font-mono font-semibold tabular-nums',
+                count ? s.text : 'text-muted-foreground/60',
+              )}
+            >
+              {count}
+            </span>
+            <span className="sr-only">{s.label}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+});

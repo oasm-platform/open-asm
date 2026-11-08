@@ -4,7 +4,7 @@ export const Route = createFileRoute('/_authed/targets/$id/')({
   beforeLoad: ({ params }) => {
     throw redirect({
       to: '/targets/$id/$tab',
-      params: { id: params.id, tab: 'inventory' },
+      params: { id: params.id, tab: 'overview' },
       search: {},
     });
   },

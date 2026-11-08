@@ -417,6 +417,8 @@ export type Target = {
   settings?: TargetSettings;
   status: JobStatus;
   scanSchedule: CronSchedule;
+  /** @nullable */
+  internalNetworkId?: string | null;
 };
 
 export type BulkTargetResultDto = {
@@ -461,6 +463,29 @@ export type TargetSourceDto = {
   icon: string;
 };
 
+export type SeverityCountsDto = {
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  info: number;
+};
+
+export type ScanProgressDto = {
+  /** Jobs finished, failed or cancelled */
+  done: number;
+  total: number;
+};
+
+export type TargetProjectRefDto = {
+  id: string;
+  name: string;
+  /** @nullable */
+  hexColor: string | null;
+  /** Assets of the target in the project */
+  assets: number;
+};
+
 export type GetManyTargetResponseDtoScanSchedule =
   (typeof GetManyTargetResponseDtoScanSchedule)[keyof typeof GetManyTargetResponseDtoScanSchedule];
 
@@ -502,6 +527,15 @@ export type GetManyTargetResponseDto = {
   duration: number;
   lastDiscoveredAt: string;
   internalNetworkId: string;
+  openVulnerabilities?: SeverityCountsDto;
+  /**
+   * Jobs of the runs still going on the target; null when idle
+   * @nullable
+   */
+  scanProgress?: ScanProgressDto | null;
+  /** @nullable */
+  nextScanAt?: string | null;
+  projects?: TargetProjectRefDto[];
 };
 
 export type GetManyGetManyTargetResponseDtoDto = {
@@ -541,6 +575,202 @@ export type TargetRepositoryDto = {
 
 export type GetManyTargetRepositoryDtoDto = {
   data: TargetRepositoryDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type TargetsSummaryDto = {
+  total: number;
+  /** Targets with a pending or running job */
+  scanning: number;
+  /** Targets with an open critical vulnerability */
+  withCritical: number;
+  /** Targets with a scan schedule */
+  scheduled: number;
+  /** Targets not discovered in 30 days */
+  stale: number;
+  openVulnerabilities: SeverityCountsDto;
+};
+
+export type JobRunType = (typeof JobRunType)[keyof typeof JobRunType];
+
+export const JobRunType = {
+  manual: 'manual',
+  scheduled: 'scheduled',
+  event: 'event',
+} as const;
+
+export type TargetRunDto = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  isCompleted: boolean;
+  status: JobStatus;
+  jobRunType: JobRunType;
+  workflowName: string;
+  /** @nullable */
+  projectId?: string | null;
+  /** @nullable */
+  projectName?: string | null;
+  /** Jobs of the run on this target */
+  jobsTotal: number;
+  /** Of those, finished (completed or skipped) */
+  jobsDone: number;
+  jobsFailed: number;
+  jobsRunning: number;
+  /** @nullable */
+  currentTool?: string | null;
+  /** Vulnerabilities this run first found on the target */
+  newVulnerabilities: number;
+};
+
+export type WeeklyNewVulnerabilitiesDto = {
+  /** Monday of the week (ISO date) */
+  week: string;
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  info: number;
+};
+
+export type Severity = (typeof Severity)[keyof typeof Severity];
+
+export const Severity = {
+  info: 'info',
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+  critical: 'critical',
+} as const;
+
+export type TargetTopVulnerabilityDto = {
+  id: string;
+  name: string;
+  severity: Severity;
+  assetValue: string;
+  /** @nullable */
+  cveId?: string[] | null;
+  createdAt: string;
+};
+
+export type NameCountDto = {
+  name: string;
+  count: number;
+};
+
+export type TargetExposureDto = {
+  /** Open ports by service count */
+  ports: NameCountDto[];
+  technologies: NameCountDto[];
+  statusCodes: NameCountDto[];
+};
+
+export type TargetInsightKind =
+  (typeof TargetInsightKind)[keyof typeof TargetInsightKind];
+
+export const TargetInsightKind = {
+  critical_open: 'critical_open',
+  tls_expiring: 'tls_expiring',
+  new_assets: 'new_assets',
+  last_run_failed: 'last_run_failed',
+  stale_scan: 'stale_scan',
+  no_schedule: 'no_schedule',
+} as const;
+
+export type InsightLevel = (typeof InsightLevel)[keyof typeof InsightLevel];
+
+export const InsightLevel = {
+  critical: 'critical',
+  warning: 'warning',
+  info: 'info',
+} as const;
+
+export type TargetInsightDto = {
+  kind: TargetInsightKind;
+  level: InsightLevel;
+  count?: number;
+  /** Days, for stale scan */
+  days?: number;
+  /** The run, for a failed run */
+  runId?: string;
+};
+
+export type TargetIssueRefDto = {
+  id: string;
+  no: number;
+  title: string;
+  status: string;
+  priority: string;
+};
+
+export type TargetOverviewDto = {
+  totalAssets: number;
+  /** Assets found in the last 7 days */
+  newAssets: number;
+  totalServices: number;
+  /** Services found in the last 7 days */
+  newServices: number;
+  /** Distinct open ports */
+  openPorts: number;
+  openVulnerabilities: SeverityCountsDto;
+  /** Open vulnerabilities found in the last 7 days */
+  newVulnerabilities: number;
+  /** Vulnerabilities fixed in the last 7 days */
+  fixedVulnerabilities: number;
+  /** @nullable */
+  nextScanAt?: string | null;
+  /** @nullable */
+  lastRun?: TargetRunDto | null;
+  /** Runs still pending or in progress */
+  activeRuns: TargetRunDto[];
+  weekly: WeeklyNewVulnerabilitiesDto[];
+  topVulnerabilities: TargetTopVulnerabilityDto[];
+  exposure: TargetExposureDto;
+  insights: TargetInsightDto[];
+  projects: TargetProjectRefDto[];
+  /** Open issues linked to the target, its assets or vulnerabilities */
+  issues: TargetIssueRefDto[];
+};
+
+export type GetManyTargetRunDtoDto = {
+  data: TargetRunDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
+export type TargetChangeKind =
+  (typeof TargetChangeKind)[keyof typeof TargetChangeKind];
+
+export const TargetChangeKind = {
+  asset: 'asset',
+  service: 'service',
+  vulnerability: 'vulnerability',
+  fixed: 'fixed',
+} as const;
+
+export type TargetChangeDto = {
+  kind: TargetChangeKind;
+  at: string;
+  /** Asset, service or vulnerability id */
+  id: string;
+  label: string;
+  /**
+   * Asset the change is on
+   * @nullable
+   */
+  assetValue?: string | null;
+  severity?: Severity | null;
+};
+
+export type GetManyTargetChangeDtoDto = {
+  data: TargetChangeDto[];
   total: number;
   page: number;
   limit: number;
@@ -3071,6 +3301,29 @@ export type VulnerabilityOpenIssueDto = {
   status: IssueStatus;
 };
 
+export type VulnerabilityProvenance =
+  (typeof VulnerabilityProvenance)[keyof typeof VulnerabilityProvenance];
+
+export const VulnerabilityProvenance = {
+  new: 'new',
+  recurring: 'recurring',
+  not_seen: 'not_seen',
+} as const;
+
+export type VulnerabilityRunSightingDto = {
+  /** @nullable */
+  runId?: string | null;
+  at: string;
+};
+
+export type VulnerabilityProjectSightingDto = {
+  provenance: VulnerabilityProvenance;
+  /** Runs of the project that reported it */
+  timesSeen: number;
+  firstSeen: VulnerabilityRunSightingDto;
+  lastSeen: VulnerabilityRunSightingDto;
+};
+
 export type VulnerabilityListItemDtoSeverity =
   (typeof VulnerabilityListItemDtoSeverity)[keyof typeof VulnerabilityListItemDtoSeverity];
 
@@ -3208,6 +3461,11 @@ export type VulnerabilityListItemDto = {
   dismissal: VulnerabilityDismissalInfoDto | null;
   /** @nullable */
   openIssue: VulnerabilityOpenIssueDto | null;
+  /**
+   * Only when the list is filtered by projectId
+   * @nullable
+   */
+  projectSighting?: VulnerabilityProjectSightingDto | null;
 };
 
 export type GetManyVulnerabilityListItemDtoDto = {
@@ -3267,16 +3525,6 @@ export type VulnerabilityDetectionStatusCountsDto = {
   fixed: number;
 };
 
-export type Severity = (typeof Severity)[keyof typeof Severity];
-
-export const Severity = {
-  info: 'info',
-  low: 'low',
-  medium: 'medium',
-  high: 'high',
-  critical: 'critical',
-} as const;
-
 export type VulnerabilityMttrDto = {
   severity: Severity;
   /**
@@ -3286,6 +3534,13 @@ export type VulnerabilityMttrDto = {
   days: number | null;
   /** Findings fixed in the window */
   count: number;
+};
+
+export type VulnerabilityProvenanceCountsDto = {
+  new: number;
+  recurring: number;
+  /** A later run scanned the asset and did not report it */
+  notSeen: number;
 };
 
 export type GetVulnerabilitiesStatisticsResponseDto = {
@@ -3304,6 +3559,8 @@ export type GetVulnerabilitiesStatisticsResponseDto = {
   pendingReview: number;
   /** Mean time to remediate per severity, findings fixed in the last 90 days */
   mttr: VulnerabilityMttrDto[];
+  /** With projectId: open findings by provenance */
+  provenanceCounts?: VulnerabilityProvenanceCountsDto;
 };
 
 export type VulnerabilitySlaDaysResponseDto = {
@@ -5378,14 +5635,6 @@ export type NotificationListResponseDto = {
   nextCursor?: string | null;
 };
 
-export type SeverityCountsDto = {
-  critical: number;
-  high: number;
-  medium: number;
-  low: number;
-  info: number;
-};
-
 export type ProjectTriggerType =
   (typeof ProjectTriggerType)[keyof typeof ProjectTriggerType];
 
@@ -5688,30 +5937,12 @@ export type UpdateProjectDto = {
   autoAddAssets?: boolean;
 };
 
-export type JobRunType = (typeof JobRunType)[keyof typeof JobRunType];
-
-export const JobRunType = {
-  manual: 'manual',
-  scheduled: 'scheduled',
-  event: 'event',
-} as const;
-
 export type ProjectRunRefDto = {
   id: string;
   createdAt: string;
   workflowName: string;
   status: JobStatus;
   jobRunType: JobRunType;
-};
-
-export type WeeklyNewVulnerabilitiesDto = {
-  /** Monday of the week (ISO date) */
-  week: string;
-  critical: number;
-  high: number;
-  medium: number;
-  low: number;
-  info: number;
 };
 
 /**
@@ -5990,15 +6221,6 @@ export type GetManyProjectRunDtoDto = {
   hasNextPage: boolean;
   pageCount: number;
 };
-
-export type VulnerabilityProvenance =
-  (typeof VulnerabilityProvenance)[keyof typeof VulnerabilityProvenance];
-
-export const VulnerabilityProvenance = {
-  new: 'new',
-  recurring: 'recurring',
-  not_seen: 'not_seen',
-} as const;
 
 export type ProjectSightingDto = {
   /** @nullable */
@@ -7214,6 +7436,14 @@ export type TargetsControllerGetTargetsInWorkspaceParams = {
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
+  /**
+   * Only targets with an open critical vulnerability
+   */
+  hasCritical?: boolean;
+  /**
+   * Only targets not discovered in the last 30 days
+   */
+  stale?: boolean;
   value?: string;
   /**
    * Filter by target type (DOMAIN, CIDR, or IP)
@@ -7239,6 +7469,27 @@ export type TargetsControllerGetTargetRepositoriesParams = {
    * true → only scanned repositories, false → only skipped ones
    */
   isEnabled?: boolean;
+};
+
+export type TargetsControllerGetTargetRunsParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  /**
+   * Only runs still pending or in progress
+   */
+  active?: boolean;
+};
+
+export type TargetsControllerGetTargetChangesParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  kind?: TargetChangeKind;
 };
 
 export type WorkspacesControllerGetWorkspacesParams = {
@@ -7818,6 +8069,18 @@ export type VulnerabilitiesControllerGetVulnerabilitiesParams = {
    * JSON filter tree, e.g. {"logic":"and","items":[{"field":"severity","op":"in","value":["high","critical"]},{"logic":"or","conditions":[{"field":"cve","op":"contains","value":"2024"},{"field":"cvssScore","op":"gte","value":"7"}]}]}. Fields: name, severity, tag, host, ip, port, cve, cwe, target, tool, affectedUrl, cvssScore, epssScore. Ops: eq, neq, contains, notContains, in, notIn, gt, gte, lt, lte.
    */
   filter?: string;
+  /**
+   * Only findings this project reported; each row then carries its sightings in the project (projectSighting)
+   */
+  projectId?: string;
+  /**
+   * With projectId: new, recurring or not seen again in the project
+   */
+  provenance?: VulnerabilityProvenance;
+  /**
+   * With projectId: first or last seen by this project run
+   */
+  jobHistoryId?: string;
 };
 
 export type VulnerabilitiesControllerGetVulnerabilitiesSortOrder =
@@ -7841,6 +8104,10 @@ export const VulnerabilitiesControllerGetVulnerabilitiesSeverityItem = {
 
 export type VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams = {
   targetIds?: string[];
+  /**
+   * Only findings this project reported; adds provenanceCounts
+   */
+  projectId?: string;
 };
 
 export type AgentsControllerListCommandApprovalsParams = {
@@ -14218,6 +14485,1113 @@ export function useTargetsControllerGetTargetRepositories<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions = getTargetsControllerGetTargetRepositoriesQueryOptions(
+    id,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Counts across the targets of the workspace: scanning, with an open critical vulnerability, scheduled, not discovered in 30 days, and open vulnerabilities by severity.
+ * @summary Targets summary
+ */
+export const targetsControllerGetTargetsSummary = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<TargetsSummaryDto>(
+    { url: `/api/targets/summary`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getTargetsControllerGetTargetsSummaryQueryKey = () => {
+  return [`/api/targets/summary`] as const;
+};
+
+export const getTargetsControllerGetTargetsSummaryQueryOptions = <
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetsSummary>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof targetsControllerGetTargetsSummary>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getTargetsControllerGetTargetsSummaryQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof targetsControllerGetTargetsSummary>>
+  > = ({ signal }) =>
+    targetsControllerGetTargetsSummary(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof targetsControllerGetTargetsSummary>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type TargetsControllerGetTargetsSummaryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof targetsControllerGetTargetsSummary>>
+>;
+export type TargetsControllerGetTargetsSummaryQueryError = unknown;
+
+export function useTargetsControllerGetTargetsSummary<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetsSummary>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetsSummary>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof targetsControllerGetTargetsSummary>>,
+          TError,
+          Awaited<ReturnType<typeof targetsControllerGetTargetsSummary>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTargetsControllerGetTargetsSummary<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetsSummary>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetsSummary>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof targetsControllerGetTargetsSummary>>,
+          TError,
+          Awaited<ReturnType<typeof targetsControllerGetTargetsSummary>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTargetsControllerGetTargetsSummary<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetsSummary>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetsSummary>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Targets summary
+ */
+
+export function useTargetsControllerGetTargetsSummary<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetsSummary>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetsSummary>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getTargetsControllerGetTargetsSummaryQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Dashboard of one target: asset, service and vulnerability counts with their 7-day change, runs in progress, weekly new vulnerabilities, top open vulnerabilities, exposure, what needs attention, and the projects and issues it belongs to.
+ * @summary Target overview
+ */
+export const targetsControllerGetTargetOverview = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<TargetOverviewDto>(
+    { url: `/api/targets/${id}/overview`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getTargetsControllerGetTargetOverviewQueryKey = (id: string) => {
+  return [`/api/targets/${id}/overview`] as const;
+};
+
+export const getTargetsControllerGetTargetOverviewQueryOptions = <
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetOverview>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetOverview>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getTargetsControllerGetTargetOverviewQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof targetsControllerGetTargetOverview>>
+  > = ({ signal }) =>
+    targetsControllerGetTargetOverview(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof targetsControllerGetTargetOverview>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type TargetsControllerGetTargetOverviewQueryResult = NonNullable<
+  Awaited<ReturnType<typeof targetsControllerGetTargetOverview>>
+>;
+export type TargetsControllerGetTargetOverviewQueryError = unknown;
+
+export function useTargetsControllerGetTargetOverview<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetOverview>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetOverview>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof targetsControllerGetTargetOverview>>,
+          TError,
+          Awaited<ReturnType<typeof targetsControllerGetTargetOverview>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTargetsControllerGetTargetOverview<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetOverview>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetOverview>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof targetsControllerGetTargetOverview>>,
+          TError,
+          Awaited<ReturnType<typeof targetsControllerGetTargetOverview>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTargetsControllerGetTargetOverview<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetOverview>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetOverview>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Target overview
+ */
+
+export function useTargetsControllerGetTargetOverview<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetOverview>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetOverview>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getTargetsControllerGetTargetOverviewQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Runs that scanned assets of the target, newest first, with their job progress on it.
+ * @summary Target runs
+ */
+export const targetsControllerGetTargetRuns = (
+  id: string,
+  params?: TargetsControllerGetTargetRunsParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyTargetRunDtoDto>(
+    { url: `/api/targets/${id}/runs`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getTargetsControllerGetTargetRunsInfiniteQueryKey = (
+  id: string,
+  params?: TargetsControllerGetTargetRunsParams,
+) => {
+  return [
+    'infinite',
+    `/api/targets/${id}/runs`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getTargetsControllerGetTargetRunsQueryKey = (
+  id: string,
+  params?: TargetsControllerGetTargetRunsParams,
+) => {
+  return [`/api/targets/${id}/runs`, ...(params ? [params] : [])] as const;
+};
+
+export const getTargetsControllerGetTargetRunsInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+    TargetsControllerGetTargetRunsParams['page']
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params?: TargetsControllerGetTargetRunsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+        TError,
+        TData,
+        QueryKey,
+        TargetsControllerGetTargetRunsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getTargetsControllerGetTargetRunsInfiniteQueryKey(id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+    QueryKey,
+    TargetsControllerGetTargetRunsParams['page']
+  > = ({ signal, pageParam }) =>
+    targetsControllerGetTargetRuns(
+      id,
+      { ...params, page: pageParam ?? params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+    TError,
+    TData,
+    QueryKey,
+    TargetsControllerGetTargetRunsParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type TargetsControllerGetTargetRunsInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>
+>;
+export type TargetsControllerGetTargetRunsInfiniteQueryError = unknown;
+
+export function useTargetsControllerGetTargetRunsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+    TargetsControllerGetTargetRunsParams['page']
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params: undefined | TargetsControllerGetTargetRunsParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+        TError,
+        TData,
+        QueryKey,
+        TargetsControllerGetTargetRunsParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+          TError,
+          Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTargetsControllerGetTargetRunsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+    TargetsControllerGetTargetRunsParams['page']
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params?: TargetsControllerGetTargetRunsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+        TError,
+        TData,
+        QueryKey,
+        TargetsControllerGetTargetRunsParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+          TError,
+          Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTargetsControllerGetTargetRunsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+    TargetsControllerGetTargetRunsParams['page']
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params?: TargetsControllerGetTargetRunsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+        TError,
+        TData,
+        QueryKey,
+        TargetsControllerGetTargetRunsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Target runs
+ */
+
+export function useTargetsControllerGetTargetRunsInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+    TargetsControllerGetTargetRunsParams['page']
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params?: TargetsControllerGetTargetRunsParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+        TError,
+        TData,
+        QueryKey,
+        TargetsControllerGetTargetRunsParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getTargetsControllerGetTargetRunsInfiniteQueryOptions(
+    id,
+    params,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getTargetsControllerGetTargetRunsQueryOptions = <
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+  TError = unknown,
+>(
+  id: string,
+  params?: TargetsControllerGetTargetRunsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getTargetsControllerGetTargetRunsQueryKey(id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>
+  > = ({ signal }) =>
+    targetsControllerGetTargetRuns(id, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type TargetsControllerGetTargetRunsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>
+>;
+export type TargetsControllerGetTargetRunsQueryError = unknown;
+
+export function useTargetsControllerGetTargetRuns<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+  TError = unknown,
+>(
+  id: string,
+  params: undefined | TargetsControllerGetTargetRunsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+          TError,
+          Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTargetsControllerGetTargetRuns<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+  TError = unknown,
+>(
+  id: string,
+  params?: TargetsControllerGetTargetRunsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+          TError,
+          Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTargetsControllerGetTargetRuns<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+  TError = unknown,
+>(
+  id: string,
+  params?: TargetsControllerGetTargetRunsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Target runs
+ */
+
+export function useTargetsControllerGetTargetRuns<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+  TError = unknown,
+>(
+  id: string,
+  params?: TargetsControllerGetTargetRunsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetRuns>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getTargetsControllerGetTargetRunsQueryOptions(
+    id,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Assets, services and vulnerabilities found on the target, and vulnerabilities confirmed fixed, newest first, a page at a time.
+ * @summary Target changes
+ */
+export const targetsControllerGetTargetChanges = (
+  id: string,
+  params?: TargetsControllerGetTargetChangesParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyTargetChangeDtoDto>(
+    { url: `/api/targets/${id}/changes`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getTargetsControllerGetTargetChangesInfiniteQueryKey = (
+  id: string,
+  params?: TargetsControllerGetTargetChangesParams,
+) => {
+  return [
+    'infinite',
+    `/api/targets/${id}/changes`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getTargetsControllerGetTargetChangesQueryKey = (
+  id: string,
+  params?: TargetsControllerGetTargetChangesParams,
+) => {
+  return [`/api/targets/${id}/changes`, ...(params ? [params] : [])] as const;
+};
+
+export const getTargetsControllerGetTargetChangesInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+    TargetsControllerGetTargetChangesParams['page']
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params?: TargetsControllerGetTargetChangesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+        TError,
+        TData,
+        QueryKey,
+        TargetsControllerGetTargetChangesParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getTargetsControllerGetTargetChangesInfiniteQueryKey(id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+    QueryKey,
+    TargetsControllerGetTargetChangesParams['page']
+  > = ({ signal, pageParam }) =>
+    targetsControllerGetTargetChanges(
+      id,
+      { ...params, page: pageParam ?? params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+    TError,
+    TData,
+    QueryKey,
+    TargetsControllerGetTargetChangesParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type TargetsControllerGetTargetChangesInfiniteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>
+>;
+export type TargetsControllerGetTargetChangesInfiniteQueryError = unknown;
+
+export function useTargetsControllerGetTargetChangesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+    TargetsControllerGetTargetChangesParams['page']
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params: undefined | TargetsControllerGetTargetChangesParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+        TError,
+        TData,
+        QueryKey,
+        TargetsControllerGetTargetChangesParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+          TError,
+          Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTargetsControllerGetTargetChangesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+    TargetsControllerGetTargetChangesParams['page']
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params?: TargetsControllerGetTargetChangesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+        TError,
+        TData,
+        QueryKey,
+        TargetsControllerGetTargetChangesParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+          TError,
+          Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTargetsControllerGetTargetChangesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+    TargetsControllerGetTargetChangesParams['page']
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params?: TargetsControllerGetTargetChangesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+        TError,
+        TData,
+        QueryKey,
+        TargetsControllerGetTargetChangesParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Target changes
+ */
+
+export function useTargetsControllerGetTargetChangesInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+    TargetsControllerGetTargetChangesParams['page']
+  >,
+  TError = unknown,
+>(
+  id: string,
+  params?: TargetsControllerGetTargetChangesParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+        TError,
+        TData,
+        QueryKey,
+        TargetsControllerGetTargetChangesParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getTargetsControllerGetTargetChangesInfiniteQueryOptions(
+    id,
+    params,
+    options,
+  );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getTargetsControllerGetTargetChangesQueryOptions = <
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+  TError = unknown,
+>(
+  id: string,
+  params?: TargetsControllerGetTargetChangesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getTargetsControllerGetTargetChangesQueryKey(id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>
+  > = ({ signal }) =>
+    targetsControllerGetTargetChanges(id, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type TargetsControllerGetTargetChangesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>
+>;
+export type TargetsControllerGetTargetChangesQueryError = unknown;
+
+export function useTargetsControllerGetTargetChanges<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+  TError = unknown,
+>(
+  id: string,
+  params: undefined | TargetsControllerGetTargetChangesParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+          TError,
+          Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTargetsControllerGetTargetChanges<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+  TError = unknown,
+>(
+  id: string,
+  params?: TargetsControllerGetTargetChangesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+          TError,
+          Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTargetsControllerGetTargetChanges<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+  TError = unknown,
+>(
+  id: string,
+  params?: TargetsControllerGetTargetChangesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Target changes
+ */
+
+export function useTargetsControllerGetTargetChanges<
+  TData = Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+  TError = unknown,
+>(
+  id: string,
+  params?: TargetsControllerGetTargetChangesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof targetsControllerGetTargetChanges>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getTargetsControllerGetTargetChangesQueryOptions(
     id,
     params,
     options,

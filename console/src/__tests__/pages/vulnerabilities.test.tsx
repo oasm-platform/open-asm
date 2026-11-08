@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderWithProviders, screen, waitFor } from '@/test/utils';
+import { within } from '@testing-library/react';
 import Vulnerabilities from '@/pages/vulnerabilities/vulnerabilities';
 
 const mockWorkspaces = [{ id: 'ws-1', name: 'Test Workspace' }];
@@ -158,10 +159,13 @@ describe('Vulnerabilities Page', () => {
       expect(screen.getAllByText('Critical').length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByText('High').length).toBeGreaterThanOrEqual(1);
     });
-    expect(screen.getByText('New (7 days)')).toBeInTheDocument();
-    // Each count is its own span, coloured by severity
-    expect(screen.getByText('1 critical')).toBeInTheDocument();
-    expect(screen.getByText('1 high')).toBeInTheDocument();
+    expect(screen.getByTitle('First detected in the last 7 days, still open')).toHaveTextContent('7d');
+    // Every severity's count under the Open figure, zeros included
+    const breakdown = screen.getByRole('list', { name: 'Open vulnerabilities by severity' });
+    expect(within(breakdown).getAllByRole('listitem')).toHaveLength(5);
+    expect(within(breakdown).getByTitle('Critical')).toHaveTextContent('1');
+    expect(within(breakdown).getByTitle('High')).toHaveTextContent('1');
+    expect(within(breakdown).getByTitle('Info')).toHaveTextContent('0');
     expect(screen.getByText('MTTR high')).toBeInTheDocument();
     expect(screen.getByText('12 d')).toBeInTheDocument();
   });

@@ -10,6 +10,7 @@ const targetsSearchSchema = z.object({
   type: z.string().optional(),
   status: z.string().optional(),
   scope: z.string().optional(),
+  view: z.string().optional(),
 });
 
 export const Route = createFileRoute('/_authed/targets/')({

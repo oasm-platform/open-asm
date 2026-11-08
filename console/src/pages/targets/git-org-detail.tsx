@@ -25,8 +25,7 @@ import {
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { FastScanDialog } from '../vulnerabilities/components/fast-scan-dialog';
-import { ListVulnerabilities } from '../vulnerabilities/list-vulnerabilitys';
-import VulnerabilitiesStatistic from '../vulnerabilities/vulnerabilites-statistic';
+import { VulnerabilitiesView } from '../vulnerabilities/vulnerabilities-view';
 import { TargetSwitcher } from './components/target-switcher';
 import SettingTarget from './setting-target';
 
@@ -112,7 +111,7 @@ export function GitOrgDetail({
         onValueChange={(value) =>
           navigate({ to: '/targets/$id/$tab', params: { id: target.id, tab: value } })
         }
-        className="w-full"
+        className="w-full gap-4"
       >
         <TabsList>
           {TABS.map((t) => (
@@ -121,12 +120,11 @@ export function GitOrgDetail({
             </TabsTrigger>
           ))}
         </TabsList>
-        <TabsContent value="repositories" className="py-3">
+        <TabsContent value="repositories">
           <RepositoriesTable targetId={target.id} />
         </TabsContent>
-        <TabsContent value="vulnerabilities" className="flex flex-col gap-5 py-3">
-          <VulnerabilitiesStatistic targetId={target.id} />
-          <ListVulnerabilities
+        <TabsContent value="vulnerabilities">
+          <VulnerabilitiesView
             targetId={target.id}
             actions={
               <FastScanDialog
