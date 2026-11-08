@@ -351,21 +351,23 @@ export default function Issues() {
           </TabsList>
         </Tabs>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative w-full max-w-xs">
-            <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
-            <Input
-              aria-label="Search issues"
-              placeholder="Search title or #number…"
-              className="h-9 pl-8"
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-            />
-          </div>
-          {filters}
-        </div>
-
         <DataTable<IssueListItemDto, unknown>
+          // In the table's own toolbar, so the gap to the table is the 16px every list uses.
+          filterComponents={[
+            <div key="filters" className="flex w-full flex-wrap items-center gap-2">
+              <div className="relative w-full max-w-xs">
+                <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+                <Input
+                  aria-label="Search issues"
+                  placeholder="Search title or #number…"
+                  className="h-9 pl-8"
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                />
+              </div>
+              {filters}
+            </div>,
+          ]}
           data={data?.data ?? []}
           columns={columns}
           isLoading={isLoading}

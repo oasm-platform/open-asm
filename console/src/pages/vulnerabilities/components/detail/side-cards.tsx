@@ -13,35 +13,12 @@ import { format } from 'date-fns';
 import { ToolLogo } from '@/components/ui/tool-logo';
 import { Bot, Tag, User } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { SideCard } from '../../../issues/components/detail-blocks';
 import { cweHref, IdGroup } from './overview-content';
 import { ConversationLink, RunLink } from './links';
 
 const fmt = (d?: string | null) =>
   d ? format(new Date(d), 'dd MMM yyyy') : '—';
-
-function SideCard({
-  title,
-  action,
-  children,
-  testId,
-}: {
-  title: ReactNode;
-  action?: ReactNode;
-  children: ReactNode;
-  testId?: string;
-}) {
-  return (
-    <section className="rounded-xl border bg-card" data-testid={testId}>
-      <header className="flex items-center justify-between gap-2 border-b px-4 py-2.5">
-        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          {title}
-        </h3>
-        {action}
-      </header>
-      <div className="flex flex-col gap-2.5 px-4 py-3 text-sm">{children}</div>
-    </section>
-  );
-}
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (

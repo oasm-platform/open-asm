@@ -112,7 +112,7 @@ export function ScheduleTab({
   const week = useWeek(archived ? [] : triggers, names, timezone);
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div className="flex flex-col gap-1.5">

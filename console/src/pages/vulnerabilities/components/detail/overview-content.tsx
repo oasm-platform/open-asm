@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { useCallback, useState, type ReactNode } from 'react';
+import { DetailSection } from '../../../issues/components/detail-blocks';
 import { CodeLocation } from '../code-location';
 
 /** Shared label style so every field label in the page reads the same. */
@@ -103,29 +104,6 @@ export function IdGroup({
 
 export const cweHref = (cwe: string) =>
   `https://cwe.mitre.org/data/definitions/${cwe.replace(/cwe-/i, '')}.html`;
-
-/** A titled block of the overview: neutral heading, icon in a quiet tile. */
-export function Section({
-  title,
-  icon,
-  children,
-}: {
-  title: string;
-  icon: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <section className="flex flex-col gap-3 px-5 py-5">
-      <h3 className="flex items-center gap-2.5 text-sm font-semibold">
-        <span className="flex size-7 items-center justify-center rounded-md bg-muted text-muted-foreground [&>svg]:size-4">
-          {icon}
-        </span>
-        {title}
-      </h3>
-      {children}
-    </section>
-  );
-}
 
 /** Label / value line of a definition list; the label column has a fixed width. */
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -237,7 +215,7 @@ export function VulnerabilityOverview({
   return (
     <div className="flex flex-col divide-y">
       {(description || synopsis) && (
-        <Section title="Description" icon={<FileText />}>
+        <DetailSection title="Description" icon={<FileText />}>
           {description && (
             <p className="max-w-prose text-sm leading-relaxed whitespace-pre-line">
               {description}
@@ -248,19 +226,19 @@ export function VulnerabilityOverview({
               {synopsis}
             </p>
           )}
-        </Section>
+        </DetailSection>
       )}
       {data.solution && (
-        <Section title="Remediation" icon={<Wrench />}>
+        <DetailSection title="Remediation" icon={<Wrench />}>
           <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-4">
             <p className="max-w-prose text-sm leading-relaxed whitespace-pre-line">
               {htmlToPlainText(data.solution)}
             </p>
           </div>
-        </Section>
+        </DetailSection>
       )}
       {hasLocation && (
-        <Section title="Affected location" icon={<MapPin />}>
+        <DetailSection title="Affected location" icon={<MapPin />}>
           <dl className="divide-y divide-dashed">
             {data.asset && (
               <Field label="Asset">
@@ -311,15 +289,15 @@ export function VulnerabilityOverview({
               </Field>
             )}
           </dl>
-        </Section>
+        </DetailSection>
       )}
       {(data.filePath || data.packageName) && (
-        <Section title="Source code" icon={<FileCode />}>
+        <DetailSection title="Source code" icon={<FileCode />}>
           <CodeLocation vulnerability={data} labelClassName={fieldLabel} />
-        </Section>
+        </DetailSection>
       )}
       {hasDetails && (
-        <Section title="Detection details" icon={<Info />}>
+        <DetailSection title="Detection details" icon={<Info />}>
           <dl className="divide-y divide-dashed">
             {!!data.authors?.length && (
               <Field label="Template authors">
@@ -358,16 +336,16 @@ export function VulnerabilityOverview({
               </pre>
             </div>
           )}
-        </Section>
+        </DetailSection>
       )}
       {references.length > 0 && (
-        <Section title="References" icon={<Link2 />}>
+        <DetailSection title="References" icon={<Link2 />}>
           <ul className="flex flex-col">
             {references.map((ref) => (
               <ReferenceLink key={ref} url={ref} />
             ))}
           </ul>
-        </Section>
+        </DetailSection>
       )}
       {isEmpty && (
         <p className="px-5 py-10 text-center text-sm text-muted-foreground">
