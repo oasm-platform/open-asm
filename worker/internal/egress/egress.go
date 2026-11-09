@@ -151,13 +151,6 @@ func (s *Server) route(conn net.Conn) {
 	s.proxy.serveConn(&peekedConn{Conn: conn, peeked: one[:]})
 }
 
-// serveSocks handles SOCKS5 sessions. Task 3 replaces this placeholder with
-// the real armon/go-socks5 handler.
-func (s *Server) serveSocks(conn net.Conn) {
-	s.logWarning("egress socks5 not-ready — closing")
-	_ = conn.Close()
-}
-
 // dialVetted dials upstream after vetting: literal deny check first, then
 // resolve-then-check so a rebound name is refused at the dialed address.
 func (s *Server) dialVetted(ctx context.Context, network, addr string) (net.Conn, error) {
