@@ -5,6 +5,7 @@ import { Project } from '@/modules/projects/entities/project.entity';
 import { ProjectsModule } from '@/modules/projects/projects.module';
 import { StatisticModule } from '@/modules/statistic/statistic.module';
 import { TargetsModule } from '@/modules/targets/targets.module';
+import { TemplatesModule } from '@/modules/templates/templates.module';
 import { VulnerabilitiesModule } from '@/modules/vulnerabilities/vulnerabilities.module';
 import { RemoteExecuteModule } from '@/modules/remote-execute/remote-execute.module';
 import { WorkersModule } from '@/modules/workers/workers.module';
@@ -67,6 +68,7 @@ import { HttpModule } from '@nestjs/axios';
     WorkersModule,
     ConnectorsModule,
     ProjectsModule,
+    TemplatesModule,
   ],
   controllers: [AgentsController],
   providers: [
