@@ -284,7 +284,7 @@ export const llmProviderSupported: LLMProviderSupported[] = [
     id: LLMProvider.OPENAI,
     name: 'OpenAI',
     logo: '/static/images/openai.svg',
-    handler: (apiKey, model) => createOpenAI({ apiKey }).chat(model),
+    handler: (apiKey, model) => createOpenAI({ apiKey }).responses(model),
     fetchModels: fetchOpenAIModels,
   },
   {
