@@ -5,6 +5,7 @@ import CodeMirror, { EditorView } from '@uiw/react-codemirror';
 import { yamlSchema } from 'codemirror-json-schema/yaml';
 import * as prettierYaml from 'prettier/plugins/yaml';
 import * as prettier from 'prettier/standalone';
+import { FilePlus, PanelLeftOpen, Sparkles, Upload } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { parse } from 'yaml';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -17,6 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useTheme } from '@/components/ui/theme-provider';
 import { usePermission } from '@/hooks/usePermission';
 import { handleServerError } from '@/lib/handle-server-error';
+import { cn } from '@/lib/utils';
 import {
   getTemplatesControllerGetContentQueryKey,
   getTemplatesControllerGetManyQueryKey,
@@ -32,6 +34,8 @@ import {
   type State,
   type TemplateTab,
 } from '../hooks/use-template-tabs';
+import { useTemplateUpload } from '../hooks/use-template-upload';
+import { AiGenButton } from './ai-gen-button';
 import { RunTemplatesDialog } from './run-templates-dialog';
 import { TemplateTabs } from './template-tabs';
 import { nucleiSchema } from '../nuclei-schema';
@@ -245,11 +249,10 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
   );
 }
 
-export function TemplateEditor() {
-  const { tabs, activeId, activate, close, openNew, discardDirty } = useTemplateTabs();
+export function TemplateEditor({ onShowList }: { onShowList?: () => void } = {}) {
+  const { tabs, activeId, activate, close, discardDirty } = useTemplateTabs();
   const queryClient = useQueryClient();
-  const { hasPermission } = usePermission();
-  const { isMobile, setOpenMobile } = useSidebar();
+  const { isMobile } = useSidebar();
   const [closing, setClosing] = useState<TemplateTab | null>(null);
   const active = tabs.find((t) => t.id === activeId);
   const anyDirty = tabs.some(isDirty);
@@ -274,26 +277,27 @@ export function TemplateEditor() {
         activeId={activeId}
         onSelect={activate}
         onClose={requestClose}
-        leading={isMobile ? <SidebarTrigger className="m-1" aria-label="Browse templates" /> : undefined}
+        leading={
+          isMobile ? (
+            <SidebarTrigger className="m-1" aria-label="Browse templates" />
+          ) : onShowList ? (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="m-1 size-7"
+              aria-label="Show template list"
+              title="Show template list"
+              onClick={onShowList}
+            >
+              <PanelLeftOpen />
+            </Button>
+          ) : undefined
+        }
       />
       {active ? (
         <TemplatePane key={active.id} tab={active} />
       ) : (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
-          <p>Select a template or create a new one</p>
-          <div className="flex gap-2">
-            {hasPermission('artifact.write') && (
-              <Button size="sm" onClick={openNew}>
-                New template
-              </Button>
-            )}
-            {isMobile && (
-              <Button size="sm" variant="outline" onClick={() => setOpenMobile(true)}>
-                Browse templates
-              </Button>
-            )}
-          </div>
-        </div>
+        <EmptyState />
       )}
       <ConfirmDialog
         open={blocker.status === 'blocked'}
@@ -314,6 +318,65 @@ export function TemplateEditor() {
         confirmText="Discard"
         onConfirm={() => closing && close(closing.id)}
       />
+    </div>
+  );
+}
+
+/** No open tab: every way to start a template, plus a drop target for YAML files. */
+function EmptyState() {
+  const { hasPermission } = usePermission();
+  const { openNew } = useTemplateTabs();
+  const { isMobile, setOpenMobile } = useSidebar();
+  const { upload, pick, input } = useTemplateUpload();
+  const [dragging, setDragging] = useState(false);
+  const canWrite = hasPermission('artifact.write');
+  const tile = 'h-auto min-w-28 flex-col gap-1.5 py-3';
+
+  return (
+    <div
+      className={cn(
+        'm-3 flex flex-1 flex-col items-center justify-center gap-4 rounded-md text-sm text-muted-foreground',
+        dragging && 'border-2 border-dashed border-primary bg-primary/5',
+      )}
+      onDragOver={(e) => {
+        if (!canWrite || !e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={(e) => {
+        if (!canWrite) return;
+        e.preventDefault();
+        setDragging(false);
+        void upload(e.dataTransfer.files);
+      }}
+    >
+      <p className="font-medium text-foreground">
+        {canWrite ? 'Start a template' : 'Select a template to view it'}
+      </p>
+      {canWrite && (
+        <div className="flex flex-wrap justify-center gap-2">
+          <Button variant="outline" className={tile} onClick={openNew}>
+            <FilePlus className="size-5" />
+            Blank
+          </Button>
+          <AiGenButton className={tile}>
+            <Sparkles className="size-5" />
+            AI gen
+          </AiGenButton>
+          <Button variant="outline" className={tile} onClick={pick}>
+            <Upload className="size-5" />
+            Upload YAML
+          </Button>
+          {input}
+        </div>
+      )}
+      {canWrite && <p className="text-xs">Or drop .yaml files here</p>}
+      {isMobile && (
+        <Button size="sm" variant="outline" onClick={() => setOpenMobile(true)}>
+          Browse templates
+        </Button>
+      )}
     </div>
   );
 }

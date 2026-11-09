@@ -1,14 +1,12 @@
 import { SidebarProvider } from '@/components/ui/sidebar';
-import { renderWithProviders, screen, waitFor } from '@/test/utils';
+import { renderWithProviders, screen } from '@/test/utils';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TemplatesSidebar } from './templates-sidebar';
 
-const createAsync = vi.fn();
 const rename = vi.fn();
 const remove = vi.fn();
 
-const openNew = vi.fn();
 const renameTab = vi.fn();
 let canWrite = true;
 
@@ -19,7 +17,6 @@ vi.mock('../hooks/use-template-tabs', async (importOriginal) => {
     ...real,
     useTemplateTabs: () => ({
       ...real.useTemplateTabs(),
-      openNew,
       rename: renameTab,
     }),
   };
@@ -34,7 +31,6 @@ vi.mock('@/hooks/use-debounce', () => ({ default: (v: unknown) => v }));
 vi.mock('@/services/apis/gen/queries', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/services/apis/gen/queries')>()),
   useTemplatesControllerGetMany: vi.fn(),
-  useTemplatesControllerCreate: () => ({ mutateAsync: createAsync }),
   useTemplatesControllerRename: () => ({ mutate: rename, isPending: false }),
   useArtifactsControllerRemove: () => ({ mutate: remove, isPending: false }),
   artifactsControllerDownload: vi.fn(),
@@ -60,6 +56,7 @@ async function setup(
   mine: unknown[],
   shared: unknown[] = [],
   extra: Record<string, unknown> = {},
+  onCollapse?: () => void,
 ) {
   const { useTemplatesControllerGetMany } = await import(
     '@/services/apis/gen/queries'
@@ -74,20 +71,14 @@ async function setup(
   })) as unknown as typeof useTemplatesControllerGetMany);
   return renderWithProviders(
     <SidebarProvider>
-      <TemplatesSidebar />
+      <TemplatesSidebar onCollapse={onCollapse} />
     </SidebarProvider>,
   );
 }
 
-// jsdom's File has no text(); browsers do.
-const yaml = (content: string, name: string) =>
-  Object.assign(new File([content], name), { text: async () => content });
-
 describe('TemplatesSidebar', () => {
   beforeEach(() => {
-    createAsync.mockReset().mockResolvedValue({});
     rename.mockReset();
-    openNew.mockClear();
     renameTab.mockClear();
     canWrite = true;
     remove.mockClear();
@@ -99,8 +90,8 @@ describe('TemplatesSidebar', () => {
       artifact({ id: 'a2', name: 'two.yaml', shareType: 'shared' }),
     ]);
     expect(await screen.findByText('one.yaml')).toBeInTheDocument();
-    expect(screen.getByText('Private')).toBeInTheDocument();
-    expect(screen.getByText('Shared')).toBeInTheDocument();
+    expect(screen.getByText(/^Private · /)).toBeInTheDocument();
+    expect(screen.getByText(/^Shared · /)).toBeInTheDocument();
   });
 
   it('requests name-sorted lists and hints when more exist than shown', async () => {
@@ -115,38 +106,27 @@ describe('TemplatesSidebar', () => {
     expect(screen.getByText('Showing 1 of 250 — search to narrow')).toBeInTheDocument();
   });
 
-  it('always renders Shared with me, with an empty message', async () => {
+  it('Shared filter shows only shared templates, with an empty message', async () => {
+    const user = userEvent.setup();
     await setup([artifact({})]);
-    expect(await screen.findByText('Shared with me')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Shared 0' }));
     expect(screen.getByText('Nothing shared with you yet')).toBeInTheDocument();
+    expect(screen.queryByText('mine.yaml')).not.toBeInTheDocument();
   });
 
-  it('collapses a section from its label', async () => {
+  it('All merges both lists by name; Mine hides shared ones', async () => {
     const user = userEvent.setup();
-    await setup([artifact({})]);
-    await user.click(await screen.findByText('My templates'));
-    await waitFor(() =>
-      expect(screen.queryByText('mine.yaml')).not.toBeInTheDocument(),
+    await setup(
+      [artifact({ id: 'a1', name: 'zeta.yaml' })],
+      [artifact({ id: 's1', name: 'alpha.yaml', isOwner: false })],
     );
-  });
-
-  it('upload error names the file and keeps going', async () => {
-    const { AxiosError } = await import('axios');
-    const { toast } = await import('sonner');
-    const spy = vi.spyOn(toast, 'error').mockImplementation(() => 1);
-    const user = userEvent.setup();
-    createAsync.mockRejectedValueOnce(
-      new AxiosError('bad', '400', undefined, undefined, {
-        status: 400,
-        data: { message: 'Invalid YAML at line 3' },
-      } as never),
-    );
-    await setup([]);
-    const input = (await screen.findByLabelText('Upload templates')) as HTMLInputElement;
-    await user.upload(input, [yaml('a', 'a.yaml'), yaml('id: b', 'b.yaml')]);
-    await waitFor(() => expect(createAsync).toHaveBeenCalledTimes(2));
-    expect(spy).toHaveBeenCalledWith('a.yaml: Invalid YAML at line 3');
-    spy.mockRestore();
+    const all = await screen.findByRole('button', { name: 'All 2' });
+    expect(all).toHaveAttribute('aria-pressed', 'true');
+    const names = screen.getAllByText(/.yaml$/).map((n) => n.textContent);
+    expect(names).toEqual(['alpha.yaml', 'zeta.yaml']);
+    await user.click(screen.getByRole('button', { name: 'Mine 1' }));
+    expect(screen.queryByText('alpha.yaml')).not.toBeInTheDocument();
+    expect(screen.getByText('zeta.yaml')).toBeInTheDocument();
   });
 
   it('lists shared templates with owner name', async () => {
@@ -155,36 +135,20 @@ describe('TemplatesSidebar', () => {
       [artifact({ id: 's1', name: 'theirs.yaml', isOwner: false, createdBy: { id: 'u2', name: 'Bob', image: null } })],
     );
     expect(await screen.findByText('theirs.yaml')).toBeInTheDocument();
-    expect(screen.getByText('Bob')).toBeInTheDocument();
+    expect(screen.getByText(/^Bob · /)).toBeInTheDocument();
   });
 
-  it('empty state offers New and Upload', async () => {
+  it('empty list points to the header actions', async () => {
     await setup([]);
-    expect(
-      await screen.findByRole('button', { name: /new template/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getAllByRole('button', { name: /upload/i }).length,
-    ).toBeGreaterThan(0);
+    expect(await screen.findByText(/no templates yet/i)).toBeInTheDocument();
   });
 
-  it('upload sends one create per selected .yaml file', async () => {
+  it('Hide list collapses the panel', async () => {
     const user = userEvent.setup();
-    await setup([]);
-    const input = (await screen.findByLabelText(
-      'Upload templates',
-    )) as HTMLInputElement;
-    await user.upload(input, [
-      yaml('id: a', 'a.yaml'),
-      yaml('id: b', 'b.yml'),
-    ]);
-    await waitFor(() => expect(createAsync).toHaveBeenCalledTimes(2));
-    expect(createAsync).toHaveBeenCalledWith({
-      data: { name: 'a.yaml', content: 'id: a' },
-    });
-    expect(createAsync).toHaveBeenCalledWith({
-      data: { name: 'b.yml', content: 'id: b' },
-    });
+    const onCollapse = vi.fn();
+    await setup([artifact({})], [], {}, onCollapse);
+    await user.click(await screen.findByRole('button', { name: /hide list/i }));
+    expect(onCollapse).toHaveBeenCalledTimes(1);
   });
 
   it('rename dialog rejects names without .yaml/.yml', async () => {
@@ -245,14 +209,6 @@ describe('TemplatesSidebar', () => {
     expect(screen.queryByRole('menuitem', { name: 'Delete' })).not.toBeInTheDocument();
   });
 
-  it('Ctrl+I opens a new template', async () => {
-    const user = userEvent.setup();
-    await setup([artifact({})]);
-    await screen.findByText('mine.yaml');
-    await user.keyboard('{Control>}i{/Control}');
-    expect(openNew).toHaveBeenCalledTimes(1);
-  });
-
   it('rename success syncs the open tab name', async () => {
     const user = userEvent.setup();
     rename.mockImplementation((_v, o) => o.onSuccess());
@@ -274,18 +230,4 @@ describe('TemplatesSidebar', () => {
     expect(screen.queryByText(/no templates yet/i)).not.toBeInTheDocument();
   });
 
-  it('stops uploading after a 409', async () => {
-    const { AxiosError } = await import('axios');
-    const user = userEvent.setup();
-    createAsync.mockRejectedValue(
-      new AxiosError('full', '409', undefined, undefined, {
-        status: 409,
-        data: { message: 'full' },
-      } as never),
-    );
-    await setup([]);
-    const input = (await screen.findByLabelText('Upload templates')) as HTMLInputElement;
-    await user.upload(input, [yaml('a', 'a.yaml'), yaml('b', 'b.yaml')]);
-    await waitFor(() => expect(createAsync).toHaveBeenCalledTimes(1));
-  });
 });

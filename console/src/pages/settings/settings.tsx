@@ -18,7 +18,7 @@ import {
 import ApiKeysSettings from './components/api-keys-settings';
 import { Files } from '@/pages/files/files';
 import Templates from '@/pages/templates/templates';
-import { AiGenButton } from '@/pages/templates/components/ai-gen-button';
+import { TemplatesHeaderActions } from '@/pages/templates/components/templates-header-actions';
 import AuditLogSettings from './components/audit-log-settings';
 import McpConnect from './components/mcp-connect';
 import MembersSettings from './components/members-settings';
@@ -130,7 +130,7 @@ export const settingsTabGroups: SettingsTabGroup[] = [
         content: {
           title: 'Templates',
           description: 'Custom nuclei templates for this workspace',
-          action: <AiGenButton />,
+          action: <TemplatesHeaderActions />,
         },
         component: <Templates />,
         permission: 'artifact.read',
@@ -282,7 +282,7 @@ const Settings = ({ defaultTab = 'general' }: SettingsProps) => {
     >
       {activeTab && (
         <div className="space-y-4">
-          <div className="flex items-center flex-row justify-between">
+          <div className="flex flex-row items-center justify-between gap-4">
             <div>
               <h3 className="text-lg font-medium">
                 {activeTab.content?.title}
