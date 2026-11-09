@@ -163,26 +163,32 @@ tasks:
     cmds:
       - node scripts/sync-tool-manifest.mjs
 
-  # Cut a release: validate, run the checks, tag, push — CI does the rest
+  # Cut a release: validate, run the checks, stamp + commit, tag, push — CI does the rest
   #
   #   task release -- v0.9.0            # the `--` is required, see below
-  #   task release VERSION=v0.9.0
+  #   task release version=v0.9.0       # VERSION= is accepted too
+  #   task release -- patch             # or minor / major, from the newest tag
   #   task release -- v0.9.0 --dry-run
   #   task release -- v0.9.0 --skip-checks
-  #   task release VERSION=v0.9.0 MESSAGE="Release v0.9.0" SKIP_CHECKS=1
+  #   task release version=v0.9.0 MESSAGE="Release v0.9.0" SKIP_CHECKS=1
   #
   # go-task reads a bare `task release v0.9.0` as a request for a task named
-  # `v0.9.0` and fails, so the separator (or the VERSION= form) is mandatory.
+  # `v0.9.0` and fails, so the separator (or the version= form) is mandatory.
   # Both are forwarded to scripts/release.mjs, which also accepts the env vars.
+  #
+  # Before tagging it writes version/author/license into core-api/package.json
+  # and console/package.json and commits only those two files on main as
+  # `release(oasm): v0.9.0`. The tag points at that commit; main and the tag are
+  # pushed together with `git push --atomic`.
   #
   # Everything downstream keys off the tag: build-release.yml triggers on
   # `push: tags: ['v*']`, so pushing the tag is what produces the binaries, the
   # images and the draft release. The draft is published by hand afterwards —
   # the workflow deliberately does not publish it.
   release:
-    desc: Tag a release and push it, kicking off build-release.yml
+    desc: Stamp the package.json files, commit release(oasm), tag and push, kicking off build-release.yml
     preconditions:
-      - sh: test -n "{{.VERSION}}{{.CLI_ARGS}}"
+      - sh: test -n "{{.VERSION}}{{.version}}{{.CLI_ARGS}}"
         msg: 'Version is required: task release -- v0.9.0'
     env:
       RELEASE_MESSAGE: '{{.MESSAGE}}'
@@ -190,4 +196,4 @@ tasks:
       RELEASE_SKIP_CHECKS: '{{.SKIP_CHECKS}}'
       RELEASE_BRANCH: '{{.BRANCH}}'
     cmds:
-      - node scripts/release.mjs {{.VERSION}} {{.CLI_ARGS}}
+      - node scripts/release.mjs {{.VERSION}} {{.version}} {{.CLI_ARGS}}

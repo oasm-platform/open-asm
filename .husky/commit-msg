@@ -11,11 +11,12 @@
 # refactor(scope): for code refactoring
 # test(scope): for adding or modifying tests
 # ci(scope): for CI related changes
+# release(scope): for the version-stamp commit made by `task release`
 
 commit_msg="$1"
-if ! grep -qE "^((feat|fix|hot-fix|perf|chore|docs|style|refactor|test|ci)\(.+\): )|^(Merge branch|Merged)" "$commit_msg"; then
+if ! grep -qE "^((feat|fix|hot-fix|perf|chore|docs|style|refactor|test|ci|release)\(.+\): )|^(Merge branch|Merged)" "$commit_msg"; then
   echo "Commit message format error!"
-  echo "Commit messages must start with one of: feat(scope):, fix(scope):, chore(scope):, docs(scope):, style(scope):, refactor(scope):, test(scope):, ci(scope):"
+  echo "Commit messages must start with one of: feat(scope):, fix(scope):, chore(scope):, docs(scope):, style(scope):, refactor(scope):, test(scope):, ci(scope):, release(scope):"
   echo "Example: feat(husky): add husky integration"
   exit 1
 fi
