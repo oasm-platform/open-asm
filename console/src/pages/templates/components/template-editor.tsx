@@ -5,14 +5,25 @@ import CodeMirror, { EditorView } from '@uiw/react-codemirror';
 import { yamlSchema } from 'codemirror-json-schema/yaml';
 import * as prettierYaml from 'prettier/plugins/yaml';
 import * as prettier from 'prettier/standalone';
-import { FilePlus, PanelLeftOpen, Sparkles, Upload } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import {
+  CircleAlert,
+  CircleCheck,
+  FilePlus,
+  MoreHorizontal,
+  PanelLeftOpen,
+  Sparkles,
+  Upload,
+} from 'lucide-react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { parse } from 'yaml';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { toast } from 'sonner';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import SeverityBadge from '@/components/ui/severity-badge';
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTheme } from '@/components/ui/theme-provider';
@@ -37,9 +48,18 @@ import {
 import { useTemplateUpload } from '../hooks/use-template-upload';
 import { AiGenButton } from './ai-gen-button';
 import { RunTemplatesDialog } from './run-templates-dialog';
+import { TemplateActionsMenu } from './template-actions-menu';
 import { TemplateTabs } from './template-tabs';
 import { nucleiSchema } from '../nuclei-schema';
 import { readApiError, toastStorageFull } from '../template-errors';
+import { readTemplateMeta } from '../template-meta';
+
+// Server-side cap on template size (TemplatesService).
+const MAX_TEMPLATE_BYTES = 256 * 1024;
+const MOD = /Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘' : 'Ctrl+';
+
+const formatBytes = (n: number) =>
+  n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`;
 
 /** `<id>.yaml` from the top-level YAML id, sanitized; the default name if absent or unparsable. */
 function nameFromContent(content: string): string {
@@ -67,6 +87,8 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
   });
   const { saving } = tab;
   const [yamlError, setYamlError] = useState<string | null>(null);
+  const { isMobile } = useSidebar();
+  const [cursor, setCursor] = useState({ line: 1, col: 1 });
 
   const { data, isError, isFetchedAfterMount, refetch } =
     useTemplatesControllerGetContent(tab.artifactId ?? '', {
@@ -181,33 +203,99 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
     [tab.name],
   );
 
+  // Parsed off the typing path: a 256 KB template would lag every keystroke.
+  const deferred = useDeferredValue(tab.content);
+  const meta = useMemo(() => readTemplateMeta(deferred), [deferred]);
+  const bytes = useMemo(() => new TextEncoder().encode(deferred).length, [deferred]);
+  const ready = !loading && !loadFailed;
+  const formatDisabled = readOnly || loading || loadFailed;
+
   return (
     <div className="flex flex-1 min-h-0 flex-col">
-      <div className="flex items-center gap-2 border-b px-3 py-1.5 text-xs text-muted-foreground">
-        <span className="truncate" aria-live="polite">
-          {status}
-        </span>
-        <div className="ml-auto flex gap-2">
+      {/* Wraps in a narrow pane so Run/Format/Save stay reachable. */}
+      <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
+        <div className="min-w-0 flex-1 basis-48">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-sm font-medium">{meta.name ?? tab.name}</span>
+            {ready && meta.severity && <SeverityBadge severity={meta.severity} />}
+            {ready && meta.protocol && (
+              <Badge variant="secondary" className="font-normal">
+                {meta.protocol}
+              </Badge>
+            )}
+          </div>
+          {ready && (meta.id || meta.tags.length > 0) && (
+            <p className="truncate text-xs text-muted-foreground">
+              {[meta.id && `id: ${meta.id}`, meta.tags.length && `tags: ${meta.tags.join(', ')}`]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
+          )}
+        </div>
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          <span
+            aria-live="polite"
+            className={cn(
+              'max-w-56 truncate rounded-full px-2 py-0.5 text-xs',
+              dirty && !readOnly
+                ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+                : 'bg-muted text-muted-foreground',
+            )}
+          >
+            {status}
+          </span>
+          <TemplateActionsMenu
+            file={tab.artifactId ? data?.artifact : undefined}
+            align="end"
+            trigger={
+              <Button size="sm" variant="outline" aria-label="More actions">
+                <MoreHorizontal />
+              </Button>
+            }
+          >
+            {/* Phones keep only Run outside the menu. */}
+            {isMobile && (
+              <>
+                <DropdownMenuItem disabled={formatDisabled} onSelect={() => void format()}>
+                  Format
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={!canSave} onSelect={() => void save()}>
+                  {saving ? 'Saving…' : 'Save'}
+                </DropdownMenuItem>
+              </>
+            )}
+          </TemplateActionsMenu>
+          {!isMobile && (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void format()}
+                disabled={formatDisabled}
+              >
+                Format
+              </Button>
+              <Button
+                size="sm"
+                variant={dirty ? 'default' : 'outline'}
+                onClick={() => void save()}
+                disabled={!canSave}
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </Button>
+            </>
+          )}
           {tab.artifactId && (
             <RunTemplatesDialog
               templateId={tab.artifactId}
+              // Primary once saved; while dirty, Save is the next step.
+              variant={dirty ? 'outline' : 'default'}
               // The server runs the saved version, so unsaved edits must not look runnable.
               disabled={
                 dirty || loading || loadFailed || !hasPermission('vulnerability.write')
               }
             />
           )}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => void format()}
-            disabled={readOnly || loading || loadFailed}
-          >
-            Format
-          </Button>
-          <Button size="sm" onClick={() => void save()} disabled={!canSave}>
-            {saving ? 'Saving…' : 'Save'}
-          </Button>
         </div>
       </div>
       {yamlError && (
@@ -242,7 +330,45 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
             editable={!readOnly}
             className="text-sm h-full"
             height="100%"
+            onStatistics={(s) =>
+              setCursor({
+                line: s.line.number,
+                col: s.selectionAsSingle.head - s.line.from + 1,
+              })
+            }
           />
+        </div>
+      )}
+      {ready && (
+        <div className="flex items-center gap-4 border-t px-3 py-1 text-xs text-muted-foreground">
+          {meta.error ? (
+            <span
+              className="flex min-w-0 items-center gap-1 text-destructive"
+              title={meta.error.message}
+            >
+              <CircleAlert className="size-3.5 shrink-0" />
+              <span className="truncate">
+                {meta.error.line ? `YAML error on line ${meta.error.line}` : 'YAML error'}
+              </span>
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+              <CircleCheck className="size-3.5" /> Valid YAML
+            </span>
+          )}
+          <span className="whitespace-nowrap">
+            Ln {cursor.line}, Col {cursor.col}
+          </span>
+          <span
+            className={cn('whitespace-nowrap', bytes > MAX_TEMPLATE_BYTES && 'text-destructive')}
+          >
+            {formatBytes(bytes)} / 256 KB
+          </span>
+          {!readOnly && (
+            <span className="ml-auto hidden whitespace-nowrap lg:inline">
+              {MOD}S save · {MOD}Shift+F format
+            </span>
+          )}
         </div>
       )}
     </div>
