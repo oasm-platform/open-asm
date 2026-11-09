@@ -21,6 +21,7 @@ import { ProjectsService } from '@/modules/projects/projects.service';
 import { RemoteExecuteService } from '@/modules/remote-execute/remote-execute.service';
 import { StatisticService } from '@/modules/statistic/statistic.service';
 import { TargetsService } from '@/modules/targets/targets.service';
+import { TemplatesService } from '@/modules/templates/templates.service';
 import { ToolConfigProfilesService } from '@/modules/tools/tool-config-profiles.service';
 import { ToolsService } from '@/modules/tools/tools.service';
 import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilities.service';
@@ -268,6 +269,7 @@ export class AgentTool {
     private readonly projectTriggersService: ProjectTriggersService,
     private readonly projectWorkflowsService: ProjectWorkflowsService,
     private readonly eventBridge: EventBridgeService,
+    private readonly templatesService: TemplatesService,
     @Inject(forwardRef(() => VulnerabilityReviewService))
     private readonly vulnerabilityReviewService: WrapperType<VulnerabilityReviewService>,
   ) {}
@@ -302,6 +304,7 @@ export class AgentTool {
       projectTriggersService: this.projectTriggersService,
       projectWorkflowsService: this.projectWorkflowsService,
       eventBridge: this.eventBridge,
+      templatesService: this.templatesService,
     };
   }
 
@@ -322,7 +325,7 @@ export class AgentTool {
     return memoryTools(this.deps, workspaceId, userId, conversationId);
   }
 
-  /** save_file: writes into the user's own private workspace files. */
+  /** save_file (the user's private Files) and save_template (workspace templates). */
   getArtifactTools(
     workspaceId: string,
     userId: string,
