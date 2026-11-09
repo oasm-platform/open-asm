@@ -18,6 +18,7 @@ import {
 import ApiKeysSettings from './components/api-keys-settings';
 import { Files } from '@/pages/files/files';
 import Templates from '@/pages/templates/templates';
+import { AiGenButton } from '@/pages/templates/components/ai-gen-button';
 import AuditLogSettings from './components/audit-log-settings';
 import McpConnect from './components/mcp-connect';
 import MembersSettings from './components/members-settings';
@@ -129,6 +130,7 @@ export const settingsTabGroups: SettingsTabGroup[] = [
         content: {
           title: 'Templates',
           description: 'Custom nuclei templates for this workspace',
+          action: <AiGenButton />,
         },
         component: <Templates />,
         permission: 'artifact.read',
