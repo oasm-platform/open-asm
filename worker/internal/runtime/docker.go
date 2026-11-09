@@ -39,6 +39,15 @@ type DockerRuntime struct {
 	// connectorNetwork, when set, replaces the default bridge for connector
 	// containers (WORKER_CONNECTOR_NETWORK); empty keeps the bridge.
 	connectorNetwork string
+	// egressAddr is the resolved dial address containers use to reach the
+	// worker-local egress proxy (host:port), derived from connectorAddr by
+	// swapping in the egress port. Empty = egress disabled.
+	egressAddr string
+	// egressEnabled gates proxy env injection (WORKER_EGRESS_PROXY).
+	egressEnabled bool
+	// egressGrpcHost is core-api's address for NO_PROXY (containers must
+	// reach it directly for callbacks, never via the proxy).
+	egressGrpcHost string
 	// cpuQuotaUnsupported is set when the daemon lacks CPU CFS quota support;
 	// such daemons reject any NanoCPUs value at container create (#734).
 	cpuQuotaUnsupported bool
@@ -714,7 +723,7 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	if execID == "" {
 		execID = generateExecID()
 	}
-	env := buildContainerEnv(spec, d.connectorAddr, d.connectorToken, execID)
+	env := buildContainerEnv(spec, d.connectorAddr, d.connectorToken, execID, EgressConfig{Addr: d.egressAddr, GrpcHost: d.egressGrpcHost, Enabled: d.egressEnabled})
 
 	// Container config: image, env, labels for lifecycle management.
 	// oasm.pool_key (normalized image) names pooled containers and lets the
@@ -1203,6 +1212,42 @@ func shortID(id string) string {
 	return id
 }
 
+// EgressConfig carries the worker-local egress proxy address into container
+// creation. Addr is the resolved dial address (host:port); empty disables
+// injection. GrpcHost is core-api's address, always bypassed via NO_PROXY.
+type EgressConfig struct {
+	Addr     string
+	GrpcHost string
+	Enabled  bool
+}
+
+// WithEgressPort derives the egress dial address from the resolved connector
+// dial address by swapping the port. A bare host gets the port appended; an
+// empty address stays empty (egress disabled).
+func WithEgressPort(connectorAddr string, egressPort int) string {
+	if connectorAddr == "" {
+		return ""
+	}
+	if host, _, err := net.SplitHostPort(connectorAddr); err == nil {
+		return net.JoinHostPort(host, strconv.Itoa(egressPort))
+	}
+	return net.JoinHostPort(strings.Trim(connectorAddr, "[]"), strconv.Itoa(egressPort))
+}
+
+// ConnectorAddr returns the resolved dial address containers use to reach
+// the worker (host:port). Used to derive sibling listener addresses.
+func (d *DockerRuntime) ConnectorAddr() string {
+	return d.connectorAddr
+}
+
+// ConfigureEgress wires the resolved egress dial address and enable flag
+// (call once at startup after listening; safe before Create).
+func (d *DockerRuntime) ConfigureEgress(addr, grpcHost string, enabled bool) {
+	d.egressAddr = addr
+	d.egressGrpcHost = grpcHost
+	d.egressEnabled = enabled
+}
+
 // buildContainerEnv constructs the env var slice for a connector container.
 // IMPORTANT (Phase 2 warm pool): this env is FIRST-RUN ONLY. A reused idle
 // container keeps its original env; per-job inputs and the config profile
@@ -1215,7 +1260,7 @@ func shortID(id string) string {
 // WORKER_GRPC_HOST only. WORKER_TOKEN prefers the per-execution single-use
 // token (spec.ConnectorToken, set by the Manager) and falls back to the
 // legacy shared secret (connectorToken) for back-compat.
-func buildContainerEnv(spec JobSpec, connectorAddr, connectorToken, execID string) []string {
+func buildContainerEnv(spec JobSpec, connectorAddr, connectorToken, execID string, egress EgressConfig) []string {
 	// Single-use per-execution token wins; the shared secret is the legacy
 	// fallback for direct runtime users that never went through the Manager.
 	workerToken := connectorToken
@@ -1242,6 +1287,37 @@ func buildContainerEnv(spec JobSpec, connectorAddr, connectorToken, execID strin
 		)
 	} else {
 		env = append(env, "WORKER_GRPC_HOST="+connectorAddr)
+	}
+
+	// Egress proxy (Phase PR1): route container traffic through the
+	// worker-local listener. Always emit the marker so connectors can tell
+	// proxied runs from direct ones; emit proxy vars only when enabled with
+	// a resolved address. The per-execution token is the proxy credential —
+	// the same token the connector presents on Register.
+	if egress.Enabled && egress.Addr != "" {
+		proxyUser := workerToken
+		host, port, err := net.SplitHostPort(egress.Addr)
+		if err != nil {
+			host, port = egress.Addr, "26277"
+		}
+		httpProxy := "http://" + proxyUser + "@" + net.JoinHostPort(host, port)
+		socksProxy := "socks5h://" + proxyUser + "@" + net.JoinHostPort(host, port)
+		env = append(env,
+			"HTTP_PROXY="+httpProxy,
+			"HTTPS_PROXY="+httpProxy,
+			"http_proxy="+httpProxy,
+			"https_proxy="+httpProxy,
+			"ALL_PROXY="+socksProxy,
+			"all_proxy="+socksProxy,
+			"WORKER_EGRESS_PROXY=on",
+		)
+		noProxy := []string{"localhost", "127.0.0.1", "::1", host}
+		if egress.GrpcHost != "" {
+			noProxy = append(noProxy, egress.GrpcHost)
+		}
+		env = append(env, "NO_PROXY="+strings.Join(noProxy, ","), "no_proxy="+strings.Join(noProxy, ","))
+	} else {
+		env = append(env, "WORKER_EGRESS_PROXY=off")
 	}
 
 	// Inject connector config profile as OASM_CONFIG JSON when present.

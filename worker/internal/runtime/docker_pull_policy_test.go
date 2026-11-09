@@ -97,7 +97,7 @@ func TestCreateSkipsPullWhenImageCached(t *testing.T) {
 // --- cache env vars ---
 
 func TestBuildContainerEnvCacheDirs(t *testing.T) {
-	env := buildContainerEnv(JobSpec{JobID: "j-1", Tool: "nuclei", TraceID: "t-1"}, "host:50051", "tok", "e-1")
+	env := buildContainerEnv(JobSpec{JobID: "j-1", Tool: "nuclei", TraceID: "t-1"}, "host:50051", "tok", "e-1", EgressConfig{})
 	for _, want := range []string{
 		"HOME=/tmp",
 		"XDG_CACHE_HOME=/tmp/.cache",
