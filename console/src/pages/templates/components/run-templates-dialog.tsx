@@ -47,10 +47,15 @@ interface RunTemplatesDialogProps {
   /** The open template, preselected. */
   templateId: string;
   disabled?: boolean;
+  variant?: 'default' | 'outline';
 }
 
 /** Runs saved templates with nuclei on targets, assets or projects. */
-export function RunTemplatesDialog({ templateId, disabled }: RunTemplatesDialogProps) {
+export function RunTemplatesDialog({
+  templateId,
+  disabled,
+  variant = 'outline',
+}: RunTemplatesDialogProps) {
   const [open, setOpen] = useState(false);
   const [templateIds, setTemplateIds] = useState<Set<string>>(new Set());
   const [scope, setScope] = useState<Scope>('targets');
@@ -85,7 +90,7 @@ export function RunTemplatesDialog({ templateId, disabled }: RunTemplatesDialogP
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <Button
         size="sm"
-        variant="outline"
+        variant={variant}
         disabled={disabled}
         title="Run saved templates against targets, assets or groups"
         onClick={() => handleOpenChange(true)}
