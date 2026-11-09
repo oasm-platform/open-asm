@@ -1,10 +1,10 @@
 {
   "name": "core-api",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "description": "",
-  "author": "",
+  "author": "oasm-platform",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "GPL-3.0-only",
   "scripts": {
     "build": "nest build",
     "typeorm": "typeorm-ts-node-commonjs -r tsconfig-paths/register",
