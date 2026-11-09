@@ -21,7 +21,8 @@ Before substantial work:
 5. **Never commit `.env`** (gitignored). Copy from `*/example.env` / `worker/.example.env` via `task init` (the worker one is manual).
 6. **Ask before scope-creep.** Schema changes, new public API contracts, dependency bumps, and CI/workflow edits need explicit user sign-off — do not add them "while you're in there".
 7. **Keep every PR small and single-purpose.** Target ≤ 400 changed lines; CI (`pr-size`) fails above 1,000 lines or 40 files. See [Pull Request Size](#pull-request-size) — plan the split *before* writing code, not after.
-8. **`.agents/skills/*` is third-party and hash-pinned in `skills-lock.json`** (synced by `npx @tanstack/intent`). Several of those skills tell you to run `npm run test` / `npm run lint` — ignore that, hard rule 1 wins. Never edit files under `.agents/skills/`; they are overwritten on the next sync.
+8. **Every core-api module has its own `AGENTS.md`, and it changes with the module.** See [Module AGENTS.md](#module-agentsmd--required-per-module). Creating a module under `core-api/src/modules/` means creating its `AGENTS.md`. Changing a module's routes, entities, events, queues, exports, cross-module wiring or invariants means updating its `AGENTS.md` in the same change.
+9. **`.agents/skills/*` is third-party and hash-pinned in `skills-lock.json`** (synced by `npx @tanstack/intent`). Several of those skills tell you to run `npm run test` / `npm run lint` — ignore that, hard rule 1 wins. Never edit files under `.agents/skills/`; they are overwritten on the next sync.
 
 ## Pull Request Size
 
@@ -32,6 +33,27 @@ Reviewers can't review large AI-generated diffs properly, so size is a hard cons
 3. **No drive-by edits.** Do not reformat untouched code, rename unrelated symbols, "tidy up" neighbouring files or fix unrelated lint. Mention them to the user as follow-ups instead.
 4. **Check the diff size before declaring done:** `git diff --shortstat origin/main...HEAD` (this count includes generated files; CI excludes them). If you are over budget, tell the user and suggest where to cut. Don't quietly hand over an oversized change.
 5. **Never apply the `size/override` label yourself.** Only a maintainer decides that a large PR is acceptable.
+
+## Module AGENTS.md — required per module
+
+Every folder in `core-api/src/modules/<name>/` has an `AGENTS.md` that gives an agent the context for that module. **Read it before changing the module.** Keep it up to date in the same PR as the code:
+
+- **New module**: add `core-api/src/modules/<name>/AGENTS.md`. A PR that adds a module without one is incomplete.
+- **Changed module**: if the change touches anything the file describes (routes and permissions, entities and data model, events, queues and processors, gRPC, exported providers, imports from other modules, invariants, gotchas), edit those lines. If you move, rename or delete something, remove the old reference. A stale `AGENTS.md` is worse than none.
+- **Cross-module change**: update the `AGENTS.md` of every module whose coupling changed, on both sides.
+- **Removed module**: its `AGENTS.md` goes with it, and other modules' files stop referencing it.
+
+Format (see `core-api/src/modules/comments/AGENTS.md` for a short example). Use these sections and drop any that don't apply:
+
+1. `# <name> module` and a one- or two-line purpose.
+2. `## Layout`: the important files and subfolders, one line each. Don't list every file.
+3. `## Public surface`: HTTP routes with their permission/role, gRPC methods, MCP/agent tools, exported providers, events published and consumed, BullMQ queues/jobs.
+4. `## Data model`: entities, key columns and constraints, cascade/soft-delete behaviour.
+5. `## Invariants`: rules the code relies on that a reader would get wrong (tenant scoping, ordering, idempotency, security checks).
+6. `## Coupling`: which modules it imports or is imported by, cycles and `forwardRef`, other code that writes its tables directly.
+7. `## Gotchas` / `## Testing`: non-obvious pitfalls, and where the specs are or that there are none.
+
+Same rules as this file: write facts that are true of the code today and that an agent would otherwise get wrong. Leave out generic NestJS advice. Name files and symbols exactly so they can be grepped. Aim for 30–120 lines. Don't copy code.
 
 ## Repository Layout
 
@@ -96,6 +118,10 @@ task migration:revert
 
 # Docker
 task docker-compose    # build+recreate full stack (workers=N scales oasm-worker, default 1)
+
+# Release — see Releases below; only when the user explicitly asks
+task release -- patch --dry-run          # preview: prints every change and command, writes nothing
+task release -- v0.13.0                  # stamp package.json files, commit, tag, push main + tag
 ```
 
 Missing entries: `console:test:coverage`, `console:e2e`, `api:test:watch`, `api:test:cov` exist as package scripts but have **no** task entry — add one instead of calling the script.
@@ -189,10 +215,43 @@ Migration location: `core-api/src/database/migrations/` (58 files, newest last).
 
 ## Git Hooks & CI
 
-- Husky v9. `pre-commit` — **fully commented out**, nothing is enforced locally. `commit-msg` — Conventional Commits required: `feat|fix|hot-fix|perf|chore|docs|style|refactor|test|ci(<scope>):`, merges allowed.
+- Husky v9. `pre-commit` — **fully commented out**, nothing is enforced locally. `commit-msg` — Conventional Commits required: `feat|fix|hot-fix|perf|chore|docs|style|refactor|test|ci|release(<scope>):`, merges allowed. `release` is reserved for the commit `task release` makes — don't use it by hand.
 - CI (`.github/workflows/`, all path-filtered; the required checks `check-lint` / `check-test` filter inside the job so they always report on PRs): `check-lint` (core-api + console matrix), `check-test` (core-api only), `check-build`, `frontend-tests` (console, `main` only), `worker-ci` (go fmt check + vet + build cli/app), `build-release` / `build-nightly`. `pr-size` is the exception: it runs on every PR via `pull_request_target`, posts a sticky bot comment and fails above 1,000 lines / 40 files. It must never check out PR code. Toolchain: Node **22** (`.nvmrc`), pnpm **10.33.2** (`packageManager` in root `package.json` — the only place to bump it), Go **1.26**. Dependabot PRs for patch/minor get auto-merged by `dependabot-auto-merge.yml` once required checks pass.
 - Since pre-commit is inert, **you** must run `task lint` and `task test` before declaring a change done.
 - Local CI rehearsal: `bash .github/scripts/test-local.sh <workflow>` (needs Docker + `act`).
+
+## Releases
+
+A release is one command, `task release`, run from the repo root on `main` (`taskfile.yml` → `scripts/release.mjs`). **Agents never run a real release on their own initiative** — it pushes to `main` and starts `build-release.yml`. A `--dry-run` is safe to run; the real thing needs the user's explicit go-ahead for that exact version.
+
+```bash
+task release -- patch --dry-run                # always preview first
+task release -- patch --dry-run --skip-checks  # quick preview without lint + test
+task release -- v0.13.0                        # explicit version (`v` is added if missing)
+task release version=v0.13.0                   # same; VERSION= also works
+task release -- minor                          # patch | minor | major, bumped from the newest semver tag
+task release -- v0.13.0-rc.1                   # prerelease
+```
+
+The `--` is mandatory: go-task reads a bare `task release v0.13.0` as a task named `v0.13.0`. Other flags: `--skip-checks` (no `task lint` / `task test`, release is unverified), `--branch NAME`, `--all` (include bot/ci/style/release commits in the notes), `MESSAGE="…"` (custom tag message instead of the changelog). `--help` prints them all.
+
+What a real run does, in order — it stops at the first failure:
+
+1. **Pre-flight**: `git fetch --prune --prune-tags` (tags deleted on the remote are dropped locally), then refuses unless the working tree is completely clean (untracked files count), the current branch is `main`, HEAD equals `origin/main`, the tag exists neither locally nor on the remote, and the version is newer than the newest semver tag. Both package.json files are read and checked here too.
+2. **Checks**: `task lint` then `task test`, then the tree must still be clean (`api:lint` runs `--fix`). Commit any lint fixes and run the release again.
+3. **Stamp**: writes `version` (tag without `v`), `author: "oasm-platform"` and `license: "GPL-3.0-only"` into `core-api/package.json` and `console/package.json`. The root `package.json` is the workspace manifest and is not touched. Values live in `PACKAGES` / `PACKAGE_FIELDS` at the top of `scripts/release.mjs`.
+4. **Commit**: only those two files, on `main`, as `release(oasm): v0.13.0`. If the commit fails (e.g. the hook), both files are restored and nothing is tagged.
+5. **Tag**: annotated tag on the release commit; its message is the changelog since the previous tag.
+6. **Push**: `git push --atomic origin refs/heads/main refs/tags/v0.13.0` — both refs land or neither does. This is a direct push to protected `main`, so it only works for an account allowed to bypass the protection.
+
+After the push, `build-release.yml` (on `push: tags: ['v*']`) builds the worker binaries and images and creates a **draft** GitHub release with the same notes (`node scripts/release.mjs --notes-only`). Publishing the draft is a manual step in the GitHub UI.
+
+Gotchas:
+
+- `git tag --list` sorts lexically (`v0.9.1` after `v0.12.0`). Use `task release -- patch --dry-run` or `git describe --tags --abbrev=0 origin/main` to see the real newest version.
+- A dirty tree blocks the release, including uncommitted files from other work. Commit them or move them aside first. Don't stash on the user's behalf.
+- If the push fails, the local release commit and tag stay. The script prints the exact push command to retry, plus the undo (`git tag -d vX && git reset --keep <previous HEAD>`).
+- The package.json files must stay plain 2-space `JSON.stringify` form. If a file would be reformatted, the release refuses before writing anything.
 
 ## Docker
 

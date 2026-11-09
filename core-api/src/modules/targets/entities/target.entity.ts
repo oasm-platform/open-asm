@@ -189,6 +189,7 @@ export class Target extends BaseEntity {
   @Column({ nullable: true })
   jobId: string;
 
+  @ApiProperty({ type: String, required: false, nullable: true })
   @Column({ type: 'uuid', nullable: true })
   internalNetworkId: string;
 

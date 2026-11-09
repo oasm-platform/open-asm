@@ -1,3 +1,4 @@
+import { StatCard } from '@/components/common/stat-card';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import JobStatusBadge from '@/components/ui/job-status';
@@ -39,11 +40,11 @@ import {
   ShieldAlert,
   TrendingUp,
   Waypoints,
-  type LucideIcon,
 } from 'lucide-react';
 import { memo, useMemo } from 'react';
-import { SeverityCounts } from '../components/severity-bar';
-import { ProvenanceBadge, TimelineSheet } from './vulnerabilities-tab';
+import { SeverityBreakdown } from '../components/severity-bar';
+import { ProvenanceBadge } from '../../vulnerabilities/components/provenance-badge';
+import { TimelineSheet } from './vulnerabilities-tab';
 import {
   assetCount,
   runTriggerLabel,
@@ -97,40 +98,6 @@ const WORKFLOW_CHANGES: Partial<Record<ProjectChange, string>> = {
 const vulnerabilityCount = (n: number) =>
   `${n} vulnerabilit${n === 1 ? 'y' : 'ies'}`;
 
-/** Same card as the dashboard's statistics: title and icon, then the number. */
-function Kpi({
-  label,
-  value,
-  icon: Icon,
-  onClick,
-  children,
-}: {
-  label: string;
-  value: string;
-  icon: LucideIcon;
-  onClick?: () => void;
-  children?: React.ReactNode;
-}) {
-  return (
-    <Card
-      className={cn(
-        'gap-2',
-        onClick && 'cursor-pointer transition-colors hover:bg-accent/70',
-      )}
-      onClick={onClick}
-    >
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle>{label}</CardTitle>
-        <Icon className="size-5 text-primary" />
-      </CardHeader>
-      <CardContent className="flex min-w-0 flex-col gap-2">
-        <p className="truncate font-mono text-4xl font-bold">{value}</p>
-        {children}
-      </CardContent>
-    </Card>
-  );
-}
-
 /**
  * New vulnerabilities per week, stacked by severity (critical at the base).
  * Severity keeps the colours it has everywhere in the console; since red,
@@ -138,7 +105,7 @@ function Kpi({
  * tooltip with each count, the legend names every colour, and a table carries
  * the same numbers for screen readers.
  */
-const WeeklyChart = memo(function WeeklyChart({
+export const WeeklyChart = memo(function WeeklyChart({
   weeks,
 }: {
   weeks: WeeklyNewVulnerabilitiesDto[];
@@ -460,7 +427,7 @@ export function OverviewTab({
   return (
     <div className="flex flex-col gap-4">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Kpi
+        <StatCard
           label="Assets"
           value={String(overview.totalAssets)}
           icon={Waypoints}
@@ -469,19 +436,16 @@ export function OverviewTab({
           <span className="text-sm text-muted-foreground">
             +{overview.newAssets} in the last 7 days
           </span>
-        </Kpi>
-        <Kpi
+        </StatCard>
+        <StatCard
           label="Open vulnerabilities"
           value={String(open)}
           icon={Bug}
           onClick={() => goTab('vulnerabilities')}
         >
-          <SeverityCounts
-            counts={overview.openVulnerabilities}
-            empty="Nothing open"
-          />
-        </Kpi>
-        <Kpi
+          <SeverityBreakdown counts={overview.openVulnerabilities} />
+        </StatCard>
+        <StatCard
           label="New in 7 days"
           value={`+${overview.newVulnerabilities}`}
           icon={TrendingUp}
@@ -504,8 +468,8 @@ export function OverviewTab({
                 )} · ${freshRuns.length} run${freshRuns.length === 1 ? '' : 's'}`
               : 'No new findings'}
           </span>
-        </Kpi>
-        <Kpi
+        </StatCard>
+        <StatCard
           label="Next run"
           value={next ? dayjs(next.at).fromNow() : '—'}
           icon={CalendarClock}
@@ -521,7 +485,7 @@ export function OverviewTab({
                 ? 'On events'
                 : 'Only when run by hand'}
           </span>
-        </Kpi>
+        </StatCard>
       </div>
 
       <Card>

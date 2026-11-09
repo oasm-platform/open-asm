@@ -221,7 +221,7 @@ const SettingTarget = ({
                         to: '/targets/$id/$tab',
                         params: {
                           id: target.id,
-                          tab: isGitOrg ? 'repositories' : 'inventory',
+                          tab: isGitOrg ? 'repositories' : 'assets',
                         },
                         search: isGitOrg
                           ? {}

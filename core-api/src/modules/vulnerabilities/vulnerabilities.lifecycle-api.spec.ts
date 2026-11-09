@@ -22,6 +22,7 @@ import { VulnerabilityEvent } from './entities/vulnerability-event.entity';
 import { Vulnerability } from './entities/vulnerability.entity';
 import { openVulnerabilityCondition } from './open-vulnerability';
 import { VulnerabilitiesService } from './vulnerabilities.service';
+import { VulnerabilityProvenance } from '../projects/provenance';
 import { vulnerabilityStatusCondition } from './vulnerability-status';
 
 const WS = 'ws-1';
@@ -198,6 +199,71 @@ describe('VulnerabilitiesService lifecycle API', () => {
       expect(qb.orderBy).toHaveBeenCalledWith('vulnerabilities.dueAt', 'DESC', 'NULLS LAST');
     });
 
+    it('narrows to a project, its provenance and run, and adds each sighting', async () => {
+      const { service, vulnRepo, dataSource } = setup();
+      const qb = queryBuilder({ many: [{ id: 'v-1', name: 'XSS' }], total: 1 });
+      vulnRepo.createQueryBuilder.mockReturnValue(qb);
+      const first = new Date('2026-11-01');
+      const last = new Date('2026-11-05');
+      dataSource.query.mockImplementation((sql: string) =>
+        Promise.resolve(
+          sql.includes('pv."timesSeen"')
+            ? [
+                {
+                  id: 'v-1',
+                  timesSeen: 3,
+                  firstSeenJobHistoryId: 'run-1',
+                  firstSeenAt: first,
+                  lastSeenJobHistoryId: 'run-3',
+                  lastSeenAt: last,
+                  provenance: VulnerabilityProvenance.RECURRING,
+                },
+              ]
+            : [],
+        ),
+      );
+
+      const result = await service.getVulnerabilities(
+        listQuery({
+          projectId: 'p-1',
+          provenance: VulnerabilityProvenance.RECURRING,
+          jobHistoryId: 'run-3',
+        }),
+        WS,
+      );
+
+      const projectCall = qb.andWhere.mock.calls.find(([sql]) =>
+        String(sql).includes('project_vulnerabilities'),
+      ) as [string, Record<string, unknown>];
+      expect(projectCall[0]).toContain('pv."projectId" = :projectId');
+      expect(projectCall[0]).toContain(') = :provenance');
+      expect(projectCall[0]).toContain('pv."lastSeenJobHistoryId" = :jobHistoryId');
+      expect(projectCall[1]).toEqual({
+        projectId: 'p-1',
+        provenance: VulnerabilityProvenance.RECURRING,
+        jobHistoryId: 'run-3',
+      });
+      expect(result.data[0].projectSighting).toEqual({
+        provenance: VulnerabilityProvenance.RECURRING,
+        timesSeen: 3,
+        firstSeen: { runId: 'run-1', at: first },
+        lastSeen: { runId: 'run-3', at: last },
+      });
+    });
+
+    it('leaves rows without a project sighting outside a project', async () => {
+      const { service, vulnRepo } = setup();
+      const qb = queryBuilder({ many: [{ id: 'v-1' }], total: 1 });
+      vulnRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const result = await service.getVulnerabilities(listQuery(), WS);
+
+      expect(result.data[0]).not.toHaveProperty('projectSighting');
+      expect(
+        qb.andWhere.mock.calls.some(([sql]) => String(sql).includes('project_vulnerabilities')),
+      ).toBe(false);
+    });
+
     it('skips the enrichment queries on an empty page', async () => {
       const { service, vulnRepo, dataSource } = setup();
       vulnRepo.createQueryBuilder.mockReturnValue(queryBuilder({}));
@@ -322,6 +388,36 @@ describe('VulnerabilitiesService lifecycle API', () => {
         expect(sql).toContain('t.id = ANY($2::uuid[])');
         expect(params).toEqual([WS, ['t-1']]);
       }
+    });
+  });
+
+  describe('getVulnerabilitiesStatistics in a project', () => {
+    it('scopes every count to the project and adds provenance counts', async () => {
+      const { service, dataSource } = setup();
+      dataSource.query.mockImplementation((sql: string) =>
+        Promise.resolve(
+          sql.includes('AS provenance')
+            ? [
+                { provenance: VulnerabilityProvenance.NEW, count: '4' },
+                { provenance: VulnerabilityProvenance.NOT_SEEN, count: '1' },
+              ]
+            : [],
+        ),
+      );
+
+      const stats = await service.getVulnerabilitiesStatistics({ projectId: 'p-1' }, WS);
+
+      expect(stats.provenanceCounts).toEqual({ new: 4, recurring: 0, notSeen: 1 });
+      for (const [sql, params] of dataSource.query.mock.calls as Array<[string, unknown[]]>) {
+        expect(params).toEqual([WS, 'p-1']);
+        expect(sql).toContain(`"projectId" = $2::uuid`);
+      }
+    });
+
+    it('has no provenance counts outside a project', async () => {
+      const { service } = setup();
+      const stats = await service.getVulnerabilitiesStatistics({}, WS);
+      expect(stats).not.toHaveProperty('provenanceCounts');
     });
   });
 

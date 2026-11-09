@@ -4,7 +4,10 @@ import { within } from '@testing-library/react';
 import ProjectDetail from '@/pages/projects/project-detail';
 
 const ROUTE = '/projects/$id/$tab';
-const at = (tab: string) => ({ routePath: ROUTE, initialEntries: [`/projects/project-1/${tab}`] });
+const at = (tab: string, query = '') => ({
+  routePath: ROUTE,
+  initialEntries: [`/projects/project-1/${tab}${query}`],
+});
 
 const binding = {
   id: 'b-1',
@@ -48,6 +51,7 @@ const {
   projectRef,
   workflowsRef,
   vulnsMock,
+  statsMock,
   removeAssetsMock,
   deleteMock,
   updateWorkflowMock,
@@ -56,6 +60,7 @@ const {
     projectRef: { value: {} as Record<string, unknown> },
     workflowsRef: { value: [] as unknown[] },
     vulnsMock: vi.fn(),
+    statsMock: vi.fn(),
     removeAssetsMock: vi.fn(),
     deleteMock: vi.fn(),
     updateWorkflowMock: vi.fn(),
@@ -167,6 +172,47 @@ const vulnerabilities = {
   severityCounts: { critical: 1, high: 2, medium: 0, low: 0, info: 0 },
 };
 
+/** The workspace list filtered by the project: rows carry their sighting. */
+const workspaceVulnerabilities = {
+  data: [
+    {
+      id: 'v-1',
+      name: 'SQL injection',
+      severity: 'critical',
+      detectionStatus: 'active',
+      reviewStatus: 'approved',
+      timesDetected: 3,
+      asset: { id: 'a-1', value: 'api.example.com' },
+      sources: [],
+      dismissal: null,
+      openIssue: null,
+      projectSighting: {
+        provenance: 'recurring',
+        timesSeen: 3,
+        firstSeen: { runId: 'run-1', at: '2026-01-01T00:00:00Z' },
+        lastSeen: { runId: 'run-3', at: '2026-01-03T00:00:00Z' },
+      },
+    },
+  ],
+  total: 1,
+  page: 1,
+  limit: 10,
+  pageCount: 1,
+  hasNextPage: false,
+};
+
+const projectStats = {
+  data: [{ severity: 'critical', count: 1 }],
+  byDetectionStatus: { new: 0, active: 1, resurfaced: 0, fixed: 0 },
+  newLast7Days: 0,
+  resurfacedLast30Days: 0,
+  fixedLast30Days: 0,
+  overdue: 0,
+  pendingReview: 0,
+  mttr: [],
+  provenanceCounts: { new: 1, recurring: 1, notSeen: 1 },
+};
+
 const assets = {
   data: [
     {
@@ -189,6 +235,15 @@ const assets = {
   hasNextPage: false,
 };
 
+vi.mock('@/hooks/useWorkspaceSelector', () => ({
+  useWorkspaceSelector: () => ({
+    workspaces: [{ id: 'ws-1', name: 'Test Workspace' }],
+    selectedWorkspace: 'ws-1',
+    isLoading: false,
+  }),
+  useWorkspaceState: () => ({ state: { selectedWorkspaceId: 'ws-1' } }),
+}));
+
 vi.mock('@/hooks/usePermission', () => ({
   usePermission: () => ({
     permissions: ['*'],
@@ -210,10 +265,16 @@ vi.mock('@/services/apis/gen/queries', async (importOriginal) => {
     ...actual,
     useProjectsControllerGetById: () => ({ data: projectRef.value, isLoading: false }),
     useProjectsControllerGetOverview: () => ({ data: overview, isLoading: false }),
-    useProjectsControllerGetVulnerabilities: (_id: string, params: unknown) => {
+    useProjectsControllerGetVulnerabilities: () => ({ data: vulnerabilities, isLoading: false }),
+    useVulnerabilitiesControllerGetVulnerabilities: (params: unknown) => {
       vulnsMock(params);
-      return { data: vulnerabilities, isLoading: false };
+      return { data: workspaceVulnerabilities, isLoading: false };
     },
+    useVulnerabilitiesControllerGetVulnerabilitiesStatistics: (params: unknown) => {
+      statsMock(params);
+      return { data: projectStats, isLoading: false };
+    },
+    useVulnerabilitiesControllerGetSettings: () => ({ data: { slaDays: { high: 30 } } }),
     useProjectsControllerGetVulnerabilityTimeline: () => ({ data: undefined, isLoading: false }),
     useProjectsControllerGetAssets: () => ({ data: assets, isLoading: false }),
     useProjectsControllerGetScopeRules: () => ({
@@ -267,6 +328,7 @@ beforeEach(() => {
   projectRef.value = baseProject();
   workflowsRef.value = [];
   vulnsMock.mockReset();
+  statsMock.mockReset();
   removeAssetsMock.mockReset();
   deleteMock.mockReset();
   updateWorkflowMock.mockReset();
@@ -332,17 +394,37 @@ describe('Project detail page', () => {
     });
   });
 
-  it('lists vulnerabilities with provenance and filters by it', async () => {
-    const { user } = renderWithProviders(<ProjectDetail />, at('vulnerabilities'));
+  it('lists the project vulnerabilities like the workspace list, with provenance', async () => {
+    renderWithProviders(<ProjectDetail />, at('vulnerabilities'));
 
     expect(await screen.findByText('SQL injection')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Provenance' })).toBeInTheDocument();
     expect(screen.getByText('Recurring ×3')).toBeInTheDocument();
-    const group = screen.getByRole('tablist', { name: 'Provenance' });
-    await user.click(within(group).getByRole('tab', { name: /^New/ }));
+    expect(screen.getByRole('combobox', { name: 'Provenance' })).toBeInTheDocument();
+    // The lifecycle cards of the Vulnerabilities page, scoped to the project
+    expect(screen.getByText('MTTR high')).toBeInTheDocument();
+    expect(statsMock).toHaveBeenLastCalledWith({ projectId: 'project-1' });
+    expect(vulnsMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ projectId: 'project-1', provenance: undefined }),
+    );
+  });
 
+  it('keeps the provenance and run filters of a run link', async () => {
+    renderWithProviders(
+      <ProjectDetail />,
+      at('vulnerabilities', '?provenance=new&run=run-3abcdef'),
+    );
+
+    expect(await screen.findByRole('button', { name: 'Clear the run filter' })).toHaveTextContent(
+      'Run #run-3a',
+    );
     await waitFor(() => {
       expect(vulnsMock).toHaveBeenLastCalledWith(
-        expect.objectContaining({ provenance: 'new', status: 'open' }),
+        expect.objectContaining({
+          projectId: 'project-1',
+          provenance: 'new',
+          jobHistoryId: 'run-3abcdef',
+        }),
       );
     });
   });

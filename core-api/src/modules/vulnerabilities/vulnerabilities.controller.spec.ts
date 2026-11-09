@@ -22,6 +22,8 @@ describe('VulnerabilitiesController workspace permission guards', () => {
     ['rejectProposal', 'POST /:id/review/reject', ['vulnerability.write']],
     ['mergeProposal', 'POST /:id/review/merge', ['vulnerability.write']],
     ['getProposalDuplicates', 'GET /:id/review/duplicates', ['vulnerability.read']],
+    ['bulkApproveProposals', 'POST /review/approve', ['vulnerability.write']],
+    ['bulkRejectProposals', 'POST /review/reject', ['vulnerability.write']],
   ];
 
   it.each(cases)('%s (%s) requires %j', (method, route, keys) => {

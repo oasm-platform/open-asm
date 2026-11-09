@@ -14,6 +14,8 @@ import {
 } from 'class-validator';
 import { Target, TargetType } from '../entities/target.entity';
 import { TargetSourceDto } from '../target-source.dto';
+import { SeverityCountsDto } from '@/modules/projects/dto/project-assets.dto';
+import { ScanProgressDto, TargetProjectRefDto } from './target-overview.dto';
 
 export class GitOrgTargetSettingsDto {
   @ApiProperty({
@@ -181,9 +183,47 @@ export class GetManyTargetResponseDto {
 
   @ApiProperty()
   internalNetworkId: string;
+
+  @ApiProperty({ type: () => SeverityCountsDto, required: false })
+  openVulnerabilities?: SeverityCountsDto;
+
+  @ApiProperty({
+    type: () => ScanProgressDto,
+    required: false,
+    nullable: true,
+    description: 'Jobs of the runs still going on the target; null when idle',
+  })
+  scanProgress?: ScanProgressDto | null;
+
+  @ApiProperty({ type: Date, required: false, nullable: true })
+  nextScanAt?: Date | null;
+
+  @ApiProperty({ type: () => [TargetProjectRefDto], required: false })
+  projects?: TargetProjectRefDto[];
 }
 
+const toOptionalBoolean = ({ value }: { value: unknown }) =>
+  value === undefined ? undefined : value === true || value === 'true';
+
 export class GetManyWorkspaceQueryParamsDto extends GetManyBaseQueryParams {
+  @ApiProperty({
+    required: false,
+    description: 'Only targets with an open critical vulnerability',
+  })
+  @IsOptional()
+  @Transform(toOptionalBoolean)
+  @IsBoolean()
+  hasCritical?: boolean;
+
+  @ApiProperty({
+    required: false,
+    description: 'Only targets not discovered in the last 30 days',
+  })
+  @IsOptional()
+  @Transform(toOptionalBoolean)
+  @IsBoolean()
+  stale?: boolean;
+
   @ApiProperty({ required: false })
   @IsString()
   @IsOptional()

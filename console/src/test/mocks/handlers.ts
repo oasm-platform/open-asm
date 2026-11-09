@@ -32,6 +32,16 @@ export const handlers = [
       totalPages: Math.ceil(mockTargets.length / limit),
     });
   }),
+  http.get('/api/targets/summary', () => {
+    return HttpResponse.json({
+      total: mockTargets.length,
+      scanning: 1,
+      withCritical: 1,
+      scheduled: 0,
+      stale: 0,
+      openVulnerabilities: { critical: 2, high: 1, medium: 0, low: 0, info: 3 },
+    });
+  }),
   http.get('/api/targets/:id', ({ params }) => {
     const target = mockTargets.find((t) => t.id === params.id);
     if (!target) return new HttpResponse(null, { status: 404 });

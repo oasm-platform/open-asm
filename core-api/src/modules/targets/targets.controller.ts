@@ -33,7 +33,16 @@ import {
   TargetRepositoryDto,
   UpdateTargetDto,
 } from './dto/targets.dto';
+import {
+  GetTargetChangesQueryDto,
+  GetTargetRunsQueryDto,
+  TargetChangeDto,
+  TargetOverviewDto,
+  TargetRunDto,
+  TargetsSummaryDto,
+} from './dto/target-overview.dto';
 import { Target } from './entities/target.entity';
+import { TargetOverviewService } from './target-overview.service';
 import { TargetsService } from './targets.service';
 
 @Controller('targets')
@@ -41,6 +50,7 @@ export class TargetsController {
   constructor(
     private readonly targetsService: TargetsService,
     private readonly auditService: AuditService,
+    private readonly overviewService: TargetOverviewService,
   ) {}
 
   @Doc({
@@ -93,11 +103,18 @@ export class TargetsController {
   })
   @WorkspaceAccess('target.read')
   @Get()
-  getTargetsInWorkspace(
+  async getTargetsInWorkspace(
     @Query() query: GetManyWorkspaceQueryParamsDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.targetsService.getTargetsInWorkspace(query, workspaceId);
+    const page = await this.targetsService.getTargetsInWorkspace(
+      query,
+      workspaceId,
+    );
+    return {
+      ...page,
+      data: await this.overviewService.withListDetails(page.data),
+    };
   }
 
   @Doc({
@@ -176,6 +193,69 @@ export class TargetsController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.targetsService.getTargetRepositories(id, workspaceId, query);
+  }
+
+  @Doc({
+    summary: 'Targets summary',
+    description:
+      'Counts across the targets of the workspace: scanning, with an open critical vulnerability, scheduled, not discovered in 30 days, and open vulnerabilities by severity.',
+    response: { serialization: TargetsSummaryDto },
+    request: { getWorkspaceId: true },
+  })
+  @WorkspaceAccess('target.read')
+  @Get('summary')
+  getTargetsSummary(@WorkspaceId() workspaceId: string) {
+    return this.overviewService.summary(workspaceId);
+  }
+
+  @Doc({
+    summary: 'Target overview',
+    description:
+      'Dashboard of one target: asset, service and vulnerability counts with their 7-day change, runs in progress, weekly new vulnerabilities, top open vulnerabilities, exposure, what needs attention, and the projects and issues it belongs to.',
+    response: { serialization: TargetOverviewDto },
+    request: { getWorkspaceId: true },
+  })
+  @WorkspaceAccess('target.read')
+  @Get(':id/overview')
+  getTargetOverview(
+    @Param() { id }: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.overviewService.overview(id, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Target runs',
+    description:
+      'Runs that scanned assets of the target, newest first, with their job progress on it.',
+    response: { serialization: GetManyResponseDto(TargetRunDto) },
+    request: { getWorkspaceId: true },
+  })
+  @WorkspaceAccess('target.read')
+  @Get(':id/runs')
+  getTargetRuns(
+    @Param() { id }: IdQueryParamDto,
+    @Query() query: GetTargetRunsQueryDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.overviewService.runs(id, workspaceId, query);
+  }
+
+  @Doc({
+    summary: 'Target changes',
+    description:
+      'Assets, services and vulnerabilities found on the target, and vulnerabilities confirmed fixed, newest first, a page at a time.',
+    response: { serialization: GetManyResponseDto(TargetChangeDto) },
+    request: { getWorkspaceId: true },
+  })
+  @WorkspaceAccess('target.read')
+  @Get(':id/changes')
+  getTargetChanges(
+    @Param() { id }: IdQueryParamDto,
+    @Query() query: GetTargetChangesQueryDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.overviewService.changes(id, workspaceId, query);
   }
 
   @Doc({
