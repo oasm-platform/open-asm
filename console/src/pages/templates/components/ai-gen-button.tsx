@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { Sparkles } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { usePermission } from '@/hooks/usePermission';
@@ -13,18 +14,25 @@ export const AI_GEN_TEMPLATE_PROMPT =
   'Use the nuclei-template-generator skill to write a Nuclei template that ';
 
 /** Opens a new AI Studio chat with the template request filled in, not sent. */
-export function AiGenButton() {
+export function AiGenButton({
+  className,
+  children,
+}: { className?: string; children?: ReactNode } = {}) {
   const { hasPermission } = usePermission();
   if (!hasPermission('agent.read')) return null;
   return (
-    <Button size="sm" variant="outline" asChild>
+    <Button size="sm" variant="outline" className={className} asChild>
       <Link
         to="/aistudio"
         search={{ text: AI_GEN_TEMPLATE_PROMPT, autoSubmit: false }}
         title="Write a template with OASM AI Studio"
       >
-        <Sparkles className="size-4" />
-        AI gen
+        {children ?? (
+          <>
+            <Sparkles className="size-4" />
+            AI gen
+          </>
+        )}
       </Link>
     </Button>
   );

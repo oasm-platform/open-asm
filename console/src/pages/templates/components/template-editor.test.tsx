@@ -178,6 +178,14 @@ describe('TemplateEditor', () => {
     expect(screen.getByRole('button', { name: 'Run' })).toBeDisabled();
   });
 
+  it('empty state starts a blank template', async () => {
+    const user = userEvent.setup();
+    setup(() => {});
+    expect(await screen.findByRole('link', { name: /AI gen/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /blank/i }));
+    expect((await box()).value).toContain('id: example-template');
+  });
+
   it('has no Run for a template that was never saved', async () => {
     setup((api) => api.openNew());
     await box();
