@@ -236,3 +236,31 @@ func TestPoolFreedSlotsCountsOnlyFreedBusySlots(t *testing.T) {
 		t.Fatalf("after idle evict: image=%d node=%d, want 1/2", img, node)
 	}
 }
+
+// An idle container past MaxPooledContainerAge retires on the next sweep
+// even though it never sat idle past the idle timeout — bounding the
+// retained creator token (the egress proxy credential) riding with it.
+func TestPoolSweepRetiresAgedIdleContainer(t *testing.T) {
+	now := time.Now()
+	p, _ := newPoolForTest(t, now)
+	// Busy for hours (LastUsedAt fresh), created past the max age.
+	p.Add(poolEntry{ID: "aged", Image: "nuclei", PoolKey: "nuclei", State: PoolStateBusy, ExecID: "exec-aged", CreatedAt: now.Add(-MaxPooledContainerAge - time.Minute), LastUsedAt: now})
+	p.ReleaseToIdle("exec-aged")
+
+	expired := p.Sweep(now)
+	if len(expired) != 1 || expired[0].ID != "aged" {
+		t.Fatalf("aged idle container must be retired, got %v", expired)
+	}
+}
+
+// A young container that never sat idle is kept even when MaxPooledContainerAge
+// passes mid-execution: busy entries are never collected.
+func TestPoolSweepKeepsBusyAgedContainer(t *testing.T) {
+	now := time.Now()
+	p, _ := newPoolForTest(t, now)
+	p.Add(poolEntry{ID: "busy", Image: "nuclei", PoolKey: "nuclei", State: PoolStateBusy, ExecID: "exec-busy", CreatedAt: now.Add(-MaxPooledContainerAge - time.Hour), LastUsedAt: now})
+
+	if expired := p.Sweep(now); len(expired) != 0 {
+		t.Fatalf("busy container must survive the sweep, got %v", expired)
+	}
+}

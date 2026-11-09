@@ -11,6 +11,7 @@ import (
 	"hash/fnv"
 	"io"
 	"net"
+	"net/url"
 	"os"
 	"runtime"
 	"strconv"
@@ -1295,13 +1296,16 @@ func buildContainerEnv(spec JobSpec, connectorAddr, connectorToken, execID strin
 	// a resolved address. The per-execution token is the proxy credential —
 	// the same token the connector presents on Register.
 	if egress.Enabled && egress.Addr != "" {
-		proxyUser := workerToken
 		host, port, err := net.SplitHostPort(egress.Addr)
 		if err != nil {
 			host, port = egress.Addr, "26277"
 		}
-		httpProxy := "http://" + proxyUser + "@" + net.JoinHostPort(host, port)
-		socksProxy := "socks5h://" + proxyUser + "@" + net.JoinHostPort(host, port)
+		// url.User escapes the token for the userinfo slot: a legacy secret
+		// carrying @ or : would otherwise corrupt the proxy URL and silently
+		// break proxied egress.
+		proxyHost := net.JoinHostPort(host, port)
+		httpProxy := (&url.URL{Scheme: "http", User: url.User(workerToken), Host: proxyHost}).String()
+		socksProxy := (&url.URL{Scheme: "socks5h", User: url.User(workerToken), Host: proxyHost}).String()
 		env = append(env,
 			"HTTP_PROXY="+httpProxy,
 			"HTTPS_PROXY="+httpProxy,

@@ -29,15 +29,20 @@ type httpProxy struct {
 func newHTTPProxy(s *Server) *httpProxy { return &httpProxy{srv: s} }
 
 func (p *httpProxy) serveConn(conn net.Conn) {
+	// Single-use connection: every response carries Connection: close and
+	// the socket is closed when this returns. The proxy speaks raw TCP
+	// (single-port sniff) with no pipelining support, so a keep-alive
+	// client reusing the socket would block forever on its second request.
+	defer conn.Close()
 	br := bufio.NewReader(conn)
 	_ = conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 	req, err := http.ReadRequest(br)
 	_ = conn.SetReadDeadline(time.Time{})
 	if err != nil {
-		_ = conn.Close()
 		return
 	}
 	rw := &connResponseWriter{conn: conn, br: br, header: http.Header{}}
+	rw.Header().Set("Connection", "close")
 	if req.Method == http.MethodConnect {
 		p.tunnel(rw, req)
 		return

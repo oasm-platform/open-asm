@@ -3,6 +3,7 @@ package egress
 import (
 	"context"
 	"crypto/subtle"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -49,17 +50,11 @@ type Server struct {
 	logger Logger
 	proxy  *httpProxy
 	dial   func(ctx context.Context, network, addr string) (net.Conn, error)
-}
-
-// ProxyURL builds the HTTP proxy URL containers use (token as userinfo).
-func ProxyURL(host string, port int, token string) string {
-	return fmt.Sprintf("http://%s@%s", token, net.JoinHostPort(host, fmt.Sprintf("%d", port)))
-}
-
-// SocksURL builds the SOCKS5 proxy URL containers use (h-variant so the
-// proxy resolves names).
-func SocksURL(host string, port int, token string) string {
-	return fmt.Sprintf("socks5h://%s@%s", token, net.JoinHostPort(host, fmt.Sprintf("%d", port)))
+	lookup func(ctx context.Context, host string) ([]string, error)
+	// dialIP opens the TCP connection to one already-vetted IP:port. A
+	// field (not a direct dialRaw call) so tests can observe which resolved
+	// addresses dialVetted actually attempts.
+	dialIP func(ctx context.Context, network, addr string) (net.Conn, error)
 }
 
 // NewServer creates the egress listener on addr (e.g. ":26277").
@@ -77,6 +72,8 @@ func NewServer(addr string, auth AuthFunc, opts Options) (*Server, error) {
 	}
 	s := &Server{lis: lis, auth: auth, deny: opts.DenyHosts, dialTO: to, logger: opts.Logger}
 	s.dial = s.dialVetted
+	s.lookup = net.DefaultResolver.LookupHost
+	s.dialIP = s.dialRaw
 	s.proxy = newHTTPProxy(s)
 	return s, nil
 }
@@ -113,7 +110,11 @@ func (s *Server) Port() int {
 func (s *Server) Close() error { return s.lis.Close() }
 
 // Serve accepts connections until ctx is cancelled or the listener closes.
+// A ctx shutdown returns nil; any other accept failure returns the error so
+// the caller can log it (a silent nil hides a dead listener).
 func (s *Server) Serve(ctx context.Context) error {
+	ctx, stop := context.WithCancelCause(ctx)
+	defer stop(nil)
 	go func() {
 		<-ctx.Done()
 		_ = s.lis.Close()
@@ -121,14 +122,18 @@ func (s *Server) Serve(ctx context.Context) error {
 	for {
 		conn, err := s.lis.Accept()
 		if err != nil {
+			if context.Cause(ctx) != nil {
+				return nil
+			}
 			select {
 			case <-ctx.Done():
 				return nil
 			default:
-				if ne, ok := err.(net.Error); ok && ne.Timeout() {
+				var ne net.Error
+				if errors.As(err, &ne) && ne.Timeout() {
 					continue
 				}
-				return nil
+				return fmt.Errorf("egress: accept: %w", err)
 			}
 		}
 		go s.route(conn)
@@ -153,6 +158,8 @@ func (s *Server) route(conn net.Conn) {
 
 // dialVetted dials upstream after vetting: literal deny check first, then
 // resolve-then-check so a rebound name is refused at the dialed address.
+// The resolver is the lookup field (net.DefaultResolver.LookupHost in
+// production, injectable in tests) so DNS rebinding stays covered.
 func (s *Server) dialVetted(ctx context.Context, network, addr string) (net.Conn, error) {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
@@ -161,13 +168,21 @@ func (s *Server) dialVetted(ctx context.Context, network, addr string) (net.Conn
 	if denyTarget(host, s.deny) {
 		return nil, &blockedError{target: addr}
 	}
-	addrs, err := net.DefaultResolver.LookupHost(ctx, host)
+	lookup := s.lookup
+	if lookup == nil {
+		lookup = net.DefaultResolver.LookupHost
+	}
+	addrs, err := lookup(ctx, host)
 	if err != nil {
 		if ip, perr := netip.ParseAddr(stripBrackets(host)); perr == nil {
 			if !IsPublicAddr(ip) {
 				return nil, &blockedError{target: addr}
 			}
-			return s.dialRaw(ctx, network, addr)
+			dialIP := s.dialIP
+			if dialIP == nil {
+				dialIP = s.dialRaw
+			}
+			return dialIP(ctx, network, addr)
 		}
 		return nil, err
 	}
@@ -176,7 +191,11 @@ func (s *Server) dialVetted(ctx context.Context, network, addr string) (net.Conn
 		if err != nil || !IsPublicAddr(ip) {
 			continue
 		}
-		c, err := s.dialRaw(ctx, network, net.JoinHostPort(a, port))
+		dialIP := s.dialIP
+		if dialIP == nil {
+			dialIP = s.dialRaw
+		}
+		c, err := dialIP(ctx, network, net.JoinHostPort(a, port))
 		if err == nil {
 			return c, nil
 		}

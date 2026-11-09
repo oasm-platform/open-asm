@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -115,5 +116,44 @@ func TestConnectTLSBackend(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	if string(body) != "tls-ok" {
 		t.Fatalf("body = %q, want tls-ok", body)
+	}
+}
+
+// A name whose DNS answers only private IPs is refused at the dialed
+// address, even though the literal name is not a blocked literal.
+func TestDialVettedRefusesReboundName(t *testing.T) {
+	srv := startEgress(t, testAuth("tok"), nil)
+	srv.lookup = func(ctx context.Context, host string) ([]string, error) {
+		if host == "rebound.example" {
+			return []string{"10.0.0.9", "192.168.1.7"}, nil
+		}
+		return nil, errors.New("no such host")
+	}
+	_, err := srv.dialVetted(context.Background(), "tcp", "rebound.example:443")
+	var be *blockedError
+	if !errors.As(err, &be) {
+		t.Fatalf("rebound name must be refused with blockedError, got %v", err)
+	}
+}
+
+// A name whose DNS mixes private and public answers skips the private one
+// and attempts the public one.
+func TestDialVettedSkipsPrivateAnswers(t *testing.T) {
+	srv := startEgress(t, testAuth("tok"), nil)
+	srv.lookup = func(ctx context.Context, host string) ([]string, error) {
+		return []string{"10.0.0.9", "203.0.113.7"}, nil
+	}
+	var attempted []string
+	srv.dialIP = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		attempted = append(attempted, addr)
+		return nil, errors.New("no route in test")
+	}
+	_, err := srv.dialVetted(context.Background(), "tcp", "mixed.example:443")
+	var be *blockedError
+	if !errors.As(err, &be) {
+		t.Fatalf("all-public-unreachable must end refused, got %v", err)
+	}
+	if len(attempted) != 1 || attempted[0] != "203.0.113.7:443" {
+		t.Fatalf("must skip 10.0.0.9 and attempt 203.0.113.7:443, attempted %v", attempted)
 	}
 }

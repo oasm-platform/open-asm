@@ -833,7 +833,6 @@ func (m *Manager) ProxyAuth(token string) (string, bool) {
 		return "", false
 	}
 	m.tokenMu.RLock()
-	defer m.tokenMu.RUnlock()
 	var matched string
 	for execID, tok := range m.tokens {
 		if subtleEqual(tok, token) {
@@ -841,11 +840,15 @@ func (m *Manager) ProxyAuth(token string) (string, bool) {
 			break
 		}
 	}
+	m.tokenMu.RUnlock()
 	if matched == "" {
 		return "", false
 	}
 	// Attribute reuse traffic to the execution actually running on the
 	// container, not the (possibly finished) creator that minted the token.
+	// tokenMu is released before taking m.mu: Cancel/Release hold m.mu and
+	// then take tokenMu, so holding both in the reverse order deadlocks the
+	// worker when a proxy request races job teardown.
 	m.mu.Lock()
 	pool := m.pool
 	m.mu.Unlock()
@@ -855,7 +858,6 @@ func (m *Manager) ProxyAuth(token string) (string, bool) {
 		}
 	}
 	return matched, true
-	return "", false
 }
 
 // gcEgressTokens drops retained tokens no live execution or pooled creator

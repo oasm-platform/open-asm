@@ -5,12 +5,13 @@ import (
 	"strings"
 )
 
-// Prefixes copied from worker/internal/worker/browser_proxy.go
-// (nonPublicPrefixes): special-purpose ranges that netip does not classify
-// as private, loopback or link-local but that are not on the internet. Kept
-// in sync manually — the egress proxy is the enforcement point for connector
-// containers, the browser proxy for sandboxed browser sessions.
-var nonPublicPrefixes = []netip.Prefix{
+// NonPublicPrefixes lists special-purpose ranges that netip does not
+// classify as private, loopback or link-local but that are not on the
+// internet. Single source of truth for both proxies: the egress proxy (this
+// package, the enforcement point for connector containers) and the browser
+// proxy (worker/internal/worker, sandboxed browser sessions) both call
+// IsPublicAddr below.
+var NonPublicPrefixes = []netip.Prefix{
 	netip.MustParsePrefix("0.0.0.0/8"),      // "this network"
 	netip.MustParsePrefix("100.64.0.0/10"),  // carrier-grade NAT
 	netip.MustParsePrefix("192.0.0.0/24"),   // IETF protocol assignments
@@ -36,7 +37,7 @@ func IsPublicAddr(ip netip.Addr) bool {
 	if !ip.IsGlobalUnicast() || ip.IsPrivate() {
 		return false
 	}
-	for _, pfx := range nonPublicPrefixes {
+	for _, pfx := range NonPublicPrefixes {
 		if pfx.Contains(ip) {
 			return false
 		}

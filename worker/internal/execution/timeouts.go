@@ -42,6 +42,15 @@ const ConnectorIdleTimeout = 60 * time.Second
 // the pool for containers idle past ConnectorIdleTimeout.
 const ConnectorSweepInterval = 10 * time.Second
 
+// MaxPooledContainerAge bounds how long one container may be reused: once a
+// container passes this age the sweeper retires it on its next idle window,
+// even if it has not sat idle past ConnectorIdleTimeout. This bounds the
+// lifetime of the retained creator token (the egress proxy credential) that
+// rides with the container — a "single-use" token must not stay valid for
+// hours on a hot container. Busy containers are never touched mid-execution;
+// retirement happens at the next ReleaseToIdle + sweep.
+const MaxPooledContainerAge = 2 * time.Hour
+
 // JobTimeoutSecondsKey is the manifest/Job-spec limit key carrying the per-job
 // timeout (seconds). The worker reads it from spec.Limits; Core may carry it
 // through the jobs proto in the future.

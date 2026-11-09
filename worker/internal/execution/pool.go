@@ -278,9 +278,12 @@ func (p *PoolManager) ReleaseToIdle(execID string) {
 	}
 }
 
-// Sweep returns every idle entry idle for at least the idle timeout. The
-// caller (Manager.SweepLoop) stops, cleans up and unregisters them. Busy
-// entries and fresh idle entries are never collected.
+// Sweep returns every idle entry idle for at least the idle timeout, plus
+// any idle entry whose container passed MaxPooledContainerAge — an aged
+// container retires on its next idle window so its retained creator token
+// (the egress proxy credential) cannot live forever on a hot container.
+// The caller (Manager.SweepLoop) stops, cleans up and unregisters them.
+// Busy entries and fresh idle entries are never collected.
 func (p *PoolManager) Sweep(now time.Time) []poolEntry {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -289,7 +292,8 @@ func (p *PoolManager) Sweep(now time.Time) []poolEntry {
 		if e.State != PoolStateIdle {
 			continue
 		}
-		if now.Sub(e.LastUsedAt) < p.idleTimeout {
+		aged := !e.CreatedAt.IsZero() && now.Sub(e.CreatedAt) >= MaxPooledContainerAge
+		if !aged && now.Sub(e.LastUsedAt) < p.idleTimeout {
 			continue
 		}
 		stale = append(stale, *e)
