@@ -7,7 +7,7 @@ Findings on assets: list/detail/statistics, the lifecycle (new → active → fi
 - `vulnerabilities.controller.ts`: HTTP routes on `vulnerabilities`.
 - `vulnerabilities.service.ts`: `VulnerabilitiesService`: `scan`, list/detail/timeline/statistics, bulk dismiss/reopen, `claimFix`, AI analysis enqueue and process.
 - `vulnerability-lifecycle.service.ts`: `VulnerabilityLifecycleService`: auto-close on covering scans (`onScanJobCompleted`), `expireRiskAcceptances`, settings and `recomputeDueAt`.
-- `vulnerability-review.service.ts`: `VulnerabilityReviewService`: `propose` (agents), `approve`, `reject`, `merge`, `duplicates`.
+- `vulnerability-review.service.ts`: `VulnerabilityReviewService`: `propose` (agents), `approve`, `reject`, `bulkApprove`, `bulkReject`, `merge`, `duplicates`.
 - `vulnerability-lifecycle.ts` (`scanScopeKey`, `stableJson`, `loadVulnerabilitySettings`, `insertInChunks`, `returnedRows`), `vulnerability-settings.ts` (`DEFAULT_VULNERABILITY_SETTINGS`, `computeDueAt`).
 - `open-vulnerability.ts` (`openVulnerabilityCondition`, `approvedVulnerabilityCondition`, `fixedVulnerabilityCondition`), `vulnerability-status.ts` (`VulnerabilityStatus` list filter), `vulnerability-filter.ts` (filter tree), `detected-vulnerability.ts` (`toDetectedVulnerability`).
 - `processors/vulnerability-analysis.processor.ts`, `vulnerability-risk-expiry.cron.ts`.
@@ -19,12 +19,13 @@ Findings on assets: list/detail/statistics, the lifecycle (new → active → fi
 | `GET vulnerabilities`, `statistics`, `settings`, `:id`, `:id/timeline`, `:id/review/duplicates` | `vulnerability.read` |
 | `POST scan`, `claim-fix`, `dismiss`, `reopen` | `vulnerability.write` |
 | `POST :id/review/approve`, `:id/review/reject`, `:id/review/merge` | `vulnerability.write` |
+| `POST review/approve`, `review/reject` (bulk, at most `BULK_REVIEW_MAX` = 200 ids) | `vulnerability.write` |
 | `POST :id/analyze` (`forceRerun`), `DELETE :id/analyze` | `vulnerability.write` |
 | `PUT settings` | `workspace.config` |
 
 - Comment routes for findings live in the `comments` module.
 - `@Global()`, exports `VulnerabilitiesService`, `VulnerabilityLifecycleService`, `VulnerabilityReviewService`.
-- Events through `@PublishEvent`: `vulnerability.status.updated` (`dismiss` and `claim-fix`), `vulnerability.bulk_updated` (`reopen`), `vulnerability.settings.updated`, `vulnerability.review.approved|rejected|merged`. Published from services: `vulnerability.proposed` (propose), `vulnerability.detected` (approve, so issue rules run on approved AI findings), `vulnerability.fixed` (auto-close), `vulnerability.analysis.completed` (processor, addressed to the requesting user). `vulnerability.dismissed`, `vulnerability.reopened`, `analysis.started` and `analysis.failed` are in the catalog, but nothing publishes them.
+- Events through `@PublishEvent`: `vulnerability.status.updated` (`dismiss` and `claim-fix`), `vulnerability.bulk_updated` (`reopen`), `vulnerability.settings.updated`, `vulnerability.review.approved|rejected|merged` (the bulk routes publish one event with `{ action: 'bulk', count, ids }` of the decided ids). Published from services: `vulnerability.proposed` (propose), `vulnerability.detected` (approve, so issue rules run on approved AI findings), `vulnerability.fixed` (auto-close), `vulnerability.analysis.completed` (processor, addressed to the requesting user). `vulnerability.dismissed`, `vulnerability.reopened`, `analysis.started` and `analysis.failed` are in the catalog, but nothing publishes them.
 - BullMQ `VULNERABILITY_ANALYSIS` (`vulnerability-analysis`): job name = vulnerability id, data = the analysis payload plus `workspaceId` and `userId`, removed on complete and on fail.
 - Cron `VulnerabilityRiskExpiryCron`: `5 * * * *`, `@Lock('cron:vulnerability-risk-expiry')`.
 - Agent/MCP tools: `discover_vulnerabilities`, `investigate_vulnerability` (read, also on MCP). `propose_vulnerability` (agent mode only) calls `VulnerabilityReviewService.propose`.
@@ -45,6 +46,8 @@ Findings on assets: list/detail/statistics, the lifecycle (new → active → fi
 - AI proposals (`pending_review`, `rejected`) never count as findings. They show only under `status=pending_review|rejected`. Their fingerprints start with `ai-`, so they can never collide with a scanner fingerprint.
 - Auto-close: only a later scan with the **same** `scanScopeKey` (asset + tool + service + inputs + config + profile) can count a miss. Findings with a null key (AI, manual, older rows) are never auto-closed, and a fix claim on them is recorded as `not_verifiable_by_scan`. `onScanJobCompleted` is called from `jobs-registry/processors/job-result.processor.ts`.
 - Re-detection is the ingest's `ON CONFLICT ("fingerprint")` clause (`rescanConflictClause` in `data-adapter.service.ts`). It moves fixed → resurfaced and clears the fix and fix-claim columns. It never touches rows under review.
+- Bulk review runs the single-id `approve`/`reject` per id, each in its own transaction. Ids missing from the workspace or no longer pending come back under `skipped`; any other error stops the batch and keeps what was already decided. Bulk approve keeps each proposed severity.
+- The `PROPOSED` and `VERIFIED_BY_AI` events carry `data.proposalToolCallId`, the id of the `propose_vulnerability` call itself; the cited calls stay in `vulnerability_sources.toolCallIds`.
 - Dismiss is only for approved findings, and an active dismissal gives 400. Risk acceptance needs a future `expiresAt` within `riskAcceptMaxDays`.
 
 ## Coupling
