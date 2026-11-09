@@ -3943,6 +3943,30 @@ export type VulnerabilityDuplicatesResponseDto = {
   data: VulnerabilityDuplicateDto[];
 };
 
+export type BulkReviewSkippedDto = {
+  id: string;
+  /** Why this id was not decided (not found, not pending review) */
+  reason: string;
+};
+
+export type BulkReviewResultDto = {
+  reviewed: VulnerabilityReviewResultDto[];
+  skipped: BulkReviewSkippedDto[];
+};
+
+export type BulkApproveVulnerabilitiesDto = {
+  /** Ids of pending AI proposals */
+  ids: string[];
+  note?: string;
+};
+
+export type BulkRejectVulnerabilitiesDto = {
+  /** Ids of pending AI proposals */
+  ids: string[];
+  /** Why the proposals are rejected */
+  note: string;
+};
+
 export type AnalyzeVulnerabilityDto = {
   /** Force rerun analysis even if already analyzed */
   forceRerun?: boolean;
@@ -38007,6 +38031,199 @@ export function useVulnerabilitiesControllerGetProposalDuplicates<
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+/**
+ * Approves each pending AI proposal in ids, keeping its proposed severity. Ids not found in the workspace or no longer pending are returned under skipped.
+ * @summary Bulk approve AI proposals
+ */
+export const vulnerabilitiesControllerBulkApproveProposals = (
+  bulkApproveVulnerabilitiesDto: BulkApproveVulnerabilitiesDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<BulkReviewResultDto>(
+    {
+      url: `/api/vulnerabilities/review/approve`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: bulkApproveVulnerabilitiesDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getVulnerabilitiesControllerBulkApproveProposalsMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerBulkApproveProposals>>,
+    TError,
+    { data: BulkApproveVulnerabilitiesDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof vulnerabilitiesControllerBulkApproveProposals>>,
+  TError,
+  { data: BulkApproveVulnerabilitiesDto },
+  TContext
+> => {
+  const mutationKey = ['vulnerabilitiesControllerBulkApproveProposals'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerBulkApproveProposals>>,
+    { data: BulkApproveVulnerabilitiesDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return vulnerabilitiesControllerBulkApproveProposals(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type VulnerabilitiesControllerBulkApproveProposalsMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerBulkApproveProposals>>
+  >;
+export type VulnerabilitiesControllerBulkApproveProposalsMutationBody =
+  BulkApproveVulnerabilitiesDto;
+export type VulnerabilitiesControllerBulkApproveProposalsMutationError =
+  unknown;
+
+/**
+ * @summary Bulk approve AI proposals
+ */
+export const useVulnerabilitiesControllerBulkApproveProposals = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof vulnerabilitiesControllerBulkApproveProposals>>,
+      TError,
+      { data: BulkApproveVulnerabilitiesDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof vulnerabilitiesControllerBulkApproveProposals>>,
+  TError,
+  { data: BulkApproveVulnerabilitiesDto },
+  TContext
+> => {
+  return useMutation(
+    getVulnerabilitiesControllerBulkApproveProposalsMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Rejects each pending AI proposal in ids with the same note (required). Ids not found in the workspace or no longer pending are returned under skipped.
+ * @summary Bulk reject AI proposals
+ */
+export const vulnerabilitiesControllerBulkRejectProposals = (
+  bulkRejectVulnerabilitiesDto: BulkRejectVulnerabilitiesDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<BulkReviewResultDto>(
+    {
+      url: `/api/vulnerabilities/review/reject`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: bulkRejectVulnerabilitiesDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getVulnerabilitiesControllerBulkRejectProposalsMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerBulkRejectProposals>>,
+    TError,
+    { data: BulkRejectVulnerabilitiesDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof vulnerabilitiesControllerBulkRejectProposals>>,
+  TError,
+  { data: BulkRejectVulnerabilitiesDto },
+  TContext
+> => {
+  const mutationKey = ['vulnerabilitiesControllerBulkRejectProposals'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerBulkRejectProposals>>,
+    { data: BulkRejectVulnerabilitiesDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return vulnerabilitiesControllerBulkRejectProposals(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type VulnerabilitiesControllerBulkRejectProposalsMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerBulkRejectProposals>>
+  >;
+export type VulnerabilitiesControllerBulkRejectProposalsMutationBody =
+  BulkRejectVulnerabilitiesDto;
+export type VulnerabilitiesControllerBulkRejectProposalsMutationError = unknown;
+
+/**
+ * @summary Bulk reject AI proposals
+ */
+export const useVulnerabilitiesControllerBulkRejectProposals = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof vulnerabilitiesControllerBulkRejectProposals>>,
+      TError,
+      { data: BulkRejectVulnerabilitiesDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof vulnerabilitiesControllerBulkRejectProposals>>,
+  TError,
+  { data: BulkRejectVulnerabilitiesDto },
+  TContext
+> => {
+  return useMutation(
+    getVulnerabilitiesControllerBulkRejectProposalsMutationOptions(options),
+    queryClient,
+  );
+};
 
 /**
  * Initiates an AI-powered analysis of a specific security vulnerability to provide detailed insights and recommendations.

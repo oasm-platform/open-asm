@@ -23,8 +23,11 @@ import { SeverityBadge } from '@/components/vulnerabilities/lifecycle-badges';
 import {
   Severity,
   useVulnerabilitiesControllerApproveProposal,
+  useVulnerabilitiesControllerBulkApproveProposals,
+  useVulnerabilitiesControllerBulkRejectProposals,
   useVulnerabilitiesControllerMergeProposal,
   useVulnerabilitiesControllerRejectProposal,
+  type BulkReviewResultDto,
   type VulnerabilityDuplicateDto,
 } from '@/services/apis/gen/queries';
 import { useNavigate } from '@tanstack/react-router';
@@ -219,6 +222,122 @@ export function RejectDialog({
           <Button variant="destructive" onClick={submit} disabled={reject.isPending}>
             {reject.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Reject
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * Approve or reject several pending proposals at once. Approve keeps each
+ * proposed severity; reject needs one reason for all of them.
+ */
+export function BulkReviewDialog({
+  action,
+  ids,
+  trigger,
+  onDone,
+}: {
+  action: 'approve' | 'reject';
+  ids: string[];
+  trigger: ReactNode;
+  onDone?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState('');
+  const [touched, setTouched] = useState(false);
+  const approve = useVulnerabilitiesControllerBulkApproveProposals();
+  const reject = useVulnerabilitiesControllerBulkRejectProposals();
+  const isReject = action === 'reject';
+  const isPending = approve.isPending || reject.isPending;
+  const missing = isReject && !note.trim();
+  const count = `${ids.length} proposal${ids.length === 1 ? '' : 's'}`;
+
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (next) {
+      setNote('');
+      setTouched(false);
+    }
+  };
+
+  const onSuccess = (res: BulkReviewResultDto) => {
+    const done = res.reviewed.length;
+    const skipped = res.skipped.length;
+    const verb = isReject ? 'rejected' : 'approved';
+    const message = `${done} proposal${done === 1 ? '' : 's'} ${verb}`;
+    const description = skipped
+      ? `${skipped} skipped: ${res.skipped[0].reason}${skipped > 1 ? ' (and others)' : ''}`
+      : isReject
+        ? undefined
+        : 'They are now new findings in the list.';
+    if (done === 0) toast.warning(message, { description });
+    else toast.success(message, { description });
+    setOpen(false);
+    onDone?.();
+  };
+  const onError = (error: unknown) =>
+    toast.error(`Failed to ${action}`, { description: errorText(error) });
+
+  const submit = () => {
+    setTouched(true);
+    if (missing) return;
+    const trimmed = note.trim();
+    if (isReject) {
+      reject.mutate({ data: { ids, note: trimmed } }, { onSuccess, onError });
+    } else {
+      approve.mutate(
+        { data: { ids, ...(trimmed ? { note: trimmed } : {}) } },
+        { onSuccess, onError },
+      );
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            {isReject ? 'Reject' : 'Approve'} {count}
+          </DialogTitle>
+          <DialogDescription>
+            {isReject
+              ? 'The rejected records are kept so the agent does not propose the same findings again.'
+              : 'Each finding joins the list as New with its proposed severity, and its SLA starts now.'}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label htmlFor="bulk-review-note">
+            {isReject ? 'Reason' : 'Note (optional)'}
+          </Label>
+          <Textarea
+            id="bulk-review-note"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={3}
+            className="resize-none"
+            placeholder={isReject ? 'Why these are not real findings' : undefined}
+            aria-invalid={touched && missing}
+          />
+          {touched && missing && (
+            <p className="text-sm text-destructive" role="alert">
+              A reason is required.
+            </p>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={isPending}>
+            Cancel
+          </Button>
+          <Button
+            variant={isReject ? 'destructive' : 'default'}
+            onClick={submit}
+            disabled={isPending}
+          >
+            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isReject ? 'Reject' : 'Approve'}
           </Button>
         </DialogFooter>
       </DialogContent>
