@@ -126,3 +126,18 @@ func TestProxyAuthLegacyReleaseDeletes(t *testing.T) {
 		t.Fatal("pool-disabled release must delete the token immediately")
 	}
 }
+
+// Reuse traffic labels the live adopter, not the finished creator.
+func TestProxyAuthLabelsLiveAdopter(t *testing.T) {
+	m := newEgressManager()
+	ctx := context.Background()
+	id1, _ := m.Submit(ctx, JobSpec{Tool: "nuclei", Image: "img:x"})
+	tok1, _ := m.ExecToken(id1)
+	if err := m.Release(ctx, id1); err != nil {
+		t.Fatal(err)
+	}
+	id2, _ := m.Submit(ctx, JobSpec{Tool: "nuclei", Image: "img:x"})
+	if label, ok := m.ProxyAuth(tok1); !ok || label != id2 {
+		t.Fatalf("ProxyAuth(creator token) = (%q, %v), want (%q, true)", label, ok, id2)
+	}
+}

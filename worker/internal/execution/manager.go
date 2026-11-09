@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -749,6 +750,8 @@ func (m *Manager) SweepLoop(ctx context.Context) {
 			for _, e := range m.pool.Sweep(time.Now()) {
 				m.sweepContainer(e)
 			}
+			// Bound retained proxy credentials to live execs + pooled creators.
+			m.gcEgressTokens()
 		}
 	}
 }
@@ -771,6 +774,7 @@ func (m *Manager) DrainPool() {
 	for _, e := range m.pool.Sweep(future) {
 		m.sweepContainer(e)
 	}
+	m.gcEgressTokens()
 }
 
 // sweepContainer tears down one expired idle container (Stop+Cleanup) and
@@ -816,17 +820,41 @@ func (m *Manager) ActiveCount() int {
 // label for proxy log lines. It accepts live execution tokens and retained
 // creator tokens of pooled containers: the same single-use token the
 // connector presents on Register authorizes its proxy traffic.
+// subtleEqual compares two credentials in constant time; empty never matches.
+func subtleEqual(a, b string) bool {
+	if len(a) == 0 || len(b) == 0 {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
+}
+
 func (m *Manager) ProxyAuth(token string) (string, bool) {
 	if token == "" {
 		return "", false
 	}
 	m.tokenMu.RLock()
 	defer m.tokenMu.RUnlock()
+	var matched string
 	for execID, tok := range m.tokens {
-		if tok == token {
-			return execID, true
+		if subtleEqual(tok, token) {
+			matched = execID
+			break
 		}
 	}
+	if matched == "" {
+		return "", false
+	}
+	// Attribute reuse traffic to the execution actually running on the
+	// container, not the (possibly finished) creator that minted the token.
+	m.mu.Lock()
+	pool := m.pool
+	m.mu.Unlock()
+	if pool != nil {
+		if cur := pool.CurrentExecForToken(matched); cur != "" {
+			return cur, true
+		}
+	}
+	return matched, true
 	return "", false
 }
 

@@ -370,6 +370,24 @@ func (p *PoolManager) CreatingExecs() []string {
 	return out
 }
 
+// CurrentExecForToken resolves the live execution label for proxy traffic
+// authenticated by a retained creator token: the container that carries
+// TokenExecID reports its current owner (busy) or the creator itself
+// (idle between executions). "" when no pooled container carries it.
+func (p *PoolManager) CurrentExecForToken(creator string) string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, e := range p.byID {
+		if e.TokenExecID == creator {
+			if e.ExecID != "" {
+				return e.ExecID
+			}
+			return creator
+		}
+	}
+	return ""
+}
+
 // IsIdle reports whether the container backing execID is idle (no execution in
 // flight). The job goroutine uses it to skip health checks while a reused
 // container sits between executions.

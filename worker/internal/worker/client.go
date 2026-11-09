@@ -459,7 +459,7 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 					egressServer, err := egress.NewServer(
 						fmt.Sprintf(":%d", cfg.EgressPort),
 						mgrInit.ProxyAuth,
-						egress.Options{DenyHosts: []string{egressHostOf(dockerRT.ConnectorAddr()), cfg.GrpcHost}},
+						egress.Options{DenyHosts: []string{egressHostOf(dockerRT.ConnectorAddr()), cfg.GrpcHost}, Logger: log},
 					)
 					if err != nil {
 						log.Error("egress proxy init failed (non-fatal) — containers keep direct egress: %v", err)

@@ -52,6 +52,19 @@ func TestEgressProxyBindsAllInterfaces(t *testing.T) {
 	}
 }
 
+// The egress proxy must receive the worker logger: without it every
+// allow/deny/bytes log line is a no-op and spec observability dies.
+func TestEgressProxyHasLogger(t *testing.T) {
+	data, err := os.ReadFile("client.go")
+	if err != nil {
+		t.Fatalf("read client.go: %v", err)
+	}
+	src := string(data)
+	if !strings.Contains(src, "Logger: log") {
+		t.Fatal("egress.Options must carry Logger: log (worker TuiLogger)")
+	}
+}
+
 func TestEgressHostOf(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{"worker-1:26276", "worker-1"},

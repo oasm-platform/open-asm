@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -119,7 +120,9 @@ func (p *httpProxy) forward(w *connResponseWriter, r *http.Request) {
 		http.Error(w, "egress denied by policy", http.StatusForbidden)
 		return
 	}
-	upstream, err := p.srv.dial(r.Context(), "tcp", r.URL.Host)
+	dialCtx, cancel := context.WithTimeout(r.Context(), p.srv.dialTO)
+	defer cancel()
+	upstream, err := p.srv.dial(dialCtx, "tcp", r.URL.Host)
 	if err != nil {
 		var be *blockedError
 		if errors.As(err, &be) {
@@ -154,7 +157,8 @@ func (p *httpProxy) forward(w *connResponseWriter, r *http.Request) {
 		}
 	}
 	w.WriteHeader(uresp.StatusCode)
-	_, _ = io.Copy(w, uresp.Body)
+	n, _ := io.Copy(w, uresp.Body)
+	p.srv.logInfo("egress bytes exec=%s method=%s target=%s bytes=%d", label, r.Method, requestTarget(r), n)
 }
 
 func (p *httpProxy) tunnel(w *connResponseWriter, r *http.Request) {
@@ -162,12 +166,14 @@ func (p *httpProxy) tunnel(w *connResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	connectHost := r.Host
 	if h, _, err := net.SplitHostPort(r.Host); err == nil {
-		if denyTarget(h, p.srv.deny) {
-			p.srv.logWarning("egress deny exec=%s method=CONNECT target=%s reason=policy", label, r.Host)
-			http.Error(w, "egress denied by policy", http.StatusForbidden)
-			return
-		}
+		connectHost = h
+	}
+	if denyTarget(connectHost, p.srv.deny) {
+		p.srv.logWarning("egress deny exec=%s method=CONNECT target=%s reason=policy", label, r.Host)
+		http.Error(w, "egress denied by policy", http.StatusForbidden)
+		return
 	}
 	dialCtx, cancel := context.WithTimeout(r.Context(), p.srv.dialTO)
 	defer cancel()
@@ -182,12 +188,18 @@ func (p *httpProxy) tunnel(w *connResponseWriter, r *http.Request) {
 		http.Error(w, "upstream error", http.StatusBadGateway)
 		return
 	}
+	var upBytes, downBytes int64
+	var wg sync.WaitGroup
 	p.srv.logInfo("egress allow exec=%s method=CONNECT target=%s", label, r.Host)
 	_, _ = w.conn.Write([]byte("HTTP/1.1 200 Connection established\r\n\r\n"))
+	wg.Add(1)
 	go func() {
-		_, _ = io.Copy(upstream, w.br)
-		_ = upstream.Close()
+		defer wg.Done()
+		upBytes, _ = io.Copy(upstream, w.br)
 	}()
-	_, _ = io.Copy(w.conn, upstream)
+	downBytes, _ = io.Copy(w.conn, upstream)
 	_ = w.conn.Close()
+	_ = upstream.Close()
+	wg.Wait()
+	p.srv.logInfo("egress bytes exec=%s method=CONNECT target=%s up=%d down=%d", label, r.Host, upBytes, downBytes)
 }

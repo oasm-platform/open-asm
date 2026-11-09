@@ -104,6 +104,35 @@ func TestHTTPForwardValidToken(t *testing.T) {
 	}
 }
 
+// Forwarded responses log the byte count (spec observability: bytes in/out).
+func TestHTTPForwardLogsBytes(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "12345678")
+	}))
+	defer backend.Close()
+	var mu sync.Mutex
+	var gotLog string
+	srv := startEgress(t, testAuth("tok-bytes"), localDialer())
+	srv.SetLogger(testLogger(func(format string, args ...any) {
+		mu.Lock()
+		defer mu.Unlock()
+		gotLog += fmt.Sprintf(format, args...) + "\n"
+	}))
+	proxyURL, _ := url.Parse("http://oasm:tok-bytes@" + srv.Addr().String())
+	client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
+	resp, err := client.Get(backendURL(t, backend) + "/")
+	if err != nil {
+		t.Fatalf("proxied GET: %v", err)
+	}
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+	mu.Lock()
+	defer mu.Unlock()
+	if !strings.Contains(gotLog, "bytes=8") {
+		t.Fatalf("forward must log bytes=8, got:\n%s", gotLog)
+	}
+}
+
 func TestHTTPMissingAuth407(t *testing.T) {
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	t.Cleanup(backend.Close)
