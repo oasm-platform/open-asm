@@ -36,6 +36,11 @@ type Config struct {
 	ConnectorToken               string `mapstructure:"connector_token"`                 // shared secret for connector auth, empty = no auth
 	Mode                         string `mapstructure:"mode"`                            // worker run mode: "cli", "node", or "" (unknown)
 
+	// Egress proxy — connector containers route outbound traffic through a
+	// worker-local listener instead of direct bridge egress.
+	EgressPort  int    `mapstructure:"egress_port"`  // internal listener port, default 26277
+	EgressProxy string `mapstructure:"egress_proxy"` // "on" (default) routes containers via the proxy; "off" is the kill switch restoring direct egress
+
 	// Warm-pool container reuse (Phase 2).
 	// PoolEnabled defaults to true; WORKER_POOL_ENABLED=false is the kill-switch
 	// restoring the legacy 1-stream-1-container behavior (no acquire/reuse).
@@ -73,6 +78,14 @@ type Config struct {
 	AgentSandboxToolsSource string `mapstructure:"agent_sandbox_tools_source"`
 }
 
+// EgressEnabled reports whether connector containers should route egress
+// through the worker-local proxy listener. Only the literal "off" (any
+// case) disables — any other value, including "0", keeps the proxy on so a
+// config typo fails closed to proxied egress.
+func EgressEnabled(c Config) bool {
+	return !strings.EqualFold(strings.TrimSpace(c.EgressProxy), "off")
+}
+
 func LoadConfig() (*Config, error) {
 	_ = godotenv.Load(".env")
 
@@ -93,6 +106,8 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("connector_addr_allow_autodetect", false)
 	viper.SetDefault("connector_network", "")
 	viper.SetDefault("connector_token", "")
+	viper.SetDefault("egress_port", 26277)
+	viper.SetDefault("egress_proxy", "on")
 	viper.SetDefault("mode", "")
 	viper.SetDefault("pool_enabled", true)
 	viper.SetDefault("connector_idle_timeout", 60)
