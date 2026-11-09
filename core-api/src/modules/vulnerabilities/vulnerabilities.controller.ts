@@ -30,6 +30,7 @@ import {
 } from './dto/get-vulnerability-statistics.dto';
 import { GetVulnerabilitiesQueryDto } from './dto/get-vulnerability.dto';
 import {
+  BulkReviewResultDto,
   ClaimFixResponseDto,
   MergeVulnerabilityResponseDto,
   ReopenVulnerabilitiesResponseDto,
@@ -41,6 +42,8 @@ import {
 } from './dto/vulnerability-response.dto';
 import {
   ApproveVulnerabilityDto,
+  BulkApproveVulnerabilitiesDto,
+  BulkRejectVulnerabilitiesDto,
   MergeVulnerabilityDto,
   RejectVulnerabilityDto,
 } from './dto/vulnerability-review.dto';
@@ -60,6 +63,14 @@ import { VulnerabilityReviewService } from './vulnerability-review.service';
 const bodyIds = (body: unknown, key = 'ids'): string[] => {
   const value = (body as Record<string, unknown> | undefined)?.[key];
   return Array.isArray(value) ? (value as string[]) : [];
+};
+
+/** Audit metadata of a bulk review: the ids actually decided. */
+const reviewedMetadata = (result: unknown) => {
+  const ids =
+    (result as BulkReviewResultDto | undefined)?.reviewed?.map((r) => r.id) ??
+    [];
+  return { action: 'bulk', count: ids.length, ids };
 };
 
 @Controller('vulnerabilities')
@@ -353,6 +364,56 @@ export class VulnerabilitiesController {
     @WorkspaceId() workspaceId: string,
   ) {
     return this.reviewService.duplicates(id, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Bulk approve AI proposals',
+    description:
+      'Approves each pending AI proposal in ids, keeping its proposed severity. Ids not found in the workspace or no longer pending are returned under skipped.',
+    response: {
+      serialization: BulkReviewResultDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @PublishEvent(EVENT_CATALOG.vulnerability.review.approved, {
+    metadata: (_body, result) => reviewedMetadata(result),
+  })
+  @WorkspaceAccess('vulnerability.write')
+  @Post('review/approve')
+  @HttpCode(HttpStatus.OK)
+  bulkApproveProposals(
+    @WorkspaceId() workspaceId: string,
+    @UserContext() user: User,
+    @Body() dto: BulkApproveVulnerabilitiesDto,
+  ) {
+    return this.reviewService.bulkApprove(dto.ids, dto, user, workspaceId);
+  }
+
+  @Doc({
+    summary: 'Bulk reject AI proposals',
+    description:
+      'Rejects each pending AI proposal in ids with the same note (required). Ids not found in the workspace or no longer pending are returned under skipped.',
+    response: {
+      serialization: BulkReviewResultDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @PublishEvent(EVENT_CATALOG.vulnerability.review.rejected, {
+    metadata: (_body, result) => reviewedMetadata(result),
+  })
+  @WorkspaceAccess('vulnerability.write')
+  @Post('review/reject')
+  @HttpCode(HttpStatus.OK)
+  bulkRejectProposals(
+    @WorkspaceId() workspaceId: string,
+    @UserContext() user: User,
+    @Body() dto: BulkRejectVulnerabilitiesDto,
+  ) {
+    return this.reviewService.bulkReject(dto.ids, dto, user, workspaceId);
   }
 
   @Doc({
