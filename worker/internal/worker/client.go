@@ -3,8 +3,10 @@ package worker
 import (
 	"context"
 	"fmt"
+	"net"
 	"oasm-worker/internal/config"
 	"oasm-worker/internal/connector"
+	"oasm-worker/internal/egress"
 	"oasm-worker/internal/execution"
 	"oasm-worker/internal/runtime"
 	"oasm-worker/internal/sysresources"
@@ -34,6 +36,15 @@ var (
 // declared manifest limit as its request, so a burst of memory-heavy images
 // (e.g. nuclei 4GiB) cannot exhaust RAM.
 const connectorResourceHeadroom = 0.8
+
+// egressHostOf splits the dial host out of a resolved host:port address for
+// the egress deny list (the own callback address is never a valid target).
+func egressHostOf(addr string) string {
+	if h, _, err := net.SplitHostPort(addr); err == nil {
+		return h
+	}
+	return addr
+}
 
 func connectInternalNetwork(ctx context.Context, grpcClient *grpcclient.Client, network string, events chan<- TuiEvent) error {
 	log := NewTuiLogger(events, "Network")
@@ -437,6 +448,33 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 					connectorServer.SetTokenLookup(mgrInit)
 				} else {
 					log.Warning("connector server unavailable — pooled container registration/auth skipped")
+				}
+				// Worker-local egress proxy: connector containers route outbound
+				// traffic through this listener instead of direct bridge egress.
+				// Non-fatal like the connector server: a failed listener leaves
+				// containers on direct egress (WORKER_EGRESS_PROXY=off does the
+				// same deliberately). Binds all interfaces — containers reach it
+				// via the resolved dial host — and is never published to the host.
+				if config.EgressEnabled(*cfg) {
+					egressServer, err := egress.NewServer(
+						fmt.Sprintf(":%d", cfg.EgressPort),
+						mgrInit.ProxyAuth,
+						egress.Options{DenyHosts: []string{egressHostOf(dockerRT.ConnectorAddr()), cfg.GrpcHost}},
+					)
+					if err != nil {
+						log.Error("egress proxy init failed (non-fatal) — containers keep direct egress: %v", err)
+					} else {
+						dockerRT.ConfigureEgress(runtime.WithEgressPort(dockerRT.ConnectorAddr(), egressServer.Port()), cfg.GrpcHost, true)
+						go func() {
+							log.Success("egress proxy listening on %s", egressServer.Addr())
+							if err := egressServer.Serve(workerCtx); err != nil {
+								log.Warning("egress proxy stopped: %v", err)
+							}
+						}()
+					}
+				} else {
+					dockerRT.ConfigureEgress("", "", false)
+					log.Info("egress proxy disabled (WORKER_EGRESS_PROXY=off) — containers keep direct egress")
 				}
 				// Phase 2 warm pool: idle containers of the same image survive
 				// their execution and are reused for the next job (finished =
