@@ -2,7 +2,6 @@ package egress
 
 import (
 	"context"
-	"crypto/subtle"
 	"errors"
 	"fmt"
 	"io"
@@ -20,16 +19,8 @@ type Logger interface {
 }
 
 // AuthFunc validates one proxy credential and returns the execution label
-// for log lines. Constant-time comparison is the caller's job; subtleEqual
-// is provided for it.
+// for log lines. Constant-time comparison is the caller's job.
 type AuthFunc func(token string) (label string, ok bool)
-
-func subtleEqual(a, b string) bool {
-	if len(a) == 0 || len(b) == 0 {
-		return false
-	}
-	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
-}
 
 // Options tunes the egress listener.
 type Options struct {
@@ -76,11 +67,6 @@ func NewServer(addr string, auth AuthFunc, opts Options) (*Server, error) {
 	s.dialIP = s.dialRaw
 	s.proxy = newHTTPProxy(s)
 	return s, nil
-}
-
-// SetLogger wires a lifecycle logger. Nil disables logging (safe).
-func (s *Server) SetLogger(l Logger) {
-	s.logger = l
 }
 
 func (s *Server) logInfo(msg string, args ...any) {
@@ -168,22 +154,9 @@ func (s *Server) dialVetted(ctx context.Context, network, addr string) (net.Conn
 	if denyTarget(host, s.deny) {
 		return nil, &blockedError{target: addr}
 	}
-	lookup := s.lookup
-	if lookup == nil {
-		lookup = net.DefaultResolver.LookupHost
-	}
-	addrs, err := lookup(ctx, host)
+	// LookupHost returns an IP literal as-is, so literals are vetted below too.
+	addrs, err := s.lookup(ctx, host)
 	if err != nil {
-		if ip, perr := netip.ParseAddr(stripBrackets(host)); perr == nil {
-			if !IsPublicAddr(ip) {
-				return nil, &blockedError{target: addr}
-			}
-			dialIP := s.dialIP
-			if dialIP == nil {
-				dialIP = s.dialRaw
-			}
-			return dialIP(ctx, network, addr)
-		}
 		return nil, err
 	}
 	for _, a := range addrs {
@@ -191,11 +164,7 @@ func (s *Server) dialVetted(ctx context.Context, network, addr string) (net.Conn
 		if err != nil || !IsPublicAddr(ip) {
 			continue
 		}
-		dialIP := s.dialIP
-		if dialIP == nil {
-			dialIP = s.dialRaw
-		}
-		c, err := dialIP(ctx, network, net.JoinHostPort(a, port))
+		c, err := s.dialIP(ctx, network, net.JoinHostPort(a, port))
 		if err == nil {
 			return c, nil
 		}
@@ -206,13 +175,6 @@ func (s *Server) dialVetted(ctx context.Context, network, addr string) (net.Conn
 func (s *Server) dialRaw(ctx context.Context, network, addr string) (net.Conn, error) {
 	d := &net.Dialer{Timeout: s.dialTO}
 	return d.DialContext(ctx, network, addr)
-}
-
-func stripBrackets(h string) string {
-	if len(h) > 1 && h[0] == '[' && h[len(h)-1] == ']' {
-		return h[1 : len(h)-1]
-	}
-	return h
 }
 
 // blockedError is a dial refused by egress policy.

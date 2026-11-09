@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"net"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	socks5 "github.com/things-go/go-socks5"
 )
@@ -27,7 +30,7 @@ func (c *tokenCredentials) Valid(user, password, _ string) bool {
 // newSocksServer builds the CONNECT-only SOCKS5 server sharing auth and the
 // vetted dialer with the HTTP half. BIND and UDP ASSOCIATE stay refused:
 // the egress proxy carries scanning TCP, nothing else.
-func (s *Server) newSocksServer() *socks5.Server {
+func (s *Server) newSocksServer(conn net.Conn) *socks5.Server {
 	return socks5.NewServer(
 		socks5.WithCredential(&tokenCredentials{auth: s.auth}),
 		socks5.WithRule(&socks5.PermitCommand{EnableConnect: true}),
@@ -35,6 +38,7 @@ func (s *Server) newSocksServer() *socks5.Server {
 		// plus the authenticated username, so denials log WHO went WHERE
 		// and allowed sessions log byte counts like the HTTP half.
 		socks5.WithDialAndRequest(func(ctx context.Context, network, addr string, req *socks5.Request) (net.Conn, error) {
+			_ = conn.SetDeadline(time.Time{})
 			label := ""
 			if req != nil && req.AuthContext != nil {
 				for _, slot := range []string{"username", "password"} {
@@ -65,51 +69,46 @@ func (s *Server) newSocksServer() *socks5.Server {
 
 // countConn wraps an allowed SOCKS5 upstream and logs tunneled bytes when
 // the session ends, matching the HTTP half's allow/bytes pair.
+// Read and Write run on separate library goroutines, hence the atomics.
 type countConn struct {
 	net.Conn
 	label  string
 	target string
 	srv    *Server
-	up     int64
-	down   int64
-	done   bool
+	up     atomic.Int64
+	down   atomic.Int64
+	once   sync.Once
 }
 
 func (c *countConn) Read(b []byte) (int, error) {
 	n, err := c.Conn.Read(b)
-	if n > 0 {
-		c.down += int64(n)
-	}
-	if err != nil {
-		c.finish()
-	}
+	c.down.Add(int64(n))
 	return n, err
 }
 
 func (c *countConn) Write(b []byte) (int, error) {
 	n, err := c.Conn.Write(b)
-	if n > 0 {
-		c.up += int64(n)
-	}
+	c.up.Add(int64(n))
 	return n, err
 }
 
+// CloseWrite lets the library half-close upstream when the client is done.
+func (c *countConn) CloseWrite() error { return closeWrite(c.Conn) }
+
+// Close runs once both copy directions are done (library defers it).
 func (c *countConn) Close() error {
-	c.finish()
+	c.once.Do(func() {
+		c.srv.logInfo("egress bytes exec=%s method=SOCKS5 target=%s up=%d down=%d", c.label, c.target, c.up.Load(), c.down.Load())
+	})
 	return c.Conn.Close()
 }
 
-func (c *countConn) finish() {
-	if c.done {
-		return
-	}
-	c.done = true
-	c.srv.logInfo("egress bytes exec=%s method=SOCKS5 target=%s up=%d down=%d", c.label, c.target, c.up, c.down)
-}
-
-// serveSocks handles one sniff-routed SOCKS5 session.
+// serveSocks handles one sniff-routed SOCKS5 session. The handshake gets the
+// same 10s budget as the HTTP half; the deadline is lifted once auth passed
+// and the upstream dial starts, so an unauthenticated client cannot park.
 func (s *Server) serveSocks(conn net.Conn) {
-	srv := s.newSocksServer()
+	_ = conn.SetDeadline(time.Now().Add(10 * time.Second))
+	srv := s.newSocksServer(conn)
 	if err := srv.ServeConn(conn); err != nil {
 		s.logWarning("egress socks5 session ended: %v", err)
 	}

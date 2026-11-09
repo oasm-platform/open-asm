@@ -127,7 +127,12 @@ func (p *httpProxy) forward(w *connResponseWriter, r *http.Request) {
 	}
 	dialCtx, cancel := context.WithTimeout(r.Context(), p.srv.dialTO)
 	defer cancel()
-	upstream, err := p.srv.dial(dialCtx, "tcp", r.URL.Host)
+	// Absolute-form URLs usually omit the port (http://host/); dial needs one.
+	addr := r.URL.Host
+	if r.URL.Port() == "" {
+		addr = net.JoinHostPort(host, "80")
+	}
+	upstream, err := p.srv.dial(dialCtx, "tcp", addr)
 	if err != nil {
 		var be *blockedError
 		if errors.As(err, &be) {
@@ -143,6 +148,9 @@ func (p *httpProxy) forward(w *connResponseWriter, r *http.Request) {
 	out := r.Clone(context.Background())
 	out.Header.Del("Proxy-Authorization")
 	out.Header.Del("Proxy-Authenticate")
+	// The body is sent unconditionally; without Expect the upstream never
+	// answers 100 Continue, which ReadResponse would return as final.
+	out.Header.Del("Expect")
 	out.RequestURI = ""
 	if err := out.Write(upstream); err != nil {
 		http.Error(w, "upstream error", http.StatusBadGateway)

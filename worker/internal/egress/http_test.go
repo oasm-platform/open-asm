@@ -17,7 +17,7 @@ import (
 
 func testAuth(token string) AuthFunc {
 	return func(got string) (string, bool) {
-		if subtleEqual(got, token) {
+		if token != "" && got == token {
 			return "exec-test", true
 		}
 		return "", false
@@ -80,7 +80,7 @@ func TestHTTPForwardValidToken(t *testing.T) {
 	var mu sync.Mutex
 	var gotLog string
 	srv := startEgress(t, testAuth("tok-http-1"), localDialer())
-	srv.SetLogger(testLogger(func(format string, args ...any) {
+	srv.logger = (testLogger(func(format string, args ...any) {
 		mu.Lock()
 		defer mu.Unlock()
 		gotLog += fmt.Sprintf(format, args...) + "\n"
@@ -113,7 +113,7 @@ func TestHTTPForwardLogsBytes(t *testing.T) {
 	var mu sync.Mutex
 	var gotLog string
 	srv := startEgress(t, testAuth("tok-bytes"), localDialer())
-	srv.SetLogger(testLogger(func(format string, args ...any) {
+	srv.logger = (testLogger(func(format string, args ...any) {
 		mu.Lock()
 		defer mu.Unlock()
 		gotLog += fmt.Sprintf(format, args...) + "\n"

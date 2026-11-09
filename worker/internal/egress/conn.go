@@ -42,11 +42,14 @@ func (w *connResponseWriter) WriteHeader(status int) {
 	_, _ = w.conn.Write([]byte("\r\n"))
 }
 
-func (w *connResponseWriter) Hijack() (net.Conn, *bufio.Reader, error) {
-	return w.conn, w.br, nil
+// closeWrite half-closes c when it supports it, so a wrapper keeps the
+// peer's EOF flowing through a tunnel instead of hiding it.
+func closeWrite(c net.Conn) error {
+	if cw, ok := c.(interface{ CloseWrite() error }); ok {
+		return cw.CloseWrite()
+	}
+	return nil
 }
-
-func (w *connResponseWriter) Flush() {}
 
 // peekedConn replays sniffed bytes before the underlying stream.
 type peekedConn struct {
@@ -72,3 +75,5 @@ func (c *peekedConn) Read(b []byte) (int, error) {
 	}
 	return c.Conn.Read(b)
 }
+
+func (c *peekedConn) CloseWrite() error { return closeWrite(c.Conn) }

@@ -810,16 +810,6 @@ func (m *Manager) ActiveCount() int {
 	return len(m.execs)
 }
 
-// ExecToken returns the per-execution single-use connector auth token for an
-// execution, and whether one exists. It structurally implements the
-// connector.TokenLookup contract (the connector server calls it from its
-// Register handshake goroutines). Any concurrently deleted token (Release/
-// Cancel/Submit failure) reads as not-found.
-
-// ProxyAuth validates one egress proxy credential and returns the execution
-// label for proxy log lines. It accepts live execution tokens and retained
-// creator tokens of pooled containers: the same single-use token the
-// connector presents on Register authorizes its proxy traffic.
 // subtleEqual compares two credentials in constant time; empty never matches.
 func subtleEqual(a, b string) bool {
 	if len(a) == 0 || len(b) == 0 {
@@ -828,6 +818,10 @@ func subtleEqual(a, b string) bool {
 	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }
 
+// ProxyAuth validates one egress proxy credential and returns the execution
+// label for proxy log lines. It accepts live execution tokens and retained
+// creator tokens of pooled containers: the same single-use token the
+// connector presents on Register authorizes its proxy traffic.
 func (m *Manager) ProxyAuth(token string) (string, bool) {
 	if token == "" {
 		return "", false
@@ -883,6 +877,12 @@ func (m *Manager) gcEgressTokens() {
 	}
 	m.tokenMu.Unlock()
 }
+
+// ExecToken returns the per-execution single-use connector auth token for an
+// execution, and whether one exists. It structurally implements the
+// connector.TokenLookup contract (the connector server calls it from its
+// Register handshake goroutines). Any concurrently deleted token (Release/
+// Cancel/Submit failure) reads as not-found.
 func (m *Manager) ExecToken(execID string) (string, bool) {
 	m.tokenMu.RLock()
 	defer m.tokenMu.RUnlock()
