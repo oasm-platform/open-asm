@@ -59,10 +59,14 @@ type poolEntry struct {
 	StateChangedAt time.Time
 	LastUsedAt     time.Time // last transition time; Sweep evicts idle entries past the idle timeout
 	ExecID         string    // owner execution ("" when idle)
-	LastJobID      string
-	LastTraceID    string
-	CPU            string // manifest cpu the container was created with (informational)
-	Memory         string // manifest memory the container was created with (informational)
+	// TokenExecID is the creating execution whose single-use token stays
+	// valid while this container lives (set on first ReleaseToIdle): pooled
+	// reuse authenticates proxy traffic as the creator.
+	TokenExecID string
+	LastJobID   string
+	LastTraceID string
+	CPU         string // manifest cpu the container was created with (informational)
+	Memory      string // manifest memory the container was created with (informational)
 	// Declared limits as numbers, reserved against the node budget while busy.
 	CPURequestMillis int
 	MemRequestBytes  int
@@ -264,6 +268,9 @@ func (p *PoolManager) ReleaseToIdle(execID string) {
 			p.markFreedLocked(e.PoolKey)
 		}
 		e.State = PoolStateIdle
+		if e.TokenExecID == "" {
+			e.TokenExecID = execID
+		}
 		e.ExecID = ""
 		e.LastUsedAt = p.now()
 		e.StateChangedAt = e.LastUsedAt
@@ -332,6 +339,35 @@ func (p *PoolManager) Evict(execID string) string {
 	// so Evict never leaves a stale routing behind.
 	p.purgeOwnerByContainer(cid)
 	return cid
+}
+
+// CreatingExec returns the TokenExecID (token-owning creator) of the
+// container currently backing execID, or "" when unknown.
+func (p *PoolManager) CreatingExec(execID string) string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	cid, ok := p.owner[execID]
+	if !ok {
+		return ""
+	}
+	if e, ok := p.byID[cid]; ok {
+		return e.TokenExecID
+	}
+	return ""
+}
+
+// CreatingExecs lists every pooled container's token-owning creator for
+// gcEgressTokens.
+func (p *PoolManager) CreatingExecs() []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	var out []string
+	for _, e := range p.byID {
+		if e.TokenExecID != "" {
+			out = append(out, e.TokenExecID)
+		}
+	}
+	return out
 }
 
 // IsIdle reports whether the container backing execID is idle (no execution in
