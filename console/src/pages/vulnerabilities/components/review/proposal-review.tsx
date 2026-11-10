@@ -19,7 +19,17 @@ import {
 } from '@/services/apis/gen/queries';
 import { Link } from '@tanstack/react-router';
 import { format } from 'date-fns';
-import { Check, GitMerge, Sparkles, Wrench, X, XCircle } from 'lucide-react';
+import {
+  Check,
+  CircleCheck,
+  CircleX,
+  Clock,
+  GitMerge,
+  Sparkles,
+  Wrench,
+  X,
+  XCircle,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ConversationLink, RunLink } from '../detail/links';
 import { VulnerabilityOverview, cweHref } from '../detail/overview-content';
@@ -31,11 +41,75 @@ import {
   useMergeProposal,
 } from './review-dialogs';
 
+type CitationStatus = 'found' | 'not_found' | 'output_expired';
+type EvidenceVerdict = 'evidence_checked' | 'unverified' | 'output_expired';
+
+/** One quote the server looked up in the stored tool output it cites. */
+interface CheckedCitation {
+  runId: string;
+  quote: string;
+  status: CitationStatus;
+  line?: number;
+  excerpt?: string;
+}
+
 interface Evidence {
   requests: string[];
   responses: string[];
   baseline?: string;
   notes?: string;
+  /** Set by the server when the agent proposed; absent on older proposals. */
+  check?: { verdict: EvidenceVerdict; citations: CheckedCitation[] };
+}
+
+const VERDICTS: Record<
+  EvidenceVerdict,
+  { label: string; variant: 'success' | 'warning' | 'secondary'; hint: string }
+> = {
+  evidence_checked: {
+    label: 'Quotes checked',
+    variant: 'success',
+    hint: 'Every quote was found verbatim in the tool output it cites.',
+  },
+  unverified: {
+    label: 'Unverified',
+    variant: 'warning',
+    hint: 'Not every quote was found in tool output. Check the proof yourself.',
+  },
+  output_expired: {
+    label: 'Output expired',
+    variant: 'secondary',
+    hint: 'Some tool output was gone before it could be checked.',
+  },
+};
+
+const CITATION_STATUS: Record<CitationStatus, { icon: ReactNode; text: string }> = {
+  found: {
+    icon: <CircleCheck className="size-3.5 text-success" />,
+    text: 'found',
+  },
+  not_found: {
+    icon: <CircleX className="size-3.5 text-destructive" />,
+    text: 'not in the output',
+  },
+  output_expired: {
+    icon: <Clock className="size-3.5 text-muted-foreground" />,
+    text: 'output expired or unknown run',
+  },
+};
+
+function readCheck(value: unknown): Evidence['check'] {
+  if (!value || typeof value !== 'object') return undefined;
+  const { verdict, citations } = value as Record<string, unknown>;
+  if (typeof verdict !== 'string' || !(verdict in VERDICTS)) return undefined;
+  return {
+    verdict: verdict as EvidenceVerdict,
+    citations: Array.isArray(citations)
+      ? (citations as CheckedCitation[]).filter(
+          (c) => c && typeof c.quote === 'string' && c.status in CITATION_STATUS,
+        )
+      : [],
+  };
 }
 
 const asStrings = (v: unknown): string[] =>
@@ -57,6 +131,7 @@ export function readEvidence(
     responses: asStrings(e.responses),
     baseline: typeof e.baseline === 'string' ? e.baseline : undefined,
     notes: typeof e.notes === 'string' ? e.notes : undefined,
+    check: readCheck(e.check),
   };
 }
 
@@ -74,13 +149,49 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 const pre =
   'whitespace-pre-wrap break-all rounded bg-muted/60 p-2 font-mono text-xs';
 
+function QuotedOutput({ check }: { check: NonNullable<Evidence['check']> }) {
+  return (
+    <div data-testid="evidence-check">
+      <span className="text-xs font-medium text-muted-foreground">
+        Quoted tool output
+      </span>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {check.citations.length === 0
+          ? 'The agent quoted no tool output.'
+          : VERDICTS[check.verdict].hint}
+      </p>
+      <ul className="mt-2 flex flex-col gap-2">
+        {check.citations.map((c, i) => (
+          <li key={i} className="flex flex-col gap-1">
+            <span className="flex flex-wrap items-center gap-1.5 text-xs">
+              {CITATION_STATUS[c.status].icon}
+              <span>{CITATION_STATUS[c.status].text}</span>
+              <span className="font-mono text-muted-foreground" title={c.runId}>
+                run {c.runId.slice(0, 8)}
+                {c.line ? `, line ${c.line}` : ''}
+              </span>
+            </span>
+            <pre className={pre}>{c.excerpt ?? c.quote}</pre>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function EvidenceCard({ evidence }: { evidence: Evidence | null }) {
+  const verdict = evidence?.check && VERDICTS[evidence.check.verdict];
   return (
     <Card className="gap-3 py-4 shadow-none" data-testid="evidence-card">
-      <CardHeader className="px-4">
+      <CardHeader className="flex flex-row items-center justify-between gap-2 px-4">
         <CardTitle className="text-sm">
           Evidence provided by the agent
         </CardTitle>
+        {verdict && (
+          <Badge variant={verdict.variant} title={verdict.hint}>
+            {verdict.label}
+          </Badge>
+        )}
       </CardHeader>
       <CardContent className="flex flex-col gap-3 px-4">
         {!evidence ? (
@@ -133,6 +244,7 @@ function EvidenceCard({ evidence }: { evidence: Evidence | null }) {
                 </tbody>
               </table>
             </div>
+            {evidence.check && <QuotedOutput check={evidence.check} />}
             {evidence.notes && (
               <div>
                 <span className="text-xs font-medium text-muted-foreground">

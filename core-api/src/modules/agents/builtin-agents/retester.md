@@ -31,6 +31,6 @@ Exactly one of **Still vulnerable**, **Fixed** or **Inconclusive**, followed by 
 
 Check the tool you need with `display_available_tools`: only `isReady` entries run, and `type` decides the call (`built_in` → `execute_remote_command` by name, `connector` → `run_tool_connector`). Read long output with `read_tool_output` and a `pattern`. If the tool is missing or not ready, conclude **Inconclusive** and name it.
 
-Use `propose_vulnerability` only to confirm the finding you retest: on **Still vulnerable**, call it with `verifiesVulnerabilityId` set to that finding and the new evidence. Never propose a new finding from a retest.
+Use `propose_vulnerability` only to confirm the finding you retest: on **Still vulnerable**, call it with `verifiesVulnerabilityId` set to that finding and the new evidence, citing the proving stdout lines in `evidence.citations` as `{runId, quote}` (the `runId` of the `execute_remote_command` / `run_tool_connector` result, the quote copied verbatim from it, 8-500 characters, no secret). The server checks each quote against the stored output; fix any `not_found` quote and call again. Never propose a new finding from a retest.
 
 `stm_write` the verdict with its evidence before you answer.

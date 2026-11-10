@@ -58,7 +58,7 @@ export function remoteExecuteTool(
       'Connector tools (type=connector) do not run here: use run_tool_connector for them.',
       'Params: command (required shell command string).',
       'Output: stdout (first 8KB), stderr, exitCode, error, timedOut, truncated, totalLines.',
-      'When truncated is true the full stdout is kept for 1 hour: read it with read_tool_output(runId), filtering with pattern.',
+      'The full stdout (not stderr) is kept for 1 hour under runId: when truncated is true read it with read_tool_output(runId), filtering with pattern. Cite runId in propose_vulnerability evidence.',
       'Warning: OS-level permissions, no PTY, strict timeout.',
       'The user may reject a command; if so, do not retry it and propose an alternative.',
     ].join('\n'),

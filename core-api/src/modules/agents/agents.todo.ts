@@ -73,7 +73,7 @@ export function formatTodosToPrompt(
     'Rule 1 (ORDER): Steps run in order. Your current step is the one marked "<<<< YOU ARE HERE"; the system only lets you start the first unfinished step.',
     'Rule 2 (TRANSITIONS): Call transition_step(id, "in_progress") before working on a step and transition_step(id, "completed") (or "failed") as soon as it is done, then start the next one.',
     'Rule 3 (PARALLEL INSIDE A STEP): Within the current step, independent tool calls may run in parallel (e.g. several lookups, or dispatching several subagents at once).',
-    'Rule 4 (DELEGATE): A step that matches a subagent is done by dispatching it. A dispatch step is completed once every subagent it needs has been dispatched; do not wait for the results there. Check the results in a later step (they are delivered to you automatically) and judge them against the goal.',
+    'Rule 4 (DELEGATE): A step that subagents deliver is completed only once their results are back, read and judged against the goal — dispatching is not completing. Dispatch every independent job of the step at once, chain dependent ones with `after`, and keep working on whatever does not depend on them while they run.',
     "Rule 5 (KEEP GOING): Work through the steps without stopping to ask, unless a decision is really the user's (scope change, risky action).",
     'Rule 6 (SHORT TEXT): Keep text between steps to 1-2 sentences. Save detailed analysis for the final step.',
     'Rule 7 (FAILURES): If a step fails, try one or two other approaches, then mark it "failed" with the reason and move on.',
