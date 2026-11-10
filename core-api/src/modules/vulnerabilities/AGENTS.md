@@ -7,7 +7,8 @@ Findings on assets: list/detail/statistics, the lifecycle (new → active → fi
 - `vulnerabilities.controller.ts`: HTTP routes on `vulnerabilities`.
 - `vulnerabilities.service.ts`: `VulnerabilitiesService`: `scan`, list/detail/timeline/statistics, bulk dismiss/reopen, `claimFix`, AI analysis enqueue and process.
 - `vulnerability-lifecycle.service.ts`: `VulnerabilityLifecycleService`: auto-close on covering scans (`onScanJobCompleted`), `expireRiskAcceptances`, settings and `recomputeDueAt`.
-- `vulnerability-review.service.ts`: `VulnerabilityReviewService`: `propose` (agents), `approve`, `reject`, `bulkApprove`, `bulkReject`, `merge`, `duplicates`.
+- `vulnerability-review.service.ts`: `VulnerabilityReviewService`: `propose` (agents), `checkEvidence`, `approve`, `reject`, `bulkApprove`, `bulkReject`, `merge`, `duplicates`.
+- `evidence-check.ts`: pure matcher for agent evidence (`checkCitations`, `findQuote`, `normalizeWhitespace`, `MIN_QUOTE_CHARS` = 8).
 - `vulnerability-lifecycle.ts` (`scanScopeKey`, `stableJson`, `loadVulnerabilitySettings`, `insertInChunks`, `returnedRows`), `vulnerability-settings.ts` (`DEFAULT_VULNERABILITY_SETTINGS`, `computeDueAt`).
 - `open-vulnerability.ts` (`openVulnerabilityCondition`, `approvedVulnerabilityCondition`, `fixedVulnerabilityCondition`), `vulnerability-status.ts` (`VulnerabilityStatus` list filter), `vulnerability-filter.ts` (filter tree), `detected-vulnerability.ts` (`toDetectedVulnerability`).
 - `processors/vulnerability-analysis.processor.ts`, `vulnerability-risk-expiry.cron.ts`.
@@ -47,12 +48,13 @@ Findings on assets: list/detail/statistics, the lifecycle (new → active → fi
 - Auto-close: only a later scan with the **same** `scanScopeKey` (asset + tool + service + inputs + config + profile) can count a miss. Findings with a null key (AI, manual, older rows) are never auto-closed, and a fix claim on them is recorded as `not_verifiable_by_scan`. `onScanJobCompleted` is called from `jobs-registry/processors/job-result.processor.ts`.
 - Re-detection is the ingest's `ON CONFLICT ("fingerprint")` clause (`rescanConflictClause` in `data-adapter.service.ts`). It moves fixed → resurfaced and clears the fix and fix-claim columns. It never touches rows under review.
 - Bulk review runs the single-id `approve`/`reject` per id, each in its own transaction. Ids missing from the workspace or no longer pending come back under `skipped`; any other error stops the batch and keeps what was already decided. Bulk approve keeps each proposed severity.
-- The `PROPOSED` and `VERIFIED_BY_AI` events carry `data.proposalToolCallId`, the id of the `propose_vulnerability` call itself; the cited calls stay in `vulnerability_sources.toolCallIds`.
+- The `PROPOSED` and `VERIFIED_BY_AI` events carry `data.proposalToolCallId`, the id of the `propose_vulnerability` call itself, and `data.evidenceVerdict`; the cited calls stay in `vulnerability_sources.toolCallIds`.
+- **Evidence check.** `propose` looks up each `evidence.citations[]` `{runId, quote}` in the conversation's stored tool output (Redis `agent:tool-output:<conversationId>:<runId>`, key from `agents/tools/tool-output-store.ts`, 1 h TTL) and writes the result to the agent source's `evidence.check` (`verdict` `evidence_checked|unverified|output_expired`, per-citation `status`, `line`, `excerpt`). Matching is whitespace-normalized and case-sensitive. The check runs once, at propose time; the excerpt is what the reviewer sees after the output expires. It never blocks or changes the proposal, and the server's `check` always replaces one sent by the caller. No column: it lives in the `evidence` jsonb, so older rows simply have no `check`.
 - Dismiss is only for approved findings, and an active dismissal gives 400. Risk acceptance needs a future `expiresAt` within `riskAcceptMaxDays`.
 
 ## Coupling
 
-- `forwardRef` cycle with `AgentsModule`: `VulnerabilitiesService` → `AgentsCompletionsService.vulAnalyze` (analysis); agents → `VulnerabilityReviewService` (`propose_vulnerability`).
+- `forwardRef` cycle with `AgentsModule`: `VulnerabilitiesService` → `AgentsCompletionsService.vulAnalyze` (analysis); agents → `VulnerabilityReviewService` (`propose_vulnerability`). `VulnerabilityReviewService` injects the global `RedisService` and reads the agents' tool-output keys (`toolOutputKey`).
 - Imports `NotificationsModule`. Uses global `JobsRegistryService`, `WorkflowRunnerService`, `WorkflowsService`, `ToolsService`, `EventBridgeService`. Registers `Asset` and `Target` repositories itself.
 - `scan` runs the first job of `vulnerability_scan_basic.yaml` (nuclei) for host targets, and the whole `repository_scan.yaml` for GIT_ORG targets. Both workflows must exist in the workspace, or the call returns 404.
 - Writers outside: `DataAdapterService` inserts and upserts findings, `vulnerability_events` (`DETECTED`) and `vulnerability_sources`, and publishes `vulnerability.detected` / `vulnerability.resurfaced`.
@@ -66,4 +68,4 @@ Findings on assets: list/detail/statistics, the lifecycle (new → active → fi
 
 ## Testing
 
-Unit specs: `vulnerabilities.service.spec.ts`, `vulnerabilities.controller.spec.ts`, `vulnerability-lifecycle.service.spec.ts`, `vulnerability-review.service.spec.ts`, `vulnerability-filter.spec.ts`, `dto/vulnerability-dtos.spec.ts`, `vulnerabilities.lifecycle-api.spec.ts`. E2E: `core-api/test/vulnerability-lifecycle.e2e-spec.ts`, `vulnerability-fast-scan.e2e-spec.ts`.
+Unit specs: `evidence-check.spec.ts`, `vulnerabilities.service.spec.ts`, `vulnerabilities.controller.spec.ts`, `vulnerability-lifecycle.service.spec.ts`, `vulnerability-review.service.spec.ts`, `vulnerability-filter.spec.ts`, `dto/vulnerability-dtos.spec.ts`, `vulnerabilities.lifecycle-api.spec.ts`. E2E: `core-api/test/vulnerability-lifecycle.e2e-spec.ts`, `vulnerability-fast-scan.e2e-spec.ts`.

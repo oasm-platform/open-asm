@@ -7,6 +7,10 @@ import type { RemoteExecuteService } from '@/modules/remote-execute/remote-execu
 import { validateTemplate } from '@/modules/templates/templates.service';
 
 import { defineTool, errorMessage } from './helpers';
+import {
+  AGENT_TOOL_OUTPUT_TTL_SECONDS,
+  toolOutputKey,
+} from './tool-output-store';
 import type { Deps, ToolCallOptions } from './types';
 
 const logger = new Logger('AgentTool');
@@ -19,15 +23,11 @@ const AGENT_TOOL_RESULT_GRACE_MS = 30_000;
 const AGENT_TOOL_OUTPUT_PAGE = 8 * 1024;
 /** Full output kept for read_tool_output: Redis only, never the database. */
 const AGENT_TOOL_OUTPUT_STORE_MAX = 10 * 1024 * 1024;
-const AGENT_TOOL_OUTPUT_TTL_SECONDS = 3600;
 /**
  * Inline templates ride in the container's OASM_CONFIG env, and Linux caps one
  * env string at 128 KB.
  */
 const AGENT_TEMPLATES_MAX_BYTES = 64 * 1024;
-
-const toolOutputKey = (conversationId: string, runId: string) =>
-  `agent:tool-output:${conversationId}:${runId}`;
 
 /** Output lines; a trailing newline ends the last line, it opens no new one. */
 function outputLines(raw: string): string[] {
@@ -38,8 +38,10 @@ function outputLines(raw: string): string[] {
 }
 
 /**
- * What the model gets of a tool's stdout: its first page and, when there is
- * more, a runId under which read_tool_output pages through the rest.
+ * What the model gets of a tool's stdout: its first page and a runId under
+ * which the whole output is kept for an hour. read_tool_output pages through
+ * it and propose_vulnerability checks quoted evidence against it, so a short
+ * output is stored too.
  */
 export async function pageForModel(
   deps: Deps<'redisService'>,
@@ -49,7 +51,7 @@ export async function pageForModel(
 ) {
   const truncated = stdout.length > AGENT_TOOL_OUTPUT_PAGE;
   let stored = false;
-  if (truncated) {
+  if (stdout !== '') {
     try {
       await deps.redisService.setex(
         toolOutputKey(conversationId, runId),
@@ -210,7 +212,7 @@ export function runConnectorTool(
       "Run one security tool against one target on this conversation's worker and get its raw output.",
       'Nothing is saved: results are not stored as assets or vulnerabilities.',
       `Waits up to ${AGENT_TOOL_RUN_TIMEOUT_MS / 60_000} minutes. Output: stdout (first ${AGENT_TOOL_OUTPUT_PAGE / 1024}KB), exitCode, error, timedOut, truncated, totalLines.`,
-      'When truncated is true the full output is kept for 1 hour: read it with read_tool_output(runId), filtering with pattern instead of paging through everything.',
+      'The full output is kept for 1 hour under runId: when truncated is true read it with read_tool_output(runId), filtering with pattern instead of paging through everything. Cite runId in propose_vulnerability evidence.',
       'Params: tool (slug), target, optional configProfileId, optional templates (nuclei only: your own template YAML, run instead of the built-in set).',
       'Tools:',
       catalog,
