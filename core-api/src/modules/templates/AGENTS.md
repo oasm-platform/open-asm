@@ -20,8 +20,8 @@ Custom scan templates (nuclei YAML) stored as workspace artifacts, plus a route 
 | `PATCH templates/:id` (rename) | `artifact.write`, owner only; publishes `artifact.updated` |
 | `POST templates/run` | `artifact.read` **and** `vulnerability.write` |
 
-- Registered in `combine.module.ts`. Exports nothing. No delete route: templates are deleted through `DELETE artifacts/:id`, and sharing goes through the artifacts share routes.
-- `create` publishes `artifact.created` from `ArtifactsService.createFromBuffer` with actor type `User`.
+- Registered in `combine.module.ts`. Exports `TemplatesService` for the agent tool `save_template` (`agents/tools/artifact.tools.ts`), which calls `create` (actor type `Agent`, `metadata.conversationId`) or `saveContent`. No delete route: templates are deleted through `DELETE artifacts/:id`, and sharing goes through the artifacts share routes.
+- `create` publishes `artifact.created` from `ArtifactsService.createFromBuffer` with actor type `User`, unless the caller passes another `actorType` (the agent tool passes `Agent`).
 
 ## Invariants
 
@@ -34,6 +34,7 @@ Custom scan templates (nuclei YAML) stored as workspace artifacts, plus a route 
 
 ## Coupling
 
+- Imported by `AgentsModule` for `TemplatesService` (agent tool `save_template`).
 - Imports `ArtifactsModule` (`ArtifactsService`, `ArtifactFoldersService`) and `StorageModule` (already global). Registers `Artifact` and `ProjectAsset` repositories and queries `artifacts` and `project_assets` directly.
 - Uses `ToolsService` and `JobsRegistryService` from the global `ToolsModule` and `JobsRegistryModule` without importing them.
 - `jobs-registry/jobs-registry.service.ts` owns the `customTemplateIds` → `customTemplates` signing (`signCustomTemplates`, cache key `<id>-<updatedAt>`); changing how templates are stored means changing that code too.

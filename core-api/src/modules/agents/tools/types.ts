@@ -17,6 +17,7 @@ import type { ProjectsService } from '@/modules/projects/projects.service';
 import type { RemoteExecuteService } from '@/modules/remote-execute/remote-execute.service';
 import type { StatisticService } from '@/modules/statistic/statistic.service';
 import type { TargetsService } from '@/modules/targets/targets.service';
+import type { TemplatesService } from '@/modules/templates/templates.service';
 import type { ToolConfigProfilesService } from '@/modules/tools/tool-config-profiles.service';
 import type { ToolsService } from '@/modules/tools/tools.service';
 import type { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilities.service';
@@ -69,6 +70,7 @@ export interface AgentToolDeps {
   projectTriggersService: ProjectTriggersService;
   projectWorkflowsService: ProjectWorkflowsService;
   eventBridge: EventBridgeService;
+  templatesService: TemplatesService;
 }
 
 export type Deps<K extends keyof AgentToolDeps> = Pick<AgentToolDeps, K>;

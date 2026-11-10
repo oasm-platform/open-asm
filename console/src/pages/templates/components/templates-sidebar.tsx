@@ -1,38 +1,15 @@
-import { ChevronRight, FileCode, MoreVertical, Plus, Upload } from 'lucide-react';
-import { useRef, useState, type ComponentProps } from 'react';
-import { useNavigate } from '@tanstack/react-router';
-import { useHotkeys } from 'react-hotkeys-hook';
-import { toast } from 'sonner';
+import { formatDistanceToNow } from 'date-fns';
+import { FileCode, MoreVertical, PanelLeftClose } from 'lucide-react';
+import { useState, type ComponentProps } from 'react';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuAction,
   SidebarMenuButton,
@@ -41,355 +18,171 @@ import {
 } from '@/components/ui/sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
 import useDebounce from '@/hooks/use-debounce';
-import { usePermission } from '@/hooks/usePermission';
-import { handleServerError } from '@/lib/handle-server-error';
-import { ShareFileDialog } from '@/pages/files/components/share-file-dialog';
+import { cn } from '@/lib/utils';
 import {
-  artifactsControllerDownload,
-  useArtifactsControllerRemove,
-  useTemplatesControllerCreate,
   useTemplatesControllerGetMany,
-  useTemplatesControllerRename,
   type ArtifactDto,
 } from '@/services/apis/gen/queries';
 import { useTemplateTabs } from '../hooks/use-template-tabs';
-import { readApiError, toastStorageFull } from '../template-errors';
+import { TemplateActionsMenu } from './template-actions-menu';
 
-const NAME_PATTERN = /\.ya?ml$/i;
-const NEW_SHORTCUT = /Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘I' : 'Ctrl+I';
+type Filter = 'all' | 'mine' | 'shared';
 
-export function TemplatesSidebar(props: ComponentProps<typeof Sidebar>) {
-  const { hasPermission } = usePermission();
-  const canWrite = hasPermission('artifact.write');
-  const { tabs, activeId, open, openNew, rename: renameTab, close } = useTemplateTabs();
+const FILTERS: { value: Filter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'mine', label: 'Mine' },
+  { value: 'shared', label: 'Shared' },
+];
+
+type Props = ComponentProps<typeof Sidebar> & {
+  /** Hides the list on desktop; the editor shows the button to bring it back. */
+  onCollapse?: () => void;
+};
+
+export function TemplatesSidebar({ onCollapse, ...props }: Props) {
+  const { tabs, activeId, open } = useTemplateTabs();
   const { isMobile, setOpenMobile } = useSidebar();
   const activeArtifactId = tabs.find((t) => t.id === activeId)?.artifactId;
-  const startNew = () => {
-    openNew();
-    setOpenMobile(false);
-  };
-  const navigate = useNavigate();
-  const fileInput = useRef<HTMLInputElement>(null);
 
-  useHotkeys(
-    'mod+i',
-    (e) => {
-      e.preventDefault();
-      startNew();
-    },
-    { enabled: canWrite, enableOnContentEditable: true, enableOnFormTags: true },
-  );
-
+  const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
   const debounced = useDebounce(search, 400);
-  const mine = useTemplatesControllerGetMany({
-    scope: 'mine',
+  const params = {
     search: debounced || undefined,
     limit: 100,
     sortBy: 'name',
     sortOrder: 'ASC',
-  });
-  const shared = useTemplatesControllerGetMany({
-    scope: 'shared',
-    search: debounced || undefined,
-    limit: 100,
-    sortBy: 'name',
-    sortOrder: 'ASC',
-  });
-  const refresh = () => {
-    void mine.refetch();
-    void shared.refetch();
-  };
-
-  const create = useTemplatesControllerCreate({ mutation: { onError: () => {} } });
-  const remove = useArtifactsControllerRemove({ mutation: { onError: () => {} } });
-  const rename = useTemplatesControllerRename({ mutation: { onError: () => {} } });
-
-  const [renaming, setRenaming] = useState<ArtifactDto | null>(null);
-  const [deleting, setDeleting] = useState<ArtifactDto | null>(null);
-  const [sharing, setSharing] = useState<ArtifactDto | null>(null);
-
-  const upload = async (files: FileList | null) => {
-    if (!files?.length) return;
-    let done = 0;
-    // Sequential: concurrent creates would race for the workspace quota.
-    for (const file of Array.from(files)) {
-      try {
-        await create.mutateAsync({
-          data: { name: file.name, content: await file.text() },
-        });
-        done++;
-      } catch (error) {
-        const { status, message } = readApiError(error);
-        if (status === 409) {
-          toastStorageFull(message, () =>
-            void navigate({ to: '/settings/$tab', params: { tab: 'files' } }),
-          );
-          // Quota errors repeat for every remaining file; stop after the first.
-          break;
-        } else if ((status === 400 || status === 413) && message) {
-          toast.error(`${file.name}: ${message}`);
-        } else {
-          handleServerError(error);
-        }
-      }
-    }
-    if (done) toast.success(`Uploaded ${done} template${done > 1 ? 's' : ''}`);
-    refresh();
-  };
-
-  const download = async (file: ArtifactDto) => {
-    try {
-      const { url } = await artifactsControllerDownload(file.id);
-      window.location.assign(url);
-    } catch (error) {
-      handleServerError(error);
-    }
-  };
+  } as const;
+  const mine = useTemplatesControllerGetMany({ scope: 'mine', ...params });
+  const shared = useTemplatesControllerGetMany({ scope: 'shared', ...params });
 
   const myItems = mine.data?.data ?? [];
   const sharedItems = shared.data?.data ?? [];
+  const counts: Record<Filter, number> = {
+    mine: mine.data?.total ?? myItems.length,
+    shared: shared.data?.total ?? sharedItems.length,
+    all: (mine.data?.total ?? myItems.length) + (shared.data?.total ?? sharedItems.length),
+  };
+  const lists = filter === 'all' ? [mine, shared] : [filter === 'mine' ? mine : shared];
+  const items =
+    filter === 'mine'
+      ? myItems
+      : filter === 'shared'
+        ? sharedItems
+        : [...myItems, ...sharedItems].sort((a, b) => a.name.localeCompare(b.name));
+  const shown = items.length;
+  const total = counts[filter];
 
-  const hint = (shown: number, total?: number) =>
-    total !== undefined && total > shown ? (
-      <p className="px-2 py-1 text-xs text-muted-foreground">
-        {`Showing ${shown} of ${total} — search to narrow`}
-      </p>
-    ) : null;
-
-  const renderItem = (file: ArtifactDto, manage: boolean) => (
-    <SidebarMenuItem key={file.id}>
-      <SidebarMenuButton
-        onClick={() => {
-          open(file, !file.isOwner);
-          setOpenMobile(false);
-        }}
-        isActive={file.id === activeArtifactId}
-        aria-current={file.id === activeArtifactId ? 'true' : undefined}
-        tooltip={file.name}
-        className="pr-8"
-      >
-        <FileCode />
-        <span className="truncate">{file.name}</span>
-        <Badge variant="outline" className="ml-auto shrink-0 font-normal">
-          {manage
-            ? file.shareType === 'private'
-              ? 'Private'
-              : 'Shared'
-            : (file.createdBy?.name ?? 'Unknown')}
-        </Badge>
-      </SidebarMenuButton>
-      <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <SidebarMenuAction
-              showOnHover
-              aria-label={`Actions for ${file.name}`}
-            >
+  const renderItem = (file: ArtifactDto) => {
+    const active = file.id === activeArtifactId;
+    const owner = file.isOwner
+      ? file.shareType === 'private'
+        ? 'Private'
+        : 'Shared'
+      : (file.createdBy?.name ?? 'Unknown');
+    return (
+      <SidebarMenuItem key={file.id}>
+        <SidebarMenuButton
+          onClick={() => {
+            open(file, !file.isOwner);
+            setOpenMobile(false);
+          }}
+          isActive={active}
+          aria-current={active ? 'true' : undefined}
+          tooltip={file.name}
+          className="h-auto items-start py-1.5 pr-8"
+        >
+          <FileCode className="mt-0.5" />
+          <span className="flex min-w-0 flex-col">
+            <span className="truncate">{file.name}</span>
+            <span className="truncate text-xs text-muted-foreground">
+              {owner} · {formatDistanceToNow(new Date(file.updatedAt), { addSuffix: true })}
+            </span>
+          </span>
+        </SidebarMenuButton>
+        <TemplateActionsMenu
+          file={file}
+          side="right"
+          align="start"
+          trigger={
+            <SidebarMenuAction showOnHover aria-label={`Actions for ${file.name}`}>
               <MoreVertical />
             </SidebarMenuAction>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side="right" align="start">
-            {manage && canWrite && (
-              <>
-                <DropdownMenuItem onSelect={() => setRenaming(file)}>
-                  Rename
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setSharing(file)}>
-                  Share
-                </DropdownMenuItem>
-              </>
-            )}
-            <DropdownMenuItem onSelect={() => void download(file)}>
-              Download
-            </DropdownMenuItem>
-            {manage && canWrite && (
-              <DropdownMenuItem
-                variant="destructive"
-                onSelect={() => setDeleting(file)}
-              >
-                Delete
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-    </SidebarMenuItem>
-  );
+          }
+        />
+      </SidebarMenuItem>
+    );
+  };
 
   return (
     // In-flow beside the app nav on desktop; a sheet on mobile, where it would not fit.
     <Sidebar collapsible={isMobile ? 'offcanvas' : 'none'} className="border-r" {...props}>
       <SidebarContent>
         <SidebarGroup className="gap-2">
-          {canWrite && (
-            <div className="flex gap-2">
-              <Button size="sm" className="flex-1" onClick={startNew}>
-                <Plus /> New
-                <kbd className="ml-1 rounded bg-primary-foreground/20 px-1 text-xs">
-                  {NEW_SHORTCUT}
-                </kbd>
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="flex-1"
-                onClick={() => fileInput.current?.click()}
-              >
-                <Upload /> Upload
-              </Button>
-            </div>
-          )}
-          <input
-            ref={fileInput}
-            type="file"
-            accept=".yaml,.yml"
-            multiple
-            hidden
-            aria-label="Upload templates"
-            onChange={(e) => {
-              void upload(e.target.files);
-              e.target.value = '';
-            }}
-          />
           <Input
             placeholder="Search templates"
             aria-label="Search templates"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-        </SidebarGroup>
-
-        <Collapsible defaultOpen asChild>
-        <SidebarGroup>
-          <SidebarGroupLabel asChild>
-            <CollapsibleTrigger className="group/trigger">
-              My templates
-              <ChevronRight className="ml-auto transition-transform group-data-[state=open]/trigger:rotate-90" />
-            </CollapsibleTrigger>
-          </SidebarGroupLabel>
-          <CollapsibleContent>
-          <SidebarGroupContent>
-            {mine.isLoading ? (
-              <Skeleton className="h-8 w-full" />
-            ) : mine.isError ? (
-              <LoadError onRetry={() => void mine.refetch()} />
-            ) : myItems.length > 0 ? (
-              <>
-                <SidebarMenu>{myItems.map((f) => renderItem(f, true))}</SidebarMenu>
-                {hint(myItems.length, mine.data?.total)}
-              </>
-            ) : (
-              <div className="flex flex-col items-start gap-2 px-2 py-1 text-sm text-muted-foreground">
-                <p>
-                  {debounced
-                    ? 'No templates match your search.'
-                    : 'No templates yet. Write one or upload existing YAML files.'}
-                </p>
-                {canWrite && !debounced && (
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={startNew}>
-                      New template
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => fileInput.current?.click()}
-                    >
-                      Upload files
-                    </Button>
-                  </div>
+          <div role="group" aria-label="Filter templates" className="flex gap-1">
+            {FILTERS.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                aria-pressed={filter === f.value}
+                onClick={() => setFilter(f.value)}
+                className={cn(
+                  'rounded-full px-2.5 py-0.5 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  filter === f.value
+                    ? 'bg-primary/15 text-primary'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/70',
                 )}
-              </div>
-            )}
-          </SidebarGroupContent>
-          </CollapsibleContent>
+              >
+                {f.label} {counts[f.value]}
+              </button>
+            ))}
+          </div>
         </SidebarGroup>
-        </Collapsible>
 
-        <Collapsible defaultOpen asChild>
-          <SidebarGroup>
-            <SidebarGroupLabel asChild>
-              <CollapsibleTrigger className="group/trigger">
-                Shared with me
-                <ChevronRight className="ml-auto transition-transform group-data-[state=open]/trigger:rotate-90" />
-              </CollapsibleTrigger>
-            </SidebarGroupLabel>
-            <CollapsibleContent>
-              <SidebarGroupContent>
-                {shared.isLoading ? (
-                  <Skeleton className="h-8 w-full" />
-                ) : shared.isError ? (
-                  <LoadError onRetry={() => void shared.refetch()} />
-                ) : sharedItems.length > 0 ? (
-                  <>
-                    <SidebarMenu>
-                      {sharedItems.map((f) => renderItem(f, false))}
-                    </SidebarMenu>
-                    {hint(sharedItems.length, shared.data?.total)}
-                  </>
-                ) : (
-                  <p className="px-2 py-1 text-sm text-muted-foreground">
-                    {debounced
-                      ? 'No templates match your search.'
-                      : 'Nothing shared with you yet'}
+        <SidebarGroup className="pt-0">
+          <SidebarGroupContent>
+            {lists.some((l) => l.isLoading) ? (
+              <Skeleton className="h-8 w-full" />
+            ) : lists.some((l) => l.isError) ? (
+              <LoadError onRetry={() => lists.forEach((l) => void l.refetch())} />
+            ) : items.length > 0 ? (
+              <>
+                <SidebarMenu>{items.map(renderItem)}</SidebarMenu>
+                {total > shown && (
+                  <p className="px-2 py-1 text-xs text-muted-foreground">
+                    {`Showing ${shown} of ${total} — search to narrow`}
                   </p>
                 )}
-              </SidebarGroupContent>
-            </CollapsibleContent>
-          </SidebarGroup>
-        </Collapsible>
+              </>
+            ) : (
+              <p className="px-2 py-1 text-sm text-muted-foreground">
+                {debounced
+                  ? 'No templates match your search.'
+                  : filter === 'shared'
+                    ? 'Nothing shared with you yet'
+                    : 'No templates yet. Start one with New, Upload or AI gen.'}
+              </p>
+            )}
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
-
-      {renaming && (
-        <RenameDialog
-          file={renaming}
-          pending={rename.isPending}
-          onClose={() => setRenaming(null)}
-          onSubmit={(name) =>
-            rename.mutate(
-              { id: renaming.id, data: { name } },
-              {
-                onSuccess: () => {
-                  toast.success('Template renamed');
-                  renameTab(renaming.id, name);
-                  setRenaming(null);
-                  refresh();
-                },
-                onError: handleServerError,
-              },
-            )
-          }
-        />
-      )}
-      {deleting && (
-        <ConfirmDialog
-          open
-          onOpenChange={(o) => !o && setDeleting(null)}
-          title="Delete template"
-          description={`Delete "${deleting.name}"? This cannot be undone.`}
-          confirmText="Delete"
-          onConfirm={() =>
-            remove.mutate(
-              { id: deleting.id },
-              {
-                onSuccess: () => {
-                  toast.success('Template deleted');
-                  tabs
-                    .filter((t) => t.artifactId === deleting.id)
-                    .forEach((t) => close(t.id));
-                  refresh();
-                },
-                onError: handleServerError,
-              },
-            )
-          }
-        />
-      )}
-      {sharing && (
-        <ShareFileDialog
-          file={sharing}
-          onOpenChange={(o) => !o && setSharing(null)}
-          onChanged={refresh}
-        />
+      {!isMobile && onCollapse && (
+        <SidebarFooter className="border-t p-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="justify-start text-muted-foreground"
+            onClick={onCollapse}
+          >
+            <PanelLeftClose /> Hide list
+          </Button>
+        </SidebarFooter>
       )}
     </Sidebar>
   );
@@ -403,66 +196,5 @@ function LoadError({ onRetry }: { onRetry: () => void }) {
         Retry
       </Button>
     </div>
-  );
-}
-
-function RenameDialog({
-  file,
-  pending,
-  onClose,
-  onSubmit,
-}: {
-  file: ArtifactDto;
-  pending: boolean;
-  onClose: () => void;
-  onSubmit: (name: string) => void;
-}) {
-  const [name, setName] = useState(file.name);
-  const [error, setError] = useState<string>();
-
-  const submit = () => {
-    const trimmed = name.trim();
-    if (!NAME_PATTERN.test(trimmed)) {
-      setError('Name must end in .yaml or .yml');
-      return;
-    }
-    onSubmit(trimmed);
-  };
-
-  return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Rename template</DialogTitle>
-        </DialogHeader>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            submit();
-          }}
-          className="grid gap-2"
-        >
-          <Label htmlFor="template-name">Template name</Label>
-          <Input
-            id="template-name"
-            value={name}
-            aria-invalid={!!error}
-            onChange={(e) => {
-              setName(e.target.value);
-              setError(undefined);
-            }}
-          />
-          {error && <p className="text-sm text-destructive">{error}</p>}
-        </form>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={submit} disabled={pending}>
-            Rename
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }

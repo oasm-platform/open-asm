@@ -5,6 +5,8 @@ import { SendMessageDtoAgentMode } from '@/services/apis/gen/queries';
 
 const agentsSearchSchema = z.object({
   text: z.string().optional(),
+  // false: ?text= only fills the input (caret at the end) for the user to finish
+  autoSubmit: z.boolean().optional(),
 });
 
 // Same landing page as /aistudio, opened in agent mode.

@@ -73,7 +73,12 @@ export default function AgentsLandingPage({
   const { open: openSettings } = useAgentSettingsDialog();
   // Shared by the /aistudio and /aistudio/agents routes, which both take ?text=
   // ?projectId= comes from a project's "Chat with Agent"
-  const { text: queryText, projectId: queryProjectId } = useSearch({
+  // ?autoSubmit=false fills ?text= into the input instead of sending it
+  const {
+    text: queryText,
+    autoSubmit: queryAutoSubmit,
+    projectId: queryProjectId,
+  } = useSearch({
     strict: false,
   });
   const [isSending, setIsSending] = useState(false);
@@ -240,16 +245,50 @@ export default function AgentsLandingPage({
 
   // Once per ?text= value: a submit held for a worker leaves isSending false,
   // and re-running would open the connect dialog again.
+  // Set when text was filled in before the input could take focus (the page
+  // may still show the provider check); the next render with an input does it.
+  const focusPendingRef = useRef(false);
+  const focusInputAtEnd = useCallback(() => {
+    const textarea = inputWrapperRef.current?.querySelector('textarea');
+    if (!textarea) return false;
+    textarea.focus();
+    requestAnimationFrame(() => {
+      const end = textarea.value.length;
+      textarea.setSelectionRange(end, end);
+    });
+    return true;
+  }, []);
+  useEffect(() => {
+    if (focusPendingRef.current && focusInputAtEnd()) {
+      focusPendingRef.current = false;
+    }
+  });
+  // Puts text in the input with the caret at its end, without sending it.
+  const fillInput = useCallback(
+    (text: string) => {
+      setInputText(text);
+      focusPendingRef.current = !focusInputAtEnd();
+    },
+    [focusInputAtEnd],
+  );
+
   const handledQueryTextRef = useRef<string | null>(null);
   useEffect(() => {
     if (queryText && !isSending && handledQueryTextRef.current !== queryText) {
       handledQueryTextRef.current = queryText;
-      void handleSendMessage(queryText);
+      if (queryAutoSubmit === false) {
+        // A starting point for the user to finish and send themselves.
+        fillInput(queryText);
+      } else {
+        void handleSendMessage(queryText);
+      }
+      // Dropped so a reload does not send or fill it again.
       const url = new URL(window.location.href);
       url.searchParams.delete('text');
+      url.searchParams.delete('autoSubmit');
       window.history.replaceState({}, '', url.toString());
     }
-  }, [queryText, isSending, handleSendMessage]);
+  }, [queryText, queryAutoSubmit, isSending, handleSendMessage, fillInput]);
 
   const handleSuggestionClick = (suggestion: string) => {
     // Agent mode runs real tools, so a suggestion is a starting point: fill it
@@ -257,14 +296,7 @@ export default function AgentsLandingPage({
     // Ask mode sends the suggestion straight away.
     if (isAgentMode) {
       // Trailing space so the user can type a target straight after.
-      const filled = `${suggestion} `;
-      setInputText(filled);
-      const textarea = inputWrapperRef.current?.querySelector('textarea');
-      if (textarea) {
-        textarea.focus();
-        const end = filled.length;
-        requestAnimationFrame(() => textarea.setSelectionRange(end, end));
-      }
+      fillInput(`${suggestion} `);
       return;
     }
     void handleSendMessage(suggestion);

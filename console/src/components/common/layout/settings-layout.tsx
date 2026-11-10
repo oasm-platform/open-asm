@@ -33,7 +33,9 @@ export default function SettingsLayout({
         title="Settings"
         showSwitchWorkspace
       />
-      <SidebarInset>
+      {/* min-w-0: wide content (long template lines) scrolls inside its own
+          box instead of widening the page past the viewport. */}
+      <SidebarInset className="min-w-0">
         {/* Mobile keeps the header: it holds the only sidebar trigger there. */}
         <HeaderBar className="md:hidden" />
         <main className="flex flex-1 flex-col gap-4 p-4 md:p-6">

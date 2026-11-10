@@ -178,6 +178,44 @@ describe('TemplateEditor', () => {
     expect(screen.getByRole('button', { name: 'Run' })).toBeDisabled();
   });
 
+  it('info bar shows name, severity and protocol read from the YAML', async () => {
+    contentResult = {
+      artifact: artifact(),
+      content:
+        'id: php-check\ninfo:\n  name: PHP check\n  severity: high\n  tags: php\nhttp: []\n',
+    };
+    setup(openSaved());
+    expect(await screen.findByText('PHP check')).toBeInTheDocument();
+    expect(screen.getByText('High')).toBeInTheDocument();
+    expect(screen.getByText('http')).toBeInTheDocument();
+    expect(screen.getByText('id: php-check · tags: php')).toBeInTheDocument();
+    expect(screen.getByText('Valid YAML')).toBeInTheDocument();
+  });
+
+  it('status bar flags a YAML syntax error with its line', async () => {
+    contentResult = { artifact: artifact(), content: 'id: x\ninfo:\n  name: [open\n' };
+    setup(openSaved());
+    expect(await screen.findByText(/YAML error on line \d+/)).toBeInTheDocument();
+  });
+
+  it('More actions offers file actions for an owned saved template', async () => {
+    const user = userEvent.setup();
+    setup(openSaved());
+    await waitFor(async () => expect((await box()).value).toBe('id: one'));
+    await user.click(screen.getByRole('button', { name: 'More actions' }));
+    for (const n of ['Rename', 'Share', 'Download', 'Delete']) {
+      expect(await screen.findByRole('menuitem', { name: n })).toBeInTheDocument();
+    }
+  });
+
+  it('empty state starts a blank template', async () => {
+    const user = userEvent.setup();
+    setup(() => {});
+    expect(await screen.findByRole('link', { name: /AI gen/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /blank/i }));
+    expect((await box()).value).toContain('id: example-template');
+  });
+
   it('has no Run for a template that was never saved', async () => {
     setup((api) => api.openNew());
     await box();

@@ -146,10 +146,15 @@ export class TemplatesService {
     };
   }
 
+  /** `actor` overrides who the audit event names (the agent tool) and adds metadata. */
   async create(
     workspaceId: string,
     userId: string,
     dto: CreateTemplateDto,
+    actor: {
+      actorType?: AuditActorType;
+      metadata?: Record<string, unknown>;
+    } = {},
   ): Promise<ArtifactDto> {
     const name = dto.name.trim();
     validateTemplate(name, dto.content);
@@ -162,7 +167,8 @@ export class TemplatesService {
       mimeType: 'application/yaml',
       buffer: Buffer.from(dto.content, 'utf8'),
       parentFolderId: folder.id,
-      actorType: AuditActorType.User,
+      actorType: actor.actorType ?? AuditActorType.User,
+      metadata: actor.metadata,
     });
   }
 

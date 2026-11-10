@@ -11,5 +11,7 @@ import { TemplatesService } from './templates.service';
   imports: [TypeOrmModule.forFeature([Artifact, ProjectAsset]), ArtifactsModule, StorageModule],
   controllers: [TemplatesController],
   providers: [TemplatesService],
+  // The agent tool save_template creates templates through it
+  exports: [TemplatesService],
 })
 export class TemplatesModule {}
