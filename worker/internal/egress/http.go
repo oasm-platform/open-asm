@@ -120,7 +120,7 @@ func (p *httpProxy) forward(w *connResponseWriter, r *http.Request) {
 		return
 	}
 	host := r.URL.Hostname()
-	if denyTarget(host, p.srv.deny) {
+	if denyTarget(host, p.srv.deny, p.srv.allow) {
 		p.srv.logWarning("egress deny exec=%s method=%s target=%s reason=policy", label, r.Method, requestTarget(r))
 		http.Error(w, "egress denied by policy", http.StatusForbidden)
 		return
@@ -183,7 +183,7 @@ func (p *httpProxy) tunnel(w *connResponseWriter, r *http.Request) {
 	if h, _, err := net.SplitHostPort(r.Host); err == nil {
 		connectHost = h
 	}
-	if denyTarget(connectHost, p.srv.deny) {
+	if denyTarget(connectHost, p.srv.deny, p.srv.allow) {
 		p.srv.logWarning("egress deny exec=%s method=CONNECT target=%s reason=policy", label, r.Host)
 		http.Error(w, "egress denied by policy", http.StatusForbidden)
 		return

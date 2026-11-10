@@ -25,6 +25,7 @@ type AuthFunc func(token string) (label string, ok bool)
 // Options tunes the egress listener.
 type Options struct {
 	DenyHosts   []string
+	Allow       []netip.Prefix // non-public ranges the operator allows (WORKER_EGRESS_ALLOW)
 	DialTimeout time.Duration
 	Logger      Logger
 }
@@ -37,6 +38,7 @@ type Server struct {
 	lis    net.Listener
 	auth   AuthFunc
 	deny   []string
+	allow  []netip.Prefix
 	dialTO time.Duration
 	logger Logger
 	proxy  *httpProxy
@@ -61,7 +63,7 @@ func NewServer(addr string, auth AuthFunc, opts Options) (*Server, error) {
 	if to == 0 {
 		to = 10 * time.Second
 	}
-	s := &Server{lis: lis, auth: auth, deny: opts.DenyHosts, dialTO: to, logger: opts.Logger}
+	s := &Server{lis: lis, auth: auth, deny: opts.DenyHosts, allow: opts.Allow, dialTO: to, logger: opts.Logger}
 	s.dial = s.dialVetted
 	s.lookup = net.DefaultResolver.LookupHost
 	s.dialIP = s.dialRaw
@@ -151,7 +153,7 @@ func (s *Server) dialVetted(ctx context.Context, network, addr string) (net.Conn
 	if err != nil {
 		return nil, err
 	}
-	if denyTarget(host, s.deny) {
+	if denyTarget(host, s.deny, s.allow) {
 		return nil, &blockedError{target: addr}
 	}
 	// LookupHost returns an IP literal as-is, so literals are vetted below too.
@@ -161,7 +163,7 @@ func (s *Server) dialVetted(ctx context.Context, network, addr string) (net.Conn
 	}
 	for _, a := range addrs {
 		ip, err := netip.ParseAddr(a)
-		if err != nil || !IsPublicAddr(ip) {
+		if err != nil || !allowedAddr(ip, s.allow) {
 			continue
 		}
 		c, err := s.dialIP(ctx, network, net.JoinHostPort(a, port))

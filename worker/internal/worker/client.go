@@ -456,10 +456,15 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 				// same deliberately). Binds all interfaces — containers reach it
 				// via the resolved dial host — and is never published to the host.
 				if config.EgressEnabled(*cfg) {
+					// A bad allowlist fails closed: private targets stay blocked.
+					allow, err := egress.ParseAllow(cfg.EgressAllow)
+					if err != nil {
+						log.Error("WORKER_EGRESS_ALLOW ignored, private targets stay blocked: %v", err)
+					}
 					egressServer, err := egress.NewServer(
 						fmt.Sprintf(":%d", cfg.EgressPort),
 						mgrInit.ProxyAuth,
-						egress.Options{DenyHosts: []string{egressHostOf(dockerRT.ConnectorAddr()), cfg.GrpcHost}, Logger: log},
+						egress.Options{DenyHosts: []string{egressHostOf(dockerRT.ConnectorAddr()), cfg.GrpcHost}, Allow: allow, Logger: log},
 					)
 					if err != nil {
 						log.Error("egress proxy init failed (non-fatal) — containers keep direct egress: %v", err)

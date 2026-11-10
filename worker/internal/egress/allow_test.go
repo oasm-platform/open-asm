@@ -36,14 +36,14 @@ func TestDenyTargetMetadata(t *testing.T) {
 		"metadata.google.internal", "instance-data",
 		"169.254.169.254",
 	} {
-		if !denyTarget(h, nil) {
+		if !denyTarget(h, nil, nil) {
 			t.Errorf("denyTarget(%q) = false, want true", h)
 		}
 	}
-	if denyTarget("example.com", nil) {
+	if denyTarget("example.com", nil, nil) {
 		t.Error("denyTarget(example.com) = true, want false (literal-only; dial path vets resolved IPs)")
 	}
-	if !denyTarget("internal.corp", []string{"internal.corp"}) {
+	if !denyTarget("internal.corp", []string{"internal.corp"}, nil) {
 		t.Error("denyTarget with explicit DenyHosts entry must deny")
 	}
 }

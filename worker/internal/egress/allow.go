@@ -1,6 +1,7 @@
 package egress
 
 import (
+	"fmt"
 	"net/netip"
 	"strings"
 )
@@ -59,7 +60,7 @@ func IsPublicAddr(ip netip.Addr) bool {
 // non-public IPs. Plain domain names pass here — the dial path resolves and
 // vets the actual IPs (resolve-then-check) so DNS rebinding cannot smuggle a
 // private target through.
-func denyTarget(host string, denyHosts []string) bool {
+func denyTarget(host string, denyHosts []string, allow []netip.Prefix) bool {
 	h := strings.ToLower(strings.Trim(host, "[]"))
 	for _, d := range denyHosts {
 		if strings.EqualFold(h, strings.Trim(d, "[]")) {
@@ -72,7 +73,47 @@ func denyTarget(host string, denyHosts []string) bool {
 		}
 	}
 	if ip, err := netip.ParseAddr(h); err == nil {
-		return !IsPublicAddr(ip)
+		return !allowedAddr(ip, allow)
 	}
 	return false
+}
+
+// allowedAddr reports whether ip may be dialed: any public address, plus
+// non-public addresses the worker operator listed (WORKER_EGRESS_ALLOW), e.g.
+// an on-prem Nessus or Acunetix on a private IP.
+func allowedAddr(ip netip.Addr, allow []netip.Prefix) bool {
+	if IsPublicAddr(ip) {
+		return true
+	}
+	ip = ip.Unmap()
+	for _, p := range allow {
+		if p.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+// ParseAllow parses a comma-separated list of IPs and CIDRs (a bare IP means
+// that single address). Hostnames are rejected: names are vetted by the IP
+// they resolve to, so list the IP or range instead.
+func ParseAllow(list string) ([]netip.Prefix, error) {
+	var out []netip.Prefix
+	for _, f := range strings.Split(list, ",") {
+		f = strings.TrimSpace(f)
+		if f == "" {
+			continue
+		}
+		if p, err := netip.ParsePrefix(f); err == nil {
+			out = append(out, p.Masked())
+			continue
+		}
+		ip, err := netip.ParseAddr(f)
+		if err != nil {
+			return nil, fmt.Errorf("egress allow %q: want an IP or CIDR", f)
+		}
+		ip = ip.Unmap()
+		out = append(out, netip.PrefixFrom(ip, ip.BitLen()))
+	}
+	return out, nil
 }

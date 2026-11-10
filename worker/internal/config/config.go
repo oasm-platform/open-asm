@@ -40,6 +40,7 @@ type Config struct {
 	// worker-local listener instead of direct bridge egress.
 	EgressPort  int    `mapstructure:"egress_port"`  // internal listener port, default 26277
 	EgressProxy string `mapstructure:"egress_proxy"` // "on" (default) routes containers via the proxy; "off" is the kill switch restoring direct egress
+	EgressAllow string `mapstructure:"egress_allow"` // comma-separated IPs/CIDRs the proxy may dial despite being non-public (on-prem Nessus/Acunetix)
 
 	// Warm-pool container reuse (Phase 2).
 	// PoolEnabled defaults to true; WORKER_POOL_ENABLED=false is the kill-switch
@@ -108,6 +109,7 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("connector_token", "")
 	viper.SetDefault("egress_port", 26277)
 	viper.SetDefault("egress_proxy", "on")
+	viper.SetDefault("egress_allow", "")
 	viper.SetDefault("mode", "")
 	viper.SetDefault("pool_enabled", true)
 	viper.SetDefault("connector_idle_timeout", 60)
