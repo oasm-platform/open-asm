@@ -309,7 +309,14 @@ describe('sidePanelContent', () => {
     const metadata = { model: 'claude-sonnet-4-5' } as ConversationMetadataDto;
     expect(
       sidePanelContent({ goal: 'g', subagents: [], messages: [], metadata: null }),
-    ).toEqual({ plan: true, subagents: false, browser: false, tools: false, stats: false });
+    ).toEqual({
+      plan: true,
+      workflow: false,
+      subagents: false,
+      browser: false,
+      tools: false,
+      stats: false,
+    });
     expect(
       sidePanelContent({
         todos: [],
@@ -318,6 +325,13 @@ describe('sidePanelContent', () => {
         metadata,
         browserScreenshots: [liveShot],
       }),
-    ).toEqual({ plan: false, subagents: true, browser: true, tools: true, stats: true });
+    ).toEqual({
+      plan: false,
+      workflow: true,
+      subagents: true,
+      browser: true,
+      tools: true,
+      stats: true,
+    });
   });
 });

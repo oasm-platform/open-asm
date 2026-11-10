@@ -181,14 +181,29 @@ const labelIcon: Record<
   'needs-plan': { icon: ListChecksIcon, className: 'text-amber-500' },
 };
 
-/** Connector slug and target of a run_tool_connector call, e.g. "nuclei example.com" */
-function connectorRunDetail(toolCall: ToolCallState): string | null {
-  if (toolCall.toolName !== 'run_tool_connector') return null;
-  const { tool, target } = toolCall.input ?? {};
-  const detail = [tool, target]
-    .filter((value) => typeof value === 'string' && value)
-    .join(' ');
-  return detail || null;
+/**
+ * What a call is about, after its name: the connector slug and target of
+ * run_tool_connector ("nuclei example.com"), or the subagent and objective
+ * of dispatch_subagent ("@recon · Map api.example.com").
+ */
+function toolCallDetail(toolCall: ToolCallState): string | null {
+  const input = toolCall.input ?? {};
+  if (toolCall.toolName === 'run_tool_connector') {
+    const detail = [input.tool, input.target]
+      .filter((value) => typeof value === 'string' && value)
+      .join(' ');
+    return detail || null;
+  }
+  if (toolCall.toolName === 'dispatch_subagent') {
+    const name = typeof input.name === 'string' ? `@${input.name}` : '';
+    const objective =
+      typeof input.objective === 'string' ? input.objective : '';
+    return [name, objective].filter(Boolean).join(' · ') || null;
+  }
+  if (toolCall.toolName === 'continue_subagent') {
+    return typeof input.message === 'string' ? input.message : null;
+  }
+  return null;
 }
 
 /** One-line label of a tool call: the name, colored by its status. */
@@ -200,7 +215,7 @@ export function ToolCallLabel({
   className?: string;
 }) {
   const config = statusConfig[toolCall.status];
-  const detail = connectorRunDetail(toolCall);
+  const detail = toolCallDetail(toolCall);
   const { icon: Icon, className: iconClassName } = labelIcon[toolCall.status];
 
   return (

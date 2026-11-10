@@ -13,11 +13,13 @@ import {
   ListChecks,
   Network,
   PanelRightClose,
+  Workflow,
   Wrench,
   type LucideIcon,
 } from 'lucide-react';
 import { useMemo, type ReactNode } from 'react';
 import { AgentTodoPanel, type AgentTodoItem } from './agent-todo-panel';
+import { AgentWorkflowPanel } from './agent-workflow-panel';
 import { BrowserPanel, type LiveBrowserScreenshot } from './browser-panel';
 import { isSubagentActive, SubagentsPanel } from './subagents-panel';
 import {
@@ -28,6 +30,7 @@ import { TurnStatsPanel } from './turn-stats-panel';
 
 export const SIDE_PANEL_TABS = [
   'plan',
+  'workflow',
   'subagents',
   'browser',
   'tools',
@@ -59,6 +62,7 @@ export function sidePanelContent({
 }: SidePanelData): Record<SidePanelTab, boolean> {
   return {
     plan: (todos?.length ?? 0) > 0 || !!goal,
+    workflow: subagents.length > 0,
     subagents: subagents.length > 0,
     browser: (browserScreenshots?.length ?? 0) > 0,
     tools: extractToolCalls(messages).length > 0,
@@ -111,8 +115,8 @@ interface ChatSidePanelProps extends SidePanelData {
 
 /**
  * The half of a split AI Studio conversation beside the chat (full screen
- * over it below lg): the plan, subagents, browser, tool calls and turn
- * stats, one tab at a time.
+ * over it below lg): the plan, the workflow of subagents, subagents, browser,
+ * tool calls and turn stats, one tab at a time.
  */
 export function ChatSidePanel({
   tab,
@@ -144,6 +148,10 @@ export function ChatSidePanel({
   const completed = todos?.filter((t) => t.status === 'completed').length ?? 0;
   const running = subagents.filter(isSubagentActive).length;
   const toolCalls = useMemo(() => extractToolCalls(messages), [messages]);
+  const planVersion = useMemo(
+    () => (todos ?? []).map((t) => `${t.id}:${t.status}`).join(','),
+    [todos],
+  );
   const toolCallsRunning = toolCalls.filter(
     (t) => t.status === 'executing' || t.status === 'pending',
   ).length;
@@ -173,6 +181,10 @@ export function ChatSidePanel({
           >
             <ListChecks />
             <TabLabel>Plan</TabLabel>
+          </TabsTrigger>
+          <TabsTrigger value="workflow" title="Workflow">
+            <Workflow />
+            <TabLabel>Workflow</TabLabel>
           </TabsTrigger>
           <TabsTrigger
             value="subagents"
@@ -229,6 +241,21 @@ export function ChatSidePanel({
             icon={ListChecks}
             title="No plan yet"
             description="The agent writes its plan here when a task takes several steps."
+          />
+        )}
+      </TabsContent>
+      <TabsContent value="workflow" className={contentClassName}>
+        {has.workflow && conversationId ? (
+          <AgentWorkflowPanel
+            conversationId={conversationId}
+            subagents={subagents}
+            planVersion={planVersion}
+          />
+        ) : (
+          <EmptyTab
+            icon={Workflow}
+            title="No workflow yet"
+            description="When the agent delegates work, each subagent shows up here under the plan step it serves, linked to the agents it builds on."
           />
         )}
       </TabsContent>
