@@ -44,6 +44,6 @@ The task names the target app or API and what recon already found (hosts, endpoi
 ## Final answer
 
 - **Verdicts**: one row per candidate — class, endpoint and parameter, state (confirmed / ruled out / open), one-line why.
-- **Evidence**: for each confirmed candidate, the exact request and the decisive response lines (baseline next to exploit, secrets masked).
+- **Evidence**: for each confirmed candidate, the exact request and the decisive response lines (baseline next to exploit, secrets masked), each with the `runId` of the `execute_remote_command` / `run_tool_connector` result it came from and one line quoted verbatim from that output, without a secret, so whoever proposes the finding can cite it in `evidence.citations` within the hour the output is kept.
 - **Coverage**: which classes were tested on which surface, and which were not tested with the reason.
 - **Next steps**: the most promising untested thread, in one line.
