@@ -86,6 +86,44 @@ export interface SubagentMetadata {
   transcript?: SubagentStep[];
   /** Later steps were not recorded: the transcript hit its size budget. */
   transcriptTruncated?: boolean;
+  /** Structured task the main agent dispatched (rendered into `task`). */
+  brief?: SubagentBrief;
+  /** Plan step (todo id) the subagent serves. */
+  stepId?: string | null;
+  /** Subagents whose results it needs; it is not claimed before they end. */
+  after?: string[];
+  /** Earlier subagents whose results led to this one (provenance only). */
+  derivedFrom?: string[];
+  /** Earlier subagent this one follows up (continue_subagent). */
+  continuesFrom?: string | null;
+  /** Step budget set at dispatch, overriding the definition's. */
+  maxSteps?: number;
+  /** What the subagent handed back with submit_result. */
+  output?: SubagentOutput;
+}
+
+export interface SubagentBrief {
+  objective: string;
+  expectedOutput: string;
+  context?: string;
+  mustDo?: string[];
+  mustNot?: string[];
+}
+
+export type SubagentOutcome = 'done' | 'partial' | 'blocked';
+
+export interface SubagentFinding {
+  title: string;
+  severity?: string;
+  evidence?: string;
+}
+
+export interface SubagentOutput {
+  outcome: SubagentOutcome;
+  summary: string;
+  facts: { key?: string; value: string }[];
+  findings: SubagentFinding[];
+  openQuestions: string[];
 }
 
 export interface MetadataDelta {
