@@ -78,3 +78,22 @@ func TestWithEgressPort(t *testing.T) {
 		}
 	}
 }
+
+// Raw port scanners bypass the egress proxy; everything else is proxied.
+func TestDirectEgress(t *testing.T) {
+	cases := map[string]bool{
+		"ghcr.io/oasm-platform/connector-nmap:7.97":       true,
+		"ghcr.io/oasm-platform/connector-rustscan:2.4.1":  true,
+		"GHCR.IO/OASM-PLATFORM/CONNECTOR-NMAP":            true,
+		"ghcr.io/oasm-platform/connector-nmap@sha256:abc": true,
+		"localhost:5000/connector-rustscan:dev":           true,
+		"ghcr.io/oasm-platform/connector-nuclei:3.11.1":   false,
+		"ghcr.io/oasm-platform/connector-nmap-extra:1":    false,
+		"": false,
+	}
+	for image, want := range cases {
+		if got := directEgress(image); got != want {
+			t.Errorf("directEgress(%q) = %v, want %v", image, got, want)
+		}
+	}
+}

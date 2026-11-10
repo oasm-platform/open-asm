@@ -724,7 +724,8 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	if execID == "" {
 		execID = generateExecID()
 	}
-	env := buildContainerEnv(spec, d.connectorAddr, d.connectorToken, execID, EgressConfig{Addr: d.egressAddr, GrpcHost: d.egressGrpcHost, Enabled: d.egressEnabled})
+	direct := directEgress(spec.Image)
+	env := buildContainerEnv(spec, d.connectorAddr, d.connectorToken, execID, EgressConfig{Addr: d.egressAddr, GrpcHost: d.egressGrpcHost, Enabled: d.egressEnabled && !direct})
 
 	// Container config: image, env, labels for lifecycle management.
 	// oasm.pool_key (normalized image) names pooled containers and lets the
@@ -830,6 +831,16 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 
 	containerID := resp.ID
 	d.logInfo("docker: container created: %s exec=%s job=%s tool=%s grpc=%s", containerID, execID, spec.JobID, spec.Tool, d.connectorAddr)
+
+	// The connector network is internal (no route out), so a direct-egress
+	// image also joins the default bridge for its outbound traffic; the
+	// callback to the worker stays on the connector network.
+	if direct && d.connectorNetwork != "" {
+		if err := d.cli.NetworkConnect(ctx, directEgressNetwork, containerID, nil); err != nil {
+			_ = d.cli.ContainerRemove(context.Background(), containerID, container.RemoveOptions{Force: true})
+			return Handle{}, fmt.Errorf("connect %s to %s: %w", containerID, directEgressNetwork, err)
+		}
+	}
 
 	// Start the container. Clean up on failure so we don't leak containers.
 	if err := d.cli.ContainerStart(ctx, containerID, container.StartOptions{}); err != nil {
@@ -1211,6 +1222,33 @@ func shortID(id string) string {
 		return id[:12]
 	}
 	return id
+}
+
+// directEgressImages are connector images that bypass the egress proxy: port
+// scanners send raw TCP/UDP probes a proxy cannot carry. Keyed by the image
+// repository's last path segment (tag/digest stripped).
+var directEgressImages = map[string]bool{
+	"connector-nmap":     true,
+	"connector-rustscan": true,
+}
+
+// directEgressNetwork gives direct-egress containers a route out when the
+// connector network is internal.
+const directEgressNetwork = "bridge"
+
+// directEgress reports whether image is exempt from the egress proxy.
+func directEgress(image string) bool {
+	repo := strings.ToLower(image)
+	if i := strings.IndexByte(repo, '@'); i >= 0 {
+		repo = repo[:i]
+	}
+	if i := strings.LastIndexByte(repo, '/'); i >= 0 {
+		repo = repo[i+1:]
+	}
+	if i := strings.IndexByte(repo, ':'); i >= 0 {
+		repo = repo[:i]
+	}
+	return directEgressImages[repo]
 }
 
 // EgressConfig carries the worker-local egress proxy address into container
