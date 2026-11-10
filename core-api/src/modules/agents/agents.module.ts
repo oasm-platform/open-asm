@@ -38,6 +38,8 @@ import { AgentMessageToolCall } from './entities/tool-call.entity';
 import { AgentWorkspaceMemory } from './entities/agent-workspace-memory.entity';
 import { AgentSkill } from './entities/agent-skill.entity';
 import { AgentSubagent } from './entities/agent-subagent.entity';
+import { AgentToolRule } from './entities/agent-tool-rule.entity';
+import { AgentsGuardService } from './agents.guard';
 import { AgentWorkflowNote } from './entities/agent-workflow-note.entity';
 import { HttpModule } from '@nestjs/axios';
 
@@ -58,6 +60,7 @@ import { HttpModule } from '@nestjs/axios';
       AgentSubagent,
       AgentWorkflowNote,
       AgentDefinition,
+      AgentToolRule,
       Project,
     ]),
     AssetsModule,
@@ -78,6 +81,7 @@ import { HttpModule } from '@nestjs/axios';
     AgentsService,
     AgentsCompletionsService,
     AgentTool,
+    AgentsGuardService,
     AgentsMcpService,
     AgentsMemoriesService,
     AgentsSkillsService,

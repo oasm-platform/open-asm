@@ -51,6 +51,9 @@ import {
   GetCommandApprovalsQueryDto,
 } from './dto/command-approval.dto';
 import { AgentsSkillsService } from './agents.skills';
+import { AgentsGuardService } from './agents.guard';
+import { CreateToolRuleDto, UpdateToolRuleDto } from './dto/tool-rule.dto';
+import { AgentToolRule } from './entities/agent-tool-rule.entity';
 import { GetAgentModesResponseDto } from './dto/agent-mode.dto';
 import {
   SubagentDetailResponseDto,
@@ -115,6 +118,7 @@ export class AgentsController {
     private readonly agentsDefinitionsService: AgentsDefinitionsService,
     private readonly agentsStreamBuffer: AgentsStreamBufferService,
     private readonly agentsUsageService: AgentsUsageService,
+    private readonly agentsGuardService: AgentsGuardService,
   ) {}
 
   @WorkspaceAccess('agent.read')
@@ -1280,5 +1284,71 @@ export class AgentsController {
       dto.isEnabled,
       userId,
     );
+  }
+
+  // ==========================================
+  // Tool rules (allow / deny / ask before the approval flow)
+  // ==========================================
+
+  @WorkspaceAccess('agent.read')
+  @Get('tool-rules')
+  @Doc({
+    summary: 'List tool rules',
+    description: "The workspace's agent tool rules, highest priority first",
+    request: { getWorkspaceId: true },
+    response: { serialization: AgentToolRule, isArray: true },
+  })
+  getToolRules(@WorkspaceId() workspaceId: string): Promise<AgentToolRule[]> {
+    return this.agentsGuardService.listRules(workspaceId);
+  }
+
+  @WorkspaceAccess('agent.write')
+  @Post('tool-rules')
+  @Doc({
+    summary: 'Create tool rule',
+    description: 'Add an agent tool rule (workspace owner only)',
+    request: { getWorkspaceId: true },
+    response: { serialization: AgentToolRule },
+  })
+  createToolRule(
+    @Body() dto: CreateToolRuleDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<AgentToolRule> {
+    return this.agentsGuardService.createRule(workspaceId, userId, dto);
+  }
+
+  @WorkspaceAccess('agent.write')
+  @Patch('tool-rules/:id')
+  @Doc({
+    summary: 'Update tool rule',
+    description: 'Change an agent tool rule (workspace owner only)',
+    request: { getWorkspaceId: true, params: [{ name: 'id', description: 'Rule ID' }] },
+    response: { serialization: AgentToolRule },
+  })
+  updateToolRule(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateToolRuleDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<AgentToolRule> {
+    return this.agentsGuardService.updateRule(workspaceId, userId, id, dto);
+  }
+
+  @WorkspaceAccess('agent.write')
+  @Delete('tool-rules/:id')
+  @Doc({
+    summary: 'Delete tool rule',
+    description: 'Remove an agent tool rule (workspace owner only)',
+    request: { getWorkspaceId: true, params: [{ name: 'id', description: 'Rule ID' }] },
+    response: { serialization: DefaultMessageResponseDto },
+  })
+  async deleteToolRule(
+    @Param('id', ParseUUIDPipe) id: string,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    await this.agentsGuardService.deleteRule(workspaceId, userId, id);
+    return { message: 'Tool rule deleted' };
   }
 }

@@ -37,6 +37,7 @@ import {
   type ApprovalContext,
   type ApprovalSettings,
 } from './agents.approvals';
+import { AgentsGuardService, guardApprovalMeta } from './agents.guard';
 import { AgentsMemoriesService } from './agents.memories';
 import { AgentConversationTodo } from './entities/agent-conversation-todo.entity';
 import { AgentConversation } from './entities/agent-conversation.entity';
@@ -272,6 +273,7 @@ export class AgentTool {
     private readonly templatesService: TemplatesService,
     @Inject(forwardRef(() => VulnerabilityReviewService))
     private readonly vulnerabilityReviewService: WrapperType<VulnerabilityReviewService>,
+    private readonly guard: AgentsGuardService,
   ) {}
 
   private get deps(): AgentToolDeps {
@@ -290,6 +292,7 @@ export class AgentTool {
       todoRepository: this.todoRepository,
       agentsMemories: this.agentsMemories,
       approvals: this.approvals,
+      guard: this.guard,
       connectorRegistry: this.connectorRegistry,
       toolConfigProfiles: this.toolConfigProfiles,
       remoteExecuteSubscribe: this.remoteExecuteSubscribe,
@@ -434,6 +437,7 @@ export class AgentTool {
           () => ({ ...approval, workspaceId, conversationId }),
           emitter,
           isReadOnlyMcpTool((toolDef as GateableTool).metadata),
+          true,
         ),
       ]),
     ) as Record<string, ToolType>;
@@ -466,8 +470,9 @@ export class AgentTool {
   }
 
   /**
-   * Wraps a tool so each call goes through the approval flow first, in any
-   * agent mode. (SELF_GATED_TOOLS gate themselves on the raw command.)
+   * Wraps a tool so each call goes through the guard (workspace rules, scope;
+   * the built-in deny list for `external` MCP tools) and then the approval
+   * flow, in any agent mode. (SELF_GATED_TOOLS gate themselves.)
    */
   private withApproval(
     name: string,
@@ -475,6 +480,7 @@ export class AgentTool {
     ctx: () => ApprovalContext,
     emitter?: EventEmitter,
     readOnly = false,
+    external = false,
   ): ToolType {
     const {
       execute: original,
@@ -484,15 +490,25 @@ export class AgentTool {
     return {
       ...(toolDef as GateableTool),
       execute: async (params: unknown, options: ToolCallOptions) => {
+        const context = ctx();
+        const verdict = await this.guard.evaluate({
+          tool: name,
+          input: params,
+          workspaceId: context.workspaceId,
+          conversationId: context.conversationId,
+          builtin: external,
+        });
+        if (verdict.action === 'deny') {
+          return { error: verdict.message, policy: verdict.policy };
+        }
         const decision = await this.approvals.authorize(
           `${name} ${stableStringify(params)}`,
           options.toolCallId,
-          ctx(),
+          context,
           emitter,
           {
             tool: name,
-            description:
-              typeof description === 'string' ? description : undefined,
+            ...guardApprovalMeta(verdict, description),
             toolMetadata:
               typeof metadata === 'object' && metadata !== null
                 ? (metadata as Record<string, unknown>)
@@ -503,7 +519,10 @@ export class AgentTool {
           options.abortSignal,
         );
         if (!decision.allowed) {
-          return { error: deniedMessage('Tool call', decision) };
+          return {
+            error: deniedMessage('Tool call', decision),
+            ...('policy' in verdict ? { policy: verdict.policy } : {}),
+          };
         }
         return original(params, options);
       },

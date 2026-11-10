@@ -4,6 +4,7 @@ import type { EventEmitter } from 'node:events';
 import { z } from 'zod';
 
 import type { ApprovalDecision, ApprovalSettings } from '../agents.approvals';
+import { guardApprovalMeta, type ToolPolicy } from '../agents.guard';
 import { pageForModel } from './connector.tools';
 import { defineTool, deniedMessage } from './helpers';
 import type { Deps, ToolCallOptions } from './types';
@@ -46,7 +47,7 @@ const inputSchema = z.object({
  * through AgentTool's approval wrapper.
  */
 export function remoteExecuteTool(
-  deps: Deps<'approvals' | 'remoteExecuteService' | 'redisService'>,
+  deps: Deps<'approvals' | 'guard' | 'remoteExecuteService' | 'redisService'>,
   workspaceId: string,
   conversationId: string,
   emitter?: EventEmitter,
@@ -70,6 +71,27 @@ export function remoteExecuteTool(
       const { toolCallId } = options;
       const sessionId = randomUUID();
 
+      const refused = (error: string, policy?: ToolPolicy) => ({
+        id: sessionId,
+        command,
+        stdout: '',
+        stderr: '',
+        exitCode: null,
+        error,
+        timedOut: false,
+        ...(policy ? { policy } : {}),
+      });
+      // Built-in deny list, workspace rules and scope, in every mode
+      const verdict = await deps.guard.evaluate({
+        tool: 'execute_remote_command',
+        input: { command },
+        workspaceId,
+        conversationId,
+        builtin: true,
+      });
+      if (verdict.action === 'deny') {
+        return refused(verdict.message, verdict.policy);
+      }
       // Without an approval context (e.g. system-driven runs) nobody can
       // approve, so refuse rather than run unreviewed commands.
       const decision = approval
@@ -80,21 +102,19 @@ export function remoteExecuteTool(
             emitter,
             {
               tool: 'execute_remote_command',
-              description: 'Run a shell command on a connected worker',
+              ...guardApprovalMeta(
+                verdict,
+                'Run a shell command on a connected worker',
+              ),
             },
             options.abortSignal,
           )
         : ({ allowed: false } satisfies ApprovalDecision);
       if (!decision.allowed) {
-        return {
-          id: sessionId,
-          command,
-          stdout: '',
-          stderr: '',
-          exitCode: null,
-          error: deniedMessage('Command', decision),
-          timedOut: false,
-        };
+        return refused(
+          deniedMessage('Command', decision),
+          'policy' in verdict ? verdict.policy : undefined,
+        );
       }
 
       const { image, ...result } =

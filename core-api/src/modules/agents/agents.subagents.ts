@@ -719,7 +719,7 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
       const autonomous = conversation.approvalMode === AgentApprovalMode.AUTO;
       const allowWrite = autonomous || def.isBuiltin;
       const approval: ApprovalSettings | undefined = allowWrite
-        ? { userId, mode: AgentApprovalMode.AUTO }
+        ? { userId, mode: AgentApprovalMode.AUTO, unattended: true }
         : undefined;
       // The pages its browser commands load go to the conversation's Browser
       // panel, labelled with this run. Nothing here waits on the user: the
@@ -1215,6 +1215,13 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
           .max(SUBAGENT_MAX_STEPS_OVERRIDE)
           .optional()
           .describe("Step budget for this job, instead of the role's default"),
+        targets: z
+          .array(z.string().min(1).max(255))
+          .max(50)
+          .optional()
+          .describe(
+            'Hosts, IPs, CIDRs or URLs the subagent will test. Each must be in the workspace targets or project scope, or the dispatch is refused.',
+          ),
       }),
       execute: async (
         input: BriefInput & {
@@ -1223,6 +1230,7 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
           from?: string[];
           step_id?: string;
           max_steps?: number;
+          targets?: string[];
         },
         options?: { abortSignal?: AbortSignal },
       ) => {
@@ -1231,7 +1239,9 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
           const row = await this.dispatch(
             ctx,
             input.name,
-            renderBrief(brief),
+            input.targets?.length
+              ? `${renderBrief(brief)}\n\n## Targets\n${input.targets.map((t) => `- ${t}`).join('\n')}`
+              : renderBrief(brief),
             options?.abortSignal,
             {
               brief,

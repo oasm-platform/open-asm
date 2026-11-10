@@ -79,6 +79,7 @@ describe('AgentTool external MCP approvals', () => {
   function createTool(authorize: jest.Mock) {
     return Object.assign(Object.create(AgentTool.prototype), {
       approvals: { authorize },
+      guard: { evaluate: jest.fn().mockResolvedValue({ action: 'default' }) },
     }) as AgentTool;
   }
 
@@ -180,6 +181,7 @@ describe('approval matching', () => {
     (
       Object.assign(Object.create(AgentTool.prototype), {
         approvals: { authorize },
+        guard: { evaluate: jest.fn().mockResolvedValue({ action: 'default' }) },
       }) as AgentTool
     ).wrapExternalToolsWithApproval(
       { partner_scan: { metadata, execute: jest.fn() } },
