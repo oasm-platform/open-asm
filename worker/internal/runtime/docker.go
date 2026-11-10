@@ -724,8 +724,8 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	if execID == "" {
 		execID = generateExecID()
 	}
-	direct := directEgress(spec.Image)
-	env := buildContainerEnv(spec, d.connectorAddr, d.connectorToken, execID, EgressConfig{Addr: d.egressAddr, GrpcHost: d.egressGrpcHost, Enabled: d.egressEnabled && !direct})
+	direct := d.goesDirect(spec.Image)
+	env := buildContainerEnv(spec, d.connectorAddr, d.connectorToken, execID, EgressConfig{Addr: d.egressAddr, GrpcHost: d.egressGrpcHost, Enabled: !direct})
 
 	// Container config: image, env, labels for lifecycle management.
 	// oasm.pool_key (normalized image) names pooled containers and lets the
@@ -1249,6 +1249,13 @@ func directEgress(image string) bool {
 		repo = repo[:i]
 	}
 	return directEgressImages[repo]
+}
+
+// goesDirect reports whether a container of image skips the egress proxy. Proxy
+// off (kill switch or failed listener) means direct egress for every image,
+// not no egress at all on an internal connector network.
+func (d *DockerRuntime) goesDirect(image string) bool {
+	return directEgress(image) || !d.egressEnabled || d.egressAddr == ""
 }
 
 // EgressConfig carries the worker-local egress proxy address into container

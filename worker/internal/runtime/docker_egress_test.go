@@ -97,3 +97,22 @@ func TestDirectEgress(t *testing.T) {
 		}
 	}
 }
+
+// With the proxy off or never configured every image goes direct; with it on
+// only the exempt scanners do.
+func TestGoesDirect(t *testing.T) {
+	const nuclei, nmap = "ghcr.io/oasm-platform/connector-nuclei:3.11.1", "ghcr.io/oasm-platform/connector-nmap:7.97"
+	on := &DockerRuntime{}
+	on.ConfigureEgress("10.0.0.2:26277", "core", true)
+	if on.goesDirect(nuclei) || !on.goesDirect(nmap) {
+		t.Fatal("proxy on: nuclei must be proxied, nmap direct")
+	}
+	off := &DockerRuntime{}
+	off.ConfigureEgress("", "", false)
+	if !off.goesDirect(nuclei) {
+		t.Fatal("kill switch: nuclei must go direct")
+	}
+	if !(&DockerRuntime{}).goesDirect(nuclei) {
+		t.Fatal("listener never configured: nuclei must go direct")
+	}
+}
