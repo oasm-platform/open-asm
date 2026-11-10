@@ -217,6 +217,9 @@ describe('AgentTool plan tools', () => {
       approvals,
       { getAgentConnectors: () => [], getConnector: () => null },
     );
+    Object.assign(agentTool, {
+      guard: { evaluate: jest.fn().mockResolvedValue({ action: 'default' }) },
+    });
   });
 
   describe('outside Agent mode', () => {

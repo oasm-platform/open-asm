@@ -119,6 +119,29 @@ describe('AgentsApprovalsService', () => {
     expect(rows).toHaveLength(0);
   });
 
+  it('asks even in auto mode when the guard escalates, and refuses unattended', async () => {
+    const emitter = new EventEmitter();
+    const prompt = jest.fn((e: { approvalId: string }) => {
+      void service.decide(e.approvalId, AgentCommandApprovalStatus.APPROVED, 'w1', 'u1');
+    });
+    emitter.on('approval-required', prompt);
+    const meta = { tool: 'execute_remote_command', escalate: true };
+    await expect(
+      service.authorize('curl x.io', 't1', ctx(AgentApprovalMode.AUTO), emitter, meta),
+    ).resolves.toEqual({ allowed: true });
+    expect(prompt).toHaveBeenCalledTimes(1);
+    await expect(
+      service.authorize(
+        'curl y.io',
+        't2',
+        { ...ctx(AgentApprovalMode.AUTO), unattended: true },
+        emitter,
+        meta,
+      ),
+    ).resolves.toEqual({ allowed: false, unattended: true });
+    expect(prompt).toHaveBeenCalledTimes(1);
+  });
+
   it('blocks in manual mode until the user approves, then remembers it', async () => {
     const emitter = new EventEmitter();
     emitter.on('approval-required', (e: { approvalId: string }) => {

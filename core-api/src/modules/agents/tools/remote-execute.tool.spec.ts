@@ -39,6 +39,7 @@ describe('remoteExecuteTool browser screenshots', () => {
     const tool = remoteExecuteTool(
       {
         approvals: { authorize: jest.fn().mockResolvedValue({ allowed: true }) },
+        guard: { evaluate: jest.fn().mockResolvedValue({ action: 'default' }) },
         remoteExecuteService: {
           waitForResult: jest.fn().mockResolvedValue({
             stdout,

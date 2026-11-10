@@ -69,3 +69,10 @@ export enum AgentDefinitionScope {
   USER = 'user',
   WORKSPACE = 'workspace',
 }
+
+/** What a workspace tool rule does to the calls it matches. */
+export enum AgentToolRuleAction {
+  ALLOW = 'allow',
+  DENY = 'deny',
+  ASK = 'ask',
+}

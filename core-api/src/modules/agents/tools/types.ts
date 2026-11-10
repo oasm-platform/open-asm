@@ -28,6 +28,7 @@ import type { WorkspacesService } from '@/modules/workspaces/workspaces.service'
 import type { RedisService } from '@/services/redis/redis.service';
 
 import type { AgentsApprovalsService } from '../agents.approvals';
+import type { AgentsGuardService } from '../agents.guard';
 import type { AgentsMemoriesService } from '../agents.memories';
 import type { AgentConversationTodo } from '../entities/agent-conversation-todo.entity';
 import type { AgentConversation } from '../entities/agent-conversation.entity';
@@ -56,6 +57,7 @@ export interface AgentToolDeps {
   todoRepository: Repository<AgentConversationTodo>;
   agentsMemories: AgentsMemoriesService;
   approvals: AgentsApprovalsService;
+  guard: AgentsGuardService;
   connectorRegistry: ConnectorRegistryService;
   toolConfigProfiles: ToolConfigProfilesService;
   remoteExecuteSubscribe: RemoteExecuteSubscribeService;

@@ -577,7 +577,7 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
       const autonomous = conversation.approvalMode === AgentApprovalMode.AUTO;
       const allowWrite = autonomous || def.isBuiltin;
       const approval: ApprovalSettings | undefined = allowWrite
-        ? { userId, mode: AgentApprovalMode.AUTO }
+        ? { userId, mode: AgentApprovalMode.AUTO, unattended: true }
         : undefined;
       // The pages its browser commands load go to the conversation's Browser
       // panel, labelled with this run. Nothing here waits on the user: the
@@ -1005,16 +1005,25 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
           .describe(
             'Complete task description: what to find out, with the ids/targets it needs',
           ),
+        targets: z
+          .array(z.string().min(1).max(255))
+          .max(50)
+          .optional()
+          .describe(
+            'Hosts, IPs, CIDRs or URLs the subagent will test. Each must be in the workspace targets or project scope, or the dispatch is refused.',
+          ),
       }),
       execute: async (
-        { name, task }: { name: string; task: string },
+        { name, task, targets }: { name: string; task: string; targets?: string[] },
         options?: { abortSignal?: AbortSignal },
       ) => {
         try {
           const row = await this.dispatch(
             ctx,
             name,
-            task,
+            targets?.length
+              ? `${task}\n\nTargets: ${targets.join(', ')}`
+              : task,
             options?.abortSignal,
           );
           return {

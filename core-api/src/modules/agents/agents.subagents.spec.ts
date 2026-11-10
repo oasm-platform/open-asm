@@ -330,7 +330,7 @@ describe('AgentsSubagentsService', () => {
 
     // Built-in: getTools gets an AUTO approval so the gate auto-allows
     const toolsCall = agentTool.getTools.mock.calls[0];
-    expect(toolsCall[4]).toEqual({ userId: 'u1', mode: 'auto' });
+    expect(toolsCall[4]).toEqual({ userId: 'u1', mode: 'auto', unattended: true });
     const call = (streamText as jest.Mock).mock.calls[0][0];
     expect(Object.keys(call.tools)).toEqual(
       expect.arrayContaining(['inspect_issue', 'execute_remote_command']),
@@ -448,7 +448,7 @@ describe('AgentsSubagentsService', () => {
 
     // getTools is called with an AUTO approval so the gate auto-allows
     const toolsCall = agentTool.getTools.mock.calls[0];
-    expect(toolsCall[4]).toEqual({ userId: 'u1', mode: 'auto' });
+    expect(toolsCall[4]).toEqual({ userId: 'u1', mode: 'auto', unattended: true });
     const call = (streamText as jest.Mock).mock.calls[0][0];
     expect(Object.keys(call.tools)).toEqual(
       expect.arrayContaining(['inspect_issue', 'execute_remote_command']),

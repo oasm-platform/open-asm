@@ -37,6 +37,8 @@ export interface ApprovalContext {
    * a step.
    */
   needsTodo?: () => Promise<boolean>;
+  /** Nobody watches this run (a subagent): a call that must ask is refused */
+  unattended?: boolean;
 }
 
 /**
@@ -90,6 +92,10 @@ export interface ApprovalToolMeta {
   input?: unknown;
   /** Only reads data: runs without asking once a plan step is in progress */
   readOnly?: boolean;
+  /** A tool rule or the scope gate wants a prompt: asked even in AUTO */
+  escalate?: boolean;
+  /** A workspace allow rule matched: runs without asking */
+  preApproved?: boolean;
 }
 
 /** Sent when a prompt no longer needs an answer, so the UI can drop it. */
@@ -103,6 +109,8 @@ export interface ApprovalDecision {
   feedback?: string;
   /** Refused without asking: the agent must get its plan approved and start it first */
   todoRequired?: boolean;
+  /** Needed a prompt, but the run is unattended */
+  unattended?: boolean;
 }
 
 interface UserDecision {
@@ -211,10 +219,14 @@ export class AgentsApprovalsService {
     if (ctx.needsTodo && (await ctx.needsTodo())) {
       return { allowed: false, todoRequired: true };
     }
-    if (ctx.mode === AgentApprovalMode.AUTO) return { allowed: true };
-    if (meta?.readOnly) return { allowed: true };
-    if (await this.isConversationAllowed(ctx.conversationId, meta?.tool)) {
-      return { allowed: true };
+    if (meta?.escalate) {
+      if (ctx.unattended) return { allowed: false, unattended: true };
+    } else {
+      if (ctx.mode === AgentApprovalMode.AUTO) return { allowed: true };
+      if (meta?.readOnly || meta?.preApproved) return { allowed: true };
+      if (await this.isConversationAllowed(ctx.conversationId, meta?.tool)) {
+        return { allowed: true };
+      }
     }
 
     // Parallel tool calls with the same command in one conversation share one

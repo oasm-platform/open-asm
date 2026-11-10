@@ -93,11 +93,16 @@ export const TODO_REQUIRED_MESSAGE =
 export const PLANNING_OFF_MESSAGE =
   'Not executed: planning is off in this conversation (only Agent mode makes plans). Do the work directly with the other tools, without a plan.';
 
+/** A subagent hit a call that needs the user's approval. */
+export const UNATTENDED_MESSAGE =
+  "Not executed: this call needs the user's approval (a workspace rule or the scope check asks for it), and a background run cannot ask. Leave it out and report it in your result so the main agent can ask the user.";
+
 export function deniedMessage(
   what: string,
   decision: ApprovalDecision,
 ): string {
   if (decision.todoRequired) return TODO_REQUIRED_MESSAGE;
+  if (decision.unattended) return UNATTENDED_MESSAGE;
   return rejectionMessage(what, decision.feedback);
 }
 
