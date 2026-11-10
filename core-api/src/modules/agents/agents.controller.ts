@@ -38,6 +38,7 @@ import { AgentsDefinitionsService } from './agents.definitions';
 import { AgentsService } from './agents.service';
 import { AgentsStreamBufferService } from './agents.stream-buffer';
 import { AgentsUsageService } from './agents.usage';
+import { WorkflowResponseDto } from './dto/workflow.dto';
 import {
   AgentConfigResponseDto,
   UpsertAgentConfigDto,
@@ -426,6 +427,56 @@ export class AgentsController {
       workspaceId,
       userId,
     );
+  }
+
+  @WorkspaceAccess('agent.write')
+  @Post('conversations/:id/subagents/:subagentId/cancel')
+  @HttpCode(HttpStatus.OK)
+  @Doc({
+    summary: 'Cancel a conversation subagent',
+    description:
+      'Stops one pending or running subagent. Subagents that wait for it start with its cancelled status.',
+    request: {
+      getWorkspaceId: true,
+      params: [
+        { name: 'id', description: 'Conversation ID' },
+        { name: 'subagentId', description: 'Subagent ID' },
+      ],
+    },
+    response: { serialization: DefaultMessageResponseDto },
+  })
+  async cancelConversationSubagent(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('subagentId', ParseUUIDPipe) subagentId: string,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    return this.agentsService.cancelConversationSubagent(
+      id,
+      subagentId,
+      workspaceId,
+      userId,
+    );
+  }
+
+  @WorkspaceAccess('agent.read')
+  @Get('conversations/:id/workflow')
+  @Doc({
+    summary: 'Get conversation workflow',
+    description:
+      'Plan steps, the subagents dispatched for them with their dependencies and results, and the shared notebook',
+    request: {
+      getWorkspaceId: true,
+      params: [{ name: 'id', description: 'Conversation ID' }],
+    },
+    response: { serialization: WorkflowResponseDto },
+  })
+  async getConversationWorkflow(
+    @Param('id', ParseUUIDPipe) id: string,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+  ): Promise<WorkflowResponseDto> {
+    return this.agentsService.getConversationWorkflow(id, workspaceId, userId);
   }
 
   @WorkspaceAccess('agent.read')

@@ -34,7 +34,7 @@ export interface SubagentStatusView {
   className: string;
 }
 
-const STATUS: Record<SubagentResponseDto['status'], SubagentStatusView> = {
+export const SUBAGENT_STATUS: Record<SubagentResponseDto['status'], SubagentStatusView> = {
   pending: { label: 'Queued', icon: Clock, className: 'text-muted-foreground' },
   in_progress: {
     label: 'Running',
@@ -75,7 +75,7 @@ function SubagentRow({
   embedded: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const status = STATUS[subagent.status];
+  const status = SUBAGENT_STATUS[subagent.status];
   const Icon = status.icon;
   const time = elapsed(subagent, now);
 

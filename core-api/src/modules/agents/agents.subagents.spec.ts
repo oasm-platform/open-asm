@@ -143,12 +143,18 @@ describe('AgentsSubagentsService', () => {
   let definitions: { listSubagents: jest.Mock };
   let skillRepo: { findOne: jest.Mock; find: jest.Mock };
   let tx: Record<string, jest.Mock>;
+  let workflow: Record<string, jest.Mock>;
 
   beforeEach(() => {
     (streamText as jest.Mock).mockClear();
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+    workflow = {
+      buildRunContext: jest.fn(() => Promise.resolve('')),
+      recordOutput: jest.fn(() => Promise.resolve()),
+      createNoteTool: jest.fn(() => ({ description: 'note' })),
+    };
     tx = {
       findOne: jest.fn(() => Promise.resolve({ id: 'c1' })),
       count: jest.fn(() => Promise.resolve(0)),
@@ -217,6 +223,7 @@ describe('AgentsSubagentsService', () => {
       { costOf: jest.fn(() => undefined), reasoningOptions: jest.fn(() => ({})) } as never,
       definitions as never,
       new AgentsSkillsService(skillRepo as never, {} as never),
+      workflow as never,
     );
   });
 
@@ -283,7 +290,9 @@ describe('AgentsSubagentsService', () => {
     expect(call).toMatchObject({ temperature: 0.3, topP: 0.9 });
     expect(call.system).toContain('# Researcher');
     // No allowlist: every read-only tool
-    expect(Object.keys(call.tools).sort()).toEqual([...READ_ONLY_TOOLS].sort());
+    expect(Object.keys(call.tools).sort()).toEqual(
+      [...READ_ONLY_TOOLS, 'submit_result'].sort(),
+    );
   });
 
   it("sends its browser pages to the conversation's live view, labelled with the run", async () => {
@@ -666,7 +675,9 @@ describe('AgentsSubagentsService', () => {
       'researcher',
     );
     const call = (streamText as jest.Mock).mock.calls[0][0];
-    const toolNames = Object.keys(call.tools);
+    const toolNames = Object.keys(call.tools).filter(
+      (t) => t !== 'submit_result',
+    );
     expect(toolNames.length).toBeGreaterThan(0);
     expect(toolNames.every((t) => READ_ONLY_TOOLS.has(t))).toBe(true);
     expect(toolNames).not.toContain('dispatch_subagent');
@@ -886,6 +897,9 @@ describe('AgentsSubagentsService', () => {
       'dispatch_subagent',
       'get_subagent_result',
       'wait_for_subagents',
+      'continue_subagent',
+      'cancel_subagent',
+      'add_workflow_note',
     ]);
 
     repo.findOne.mockResolvedValueOnce({
@@ -1047,5 +1061,226 @@ describe('AgentsSubagentsService', () => {
       expect.any(Number),
       expect.any(Number),
     ]);
+  });
+
+  describe('workflow', () => {
+    const ctx = { conversationId: 'c1', workspaceId: 'w1', userId: 'u1' };
+
+    it('stores the brief, plan step, dependencies, sources and step budget of a dispatch', async () => {
+      tx.find = jest.fn(() => Promise.resolve([{ id: 'up1' }, { id: 'src1' }]));
+      tx.findOne
+        .mockResolvedValueOnce({ id: 'c1' })
+        .mockResolvedValueOnce({ id: 'step1' });
+      const brief = { objective: 'Map api.example.com', expectedOutput: 'Hosts' };
+      const row = await service.dispatch(ctx, 'researcher', 'text', undefined, {
+        brief,
+        after: ['up1', 'up1'],
+        derivedFrom: ['src1', 'src1'],
+        maxSteps: 999,
+      });
+      expect(row.metadata).toMatchObject({
+        brief,
+        stepId: 'step1',
+        after: ['up1'],
+        derivedFrom: ['src1'],
+        maxSteps: 200,
+      });
+    });
+
+    it('rejects a source from another conversation', async () => {
+      tx.find = jest.fn(() => Promise.resolve([]));
+      await expect(
+        service.dispatch(ctx, 'researcher', 'text', undefined, {
+          derivedFrom: ['other'],
+        }),
+      ).rejects.toThrow('Unknown subagent id');
+      expect(tx.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects dependencies from another conversation', async () => {
+      tx.find = jest.fn(() => Promise.resolve([]));
+      await expect(
+        service.dispatch(ctx, 'researcher', 'text', undefined, {
+          after: ['other'],
+        }),
+      ).rejects.toThrow('Unknown subagent id');
+      expect(tx.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects a plan step that is not this conversation', async () => {
+      tx.findOne
+        .mockResolvedValueOnce({ id: 'c1' })
+        .mockResolvedValueOnce(null);
+      await expect(
+        service.dispatch(ctx, 'researcher', 'text', undefined, {
+          stepId: 'nope',
+        }),
+      ).rejects.toThrow('Unknown plan step');
+    });
+
+    it('dispatch_subagent renders the brief into the task text', async () => {
+      const tools = service.createTools(ctx);
+      const result = (await tools.dispatch_subagent.execute!(
+        {
+          name: 'researcher',
+          objective: 'Find CVEs of nginx 1.18',
+          expected_output: 'CVE ids with links',
+          must_not: ['touch the target'],
+        },
+        {} as never,
+      )) as { id: string };
+      expect(result.id).toBe('s1');
+      const saved = tx.save.mock.calls[0][0] as {
+        task: string;
+        metadata: { brief: unknown };
+      };
+      expect(saved.task).toContain('## Objective\nFind CVEs of nginx 1.18');
+      expect(saved.task).toContain('## Must not do\n- touch the target');
+      expect(saved.metadata.brief).toEqual({
+        objective: 'Find CVEs of nginx 1.18',
+        expectedOutput: 'CVE ids with links',
+        mustNot: ['touch the target'],
+      });
+    });
+
+    it('claims only rows whose dependencies have ended', async () => {
+      await (service as unknown as { claimNext: () => Promise<unknown> }).claimNext();
+      const sql = String(repo.query.mock.calls[0][0]);
+      expect(sql).toContain("metadata->'after'");
+      expect(sql).toContain('FOR UPDATE OF s SKIP LOCKED');
+    });
+
+    it('cancels one active subagent of the conversation', async () => {
+      repo.query.mockResolvedValueOnce([[{ id: 's1' }], 1]);
+      await expect(service.cancelOne('c1', 's1')).resolves.toBe(true);
+      expect(repo.query.mock.calls[0][1]).toEqual([
+        's1',
+        'c1',
+        SubagentStatus.CANCELLED,
+        SubagentStatus.PENDING,
+        SubagentStatus.IN_PROGRESS,
+      ]);
+      repo.query.mockResolvedValueOnce([[], 0]);
+      await expect(service.cancelOne('c1', 's2')).resolves.toBe(false);
+    });
+
+    it('continue_subagent follows up an ended subagent, never a running one', async () => {
+      const tools = service.createTools(ctx);
+      repo.findOne.mockResolvedValueOnce({
+        id: 'old',
+        name: 'researcher',
+        status: SubagentStatus.IN_PROGRESS,
+      });
+      await expect(
+        tools.continue_subagent.execute!(
+          { id: 'old', message: 'dig deeper' },
+          {} as never,
+        ),
+      ).resolves.toMatchObject({ error: expect.stringContaining('still running') });
+
+      tx.find = jest.fn(() => Promise.resolve([{ id: 'old' }]));
+      repo.findOne.mockResolvedValueOnce({
+        id: 'old',
+        name: 'researcher',
+        status: SubagentStatus.COMPLETED,
+        metadata: { stepId: 'step1' },
+      });
+      await expect(
+        tools.continue_subagent.execute!(
+          { id: 'old', message: 'dig deeper' },
+          {} as never,
+        ),
+      ).resolves.toMatchObject({ continuesFrom: 'old' });
+      expect(tx.save.mock.calls[0][0]).toMatchObject({
+        task: 'dig deeper',
+        metadata: { continuesFrom: 'old' },
+      });
+    });
+
+    it('hands a run its workflow context and replays the run it continues', async () => {
+      workflow.buildRunContext.mockResolvedValueOnce('<workflow_context>\nx\n</workflow_context>');
+      repo.findOne.mockResolvedValueOnce({
+        id: 'old',
+        task: 'first task',
+        result: 'first answer',
+        status: SubagentStatus.COMPLETED,
+      });
+      (streamText as jest.Mock).mockReturnValue(
+        streamResult({ text: 'ok', steps: [] }),
+      );
+      await (service as unknown as { run: (j: unknown) => Promise<void> }).run({
+        id: 's1',
+        conversationId: 'c1',
+        name: 'researcher',
+        task: 'follow-up',
+        metadata: { continuesFrom: 'old' },
+      });
+      const call = (streamText as jest.Mock).mock.calls[0][0];
+      expect(call.messages).toEqual([
+        { role: 'user', content: '<task>\nfirst task\n</task>' },
+        { role: 'assistant', content: 'first answer' },
+        {
+          role: 'user',
+          content: '<workflow_context>\nx\n</workflow_context>\n\n<task>\nfollow-up\n</task>',
+        },
+      ]);
+      expect(call.system).toContain('submit_result');
+    });
+
+    it('stores the structured result and records its notes', async () => {
+      (streamText as jest.Mock).mockImplementationOnce(
+        (opts: { tools: Record<string, { execute: (i: unknown) => unknown }> }) => {
+          void opts.tools.submit_result.execute({
+            outcome: 'partial',
+            summary: 'Two hosts',
+            facts: [{ key: 'host:a', value: 'a is live' }],
+            findings: [],
+            open_questions: ['is b live?'],
+          });
+          return streamResult({ text: '', steps: [] });
+        },
+      );
+      await (service as unknown as { run: (j: unknown) => Promise<void> }).run({
+        id: 's1',
+        conversationId: 'c1',
+        name: 'researcher',
+        task: 't',
+      });
+      const completed = repo.query.mock.calls.find((c) =>
+        String(c[0]).includes('result = $3'),
+      );
+      expect(completed?.[1][2]).toContain('**Outcome:** partial');
+      expect(JSON.parse(completed?.[1][3] as string).output).toMatchObject({
+        outcome: 'partial',
+        openQuestions: ['is b live?'],
+      });
+      expect(workflow.recordOutput).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 's1' }),
+        expect.objectContaining({ summary: 'Two hosts' }),
+      );
+    });
+
+    it('reminds the main agent to validate findings and follow up unfinished work', () => {
+      const text = service.formatResultsMessage([
+        {
+          id: 's1',
+          name: 'webapp-tester',
+          status: SubagentStatus.COMPLETED,
+          result: 'r',
+          metadata: {
+            output: {
+              outcome: 'partial',
+              summary: 's',
+              facts: [],
+              findings: [{ title: 'SQLi in /login' }],
+              openQuestions: [],
+            },
+          },
+        } as never,
+      ]);
+      expect(text).toContain('outcome="partial"');
+      expect(text).toContain('independent validation subagent');
+      expect(text).toContain('Not done: webapp-tester (partial)');
+    });
   });
 });

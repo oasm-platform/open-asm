@@ -346,8 +346,14 @@ describe('AgentTool run_tool_connector', () => {
       timedOut: false,
       truncated: false,
       totalLines: 1,
+      runId: expect.any(String),
     });
-    expect((agentTool as any).redisService.setex).not.toHaveBeenCalled();
+    // Kept even when short, so propose_vulnerability can check quotes from it
+    expect((agentTool as any).redisService.setex).toHaveBeenCalledWith(
+      `agent:tool-output:c1:${(result as { runId: string }).runId}`,
+      3600,
+      'raw output',
+    );
   });
 
   describe('inline nuclei templates', () => {

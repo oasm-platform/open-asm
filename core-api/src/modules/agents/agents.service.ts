@@ -39,6 +39,9 @@ import {
 import { AgentsMemoriesService } from './agents.memories';
 import { AgentsModelsCatalogService } from './agents.models-catalog';
 import { AgentsSubagentsService } from './agents.subagents';
+import { AgentsWorkflowService } from './agents.workflow';
+import type { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
+import type { WorkflowResponseDto } from './dto/workflow.dto';
 import type {
   ConversationMetadataDto,
   SubagentDetailResponseDto,
@@ -118,6 +121,7 @@ export class AgentsService {
     private readonly agentsConfig: AgentsConfigService,
     private readonly modelsCatalog: AgentsModelsCatalogService,
     private readonly subagents: AgentsSubagentsService,
+    private readonly workflow: AgentsWorkflowService,
   ) {}
 
   private async getDefaultLLMConfigId(
@@ -601,6 +605,43 @@ export class AgentsService {
       throw new NotFoundException('Subagent not found');
     }
     return detail;
+  }
+
+  /** Stops one pending or running subagent of the user's conversation. */
+  async cancelConversationSubagent(
+    id: string,
+    subagentId: string,
+    workspaceId: string,
+    userId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    const conversation = await this.conversationRepository.findOne({
+      where: { id, workspaceId, createdBy: userId },
+      select: ['id'],
+    });
+    if (!conversation) {
+      throw new NotFoundException('Conversation not found');
+    }
+    const cancelled = await this.subagents.cancelOne(id, subagentId);
+    if (!cancelled) {
+      throw new BadRequestException('The subagent is not pending or running');
+    }
+    return { message: 'Subagent cancelled' };
+  }
+
+  /** Plan steps, dispatched subagents with their links, and notebook. */
+  async getConversationWorkflow(
+    id: string,
+    workspaceId: string,
+    userId: string,
+  ): Promise<WorkflowResponseDto> {
+    const conversation = await this.conversationRepository.findOne({
+      where: { id, workspaceId, createdBy: userId },
+      select: ['id', 'metadata'],
+    });
+    if (!conversation) {
+      throw new NotFoundException('Conversation not found');
+    }
+    return this.workflow.getWorkflow(id, conversation.metadata?.goal ?? null);
   }
 
   async getConversations(

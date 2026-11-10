@@ -23,6 +23,7 @@ import { AgentsMemoriesService } from './agents.memories';
 import { AgentsModelsCatalogService } from './agents.models-catalog';
 import { AgentsStreamBufferService } from './agents.stream-buffer';
 import { AgentsSubagentsService } from './agents.subagents';
+import { AgentsWorkflowService } from './agents.workflow';
 import { AgentsUsageService } from './agents.usage';
 import { AgentsService } from './agents.service';
 import { AgentTool } from './agents.tools';
@@ -39,6 +40,7 @@ import { AgentSkill } from './entities/agent-skill.entity';
 import { AgentSubagent } from './entities/agent-subagent.entity';
 import { AgentToolRule } from './entities/agent-tool-rule.entity';
 import { AgentsGuardService } from './agents.guard';
+import { AgentWorkflowNote } from './entities/agent-workflow-note.entity';
 import { HttpModule } from '@nestjs/axios';
 
 @Global()
@@ -56,6 +58,7 @@ import { HttpModule } from '@nestjs/axios';
       AgentCommandApproval,
       AgentConfig,
       AgentSubagent,
+      AgentWorkflowNote,
       AgentDefinition,
       AgentToolRule,
       Project,
@@ -86,6 +89,7 @@ import { HttpModule } from '@nestjs/axios';
     AgentsConfigService,
     AgentsModelsCatalogService,
     AgentsSubagentsService,
+    AgentsWorkflowService,
     AgentsDefinitionsService,
     AgentsStreamBufferService,
     AgentsUsageService,
@@ -100,6 +104,7 @@ import { HttpModule } from '@nestjs/axios';
     AgentsApprovalsService,
     AgentsModelsCatalogService,
     AgentsSubagentsService,
+    AgentsWorkflowService,
     AgentsDefinitionsService,
   ],
 })
