@@ -6,12 +6,11 @@ export interface ToolRuleLike {
   id: string;
   toolName: string;
   pattern: string | null;
-  isRegex: boolean;
   action: AgentToolRuleAction;
   priority: number;
 }
 
-/** Longest text a rule pattern is run against (bounds regex cost). */
+/** Longest text a rule pattern is run against (bounds matching cost). */
 export const RULE_SUBJECT_MAX = 16 * 1024;
 
 const ACTION_RANK: Record<AgentToolRuleAction, number> = {
@@ -20,15 +19,40 @@ const ACTION_RANK: Record<AgentToolRuleAction, number> = {
   [AgentToolRuleAction.ALLOW]: 2,
 };
 
-/** Throws a message safe to show when `pattern` is not a valid regex. */
-export function compileRulePattern(pattern: string): RegExp {
-  return new RegExp(pattern, 'i');
+/**
+ * Whether `text` matches `pattern` as a whole, ignoring case: `*` stands for
+ * any run of characters, `?` for exactly one. Matched without building a
+ * RegExp from the pattern, so a rule cannot be made to backtrack for ever.
+ */
+export function wildcardMatch(pattern: string, text: string): boolean {
+  const p = pattern.toLowerCase();
+  const t = text.toLowerCase();
+  let pi = 0;
+  let ti = 0;
+  let star = -1;
+  let mark = 0;
+  while (ti < t.length) {
+    if (pi < p.length && (p[pi] === '?' || p[pi] === t[ti])) {
+      pi++;
+      ti++;
+    } else if (pi < p.length && p[pi] === '*') {
+      star = pi++;
+      mark = ti;
+    } else if (star !== -1) {
+      pi = star + 1;
+      ti = ++mark;
+    } else {
+      return false;
+    }
+  }
+  while (p[pi] === '*') pi++;
+  return pi === p.length;
 }
 
 /**
  * The rule that decides a call to `tool` whose input reads as `subject`:
- * highest priority first, deny > ask > allow on a tie. A regex that no longer
- * compiles never matches.
+ * highest priority first, deny > ask > allow on a tie. A pattern must match the
+ * whole subject (see `wildcardMatch`); a null pattern matches every call.
  */
 export function matchToolRule<T extends ToolRuleLike>(
   rules: readonly T[],
@@ -46,12 +70,7 @@ export function matchToolRule<T extends ToolRuleLike>(
     ordered.find((rule) => {
       if (!globMatch(rule.toolName, tool)) return false;
       if (!rule.pattern) return true;
-      if (!rule.isRegex) return text.toLowerCase().includes(rule.pattern.toLowerCase());
-      try {
-        return compileRulePattern(rule.pattern).test(text);
-      } catch {
-        return false;
-      }
+      return wildcardMatch(rule.pattern, text);
     }) ?? null
   );
 }

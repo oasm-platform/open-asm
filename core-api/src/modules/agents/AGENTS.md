@@ -56,7 +56,7 @@ All routes: `@Controller('agents')`, `AuthGuard`, `@WorkspaceAccess('agent.read'
 - `agent_conversation_todos` (the plan) and `agent_subagents` → conversation (cascade); both have a `@VersionColumn`.
 - `agent_command_approvals`: unique (`userId`, `hash`), hash = SHA-256 of `conversationId\0command`; no FKs, so `forgetConversations` deletes them by hand.
 - `agent_definitions`: unique (`workspaceId`, `createdBy`, `name`) and partial unique (`workspaceId`, `name`) where `scope = 'workspace'`. `agent_skills`: unique (`workspaceId`, `name`). `agent_mcp_configs`: one row per workspace, servers in `configJson.mcpServers`. `agent_workspace_memories`: LTM records per user.
-- `agent_tool_rules` (`AgentToolRule`): workspace-wide; `toolName` (`*` glob), `pattern` (null = every call; case-insensitive substring, or regex with `isRegex`), `action` allow/deny/ask, `priority`, `enabled`. Workspace cascade, `createdBy` SET NULL.
+- `agent_tool_rules` (`AgentToolRule`): workspace-wide; `toolName` (`*` glob), `pattern` (null = every call; else a case-insensitive wildcard pattern, `*` any run and `?` one character, that must match the whole command or JSON input; see `wildcardMatch`), `action` allow/deny/ask, `priority`, `enabled`. Workspace cascade, `createdBy` SET NULL.
 - No soft delete anywhere.
 
 ## Invariants
@@ -89,7 +89,7 @@ All routes: `@Controller('agents')`, `AuthGuard`, `@WorkspaceAccess('agent.read'
 - `save_template` (`tools/artifact.tools.ts`) writes nuclei templates through `TemplatesService.create` / `saveContent`, so they land in the workspace `custom-templates` folder with the same validation as the HTTP routes; `save_file` writes to the user's Files root and is not runnable as a template. The built-in `nuclei-template-generator` skill tells the model to use `save_template`.
 - MCP: `isSafeUrl` (private-range block) is applied only by `pingMCPServer`; `AgentsMcpService` connects to whatever URL is saved. External tools are named `<server>_<tool>` and built-in tools win on a name clash.
 - Redis keys: STM `agents:stm:<conversationId>` (24 h TTL), stream buffer `agent:stream:<id>` + channel `agent:stream:chan:<id>`, model lists `agents:models:<configId>` (1 h). Deleting a conversation must also clear STM and approvals (see `deleteConversation`).
-- Guard: rules are cached per workspace for 30 s (`RULES_TTL_MS`) and dropped on CRUD on that instance only. Host names are never resolved, so an IP target does not cover its domain and vice versa. Rule regexes run with no timeout (subject capped at `RULE_SUBJECT_MAX`); only workspace owners write them. The deny list reads the command with quotes stripped, so it also refuses e.g. `grep "DROP TABLE"`. Not covered: `retrieve_web_page`, nuclei `templates`, built-in tools other than the two with structured targets.
+- Guard: rules are cached per workspace for 30 s (`RULES_TTL_MS`) and dropped on CRUD on that instance only. Host names are never resolved, so an IP target does not cover its domain and vice versa. Rule patterns are wildcards, never regexes built from user input (no ReDoS); the subject is capped at `RULE_SUBJECT_MAX` and only workspace owners write rules. A deny on a word anywhere needs `*word*`. The deny list reads the command with quotes stripped, so it also refuses e.g. `grep "DROP TABLE"`. Not covered: `retrieve_web_page`, nuclei `templates`, built-in tools other than the two with structured targets.
 - Long-term memory is opt-in: with `memoryEnabled = false` the `ltm_*` tools are removed and LTM is left out of the prompt.
 
 ## Testing

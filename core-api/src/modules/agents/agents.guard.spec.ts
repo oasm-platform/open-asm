@@ -29,8 +29,7 @@ describe('AgentsGuardService.evaluate', () => {
     id: `r${rules.length}`,
     toolName: 'execute_remote_command',
     pattern: null,
-    isRegex: false,
-    priority: 0,
+      priority: 0,
     ...over,
   });
 
@@ -52,9 +51,9 @@ describe('AgentsGuardService.evaluate', () => {
 
   it('applies workspace rules: deny, ask, allow', async () => {
     rules = [
-      rule({ id: 'deny', pattern: 'masscan', action: A.DENY }),
+      rule({ id: 'deny', pattern: '*masscan*', action: A.DENY }),
       rule({ id: 'ask', toolName: 'save_*', action: A.ASK }),
-      rule({ id: 'allow', pattern: '^whoami$', isRegex: true, action: A.ALLOW }),
+      rule({ id: 'allow', pattern: 'whoami', action: A.ALLOW }),
     ];
     await expect(call('execute_remote_command', { command: 'masscan 10.0.0.1' })).resolves.toMatchObject({
       action: 'deny',
@@ -98,7 +97,7 @@ describe('AgentsGuardService.evaluate', () => {
       action: 'ask',
       policy: { source: 'scope' },
     });
-    rules = [rule({ pattern: 'curl -s https://evil.com', action: A.ALLOW })];
+    rules = [rule({ pattern: 'curl -s https://evil.com/*', action: A.ALLOW })];
     await expect(call('execute_remote_command', curl, true)).resolves.toMatchObject({
       action: 'allow',
       policy: { source: 'rule' },

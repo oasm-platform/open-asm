@@ -1,7 +1,7 @@
 import type { UserContextPayload } from '@/common/interfaces/app.interface';
 import { ProjectScopeRuleMode, ProjectScopeRuleType } from '@/common/enums/enum';
 import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import type { CreateToolRuleDto, UpdateToolRuleDto } from './dto/tool-rule.dto';
@@ -15,7 +15,7 @@ import {
   scopeVerdict,
   type ScopeEntry,
 } from './guard/target-scope';
-import { compileRulePattern, matchToolRule } from './guard/tool-rules';
+import { matchToolRule } from './guard/tool-rules';
 import { stableStringify } from './tools/helpers';
 
 /** Why the guard decided a call; stored in the tool call's result. */
@@ -254,7 +254,6 @@ export class AgentsGuardService {
 
   async createRule(workspaceId: string, userId: string, dto: CreateToolRuleDto) {
     await this.assertOwner(workspaceId, userId);
-    this.assertPattern(dto);
     const saved = await this.ruleRepo.save(
       this.ruleRepo.create({ ...dto, workspaceId, createdBy: userId }),
     );
@@ -266,7 +265,6 @@ export class AgentsGuardService {
     await this.assertOwner(workspaceId, userId);
     const rule = await this.findRule(workspaceId, id);
     Object.assign(rule, dto);
-    this.assertPattern(rule);
     const saved = await this.ruleRepo.save(rule);
     this.rulesCache.delete(workspaceId);
     return saved;
@@ -288,14 +286,5 @@ export class AgentsGuardService {
     return this.workspacesService.getWorkspaceByIdAndOwner(workspaceId, {
       id: userId,
     } as UserContextPayload);
-  }
-
-  private assertPattern(rule: { pattern?: string | null; isRegex?: boolean }) {
-    if (!rule.isRegex || !rule.pattern) return;
-    try {
-      compileRulePattern(rule.pattern);
-    } catch (error) {
-      throw new BadRequestException(`Invalid pattern: ${(error as Error).message}`);
-    }
   }
 }

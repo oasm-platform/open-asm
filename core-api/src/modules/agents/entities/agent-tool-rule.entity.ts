@@ -32,13 +32,9 @@ export class AgentToolRule extends BaseEntity {
   @Column({ type: 'varchar', length: 255 })
   toolName: string;
 
-  @ApiPropertyOptional({ nullable: true, description: 'Matched against the command, or the JSON input of other tools; null matches every call' })
+  @ApiPropertyOptional({ nullable: true, description: 'Wildcard pattern (`*`, `?`, case-insensitive) matched against the whole command, or the JSON input of other tools; null matches every call' })
   @Column({ type: 'text', nullable: true })
   pattern: string | null;
-
-  @ApiProperty({ default: false, description: 'pattern is a case-insensitive regex instead of a case-insensitive substring' })
-  @Column({ type: 'boolean', default: false })
-  isRegex: boolean;
 
   @ApiProperty({ enum: AgentToolRuleAction, enumName: 'AgentToolRuleAction' })
   @Column({ type: 'varchar' })

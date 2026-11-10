@@ -17,16 +17,11 @@ export class CreateToolRuleDto {
   @Matches(/^[\w.*-]{1,255}$/, { message: 'toolName may only hold letters, digits, _ . - and *' })
   toolName: string;
 
-  @ApiPropertyOptional({ nullable: true, maxLength: 1000, description: 'Substring (or regex with isRegex) matched case-insensitively; omit to match every call' })
+  @ApiPropertyOptional({ nullable: true, maxLength: 1000, description: 'Matched against the whole command (or the JSON input of other tools), case-insensitively: `*` matches any run of characters, `?` one character. Omit to match every call' })
   @IsOptional()
   @IsString()
   @MaxLength(1000)
   pattern?: string | null;
-
-  @ApiPropertyOptional({ default: false })
-  @IsOptional()
-  @IsBoolean()
-  isRegex?: boolean;
 
   @ApiProperty({ enum: AgentToolRuleAction, enumName: 'AgentToolRuleAction' })
   @IsEnum(AgentToolRuleAction)
