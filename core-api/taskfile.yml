@@ -16,6 +16,13 @@ tasks:
       NODE_ENV: 'production'
   install: pnpm install
   lint: pnpm run lint
+  # Lint only the given files (same config, no --fix), for when the full run
+  # runs out of memory. Usage: task api:lint:files FILES="src/a.ts src/b.ts"
+  lint:files:
+    requires:
+      vars: [FILES]
+    cmds:
+      - pnpm exec eslint {{.FILES}}
   # Type-check without emitting (no dist/ writes, safe next to a running build).
   typecheck: pnpm exec tsc --noEmit -p tsconfig.build.json
   # Regenerate the Go gRPC stubs for core-api/src/proto/*.proto into
