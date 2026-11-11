@@ -1,10 +1,14 @@
+import { isIpOrCidr } from '@/common/utils/ip-range.util';
 import {
   PresignUploadRequestDto,
   PresignUploadResponseDto,
 } from '@/modules/storage/dto/presign-storage.dto';
 import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import type { ValidatorConstraintInterface } from 'class-validator';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsEmail,
   IsEnum,
@@ -15,8 +19,10 @@ import {
   Max,
   MaxLength,
   Min,
+  Validate,
   ValidateIf,
   ValidateNested,
+  ValidatorConstraint,
 } from 'class-validator';
 
 /**
@@ -54,6 +60,37 @@ export class AuthSettingsDto {
   @IsOptional()
   @IsBoolean()
   allowSignUp?: boolean;
+}
+
+export const ADMIN_ALLOWED_IPS_MAX = 100;
+
+@ValidatorConstraint({ name: 'isIpOrCidr' })
+class IsIpOrCidrConstraint implements ValidatorConstraintInterface {
+  validate(value: unknown): boolean {
+    return typeof value === 'string' && isIpOrCidr(value.trim());
+  }
+
+  defaultMessage(): string {
+    return 'each value in allowedIps must be an IP address or CIDR range';
+  }
+}
+
+/** Who may reach the admin console and `/admin/*` APIs (`settings.adminAccess`) */
+export class AdminAccessSettingsDto {
+  @ApiPropertyOptional({
+    description:
+      'IP addresses or CIDR ranges allowed to use the admin console and APIs. Empty allows every IP.',
+    type: [String],
+    example: ['203.0.113.7', '10.0.0.0/8'],
+    default: [],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(ADMIN_ALLOWED_IPS_MAX)
+  @IsString({ each: true })
+  @MaxLength(64, { each: true })
+  @Validate(IsIpOrCidrConstraint, { each: true })
+  allowedIps?: string[];
 }
 
 /**
@@ -151,6 +188,12 @@ export class SystemSettingsDto {
   @ValidateNested()
   @Type(() => AuthSettingsDto)
   auth?: AuthSettingsDto;
+
+  @ApiPropertyOptional({ type: () => AdminAccessSettingsDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AdminAccessSettingsDto)
+  adminAccess?: AdminAccessSettingsDto;
 
   @ApiPropertyOptional({ type: () => MailServerSettingsDto })
   @IsOptional()

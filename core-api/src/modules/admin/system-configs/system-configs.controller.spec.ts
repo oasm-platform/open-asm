@@ -9,6 +9,7 @@ import type { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
+import type { IncomingMessage } from 'node:http';
 import type { DataSource } from 'typeorm';
 import { MailService } from './mail.service';
 import { SystemConfigsController } from './system-configs.controller';
@@ -543,6 +544,26 @@ describe('SystemConfigsController', () => {
       expect(rolesOf(SystemConfigsController.prototype.sendTestMail)).toEqual([
         Role.ADMIN,
       ]);
+    });
+  });
+
+  describe('updateSettings', () => {
+    it('passes the client IP so the admin IP list cannot lock them out', async () => {
+      const updateSettings = jest
+        .fn()
+        .mockResolvedValue({ message: 'System settings updated successfully' });
+      (
+        systemConfigsService as unknown as { updateSettings: jest.Mock }
+      ).updateSettings = updateSettings;
+      const dto = { adminAccess: { allowedIps: ['203.0.113.7'] } };
+      const request = {
+        socket: { remoteAddress: '203.0.113.7' },
+        headers: {},
+      } as unknown as IncomingMessage;
+
+      await controller.updateSettings(dto, request);
+
+      expect(updateSettings).toHaveBeenCalledWith(dto, '203.0.113.7');
     });
   });
 
