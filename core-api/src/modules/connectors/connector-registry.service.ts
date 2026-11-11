@@ -20,6 +20,8 @@ export interface ConnectorManifestEntry {
   /** When true the AI agent exposes this connector as its own callable tool. */
   agentTool?: boolean;
   configSchema?: Record<string, unknown>;
+  /** "direct" skips the worker egress proxy (raw port scanners); omitted = proxy. */
+  egress?: 'proxy' | 'direct';
   [key: string]: unknown;
 }
 

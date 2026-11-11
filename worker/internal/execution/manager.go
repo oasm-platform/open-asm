@@ -401,6 +401,7 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 			// token (WORKER_TOKEN env); the connector server validates it
 			// per-execution.
 			ConnectorToken: spec.ConnectorToken,
+			DirectEgress:   spec.DirectEgress,
 		}
 	}
 	m.mu.Unlock()

@@ -1196,6 +1196,7 @@ type ToolRun struct {
 	Cpu            *string                `protobuf:"bytes,5,opt,name=cpu,proto3,oneof" json:"cpu,omitempty"`
 	Memory         *string                `protobuf:"bytes,6,opt,name=memory,proto3,oneof" json:"memory,omitempty"`
 	TimeoutSeconds *int32                 `protobuf:"varint,7,opt,name=timeout_seconds,json=timeoutSeconds,proto3,oneof" json:"timeout_seconds,omitempty"`
+	DirectEgress   bool                   `protobuf:"varint,8,opt,name=direct_egress,json=directEgress,proto3" json:"direct_egress,omitempty"` // manifest egress: direct skips the egress proxy
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1277,6 +1278,13 @@ func (x *ToolRun) GetTimeoutSeconds() int32 {
 		return *x.TimeoutSeconds
 	}
 	return 0
+}
+
+func (x *ToolRun) GetDirectEgress() bool {
+	if x != nil {
+		return x.DirectEgress
+	}
+	return false
 }
 
 type RemoteExecuteSubscribeResponse struct {
@@ -2773,7 +2781,7 @@ const file_workers_proto_rawDesc = "" +
 	"\x1bBuiltinToolRegistryResponse\x12\x1d\n" +
 	"\n" +
 	"tool_paths\x18\x01 \x03(\tR\ttoolPaths\"\x1f\n" +
-	"\x1dRemoteExecuteSubscribeRequest\"\xf5\x01\n" +
+	"\x1dRemoteExecuteSubscribeRequest\"\x9a\x02\n" +
 	"\aToolRun\x12\x12\n" +
 	"\x04tool\x18\x01 \x01(\tR\x04tool\x12\x14\n" +
 	"\x05image\x18\x02 \x01(\tR\x05image\x12\x16\n" +
@@ -2782,7 +2790,8 @@ const file_workers_proto_rawDesc = "" +
 	"configJson\x12\x15\n" +
 	"\x03cpu\x18\x05 \x01(\tH\x00R\x03cpu\x88\x01\x01\x12\x1b\n" +
 	"\x06memory\x18\x06 \x01(\tH\x01R\x06memory\x88\x01\x01\x12,\n" +
-	"\x0ftimeout_seconds\x18\a \x01(\x05H\x02R\x0etimeoutSeconds\x88\x01\x01B\x06\n" +
+	"\x0ftimeout_seconds\x18\a \x01(\x05H\x02R\x0etimeoutSeconds\x88\x01\x01\x12#\n" +
+	"\rdirect_egress\x18\b \x01(\bR\fdirectEgressB\x06\n" +
 	"\x04_cpuB\t\n" +
 	"\a_memoryB\x12\n" +
 	"\x10_timeout_seconds\"\x83\x02\n" +

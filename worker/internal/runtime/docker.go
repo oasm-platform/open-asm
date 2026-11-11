@@ -724,7 +724,7 @@ func (d *DockerRuntime) Create(ctx context.Context, spec JobSpec, opts RuntimeOp
 	if execID == "" {
 		execID = generateExecID()
 	}
-	direct := d.goesDirect(spec.Image)
+	direct := d.goesDirect(spec)
 	env := buildContainerEnv(spec, d.connectorAddr, d.connectorToken, execID, EgressConfig{Addr: d.egressAddr, GrpcHost: d.egressGrpcHost, Enabled: !direct})
 
 	// Container config: image, env, labels for lifecycle management.
@@ -1224,38 +1224,16 @@ func shortID(id string) string {
 	return id
 }
 
-// directEgressImages are connector images that bypass the egress proxy: port
-// scanners send raw TCP/UDP probes a proxy cannot carry. Keyed by the image
-// repository's last path segment (tag/digest stripped).
-var directEgressImages = map[string]bool{
-	"connector-nmap":     true,
-	"connector-rustscan": true,
-}
-
 // directEgressNetwork gives direct-egress containers a route out when the
 // connector network is internal.
 const directEgressNetwork = "bridge"
 
-// directEgress reports whether image is exempt from the egress proxy.
-func directEgress(image string) bool {
-	repo := strings.ToLower(image)
-	if i := strings.IndexByte(repo, '@'); i >= 0 {
-		repo = repo[:i]
-	}
-	if i := strings.LastIndexByte(repo, '/'); i >= 0 {
-		repo = repo[i+1:]
-	}
-	if i := strings.IndexByte(repo, ':'); i >= 0 {
-		repo = repo[:i]
-	}
-	return directEgressImages[repo]
-}
-
-// goesDirect reports whether a container of image skips the egress proxy. Proxy
-// off (kill switch or failed listener) means direct egress for every image,
-// not no egress at all on an internal connector network.
-func (d *DockerRuntime) goesDirect(image string) bool {
-	return directEgress(image) || !d.egressEnabled || d.egressAddr == ""
+// goesDirect reports whether a container skips the egress proxy: its manifest
+// says egress: direct, or the proxy is off (kill switch or failed listener),
+// which means direct egress for every image, not no egress at all on an
+// internal connector network.
+func (d *DockerRuntime) goesDirect(spec JobSpec) bool {
+	return spec.DirectEgress || !d.egressEnabled || d.egressAddr == ""
 }
 
 // EgressConfig carries the worker-local egress proxy address into container

@@ -313,6 +313,7 @@ export function runConnectorTool(
             cpu: limits.cpu,
             memory: limits.memory,
             timeoutSeconds,
+            directEgress: entry.egress === 'direct',
           },
           runId,
           timeoutSeconds * 1000 + AGENT_TOOL_RESULT_GRACE_MS,

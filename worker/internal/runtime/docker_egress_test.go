@@ -79,40 +79,21 @@ func TestWithEgressPort(t *testing.T) {
 	}
 }
 
-// Raw port scanners bypass the egress proxy; everything else is proxied.
-func TestDirectEgress(t *testing.T) {
-	cases := map[string]bool{
-		"ghcr.io/oasm-platform/connector-nmap:7.97":       true,
-		"ghcr.io/oasm-platform/connector-rustscan:2.4.1":  true,
-		"GHCR.IO/OASM-PLATFORM/CONNECTOR-NMAP":            true,
-		"ghcr.io/oasm-platform/connector-nmap@sha256:abc": true,
-		"localhost:5000/connector-rustscan:dev":           true,
-		"ghcr.io/oasm-platform/connector-nuclei:3.11.1":   false,
-		"ghcr.io/oasm-platform/connector-nmap-extra:1":    false,
-		"": false,
-	}
-	for image, want := range cases {
-		if got := directEgress(image); got != want {
-			t.Errorf("directEgress(%q) = %v, want %v", image, got, want)
-		}
-	}
-}
-
-// With the proxy off or never configured every image goes direct; with it on
-// only the exempt scanners do.
+// With the proxy on only manifest egress: direct skips it; with it off or
+// never configured every container goes direct.
 func TestGoesDirect(t *testing.T) {
-	const nuclei, nmap = "ghcr.io/oasm-platform/connector-nuclei:3.11.1", "ghcr.io/oasm-platform/connector-nmap:7.97"
+	proxied, direct := JobSpec{Image: "connector-nuclei"}, JobSpec{Image: "connector-nmap", DirectEgress: true}
 	on := &DockerRuntime{}
 	on.ConfigureEgress("10.0.0.2:26277", "core", true)
-	if on.goesDirect(nuclei) || !on.goesDirect(nmap) {
+	if on.goesDirect(proxied) || !on.goesDirect(direct) {
 		t.Fatal("proxy on: nuclei must be proxied, nmap direct")
 	}
 	off := &DockerRuntime{}
 	off.ConfigureEgress("", "", false)
-	if !off.goesDirect(nuclei) {
+	if !off.goesDirect(proxied) {
 		t.Fatal("kill switch: nuclei must go direct")
 	}
-	if !(&DockerRuntime{}).goesDirect(nuclei) {
+	if !(&DockerRuntime{}).goesDirect(proxied) {
 		t.Fatal("listener never configured: nuclei must go direct")
 	}
 }

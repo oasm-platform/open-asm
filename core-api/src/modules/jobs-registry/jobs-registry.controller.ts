@@ -566,7 +566,7 @@ export class JobsRegistryController {
       }
 
       // Manifest resource limits — scheduling context for the worker runtime.
-      // Field names match the proto (cpu/memory/timeout_seconds).
+      // Keys are camelCase: proto-loader (keepCase: false) drops snake_case.
       const defaults = this.connectorRegistry.getResourceDefaults(
         job.tool!.name,
       );
@@ -585,7 +585,8 @@ export class JobsRegistryController {
         image: connectorEntry.image,
         cpu: defaults.cpu,
         memory: defaults.memory,
-        timeout_seconds: defaults.timeoutSeconds,
+        timeoutSeconds: defaults.timeoutSeconds,
+        directEgress: connectorEntry.egress === 'direct',
         inputs: {
           fields: packStructFields(await this.resolveConnectorInputs(job)),
         },

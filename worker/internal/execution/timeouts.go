@@ -52,8 +52,8 @@ const ConnectorSweepInterval = 10 * time.Second
 const MaxPooledContainerAge = 2 * time.Hour
 
 // JobTimeoutSecondsKey is the manifest/Job-spec limit key carrying the per-job
-// timeout (seconds). The worker reads it from spec.Limits; Core may carry it
-// through the jobs proto in the future.
+// timeout (seconds). The worker reads it from spec.Limits, filled from the
+// Job proto's timeout_seconds.
 const JobTimeoutSecondsKey = "timeoutSeconds"
 
 // ValidateConnectorTimeouts enforces the invariant that the connector connect
