@@ -13,7 +13,9 @@ Dashboard numbers for a workspace (live counts, timelines, top-N lists, TLS and 
 ## Public surface
 
 All routes are `GET`, `@WorkspaceAccess('workspace.read')`, workspace from the `X-Workspace-Id` header/cookie:
-`statistic`, `statistic/timeline`, `statistic/issues-timeline`, `statistic/top-tags-assets`, `statistic/asset-locations`, `statistic/tls`, `statistic/top-assets-vulnerabilities`, `statistic/top-ports`, `statistic/top-technologies`.
+`statistic`, `statistic/timeline`, `statistic/issues-timeline`, `statistic/top-tags-assets`, `statistic/asset-locations`, `statistic/tls`, `statistic/attention`, `statistic/top-assets-vulnerabilities`, `statistic/top-ports`, `statistic/top-technologies`.
+
+- `statistic/attention` (`getAttention`) is the dashboard's "Needs attention": raw counts go through the pure `buildWorkspaceInsights` in `workspace-insights.ts`, which drops zero counts and orders worst first. Its TLS count is `getTlsStatistics` `alreadyExpired + expireInAMonth`, so it matches the Certificates card. "Failed runs" are distinct `jobHistoryId`s with a failed job of the workspace in 7 days (jobs have no `workspaceId`; the path is asset → target). `InsightLevel` is reused from `targets/dto/target-overview.dto.ts`.
 
 - Registered in `combine.module.ts`. Exports `StatisticService`.
 - Agent tool use: `agents/tools/workspace.tools.ts` calls `getStatistics`.
@@ -41,4 +43,4 @@ All routes are `GET`, `@WorkspaceAccess('workspace.read')`, workspace from the `
 
 ## Testing
 
-`statistic.service.spec.ts`, `statistic.controller.spec.ts` (including a check that every route has the workspace permission guard), `statistic-cron.service.spec.ts`.
+`statistic.service.spec.ts`, `statistic.controller.spec.ts` (including a check that every route has the workspace permission guard), `statistic-cron.service.spec.ts`, `workspace-insights.spec.ts` (rules and `getAttention`).

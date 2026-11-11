@@ -6,8 +6,10 @@ import { TopTechnologiesResponseDto } from './dto/top-technologies.dto';
 import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
 
 import {
+  CronSchedule,
   DefaultWorkflow,
   EventTriggerType,
+  JobStatus,
   Severity,
   TargetType,
 } from '@/common/enums/enum';
@@ -25,6 +27,12 @@ import { EventBridgeService } from '../event-bridge/publishing/event-bridge.serv
 import type { WorkflowRunCompletedPayload } from '../event-bridge/contracts/event-payloads';
 import { Target } from '../targets/entities/target.entity';
 import { AssetLocationDto } from './dto/asset-location.dto';
+import { WorkspaceAttentionResponseDto } from './dto/attention.dto';
+import {
+  buildWorkspaceInsights,
+  FAILED_RUNS_DAYS,
+  STALE_TARGET_DAYS,
+} from './workspace-insights';
 
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { openVulnerabilityCondition } from '../vulnerabilities/open-vulnerability';
@@ -744,6 +752,58 @@ export class StatisticService {
       expireIn3Months: Number(result.expireIn3Months),
       wontExpireAnytimeSoon: Number(result.wontExpireAnytimeSoon),
       newCertificatesDiscovered: Number(result.newCertificatesDiscovered),
+    };
+  }
+
+  /**
+   * What the workspace needs attention for: open critical and overdue
+   * findings, runs with a failed job, expiring certificates (the TLS card's
+   * own numbers), AI proposals to review, and targets that are stale or never
+   * scanned on a schedule.
+   */
+  async getAttention(workspaceId: string): Promise<WorkspaceAttentionResponseDto> {
+    const open = openVulnerabilityCondition('v');
+    const workspaceFindings = `FROM vulnerabilities v
+        JOIN assets a ON a.id = v."assetId"
+        JOIN targets t ON t.id = a."targetId"
+       WHERE t."workspaceId" = $1`;
+    const [rows, tls] = await Promise.all([
+      this.dataSource.query<Array<Record<string, number | string>>>(
+        `SELECT
+           (SELECT COUNT(*) ${workspaceFindings}
+               AND ${open} AND v.severity = '${Severity.CRITICAL}') AS "criticalOpen",
+           (SELECT COUNT(*) ${workspaceFindings}
+               AND ${open} AND v."dueAt" < now()) AS "slaOverdue",
+           (SELECT COUNT(*) ${workspaceFindings}
+               AND v."reviewStatus" = 'pending_review') AS "pendingReview",
+           (SELECT COUNT(DISTINCT j."jobHistoryId") FROM jobs j
+              JOIN assets a ON a.id = j."assetId"
+              JOIN targets t ON t.id = a."targetId"
+             WHERE t."workspaceId" = $1 AND j.status = '${JobStatus.FAILED}'
+               AND j."updatedAt" > now() - interval '${FAILED_RUNS_DAYS} days') AS "failedRuns",
+           (SELECT COUNT(*) FROM targets t
+             WHERE t."workspaceId" = $1
+               AND (t."lastDiscoveredAt" IS NULL
+                    OR t."lastDiscoveredAt" < LOCALTIMESTAMP - interval '${STALE_TARGET_DAYS} days')) AS "staleTargets",
+           (SELECT COUNT(*) FROM targets t
+             WHERE t."workspaceId" = $1
+               AND (t."scanSchedule" IS NULL OR t."scanSchedule" = '${CronSchedule.DISABLED}')) AS "unscheduledTargets"`,
+        [workspaceId],
+      ),
+      this.getTlsStatistics(workspaceId),
+    ]);
+    const row = rows[0] ?? {};
+    const count = (key: string) => Number(row[key] ?? 0) || 0;
+    return {
+      insights: buildWorkspaceInsights({
+        criticalOpen: count('criticalOpen'),
+        slaOverdue: count('slaOverdue'),
+        failedRuns: count('failedRuns'),
+        tlsExpiring: tls.alreadyExpired + tls.expireInAMonth,
+        staleTargets: count('staleTargets'),
+        pendingReview: count('pendingReview'),
+        unscheduledTargets: count('unscheduledTargets'),
+      }),
     };
   }
 
