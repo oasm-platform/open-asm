@@ -17,13 +17,14 @@ Findings on assets: list/detail/statistics, the lifecycle (new → active → fi
 
 | Route | Permission |
 |---|---|
-| `GET vulnerabilities`, `statistics`, `settings`, `:id`, `:id/timeline`, `:id/review/duplicates` | `vulnerability.read` |
+| `GET vulnerabilities`, `statistics`, `activity`, `settings`, `:id`, `:id/timeline`, `:id/review/duplicates` | `vulnerability.read` |
 | `POST scan`, `claim-fix`, `dismiss`, `reopen` | `vulnerability.write` |
 | `POST :id/review/approve`, `:id/review/reject`, `:id/review/merge` | `vulnerability.write` |
 | `POST review/approve`, `review/reject` (bulk, at most `BULK_REVIEW_MAX` = 200 ids) | `vulnerability.write` |
 | `POST :id/analyze` (`forceRerun`), `DELETE :id/analyze` | `vulnerability.write` |
 | `PUT settings` | `workspace.config` |
 
+- `GET activity` (`getActivity`, dashboard feed) pages `vulnerability_events` of the whole workspace, newest first, optional `types[]` filter. It filters on both `e."workspaceId"` (index `IDX_vulnerability_events_workspaceId_occurredAt`) and the target join. Static routes like `activity` must stay above `:id`.
 - Comment routes for findings live in the `comments` module.
 - `@Global()`, exports `VulnerabilitiesService`, `VulnerabilityLifecycleService`, `VulnerabilityReviewService`.
 - Events through `@PublishEvent`: `vulnerability.status.updated` (`dismiss` and `claim-fix`), `vulnerability.bulk_updated` (`reopen`), `vulnerability.settings.updated`, `vulnerability.review.approved|rejected|merged` (the bulk routes publish one event with `{ action: 'bulk', count, ids }` of the decided ids). Published from services: `vulnerability.proposed` (propose), `vulnerability.detected` (approve, so issue rules run on approved AI findings), `vulnerability.fixed` (auto-close), `vulnerability.analysis.completed` (processor, addressed to the requesting user). `vulnerability.dismissed`, `vulnerability.reopened`, `analysis.started` and `analysis.failed` are in the catalog, but nothing publishes them.
@@ -68,4 +69,4 @@ Findings on assets: list/detail/statistics, the lifecycle (new → active → fi
 
 ## Testing
 
-Unit specs: `evidence-check.spec.ts`, `vulnerabilities.service.spec.ts`, `vulnerabilities.controller.spec.ts`, `vulnerability-lifecycle.service.spec.ts`, `vulnerability-review.service.spec.ts`, `vulnerability-filter.spec.ts`, `dto/vulnerability-dtos.spec.ts`, `vulnerabilities.lifecycle-api.spec.ts`. E2E: `core-api/test/vulnerability-lifecycle.e2e-spec.ts`, `vulnerability-fast-scan.e2e-spec.ts`.
+Unit specs: `evidence-check.spec.ts`, `vulnerabilities.service.spec.ts`, `vulnerability-activity.spec.ts`, `vulnerabilities.controller.spec.ts`, `vulnerability-lifecycle.service.spec.ts`, `vulnerability-review.service.spec.ts`, `vulnerability-filter.spec.ts`, `dto/vulnerability-dtos.spec.ts`, `vulnerabilities.lifecycle-api.spec.ts`. E2E: `core-api/test/vulnerability-lifecycle.e2e-spec.ts`, `vulnerability-fast-scan.e2e-spec.ts`.

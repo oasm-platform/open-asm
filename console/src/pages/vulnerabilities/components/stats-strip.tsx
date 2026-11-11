@@ -10,6 +10,7 @@ import {
 } from '@/services/apis/gen/queries';
 import {
   AlarmClock,
+  Bot,
   CircleCheck,
   RotateCcw,
   ShieldAlert,
@@ -19,14 +20,19 @@ import {
 import { SEVERITY_TEXT_CLASS } from '../../dashboard/severity';
 import { SeverityBreakdown } from '../../projects/components/severity-bar';
 
-/** A view of the list a card opens: `open`, findings new in 7 days, or overdue ones. */
-export type StatsView = 'open' | 'new' | 'overdue';
+/**
+ * A view of the list a card opens: `open`, findings new in 7 days, overdue
+ * ones, or AI proposals waiting for review.
+ */
+export type StatsView = 'open' | 'new' | 'overdue' | 'pending_review';
 
 interface StatsStripProps {
   stats?: GetVulnerabilitiesStatisticsResponseDto;
   isLoading?: boolean;
   /** Opens the list view a card counts; cards without an exact view are not clickable. */
   onSelect?: (view: StatsView) => void;
+  /** Shows AI proposals to review instead of open findings (the dashboard counts those already). */
+  showPendingReview?: boolean;
 }
 
 /** One row of compact cards on wide screens, like the dashboard totals. */
@@ -40,6 +46,7 @@ export function VulnerabilityStatsStrip({
   stats,
   isLoading,
   onSelect,
+  showPendingReview,
 }: StatsStripProps) {
   const { data: settings } = useVulnerabilitiesControllerGetSettings();
 
@@ -86,14 +93,24 @@ export function VulnerabilityStatsStrip({
         aside={<StatNote title="First detected in the last 7 days, still open">7d</StatNote>}
         onClick={select('new')}
       />
-      <StatCard
-        label="Open"
-        icon={ShieldAlert}
-        value={open}
-        onClick={select('open')}
-      >
-        <SeverityBreakdown counts={counts} />
-      </StatCard>
+      {showPendingReview ? (
+        <StatCard
+          label="Pending review"
+          icon={Bot}
+          value={stats.pendingReview}
+          hint="AI proposals waiting for a decision"
+          onClick={select('pending_review')}
+        />
+      ) : (
+        <StatCard
+          label="Open"
+          icon={ShieldAlert}
+          value={open}
+          onClick={select('open')}
+        >
+          <SeverityBreakdown counts={counts} />
+        </StatCard>
+      )}
       <StatCard
         label="Resurfaced"
         icon={RotateCcw}

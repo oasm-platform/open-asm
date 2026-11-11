@@ -47,6 +47,10 @@ import type {
 } from './dto/get-vulnerability-statistics.dto';
 import type { GetVulnerabilitiesQueryDto } from './dto/get-vulnerability.dto';
 import type {
+  GetVulnerabilityActivityQueryDto,
+  VulnerabilityActivityDto,
+} from './dto/vulnerability-activity.dto';
+import type {
   ClaimFixResponseDto,
   ReopenVulnerabilitiesResponseDto,
   VulnerabilityDetailDto,
@@ -514,6 +518,77 @@ export class VulnerabilitiesService {
         occurredAt: row.occurredAt as Date,
       })),
     };
+  }
+
+  /**
+   * Timeline events of every finding in the workspace, newest first, a page
+   * at a time, each with the finding, its asset and who caused it.
+   */
+  async getActivity(
+    query: GetVulnerabilityActivityQueryDto,
+    workspaceId: string,
+  ): Promise<GetManyBaseResponseDto<VulnerabilityActivityDto>> {
+    const params: unknown[] = [workspaceId];
+    let typeFilter = '';
+    if (query.types?.length) {
+      params.push(query.types);
+      typeFilter = ` AND e.type = ANY($${params.length}::text[])`;
+    }
+    // The event's own workspaceId uses its index; the target join is the
+    // tenant path every finding query follows.
+    const from = `FROM "vulnerability_events" e
+         JOIN "vulnerabilities" v ON v.id = e."vulnerabilityId"
+         JOIN "assets" a ON a.id = v."assetId"
+         JOIN "targets" t ON t.id = a."targetId"`;
+    const where = `WHERE e."workspaceId" = $1 AND t."workspaceId" = $1${typeFilter}`;
+    const limit = Number(query.limit);
+    const offset = (Number(query.page) - 1) * limit;
+
+    const [[{ total }], rows] = await Promise.all([
+      this.dataSource.query<Array<{ total: number }>>(
+        `SELECT COUNT(*)::int AS total ${from} ${where}`,
+        params,
+      ),
+      this.dataSource.query<Array<Record<string, unknown>>>(
+        `SELECT e.id, e.type, e."fromStatus", e."toStatus", e."jobHistoryId", e.data,
+                e."occurredAt", v.id AS "vulnerabilityId", v.name AS "vulnerabilityName",
+                v.severity, a.value AS "assetValue",
+                u.id AS "actorId", u.name AS "actorName", u.image AS "actorImage"
+           ${from}
+           LEFT JOIN "users" u ON u.id = e."actorId"
+          ${where}
+          ORDER BY e."occurredAt" DESC, e.id
+          LIMIT ${limit} OFFSET ${offset}`,
+        params,
+      ),
+    ]);
+
+    return getManyResponse({
+      query,
+      total,
+      data: rows.map((row) => ({
+        id: row.id as string,
+        type: row.type as VulnerabilityEventType,
+        fromStatus: (row.fromStatus as string | null) ?? null,
+        toStatus: (row.toStatus as string | null) ?? null,
+        jobHistoryId: (row.jobHistoryId as string | null) ?? null,
+        data: (row.data as Record<string, unknown> | null) ?? null,
+        occurredAt: row.occurredAt as Date,
+        vulnerability: {
+          id: row.vulnerabilityId as string,
+          name: row.vulnerabilityName as string,
+          severity: row.severity as Severity,
+        },
+        assetValue: row.assetValue as string,
+        actor: row.actorId
+          ? {
+              id: row.actorId as string,
+              name: row.actorName as string,
+              image: (row.actorImage as string | null) ?? null,
+            }
+          : null,
+      })),
+    });
   }
 
   /**

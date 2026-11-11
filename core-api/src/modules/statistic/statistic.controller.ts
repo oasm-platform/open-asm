@@ -12,6 +12,7 @@ import { TlsStatisticResponseDto } from './dto/tls-statistic.dto';
 import { TopAssetVulnerabilities } from './dto/top-assets-vulnerabilities.dto';
 import { TopTagAsset } from './dto/top-tags-assets.dto';
 import { AssetLocationDto } from './dto/asset-location.dto';
+import { WorkspaceAttentionResponseDto } from './dto/attention.dto';
 import { StatisticService } from './statistic.service';
 
 @ApiTags('Statistic')
@@ -137,6 +138,25 @@ export class StatisticController {
     @WorkspaceId() workspaceId: string,
   ): Promise<TlsStatisticResponseDto> {
     return this.statisticService.getTlsStatistics(workspaceId);
+  }
+
+  @Doc({
+    summary: 'Get what needs attention in a workspace',
+    description:
+      'Open critical and SLA-overdue findings, runs with a failed job in 7 days, TLS certificates expired or expiring within 30 days, targets not discovered for 30 days or without a scan schedule, and AI proposals waiting for review. Worst first; kinds with a zero count are left out.',
+    response: {
+      serialization: WorkspaceAttentionResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('workspace.read')
+  @Get('attention')
+  getAttention(
+    @WorkspaceId() workspaceId: string,
+  ): Promise<WorkspaceAttentionResponseDto> {
+    return this.statisticService.getAttention(workspaceId);
   }
 
   @Doc({

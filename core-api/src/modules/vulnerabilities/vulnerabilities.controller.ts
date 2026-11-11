@@ -30,6 +30,10 @@ import {
 } from './dto/get-vulnerability-statistics.dto';
 import { GetVulnerabilitiesQueryDto } from './dto/get-vulnerability.dto';
 import {
+  GetVulnerabilityActivityQueryDto,
+  VulnerabilityActivityDto,
+} from './dto/vulnerability-activity.dto';
+import {
   BulkReviewResultDto,
   ClaimFixResponseDto,
   MergeVulnerabilityResponseDto,
@@ -136,6 +140,26 @@ export class VulnerabilitiesController {
       query,
       workspaceId,
     );
+  }
+
+  @Doc({
+    summary: 'Get vulnerability activity',
+    description:
+      'Timeline events of every finding in the workspace, newest first: detection, status changes, dismissals, fix claims, review decisions. Each carries the finding, its asset and who caused it.',
+    response: {
+      serialization: GetManyResponseDto(VulnerabilityActivityDto),
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @WorkspaceAccess('vulnerability.read')
+  @Get('activity')
+  getActivity(
+    @Query() query: GetVulnerabilityActivityQueryDto,
+    @WorkspaceId() workspaceId: string,
+  ) {
+    return this.vulnerabilitiesService.getActivity(query, workspaceId);
   }
 
   @Doc({
