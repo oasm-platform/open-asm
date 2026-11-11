@@ -94,15 +94,16 @@ export function SidePanelResizer({
   onResize,
   onCommit,
 }: SidePanelResizerProps) {
-  // While dragging, the width goes straight onto the panel's style, once
-  // per frame: a React render of the whole chat page per pointer move is
-  // what makes a drag lag. State is set once, on release.
+  // While dragging, the width goes straight onto the panel's style: a React
+  // render of the whole chat page per pointer move is what makes a drag lag.
+  // It is written in the move itself, not a frame later: browsers already
+  // deliver pointer moves once per frame, and nothing reads layout here, so
+  // the edge stays under the pointer. State is set once, on release.
   const drag = useRef<{
     startX: number;
     startWidth: number;
     total: number;
     last: number;
-    frame: number;
   } | null>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -119,7 +120,6 @@ export function SidePanelResizer({
       startWidth,
       total: rowRef.current?.clientWidth ?? 0,
       last: startWidth,
-      frame: 0,
     };
     setDragging(true);
   };
@@ -127,18 +127,15 @@ export function SidePanelResizer({
     const d = drag.current;
     if (!d) return;
     // The panel is on the right: moving left widens it
-    d.last = clampPanelWidth(d.startWidth + (d.startX - e.clientX), d.total);
-    if (d.frame) return;
-    d.frame = requestAnimationFrame(() => {
-      d.frame = 0;
-      if (panelRef.current) panelRef.current.style.width = `${d.last}px`;
-    });
+    const next = clampPanelWidth(d.startWidth + (d.startX - e.clientX), d.total);
+    if (next === d.last) return;
+    d.last = next;
+    if (panelRef.current) panelRef.current.style.width = `${next}px`;
   };
   const end = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     if (!d) return;
     drag.current = null;
-    if (d.frame) cancelAnimationFrame(d.frame);
     if (panelRef.current) panelRef.current.style.maxWidth = '';
     setDragging(false);
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {

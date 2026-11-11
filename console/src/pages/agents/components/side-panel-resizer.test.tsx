@@ -66,11 +66,6 @@ describe('SidePanelResizer', () => {
   });
 
   it('moves the panel edge without re-rendering while dragging, then keeps the width', () => {
-    // Runs the frame at once; id 0 marks no frame pending
-    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
-      cb(0);
-      return 0;
-    });
     render(<Split />);
     const divider = screen.getByRole('separator', { name: 'Resize side panel' });
     const panel = screen.getByTestId('panel');

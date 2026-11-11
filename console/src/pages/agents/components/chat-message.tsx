@@ -290,10 +290,12 @@ export const ChatMessage = memo(function ChatMessage({
   }, [parts, isReasoningStreaming, showGenerating, showInitialThinking]);
 
   return (
-    // Fades up into place once, when it first renders
+    // Fades up into place once, when it first renders. Off screen the
+    // browser skips its layout (keeping the last size it had), so resizing
+    // the chat beside the side panel only rewraps the messages in view
     <Message
       from={message.role}
-      className="animate-in fade-in-0 slide-in-from-bottom-1 duration-300"
+      className="animate-in fade-in-0 slide-in-from-bottom-1 duration-300 [content-visibility:auto] [contain-intrinsic-size:auto_120px]"
     >
       <MessageContent expandable={message.role === 'user'}>
         <div className="flex flex-col w-full gap-2.5">

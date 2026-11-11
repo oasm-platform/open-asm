@@ -43,7 +43,7 @@ import {
   Maximize2,
   Square,
 } from 'lucide-react';
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildWorkflowLayout,
   WORKFLOW_EDGE_KINDS,
@@ -52,6 +52,7 @@ import {
   type AgentNodeData,
   type RootNodeData,
   type StepNodeData,
+  type WorkflowBounds,
   type WorkflowEdgeData,
 } from './agent-workflow-layout';
 import { SidePanelSection } from './side-panel-layout';
@@ -98,7 +99,7 @@ const RootNode = memo(function RootNode({ data }: NodeProps) {
       <p className="line-clamp-2 text-muted-foreground">
         {goal ?? 'Main agent'}
       </p>
-      <Handle type="source" position={Position.Right} className={handleClass} />
+      <Handle type="source" position={Position.Bottom} className={handleClass} />
     </div>
   );
 });
@@ -113,7 +114,7 @@ const StepNode = memo(function StepNode({ data }: NodeProps) {
       style={{ height: WORKFLOW_HEAD_HEIGHT }}
       title={step.content}
     >
-      <Handle type="target" position={Position.Left} className={handleClass} />
+      <Handle type="target" position={Position.Top} className={handleClass} />
       <div className="flex items-center gap-1.5">
         <Icon className={cn('size-3.5 shrink-0', status.className)} />
         <span className="line-clamp-2 font-medium">
@@ -123,7 +124,7 @@ const StepNode = memo(function StepNode({ data }: NodeProps) {
       <span className="tabular-nums text-muted-foreground">
         {count} agent{count === 1 ? '' : 's'}
       </span>
-      <Handle type="source" position={Position.Right} className={handleClass} />
+      <Handle type="source" position={Position.Bottom} className={handleClass} />
     </div>
   );
 });
@@ -142,7 +143,7 @@ const AgentNode = memo(function AgentNode({ data }: NodeProps) {
       )}
       style={{ height: WORKFLOW_NODE_HEIGHT }}
     >
-      <Handle type="target" position={Position.Left} className={handleClass} />
+      <Handle type="target" position={Position.Top} className={handleClass} />
       <div className="flex items-center gap-1.5">
         <Icon className={cn('size-3.5 shrink-0', status.className)} />
         <span className="truncate font-medium">@{node.name}</span>
@@ -167,7 +168,7 @@ const AgentNode = memo(function AgentNode({ data }: NodeProps) {
           {node.findings.length === 1 ? '' : 's'}
         </span>
       )}
-      <Handle type="source" position={Position.Right} className={handleClass} />
+      <Handle type="source" position={Position.Bottom} className={handleClass} />
     </div>
   );
 });
@@ -175,9 +176,9 @@ const AgentNode = memo(function AgentNode({ data }: NodeProps) {
 const nodeTypes: NodeTypes = { root: RootNode, step: StepNode, agent: AgentNode };
 
 /**
- * A link coloured by how the target came from the source, with a pulse
- * travelling left to right along it: fast while work flows through it,
- * slow otherwise.
+ * A link coloured by how the target came from the source. Only a link work
+ * is flowing through right now carries a pulse travelling top to bottom;
+ * finished and waiting links stay still so the shape of the graph reads.
  */
 function FlowEdge({
   id,
@@ -212,13 +213,9 @@ function FlowEdge({
           strokeOpacity: live || highlighted ? 1 : 0.65,
         }}
       />
-      {!reducedMotion() && (
-        <circle r={live ? 3.5 : 2.5} fill={meta.color}>
-          <animateMotion
-            dur={live ? '1.4s' : '3.5s'}
-            repeatCount="indefinite"
-            path={path}
-          />
+      {live && !reducedMotion() && (
+        <circle r={3.5} fill={meta.color}>
+          <animateMotion dur="1.4s" repeatCount="indefinite" path={path} />
         </circle>
       )}
     </g>
@@ -348,21 +345,55 @@ function NodeDetail({
   );
 }
 
+/** How much closer than "the whole graph fits" the view starts */
+const ZOOM_BOOST = 1.3;
+const FIT_PADDING = 0.08;
+
 /**
- * Fits the graph again once its box stops changing size (detail pane opened,
- * panel resized): refitting on every frame of a divider drag makes it stutter.
+ * Puts the middle of the workflow in the middle of the view, across and
+ * down. A graph that fits is shown whole, a little closer than a tight fit;
+ * one too long for that (it would be unreadably small) is zoomed to
+ * `minZoom` with its middle centred, the ends running off the edges. Never
+ * closer than 1:1.
+ *
+ * The box comes from the layout, not from React Flow: its nodes are
+ * controlled without `onNodesChange`, so they never report as measured.
+ * The first placement is immediate; later ones (graph grew, panel resized)
+ * wait for the box to settle: recentring on every frame of a divider drag
+ * makes it stutter.
  */
-function FitOnResize({ minZoom }: { minZoom: number }) {
-  const { fitView } = useReactFlow();
+function CenterOnResize({
+  bounds,
+  minZoom,
+}: {
+  bounds: WorkflowBounds;
+  minZoom: number;
+}) {
+  const { setCenter } = useReactFlow();
   const width = useStore((s) => s.width);
   const height = useStore((s) => s.height);
+  const ready = useStore((s) => !!s.panZoom);
+  const placed = useRef(false);
+  const { x, y, width: boxWidth, height: boxHeight } = bounds;
   useEffect(() => {
-    if (!width || !height) return;
-    const timer = setTimeout(() => {
-      void fitView({ padding: 0.08, maxZoom: 1, minZoom });
-    }, 150);
+    if (!width || !height || !ready || !boxWidth || !boxHeight) return;
+    const center = () => {
+      const fit =
+        Math.min(width / boxWidth, height / boxHeight) * (1 - FIT_PADDING * 2);
+      const zoom = Math.min(Math.max(fit * ZOOM_BOOST, minZoom), 1);
+      void setCenter(x + boxWidth / 2, y + boxHeight / 2, { zoom }).then(
+        (done) => {
+          if (done) placed.current = true;
+        },
+      );
+    };
+    if (!placed.current) {
+      center();
+      return;
+    }
+    const timer = setTimeout(center, 150);
     return () => clearTimeout(timer);
-  }, [width, height, minZoom, fitView]);
+  }, [width, height, ready, x, y, boxWidth, boxHeight, minZoom, setCenter]);
   return null;
 }
 
@@ -376,8 +407,8 @@ function WorkflowCanvas({
   expanded?: boolean;
 }) {
   const { resolvedTheme } = useTheme();
-  // The side panel shows the whole graph small; Expand is for reading it
-  const fitMin = expanded ? 0.2 : 0.3;
+  // Expand has the room to start closer; both pan and zoom from there
+  const startMin = expanded ? 0.5 : 0.4;
   return (
     <ReactFlow
       nodes={layout.nodes}
@@ -385,8 +416,6 @@ function WorkflowCanvas({
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
       colorMode={resolvedTheme}
-      fitView
-      fitViewOptions={{ padding: 0.08, maxZoom: 1, minZoom: fitMin }}
       minZoom={0.2}
       maxZoom={1.5}
       nodesDraggable={false}
@@ -400,7 +429,7 @@ function WorkflowCanvas({
     >
       <Background gap={16} size={1} />
       <Controls showInteractive={false} position="bottom-left" />
-      <FitOnResize minZoom={fitMin} />
+      <CenterOnResize bounds={layout.bounds} minZoom={startMin} />
     </ReactFlow>
   );
 }
@@ -414,7 +443,7 @@ interface AgentWorkflowPanelProps {
 }
 
 /**
- * The conversation as a workflow, read left to right: the goal, then each
+ * The conversation as a workflow, read top to bottom: the goal, then each
  * plan step with the subagents dispatched for it, its last results feeding
  * the next step, and the links between agents (waited for, derived from,
  * followed up), then the notebook they shared.
@@ -453,8 +482,9 @@ export function AgentWorkflowPanel({
       (max, n) => Math.max(max, n.position.y + WORKFLOW_NODE_HEIGHT),
       0,
     );
-    // Drawn at well under half size in the side panel
-    return Math.min(Math.max((bottom ?? 0) * 0.45 + 48, 200), 420);
+    // Drawn at well under half size in the side panel; read top to bottom,
+    // so it gets more height than width
+    return Math.min(Math.max((bottom ?? 0) * 0.45 + 48, 200), 560);
   }, [layout]);
 
   if (isLoading || !data || !layout) {
