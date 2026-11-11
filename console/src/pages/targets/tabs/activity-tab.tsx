@@ -36,7 +36,7 @@ const nextPage = (last: { hasNextPage: boolean; page: number }) =>
  * Loads the next page when the end of a scrolling list comes into view (or
  * is already in view after a page lands, so a tall card fills up).
  */
-function LoadMore({
+export function LoadMore({
   hasNextPage,
   isFetchingNextPage,
   fetchNextPage,

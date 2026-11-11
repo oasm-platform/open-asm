@@ -7,6 +7,7 @@ import CreateWorkspace from '../workspaces/create-workspace';
 import { AssetTrends } from './components/asset-trends';
 import IpLocationsCard from './components/ip-locations-card';
 import IssuesTimeline from './components/issues-timeline';
+import NeedsAttention from './components/needs-attention';
 import RecentAssets from './components/recent-assets';
 import Statistic from './components/statistic';
 import TlsStatistics from './components/tls-statistics';
@@ -14,6 +15,8 @@ import TopAssetsVulnerabilitiesChart from './components/top-assets-vulnerabiliti
 import TopPorts from './components/top-ports';
 import TopTechnologies from './components/top-technologies';
 import VulnerabilityStatistic from './components/vulnerabilities-statistic';
+import VulnerabilityActivity from './components/vulnerability-activity';
+import VulnerabilityLifecycle from './components/vulnerability-lifecycle';
 
 export default function Dashboard() {
   const { workspaces, isLoading: workspacesLoading } = useWorkspaceSelector();
@@ -62,6 +65,15 @@ export default function Dashboard() {
             <div className="flex-1">
               <TlsStatistics />
             </div>
+          </div>
+        </div>
+        <VulnerabilityLifecycle />
+        <div className="grid grid-cols-1 xl:grid-cols-6 gap-4">
+          <div className="xl:col-span-2">
+            <NeedsAttention />
+          </div>
+          <div className="xl:col-span-4">
+            <VulnerabilityActivity />
           </div>
         </div>
         <div className="space-y-4">

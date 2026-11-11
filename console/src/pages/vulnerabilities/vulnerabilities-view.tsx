@@ -1,3 +1,4 @@
+import { VulnerabilityStatus } from '@/services/apis/gen/queries';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { format, subDays } from 'date-fns';
 import type { ReactNode } from 'react';
@@ -9,10 +10,10 @@ import { ListVulnerabilities } from './list-vulnerabilitys';
 import { useVulnerabilityStats } from './use-vulnerability-stats';
 
 /** Search of the list view a stat card counts; filters it does not use are cleared. */
-function statsViewSearch(view: StatsView): Record<string, unknown> {
+export function statsViewSearch(view: StatsView): Record<string, unknown> {
   const today = new Date();
   return {
-    status: undefined,
+    status: view === 'pending_review' ? VulnerabilityStatus.pending_review : undefined,
     overdue: view === 'overdue' ? true : undefined,
     createdFrom:
       view === 'new' ? format(subDays(today, 7), 'yyyy-MM-dd') : undefined,

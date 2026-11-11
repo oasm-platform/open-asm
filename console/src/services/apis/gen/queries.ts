@@ -3183,6 +3183,32 @@ export type TlsStatisticResponseDto = {
   newCertificatesDiscovered: number;
 };
 
+export type WorkspaceInsightKind =
+  (typeof WorkspaceInsightKind)[keyof typeof WorkspaceInsightKind];
+
+export const WorkspaceInsightKind = {
+  critical_open: 'critical_open',
+  sla_overdue: 'sla_overdue',
+  failed_runs: 'failed_runs',
+  tls_expiring: 'tls_expiring',
+  stale_targets: 'stale_targets',
+  pending_review: 'pending_review',
+  unscheduled_targets: 'unscheduled_targets',
+} as const;
+
+export type WorkspaceInsightDto = {
+  kind: WorkspaceInsightKind;
+  level: InsightLevel;
+  count: number;
+  /** Window of the count, in days */
+  days?: number;
+};
+
+export type WorkspaceAttentionResponseDto = {
+  /** Worst first; empty when all is well */
+  insights: WorkspaceInsightDto[];
+};
+
 export type TopAssetVulnerabilities = {
   /** The number of critical vulnerabilities */
   critical: number;
@@ -3563,6 +3589,62 @@ export type GetVulnerabilitiesStatisticsResponseDto = {
   provenanceCounts?: VulnerabilityProvenanceCountsDto;
 };
 
+export type VulnerabilityEventType =
+  (typeof VulnerabilityEventType)[keyof typeof VulnerabilityEventType];
+
+export const VulnerabilityEventType = {
+  detected: 'detected',
+  status_changed: 'status_changed',
+  fix_claimed: 'fix_claimed',
+  dismissed: 'dismissed',
+  reopened: 'reopened',
+  risk_expired: 'risk_expired',
+  proposed: 'proposed',
+  approved: 'approved',
+  rejected: 'rejected',
+  merged: 'merged',
+  verified_by_ai: 'verified_by_ai',
+  issue_linked: 'issue_linked',
+} as const;
+
+export type VulnerabilityActivityFindingDto = {
+  id: string;
+  name: string;
+  severity: Severity;
+};
+
+/**
+ * @nullable
+ */
+export type VulnerabilityActivityDtoData = { [key: string]: unknown } | null;
+
+export type VulnerabilityActivityDto = {
+  id: string;
+  type: VulnerabilityEventType;
+  /** @nullable */
+  fromStatus?: string | null;
+  /** @nullable */
+  toStatus?: string | null;
+  /** @nullable */
+  jobHistoryId?: string | null;
+  /** @nullable */
+  actor: VulnerabilityUserRefDto | null;
+  /** @nullable */
+  data?: VulnerabilityActivityDtoData;
+  occurredAt: string;
+  vulnerability: VulnerabilityActivityFindingDto;
+  assetValue: string;
+};
+
+export type GetManyVulnerabilityActivityDtoDto = {
+  data: VulnerabilityActivityDto[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+  pageCount: number;
+};
+
 export type VulnerabilitySlaDaysResponseDto = {
   /** @nullable */
   critical: number | null;
@@ -3830,24 +3912,6 @@ export type VulnerabilityDetailDto = {
   /** @nullable */
   fixClaimedByUser: VulnerabilityUserRefDto | null;
 };
-
-export type VulnerabilityEventType =
-  (typeof VulnerabilityEventType)[keyof typeof VulnerabilityEventType];
-
-export const VulnerabilityEventType = {
-  detected: 'detected',
-  status_changed: 'status_changed',
-  fix_claimed: 'fix_claimed',
-  dismissed: 'dismissed',
-  reopened: 'reopened',
-  risk_expired: 'risk_expired',
-  proposed: 'proposed',
-  approved: 'approved',
-  rejected: 'rejected',
-  merged: 'merged',
-  verified_by_ai: 'verified_by_ai',
-  issue_linked: 'issue_linked',
-} as const;
 
 /**
  * @nullable
@@ -5746,6 +5810,123 @@ export type UpdateSkillDto = {
 export type ToggleSkillDto = {
   /** Whether the skill should be available to the agent */
   isEnabled: boolean;
+};
+
+export type AgentToolRuleAction =
+  (typeof AgentToolRuleAction)[keyof typeof AgentToolRuleAction];
+
+export const AgentToolRuleAction = {
+  allow: 'allow',
+  deny: 'deny',
+  ask: 'ask',
+} as const;
+
+/**
+ * @nullable
+ */
+export type AgentToolRuleCreatedBy = { [key: string]: unknown } | null;
+
+/**
+ * Wildcard pattern (`*`, `?`, case-insensitive) matched against the whole command, or the JSON input of other tools; null matches every call
+ * @nullable
+ */
+export type AgentToolRulePattern = { [key: string]: unknown } | null;
+
+/**
+ * @nullable
+ */
+export type AgentToolRuleDescription = { [key: string]: unknown } | null;
+
+export type AgentToolRule = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  workspaceId: string;
+  /** @nullable */
+  createdBy?: AgentToolRuleCreatedBy;
+  /** Tool name; `*` matches any run of characters */
+  toolName: string;
+  /**
+   * Wildcard pattern (`*`, `?`, case-insensitive) matched against the whole command, or the JSON input of other tools; null matches every call
+   * @nullable
+   */
+  pattern?: AgentToolRulePattern;
+  action: AgentToolRuleAction;
+  /** Higher runs first; on a tie deny beats ask beats allow */
+  priority: number;
+  enabled: boolean;
+  /** @nullable */
+  description?: AgentToolRuleDescription;
+};
+
+/**
+ * Matched against the whole command (or the JSON input of other tools), case-insensitively: `*` matches any run of characters, `?` one character. Omit to match every call
+ * @maxLength 1000
+ * @nullable
+ */
+export type CreateToolRuleDtoPattern = { [key: string]: unknown } | null;
+
+/**
+ * Shown to the agent when the rule denies a call
+ * @maxLength 500
+ * @nullable
+ */
+export type CreateToolRuleDtoDescription = { [key: string]: unknown } | null;
+
+export type CreateToolRuleDto = {
+  /** Tool name; `*` matches any run of characters */
+  toolName: string;
+  /**
+   * Matched against the whole command (or the JSON input of other tools), case-insensitively: `*` matches any run of characters, `?` one character. Omit to match every call
+   * @maxLength 1000
+   * @nullable
+   */
+  pattern?: CreateToolRuleDtoPattern;
+  action: AgentToolRuleAction;
+  /** Higher runs first; on a tie deny beats ask beats allow */
+  priority?: number;
+  enabled?: boolean;
+  /**
+   * Shown to the agent when the rule denies a call
+   * @maxLength 500
+   * @nullable
+   */
+  description?: CreateToolRuleDtoDescription;
+};
+
+/**
+ * Matched against the whole command (or the JSON input of other tools), case-insensitively: `*` matches any run of characters, `?` one character. Omit to match every call
+ * @maxLength 1000
+ * @nullable
+ */
+export type UpdateToolRuleDtoPattern = { [key: string]: unknown } | null;
+
+/**
+ * Shown to the agent when the rule denies a call
+ * @maxLength 500
+ * @nullable
+ */
+export type UpdateToolRuleDtoDescription = { [key: string]: unknown } | null;
+
+export type UpdateToolRuleDto = {
+  /** Tool name; `*` matches any run of characters */
+  toolName?: string;
+  /**
+   * Matched against the whole command (or the JSON input of other tools), case-insensitively: `*` matches any run of characters, `?` one character. Omit to match every call
+   * @maxLength 1000
+   * @nullable
+   */
+  pattern?: UpdateToolRuleDtoPattern;
+  action?: AgentToolRuleAction;
+  /** Higher runs first; on a tie deny beats ask beats allow */
+  priority?: number;
+  enabled?: boolean;
+  /**
+   * Shown to the agent when the rule denies a call
+   * @maxLength 500
+   * @nullable
+   */
+  description?: UpdateToolRuleDtoDescription;
 };
 
 export type NotificationResponseDtoStatus =
@@ -8247,6 +8428,18 @@ export type VulnerabilitiesControllerGetVulnerabilitiesStatisticsParams = {
    * Only findings this project reported; adds provenanceCounts
    */
   projectId?: string;
+};
+
+export type VulnerabilitiesControllerGetActivityParams = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  /**
+   * Only these event types; all when left out
+   */
+  types?: VulnerabilityEventType[];
 };
 
 export type AgentsControllerListCommandApprovalsParams = {
@@ -35638,6 +35831,160 @@ export function useStatisticControllerGetTlsStatistics<
 }
 
 /**
+ * Open critical and SLA-overdue findings, runs with a failed job in 7 days, TLS certificates expired or expiring within 30 days, targets not discovered for 30 days or without a scan schedule, and AI proposals waiting for review. Worst first; kinds with a zero count are left out.
+ * @summary Get what needs attention in a workspace
+ */
+export const statisticControllerGetAttention = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<WorkspaceAttentionResponseDto>(
+    { url: `/api/statistic/attention`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getStatisticControllerGetAttentionQueryKey = () => {
+  return [`/api/statistic/attention`] as const;
+};
+
+export const getStatisticControllerGetAttentionQueryOptions = <
+  TData = Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getStatisticControllerGetAttentionQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof statisticControllerGetAttention>>
+  > = ({ signal }) => statisticControllerGetAttention(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StatisticControllerGetAttentionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof statisticControllerGetAttention>>
+>;
+export type StatisticControllerGetAttentionQueryError = unknown;
+
+export function useStatisticControllerGetAttention<
+  TData = Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetAttention>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetAttention<
+  TData = Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetAttention>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetAttention<
+  TData = Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get what needs attention in a workspace
+ */
+
+export function useStatisticControllerGetAttention<
+  TData = Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getStatisticControllerGetAttentionQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
  * Retrieves the top 10 assets with the most vulnerabilities in a workspace.
  * @summary Get top 10 assets with the most vulnerabilities in a workspace
  */
@@ -36882,6 +37229,373 @@ export function useVulnerabilitiesControllerGetVulnerabilitiesStatistics<
       params,
       options,
     );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Timeline events of every finding in the workspace, newest first: detection, status changes, dismissals, fix claims, review decisions. Each carries the finding, its asset and who caused it.
+ * @summary Get vulnerability activity
+ */
+export const vulnerabilitiesControllerGetActivity = (
+  params?: VulnerabilitiesControllerGetActivityParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<GetManyVulnerabilityActivityDtoDto>(
+    { url: `/api/vulnerabilities/activity`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getVulnerabilitiesControllerGetActivityInfiniteQueryKey = (
+  params?: VulnerabilitiesControllerGetActivityParams,
+) => {
+  return [
+    'infinite',
+    `/api/vulnerabilities/activity`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getVulnerabilitiesControllerGetActivityQueryKey = (
+  params?: VulnerabilitiesControllerGetActivityParams,
+) => {
+  return [
+    `/api/vulnerabilities/activity`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getVulnerabilitiesControllerGetActivityInfiniteQueryOptions = <
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+    VulnerabilitiesControllerGetActivityParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: VulnerabilitiesControllerGetActivityParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+        TError,
+        TData,
+        QueryKey,
+        VulnerabilitiesControllerGetActivityParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getVulnerabilitiesControllerGetActivityInfiniteQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+    QueryKey,
+    VulnerabilitiesControllerGetActivityParams['page']
+  > = ({ signal, pageParam }) =>
+    vulnerabilitiesControllerGetActivity(
+      { ...params, page: pageParam ?? params?.['page'] },
+      requestOptions,
+      signal,
+    );
+
+  return { queryKey, queryFn, ...queryOptions } as UseInfiniteQueryOptions<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+    TError,
+    TData,
+    QueryKey,
+    VulnerabilitiesControllerGetActivityParams['page']
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type VulnerabilitiesControllerGetActivityInfiniteQueryResult =
+  NonNullable<Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>>;
+export type VulnerabilitiesControllerGetActivityInfiniteQueryError = unknown;
+
+export function useVulnerabilitiesControllerGetActivityInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+    VulnerabilitiesControllerGetActivityParams['page']
+  >,
+  TError = unknown,
+>(
+  params: undefined | VulnerabilitiesControllerGetActivityParams,
+  options: {
+    query: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+        TError,
+        TData,
+        QueryKey,
+        VulnerabilitiesControllerGetActivityParams['page']
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+          TError,
+          Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useVulnerabilitiesControllerGetActivityInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+    VulnerabilitiesControllerGetActivityParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: VulnerabilitiesControllerGetActivityParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+        TError,
+        TData,
+        QueryKey,
+        VulnerabilitiesControllerGetActivityParams['page']
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+          TError,
+          Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+          QueryKey
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useVulnerabilitiesControllerGetActivityInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+    VulnerabilitiesControllerGetActivityParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: VulnerabilitiesControllerGetActivityParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+        TError,
+        TData,
+        QueryKey,
+        VulnerabilitiesControllerGetActivityParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get vulnerability activity
+ */
+
+export function useVulnerabilitiesControllerGetActivityInfinite<
+  TData = InfiniteData<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+    VulnerabilitiesControllerGetActivityParams['page']
+  >,
+  TError = unknown,
+>(
+  params?: VulnerabilitiesControllerGetActivityParams,
+  options?: {
+    query?: Partial<
+      UseInfiniteQueryOptions<
+        Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+        TError,
+        TData,
+        QueryKey,
+        VulnerabilitiesControllerGetActivityParams['page']
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseInfiniteQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getVulnerabilitiesControllerGetActivityInfiniteQueryOptions(
+      params,
+      options,
+    );
+
+  const query = useInfiniteQuery(
+    queryOptions,
+    queryClient,
+  ) as UseInfiniteQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getVulnerabilitiesControllerGetActivityQueryOptions = <
+  TData = Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+  TError = unknown,
+>(
+  params?: VulnerabilitiesControllerGetActivityParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getVulnerabilitiesControllerGetActivityQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>
+  > = ({ signal }) =>
+    vulnerabilitiesControllerGetActivity(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type VulnerabilitiesControllerGetActivityQueryResult = NonNullable<
+  Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>
+>;
+export type VulnerabilitiesControllerGetActivityQueryError = unknown;
+
+export function useVulnerabilitiesControllerGetActivity<
+  TData = Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+  TError = unknown,
+>(
+  params: undefined | VulnerabilitiesControllerGetActivityParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+          TError,
+          Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useVulnerabilitiesControllerGetActivity<
+  TData = Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+  TError = unknown,
+>(
+  params?: VulnerabilitiesControllerGetActivityParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+          TError,
+          Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useVulnerabilitiesControllerGetActivity<
+  TData = Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+  TError = unknown,
+>(
+  params?: VulnerabilitiesControllerGetActivityParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get vulnerability activity
+ */
+
+export function useVulnerabilitiesControllerGetActivity<
+  TData = Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+  TError = unknown,
+>(
+  params?: VulnerabilitiesControllerGetActivityParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof vulnerabilitiesControllerGetActivity>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getVulnerabilitiesControllerGetActivityQueryOptions(
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -45133,6 +45847,437 @@ export const useAgentsControllerToggleSkill = <
 > => {
   return useMutation(
     getAgentsControllerToggleSkillMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * The workspace's agent tool rules, highest priority first
+ * @summary List tool rules
+ */
+export const agentsControllerGetToolRules = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AgentToolRule[]>(
+    { url: `/api/agents/tool-rules`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerGetToolRulesQueryKey = () => {
+  return [`/api/agents/tool-rules`] as const;
+};
+
+export const getAgentsControllerGetToolRulesQueryOptions = <
+  TData = Awaited<ReturnType<typeof agentsControllerGetToolRules>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof agentsControllerGetToolRules>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAgentsControllerGetToolRulesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentsControllerGetToolRules>>
+  > = ({ signal }) => agentsControllerGetToolRules(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentsControllerGetToolRules>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentsControllerGetToolRulesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerGetToolRules>>
+>;
+export type AgentsControllerGetToolRulesQueryError = unknown;
+
+export function useAgentsControllerGetToolRules<
+  TData = Awaited<ReturnType<typeof agentsControllerGetToolRules>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetToolRules>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetToolRules>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetToolRules>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetToolRules<
+  TData = Awaited<ReturnType<typeof agentsControllerGetToolRules>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetToolRules>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentsControllerGetToolRules>>,
+          TError,
+          Awaited<ReturnType<typeof agentsControllerGetToolRules>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentsControllerGetToolRules<
+  TData = Awaited<ReturnType<typeof agentsControllerGetToolRules>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetToolRules>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List tool rules
+ */
+
+export function useAgentsControllerGetToolRules<
+  TData = Awaited<ReturnType<typeof agentsControllerGetToolRules>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentsControllerGetToolRules>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAgentsControllerGetToolRulesQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Add an agent tool rule (workspace owner only)
+ * @summary Create tool rule
+ */
+export const agentsControllerCreateToolRule = (
+  createToolRuleDto: CreateToolRuleDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AgentToolRule>(
+    {
+      url: `/api/agents/tool-rules`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createToolRuleDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAgentsControllerCreateToolRuleMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerCreateToolRule>>,
+    TError,
+    { data: CreateToolRuleDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerCreateToolRule>>,
+  TError,
+  { data: CreateToolRuleDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerCreateToolRule'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerCreateToolRule>>,
+    { data: CreateToolRuleDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return agentsControllerCreateToolRule(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerCreateToolRuleMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerCreateToolRule>>
+>;
+export type AgentsControllerCreateToolRuleMutationBody = CreateToolRuleDto;
+export type AgentsControllerCreateToolRuleMutationError = unknown;
+
+/**
+ * @summary Create tool rule
+ */
+export const useAgentsControllerCreateToolRule = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerCreateToolRule>>,
+      TError,
+      { data: CreateToolRuleDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerCreateToolRule>>,
+  TError,
+  { data: CreateToolRuleDto },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerCreateToolRuleMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Change an agent tool rule (workspace owner only)
+ * @summary Update tool rule
+ */
+export const agentsControllerUpdateToolRule = (
+  id: string,
+  updateToolRuleDto: UpdateToolRuleDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AgentToolRule>(
+    {
+      url: `/api/agents/tool-rules/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateToolRuleDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAgentsControllerUpdateToolRuleMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerUpdateToolRule>>,
+    TError,
+    { id: string; data: UpdateToolRuleDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerUpdateToolRule>>,
+  TError,
+  { id: string; data: UpdateToolRuleDto },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerUpdateToolRule'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerUpdateToolRule>>,
+    { id: string; data: UpdateToolRuleDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return agentsControllerUpdateToolRule(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerUpdateToolRuleMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerUpdateToolRule>>
+>;
+export type AgentsControllerUpdateToolRuleMutationBody = UpdateToolRuleDto;
+export type AgentsControllerUpdateToolRuleMutationError = unknown;
+
+/**
+ * @summary Update tool rule
+ */
+export const useAgentsControllerUpdateToolRule = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerUpdateToolRule>>,
+      TError,
+      { id: string; data: UpdateToolRuleDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerUpdateToolRule>>,
+  TError,
+  { id: string; data: UpdateToolRuleDto },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerUpdateToolRuleMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Remove an agent tool rule (workspace owner only)
+ * @summary Delete tool rule
+ */
+export const agentsControllerDeleteToolRule = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/agents/tool-rules/${id}`, method: 'DELETE', signal },
+    options,
+  );
+};
+
+export const getAgentsControllerDeleteToolRuleMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof agentsControllerDeleteToolRule>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof agentsControllerDeleteToolRule>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['agentsControllerDeleteToolRule'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof agentsControllerDeleteToolRule>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return agentsControllerDeleteToolRule(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AgentsControllerDeleteToolRuleMutationResult = NonNullable<
+  Awaited<ReturnType<typeof agentsControllerDeleteToolRule>>
+>;
+
+export type AgentsControllerDeleteToolRuleMutationError = unknown;
+
+/**
+ * @summary Delete tool rule
+ */
+export const useAgentsControllerDeleteToolRule = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof agentsControllerDeleteToolRule>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof agentsControllerDeleteToolRule>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getAgentsControllerDeleteToolRuleMutationOptions(options),
     queryClient,
   );
 };
