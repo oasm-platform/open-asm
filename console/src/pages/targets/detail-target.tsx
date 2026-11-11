@@ -19,6 +19,7 @@ import { FastScanDialog } from '../vulnerabilities/components/fast-scan-dialog';
 import { VulnerabilitiesView } from '../vulnerabilities/vulnerabilities-view';
 import AssetsDiscovering from './assets-discovering';
 import { GitOrgDetail } from './git-org-detail';
+import { RunAiPentestButton } from './components/run-ai-pentest-button';
 import { TargetSwitcher } from './components/target-switcher';
 import { TargetActivityTab } from './tabs/activity-tab';
 import { TargetOverviewTab } from './tabs/overview-tab';
@@ -181,18 +182,21 @@ export function DetailTarget() {
       )}
       <div className="flex flex-col gap-4">
         <Tabs value={tab} onValueChange={goTab}>
-          <div className="w-full overflow-x-auto scrollbar-hide">
-            <TabsList className="flex w-max flex-nowrap rounded-none bg-transparent p-0">
-              {TARGET_TABS.map((t) => (
-                <TabsTrigger
-                  key={t.value}
-                  value={t.value}
-                  className="h-9 flex-none hover:cursor-pointer"
-                >
-                  {t.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1 overflow-x-auto scrollbar-hide">
+              <TabsList className="flex w-max flex-nowrap rounded-none bg-transparent p-0">
+                {TARGET_TABS.map((t) => (
+                  <TabsTrigger
+                    key={t.value}
+                    value={t.value}
+                    className="h-9 flex-none hover:cursor-pointer"
+                  >
+                    {t.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
+            <RunAiPentestButton targetValue={target.value} className="shrink-0" />
           </div>
         </Tabs>
         {tabs[tab]}
