@@ -43,7 +43,7 @@ const layoutOf = (
 };
 
 describe('workflowDepths', () => {
-  it('puts each node one right of its deepest parent and ignores unknown links', () => {
+  it('puts each node one below its deepest parent and ignores unknown links', () => {
     const depths = workflowDepths([
       node('a'),
       node('b', { after: ['a'] }),
@@ -55,17 +55,17 @@ describe('workflowDepths', () => {
 });
 
 describe('buildWorkflowLayout', () => {
-  it('chains the steps left to right, each followed by its agents', () => {
+  it('chains the steps top to bottom, each followed by its agents', () => {
     const { at } = layoutOf([
       node('a'),
       node('a2', { continuesFrom: 'a' }),
       node('v', { stepId: 't2' }),
     ]);
-    const xs = ['root', 'step:t1', 'a', 'a2', 'step:t2', 'v', 'step:t3'].map(
-      (id) => at(id).x,
+    const ys = ['root', 'step:t1', 'a', 'a2', 'step:t2', 'v', 'step:t3'].map(
+      (id) => at(id).y,
     );
-    expect(xs).toEqual([...xs].sort((p, q) => p - q));
-    expect(new Set(xs).size).toBe(xs.length);
+    expect(ys).toEqual([...ys].sort((p, q) => p - q));
+    expect(new Set(ys).size).toBe(ys.length);
   });
 
   it("feeds a step's last results into the next step", () => {
@@ -113,21 +113,32 @@ describe('buildWorkflowLayout', () => {
     expect(edges.find((e) => e.id === 'after:a->b')?.data?.live).toBe(true);
   });
 
-  it('stacks siblings of one step without overlap', () => {
+  it('lines up siblings of one step side by side without overlap', () => {
     const { at } = layoutOf([node('a'), node('b'), node('c')], [steps[2]]);
-    expect(at('b').y).toBeGreaterThanOrEqual(at('a').y + 84);
-    expect(at('c').y).toBeGreaterThanOrEqual(at('b').y + 84);
-    expect(at('a').x).toBe(at('c').x);
+    expect(at('b').x).toBeGreaterThanOrEqual(at('a').x + 220);
+    expect(at('c').x).toBeGreaterThanOrEqual(at('b').x + 220);
+    expect(at('a').y).toBe(at('c').y);
   });
 
-  it('hangs agents off the goal without a plan, and below the plan outside it', () => {
+  it('hangs agents off the goal without a plan, and beside the plan outside it', () => {
     const bare = layoutOf([node('a', { stepId: null })], []);
     expect(bare.links).toEqual(['dispatch:root->a']);
-    expect(bare.at('a').x).toBeGreaterThan(0);
+    expect(bare.at('a').y).toBeGreaterThan(0);
 
     const mixed = layoutOf([node('a'), node('x', { stepId: null })], [steps[2]]);
     expect(mixed.links).toContain('dispatch:root->x');
-    expect(mixed.at('x').y).toBeGreaterThan(mixed.at('a').y);
+    expect(mixed.at('x').x).toBeGreaterThanOrEqual(mixed.at('a').x + 220);
+  });
+
+  it('reports the box around every node, from the sizes it draws them at', () => {
+    const { bounds, at } = layoutOf([node('a'), node('b')], [steps[2]]);
+    // Two agents side by side under the step, the goal above
+    const right = Math.max(at('a').x, at('b').x) + 220;
+    const left = Math.min(at('root').x, at('a').x, at('b').x);
+    expect(bounds.x).toBe(left);
+    expect(bounds.width).toBe(right - left);
+    expect(bounds.y).toBe(at('root').y);
+    expect(bounds.y + bounds.height).toBe(at('a').y + 84);
   });
 
   it('highlights the links of the selected agent and dims the rest', () => {

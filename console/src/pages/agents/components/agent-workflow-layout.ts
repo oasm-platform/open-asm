@@ -8,15 +8,15 @@ import type { Edge, Node } from '@xyflow/react';
 export const WORKFLOW_NODE_WIDTH = 220;
 export const WORKFLOW_NODE_HEIGHT = 84;
 export const WORKFLOW_HEAD_HEIGHT = 64;
-const GAP_X = 64;
-const GAP_Y = 20;
+const GAP_X = 24;
+const GAP_Y = 48;
 /** Room between the plan pipeline and the subagents outside the plan */
 const BAND_GAP = 48;
-const COLUMN = WORKFLOW_NODE_WIDTH + GAP_X;
+const ROW = WORKFLOW_NODE_HEIGHT + GAP_Y;
 
 const ROOT_ID = 'root';
 
-/** How one node led to another, left to right */
+/** How one node led to another, top to bottom */
 export type WorkflowEdgeKind =
   | 'plan' // goal → first step, or a step without subagents → the next one
   | 'handoff' // the last results of a step → the next step
@@ -62,6 +62,12 @@ export type WorkflowGraphNode =
   | Node<StepNodeData, 'step'>
   | Node<AgentNodeData, 'agent'>;
 export type WorkflowGraphEdge = Edge<WorkflowEdgeData, 'flow'>;
+export type WorkflowBounds = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
 
 const ACTIVE = new Set(['pending', 'in_progress']);
 
@@ -121,15 +127,20 @@ function stepLeaves(nodes: WorkflowNodeDto[]): WorkflowNodeDto[] {
 }
 
 /**
- * Lays the workflow out as a pipeline read left to right: the goal, then each
- * plan step followed by the subagents it dispatched (in columns by
- * dependency depth), then the next step, fed by the step's last results.
- * Subagents outside the plan hang off the goal below the pipeline.
+ * Lays the workflow out as a pipeline read top to bottom: the goal, then each
+ * plan step followed by the subagents it dispatched (in rows by dependency
+ * depth), then the next step, fed by the step's last results.
+ * Subagents outside the plan hang off the goal beside the pipeline.
  */
 export function buildWorkflowLayout(
   workflow: Pick<WorkflowResponseDto, 'goal' | 'steps' | 'nodes'>,
   selectedId?: string | null,
-): { nodes: WorkflowGraphNode[]; edges: WorkflowGraphEdge[] } {
+): {
+  nodes: WorkflowGraphNode[];
+  edges: WorkflowGraphEdge[];
+  /** Box around every node, at the sizes they are drawn */
+  bounds: WorkflowBounds;
+} {
   const steps = [...workflow.steps].sort((a, b) => a.sortOrder - b.sortOrder);
   const stepIds = new Set(steps.map((s) => s.id));
   const known = new Set(workflow.nodes.map((n) => n.id));
@@ -143,29 +154,29 @@ export function buildWorkflowLayout(
     (n) => !n.stepId || !stepIds.has(n.stepId),
   );
 
-  // Columns: each step right of everything before it, each subagent right of
-  // its step and of the agents it came from
-  const column = new Map<string, number>([[ROOT_ID, 0]]);
+  // Rows: each step below everything before it, each subagent below its step
+  // and the agents it came from
+  const row = new Map<string, number>([[ROOT_ID, 0]]);
   const placeAgents = (nodes: WorkflowNodeDto[], first: number): number => {
     let last = first - 1;
     // Parents inside the same group may come later in the list
     for (let pass = 0; pass <= nodes.length; pass++) {
       for (const n of nodes) {
         const parents = upstream(n, known)
-          .map((p) => column.get(p.id))
-          .filter((c): c is number => c !== undefined);
-        const c = Math.max(first, ...parents.map((p) => p + 1));
-        column.set(n.id, c);
-        last = Math.max(last, c);
+          .map((p) => row.get(p.id))
+          .filter((r): r is number => r !== undefined);
+        const r = Math.max(first, ...parents.map((p) => p + 1));
+        row.set(n.id, r);
+        last = Math.max(last, r);
       }
     }
     return last;
   };
   let cursor = 1;
   for (const g of groups) {
-    column.set(g.id, cursor);
+    row.set(g.id, cursor);
     cursor = placeAgents(g.nodes, cursor + 1) + 1;
-    cursor = Math.max(cursor, (column.get(g.id) ?? 0) + 1);
+    cursor = Math.max(cursor, (row.get(g.id) ?? 0) + 1);
   }
   placeAgents(outside, 1);
 
@@ -216,26 +227,24 @@ export function buildWorkflowLayout(
     }
   }
 
-  // Rows: column by column, each node level with its parents where there is
-  // room, each column's stack shifted to sit centred on what it wants
-  const height = (id: string) =>
-    byId.has(id) ? WORKFLOW_NODE_HEIGHT : WORKFLOW_HEAD_HEIGHT;
+  // Across: row by row, each node under its parents where there is room,
+  // each row shifted to sit centred under what it wants
   const center = new Map<string, number>();
-  const top = new Map<string, number>();
-  const placeColumns = (ids: string[], floor: number) => {
-    const cols = new Map<number, string[]>();
+  const left = new Map<string, number>();
+  const placeRows = (ids: string[], floor: number) => {
+    const rows = new Map<number, string[]>();
     for (const id of ids) {
-      const c = column.get(id) ?? 0;
-      cols.set(c, [...(cols.get(c) ?? []), id]);
+      const r = row.get(id) ?? 0;
+      rows.set(r, [...(rows.get(r) ?? []), id]);
     }
-    let bottom = floor;
-    for (const c of [...cols.keys()].sort((a, b) => a - b)) {
-      const items = cols
-        .get(c)!
+    let right = floor;
+    for (const r of [...rows.keys()].sort((a, b) => a - b)) {
+      const items = rows
+        .get(r)!
         .map((id, order) => {
           const ps = (parentsOf.get(id) ?? [])
             .map((p) => center.get(p))
-            .filter((y): y is number => y !== undefined);
+            .filter((x): x is number => x !== undefined);
           const want =
             ps.length > 0 ? ps.reduce((a, b) => a + b, 0) / ps.length : undefined;
           return { id, want, order };
@@ -245,55 +254,61 @@ export function buildWorkflowLayout(
             (a.want ?? Infinity) - (b.want ?? Infinity) || a.order - b.order,
         );
       let next = floor;
-      const ys = items.map(({ id, want }) => {
-        const h = height(id);
-        const y = Math.max(want !== undefined ? want - h / 2 : floor, next);
-        next = y + h + GAP_Y;
-        return y;
+      const xs = items.map(({ want }) => {
+        const x = Math.max(
+          want !== undefined ? want - WORKFLOW_NODE_WIDTH / 2 : floor,
+          next,
+        );
+        next = x + WORKFLOW_NODE_WIDTH + GAP_X;
+        return x;
       });
-      // Shift the stack so its middle meets the middle of what it wants
+      // Shift the row so its middle meets the middle of what it wants
       const wants = items.filter((it) => it.want !== undefined);
       let shift = 0;
       if (wants.length > 0) {
         const wantMid =
           wants.reduce((a, it) => a + it.want!, 0) / wants.length;
-        const first = ys[0];
-        const last = ys[ys.length - 1] + height(items[items.length - 1].id);
+        const first = xs[0];
+        const last = xs[xs.length - 1] + WORKFLOW_NODE_WIDTH;
         shift = Math.max(floor - first, wantMid - (first + last) / 2);
       }
       items.forEach(({ id }, i) => {
-        const y = ys[i] + shift;
-        top.set(id, y);
-        center.set(id, y + height(id) / 2);
-        bottom = Math.max(bottom, y + height(id));
+        const x = xs[i] + shift;
+        left.set(id, x);
+        center.set(id, x + WORKFLOW_NODE_WIDTH / 2);
+        right = Math.max(right, x + WORKFLOW_NODE_WIDTH);
       });
     }
-    return bottom;
+    return right;
   };
-  top.set(ROOT_ID, 0);
-  center.set(ROOT_ID, WORKFLOW_HEAD_HEIGHT / 2);
+  left.set(ROOT_ID, 0);
+  center.set(ROOT_ID, WORKFLOW_NODE_WIDTH / 2);
   const pipeline = [
     ...groups.flatMap((g) => [g.id, ...g.nodes.map((n) => n.id)]),
   ];
   // Without a plan the agents simply hang off the goal
-  let bottom = placeColumns(
+  let right = placeRows(
     pipeline.length > 0 ? pipeline : outside.map((n) => n.id),
     0,
   );
-  bottom = Math.max(bottom, WORKFLOW_HEAD_HEIGHT);
+  right = Math.max(right, WORKFLOW_NODE_WIDTH);
   if (groups.length > 0 && outside.length > 0) {
-    placeColumns(
+    placeRows(
       outside.map((n) => n.id),
-      bottom + BAND_GAP,
+      right + BAND_GAP,
     );
   }
 
-  const x = (id: string) => (column.get(id) ?? 0) * COLUMN;
+  // Heads are shorter than agents: centred in the row, edges meet evenly
+  const x = (id: string) => left.get(id) ?? 0;
+  const y = (id: string) =>
+    (row.get(id) ?? 0) * ROW +
+    (byId.has(id) ? 0 : (WORKFLOW_NODE_HEIGHT - WORKFLOW_HEAD_HEIGHT) / 2);
   const nodes: WorkflowGraphNode[] = [
     {
       id: ROOT_ID,
       type: 'root',
-      position: { x: 0, y: 0 },
+      position: { x: x(ROOT_ID), y: y(ROOT_ID) },
       data: { goal: workflow.goal, count: workflow.nodes.length },
       draggable: false,
       selectable: false,
@@ -303,7 +318,7 @@ export function buildWorkflowLayout(
       (g, index): WorkflowGraphNode => ({
         id: g.id,
         type: 'step',
-        position: { x: x(g.id), y: top.get(g.id) ?? 0 },
+        position: { x: x(g.id), y: y(g.id) },
         data: { step: g.step, index, count: g.nodes.length },
         draggable: false,
         selectable: false,
@@ -314,12 +329,30 @@ export function buildWorkflowLayout(
       (n): WorkflowGraphNode => ({
         id: n.id,
         type: 'agent',
-        position: { x: x(n.id), y: top.get(n.id) ?? 0 },
+        position: { x: x(n.id), y: y(n.id) },
         data: { node: n, selected: n.id === selectedId },
         draggable: false,
         style: { width: WORKFLOW_NODE_WIDTH },
       }),
     ),
   ];
-  return { nodes, edges };
+  // Known up front: the nodes are drawn at fixed sizes, so the view can be
+  // placed without waiting for React Flow to measure them
+  const boxes = nodes.map((n) => ({
+    x: n.position.x,
+    y: n.position.y,
+    right: n.position.x + WORKFLOW_NODE_WIDTH,
+    bottom:
+      n.position.y +
+      (n.type === 'agent' ? WORKFLOW_NODE_HEIGHT : WORKFLOW_HEAD_HEIGHT),
+  }));
+  const minX = Math.min(...boxes.map((b) => b.x));
+  const minY = Math.min(...boxes.map((b) => b.y));
+  const bounds = {
+    x: minX,
+    y: minY,
+    width: Math.max(...boxes.map((b) => b.right)) - minX,
+    height: Math.max(...boxes.map((b) => b.bottom)) - minY,
+  };
+  return { nodes, edges, bounds };
 }
