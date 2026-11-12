@@ -1,22 +1,23 @@
-import { Public, Roles } from '@/common/decorators/app.decorator';
+import { Public } from '@/common/decorators/app.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
-import { Role } from '@/common/enums/enum';
 import { CreateToolDto } from '@/modules/tools/dto/create-tool.dto';
 import { Tool } from '@/modules/tools/entities/tools.entity';
 import { ToolsService } from '@/modules/tools/tools.service';
 import { Body, Controller, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Admin } from './admin.decorator';
 import { AdminService } from './admin.service';
 import { CreateFirstAdminDto } from './dto/admin.dto';
 
 /**
  * System administration endpoints.
- * Every route requires the ADMIN role unless marked @Public().
+ * Every route requires the ADMIN role unless marked @Public(); all of them,
+ * `POST /admin/init` included, go through AdminGuard.
  */
 @ApiTags('Admin')
 @Controller('admin')
-@Roles(Role.ADMIN)
+@Admin()
 export class AdminController {
   constructor(
     private readonly adminService: AdminService,

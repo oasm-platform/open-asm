@@ -1,7 +1,6 @@
-import { Roles } from '@/common/decorators/app.decorator';
+import { Admin } from '../admin.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
-import { Role } from '@/common/enums/enum';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
@@ -14,7 +13,7 @@ import { AdminUserDto, GetManyAdminUsersDto } from './dto/admin-users.dto';
  */
 @ApiTags('Admin')
 @Controller('admin/users')
-@Roles(Role.ADMIN)
+@Admin()
 export class AdminUsersController {
   constructor(private readonly adminUsersService: AdminUsersService) {}
 

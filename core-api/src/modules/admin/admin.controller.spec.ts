@@ -7,6 +7,7 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
+import { SystemConfigsService } from './system-configs/system-configs.service';
 
 const reflector = new Reflector();
 
@@ -30,6 +31,8 @@ describe('AdminController', () => {
       providers: [
         { provide: AdminService, useValue: adminService },
         { provide: ToolsService, useValue: toolsService },
+        // Injected by AdminGuard (`@Admin()`)
+        { provide: SystemConfigsService, useValue: {} },
       ],
     }).compile();
 

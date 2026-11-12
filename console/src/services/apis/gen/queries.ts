@@ -1451,6 +1451,11 @@ export type AuthSettingsDto = {
   allowSignUp?: boolean;
 };
 
+export type AdminAccessSettingsDto = {
+  /** IP addresses or CIDR ranges allowed to use the admin console and APIs. Empty allows every IP. */
+  allowedIps?: string[];
+};
+
 export type MailProvider = (typeof MailProvider)[keyof typeof MailProvider];
 
 export const MailProvider = {
@@ -1483,6 +1488,7 @@ export type MailServerSettingsDto = {
 
 export type SystemSettingsDto = {
   auth?: AuthSettingsDto;
+  adminAccess?: AdminAccessSettingsDto;
   mailServer?: MailServerSettingsDto;
 };
 

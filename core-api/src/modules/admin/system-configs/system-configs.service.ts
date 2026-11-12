@@ -2,6 +2,7 @@ import { GITHUB_REPO } from '@/common/constants/app.constants';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { ReleaseVersion } from '@/common/interfaces/app.interface';
 import { encrypt } from '@/common/utils/encryption.util';
+import { isIpInRanges } from '@/common/utils/ip-range.util';
 import { RedisService } from '@/services/redis/redis.service';
 import {
   BadRequestException,
@@ -15,6 +16,7 @@ import axios from 'axios';
 import { Repository } from 'typeorm';
 import { StorageService } from '@/modules/storage/storage.service';
 import {
+  AdminAccessSettingsDto,
   MailProvider,
   MailServerSettingsDto,
   SystemConfigResponseDto,
@@ -46,6 +48,7 @@ export class SystemConfigsService implements OnModuleInit {
   /** Defaults per settings section; stored fields override them */
   private static readonly DEFAULT_SETTINGS: SystemSettings = {
     auth: { allowSignUp: false },
+    adminAccess: { allowedIps: [] },
     mailServer: {
       enabled: false,
       provider: MailProvider.SMTP,
@@ -186,18 +189,40 @@ export class SystemConfigsService implements OnModuleInit {
   }
 
   /**
+   * Whether `ip` may use the admin console and APIs: every IP while
+   * `adminAccess.allowedIps` is empty, otherwise only listed addresses and
+   * ranges. An unknown client IP is refused once the list is set.
+   */
+  async isAdminIpAllowed(ip: string | undefined): Promise<boolean> {
+    const { adminAccess } = await this.getSettings();
+    const allowedIps = Array.isArray(adminAccess?.allowedIps)
+      ? (adminAccess.allowedIps as string[])
+      : [];
+    return allowedIps.length === 0 || isIpInRanges(ip, allowedIps);
+  }
+
+  /**
    * Merge the given sections into the stored settings in one statement, so
    * concurrent saves of different sections or fields don't overwrite each
    * other. Fields left out of a section keep their stored value.
    * @param dto Sections to update
+   * @param requesterIp Client IP of the admin saving, so a new admin IP
+   * allow-list can't lock them out
    * @returns Success message
    */
   async updateSettings(
     dto: SystemSettingsDto,
+    requesterIp?: string,
   ): Promise<DefaultMessageResponseDto> {
     const patch = { ...(dto as SystemSettings) };
     if (dto.mailServer) {
       patch.mailServer = await this.prepareMailServerPatch(dto.mailServer);
+    }
+    if (dto.adminAccess) {
+      patch.adminAccess = this.prepareAdminAccessPatch(
+        dto.adminAccess,
+        requesterIp,
+      );
     }
     const sections = Object.entries(patch).filter(
       ([, value]) => value !== undefined && value !== null,
@@ -238,6 +263,25 @@ export class SystemConfigsService implements OnModuleInit {
       );
     }
     return patch;
+  }
+
+  /**
+   * Trims and de-duplicates the admin IP allow-list, and refuses a non-empty
+   * list that leaves out the admin saving it: they would lose access at once.
+   */
+  private prepareAdminAccessPatch(
+    dto: AdminAccessSettingsDto,
+    requesterIp: string | undefined,
+  ): Record<string, unknown> {
+    if (!dto.allowedIps) return {};
+
+    const allowedIps = [...new Set(dto.allowedIps.map((ip) => ip.trim()))];
+    if (allowedIps.length > 0 && !isIpInRanges(requesterIp, allowedIps)) {
+      throw new BadRequestException(
+        `Add your current IP address (${requesterIp ?? 'unknown'}) to the list, or you lose admin access`,
+      );
+    }
+    return { allowedIps };
   }
 
   /**

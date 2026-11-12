@@ -1,7 +1,6 @@
-import { Roles } from '@/common/decorators/app.decorator';
+import { requestClientIp } from '@/common/config/trusted-proxies';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
-import { Role } from '@/common/enums/enum';
 import { StorageService } from '@/modules/storage/storage.service';
 import {
   BadRequestException,
@@ -13,8 +12,11 @@ import {
   Patch,
   Post,
   Put,
+  Req,
 } from '@nestjs/common';
+import type { IncomingMessage } from 'node:http';
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Admin } from '../admin.decorator';
 import {
   ConfirmLogoRequestDto,
   LogoPresignRequestDto,
@@ -35,7 +37,7 @@ const LOGO_MAX_SIZE_BYTES = 5 * 1024 * 1024;
  */
 @ApiTags('System Configs')
 @Controller('admin/system-configs')
-@Roles(Role.ADMIN)
+@Admin()
 export class SystemConfigsController {
   constructor(
     private readonly systemConfigsService: SystemConfigsService,
@@ -122,8 +124,12 @@ export class SystemConfigsController {
   })
   async updateSettings(
     @Body() dto: SystemSettingsDto,
+    @Req() request: IncomingMessage,
   ): Promise<DefaultMessageResponseDto> {
-    return this.systemConfigsService.updateSettings(dto);
+    return this.systemConfigsService.updateSettings(
+      dto,
+      requestClientIp(request),
+    );
   }
 
   /**

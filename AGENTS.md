@@ -186,7 +186,7 @@ Migration location: `core-api/src/database/migrations/` (58 files, newest last).
 - Entities in module folders or `src/common/entity/`; `dataSourceOptions.entities` globs `**/*.entity{.ts,.js}`.
 - **User data responses expose only `id`, `name`, `image`** — enforce in services, not controllers.
 - `@getWorkspaceId: true` on controllers that need tenant context; workspace scoping is not optional.
-- **Admin-only endpoints live in `src/modules/admin/`** and are served under `/admin/*` with class-level `@Roles(Role.ADMIN)` (system configs + logo upload, tool creation, public `POST /admin/init`). Put new platform-admin endpoints there, not in the domain module.
+- **Admin-only endpoints live in `src/modules/admin/`** and are served under `/admin/*` with class-level `@Admin()` (`modules/admin/admin.decorator.ts`: ADMIN role + `AdminGuard`, which enforces the admin IP allow-list) (system configs + logo upload, tool creation, public `POST /admin/init`). Put new platform-admin endpoints there, not in the domain module.
 - gRPC server `:16276`, protos in `src/proto/`, Go stubs generated into `worker/internal/gen/` (there is **no** `grpc-client/` directory anymore — older docs are stale).
 - BullMQ for async jobs; queue payloads are slim and tenant-scoped.
 - MCP is an **in-process controller** (`src/mcp/mcp.controller.ts`, `GET /mcp` + `POST /mcp/message`, guarded by `McpGuard`) — not a separate server, no `ASSISTANT_HOST`/`SEARXNG_URL`.

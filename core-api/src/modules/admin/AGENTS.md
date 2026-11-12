@@ -6,13 +6,14 @@ Platform-admin endpoints under `/admin/*`: the first-admin bootstrap, tool creat
 
 - `admin.module.ts`: imports the three submodules. No exports.
 - `admin.controller.ts` / `admin.service.ts`: `POST /admin/init`, `POST /admin/tools`.
+- `admin.decorator.ts` / `admin.guard.ts`: `@Admin()` = `@Roles(Role.ADMIN)` + `@UseGuards(AdminGuard)`. `AdminGuard` holds admin-only checks beyond the role; today only the admin IP allow-list.
 - `system-configs/`: `SystemConfigsModule` (exports `SystemConfigsService`), `SystemConfigsController`, `MailService`, `SignUpHook`, entity `SystemConfig`.
 - `users/`: `AdminUsersModule`, `AdminUsersController`, `AdminUsersService` (`toAdminUserDto`), `PendingApprovalHook`.
 - `workspaces/`: `AdminWorkspacesModule`, `AdminWorkspacesController`, `AdminWorkspacesService`.
 
 ## Public surface
 
-Every controller has class-level `@Roles(Role.ADMIN)`. Workspace permissions do not apply here: admins bypass membership.
+Every controller has class-level `@Admin()` (not bare `@Roles(Role.ADMIN)`; `admin.guard.spec.ts` asserts it for all four). The global `AuthGuard` runs first (session + role), then `AdminGuard` refuses with 403 when the client IP (`requestClientIp`, honours `TRUSTED_PROXIES`) is not in `settings.adminAccess.allowedIps`. An empty list allows every IP. `AdminGuard` also runs on the `@Public()` `POST /admin/init`. Workspace permissions do not apply here: admins bypass membership.
 
 | Route | Notes |
 |---|---|
@@ -38,7 +39,8 @@ Ban, unban, create-user and impersonation are better-auth admin-plugin routes un
 ## Data model
 
 - `system_configs`: a single row. `findOrCreateConfig()` creates it lazily. Columns: `name`, `logoPath` (`<bucket>/<key>`), `settings` jsonb keyed by section.
-- `SystemConfigsService.DEFAULT_SETTINGS` fills in missing sections on read. Defaults: `auth.allowSignUp = false`, mail server off.
+- `SystemConfigsService.DEFAULT_SETTINGS` fills in missing sections on read. Defaults: `auth.allowSignUp = false`, `adminAccess.allowedIps = []`, mail server off.
+- `settings.adminAccess.allowedIps`: IPs or CIDR ranges (validated by `isIpOrCidr`, max 100). `updateSettings` trims and de-duplicates them, and refuses (400) a non-empty list that does not cover the saving admin's own IP, so they can't lock themselves out. Recovery if locked out anyway: clear the list in the `system_configs.settings` row.
 - `updateSettings` merges per section with one SQL `jsonb` statement, so concurrent saves of different fields don't overwrite each other. Don't replace it with load-modify-save.
 - `settings.mailServer.password` is encrypted with the global `encrypt()` (system KEK, not a workspace DEK). An empty password in a PATCH keeps the stored one. It is listed in `SECRET_COLUMNS` (`encryption-upgrade.service.ts`), so a new secret in `settings` must be added there too.
 
@@ -51,7 +53,9 @@ Ban, unban, create-user and impersonation are better-auth admin-plugin routes un
 
 ## Coupling
 
-- `SystemConfigsModule` is imported by `AdminUsersModule` and `RootModule` (`GET /metadata` uses `getConfig` and `isSignUpAllowed`). It is not global.
+- `AdminGuard` injects `SystemConfigsService`, so every module with an `@Admin()` controller imports `SystemConfigsModule` (including `AdminWorkspacesModule`). Controller specs that compile a `TestingModule` must provide it.
+- The IP allow-list does not cover better-auth's `/api/auth/admin/*` routes (ban, set-role, impersonate, create-user): they are served by the better-auth handler, not Nest controllers.
+- `SystemConfigsModule` is imported by `AdminUsersModule`, `AdminWorkspacesModule` and `RootModule` (`GET /metadata` uses `getConfig` and `isSignUpAllowed`). It is not global.
 - `ToolsService` and `StorageService` come from global modules. `combine.module.ts` keeps `AdminModule` below `JobsRegistryModule` to avoid the tools ↔ workers ↔ jobs-registry import cycle. Don't reorder.
 - `AdminWorkspacesService` writes the `workspaces` table directly and does not go through `WorkspacesService`. `AdminUsersService` reads `workspace_members` with raw SQL and presence through `UserPresenceService`.
 - `MailService` injects `AUTH_INSTANCE_KEY` and sets `emailVerification.sendVerificationEmail` in `onModuleInit`.

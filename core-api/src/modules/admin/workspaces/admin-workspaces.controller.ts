@@ -1,7 +1,6 @@
-import { Roles } from '@/common/decorators/app.decorator';
+import { Admin } from '../admin.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
-import { Role } from '@/common/enums/enum';
 import { ArtifactQuotaService } from '@/modules/artifacts/artifact-quota.service';
 import {
   UpdateStorageQuotaDto,
@@ -37,7 +36,7 @@ const auditTarget = {
  */
 @ApiTags('Admin')
 @Controller('admin/workspaces')
-@Roles(Role.ADMIN)
+@Admin()
 export class AdminWorkspacesController {
   constructor(
     private readonly adminWorkspacesService: AdminWorkspacesService,

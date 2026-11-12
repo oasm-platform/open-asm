@@ -1,5 +1,5 @@
+import { ipType, toBlockList } from '@/common/utils/ip-range.util';
 import type { IncomingMessage } from 'node:http';
-import { BlockList, isIP } from 'node:net';
 
 /**
  * Parses TRUSTED_PROXIES: comma-separated IPs or CIDR ranges of the reverse
@@ -11,31 +11,6 @@ export function parseTrustedProxies(raw: string | undefined | null): string[] {
     .split(',')
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0);
-}
-
-function ipType(ip: string): 'ipv4' | 'ipv6' | null {
-  const family = isIP(ip);
-  return family === 4 ? 'ipv4' : family === 6 ? 'ipv6' : null;
-}
-
-/** Invalid entries are skipped; Better Auth already warns about them at boot. */
-function toBlockList(trustedProxies: string[]): BlockList {
-  const list = new BlockList();
-  for (const entry of trustedProxies) {
-    const [address, prefix] = entry.split('/');
-    const type = ipType(address);
-    if (!type) continue;
-    if (prefix === undefined) {
-      list.addAddress(address, type);
-      continue;
-    }
-    const bits = Number(prefix);
-    const maxBits = type === 'ipv4' ? 32 : 128;
-    if (/^\d+$/.test(prefix) && bits <= maxBits) {
-      list.addSubnet(address, bits, type);
-    }
-  }
-  return list;
 }
 
 /**

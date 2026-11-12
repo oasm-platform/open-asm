@@ -207,6 +207,7 @@ describe('SystemConfigsService', () => {
 
       await expect(service.getSettings()).resolves.toEqual({
         auth: { allowSignUp: false },
+        adminAccess: { allowedIps: [] },
         mailServer: {
           enabled: false,
           provider: 'smtp',
@@ -272,6 +273,39 @@ describe('SystemConfigsService', () => {
       });
 
       await expect(service.isSignUpAllowed()).resolves.toBe(true);
+    });
+  });
+
+  describe('isAdminIpAllowed', () => {
+    const withAllowedIps = (allowedIps: unknown) =>
+      (mockSystemConfigRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 1,
+        settings: { adminAccess: { allowedIps } },
+      });
+
+    it('allows every IP while the list is empty', async () => {
+      withAllowedIps([]);
+
+      await expect(service.isAdminIpAllowed('192.0.2.1')).resolves.toBe(true);
+      await expect(service.isAdminIpAllowed(undefined)).resolves.toBe(true);
+    });
+
+    it('allows every IP when nothing is stored', async () => {
+      (mockSystemConfigRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 1,
+        settings: {},
+      });
+
+      await expect(service.isAdminIpAllowed('192.0.2.1')).resolves.toBe(true);
+    });
+
+    it('allows only listed addresses and ranges once the list is set', async () => {
+      withAllowedIps(['203.0.113.7', '10.0.0.0/8']);
+
+      await expect(service.isAdminIpAllowed('203.0.113.7')).resolves.toBe(true);
+      await expect(service.isAdminIpAllowed('10.2.3.4')).resolves.toBe(true);
+      await expect(service.isAdminIpAllowed('192.0.2.1')).resolves.toBe(false);
+      await expect(service.isAdminIpAllowed(undefined)).resolves.toBe(false);
     });
   });
 
@@ -374,6 +408,56 @@ describe('SystemConfigsService', () => {
         await service.updateSettings({ mailServer: { enabled: true } });
 
         expect(savedSections().mailServer).toEqual({ enabled: true });
+      });
+    });
+
+    describe('admin access', () => {
+      const savedAllowedIps = () =>
+        (
+          JSON.parse(
+            (queryBuilder.setParameter.mock.calls[0] as [string, string])[1],
+          ) as { adminAccess: { allowedIps: string[] } }
+        ).adminAccess.allowedIps;
+
+      it('stores the list trimmed and without duplicates', async () => {
+        await service.updateSettings(
+          {
+            adminAccess: {
+              allowedIps: [' 203.0.113.7 ', '10.0.0.0/8', '203.0.113.7'],
+            },
+          },
+          '203.0.113.7',
+        );
+
+        expect(savedAllowedIps()).toEqual(['203.0.113.7', '10.0.0.0/8']);
+      });
+
+      it('accepts a list that covers the admin saving it', async () => {
+        await service.updateSettings(
+          { adminAccess: { allowedIps: ['10.0.0.0/8'] } },
+          '10.1.2.3',
+        );
+
+        expect(savedAllowedIps()).toEqual(['10.0.0.0/8']);
+      });
+
+      it('refuses a list that would lock out the admin saving it', async () => {
+        await expect(
+          service.updateSettings(
+            { adminAccess: { allowedIps: ['10.0.0.0/8'] } },
+            '203.0.113.7',
+          ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(queryBuilder.execute).not.toHaveBeenCalled();
+      });
+
+      it('accepts an empty list, which allows every IP', async () => {
+        await service.updateSettings(
+          { adminAccess: { allowedIps: [] } },
+          '203.0.113.7',
+        );
+
+        expect(savedAllowedIps()).toEqual([]);
       });
     });
   });
