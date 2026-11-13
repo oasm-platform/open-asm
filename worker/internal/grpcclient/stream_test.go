@@ -185,6 +185,35 @@ func TestRunWorkerStream_DeliversCancelToHandler(t *testing.T) {
 	}
 }
 
+func TestRunWorkerStream_RegisterSendsConfiguredName(t *testing.T) {
+	names := make(chan string, 1)
+	client, _ := newStreamTestClient(t, func(
+		srv grpc.BidiStreamingServer[workers.WorkerToCore, workers.CoreToWorker],
+	) error {
+		frame, err := srv.Recv()
+		if err != nil {
+			return err
+		}
+		names <- frame.GetRegister().GetMetadata().GetName()
+		<-srv.Context().Done()
+		return srv.Context().Err()
+	})
+	client.SetName("scanner-eu-1")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	go func() { _ = client.RunWorkerStream(ctx, nil) }()
+
+	select {
+	case got := <-names:
+		if got != "scanner-eu-1" {
+			t.Fatalf("register name = %q, want %q", got, "scanner-eu-1")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("register frame was never sent")
+	}
+}
+
 func TestRunWorkerStream_RejectedRegisterFails(t *testing.T) {
 	client, _ := newStreamTestClient(t, acceptingConnect(t, false, nil))
 

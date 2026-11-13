@@ -2,6 +2,9 @@
 FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS builder
 
 ARG TARGETARCH
+# Release tag (e.g. v0.13.0), the same value core-api receives as APP_VERSION.
+# Unset builds (nightly, local compose) report "dev".
+ARG APP_VERSION=dev
 
 WORKDIR /app
 
@@ -17,13 +20,18 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Cross-compile for the target architecture; CGO_ENABLED=0 makes this dependency-free
+# Cross-compile for the target architecture; CGO_ENABLED=0 makes this dependency-free.
+# The version is linked into the binary, so it travels with it even when the
+# image's env and labels are not inspected.
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build \
-    -ldflags='-w -s -extldflags "-static"' \
+    -ldflags="-w -s -extldflags '-static' -X oasm-worker/internal/buildinfo.Version=${APP_VERSION}" \
     -o oasm-worker ./cmd/app
 
 # Stage 2: Runtime
 FROM debian:bookworm-slim
+
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
 
 WORKDIR /app
 
@@ -72,6 +80,7 @@ ENV WORKER_TOOL_PATH=oasm-tools
 LABEL org.opencontainers.image.title="OASM Worker"
 LABEL org.opencontainers.image.description="Attack Surface Management worker agent"
 LABEL org.opencontainers.image.vendor="OASM Platform"
+LABEL org.opencontainers.image.version=$APP_VERSION
 
 # Entrypoint
 ENTRYPOINT ["/app/oasm-worker"]

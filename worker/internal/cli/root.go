@@ -4,6 +4,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"oasm-worker/internal/buildinfo"
 	"oasm-worker/internal/config"
 	"oasm-worker/internal/tui"
 	"oasm-worker/internal/worker"
@@ -119,8 +120,9 @@ func Execute() {
 // when no --mode flag is given.
 func rootCommand(defaultMode string) *cobra.Command {
 	rootCmd := &cobra.Command{
-		Use:   "oasm-worker",
-		Short: "OASM Worker is an attack surface management agent",
+		Use:     "oasm-worker",
+		Version: buildinfo.Current(),
+		Short:   "OASM Worker is an attack surface management agent",
 		Long: `OASM Worker is a high-performance agent used for attack surface management tasks.
 
 The worker runs in one of two modes, reported to core-api when it joins:
@@ -133,7 +135,8 @@ The worker runs in one of two modes, reported to core-api when it joins:
         '--mode node' and configure via the flags below or WORKER_* environment
         variables (WORKER_API_KEY, WORKER_MAX_CONCURRENCY, WORKER_GRPC_HOST,
         WORKER_GRPC_PORT, WORKER_TLS_ENABLED, WORKER_TOOL_PATH, WORKER_NETWORK,
-        WORKER_CONNECTOR_ADDR). WORKER_CONNECTOR_ADDR overrides the address
+        WORKER_NAME, WORKER_CONNECTOR_ADDR). WORKER_NAME sets the name shown
+        in the console; when unset the OS hostname is used. WORKER_CONNECTOR_ADDR overrides the address
         connector containers dial back on (default port 26276); when unset the
         worker auto-derives host.docker.internal and adds a host-gateway
         mapping to each container. To run several workers on one host, set

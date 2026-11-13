@@ -31,6 +31,7 @@ type Client struct {
 	apiKey            string
 	toolPath          string
 	runMode           string // "cli", "node", or "" (unknown)
+	name              string // WORKER_NAME; empty = OS hostname
 	logger            Logger
 	auth              *tokenAuth
 	telemetryProvider TelemetryProvider
@@ -251,4 +252,20 @@ func (c *Client) JobsAvailable() <-chan struct{} {
 // sent in metadata during Join. Must be called before Connect.
 func (c *Client) SetRunMode(mode string) {
 	c.runMode = mode
+}
+
+// SetName stores the operator-chosen worker name (WORKER_NAME) sent in
+// metadata during Join and stream Register. Blank keeps the OS hostname.
+// Must be called before Connect.
+func (c *Client) SetName(name string) {
+	c.name = strings.TrimSpace(name)
+}
+
+// workerName is the name reported to core-api: the configured name when set,
+// otherwise the OS hostname.
+func (c *Client) workerName() (string, error) {
+	if c.name != "" {
+		return c.name, nil
+	}
+	return os.Hostname()
 }

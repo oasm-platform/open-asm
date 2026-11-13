@@ -20,13 +20,16 @@ type Config struct {
 	// MaxConcurrency is the max number of concurrent jobs. 0 (default) = auto:
 	// ResolveMaxConcurrency sizes it from the CPU/RAM available to the worker.
 	// A positive value is an explicit operator override.
-	MaxConcurrency int       `mapstructure:"max_concurrency"`
-	GrpcHost       string    `mapstructure:"grpc_host"`
-	GrpcPort       int       `mapstructure:"grpc_port"`
-	ToolPath       string    `mapstructure:"tool_path"`
-	Network        string    `mapstructure:"network"`
-	WorkspaceRoot  string    `mapstructure:"workspace_root"`
-	TLS            TLSConfig `mapstructure:",squash"`
+	MaxConcurrency int    `mapstructure:"max_concurrency"`
+	GrpcHost       string `mapstructure:"grpc_host"`
+	GrpcPort       int    `mapstructure:"grpc_port"`
+	ToolPath       string `mapstructure:"tool_path"`
+	Network        string `mapstructure:"network"`
+	// Name (WORKER_NAME) is the name the worker registers with; empty = the
+	// OS hostname.
+	Name          string    `mapstructure:"name"`
+	WorkspaceRoot string    `mapstructure:"workspace_root"`
+	TLS           TLSConfig `mapstructure:",squash"`
 
 	// Connector server — Docker containers connect back to the worker via this gRPC endpoint.
 	ConnectorPort                int    `mapstructure:"connector_port"`                  // gRPC port for connectors, default 26276
@@ -101,6 +104,7 @@ func LoadConfig() (*Config, error) {
 
 	viper.SetDefault("api_key", "")
 	viper.SetDefault("network", "")
+	viper.SetDefault("name", "")
 	viper.SetDefault("max_concurrency", 0) // 0 = auto-size from available CPU/RAM
 	viper.SetDefault("grpc_host", "localhost")
 	viper.SetDefault("grpc_port", 16276)

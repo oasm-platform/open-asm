@@ -3,6 +3,7 @@ package grpcclient
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -72,6 +73,60 @@ func TestJoin_SendsAPIKeyAndMetadata(t *testing.T) {
 	// Default runMode is empty → UNKNOWN
 	if call.mode != workers.WorkerRunMode_WORKER_RUN_MODE_UNKNOWN {
 		t.Errorf("expected default mode UNKNOWN, got %v", call.mode)
+	}
+}
+
+func TestJoin_SendsConfiguredName(t *testing.T) {
+	// Given: client configured with an explicit worker name (WORKER_NAME)
+	srv := newTestServer(t)
+	srv.workersSrv.joinFn = func(ctx context.Context, req *workers.JoinRequest) (*workers.JoinResponse, error) {
+		return &workers.JoinResponse{WorkerId: "w-1", WorkerToken: "tok-1"}, nil
+	}
+	srv.client.SetName("  scanner-eu-1  ")
+
+	// When: Join is called
+	if err := srv.client.Join(context.Background()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Then: the configured name, trimmed, replaces the hostname
+	srv.workersSrv.mu.Lock()
+	defer srv.workersSrv.mu.Unlock()
+	call := srv.workersSrv.joinCalls[0]
+	if call.metadata == nil || call.metadata.Name == nil {
+		t.Fatal("expected metadata name to be set")
+	}
+	if got := *call.metadata.Name; got != "scanner-eu-1" {
+		t.Errorf("expected name scanner-eu-1, got %q", got)
+	}
+}
+
+func TestJoin_BlankNameFallsBackToHostname(t *testing.T) {
+	// Given: a blank WORKER_NAME, which must not register an empty name
+	srv := newTestServer(t)
+	srv.workersSrv.joinFn = func(ctx context.Context, req *workers.JoinRequest) (*workers.JoinResponse, error) {
+		return &workers.JoinResponse{WorkerId: "w-1", WorkerToken: "tok-1"}, nil
+	}
+	srv.client.SetName("   ")
+	hostname, err := os.Hostname()
+	if err != nil {
+		t.Skipf("hostname unavailable: %v", err)
+	}
+
+	// When: Join is called
+	if err := srv.client.Join(context.Background()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Then: the OS hostname is sent
+	srv.workersSrv.mu.Lock()
+	defer srv.workersSrv.mu.Unlock()
+	call := srv.workersSrv.joinCalls[0]
+	if call.metadata == nil || call.metadata.Name == nil {
+		t.Fatal("expected metadata name to be set")
+	}
+	if got := *call.metadata.Name; got != hostname {
+		t.Errorf("expected hostname %q, got %q", hostname, got)
 	}
 }
 
