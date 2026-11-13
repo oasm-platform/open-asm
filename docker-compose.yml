@@ -81,6 +81,11 @@ services:
       - WORKER_MODE=node
       - WORKER_GRPC_HOST=core-api
       - WORKER_GRPC_PORT=16276
+      # Name shown in the console instead of the container ID (the OS hostname
+      # inside the container). Every replica of a scaled service shares it.
+      # Override with WORKER_NAME in the shell or the --env-file; this list
+      # wins over ./worker/.env.
+      - WORKER_NAME=${WORKER_NAME:-oasm-builtin-worker}
       # Concurrency auto-sizes from the container's CPU/RAM (cgroup-aware).
       # Pin it by setting WORKER_MAX_CONCURRENCY to a positive value.
       - WORKER_TOOL_PATH=/app/oasm-tools

@@ -197,6 +197,33 @@ export class WorkerToolDto {
   currentJobs: WorkerToolJobDto[];
 }
 
+/** Where a worker's public IP is located, from the geo-ip database. */
+export class WorkerLocationDto {
+  @ApiProperty({ required: false })
+  country?: string;
+
+  @ApiProperty({ required: false, description: 'ISO 3166-1 alpha-2 code.' })
+  countryCode?: string;
+
+  @ApiProperty({ required: false })
+  region?: string;
+
+  @ApiProperty({ required: false })
+  city?: string;
+
+  @ApiProperty({ required: false })
+  latitude?: number;
+
+  @ApiProperty({ required: false })
+  longitude?: number;
+
+  @ApiProperty({ required: false })
+  timezone?: string;
+
+  @ApiProperty({ required: false })
+  isp?: string;
+}
+
 /**
  * Response DTO for a single worker (`GET /workers/:id`).
  */
@@ -219,8 +246,21 @@ export class GetWorkerResponseDto {
   @ApiProperty({ required: false })
   os?: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({
+    required: false,
+    description:
+      'Public IP the worker joined from. Omitted when it is a local or private address.',
+  })
   ipAddress?: string;
+
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    type: WorkerLocationDto,
+    description:
+      'Location of `ipAddress`; null when the IP is hidden, unknown or the lookup failed.',
+  })
+  location?: WorkerLocationDto | null;
 
   @ApiProperty({ enum: WorkerType })
   type: WorkerType;

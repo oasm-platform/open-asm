@@ -30,13 +30,13 @@ func mapRunMode(mode string) workers.WorkerRunMode {
 // sent along so the server re-uses the same worker identity; the (possibly
 // rotated) returned token is persisted for the next restart.
 func (c *Client) Join(ctx context.Context) error {
-	hostname, err := os.Hostname()
+	name, err := c.workerName()
 	var metadata *workers.WorkerMetadata
 	if err == nil {
 		osName := runtime.GOOS
 		mode := mapRunMode(c.runMode)
 		metadata = &workers.WorkerMetadata{
-			Name: &hostname,
+			Name: &name,
 			Os:   &osName,
 			Mode: &mode,
 		}

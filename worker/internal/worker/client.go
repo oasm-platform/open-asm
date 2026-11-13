@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"oasm-worker/internal/buildinfo"
 	"oasm-worker/internal/config"
 	"oasm-worker/internal/connector"
 	"oasm-worker/internal/dnsresolver"
@@ -88,6 +89,7 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 		return
 	}
 	grpcClient.SetRunMode(cfg.Mode)
+	grpcClient.SetName(cfg.Name)
 
 	// ponytail: lazy browser singleton — avoids ~300MB chromium resident when no screenshot jobs.
 	var (
@@ -579,7 +581,7 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 		func() int { return len(semaphore) },
 		cfg.MaxConcurrency,
 		cfg.Mode,
-		"dev",
+		buildinfo.Current(),
 	)
 	if err != nil {
 		log.Warning("worker telemetry disabled: failed to initialize provider: %v", err)

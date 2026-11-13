@@ -3,10 +3,10 @@ package grpcclient
 import (
 	"context"
 	"fmt"
-	"os"
 	"runtime"
 	"time"
 
+	"oasm-worker/internal/buildinfo"
 	workers "oasm-worker/internal/gen/workers"
 )
 
@@ -65,11 +65,11 @@ func (c *Client) RunWorkerStream(ctx context.Context, onCancel StreamCancelFunc)
 		}
 	}()
 
-	hostname, _ := os.Hostname()
+	name, _ := c.workerName()
 	osName := runtime.GOOS
 	// Same enum as Join, so the same mapping applies.
 	mode := mapRunMode(c.runMode)
-	version := "dev"
+	version := buildinfo.Current()
 	token := c.auth.currentToken()
 
 	if err := session.Send(&workers.WorkerToCore{
@@ -77,7 +77,7 @@ func (c *Client) RunWorkerStream(ctx context.Context, onCancel StreamCancelFunc)
 			Register: &workers.RegisterRequest{
 				ApiKey:   c.apiKey,
 				Token:    &token,
-				Metadata: &workers.WorkerMetadata{Name: &hostname, Os: &osName, Mode: &mode},
+				Metadata: &workers.WorkerMetadata{Name: &name, Os: &osName, Mode: &mode},
 				Version:  &version,
 			},
 		},

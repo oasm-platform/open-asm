@@ -32,12 +32,15 @@ Scan worker nodes: join/identity, liveness, listing, the gRPC channels a worker 
 ## Data model
 
 - `workers` (`WorkerInstance`): `token` is stored in plain text and looked up by `IDX_workers_token`. `type` is a `WorkerType`; `scope` is `workspace` or `cloud`; `runMode` is `'cli' | 'node' | null`; `enabledAgentMode`.
+- `name` is what the worker reports on join: `WORKER_NAME`, else its OS hostname. It is trimmed and capped at `WORKER_NAME_MAX_LENGTH` (128). `ipAddress` is the joining peer, resolved through `TRUSTED_PROXIES` (`resolveClientIp`); it may be IPv4-mapped (`::ffff:a.b.c.d`).
 - `workspaceId` FK `CASCADE`. `internalNetworkId` FK `CASCADE`: deleting an internal network deletes its workers. `toolId` is set for PROVIDER workers.
 - `currentJobsCount`, `toolsCount` and `isOnline` are computed, not columns. Rows are hard-deleted by the sweep.
 
 ## Invariants
 
 - **Join order** (`WorkersService.join`). (1) A live join key is consumed with `GETDEL`, so it is single-use; it creates a workspace worker, or resumes the token's worker if that worker is already in the key's workspace. (2) A known token resumes its worker. (3) `OASM_CLOUD_APIKEY` creates a cloud worker (`CLOUD` + `BUILT_IN`, no workspace). (4) Anything else is an `RpcException`.
+- **Rejoin refreshes** `ipAddress`, `runMode` and `name` (a blank reported name keeps the stored one), so a restart with a new `WORKER_NAME` renames the same identity.
+- **Worker detail IP/location** (`getWorkerById`): `ipAddress` is returned only when `isPublicIp` holds (loopback, RFC 1918, CGNAT, link-local and ULA are hidden) and is unmapped to IPv4. `location` is looked up per request through `GeoIpService` (no cache, no column); a failed or unknown lookup yields `null` and never fails the request. The list (`getWorkerList`) returns neither.
 - **Global worker** means `CLOUD` + `BUILT_IN` (`isGlobalWorker`). PROVIDER workers are cloud-scoped but never global.
 - **Agent eligibility** (`servesAgents`): a workspace worker serves its own workspace. A global worker serves agents only if it subscribed with `x-agent-sandbox: 1`. PROVIDER workers never serve agents. `registerWorker` rewrites `enabledAgentMode` on every subscribe.
 - **Worker pick order for a conversation** (`pickConversationWorker`): Redis pin → Postgres pin (`agent_conversations.workerId`) → a connected workspace worker → a global one. A new pin is written only after a successful push (`pinConversationWorker`). An out-of-scope pin is cleared.
@@ -50,7 +53,7 @@ Scan worker nodes: join/identity, liveness, listing, the gRPC channels a worker 
 
 ## Coupling
 
-- `forwardRef(() => ToolsModule)` (the two modules import each other) and `ConnectorsModule`. `WorkersService` injects `JobsRegistryService` and `ToolsService` with `forwardRef`. This is part of the tools ↔ workers ↔ jobs-registry cycle noted in `combine.module.ts`.
+- `forwardRef(() => ToolsModule)` (the two modules import each other) and `ConnectorsModule`. Uses the global `GeoIpService` (`src/services/geo-ip`) for the detail location. `WorkersService` injects `JobsRegistryService` and `ToolsService` with `forwardRef`. This is part of the tools ↔ workers ↔ jobs-registry cycle noted in `combine.module.ts`.
 - Writes other modules' tables: `jobs` (through `jobsRegistryService.repo` and raw SQL), `network_interfaces` (`connectInternalNetwork`), and `agent_conversations.workerId` (conversation pin).
 - Consumers: `remote-execute`, which wraps `RemoteExecuteSubscribeService`. `agents`, which uses `getWorkers(..., { agentWorkspaceId })`, `isAgentWorkerForWorkspace`, `isAgentReady`, and pick/pin. `jobs-registry`, which uses `WorkerStreamRegistry.publishCancel` / `publishJobsAvailable` and `WorkerInstance`. `src/common/guards/` (`GrpcWorkerTokenGuard`, `WorkerTokenGuard`), which uses `validateWorkerToken`. `ToolsService`, which counts workers through `workersService.repo`.
 
