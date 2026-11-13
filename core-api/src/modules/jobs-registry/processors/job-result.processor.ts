@@ -69,6 +69,10 @@ class WithFailurePayload extends Error {
  * failed the whole step, which then skipped every step that needed it.
  *
  * Matched on the captured output, so a genuine tool error still fails.
+ *
+ * The same output is printed when the worker's resolver is unreachable, so an
+ * asset that discovery already resolved (A/AAAA in `dnsRecords`) is never
+ * benign: see {@link unresolvableButDiscoveredReason}.
  */
 const BENIGN_BUILT_IN_OUTCOMES: {
   tool: RegExp;
@@ -91,6 +95,33 @@ function benignBuiltInReason(
   return BENIGN_BUILT_IN_OUTCOMES.find(
     (entry) => entry.tool.test(toolName) && entry.pattern.test(output),
   )?.reason;
+}
+
+/** Address records discovery stored for the asset (dnsx `A` / `AAAA`). */
+function discoveredAddresses(dnsRecords?: object | null): string[] {
+  if (!dnsRecords) return [];
+  const records = dnsRecords as Record<string, unknown>;
+  return ['A', 'AAAA'].flatMap((type) => {
+    const values = records[type];
+    return Array.isArray(values)
+      ? values.filter((v): v is string => typeof v === 'string' && v !== '')
+      : [];
+  });
+}
+
+/**
+ * A "host does not resolve" outcome for a host discovery DID resolve is a DNS
+ * failure on the worker, not the target's condition.
+ * @returns the failure message, or undefined when the outcome stays benign.
+ */
+function unresolvableButDiscoveredReason(job: Job): string | undefined {
+  const addresses = discoveredAddresses(job.asset?.dnsRecords);
+  if (addresses.length === 0) return undefined;
+  return (
+    `${job.asset.value} resolved during discovery (${addresses.slice(0, 3).join(', ')}) ` +
+    `but ${job.tool.name} could not resolve it: check the worker's DNS ` +
+    `(outbound UDP/53 or WORKER_DNS_RESOLVERS)`
+  );
 }
 
 @Processor(BullMQName.JOB_RESULT, {
@@ -180,6 +211,12 @@ export class JobResultProcessor extends WorkerHost {
       // path: it is the target's condition, so the job completes with an empty
       // result instead of failing (and retrying, and failing its step).
       const benignReason = benignBuiltInReason(job.tool.name, rawResult?.raw);
+      const dnsFailure = benignReason
+        ? unresolvableButDiscoveredReason(job)
+        : undefined;
+      if (dnsFailure) {
+        throw new WithFailurePayload(dnsFailure, rawResult.payload);
+      }
       if (rawResult?.error && !benignReason) {
         throw new WithFailurePayload(
           normalizeFailureReason(rawResult.raw) ?? 'Job reported error',

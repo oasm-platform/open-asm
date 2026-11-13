@@ -497,6 +497,33 @@ func TestProcessJobLegacyBranch(t *testing.T) {
 	}
 }
 
+// Built-in naabu/dnsx commands run with the worker's resolvers pinned, so a
+// network that blocks public DNS does not make every host unresolvable.
+func TestProcessJobLegacyPinsDNSResolvers(t *testing.T) {
+	prev := builtinResolvers
+	builtinResolvers = []string{"127.0.0.11:53"}
+	t.Cleanup(func() { builtinResolvers = prev })
+
+	client, jobsSrv, _ := newWorkerTestSetup(t)
+	events := make(chan TuiEvent, 64)
+	jobsSrv.nextFn = func() (*pb.Job, error) {
+		return &pb.Job{Id: "job-dns-1", Command: strPtr("naabu -version")}, nil
+	}
+
+	processJob(context.Background(), pullJob(t, client), client, nil, "", events, nil, nil, nil)
+
+	close(events)
+	for ev := range events {
+		if ev.Type == EventJobStarted {
+			if want := "naabu -r 127.0.0.11:53 -version"; ev.Command != want {
+				t.Fatalf("started command = %q, want %q", ev.Command, want)
+			}
+			return
+		}
+	}
+	t.Fatal("expected EventJobStarted event")
+}
+
 // A connector job reaching a worker whose Docker runtime failed to start must
 // fail with that cause, not fall through to the legacy path's "No command" (#824).
 func TestProcessJobConnectorWithoutRuntime(t *testing.T) {

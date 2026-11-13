@@ -42,6 +42,11 @@ type Config struct {
 	EgressProxy string `mapstructure:"egress_proxy"` // "on" (default) routes containers via the proxy; "off" is the kill switch restoring direct egress
 	EgressAllow string `mapstructure:"egress_allow"` // comma-separated IPs/CIDRs the proxy may dial despite being non-public (on-prem Nessus/Acunetix)
 
+	// DNSResolvers (WORKER_DNS_RESOLVERS) pins the resolvers built-in naabu uses:
+	// comma-separated IP[:port]. Empty (default) = the nameservers in
+	// /etc/resolv.conf; "off" = keep naabu's hard-coded public resolvers.
+	DNSResolvers string `mapstructure:"dns_resolvers"`
+
 	// Warm-pool container reuse (Phase 2).
 	// PoolEnabled defaults to true; WORKER_POOL_ENABLED=false is the kill-switch
 	// restoring the legacy 1-stream-1-container behavior (no acquire/reuse).
@@ -110,6 +115,7 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("egress_port", 26277)
 	viper.SetDefault("egress_proxy", "on")
 	viper.SetDefault("egress_allow", "")
+	viper.SetDefault("dns_resolvers", "")
 	viper.SetDefault("mode", "")
 	viper.SetDefault("pool_enabled", true)
 	viper.SetDefault("connector_idle_timeout", 60)

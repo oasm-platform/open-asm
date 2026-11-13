@@ -311,6 +311,61 @@ describe('JobResultProcessor', () => {
       expect(mockWorkflowRunnerService.onJobTerminal).toHaveBeenCalled();
     });
 
+    // The FTL line is the same when the worker's resolver is unreachable. A host
+    // that discovery already resolved is not "nothing to scan": completing it
+    // hid a broken worker DNS behind a `done` step with zero ports.
+    it.each([
+      ['an A record', { A: ['104.18.10.66'] }],
+      ['only an AAAA record', { AAAA: ['2606:4700::6812:a42'] }],
+    ])(
+      'should fail the job when discovery resolved the host to %s',
+      async (_label, dnsRecords) => {
+        mockJobsRegistryService.findJobForUpdate.mockResolvedValue({
+          ...naabuJob(),
+          asset: { value: 'opencode.ai', dnsRecords },
+        });
+        mockStorageService.readJsonFile.mockResolvedValue({
+          jobId: 'job-1',
+          error: true,
+          raw: '[FTL] Could not run enumeration: no valid ipv4 or ipv6 targets were found',
+        });
+        const lastAttemptBullJob = {
+          ...baseBullJob,
+          attemptsMade: 2,
+        } as unknown as Parameters<JobResultProcessor['process']>[0];
+
+        await expect(processor.process(lastAttemptBullJob)).rejects.toThrow(
+          /opencode\.ai resolved during discovery.*worker's DNS/,
+        );
+
+        expect(mockJobsRegistryService.handleJobError).toHaveBeenCalled();
+        expect(mockJobRepository.update).not.toHaveBeenCalled();
+      },
+    );
+
+    it('should complete the job when discovery found no address for the host', async () => {
+      mockJobsRegistryService.findJobForUpdate.mockResolvedValue({
+        ...naabuJob(),
+        asset: {
+          value: 'stats.dev.opencode.ai',
+          dnsRecords: { SOA: ['dns.cloudflare.com'], A: [] },
+        },
+      });
+      mockStorageService.readJsonFile.mockResolvedValue({
+        jobId: 'job-1',
+        error: true,
+        raw: '[FTL] Could not run enumeration: no valid ipv4 or ipv6 targets were found',
+      });
+
+      await processor.process(baseBullJob);
+
+      expect(mockJobsRegistryService.handleJobError).not.toHaveBeenCalled();
+      expect(mockJobRepository.update).toHaveBeenCalledWith(
+        { id: 'job-1', status: JobStatus.IN_PROGRESS },
+        expect.objectContaining({ status: JobStatus.COMPLETED }),
+      );
+    });
+
     it('should still fail the job on a real tool error', async () => {
       mockJobsRegistryService.findJobForUpdate.mockResolvedValue(naabuJob());
       mockStorageService.readJsonFile.mockResolvedValue({
