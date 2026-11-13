@@ -174,7 +174,7 @@ Migration location: `core-api/src/database/migrations/` (58 files, newest last).
 |---|---|
 | `core-api/.env` (from `example.env`) | `POSTGRES_*`, `REDIS_URL`, `PORT=6276`, `GRPC_PORT=16276`, `GEO_IP_URL`, `OASM_CLOUD_APIKEY`, `ENCRYPTION_KEYS` (comma-separated KEKs, **last = active**), `RUSTFS_ENDPOINT/ACCESS_KEY/SECRET_KEY`, `AUDIT_ARCHIVE_DIR`. Optional cloud-S3 knobs (`STORAGE_URL_BASE`, `S3_*`, `CORS_ALLOWED_ORIGINS`) default in `storage.config.ts` |
 | `console/.env` (from `example.env`) | `VITE_API_URL` (dev `http://localhost:6276`) |
-| `worker/.env` (from `.example.env`) | `WORKER_API_KEY`, `WORKER_MAX_CONCURRENCY`, `WORKER_GRPC_HOST/PORT`, plus `WORKER_MODE`, `WORKER_TOOL_PATH`, `WORKER_TOKEN_FILE`, `WORKER_CONNECTOR_ADDR`, `WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT`, `WORKER_NETWORK` |
+| `worker/.env` (from `.example.env`) | `WORKER_API_KEY`, `WORKER_MAX_CONCURRENCY`, `WORKER_GRPC_HOST/PORT`, plus `WORKER_MODE`, `WORKER_TOOL_PATH`, `WORKER_TOKEN_FILE`, `WORKER_CONNECTOR_ADDR`, `WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT`, `WORKER_NETWORK`, `WORKER_DNS_RESOLVERS` (resolvers pinned onto built-in naabu via `-r`; empty = `/etc/resolv.conf`, `off` = naabu's public resolvers) |
 
 `ENCRYPTION_KEYS` semantics matter: the last key encrypts *and* decrypts, earlier keys are decrypt-only, and the built-in default stays decrypt-only too. New ciphertext is AES-256-GCM tagged with its key id (`v2:<keyId>:…`, workspace data `v2:dek:…`), so keys can move; the older AES-CBC formats stay readable, and `EncryptionUpgradeService` re-wraps DEKs and rewrites older ciphertext with the active key at boot. Outside development/test the API refuses to boot unless the last key is random and 32+ characters (`assertEncryptionKeys` in `main.ts`).
 

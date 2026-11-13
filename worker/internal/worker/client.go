@@ -6,6 +6,7 @@ import (
 	"net"
 	"oasm-worker/internal/config"
 	"oasm-worker/internal/connector"
+	"oasm-worker/internal/dnsresolver"
 	"oasm-worker/internal/egress"
 	"oasm-worker/internal/execution"
 	"oasm-worker/internal/runtime"
@@ -13,6 +14,7 @@ import (
 	"oasm-worker/internal/telemetry"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -144,6 +146,18 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 	if err != nil {
 		log.ErrorE("Failed to resolve tool path", err)
 		return
+	}
+
+	// Set before any job goroutine starts; read-only afterwards.
+	builtinResolvers, err = dnsresolver.Load(cfg.DNSResolvers)
+	if err != nil {
+		log.ErrorE("Invalid WORKER_DNS_RESOLVERS", err)
+		return
+	}
+	if len(builtinResolvers) > 0 {
+		log.Info("Built-in naabu DNS resolvers: %s", strings.Join(builtinResolvers, ", "))
+	} else {
+		log.Warning("Built-in naabu DNS resolvers: tool defaults (public resolvers); scans fail where outbound DNS to them is blocked")
 	}
 
 	ready := make(chan bool, 1)

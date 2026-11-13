@@ -18,6 +18,7 @@ import (
 	"github.com/go-rod/rod"
 
 	"oasm-worker/internal/connector"
+	"oasm-worker/internal/dnsresolver"
 	"oasm-worker/internal/execution"
 	"oasm-worker/internal/grpcclient"
 )
@@ -182,7 +183,7 @@ func processJob(ctx context.Context, job *pb.Job, grpcClient *grpcclient.Client,
 	}
 
 	startTime := time.Now()
-	cmdStr := job.GetCommand()
+	cmdStr := dnsresolver.ApplyToCommand(job.GetCommand(), builtinResolvers)
 
 	Emit(events, TuiEvent{
 		Type:       EventJobStarted,
