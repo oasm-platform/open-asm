@@ -42,6 +42,7 @@ describe('Search page Ask AI', () => {
     const user = userEvent.setup();
     render(<Search />);
     expect(screen.getByText('No results')).toBeInTheDocument();
+    expect(screen.getByText(/Nothing matched “nginx 1.18”/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Ask AI' }));
     expect(navigateMock).toHaveBeenCalledWith({
       to: '/aistudio',

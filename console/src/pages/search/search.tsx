@@ -200,7 +200,7 @@ export default function Search() {
       ) : total === 0 ? (
         <EmptyState
           title="No results"
-          description={`Nothing matched “${urlQuery}”. Try a shorter term, drop a filter, or ask AI about it.`}
+          description={`Nothing matched “${urlQuery.trim()}”. Try a shorter term, drop a filter, or ask AI about it.`}
           action={<AskAiButton query={urlQuery} />}
           secondaryAction={
             <Button
