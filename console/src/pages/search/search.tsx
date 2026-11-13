@@ -1,3 +1,4 @@
+import { AskAiButton } from '@/components/common/ask-ai-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/common/states/empty-state';
@@ -180,19 +181,17 @@ export default function Search() {
         )}
       </div>
 
-      {isError && (
-        <EmptyState
-          title="Search failed"
-          description="The server did not answer. Try again."
-          action={<Button onClick={() => refetch()}>Retry</Button>}
-        />
-      )}
-
       {!urlQuery ? (
         <EmptyState
           title="Search your attack surface"
           description="Type a hostname, CVE or field filter. Results include findings so you can jump straight into triage."
           icon={<SearchIcon className="size-5" aria-hidden />}
+        />
+      ) : isError ? (
+        <EmptyState
+          title="Search failed"
+          description="The server did not answer. Try again."
+          action={<Button onClick={() => refetch()}>Retry</Button>}
         />
       ) : isFetching ? (
         <p className="py-8 text-center text-sm text-muted-foreground">
@@ -201,8 +200,19 @@ export default function Search() {
       ) : total === 0 ? (
         <EmptyState
           title="No results"
-          description={`Nothing matched “${urlQuery}”. Try a shorter term or drop a filter.`}
-          action={<Button onClick={() => setInput('')}>Clear search</Button>}
+          description={`Nothing matched “${urlQuery}”. Try a shorter term, drop a filter, or ask AI about it.`}
+          action={<AskAiButton query={urlQuery} />}
+          secondaryAction={
+            <Button
+              variant="outline"
+              onClick={() => {
+                setInput('');
+                navigate({ to: '/search', search: { query: '' } });
+              }}
+            >
+              Clear search
+            </Button>
+          }
         />
       ) : (
         <>
