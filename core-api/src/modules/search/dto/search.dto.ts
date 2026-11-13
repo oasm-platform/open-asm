@@ -12,12 +12,17 @@ import {
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
+
+/** Longest accepted search term; longer input is rejected with 400. */
+export const SEARCH_VALUE_MAX_LENGTH = 255;
 
 export class SearchAssetsTargetsDto extends GetManyBaseQueryParams {
   @ApiProperty({ required: true })
   @IsString()
+  @MaxLength(SEARCH_VALUE_MAX_LENGTH)
   value: string;
 
   @ApiProperty({ required: false, example: 10 })
