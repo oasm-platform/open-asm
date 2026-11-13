@@ -12,6 +12,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"oasm-worker/internal/egress"
 )
 
 // publicProxy is the forward proxy each browser session on a shared
@@ -28,8 +30,8 @@ type publicProxy struct {
 	tr      *http.Transport
 	dialer  *net.Dialer
 	onBlock func(line string)
-	// dialable decides which addresses may be dialed; isPublicAddr outside
-	// tests.
+	// dialable decides which addresses may be dialed; egress.IsPublicAddr
+	// outside tests.
 	dialable func(netip.Addr) bool
 }
 
@@ -38,7 +40,7 @@ func newPublicProxy(onBlock func(line string)) (*publicProxy, error) {
 	if err != nil {
 		return nil, err
 	}
-	p := &publicProxy{ln: ln, onBlock: onBlock, dialable: isPublicAddr}
+	p := &publicProxy{ln: ln, onBlock: onBlock, dialable: egress.IsPublicAddr}
 	p.dialer = &net.Dialer{Timeout: 10 * time.Second, Control: p.checkDial}
 	p.tr = &http.Transport{DialContext: p.dialer.DialContext, IdleConnTimeout: 30 * time.Second}
 	p.rp = &httputil.ReverseProxy{
@@ -153,43 +155,6 @@ func (p *publicProxy) tunnel(w http.ResponseWriter, r *http.Request) {
 	_ = client.Close()
 }
 
-// nonPublicPrefixes are special-purpose ranges that netip does not classify
-// as private, loopback or link-local but that are not on the internet.
-var nonPublicPrefixes = []netip.Prefix{
-	netip.MustParsePrefix("0.0.0.0/8"),      // "this network"
-	netip.MustParsePrefix("100.64.0.0/10"),  // carrier-grade NAT
-	netip.MustParsePrefix("192.0.0.0/24"),   // IETF protocol assignments
-	netip.MustParsePrefix("198.18.0.0/15"),  // benchmarking
-	netip.MustParsePrefix("240.0.0.0/4"),    // reserved
-	netip.MustParsePrefix("::/96"),          // IPv4-compatible (deprecated)
-	netip.MustParsePrefix("100::/64"),       // discard
-	netip.MustParsePrefix("64:ff9b:1::/48"), // local-use NAT64
-}
-
-// isPublicAddr reports whether ip is a unicast address on the internet. An
-// IPv4 address embedded by NAT64 or 6to4 is judged by that IPv4 address.
-func isPublicAddr(ip netip.Addr) bool {
-	ip = ip.Unmap()
-	if !ip.IsGlobalUnicast() || ip.IsPrivate() {
-		return false
-	}
-	for _, pfx := range nonPublicPrefixes {
-		if pfx.Contains(ip) {
-			return false
-		}
-	}
-	if ip.Is6() {
-		b := ip.As16()
-		switch {
-		case netip.MustParsePrefix("64:ff9b::/96").Contains(ip):
-			return isPublicAddr(netip.AddrFrom4([4]byte(b[12:16])))
-		case netip.MustParsePrefix("2002::/16").Contains(ip):
-			return isPublicAddr(netip.AddrFrom4([4]byte(b[2:6])))
-		}
-	}
-	return true
-}
-
 // sharedWorkerHostErr refuses up front a host that a shared worker's proxy
 // would block anyway: localhost or a non-public IP.
 func sharedWorkerHostErr(host string) error {
@@ -197,7 +162,7 @@ func sharedWorkerHostErr(host string) error {
 	if h == "localhost" || strings.HasSuffix(h, ".localhost") {
 		return fmt.Errorf("%s is the worker itself; this worker is shared, so the browser reaches only public hosts", host)
 	}
-	if ip, err := netip.ParseAddr(h); err == nil && !isPublicAddr(ip) {
+	if ip, err := netip.ParseAddr(h); err == nil && !egress.IsPublicAddr(ip) {
 		return fmt.Errorf("%s is not a public address; this worker is shared, so the browser reaches only public hosts", host)
 	}
 	return nil

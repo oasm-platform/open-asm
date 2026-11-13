@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -400,6 +401,7 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 			// token (WORKER_TOKEN env); the connector server validates it
 			// per-execution.
 			ConnectorToken: spec.ConnectorToken,
+			DirectEgress:   spec.DirectEgress,
 		}
 	}
 	m.mu.Unlock()
@@ -601,9 +603,15 @@ func (m *Manager) Cancel(ctx context.Context, id string) error {
 	h := e.Handle
 	e.State = StateCancelled
 	delete(m.execs, id)
-	// Single-use: the token dies with its execution.
+	// Single-use: the token dies with its execution, plus the pooled
+	// creator token of the container cancelled with it.
 	m.tokenMu.Lock()
 	delete(m.tokens, id)
+	if m.pool != nil {
+		if creator := m.pool.CreatingExec(id); creator != "" {
+			delete(m.tokens, creator)
+		}
+	}
 	m.tokenMu.Unlock()
 	// Pooled container dies with its cancelled execution.
 	if m.pool != nil {
@@ -641,10 +649,13 @@ func (m *Manager) Release(ctx context.Context, execID string) error {
 		e.State = StateDone
 		delete(m.execs, execID)
 	}
-	// Single-use: the token dies with its execution.
-	m.tokenMu.Lock()
-	delete(m.tokens, execID)
-	m.tokenMu.Unlock()
+	// Pool wired: the container (and its creator token) survives for reuse;
+	// gcEgressTokens owns deletion. Without a pool the 1:1 path deletes now.
+	if m.pool == nil {
+		m.tokenMu.Lock()
+		delete(m.tokens, execID)
+		m.tokenMu.Unlock()
+	}
 	if m.binder != nil {
 		m.binder.ReleaseExec(execID)
 	}
@@ -696,6 +707,11 @@ func (m *Manager) ContainerDown(execID string) {
 	// token is deleted BEFORE the pool-nil early return.
 	m.tokenMu.Lock()
 	delete(m.tokens, execID)
+	if m.pool != nil {
+		if creator := m.pool.CreatingExec(execID); creator != "" {
+			delete(m.tokens, creator)
+		}
+	}
 	m.tokenMu.Unlock()
 	if m.pool == nil {
 		return
@@ -735,6 +751,8 @@ func (m *Manager) SweepLoop(ctx context.Context) {
 			for _, e := range m.pool.Sweep(time.Now()) {
 				m.sweepContainer(e)
 			}
+			// Bound retained proxy credentials to live execs + pooled creators.
+			m.gcEgressTokens()
 		}
 	}
 }
@@ -757,6 +775,7 @@ func (m *Manager) DrainPool() {
 	for _, e := range m.pool.Sweep(future) {
 		m.sweepContainer(e)
 	}
+	m.gcEgressTokens()
 }
 
 // sweepContainer tears down one expired idle container (Stop+Cleanup) and
@@ -765,9 +784,10 @@ func (m *Manager) sweepContainer(e poolEntry) {
 	// A swept entry that still names an execution (defensive: released entries
 	// are cleared by ReleaseToIdle) drops that execution's single-use token
 	// with it — no token survives the container that carried it.
-	if e.ExecID != "" {
+	if e.ExecID != "" || e.TokenExecID != "" {
 		m.tokenMu.Lock()
 		delete(m.tokens, e.ExecID)
+		delete(m.tokens, e.TokenExecID)
 		m.tokenMu.Unlock()
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), ConnectorCleanupTimeout)
@@ -789,6 +809,74 @@ func (m *Manager) ActiveCount() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return len(m.execs)
+}
+
+// subtleEqual compares two credentials in constant time; empty never matches.
+func subtleEqual(a, b string) bool {
+	if len(a) == 0 || len(b) == 0 {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
+}
+
+// ProxyAuth validates one egress proxy credential and returns the execution
+// label for proxy log lines. It accepts live execution tokens and retained
+// creator tokens of pooled containers: the same single-use token the
+// connector presents on Register authorizes its proxy traffic.
+func (m *Manager) ProxyAuth(token string) (string, bool) {
+	if token == "" {
+		return "", false
+	}
+	m.tokenMu.RLock()
+	var matched string
+	for execID, tok := range m.tokens {
+		if subtleEqual(tok, token) {
+			matched = execID
+			break
+		}
+	}
+	m.tokenMu.RUnlock()
+	if matched == "" {
+		return "", false
+	}
+	// Attribute reuse traffic to the execution actually running on the
+	// container, not the (possibly finished) creator that minted the token.
+	// tokenMu is released before taking m.mu: Cancel/Release hold m.mu and
+	// then take tokenMu, so holding both in the reverse order deadlocks the
+	// worker when a proxy request races job teardown.
+	m.mu.Lock()
+	pool := m.pool
+	m.mu.Unlock()
+	if pool != nil {
+		if cur := pool.CurrentExecForToken(matched); cur != "" {
+			return cur, true
+		}
+	}
+	return matched, true
+}
+
+// gcEgressTokens drops retained tokens no live execution or pooled creator
+// needs. Runs each SweepLoop tick and in DrainPool.
+func (m *Manager) gcEgressTokens() {
+	keep := map[string]bool{}
+	m.mu.Lock()
+	for id := range m.execs {
+		keep[id] = true
+	}
+	pool := m.pool
+	m.mu.Unlock()
+	if pool != nil {
+		for _, creator := range pool.CreatingExecs() {
+			keep[creator] = true
+		}
+	}
+	m.tokenMu.Lock()
+	for id := range m.tokens {
+		if !keep[id] {
+			delete(m.tokens, id)
+		}
+	}
+	m.tokenMu.Unlock()
 }
 
 // ExecToken returns the per-execution single-use connector auth token for an

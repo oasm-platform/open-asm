@@ -52,6 +52,8 @@ message Job {
   optional string cpu = 9;               // e.g. "500m" (millicores) or "1" (cores)
   optional string memory = 10;           // e.g. "512Mi", "1Gi"
   optional int32 timeout_seconds = 11;   // container timeout in seconds
+  // Manifest egress: direct skips the worker egress proxy (raw port scanners).
+  bool direct_egress = 12;
 }
 
 // Request for the batched claim path. `limit` is the number of free

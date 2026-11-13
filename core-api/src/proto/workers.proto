@@ -109,6 +109,7 @@ message ToolRun {
   optional string cpu            = 5;
   optional string memory         = 6;
   optional int32 timeout_seconds = 7;
+  bool direct_egress             = 8; // manifest egress: direct skips the egress proxy
 }
 
 message RemoteExecuteSubscribeResponse {

@@ -11,6 +11,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+
+	"oasm-worker/internal/egress"
 )
 
 func proxiedClient(t *testing.T, p *publicProxy) *http.Client {
@@ -113,7 +115,7 @@ func TestIsPublicAddr(t *testing.T) {
 		"64:ff9b:1::a00:1": false,
 	}
 	for in, want := range cases {
-		if got := isPublicAddr(netip.MustParseAddr(in)); got != want {
+		if got := egress.IsPublicAddr(netip.MustParseAddr(in)); got != want {
 			t.Errorf("isPublicAddr(%s) = %v, want %v", in, got, want)
 		}
 	}

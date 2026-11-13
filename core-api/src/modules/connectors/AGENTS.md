@@ -22,6 +22,7 @@ In-memory catalogue of scanner connectors (container images the worker runs), lo
 
 - The manifest loads once in `onModuleInit` from `path.resolve(process.cwd(), 'resources/connectors/manifest.json')`, so the process must start with `core-api/` as its cwd. A missing file, invalid JSON or an empty `connectors` array only logs a warning, and the registry stays empty: every lookup returns `null`/`[]` and boot does not fail.
 - `resourceDefaults` are validated per field. CPU matches `^[0-9]+(\.[0-9]+)?m?$`. Memory is an integer with an optional `Mi|Gi|Ki|M|G|K` suffix (the worker rejects fractions). `timeoutSeconds` is a positive integer. Each invalid or missing field falls back on its own to `500m` / `512Mi` / `600`, and an unknown slug gets all three defaults.
+- `egress` is `direct` or absent (= proxy). `jobs-registry.controller.ts` and `agents/tools/connector.tools.ts` turn `egress === 'direct'` into `directEgress` on the gRPC Job / ToolRun; the worker then skips its egress proxy for that container. Send it camelCase: proto-loader runs with `keepCase: false` and drops snake_case keys.
 - `manifest.json` is generated (`task sync-connectors`) and must not be hand-edited. Change the manifest upstream and re-sync.
 - Duplicate slugs in the manifest: the last entry wins (plain `Map.set`).
 

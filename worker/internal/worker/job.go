@@ -576,7 +576,8 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 		JobID:  job.Id,
 		// Ownership fingerprint for the oasm.worker_id label — lets the NEXT
 		// boot's ReconcileOrphans recognize this worker's own containers.
-		WorkerID: grpcClient.OwnerID(),
+		WorkerID:     grpcClient.OwnerID(),
+		DirectEgress: job.GetDirectEgress(),
 	}
 
 	// Attach manifest resource limits (scheduling context from core-api) when

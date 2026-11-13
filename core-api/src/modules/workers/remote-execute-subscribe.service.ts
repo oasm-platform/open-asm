@@ -35,6 +35,8 @@ export interface ToolRunPayload {
   cpu?: string;
   memory?: string;
   timeoutSeconds?: number;
+  /** Manifest egress "direct": skip the worker egress proxy. */
+  directEgress?: boolean;
 }
 
 /** The worker picked for a conversation's next push. */

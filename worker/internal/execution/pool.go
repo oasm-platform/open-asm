@@ -59,10 +59,14 @@ type poolEntry struct {
 	StateChangedAt time.Time
 	LastUsedAt     time.Time // last transition time; Sweep evicts idle entries past the idle timeout
 	ExecID         string    // owner execution ("" when idle)
-	LastJobID      string
-	LastTraceID    string
-	CPU            string // manifest cpu the container was created with (informational)
-	Memory         string // manifest memory the container was created with (informational)
+	// TokenExecID is the creating execution whose single-use token stays
+	// valid while this container lives (set on first ReleaseToIdle): pooled
+	// reuse authenticates proxy traffic as the creator.
+	TokenExecID string
+	LastJobID   string
+	LastTraceID string
+	CPU         string // manifest cpu the container was created with (informational)
+	Memory      string // manifest memory the container was created with (informational)
 	// Declared limits as numbers, reserved against the node budget while busy.
 	CPURequestMillis int
 	MemRequestBytes  int
@@ -264,6 +268,9 @@ func (p *PoolManager) ReleaseToIdle(execID string) {
 			p.markFreedLocked(e.PoolKey)
 		}
 		e.State = PoolStateIdle
+		if e.TokenExecID == "" {
+			e.TokenExecID = execID
+		}
 		e.ExecID = ""
 		e.LastUsedAt = p.now()
 		e.StateChangedAt = e.LastUsedAt
@@ -271,9 +278,12 @@ func (p *PoolManager) ReleaseToIdle(execID string) {
 	}
 }
 
-// Sweep returns every idle entry idle for at least the idle timeout. The
-// caller (Manager.SweepLoop) stops, cleans up and unregisters them. Busy
-// entries and fresh idle entries are never collected.
+// Sweep returns every idle entry idle for at least the idle timeout, plus
+// any idle entry whose container passed MaxPooledContainerAge — an aged
+// container retires on its next idle window so its retained creator token
+// (the egress proxy credential) cannot live forever on a hot container.
+// The caller (Manager.SweepLoop) stops, cleans up and unregisters them.
+// Busy entries and fresh idle entries are never collected.
 func (p *PoolManager) Sweep(now time.Time) []poolEntry {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -282,7 +292,8 @@ func (p *PoolManager) Sweep(now time.Time) []poolEntry {
 		if e.State != PoolStateIdle {
 			continue
 		}
-		if now.Sub(e.LastUsedAt) < p.idleTimeout {
+		aged := !e.CreatedAt.IsZero() && now.Sub(e.CreatedAt) >= MaxPooledContainerAge
+		if !aged && now.Sub(e.LastUsedAt) < p.idleTimeout {
 			continue
 		}
 		stale = append(stale, *e)
@@ -332,6 +343,53 @@ func (p *PoolManager) Evict(execID string) string {
 	// so Evict never leaves a stale routing behind.
 	p.purgeOwnerByContainer(cid)
 	return cid
+}
+
+// CreatingExec returns the TokenExecID (token-owning creator) of the
+// container currently backing execID, or "" when unknown.
+func (p *PoolManager) CreatingExec(execID string) string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	cid, ok := p.owner[execID]
+	if !ok {
+		return ""
+	}
+	if e, ok := p.byID[cid]; ok {
+		return e.TokenExecID
+	}
+	return ""
+}
+
+// CreatingExecs lists every pooled container's token-owning creator for
+// gcEgressTokens.
+func (p *PoolManager) CreatingExecs() []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	var out []string
+	for _, e := range p.byID {
+		if e.TokenExecID != "" {
+			out = append(out, e.TokenExecID)
+		}
+	}
+	return out
+}
+
+// CurrentExecForToken resolves the live execution label for proxy traffic
+// authenticated by a retained creator token: the container that carries
+// TokenExecID reports its current owner (busy) or the creator itself
+// (idle between executions). "" when no pooled container carries it.
+func (p *PoolManager) CurrentExecForToken(creator string) string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, e := range p.byID {
+		if e.TokenExecID == creator {
+			if e.ExecID != "" {
+				return e.ExecID
+			}
+			return creator
+		}
+	}
+	return ""
 }
 
 // IsIdle reports whether the container backing execID is idle (no execution in

@@ -146,6 +146,33 @@ describe('JobsRegistryController', () => {
       expect(result.inputs).toEqual({
         fields: { target: { stringValue: 'https://example.com' } },
       });
+      // camelCase keys: proto-loader drops snake_case ones on serialize.
+      expect(result.timeoutSeconds).toBe(600);
+      expect(result).not.toHaveProperty('timeout_seconds');
+      // No manifest egress: proxied.
+      expect(result.directEgress).toBe(false);
+    });
+
+    it('passes manifest egress: direct to the worker', async () => {
+      mockJobsRegistryService.getNextJob.mockResolvedValue({
+        id: 'job-nmap',
+        workspaceId: 'ws-1',
+        category: 'ports_scanner',
+        asset: { value: 'example.com' },
+        config: null,
+        tool: { id: 'nmap', name: 'Nmap' },
+      });
+      mockConnectorRegistry.getConnector.mockReturnValue({
+        name: 'Nmap',
+        slug: 'nmap',
+        image: 'ghcr.io/oasm-platform/connector-nmap:7.97',
+        egress: 'direct',
+      });
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({});
+
+      const result = await controller.next({ id: 'worker-1' });
+
+      expect(result.directEgress).toBe(true);
     });
 
     it('sends the inputs a job was planned with, e.g. the URL of a web service', async () => {

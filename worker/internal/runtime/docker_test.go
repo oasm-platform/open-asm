@@ -185,7 +185,7 @@ func TestDockerRuntimeConfigJSONRoundTrip(t *testing.T) {
 
 func TestBuildContainerEnvBaseVars(t *testing.T) {
 	spec := JobSpec{JobID: "j-123", Tool: "nuclei", TraceID: "tr-456"}
-	env := buildContainerEnv(spec, "host:50051", "tok-789", "exec-abc")
+	env := buildContainerEnv(spec, "host:50051", "tok-789", "exec-abc", EgressConfig{})
 
 	assertEnvContains := func(key, want string) {
 		t.Helper()
@@ -215,7 +215,7 @@ func TestBuildContainerEnvBaseVars(t *testing.T) {
 // when it is set, falling back to the connectorToken parameter otherwise.
 func TestBuildContainerEnvPrefersSpecConnectorToken(t *testing.T) {
 	spec := JobSpec{JobID: "j-tok", Tool: "nuclei", ConnectorToken: "per-exec-9f2a"}
-	env := buildContainerEnv(spec, "host:50051", "legacy-shared", "exec-abc")
+	env := buildContainerEnv(spec, "host:50051", "legacy-shared", "exec-abc", EgressConfig{})
 
 	found := false
 	for _, e := range env {
@@ -249,7 +249,7 @@ func TestBuildContainerEnvSplitsGrpcHostPort(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			env := buildContainerEnv(spec, tc.addr, "tok", "exec-1")
+			env := buildContainerEnv(spec, tc.addr, "tok", "exec-1", EgressConfig{})
 			got := map[string]string{}
 			for _, e := range env {
 				k, v, ok := strings.Cut(e, "=")
@@ -275,7 +275,7 @@ func TestBuildContainerEnvSplitsGrpcHostPort(t *testing.T) {
 // unknown, so no WORKER_GRPC_PORT var is invented.
 func TestBuildContainerEnvNoPortAddrEmitsHostOnly(t *testing.T) {
 	spec := JobSpec{JobID: "j-noport", Tool: "nuclei", TraceID: "tr-noport"}
-	env := buildContainerEnv(spec, "oasm-worker", "tok", "exec-1")
+	env := buildContainerEnv(spec, "oasm-worker", "tok", "exec-1", EgressConfig{})
 	var hostFound bool
 	for _, e := range env {
 		if strings.HasPrefix(e, "WORKER_GRPC_PORT=") {
@@ -297,7 +297,7 @@ func TestBuildContainerEnvOASMConfig(t *testing.T) {
 		TraceID: "tr-cfg",
 		Config:  map[string]any{"proxy": true, "rateLimit": float64(50)},
 	}
-	env := buildContainerEnv(spec, "", "", "")
+	env := buildContainerEnv(spec, "", "", "", EgressConfig{})
 
 	var found string
 	for _, e := range env {
@@ -323,7 +323,7 @@ func TestBuildContainerEnvOASMConfig(t *testing.T) {
 
 func TestBuildContainerEnvNilConfig(t *testing.T) {
 	spec := JobSpec{JobID: "j-no", Tool: "nuclei", TraceID: "tr-no"}
-	env := buildContainerEnv(spec, "", "", "")
+	env := buildContainerEnv(spec, "", "", "", EgressConfig{})
 
 	for _, e := range env {
 		if strings.HasPrefix(e, "OASM_CONFIG=") {
@@ -396,7 +396,7 @@ func TestBuildContainerEnvNoInputs(t *testing.T) {
 		TraceID: "tr-in",
 		Inputs:  map[string]any{"target": "example.com", "severity": "high"},
 	}
-	env := buildContainerEnv(spec, "", "", "")
+	env := buildContainerEnv(spec, "", "", "", EgressConfig{})
 
 	for _, e := range env {
 		if strings.HasPrefix(e, "INPUT_") {
@@ -562,7 +562,7 @@ func TestResolveConnectorAddrLinuxFallback(t *testing.T) {
 // WORKER_GRPC_ADDR — never the old raw 0.0.0.0 default.
 func TestBuildContainerEnvUsesResolvedAddr(t *testing.T) {
 	r := NewDockerRuntimeWithClient(nil, "172.18.0.3:50051", "tok")
-	env := buildContainerEnv(JobSpec{JobID: "j-1", Tool: "nuclei", TraceID: "t-1"}, r.connectorAddr, r.connectorToken, "e-1")
+	env := buildContainerEnv(JobSpec{JobID: "j-1", Tool: "nuclei", TraceID: "t-1"}, r.connectorAddr, r.connectorToken, "e-1", EgressConfig{})
 
 	found := false
 	for _, e := range env {

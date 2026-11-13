@@ -271,6 +271,10 @@ networks:
     driver: bridge
   # Fixed name (no project prefix): the worker attaches connector containers it
   # spawns through the Engine API by this exact name.
+  # internal: no route out, so connector egress goes through the worker's
+  # egress proxy (:26277). Raw port scanners (nmap, rustscan) are exempt: the
+  # worker also attaches them to the default bridge.
   oasm-connectors:
     name: oasm-connectors
     driver: bridge
+    internal: true

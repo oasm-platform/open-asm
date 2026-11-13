@@ -125,9 +125,10 @@ func runAgentTool(ctx context.Context, sessionID, ownerID string, run *pb.ToolRu
 		Image:  run.GetImage(),
 		Inputs: map[string]any{"target": run.GetTarget()},
 		// Container label/trace id only; there is no job behind it.
-		JobID:    sessionID,
-		WorkerID: ownerID,
-		Lane:     execution.AgentLane,
+		JobID:        sessionID,
+		WorkerID:     ownerID,
+		Lane:         execution.AgentLane,
+		DirectEgress: run.GetDirectEgress(),
 	}
 	// No JobTimeoutSecondsKey: the manager requires it above the connect
 	// timeout, while the agent budget is shorter. drainAgentTool enforces it.

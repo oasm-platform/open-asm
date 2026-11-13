@@ -241,6 +241,7 @@ describe('AgentTool run_tool_connector', () => {
     shortDescription: 'Network mapper',
     agentTool: true,
     image: 'nmap:latest',
+    egress: 'direct' as const,
   };
   type Runnable = {
     execute: (input: unknown, options?: unknown) => Promise<unknown>;
@@ -323,6 +324,7 @@ describe('AgentTool run_tool_connector', () => {
         tool: 'nmap',
         image: 'nmap:latest',
         target: 'example.com',
+        directEgress: true,
         configJson: '{"rate":10}',
         cpu: '500m',
         memory: '512Mi',

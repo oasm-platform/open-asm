@@ -44,6 +44,9 @@ type JobSpec struct {
 	// (direct runtime users) → label omitted → never tier-2 removable by
 	// another worker.
 	WorkerID string
+	// DirectEgress (manifest egress: direct) skips the egress proxy: raw
+	// TCP/UDP probes (port scanners) cannot go through it.
+	DirectEgress bool
 }
 
 type RuntimeOpts struct {
