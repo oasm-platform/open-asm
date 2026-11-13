@@ -7,6 +7,8 @@ import {
   WorkerScope,
   WorkerType,
 } from '@/common/enums/enum';
+import { isPublicIp, unmapIpv4 } from '@/common/utils/ip-range.util';
+import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
 import { RedisService } from '@/services/redis/redis.service';
 import { generateToken } from '@/utils/genToken';
 import { getManyResponse } from '@/utils/getManyResponse';
@@ -51,10 +53,20 @@ import {
   WorkerAliveDto,
   WorkerJoinDto,
   WorkerListItemDto,
+  WorkerLocationDto,
   WorkerToolDto,
   WorkerToolJobDto,
 } from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
+
+/** Longest worker name stored; a worker reports it, so it is untrusted input. */
+export const WORKER_NAME_MAX_LENGTH = 128;
+
+/** The reported name trimmed and capped, or undefined when it is blank. */
+function normalizeWorkerName(name: string | undefined): string | undefined {
+  const trimmed = name?.trim();
+  return trimmed ? trimmed.slice(0, WORKER_NAME_MAX_LENGTH) : undefined;
+}
 
 /**
  * The list filters plus the workspace the request runs in. The workspace
@@ -101,6 +113,8 @@ export class WorkersService {
     private readonly connectorRegistry: ConnectorRegistryService,
 
     private readonly eventBridge: EventBridgeService,
+
+    private readonly geoIpService: GeoIpService,
   ) {}
 
   /**
@@ -591,9 +605,15 @@ export class WorkersService {
       );
     }
 
-    const { jobsByTool, currentJobsCount } = await this.getRunningJobsByTool(
-      worker.id,
-    );
+    // A local or private address (a worker next to core-api, or behind the
+    // same NAT) says nothing about where the worker is, so it is not shown.
+    const publicIp = isPublicIp(worker.ipAddress)
+      ? unmapIpv4(worker.ipAddress)
+      : undefined;
+    const [{ jobsByTool, currentJobsCount }, location] = await Promise.all([
+      this.getRunningJobsByTool(worker.id),
+      publicIp ? this.locateIp(publicIp) : Promise.resolve(null),
+    ]);
 
     // Never expose `token` — it is a live worker secret.
     return {
@@ -603,7 +623,8 @@ export class WorkersService {
       lastSeenAt: worker.lastSeenAt,
       name: worker.name,
       os: worker.os,
-      ipAddress: worker.ipAddress,
+      ipAddress: publicIp,
+      location,
       type: worker.type,
       scope: worker.scope,
       runMode: worker.runMode as 'cli' | 'node' | null,
@@ -621,6 +642,35 @@ export class WorkersService {
         currentJobs: jobsByTool.get(tool.name ?? tool.id) ?? [],
       })),
     };
+  }
+
+  /**
+   * Location of a public IP, or null when the geo-ip database does not know
+   * it. A lookup failure is logged and also yields null: the location is an
+   * extra on the detail page and must not fail it.
+   */
+  private async locateIp(ip: string): Promise<WorkerLocationDto | null> {
+    try {
+      const [geo] = await this.geoIpService.getGeoIp([ip]);
+      if (geo?.status !== 'success') return null;
+      return {
+        country: geo.country || undefined,
+        countryCode: geo.countryCode || undefined,
+        region: geo.regionName || undefined,
+        city: geo.city || undefined,
+        latitude: geo.lat,
+        longitude: geo.lon,
+        timezone: geo.timezone || undefined,
+        isp: geo.isp || undefined,
+      };
+    } catch (error: unknown) {
+      this.logger.warn(
+        `Worker location lookup failed: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+      return null;
+    }
   }
 
   /** Real-time scan targets of a worker, grouped by tool.
@@ -706,6 +756,7 @@ export class WorkersService {
   public async join(dto: WorkerJoinDto): Promise<WorkerInstance> {
     const { apiKey, token, metadata, ipAddress } = dto;
     const runMode = this.mapRunMode(metadata?.mode);
+    const name = normalizeWorkerName(metadata?.name);
 
     const existingWorker = token
       ? await this.repo.findOne({ where: { token } })
@@ -722,13 +773,13 @@ export class WorkersService {
         existingWorker?.scope === WorkerScope.WORKSPACE &&
         existingWorker.workspaceId === joinKey.workspaceId
       ) {
-        return this.rejoinWorker(existingWorker, ipAddress, runMode, {
+        return this.rejoinWorker(existingWorker, ipAddress, runMode, name, {
           joinKeyId: joinKey.id,
         });
       }
       const worker = await this.createWorkspaceWorker(
         joinKey.workspaceId,
-        metadata,
+        { ...metadata, name },
         ipAddress,
         runMode,
       );
@@ -740,12 +791,12 @@ export class WorkersService {
 
     // 2. Token rejoin
     if (existingWorker) {
-      return this.rejoinWorker(existingWorker, ipAddress, runMode);
+      return this.rejoinWorker(existingWorker, ipAddress, runMode, name);
     }
 
     // 3. Cloud worker
     if (isCloudKey) {
-      return this.createCloudWorker(metadata, ipAddress, runMode);
+      return this.createCloudWorker({ ...metadata, name }, ipAddress, runMode);
     }
 
     throw new RpcException('Join key is invalid, expired or already used');
@@ -756,12 +807,18 @@ export class WorkersService {
     existingWorker: WorkerInstance,
     ipAddress: string | undefined,
     runMode: string | null,
+    name: string | undefined,
     extra?: { joinKeyId?: string },
   ): Promise<WorkerInstance> {
     await this.fallbackWorkerRejoin(existingWorker.id);
     const updates: Record<string, unknown> = {};
     if (ipAddress) {
       updates.ipAddress = ipAddress;
+    }
+    // The worker reports WORKER_NAME (or its hostname) on every join, so a
+    // renamed worker keeps its identity and only its name changes.
+    if (name && name !== existingWorker.name) {
+      updates.name = name;
     }
     // Update runMode only if changed
     if (runMode !== existingWorker.runMode) {

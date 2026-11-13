@@ -2739,6 +2739,18 @@ export type GetManyWorkerListItemDtoDto = {
   pageCount: number;
 };
 
+export type WorkerLocationDto = {
+  country?: string;
+  /** ISO 3166-1 alpha-2 code. */
+  countryCode?: string;
+  region?: string;
+  city?: string;
+  latitude?: number;
+  longitude?: number;
+  timezone?: string;
+  isp?: string;
+};
+
 export type WorkerTelemetryNodeDto = {
   hostname: string;
   os: string;
@@ -2934,7 +2946,13 @@ export type GetWorkerResponseDto = {
   lastSeenAt: string;
   name?: string;
   os?: string;
+  /** Public IP the worker joined from. Omitted when it is a local or private address. */
   ipAddress?: string;
+  /**
+   * Location of `ipAddress`; null when the IP is hidden, unknown or the lookup failed.
+   * @nullable
+   */
+  location?: WorkerLocationDto | null;
   type: GetWorkerResponseDtoType;
   scope: GetWorkerResponseDtoScope;
   /** @nullable */

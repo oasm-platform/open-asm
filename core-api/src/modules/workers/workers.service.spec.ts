@@ -15,9 +15,10 @@ import { NetworkInterface } from '../internal-networks/entities/network-interfac
 import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
 import { ToolsService } from '../tools/tools.service';
 import { RedisService } from '@/services/redis/redis.service';
+import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
 import { AliveStreamManager } from './alive-stream-manager.service';
 import { WorkerInstance } from './entities/worker.entity';
-import { WorkersService } from './workers.service';
+import { WORKER_NAME_MAX_LENGTH, WorkersService } from './workers.service';
 import { WorkerJoinKeyService } from './worker-join-key.service';
 import { WorkerTelemetryService } from './worker-telemetry.service';
 
@@ -37,6 +38,7 @@ describe('WorkersService', () => {
   let mockConnectorRegistryService: Partial<ConnectorRegistryService>;
   let mockWorkerTelemetryService: Partial<WorkerTelemetryService>;
   let mockEventBridge: { publishSafely: jest.Mock };
+  let mockGeoIpService: { getGeoIp: jest.Mock };
 
   beforeEach(async () => {
     mockWorkerInstanceRepository = {
@@ -121,6 +123,8 @@ describe('WorkersService', () => {
 
     mockEventBridge = { publishSafely: jest.fn().mockResolvedValue('1-0') };
 
+    mockGeoIpService = { getGeoIp: jest.fn().mockResolvedValue([]) };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         WorkersService,
@@ -179,6 +183,10 @@ describe('WorkersService', () => {
         {
           provide: EventBridgeService,
           useValue: mockEventBridge,
+        },
+        {
+          provide: GeoIpService,
+          useValue: mockGeoIpService,
         },
       ],
     }).compile();
@@ -512,6 +520,82 @@ describe('WorkersService', () => {
         expect.objectContaining({ runMode: 'node' }),
       );
       expect(result.runMode).toBe('node');
+    });
+
+    const mockTokenRejoin = (existingWorker: Record<string, unknown>) => {
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockImplementation(
+        (opts: Record<string, unknown>) => {
+          const where = opts.where as Record<string, unknown> | undefined;
+          if (where?.token === existingWorker.token) return existingWorker;
+          if (where?.id === existingWorker.id) return existingWorker;
+          return null;
+        },
+      );
+      (mockWorkerInstanceRepository.update as jest.Mock).mockResolvedValue(
+        undefined,
+      );
+      (mockWorkerInstanceRepository as any).manager = {
+        query: jest.fn().mockResolvedValue(undefined),
+      };
+    };
+
+    it('renames the worker on token rejoin when it reports a new name', async () => {
+      mockTokenRejoin({
+        id: 'w-existing',
+        token: 'tok-existing',
+        name: 'old-host',
+        runMode: 'node',
+      });
+
+      await service.join({
+        apiKey: 'api-key-1',
+        token: 'tok-existing',
+        metadata: { name: '  scanner-eu-1 ', os: 'linux', mode: 2 },
+      });
+
+      expect(mockWorkerInstanceRepository.update).toHaveBeenCalledWith(
+        { id: 'w-existing' },
+        expect.objectContaining({ name: 'scanner-eu-1' }),
+      );
+    });
+
+    it('keeps the stored name on token rejoin when the reported name is blank', async () => {
+      mockTokenRejoin({
+        id: 'w-existing',
+        token: 'tok-existing',
+        name: 'scanner-eu-1',
+        runMode: 'node',
+      });
+
+      await service.join({
+        apiKey: 'api-key-1',
+        token: 'tok-existing',
+        metadata: { name: '   ', os: 'linux', mode: 2 },
+      });
+
+      expect(mockWorkerInstanceRepository.update).not.toHaveBeenCalledWith(
+        { id: 'w-existing' },
+        expect.objectContaining({ name: expect.anything() }),
+      );
+    });
+
+    it('caps an over-long reported name when creating a worker', async () => {
+      (mockConfigService.get as jest.Mock).mockReturnValue('cloud-key');
+      (mockWorkerInstanceRepository.save as jest.Mock).mockResolvedValue(
+        undefined,
+      );
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 'w-new',
+      });
+
+      await service.join({
+        apiKey: 'cloud-key',
+        metadata: { name: 'x'.repeat(500), os: 'linux', mode: 2 },
+      });
+
+      const saved = (mockWorkerInstanceRepository.save as jest.Mock).mock
+        .calls[0][0] as { name: string };
+      expect(saved.name).toHaveLength(WORKER_NAME_MAX_LENGTH);
     });
 
     it('should NOT update runMode on token rejoin when mode unchanged', async () => {
@@ -1123,6 +1207,100 @@ describe('WorkersService', () => {
           inspectionSucceeded: true,
         })),
       },
+    });
+
+    describe('ip address and location', () => {
+      const googleGeo = {
+        query: '8.8.8.8',
+        status: 'success',
+        country: 'United States',
+        countryCode: 'US',
+        regionName: 'California',
+        city: 'Mountain View',
+        lat: 37.422,
+        lon: -122.085,
+        timezone: 'America/Los_Angeles',
+        isp: 'Google LLC',
+      };
+
+      it('returns the public IP with its location', async () => {
+        mockGeoIpService.getGeoIp.mockResolvedValue([googleGeo]);
+
+        const result = await runGetWorkerById({
+          id: workerId,
+          workspaceId,
+          ipAddress: '8.8.8.8',
+        });
+
+        expect(mockGeoIpService.getGeoIp).toHaveBeenCalledWith(['8.8.8.8']);
+        expect(result.ipAddress).toBe('8.8.8.8');
+        expect(result.location).toEqual({
+          country: 'United States',
+          countryCode: 'US',
+          region: 'California',
+          city: 'Mountain View',
+          latitude: 37.422,
+          longitude: -122.085,
+          timezone: 'America/Los_Angeles',
+          isp: 'Google LLC',
+        });
+      });
+
+      it('unmaps an IPv4-mapped address before showing and locating it', async () => {
+        mockGeoIpService.getGeoIp.mockResolvedValue([googleGeo]);
+
+        const result = await runGetWorkerById({
+          id: workerId,
+          workspaceId,
+          ipAddress: '::ffff:8.8.8.8',
+        });
+
+        expect(mockGeoIpService.getGeoIp).toHaveBeenCalledWith(['8.8.8.8']);
+        expect(result.ipAddress).toBe('8.8.8.8');
+      });
+
+      it.each(['127.0.0.1', '192.168.1.10', '172.18.0.5', '::1'])(
+        'hides a local IP (%s) and skips the lookup',
+        async (ipAddress) => {
+          const result = await runGetWorkerById({
+            id: workerId,
+            workspaceId,
+            ipAddress,
+          });
+
+          expect(result.ipAddress).toBeUndefined();
+          expect(result.location).toBeNull();
+          expect(mockGeoIpService.getGeoIp).not.toHaveBeenCalled();
+        },
+      );
+
+      it('keeps the IP without a location when the lookup fails', async () => {
+        mockGeoIpService.getGeoIp.mockRejectedValue(new Error('geo-ip down'));
+
+        const result = await runGetWorkerById({
+          id: workerId,
+          workspaceId,
+          ipAddress: '8.8.8.8',
+        });
+
+        expect(result.ipAddress).toBe('8.8.8.8');
+        expect(result.location).toBeNull();
+      });
+
+      it('returns no location when the IP is unknown to the database', async () => {
+        mockGeoIpService.getGeoIp.mockResolvedValue([
+          { error: 'IP not found' },
+        ]);
+
+        const result = await runGetWorkerById({
+          id: workerId,
+          workspaceId,
+          ipAddress: '8.8.8.8',
+        });
+
+        expect(result.ipAddress).toBe('8.8.8.8');
+        expect(result.location).toBeNull();
+      });
     });
 
     it('returns built-in tools only for a cli worker and keeps toolsCount in sync', async () => {

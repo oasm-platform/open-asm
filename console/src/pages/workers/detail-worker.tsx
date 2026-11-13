@@ -2,9 +2,13 @@ import Page from '@/components/common/page';
 import { Badge } from '@/components/ui/badge';
 import { useWorkersControllerGetWorkerById } from '@/services/apis/gen/queries';
 import { useParams } from '@tanstack/react-router';
+import type { WorkerLocationDto } from '@/services/apis/gen/queries';
 import {
   Box,
+  Building2,
   CircleDot,
+  Globe,
+  MapPin,
   Server,
   Shield,
   Zap,
@@ -19,6 +23,13 @@ function formatType(type: string) {
   if (type === 'built_in') return 'Built-in';
   if (type === 'cli') return 'CLI';
   return type.charAt(0).toUpperCase() + type.slice(1);
+}
+
+/** `Mountain View, California, United States`, skipping the parts that are unknown. */
+function formatLocation(location: WorkerLocationDto) {
+  return [location.city, location.region, location.country]
+    .filter(Boolean)
+    .join(', ');
 }
 
 export default function WorkerDetail() {
@@ -54,6 +65,8 @@ export default function WorkerDetail() {
   }
 
   const tools = worker.tools ?? [];
+  // The API omits the IP when it is local/private, so there is nothing to show.
+  const location = worker.location ? formatLocation(worker.location) : '';
   const identityHeader = (
     <div className="flex items-center gap-4 border-b border-border/60 bg-gradient-to-r from-primary/[0.07] via-transparent to-transparent p-6">
       <div className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-muted/60 ring-1 ring-border/60">
@@ -103,6 +116,36 @@ export default function WorkerDetail() {
             </Badge>
           )}
         </div>
+        {worker.ipAddress && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <Globe className="size-3.5" />
+              <span className="font-mono text-foreground">
+                {worker.ipAddress}
+              </span>
+            </span>
+            {location && (
+              <span
+                className="flex items-center gap-1.5"
+                title={worker.location?.timezone}
+              >
+                <MapPin className="size-3.5" />
+                {location}
+                {worker.location?.countryCode && (
+                  <span className="text-xs">
+                    ({worker.location.countryCode})
+                  </span>
+                )}
+              </span>
+            )}
+            {worker.location?.isp && (
+              <span className="flex items-center gap-1.5">
+                <Building2 className="size-3.5" />
+                {worker.location.isp}
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
