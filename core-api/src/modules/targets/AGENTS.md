@@ -43,6 +43,7 @@ Scan roots of a workspace: a domain, IP, CIDR or Git organization. A target owns
 - Manual CIDRs (not internal network, not AWS) are normalised to the network address (`formatCidr(parseCidr())`) and rejected when they overlap another external CIDR of the workspace or of the same request (`assertNoCidrOverlap`).
 - Assets created on insert: DOMAIN/IP get one primary asset. CIDR gets **one asset per address** (`expandCIDRToIPs`, the first one is primary), inserted in chunks of `ASSET_INSERT_CHUNK = 1000` with `orIgnore`. GIT_ORG gets none; repositories come from `RepositorySyncService` on `target.git_org.create`.
 - Every service query filters on `workspaceId` directly (targets carry it, no join needed).
+- `getTargetsInWorkspace` pages first: it selects the page of ids from `targets` alone (target-level filters, `value` as escaped `ILIKE`), counts there, and only then joins assets, services and jobs for those ids. A `status` filter or a `totalAssetServices` / `duration` sort needs the aggregate before `LIMIT`, so those keep the old whole-workspace path. Do not join `workspace.workspaceMembers` there: it multiplies rows by the member count.
 
 ## Coupling
 

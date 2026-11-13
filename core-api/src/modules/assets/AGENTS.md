@@ -52,6 +52,8 @@ Read side of the attack surface: hosts (`assets`), their open ports (`asset_serv
 
 ## Gotchas
 
+- `getManyAsssetServices` matches `value` with `ILIKE` and an escaped pattern (`containsLikePattern`), so `%` and `_` in user input are literal. With no trigram index on `asset_services.value` every miss is a sequential scan.
+
 - `generateServiceTags` only **returns** suggestions and stores nothing, although its Swagger text says it replaces tags. It uses the workspace/user default LLM config (`findDefaultLLMConfig`), `generateText`, and the prompt `agents/prompts/GENERATE_SERVICE_TAGS.md`, which the constructor loads from disk.
 - Catalog events `asset.updated` and `asset.enabled_changed` have no publisher. The audit mapping `asset.deleted` → `AssetsController.deleteAsset` points at a method that does not exist.
 - Tech strings on list rows are `name:version`. See `technology/AGENTS.md` for why those miss the enrichment cache.

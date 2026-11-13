@@ -263,6 +263,18 @@ describe('AssetsService', () => {
       );
     });
 
+    it('matches value with an escaped contains pattern', async () => {
+      await service.getManyAsssetServices(
+        { page: 1, limit: 10, sortBy: 'createdAt', sortOrder: 'ASC', value: '100%_up' } as any,
+        'workspace-uuid',
+      );
+
+      expect((mockAssetServiceRepository as any).andWhere).toHaveBeenCalledWith(
+        'asset_service.value ILIKE :value',
+        { value: '%100\\%\\_up%' },
+      );
+    });
+
     it('applies no freshness predicate without isNew', async () => {
       await service.getManyAsssetServices(
         { page: 1, limit: 10, sortBy: 'createdAt', sortOrder: 'ASC' } as any,
