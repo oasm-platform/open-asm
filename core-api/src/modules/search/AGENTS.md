@@ -7,7 +7,7 @@ Global search in the console: assets, targets and approved vulnerabilities in th
 - `search.controller.ts`: `/search` routes.
 - `search.service.ts`: the combined search, vulnerability search, and history CRUD.
 - `entities/search-history.entity.ts`: `SearchHistory`.
-- `dto/search.dto.ts`: `SearchAssetsTargetsDto` (extends `GetManyBaseQueryParams`, adds `value`, `isSaveHistory`, `severity[]`).
+- `dto/search.dto.ts`: `SearchAssetsTargetsDto` (extends `GetManyBaseQueryParams`, adds `value` (max 255), `isSaveHistory`, `severity[]`).
 
 ## Public surface
 
@@ -27,19 +27,22 @@ No events, queues or exports.
 
 ## Invariants
 
-- The asset/target limit is split by the ratio of `StatisticService.getTotalAssets` / `getTotalTargets`, with at least 1 target slot. `hasNextPage` uses those totals, not the filtered result counts.
-- Vulnerabilities: at most `VULNERABILITY_SEARCH_LIMIT` (5), newest first. They are scoped through `asset → target.workspaceId` and filtered by `approvedVulnerabilityCondition('v')`, so AI proposals under review are hidden. The match covers name, `affectedUrl` and any `cveId` element (ILIKE). Without `value` or `severity` the list is empty.
+- `value` is trimmed and capped at `SEARCH_VALUE_MAX_LENGTH` (255) by the DTO. A blank value returns no assets or targets; vulnerabilities then need `severity`.
+- Every match is `ILIKE` with `%`, `_` and `\` escaped (`containsLikePattern` in `common/utils/like-pattern.util.ts`), so user input is never a wildcard.
+- The limit is split by `splitSearchLimit` from the **filtered** totals: targets get up to `floor(limit / 2)`, and whatever one side cannot fill goes to the other. The split depends only on the totals, so it is the same on every page. `pageCount = max(ceil(assetsTotal / assetsLimit), ceil(targetsTotal / targetsLimit))`, `hasNextPage = page < pageCount`.
+- Round 1 fetches page 1 of both at the full limit (this also yields the totals), alongside the vulnerability search and the history save. A page > 1 needs a second round at the per-type limits.
+- `total` = assets total + targets total + returned vulnerabilities. The console shows "Ask AI" when it is 0, so keep the field.
+- Vulnerabilities: at most `VULNERABILITY_SEARCH_LIMIT` (5), newest first. They are scoped through `asset → target.workspaceId` and filtered by `approvedVulnerabilityCondition('v')`, so AI proposals under review are hidden. The match covers name, `affectedUrl` and `array_to_string(cveId, ' ')`. Without `value` or `severity` the list is empty.
 
 ## Coupling
 
-- Imports `TargetsModule` (`getTargetsInWorkspace`), `AssetsModule` (`getManyAsssetServices`, with three s), `StatisticModule`. Registers the `Vulnerability` repository itself and does not import `VulnerabilitiesModule`.
+- Imports `TargetsModule` (`getTargetsInWorkspace`) and `AssetsModule` (`getManyAsssetServices`, with three s). Registers the `Vulnerability` repository itself and does not import `VulnerabilitiesModule`.
 
 ## Gotchas
 
-- `deleteAllSearchHistories` calls `delete({ user })` with the whole request user object, not `{ userId }`.
-- `DELETE histories/:id` does not validate `id` as a UUID.
-- History filtering uses case-sensitive `LIKE`. The vulnerability search uses `ILIKE`.
+- Without a trigram index every non-matching term is a full scan of `asset_services` and `vulnerabilities` (about 65–110 ms on 70k assets). A `pg_trgm` GIN proposal is in `.agents/research-reports/search-query-optimization.md` and waits for owner approval.
+- `DELETE histories/:id` rejects a non-UUID id with 400 (`ParseUUIDPipe`).
 
 ## Testing
 
-`search.service.spec.ts` only checks that the service is defined.
+`search.service.spec.ts` covers trimming, the limit split and backfill, paging, the escaped vulnerability pattern, history save/bump/filter and delete-all by `userId`.
