@@ -11,6 +11,7 @@ import {
 import { openVulnerabilityCondition } from '@/modules/vulnerabilities/open-vulnerability';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { getManyResponse } from '@/utils/getManyResponse';
+import { containsLikePattern } from '@/common/utils/like-pattern.util';
 import { InjectQueue } from '@nestjs/bullmq';
 import {
   BadRequestException,
@@ -782,102 +783,135 @@ export class TargetsService implements OnModuleInit {
 
     const offset = (page - 1) * limit;
 
-    const queryBuilder = this.repo
-      .createQueryBuilder('targets')
-      .innerJoin('targets.workspace', 'workspace')
-      .innerJoin('workspace.workspaceMembers', 'workspaceMember')
-      .leftJoin('targets.assets', 'asset')
-      .leftJoin('asset.assetServices', 'assetService')
-      .leftJoin('asset.jobs', 'job')
-      .where('targets.workspaceId = :workspaceId', { workspaceId })
-      .select([
-        'targets.id as id',
-        'targets.value as value',
-        'targets.type as type',
-        'targets.source as "source"',
-        'targets.lastDiscoveredAt as "lastDiscoveredAt"',
-        'targets.reScanCount as "reScanCount"',
-        'targets.scanSchedule as "scanSchedule"',
-        'targets.internalNetworkId as "internalNetworkId"',
-        `CAST(COUNT(DISTINCT "assetService"."id") AS INTEGER) AS "totalAssetServices"`,
-        `CAST(COUNT(DISTINCT asset.id) FILTER (WHERE asset."isEnabled") AS INTEGER) AS "totalAssets"`,
-        'targets.integrationId as "integrationId"',
-        `CASE
-        WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
-        WHEN COUNT(CASE WHEN job.status = '${JobStatus.PENDING}' THEN 1 END) > 0 THEN '${JobStatus.PENDING}'
-        WHEN COUNT(CASE WHEN job.status = '${JobStatus.COMPLETED}' THEN 1 END) > 0 THEN '${JobStatus.COMPLETED}'
-        ELSE '${JobStatus.COMPLETED}'
-      END AS status`,
-      ])
-      .groupBy('targets.id');
-
-    if (value) {
-      queryBuilder.andWhere('targets.value LIKE :value', {
-        value: `%${value}%`,
-      });
-    }
-
-    if (type) {
-      queryBuilder.andWhere('targets.type = :type', { type });
-    }
-
-    if (status) {
-      // Filter by computed status using HAVING clause
-      const statusCase = `CASE
+    const statusCase = `CASE
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.IN_PROGRESS}' THEN 1 END) > 0 THEN '${JobStatus.IN_PROGRESS}'
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.PENDING}' THEN 1 END) > 0 THEN '${JobStatus.PENDING}'
         WHEN COUNT(CASE WHEN job.status = '${JobStatus.COMPLETED}' THEN 1 END) > 0 THEN '${JobStatus.COMPLETED}'
         ELSE '${JobStatus.COMPLETED}'
       END`;
 
+    // Target-level predicates only: safe both before and after aggregation.
+    // The workspace join stays because it drops soft-deleted workspaces.
+    const filteredTargets = () => {
+      const qb = this.repo
+        .createQueryBuilder('targets')
+        .innerJoin('targets.workspace', 'workspace')
+        .where('targets.workspaceId = :workspaceId', { workspaceId });
+
+      if (value) {
+        qb.andWhere('targets.value ILIKE :value', {
+          value: containsLikePattern(value),
+        });
+      }
+
+      if (type) {
+        qb.andWhere('targets.type = :type', { type });
+      }
+
+      if (scope !== undefined) {
+        if (scope === TargetScopeType.INTERNAL) {
+          qb.andWhere('targets.internalNetworkId IS NOT NULL');
+        } else {
+          qb.andWhere('targets.internalNetworkId IS NULL');
+        }
+      }
+
+      if (hasCritical) {
+        qb.andWhere(
+          `EXISTS (SELECT 1 FROM vulnerabilities crit_v
+            JOIN assets crit_a ON crit_a.id = crit_v."assetId"
+           WHERE crit_a."targetId" = targets.id AND crit_v.severity = :critical
+             AND ${openVulnerabilityCondition('crit_v')})`,
+          { critical: Severity.CRITICAL },
+        );
+      }
+
+      if (stale) {
+        qb.andWhere(
+          `(targets.lastDiscoveredAt IS NULL OR targets.lastDiscoveredAt < LOCALTIMESTAMP - interval '${STALE_DAYS} days')`,
+        );
+      }
+
+      return qb;
+    };
+
+    const aggregated = () =>
+      filteredTargets()
+        .leftJoin('targets.assets', 'asset')
+        .leftJoin('asset.assetServices', 'assetService')
+        .leftJoin('asset.jobs', 'job')
+        .select([
+          'targets.id as id',
+          'targets.value as value',
+          'targets.type as type',
+          'targets.source as "source"',
+          'targets.lastDiscoveredAt as "lastDiscoveredAt"',
+          'targets.reScanCount as "reScanCount"',
+          'targets.scanSchedule as "scanSchedule"',
+          'targets.internalNetworkId as "internalNetworkId"',
+          `CAST(COUNT(DISTINCT "assetService"."id") AS INTEGER) AS "totalAssetServices"`,
+          `CAST(COUNT(DISTINCT asset.id) FILTER (WHERE asset."isEnabled") AS INTEGER) AS "totalAssets"`,
+          'targets.integrationId as "integrationId"',
+          `${statusCase} AS status`,
+        ])
+        .groupBy('targets.id');
+
+    const sortColumn =
+      sortBy in Target ? `targets.${sortBy}` : 'targets.createdAt';
+
+    type TargetRow = Omit<Target, 'source'> & {
+      source: unknown;
+      duration: number;
+    };
+    let total: number;
+    let targets: TargetRow[];
+
+    if (status || sortBy === 'totalAssetServices' || sortBy === 'duration') {
+      // Filtering or sorting on an aggregate: aggregate the whole workspace.
+      const queryBuilder = aggregated();
+
       if (status === JobStatus.COMPLETED) {
         queryBuilder.having(
           `(${statusCase}) = :status OR (COUNT(job.id) = 0 AND :status = '${JobStatus.COMPLETED}')`,
           { status },
         );
-      } else {
+      } else if (status) {
         queryBuilder.having(`(${statusCase}) = :status`, { status });
       }
-    }
 
-    if (scope !== undefined) {
-      if (scope === TargetScopeType.INTERNAL) {
-        queryBuilder.andWhere('targets.internalNetworkId IS NOT NULL');
+      if (sortBy === 'totalAssetServices' || sortBy === 'duration') {
+        queryBuilder.orderBy(`"${sortBy}"`, sortOrder);
       } else {
-        queryBuilder.andWhere('targets.internalNetworkId IS NULL');
+        queryBuilder.orderBy(sortColumn, sortOrder);
       }
-    }
 
-    if (hasCritical) {
-      queryBuilder.andWhere(
-        `EXISTS (SELECT 1 FROM vulnerabilities crit_v
-          JOIN assets crit_a ON crit_a.id = crit_v."assetId"
-         WHERE crit_a."targetId" = targets.id AND crit_v.severity = :critical
-           AND ${openVulnerabilityCondition('crit_v')})`,
-        { critical: Severity.CRITICAL },
-      );
-    }
-
-    if (stale) {
-      queryBuilder.andWhere(
-        `(targets.lastDiscoveredAt IS NULL OR targets.lastDiscoveredAt < LOCALTIMESTAMP - interval '${STALE_DAYS} days')`,
-      );
-    }
-
-    if (sortBy === 'totalAssetServices' || sortBy === 'duration') {
-      queryBuilder.orderBy(`"${sortBy}"`, sortOrder);
-    } else if (sortBy in Target) {
-      queryBuilder.orderBy(`targets.${sortBy}`, sortOrder);
+      total = await queryBuilder.getCount();
+      targets = await queryBuilder.limit(limit).offset(offset).getRawMany();
     } else {
-      queryBuilder.orderBy('targets.createdAt', sortOrder);
+      // Page first on the targets table alone, then aggregate only that page:
+      // joining assets/services/jobs for every target before LIMIT is what
+      // made this slow on large workspaces.
+      const pageQuery = filteredTargets()
+        .select('targets.id', 'id')
+        .orderBy(sortColumn, sortOrder);
+
+      total = await pageQuery.getCount();
+      const pageIds = (
+        await pageQuery.limit(limit).offset(offset).getRawMany<{ id: string }>()
+      ).map((row) => row.id);
+
+      if (pageIds.length === 0) {
+        return getManyResponse({ query, data: [], total });
+      }
+
+      const rows: TargetRow[] = await aggregated()
+        .andWhere('targets.id IN (:...pageIds)', { pageIds })
+        .getRawMany();
+      const position = new Map(pageIds.map((id, index) => [id, index]));
+      targets = rows.sort(
+        (a, b) => (position.get(a.id) ?? 0) - (position.get(b.id) ?? 0),
+      );
     }
-
-    const total = await queryBuilder.getCount();
-
-    const targets: (Omit<Target, 'source'> & {
-      source: unknown;
-      duration: number;
-    })[] = await queryBuilder.limit(limit).offset(offset).getRawMany();
 
     const favicons = await this.getTargetFavicons(
       targets

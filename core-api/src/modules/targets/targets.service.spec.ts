@@ -1424,6 +1424,7 @@ describe('TargetsService', () => {
     it('getTargetsInWorkspace select should include targets.source', async () => {
       // Arrange
       const builder = baseBuilder();
+      builder.getRawMany.mockResolvedValue([{ id: 't-1' }]);
       (mockTargetRepository.createQueryBuilder as jest.Mock).mockReturnValue(
         builder,
       );
@@ -1439,6 +1440,97 @@ describe('TargetsService', () => {
         expect.arrayContaining(['targets.source as "source"']),
       );
       expect(builder.groupBy).toHaveBeenCalledWith('targets.id');
+    });
+
+    it('getTargetsInWorkspace matches value case-insensitively with an escaped pattern', async () => {
+      const builder = baseBuilder();
+      (mockTargetRepository.createQueryBuilder as jest.Mock).mockReturnValue(
+        builder,
+      );
+
+      await service.getTargetsInWorkspace(
+        { page: 1, limit: 10, value: 'Acme_1%' } as never,
+        'ws-1',
+      );
+
+      expect(builder.andWhere).toHaveBeenCalledWith(
+        'targets.value ILIKE :value',
+        { value: '%Acme\\_1\\%%' },
+      );
+    });
+
+    it('getTargetsInWorkspace does not join workspace members (it only multiplied rows)', async () => {
+      const builder = baseBuilder();
+      (mockTargetRepository.createQueryBuilder as jest.Mock).mockReturnValue(
+        builder,
+      );
+
+      await service.getTargetsInWorkspace({ page: 1, limit: 10 } as never, 'ws-1');
+
+      const joins = builder.innerJoin.mock.calls.map(([rel]) => rel as string);
+      expect(joins).not.toContain('workspace.workspaceMembers');
+    });
+
+    it('getTargetsInWorkspace picks the page of ids first and aggregates only those', async () => {
+      const builder = baseBuilder();
+      builder.getCount.mockResolvedValue(12);
+      builder.getRawMany
+        .mockResolvedValueOnce([{ id: 't-1' }, { id: 't-2' }])
+        .mockResolvedValueOnce([
+          { id: 't-1', value: 'a.com', source: 'MANUAL', type: 'DOMAIN' },
+          { id: 't-2', value: 'b.com', source: 'MANUAL', type: 'DOMAIN' },
+        ]);
+      (mockTargetRepository.createQueryBuilder as jest.Mock).mockReturnValue(
+        builder,
+      );
+
+      const result = await service.getTargetsInWorkspace(
+        { page: 2, limit: 2 } as never,
+        'ws-1',
+      );
+
+      expect(builder.limit).toHaveBeenCalledWith(2);
+      expect(builder.offset).toHaveBeenCalledWith(2);
+      expect(builder.andWhere).toHaveBeenCalledWith('targets.id IN (:...pageIds)', {
+        pageIds: ['t-1', 't-2'],
+      });
+      expect(builder.having).not.toHaveBeenCalled();
+      expect(result.total).toBe(12);
+      expect(result.data.map((t) => t.id)).toEqual(['t-1', 't-2']);
+    });
+
+    it('getTargetsInWorkspace skips the aggregate query when the page is empty', async () => {
+      const builder = baseBuilder();
+      (mockTargetRepository.createQueryBuilder as jest.Mock).mockReturnValue(
+        builder,
+      );
+
+      const result = await service.getTargetsInWorkspace(
+        { page: 1, limit: 10, value: 'zzqx' } as never,
+        'ws-1',
+      );
+
+      expect(builder.getRawMany).toHaveBeenCalledTimes(1);
+      expect(builder.groupBy).not.toHaveBeenCalled();
+      expect(result.data).toEqual([]);
+    });
+
+    it('getTargetsInWorkspace keeps the aggregate-first path for a status filter', async () => {
+      const builder = baseBuilder();
+      (mockTargetRepository.createQueryBuilder as jest.Mock).mockReturnValue(
+        builder,
+      );
+
+      await service.getTargetsInWorkspace(
+        { page: 1, limit: 10, status: 'pending' } as never,
+        'ws-1',
+      );
+
+      expect(builder.having).toHaveBeenCalled();
+      expect(builder.andWhere).not.toHaveBeenCalledWith(
+        'targets.id IN (:...pageIds)',
+        expect.anything(),
+      );
     });
 
     it('getTargetsInWorkspace maps a MANUAL raw source to {source: "Manual", icon: ""}', async () => {

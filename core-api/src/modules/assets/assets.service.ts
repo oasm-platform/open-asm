@@ -7,6 +7,7 @@ import * as Mustache from 'mustache';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
 import { getManyResponse } from '@/utils/getManyResponse';
+import { containsLikePattern } from '@/common/utils/like-pattern.util';
 import { generateText } from 'ai';
 import {
   BadRequestException,
@@ -514,7 +515,7 @@ export class AssetsService {
 
     if (query.value) {
       queryBuilder.andWhere('asset_service.value ILIKE :value', {
-        value: `%${query.value}%`,
+        value: containsLikePattern(query.value),
       });
     }
 
