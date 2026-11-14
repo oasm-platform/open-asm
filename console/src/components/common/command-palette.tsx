@@ -4,7 +4,6 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator,
   CommandShortcut,
 } from '@/components/ui/command';
 import { menu } from '@/components/common/layout/menu-bar';
@@ -227,16 +226,12 @@ export function CommandPalette() {
               ))}
             </CommandGroup>
           )}
-
-          <CommandSeparator />
-          <CommandGroup heading="Tip">
-            <CommandItem disabled>
-              <CornerDownLeft className="size-4" aria-hidden />
-              Enter opens · Esc closes
-              <CommandShortcut>⌘K</CommandShortcut>
-            </CommandItem>
-          </CommandGroup>
         </CommandList>
+        <div className="flex items-center gap-2 border-t px-4 py-2 text-xs text-muted-foreground">
+          <CornerDownLeft className="size-3.5" aria-hidden />
+          Enter opens · Esc closes
+          <kbd className="ml-auto font-mono tracking-widest">⌘K</kbd>
+        </div>
       </CommandDialog>
     </>
   );
