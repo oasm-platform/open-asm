@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-11T02:45:09.177609279Z",
+  "generatedAt": "2026-11-14T03:55:02.7405477Z",
   "connectors": [
     {
       "name": "Acunetix",
@@ -194,6 +194,18 @@
             "title": "Disable redirects",
             "type": "boolean"
           },
+          "filterRegex": {
+            "description": "Drop findings whose \"<url>?<param>=\" form matches any regex (Go RE2 syntax). Wins over Match URL regex. Applied by the adapter.",
+            "items": {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Filter URL regex",
+            "type": "array",
+            "ui:placeholder": "[?&](utm_[a-z]+|_)="
+          },
           "headers": {
             "description": "Extra request headers, one per entry (Arjun --headers). Omitted entirely when empty.",
             "items": {
@@ -208,6 +220,18 @@
             "title": "Include params",
             "type": "string",
             "ui:placeholder": "status,debug"
+          },
+          "matchRegex": {
+            "description": "Only report findings whose \"<url>?<param>=\" form matches at least one regex (Go RE2 syntax; prefix (?i) for case-insensitive). Arjun has no URL regex option, so the adapter filters its output.",
+            "items": {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Match URL regex",
+            "type": "array",
+            "ui:placeholder": "[?&](redirect|url|next|return)="
           },
           "maxUrls": {
             "default": 10000,
@@ -328,11 +352,35 @@
       "configSchema": {
         "additionalProperties": false,
         "properties": {
+          "filterRegex": {
+            "description": "Drop URLs matching any regex (Go RE2 syntax, matched against the full URL). Wins over Match URL regex. Applied by the adapter.",
+            "items": {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Filter URL regex",
+            "type": "array",
+            "ui:placeholder": "\\.(css|js|png|svg|woff2?)(\\?|$)"
+          },
           "from": {
             "description": "Start timestamp filter YYYYMM (gau --from).",
             "title": "From",
             "type": "string",
             "ui:placeholder": "201901"
+          },
+          "matchRegex": {
+            "description": "Only report URLs matching at least one regex (Go RE2 syntax, matched against the full URL; prefix (?i) for case-insensitive). gau has no URL regex option, so the adapter filters its output.",
+            "items": {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Match URL regex",
+            "type": "array",
+            "ui:placeholder": "/(login|signin|admin)(/|\\?|$)"
           },
           "providers": {
             "description": "Archive providers to query. Default: all four.",
@@ -582,6 +630,18 @@
             "title": "Match extensions",
             "type": "array"
           },
+          "filterRegex": {
+            "description": "Drop URLs matching any regex (Go RE2 syntax, matched against the full URL). Wins over Match URL regex. Passed to katana -fr.",
+            "items": {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Filter URL regex",
+            "type": "array",
+            "ui:placeholder": "\\.(css|js|png|svg|woff2?)(\\?|$)"
+          },
           "filterSimilar": {
             "default": false,
             "description": "Collapse near-duplicate URLs (katana -fsu). Dramatically reduces volume on some sites.",
@@ -610,6 +670,18 @@
             "description": "Extract endpoints from JavaScript files (katana -jc). No browser required.",
             "title": "Parse JavaScript",
             "type": "boolean"
+          },
+          "matchRegex": {
+            "description": "Only report URLs matching at least one regex (Go RE2 syntax, matched against the full URL; prefix (?i) for case-insensitive). Passed to katana -mr, so the crawl still follows non-matching pages.",
+            "items": {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Match URL regex",
+            "type": "array",
+            "ui:placeholder": "/(login|signin|admin)(/|\\?|$)"
           },
           "maxDomainPages": {
             "default": 0,
@@ -674,8 +746,8 @@
     {
       "name": "Nessus",
       "slug": "nessus",
-      "version": "0.1.0",
-      "image": "ghcr.io/oasm-platform/connector-nessus:0.1.0",
+      "version": "0.2.0",
+      "image": "ghcr.io/oasm-platform/connector-nessus:0.2.0",
       "author": "oasm",
       "pricingTier": [
         "free"
@@ -728,6 +800,11 @@
             "title": "API access key",
             "type": "string",
             "ui:placeholder": "Enter API access key"
+          },
+          "disableTlsChecks": {
+            "description": "Skip TLS certificate verification (only for a Nessus instance still serving its default self-signed certificate).",
+            "title": "Disable TLS checks",
+            "type": "boolean"
           },
           "folderId": {
             "description": "ID of the Nessus folder that will contain the scan.",
@@ -1959,6 +2036,18 @@
             "type": "array",
             "ui:placeholder": "php, html, js"
           },
+          "filterRegex": {
+            "description": "Drop URLs matching any regex (Go RE2 syntax, matched against the full URL). Wins over Match URL regex. Applied by the adapter.",
+            "items": {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Filter URL regex",
+            "type": "array",
+            "ui:placeholder": "\\.(css|js|png|svg|woff2?)(\\?|$)"
+          },
           "headers": {
             "description": "Extra request headers, one -H per entry, e.g. \"X-Api-Key: abc\".",
             "items": {
@@ -1973,6 +2062,18 @@
             "title": "Include status codes",
             "type": "string",
             "ui:placeholder": "200, 301"
+          },
+          "matchRegex": {
+            "description": "Only report URLs matching at least one regex (Go RE2 syntax, matched against the full URL; prefix (?i) for case-insensitive). dirsearch --exclude-regex matches the response body instead, so the adapter filters the report.",
+            "items": {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Match URL regex",
+            "type": "array",
+            "ui:placeholder": "/(login|signin|admin)(/|\\?|$)"
           },
           "maxRecursionDepth": {
             "description": "Maximum recursion depth; only used when recursive is true (dirsearch -R).",
@@ -2144,6 +2245,18 @@
             "type": "string",
             "ui:placeholder": "400,404"
           },
+          "filterRegex": {
+            "description": "Drop URLs matching any regex (Go RE2 syntax, matched against the full URL). Wins over Match URL regex. Applied by the adapter.",
+            "items": {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Filter URL regex",
+            "type": "array",
+            "ui:placeholder": "\\.(css|js|png|svg|woff2?)(\\?|$)"
+          },
           "filterSize": {
             "description": "Filter responses of this size in bytes (ffuf -fs).",
             "title": "Filter response size",
@@ -2169,6 +2282,18 @@
             "title": "Match status codes",
             "type": "string",
             "ui:placeholder": "200,204,301,302,307,401,403"
+          },
+          "matchRegex": {
+            "description": "Only report URLs matching at least one regex (Go RE2 syntax, matched against the full URL; prefix (?i) for case-insensitive). ffuf -mr matches the response body instead, so the adapter filters the matched URLs.",
+            "items": {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Match URL regex",
+            "type": "array",
+            "ui:placeholder": "/(login|signin|admin)(/|\\?|$)"
           },
           "maxTime": {
             "description": "Maximum running time in seconds (ffuf -maxtime). The adapter also enforces a hard 20 minute timeout.",
