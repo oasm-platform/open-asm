@@ -733,6 +733,7 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
       });
       const allTools = this.agentTool.getTools(
         workspaceId,
+        userId,
         AgentMode.AGENT,
         toolEvents,
         conversation.id,

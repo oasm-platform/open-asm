@@ -219,6 +219,11 @@ describe('AgentTool plan tools', () => {
     );
     Object.assign(agentTool, {
       guard: { evaluate: jest.fn().mockResolvedValue({ action: 'default' }) },
+      workspacesService: {
+        getMembershipWithPermissions: jest
+          .fn()
+          .mockResolvedValue({ permissionKeys: ['*'] }),
+      },
     });
   });
 
@@ -512,6 +517,7 @@ describe('AgentTool plan tools', () => {
       });
       const tools = agentTool.getTools(
         'w1',
+        'u1',
         AgentMode.AGENT,
         emitter,
         'c1',
@@ -536,6 +542,7 @@ describe('AgentTool plan tools', () => {
       });
       const tools = agentTool.getTools(
         'w1',
+        'u1',
         AgentMode.AGENT,
         emitter,
         'c1',

@@ -310,7 +310,7 @@ describe('AgentsSubagentsService', () => {
       task: 't',
     });
 
-    const emitter = agentTool.getTools.mock.calls[0][2] as {
+    const emitter = agentTool.getTools.mock.calls[0][3] as {
       emit: (event: string, data: unknown) => void;
     };
     const shot = { toolCallId: 't1', command: 'browser open x', image: 'jpg' };
@@ -339,7 +339,7 @@ describe('AgentsSubagentsService', () => {
 
     // Built-in: getTools gets an AUTO approval so the gate auto-allows
     const toolsCall = agentTool.getTools.mock.calls[0];
-    expect(toolsCall[4]).toEqual({ userId: 'u1', mode: 'auto', unattended: true });
+    expect(toolsCall[5]).toEqual({ userId: 'u1', mode: 'auto', unattended: true });
     const call = (streamText as jest.Mock).mock.calls[0][0];
     expect(Object.keys(call.tools)).toEqual(
       expect.arrayContaining(['inspect_issue', 'execute_remote_command']),
@@ -457,7 +457,7 @@ describe('AgentsSubagentsService', () => {
 
     // getTools is called with an AUTO approval so the gate auto-allows
     const toolsCall = agentTool.getTools.mock.calls[0];
-    expect(toolsCall[4]).toEqual({ userId: 'u1', mode: 'auto', unattended: true });
+    expect(toolsCall[5]).toEqual({ userId: 'u1', mode: 'auto', unattended: true });
     const call = (streamText as jest.Mock).mock.calls[0][0];
     expect(Object.keys(call.tools)).toEqual(
       expect.arrayContaining(['inspect_issue', 'execute_remote_command']),
@@ -664,9 +664,11 @@ describe('AgentsSubagentsService', () => {
     );
 
     // Its own emitter carries only its browser pages; no approval settings,
-    // and the conversation's project (none here)
+    // and the conversation's project (none here). The member is still passed,
+    // so its tools keep the member's workspace permissions.
     expect(agentTool.getTools).toHaveBeenCalledWith(
       'w1',
+      'u1',
       'agent',
       expect.anything(),
       'c1',
