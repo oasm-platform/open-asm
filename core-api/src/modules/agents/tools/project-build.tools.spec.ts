@@ -112,11 +112,12 @@ function setup(permissionKeys: string[] = ['*']) {
                 totalRequested: dto.targets.length,
               }),
       ),
+      // Exact lookup, like the real IN query
       findByWorkspaceAndValues: jest.fn((_w: string, values: string[]) =>
         Promise.resolve(
-          values.includes('old.example.com')
-            ? [{ id: 't-old', value: 'old.example.com' }]
-            : [],
+          [{ id: 't-old', value: 'old.example.com' }].filter((t) =>
+            values.some((value) => value === t.value),
+          ),
         ),
       ),
     },
