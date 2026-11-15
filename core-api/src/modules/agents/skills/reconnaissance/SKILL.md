@@ -29,7 +29,7 @@ Classify each by the sink it feeds, because that is what a tester does next: obj
 
 ## Practical notes
 
-- Beyond the always-present basics, tool availability varies per worker: list them first (`display_available_tools`) and use what is `isReady`.
+- Beyond the always-present basics, tool availability varies per worker: list them first (`display_available_tools`) and set each connector's `config` fields to the layer you are mapping.
 - Enumerate passive sources with `retrieve_web_page` when no dedicated tool exists — public certificate-transparency JSON and public DNS APIs are plain URLs.
 - Keep every command bounded: one target, rate limits, explicit timeouts, about 60 seconds each. Several narrow commands beat one wide sweep that times out.
 - Read long output with `read_tool_output` and a `pattern`; extract the facts and discard the dump.

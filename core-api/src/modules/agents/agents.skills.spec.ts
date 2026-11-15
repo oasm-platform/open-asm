@@ -49,4 +49,21 @@ describe('AgentsSkillsService built-in skills', () => {
     expect(content).toContain('matchers');
     expect(content).toContain('save_template');
   });
+
+  it('offers project-builder and loads its pipeline method', async () => {
+    const prompt = await service.buildSkillsPrompt('w1');
+    expect(prompt).toMatch(/^- project-builder: .*pipeline/m);
+
+    const loadSkill = service.createLoadSkillTool('w1') as unknown as LoadSkill;
+    const result = await loadSkill.execute(
+      { name: 'project-builder' },
+      { toolCallId: 't', messages: [] },
+    );
+    expect(result.error).toBeUndefined();
+    const content = result.content as string;
+    // Names the tools it drives, so a rename shows up here
+    expect(content).toContain('inspect_pipeline_tool');
+    expect(content).toContain('create_project');
+    expect(content).toContain('configProfileId');
+  });
 });

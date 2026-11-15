@@ -10,7 +10,7 @@ The tool catalogue (built-in CLIs, manifest connectors, provider tools), per-wor
 - `tool-sync.service.ts`: `ToolSyncService.onModuleInit` syncs built-ins and manifest connectors into `tools`. Not exported.
 - `tool-categories.ts`, `tool-io.ts`, `tool-target-types.ts`: pure helpers (`resolveToolCategory`, `resolveStepInputs`, `resolveToolTargetTypes`, manifest parsing) shared with workflows, projects and jobs-registry.
 - `tools-provider/built-in-tools.ts`: `builtInTools` (command templates and result parsers).
-- `validators/tool-config-profiles.crypto.ts`: sensitive-field detection, encrypt/decrypt/mask. `validators/tool-config-profiles.validator.ts`: cached AJV validation against the connector `configSchema`.
+- `validators/tool-config-profiles.crypto.ts`: sensitive-field detection, encrypt/decrypt/mask. `validators/tool-config-profiles.validator.ts`: cached AJV validation against the connector `configSchema` (`validateProfileOrThrow`; `validatePartialConfigOrThrow` ignores top-level `required`, used by the agent's project pipeline steps).
 
 ## Public surface
 
@@ -34,7 +34,7 @@ The tool catalogue (built-in CLIs, manifest connectors, provider tools), per-wor
 ## Invariants
 
 - Connector lookup everywhere is `ConnectorRegistryService.getConnector(tool.name)`.
-- **Readiness.** A built-in tool is always installed and ready. A connector is installed when its `workspace_tools` row has `isEnabled`. It is ready when it is installed and either its manifest has no `configSchema` or the workspace has a profile for it. `agentTool` means built-in, or manifest `agentTool: true`.
+- **Readiness.** A built-in tool is always installed and ready. A connector is installed when its `workspace_tools` row has `isEnabled`. It is ready when it is installed and either its manifest has no `configSchema` or the workspace has a profile for it. `agentTool` means built-in, or manifest `agentTool: true`. The AI agent ignores `isReady` (`getAgentTools` still computes it): it sets non-secret config inline per run.
 - **Sensitive fields** are the schema properties with `ui:widget: password`, or whose name matches `/(password|passwd|secret|token|api_?key|access_?key)/i`. They are encrypted at rest and masked (`****…`) in every response.
 - **Profile update.** An incoming masked value (`isMaskedValue`) keeps the stored ciphertext. A rename-only update saves without re-encrypting, because re-encrypting would double-encrypt the stored values.
 - The first profile for a workspace+tool becomes the default. Deleting the default promotes the oldest remaining profile. `setDefault` runs in a transaction.
@@ -54,7 +54,7 @@ The tool catalogue (built-in CLIs, manifest connectors, provider tools), per-wor
 
 - Imports `forwardRef(() => WorkersModule)` and `ConnectorsModule`. `ToolsService` injects `WorkersService` with `forwardRef` and counts workers through `workersService.repo`. This is part of the tools ↔ workers ↔ jobs-registry cycle; see the comment in `combine.module.ts`, where `AdminModule` must load after `JobsRegistryModule`.
 - Registers the `Asset` and `Vulnerability` repositories (exposed as public `assetRepo` / `vulnerabilityRepo`).
-- Used by: jobs-registry (`resolveConfigForJob`, `assertProfileOwnership`, `getToolByNames`, the helpers, `builtInTools`, `maskProfile`), `workflows.service.ts`, `projects/project-workflows.service.ts`, agents (`getManyTools`, `installTool`, `getInstalledTools`, `getAgentTools`, `getToolById`), `admin.controller.ts`, `templates.service.ts`, `vulnerabilities.service.ts`. `connectors/connector-registry.service.ts` imports the `ManifestCapability` type from `tool-categories.ts`.
+- Used by: jobs-registry (`resolveConfigForJob`, `assertProfileOwnership`, `getToolByNames`, the helpers, `builtInTools`, `maskProfile`), `workflows.service.ts`, `projects/project-workflows.service.ts`, agents (`getManyTools`, `installTool`, `getInstalledTools`, `getAgentTools`, `getToolById`, `ToolConfigProfilesService.list` for `list_tool_config_profiles`), `admin.controller.ts`, `templates.service.ts`, `vulnerabilities.service.ts`. `connectors/connector-registry.service.ts` imports the `ManifestCapability` type from `tool-categories.ts`.
 
 ## Gotchas
 

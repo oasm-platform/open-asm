@@ -26,7 +26,7 @@ Scan roots of a workspace: a domain, IP, CIDR or Git organization. A target owns
 - Event bridge: `@PublishEvent` sends `target.created` (bulk) and `target.updated` (PATCH). `target.deleted` is not on the stream: `deleteTarget` writes it only as an audit row via `AuditService.auditSafely`. After the create transaction, `createMultipleTargets` publishes `asset.discovered` once per target for its new assets.
 - In-process events (`EventEmitter2`): `target.<type>.create` for each created target (`target.domain.create`, `target.cidr.create`, `target.ip.create`, `target.git_org.create`), and `target.git_org.re-scan` when GIT_ORG settings change.
 - BullMQ: registers `ASSETS_DISCOVERY_SCHEDULE` and adds one repeatable job per scheduled target (job name = target id, data `{ id }`, `repeat.pattern` = the `CronSchedule` value). The consumer is `AssetsDiscoveryScheduleConsumer` in `jobs-registry/processors/scan-schedule.processor.ts`.
-- MCP/agent tools: `retrieve_targets` (`getTargetsTool` in `agents/tools/workspace.tools.ts`, also on MCP) calls `getTargetsInWorkspace`. Agent-only `create_project` and `add_targets` call `createMultipleTargets` through `ensureTargets` in `agents/tools/project-build.tools.ts`. `ensureTargets` looks up existing targets from `result.skipped`, which is always empty (see Gotchas).
+- MCP/agent tools: `retrieve_targets` (`getTargetsTool` in `agents/tools/workspace.tools.ts`, also on MCP) calls `getTargetsInWorkspace`. Agent-only `create_project` and `add_targets` go through `ensureTargets` in `agents/tools/project-build.tools.ts`, which looks existing values up with `findByWorkspaceAndValues` first and sends only new ones to `createMultipleTargets` (duplicates are rejected, see Gotchas).
 
 ## Data model
 
