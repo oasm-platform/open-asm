@@ -28,11 +28,10 @@ Run only the commands the current step needs, and check their output against the
 
 ## 1. List the tools and read their type
 
-1. Call `display_available_tools`: it lists only the tools the agent can use in this workspace.
-2. Keep only tools with `isReady` true.
-3. Look at each tool's `type`: `built_in` → section 2, `connector` → section 3. Decide from `type` only, never from the name.
+1. Call `display_available_tools`: it lists only the tools the agent can use in this workspace, with each connector's `config` fields.
+2. Look at each tool's `type`: `built_in` → section 2, `connector` → section 3. Decide from `type` only, never from the name.
 
-If the tool you need is not listed or not ready, tell the user which one and that it can be installed from the Tools page.
+If the tool you need is not listed, tell the user which one and that it can be installed from the Tools page.
 
 ## 2. Built-in tools: `execute_remote_command`
 
@@ -50,8 +49,10 @@ httpx -u https://example.com -silent -status-code -title
 
 ## 3. Connector tools: `run_tool_connector`
 
-1. Run one with `run_tool_connector(tool, target)`; `tool` is the connector's `name` (its description lists the accepted slugs). Add `configProfileId` only when the user picked a profile.
-2. Output is capped at the first 8KB. When `truncated` is true, call `read_tool_output(runId, pattern)` to pull the lines you need instead of paging through everything.
+1. Run one with `run_tool_connector(tool, target)`; `tool` is the connector's `name` (its description lists the accepted slugs).
+2. Fit the run to the task with `config`: read the connector's `config` fields and set the ones the task needs (a match regex, ports, severity, depth, rate). Leave the rest at their defaults.
+3. Fields marked `secret` never go in `config`; they come from a config profile (`list_tool_config_profiles`, then `configProfileId`, or the default profile). If a run is refused for missing required fields, set the non-secret ones in `config`; for secret ones, tell the user which fields the profile needs.
+4. Output is capped at the first 8KB. When `truncated` is true, call `read_tool_output(runId, pattern)` to pull the lines you need instead of paging through everything.
 
 Never run a connector's binary through `execute_remote_command`, and never pass a built-in tool to `run_tool_connector`.
 

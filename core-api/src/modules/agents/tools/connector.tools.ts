@@ -3,8 +3,12 @@ import { Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
+import { WorkerType } from '@/common/enums/enum';
+import type { ConnectorRegistryService } from '@/modules/connectors/connector-registry.service';
 import type { RemoteExecuteService } from '@/modules/remote-execute/remote-execute.service';
 import { validateTemplate } from '@/modules/templates/templates.service';
+import { getSensitiveFields } from '@/modules/tools/validators/tool-config-profiles.crypto';
+import { validatePartialConfigOrThrow } from '@/modules/tools/validators/tool-config-profiles.validator';
 
 import { defineTool, errorMessage } from './helpers';
 import {
@@ -71,9 +75,13 @@ export async function pageForModel(
   };
 }
 
+export function isEmptyConfigValue(value: unknown): boolean {
+  return value === undefined || value === null || value === '';
+}
+
 /** Required config fields of a connector that `config` leaves empty. */
-function missingRequiredConfig(
-  schema: Record<string, unknown> | undefined,
+export function missingRequiredConfig(
+  schema: Record<string, unknown> | null | undefined,
   config: Record<string, unknown> | undefined,
 ): string[] {
   const required = Array.isArray(schema?.required)
@@ -81,9 +89,117 @@ function missingRequiredConfig(
         (key): key is string => typeof key === 'string',
       )
     : [];
-  return required.filter((key) => {
-    const value = config?.[key];
-    return value === undefined || value === null || value === '';
+  return required.filter((key) => isEmptyConfigValue(config?.[key]));
+}
+
+/**
+ * Why an inline connector config the model wrote is refused, or null. Only
+ * fields of the connector's configSchema, never a secret one (secrets live in
+ * profiles so they never pass through the model), with values the schema
+ * accepts. Required fields are not checked here: a profile may supply them.
+ */
+export function checkInlineConfig(
+  registry: Pick<ConnectorRegistryService, 'getConnector'>,
+  toolName: string,
+  config: Record<string, unknown>,
+): string | null {
+  const fields = Object.keys(config);
+  if (fields.length === 0) return null;
+  const schema = registry.getConnector(toolName)?.configSchema;
+  const properties = (schema?.properties ?? {}) as Record<string, unknown>;
+  const unknown = fields.filter((field) => !(field in properties));
+  if (unknown.length > 0) {
+    const known = Object.keys(properties);
+    return `${toolName} has no config field ${unknown.join(', ')}. ${
+      known.length > 0 ? `Its fields: ${known.join(', ')}.` : 'It takes no config.'
+    }`;
+  }
+  const secrets = getSensitiveFields(schema).filter((field) => field in config);
+  if (secrets.length > 0) {
+    return `${secrets.join(', ')} of ${toolName} cannot be set inline: secrets go in a config profile the user creates. Pass its configProfileId instead.`;
+  }
+  try {
+    validatePartialConfigOrThrow(
+      registry as ConnectorRegistryService,
+      toolName,
+      config,
+    );
+  } catch (error) {
+    return errorMessage(error);
+  }
+  return null;
+}
+
+/**
+ * Config profiles as the model sees them: which fields each sets and which
+ * required ones it leaves empty, never a value (secrets included).
+ */
+export function summarizeProfiles(
+  schema: Record<string, unknown> | null,
+  profiles: Array<{
+    id?: string;
+    name: string;
+    isDefault: boolean;
+    config?: Record<string, unknown>;
+  }>,
+) {
+  return profiles.map((profile) => ({
+    id: profile.id,
+    name: profile.name,
+    isDefault: profile.isDefault,
+    configuredFields: Object.entries(profile.config ?? {})
+      .filter(([, value]) => !isEmptyConfigValue(value))
+      .map(([key]) => key),
+    missingRequired: missingRequiredConfig(schema, profile.config),
+  }));
+}
+
+const listToolConfigProfilesSchema = z.object({
+  tool: z
+    .string()
+    .min(1)
+    .max(100)
+    .describe('Connector slug (name from display_available_tools)'),
+});
+
+/**
+ * list_tool_config_profiles: the config profiles of one installed connector,
+ * so the model can pick a configProfileId for run_tool_connector. Field
+ * names only: a profile's values (secrets included) never reach the model.
+ */
+export function listToolConfigProfilesTool(
+  deps: Deps<'toolsService' | 'toolConfigProfiles' | 'connectorRegistry'>,
+  workspaceId: string,
+): Tool {
+  return defineTool({
+    description: [
+      'List the config profiles of one connector installed in this workspace, to choose configProfileId for run_tool_connector.',
+      'Each profile: id, name, isDefault, configuredFields (fields it sets), missingRequired (required fields it leaves empty; such a profile cannot run).',
+      'run_tool_connector uses the default profile when configProfileId is omitted. Field meanings are in the config of display_available_tools. Values are never returned.',
+      'Params: tool (connector slug).',
+    ].join('\n'),
+    inputSchema: listToolConfigProfilesSchema,
+    execute: async (params: z.infer<typeof listToolConfigProfilesSchema>) => {
+      const slug = params.tool;
+      // Same install check as run_tool_connector: Tool.name is the slug.
+      const [toolRow] = await deps.toolsService.getToolByNames({
+        names: [slug],
+      });
+      const installed = toolRow?.id
+        ? await deps.toolsService.getToolById(toolRow.id, workspaceId)
+        : null;
+      if (!installed?.isInstalled || installed.type !== WorkerType.CONNECTOR) {
+        return {
+          error: `Tool ${slug} is not a connector installed in this workspace.`,
+        };
+      }
+      const schema = deps.connectorRegistry.getConnectorSchema(slug);
+      const profiles = await deps.toolConfigProfiles.list(
+        workspaceId,
+        installed.id!,
+      );
+      return { tool: slug, profiles: summarizeProfiles(schema, profiles) };
+    },
   });
 }
 
@@ -191,7 +307,19 @@ export function runConnectorTool(
       .string()
       .min(1)
       .describe('Target passed to the tool: domain, IP, host:port or URL'),
-    configProfileId: z.string().uuid().optional(),
+    configProfileId: z
+      .string()
+      .uuid()
+      .optional()
+      .describe(
+        'Config profile id from list_tool_config_profiles; omit to use the default profile',
+      ),
+    config: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe(
+        'Settings for this run, merged over the profile: field names and meanings from the config of display_available_tools. Never secret fields.',
+      ),
     templates: z
       .array(z.string().min(1))
       .max(20)
@@ -213,7 +341,8 @@ export function runConnectorTool(
       'Nothing is saved: results are not stored as assets or vulnerabilities.',
       `Waits up to ${AGENT_TOOL_RUN_TIMEOUT_MS / 60_000} minutes. Output: stdout (first ${AGENT_TOOL_OUTPUT_PAGE / 1024}KB), exitCode, error, timedOut, truncated, totalLines.`,
       'The full output is kept for 1 hour under runId: when truncated is true read it with read_tool_output(runId), filtering with pattern instead of paging through everything. Cite runId in propose_vulnerability evidence.',
-      'Params: tool (slug), target, optional configProfileId, optional templates (nuclei only: your own template YAML, run instead of the built-in set).',
+      'Shape the run with config (fields from display_available_tools: e.g. a match regex, ports, severity); secret fields only come from a profile. A refusal names the required fields still missing.',
+      'Params: tool (slug), target, optional config, optional configProfileId (from list_tool_config_profiles; default profile when omitted), optional templates (nuclei only: your own template YAML, run instead of the built-in set).',
       'Tools:',
       catalog,
     ].join('\n'),
@@ -222,7 +351,13 @@ export function runConnectorTool(
       params: z.infer<typeof inputSchema>,
       options: ToolCallOptions,
     ) => {
-      const { tool: slug, target, configProfileId, templates } = params;
+      const {
+        tool: slug,
+        target,
+        configProfileId,
+        templates,
+        config: inlineConfig,
+      } = params;
       if (templates?.length) {
         if (slug !== 'nuclei') {
           return { error: 'templates only apply to the nuclei tool.' };
@@ -254,6 +389,10 @@ export function runConnectorTool(
       if (!entry?.image || !installed?.isInstalled) {
         return { error: `Tool ${slug} is not installed in this workspace.` };
       }
+      const badConfig = inlineConfig
+        ? checkInlineConfig(deps.connectorRegistry, slug, inlineConfig)
+        : null;
+      if (badConfig) return { error: badConfig };
 
       const pick = await deps.remoteExecuteSubscribe.pickConversationWorker(
         conversationId,
@@ -271,7 +410,12 @@ export function runConnectorTool(
         config = await deps.toolConfigProfiles.resolveConfigForJob(
           workspaceId,
           installed.id!,
-          { configProfileId },
+          {
+            configProfileId,
+            ...(inlineConfig && Object.keys(inlineConfig).length > 0
+              ? { config: inlineConfig }
+              : {}),
+          },
         );
       } catch (error) {
         return { error: errorMessage(error) };
@@ -285,7 +429,7 @@ export function runConnectorTool(
       const missing = missingRequiredConfig(entry.configSchema, config);
       if (missing.length > 0) {
         return {
-          error: `Tool ${slug} needs configuration (${missing.join(', ')}). Add a config profile for it in this workspace.`,
+          error: `Tool ${slug} needs configuration (${missing.join(', ')}). Set the non-secret ones in config; secret ones come only from a config profile the user adds in this workspace.`,
         };
       }
 

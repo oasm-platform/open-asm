@@ -5,7 +5,11 @@ import { withoutDisabledTools } from './agents.config';
 import { AgentsMcpService, getMcpToolMetadata } from './agents.mcp';
 import type { AgentsService } from './agents.service';
 import { AgentTool, MCP_TOOLS, READ_ONLY_TOOLS } from './agents.tools';
-import { pageToolOutput } from './tools/connector.tools';
+import {
+  listToolConfigProfilesTool,
+  pageToolOutput,
+} from './tools/connector.tools';
+import { _resetValidatorCache } from '@/modules/tools/validators/tool-config-profiles.validator';
 import { stableStringify } from './tools/helpers';
 import { listConnectorsTool } from './tools/workspace.tools';
 
@@ -448,6 +452,63 @@ describe('AgentTool run_tool_connector', () => {
     expect(subscribe.pinConversationWorker).toHaveBeenCalledWith('c1', 'wk-2');
   });
 
+  describe('inline config', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        ports: { type: 'string', description: 'Ports to scan.' },
+        retries: { type: 'integer', minimum: 0 },
+        apiKey: { type: 'string', 'ui:widget': 'password' },
+      },
+    };
+    const withSchema = () => {
+      const agentTool = createAgentTool();
+      (agentTool as any).connectorRegistry.getConnector = jest.fn(() => ({
+        ...connector,
+        configSchema: schema,
+      }));
+      return agentTool;
+    };
+    beforeEach(() => _resetValidatorCache());
+
+    it('merges it over the profile for this run', async () => {
+      const agentTool = withSchema();
+
+      await runnable(agentTool).execute(
+        { tool: 'nmap', target: 'example.com', config: { ports: '22,443' } },
+        { toolCallId: 'call-1' },
+      );
+
+      expect(
+        (agentTool as any).toolConfigProfiles.resolveConfigForJob,
+      ).toHaveBeenCalledWith('w1', 't1', {
+        configProfileId: undefined,
+        config: { ports: '22,443' },
+      });
+      expect(
+        (agentTool as any).remoteExecuteService.waitForToolRun,
+      ).toHaveBeenCalled();
+    });
+
+    it.each([
+      ['a secret field', { apiKey: 'k' }, 'apiKey'],
+      ['an unknown field', { colour: 'red' }, 'colour'],
+      ['a value of the wrong type', { retries: 'many' }, 'retries'],
+    ])('refuses %s before running', async (_case, config, mention) => {
+      const agentTool = withSchema();
+
+      const result = (await runnable(agentTool).execute(
+        { tool: 'nmap', target: 'example.com', config },
+        { toolCallId: 'call-1' },
+      )) as { error: string };
+
+      expect(result.error).toContain(mention);
+      expect(
+        (agentTool as any).remoteExecuteService.waitForToolRun,
+      ).not.toHaveBeenCalled();
+    });
+  });
+
   it('refuses a tool whose required config is missing', async () => {
     const agentTool = createAgentTool({
       toolConfigProfiles: {
@@ -565,13 +626,42 @@ describe('AgentTool display_available_tools', () => {
     inputSchema: { parse: (value: unknown) => unknown };
     execute: (input: unknown) => Promise<unknown[]>;
   };
+  const acunetixSchema = {
+    type: 'object',
+    required: ['url', 'apiKey'],
+    properties: {
+      url: {
+        type: 'string',
+        title: 'Acunetix URL',
+        description: 'Base URL of the Acunetix instance.',
+        'ui:placeholder': 'https://acunetix.local:3443',
+      },
+      apiKey: {
+        type: 'string',
+        title: 'API key',
+        'ui:widget': 'password',
+      },
+      criticality: {
+        type: 'integer',
+        description: 'Target business criticality.',
+        enum: [30, 20, 10, 0],
+        default: 10,
+      },
+    },
+  };
+  const getConnectorSchema = jest.fn((slug: string) =>
+    slug === 'acunetix' ? acunetixSchema : null,
+  );
   const listTools = (getAgentTools: jest.Mock) =>
     listConnectorsTool(
-      { toolsService: { getAgentTools } } as any,
+      {
+        toolsService: { getAgentTools },
+        connectorRegistry: { getConnectorSchema },
+      } as any,
       'w1',
     ) as unknown as Listing;
 
-  it("lists the workspace's agent tools with readiness as an array", async () => {
+  it("lists the workspace's agent tools with their config fields, not a readiness flag", async () => {
     const getAgentTools = jest.fn().mockResolvedValue([
       {
         id: 't1',
@@ -606,7 +696,6 @@ describe('AgentTool display_available_tools', () => {
         type: WorkerType.BUILT_IN,
         categories: ['subdomains'],
         description: 'Subdomain discovery',
-        isReady: true,
       },
       {
         id: 't2',
@@ -614,9 +703,48 @@ describe('AgentTool display_available_tools', () => {
         type: WorkerType.CONNECTOR,
         categories: ['vulnerabilities'],
         description: 'Web scanner',
-        isReady: false,
+        config: [
+          {
+            name: 'url',
+            type: 'string',
+            required: true,
+            description: 'Base URL of the Acunetix instance.',
+          },
+          {
+            name: 'apiKey',
+            type: 'string',
+            required: true,
+            description: 'API key',
+            secret: true,
+          },
+          {
+            name: 'criticality',
+            type: 'integer',
+            required: false,
+            description: 'Target business criticality.',
+            enum: [30, 20, 10, 0],
+            default: 10,
+          },
+        ],
       },
     ]);
+  });
+
+  it('omits config for a connector without a config schema', async () => {
+    const getAgentTools = jest.fn().mockResolvedValue([
+      {
+        id: 't3',
+        name: 'httpx',
+        type: WorkerType.CONNECTOR,
+        categories: [],
+        description: 'HTTP probe',
+        isReady: true,
+      },
+    ]);
+
+    const [item] = await listTools(getAgentTools).execute({});
+
+    expect(item).not.toHaveProperty('config');
   });
 
   it('ignores stale agentTool and paging params', async () => {
@@ -628,6 +756,103 @@ describe('AgentTool display_available_tools', () => {
     );
 
     expect(getAgentTools).toHaveBeenCalledWith('w1', undefined);
+  });
+});
+
+describe('AgentTool list_tool_config_profiles', () => {
+  type Listing = {
+    execute: (input: unknown) => Promise<Record<string, unknown>>;
+  };
+  const schema = {
+    type: 'object',
+    required: ['url', 'apiKey'],
+    properties: {
+      url: { type: 'string' },
+      apiKey: { type: 'string', 'ui:widget': 'password' },
+      criticality: { type: 'integer' },
+    },
+  };
+
+  function build(installed: boolean) {
+    const deps = {
+      toolsService: {
+        getToolByNames: jest
+          .fn()
+          .mockResolvedValue([{ id: 't2', name: 'acunetix' }]),
+        getToolById: jest.fn().mockResolvedValue({
+          id: 't2',
+          name: 'acunetix',
+          type: WorkerType.CONNECTOR,
+          isInstalled: installed,
+        }),
+      },
+      toolConfigProfiles: {
+        list: jest.fn().mockResolvedValue([
+          {
+            id: 'p1',
+            name: 'prod',
+            isDefault: true,
+            config: { url: 'https://acu.local', apiKey: '****abcd', criticality: '' },
+          },
+          {
+            id: 'p2',
+            name: 'draft',
+            isDefault: false,
+            config: { url: 'https://acu2.local' },
+          },
+        ]),
+      },
+      connectorRegistry: { getConnectorSchema: jest.fn(() => schema) },
+    };
+    const tool = listToolConfigProfilesTool(
+      deps as any,
+      'w1',
+    ) as unknown as Listing;
+    return { deps, tool };
+  }
+
+  it('lists the profiles with the fields they set, never their values', async () => {
+    const { deps, tool } = build(true);
+
+    const result = await tool.execute({ tool: 'acunetix' });
+
+    expect(deps.toolsService.getToolById).toHaveBeenCalledWith('t2', 'w1');
+    expect(deps.toolConfigProfiles.list).toHaveBeenCalledWith('w1', 't2');
+    expect(result).toEqual({
+      tool: 'acunetix',
+      profiles: [
+        {
+          id: 'p1',
+          name: 'prod',
+          isDefault: true,
+          configuredFields: ['url', 'apiKey'],
+          missingRequired: [],
+        },
+        {
+          id: 'p2',
+          name: 'draft',
+          isDefault: false,
+          configuredFields: ['url'],
+          missingRequired: ['apiKey'],
+        },
+      ],
+    });
+    expect(JSON.stringify(result)).not.toContain('acu.local');
+    expect(JSON.stringify(result)).not.toContain('abcd');
+  });
+
+  it('refuses a connector that is not installed in the workspace', async () => {
+    const { deps, tool } = build(false);
+
+    const result = await tool.execute({ tool: 'acunetix' });
+
+    expect(result).toHaveProperty('error');
+    expect(deps.toolConfigProfiles.list).not.toHaveBeenCalled();
+  });
+
+  it('is read-only and stays off the MCP surface', () => {
+    expect(READ_ONLY_TOOLS.has('list_tool_config_profiles')).toBe(true);
+    expect(MCP_TOOLS.has('list_tool_config_profiles')).toBe(false);
   });
 });
 
@@ -677,6 +902,8 @@ describe('AgentTool MCP surface', () => {
     'read_tool_output',
     'retrieve_web_page',
     'display_available_tools',
+    'list_tool_config_profiles',
+    'inspect_pipeline_tool',
   ])('never offers %s', (name) => {
     expect(agentTool.getMcpTools('w1')).not.toHaveProperty(name);
   });

@@ -2,7 +2,7 @@ import type { Tool } from 'ai';
 import { z } from 'zod';
 
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
-import { WorkerScope } from '@/common/enums/enum';
+import { WorkerScope, WorkerType } from '@/common/enums/enum';
 import {
   detailAssetSchema,
   detailIssueSchema,
@@ -19,6 +19,7 @@ import {
   listToolsSchema,
   listWorkersSchema,
 } from '@/mcp/mcp.schema';
+import { getSensitiveFields } from '@/modules/tools/validators/tool-config-profiles.crypto';
 
 import {
   NEWEST_FIRST,
@@ -386,20 +387,65 @@ export function detailIssueTool(
   });
 }
 
+interface ConfigFieldInfo {
+  name: string;
+  type?: unknown;
+  required: boolean;
+  description?: string;
+  enum?: unknown[];
+  default?: unknown;
+  secret?: true;
+}
+
+/**
+ * The fields of a connector's configSchema as the model reads them: what each
+ * one means, never a value. `ui:*` keys are form hints and are dropped.
+ */
+export function describeConfigFields(
+  schema: Record<string, unknown> | null,
+): ConfigFieldInfo[] {
+  const properties = schema?.properties;
+  if (!properties || typeof properties !== 'object') return [];
+  const required = new Set(
+    Array.isArray(schema.required) ? (schema.required as unknown[]) : [],
+  );
+  const secrets = new Set(getSensitiveFields(schema));
+  return Object.entries(properties as Record<string, unknown>).map(
+    ([name, raw]) => {
+      const prop = (raw && typeof raw === 'object' ? raw : {}) as Record<
+        string,
+        unknown
+      >;
+      const description = prop.description ?? prop.title;
+      return {
+        name,
+        type: prop.type,
+        required: required.has(name),
+        ...(typeof description === 'string' ? { description } : {}),
+        ...(Array.isArray(prop.enum) ? { enum: prop.enum } : {}),
+        ...(prop.default !== undefined ? { default: prop.default } : {}),
+        ...(secrets.has(name) ? { secret: true as const } : {}),
+      };
+    },
+  );
+}
+
 /**
  * display_available_tools: the tools the agent can use in this workspace —
- * built-in tools plus the installed agent connectors — with their readiness.
+ * built-in tools plus the installed agent connectors — with their readiness
+ * and, for connectors, what each config field means.
  */
 export function listConnectorsTool(
-  deps: Deps<'toolsService'>,
+  deps: Deps<'toolsService' | 'connectorRegistry'>,
   workspaceId: string,
 ): Tool {
   return defineTool({
     description: [
       'List the security tools/scanners the agent can use in this workspace: built-in tools and the installed connectors that support the agent.',
-      'Each item: id, name, type (built_in or connector), categories (modes it can run in), description, isReady.',
-      'A tool runs only when isReady is true; isReady=false means the connector still needs a config profile in this workspace.',
+      'Each item: id, name, type (built_in or connector), categories (modes it can run in), description, and config for connectors that take configuration.',
       'type decides how it runs: built_in → execute_remote_command with the tool name as the command; connector → run_tool_connector.',
+      "config lists the connector's settings: name, type, required, description (what the field controls), enum, default, secret (a credential).",
+      'Set non-secret fields yourself in run_tool_connector config to fit the task. Secret fields and required ones you cannot fill come from a config profile (list_tool_config_profiles); without one, tell the user which fields the profile needs.',
       'Returns a JSON array, sorted by name. Params: q (search by name or description).',
     ].join('\n'),
     inputSchema: listToolsSchema,
@@ -408,14 +454,22 @@ export function listConnectorsTool(
         workspaceId,
         params.q,
       );
-      return tools.map((i) => ({
-        id: i.id,
-        name: i.name,
-        type: i.type,
-        categories: (i.categories ?? []).map((c) => c.name),
-        description: i.description,
-        isReady: i.isReady,
-      }));
+      return tools.map((i) => {
+        const config =
+          i.type === WorkerType.CONNECTOR
+            ? describeConfigFields(
+                deps.connectorRegistry.getConnectorSchema(i.name),
+              )
+            : [];
+        return {
+          id: i.id,
+          name: i.name,
+          type: i.type,
+          categories: (i.categories ?? []).map((c) => c.name),
+          description: i.description,
+          ...(config.length > 0 ? { config } : {}),
+        };
+      });
     },
   });
 }

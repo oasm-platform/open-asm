@@ -42,7 +42,11 @@ import { AgentsMemoriesService } from './agents.memories';
 import { AgentConversationTodo } from './entities/agent-conversation-todo.entity';
 import { AgentConversation } from './entities/agent-conversation.entity';
 import { artifactTools } from './tools/artifact.tools';
-import { readToolOutputTool, runConnectorTool } from './tools/connector.tools';
+import {
+  listToolConfigProfilesTool,
+  readToolOutputTool,
+  runConnectorTool,
+} from './tools/connector.tools';
 import { deniedMessage, stableStringify } from './tools/helpers';
 import { memoryTools } from './tools/memory.tools';
 import { planTools } from './tools/plan.tools';
@@ -53,6 +57,7 @@ import {
   createProjectTool,
   installToolTool,
   listPipelineToolsTool,
+  inspectPipelineToolTool,
   listWorkflowTemplatesTool,
   removeProjectTriggerTool,
   removeProjectWorkflowTool,
@@ -118,6 +123,7 @@ const WORKSPACE_TOOLS: Record<string, ToolBuilder> = {
   enumerate_open_issues: listIssuesTool,
   inspect_issue: detailIssueTool,
   display_available_tools: listConnectorsTool,
+  list_tool_config_profiles: listToolConfigProfilesTool,
   list_active_workers: listWorkersTool,
   review_jobs: listJobsTool,
   list_projects: listProjectsTool,
@@ -127,6 +133,7 @@ const WORKSPACE_TOOLS: Record<string, ToolBuilder> = {
   read_project_file: readProjectFileTool,
   list_workflow_templates: listWorkflowTemplatesTool,
   list_pipeline_tools: listPipelineToolsTool,
+  inspect_pipeline_tool: inspectPipelineToolTool,
 };
 
 /** Agent mode only: they build or change projects, or start their scans. */
@@ -198,6 +205,7 @@ export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
   'enumerate_open_issues',
   'inspect_issue',
   'display_available_tools',
+  'list_tool_config_profiles',
   'list_active_workers',
   'review_jobs',
   'list_projects',
@@ -207,6 +215,7 @@ export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
   'read_project_file',
   'list_workflow_templates',
   'list_pipeline_tools',
+  'inspect_pipeline_tool',
   'read_tool_output',
 ]);
 
