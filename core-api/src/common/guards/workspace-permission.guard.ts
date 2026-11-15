@@ -4,6 +4,7 @@ import { Reflector } from '@nestjs/core';
 import { WorkspacePermissions } from '../decorators/workspace-permissions.decorator';
 import { getWorkspaceIdFromRequest } from '../decorators/workspace-id.decorator';
 import { RequestWithMetadata } from '../interfaces/app.interface';
+import { firstMissingPermission } from '../utils/permission-keys.util';
 import { isUUID } from 'class-validator';
 
 // Same check `WorkspaceId` uses, applied here so a malformed header is a 400
@@ -100,17 +101,7 @@ export class WorkspacePermissionGuard implements CanActivate {
     );
 
     if (required && required.length > 0) {
-      const hasWildcard = permissionKeys.includes('*');
-      const hasAll = required.every((key) => {
-        if (permissionKeys.includes(key)) return true;
-        // {domain}.write implies {domain}.read
-        if (key.endsWith('.read')) {
-          const writeKey = `${key.slice(0, -'.read'.length)}.write`;
-          return permissionKeys.includes(writeKey);
-        }
-        return false;
-      });
-      if (!hasWildcard && !hasAll) {
+      if (firstMissingPermission(permissionKeys, required) !== null) {
         throw new ForbiddenException(
           'You do not have permission to perform this action',
         );

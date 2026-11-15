@@ -26,6 +26,10 @@ function setup() {
     projectFilesService: { readText: jest.fn() },
     // Agent mode also builds run_tool_connector: no connectors here
     connectorRegistry: { getAgentConnectors: jest.fn().mockReturnValue([]) },
+    // The run's member holds every permission (TOOL_PERMISSIONS has its own spec)
+    workspacesService: {
+      getMembershipWithPermissions: jest.fn().mockResolvedValue({ permissionKeys: ['*'] }),
+    },
   };
   const agentTool = Object.assign(
     Object.create(AgentTool.prototype),
@@ -33,7 +37,7 @@ function setup() {
   ) as AgentTool;
   // Ungated: no approval settings
   const tools = (mode: AgentMode, projectId?: string) =>
-    agentTool.getTools('w1', mode, undefined, 'c1', undefined, projectId) as Record<
+    agentTool.getTools('w1', 'u1', mode, undefined, 'c1', undefined, projectId) as Record<
       string,
       { execute: (params: unknown, options: ToolCallOptions) => Promise<unknown> }
     >;

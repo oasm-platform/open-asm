@@ -289,25 +289,31 @@ describe('AgentTool run_tool_connector', () => {
           timedOut: false,
         }),
       },
+      // The run's member holds every permission (TOOL_PERMISSIONS has its own spec)
+      workspacesService: {
+        getMembershipWithPermissions: jest
+          .fn()
+          .mockResolvedValue({ permissionKeys: ['*'] }),
+      },
       ...overrides,
     }) as AgentTool;
 
   const runnable = (agentTool: AgentTool) =>
-    agentTool.getTools('w1', AgentMode.AGENT, undefined, 'c1')
+    agentTool.getTools('w1', 'u1', AgentMode.AGENT, undefined, 'c1')
       .run_tool_connector as Runnable;
   const readOutput = (agentTool: AgentTool) =>
-    agentTool.getTools('w1', AgentMode.AGENT, undefined, 'c1')
+    agentTool.getTools('w1', 'u1', AgentMode.AGENT, undefined, 'c1')
       .read_tool_output as Runnable;
 
   it('is offered in AGENT mode only, and only with a conversation', () => {
     const agentTool = createAgentTool();
     expect(
-      agentTool.getTools('w1', AgentMode.AGENT, undefined, 'c1'),
+      agentTool.getTools('w1', 'u1', AgentMode.AGENT, undefined, 'c1'),
     ).toHaveProperty('run_tool_connector');
     expect(
-      agentTool.getTools('w1', AgentMode.ASK, undefined, 'c1'),
+      agentTool.getTools('w1', 'u1', AgentMode.ASK, undefined, 'c1'),
     ).not.toHaveProperty('run_tool_connector');
-    expect(agentTool.getTools('w1', AgentMode.AGENT)).not.toHaveProperty(
+    expect(agentTool.getTools('w1', 'u1', AgentMode.AGENT)).not.toHaveProperty(
       'run_tool_connector',
     );
   });

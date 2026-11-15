@@ -861,7 +861,7 @@ export class AgentsCompletionsService {
 
       const model = await this.createLanguageModel(llmConfig, workspaceId);
       const tools = withoutDisabledTools(
-        this.agentTool.getTools(workspaceId, AgentMode.AGENT),
+        this.agentTool.getTools(workspaceId, userId, AgentMode.AGENT),
         await this.agentsConfig.find(workspaceId, userId),
       );
 
@@ -2937,6 +2937,7 @@ export class AgentsCompletionsService {
       ...externalMcpTools,
       ...(this.agentTool.getTools(
         workspaceId,
+        userId,
         agentMode,
         todosEmitter,
         conversation.id,

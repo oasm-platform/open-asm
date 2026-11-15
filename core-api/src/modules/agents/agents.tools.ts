@@ -1,5 +1,11 @@
 import type { WrapperType } from '@/common/types/app.types';
-import { Inject, Injectable, forwardRef } from '@nestjs/common';
+import { firstMissingPermission } from '@/common/utils/permission-keys.util';
+import {
+  Inject,
+  Injectable,
+  NotFoundException,
+  forwardRef,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Tool } from 'ai';
 import type { EventEmitter } from 'node:events';
@@ -38,6 +44,7 @@ import {
   type ApprovalSettings,
 } from './agents.approvals';
 import { AgentsGuardService, guardApprovalMeta } from './agents.guard';
+import { TOOL_PERMISSIONS } from './agents.tool-permissions';
 import { AgentsMemoriesService } from './agents.memories';
 import { AgentConversationTodo } from './entities/agent-conversation-todo.entity';
 import { AgentConversation } from './entities/agent-conversation.entity';
@@ -360,13 +367,42 @@ export class AgentTool {
   }
 
   /**
-   * The built-in tools for `agentMode`, behind the approval flow when given.
-   * With `projectId` (the conversation's project) the project-aware tools are
-   * locked to it. `agentName` names the agent definition running them (a
-   * subagent); tools that record provenance (propose_vulnerability) use it.
+   * The built-in tools for `agentMode`, run on behalf of `userId`: every call
+   * first needs that member's workspace permission (TOOL_PERMISSIONS), then
+   * goes through the approval flow when given. With `projectId` (the
+   * conversation's project) the project-aware tools are locked to it.
+   * `agentName` names the agent definition running them (a subagent); tools
+   * that record provenance (propose_vulnerability) use it.
    */
   getTools(
     workspaceId: string,
+    userId: string,
+    agentMode: AgentMode,
+    emitter?: EventEmitter,
+    conversationId?: string,
+    approval?: ApprovalSettings,
+    projectId?: string | null,
+    agentName?: string,
+  ): Record<string, ToolType> {
+    return this.withPermissions(
+      this.getApprovalGatedTools(
+        workspaceId,
+        userId,
+        agentMode,
+        emitter,
+        conversationId,
+        approval,
+        projectId,
+        agentName,
+      ),
+      workspaceId,
+      userId,
+    );
+  }
+
+  private getApprovalGatedTools(
+    workspaceId: string,
+    userId: string,
     agentMode: AgentMode,
     emitter?: EventEmitter,
     conversationId?: string,
@@ -378,7 +414,7 @@ export class AgentTool {
     const conversation = conversationId ?? '';
     const scope: ToolScope = {
       projectId,
-      userId: approval?.userId,
+      userId,
       conversationId,
       agentName,
     };
@@ -476,6 +512,68 @@ export class AgentTool {
         ),
       ]),
     ) as Record<string, ToolType>;
+  }
+
+  /**
+   * Wraps each tool so a call runs only when `userId` holds the tool's
+   * TOOL_PERMISSIONS keys, read at call time (a revoked key stops the next
+   * call), with the API guard's rule. Runs before the guard and the approval
+   * prompt, so nobody is asked to approve what the member may not do.
+   */
+  private withPermissions(
+    tools: Record<string, ToolType>,
+    workspaceId: string,
+    userId: string,
+  ): Record<string, ToolType> {
+    return Object.fromEntries(
+      Object.entries(tools).map(([name, toolDef]) => {
+        const { execute: original } = toolDef as GateableTool;
+        return [
+          name,
+          {
+            ...(toolDef as GateableTool),
+            execute: async (params: unknown, options: ToolCallOptions) => {
+              const refused = await this.permissionRefusal(
+                name,
+                workspaceId,
+                userId,
+              );
+              if (refused) return { error: refused };
+              return original(params, options);
+            },
+          },
+        ];
+      }),
+    ) as Record<string, ToolType>;
+  }
+
+  /** Why `userId` may not run tool `name` here, or null when they may. */
+  private async permissionRefusal(
+    name: string,
+    workspaceId: string,
+    userId: string,
+  ): Promise<string | null> {
+    const required = TOOL_PERMISSIONS[name];
+    if (!required) {
+      return `Not executed: "${name}" has no workspace permission mapping.`;
+    }
+    let permissionKeys: string[];
+    try {
+      ({ permissionKeys } =
+        await this.workspacesService.getMembershipWithPermissions(
+          workspaceId,
+          userId,
+        ));
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        return 'Not executed: the user is not a member of this workspace.';
+      }
+      throw error;
+    }
+    const missingKey = firstMissingPermission(permissionKeys, required);
+    return missingKey
+      ? `Not executed: the user lacks the "${missingKey}" workspace permission for this.`
+      : null;
   }
 
   /**
