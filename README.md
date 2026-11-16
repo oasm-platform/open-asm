@@ -335,7 +335,9 @@ See [`SECURITY.md`](SECURITY.md). Short version: report sensitive vulnerabilitie
 
 ## License
 
-[GNU General Public License v3.0](LICENSE) — see `LICENSE` in the repo root.
+[GNU Affero General Public License v3.0](LICENSE) — see `LICENSE` in the repo root.
+
+If you run a modified version of OASM as a network service, the AGPL requires you to offer its users the complete source of that modified version.
 
 ## Star History
 

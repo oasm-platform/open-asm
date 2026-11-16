@@ -39,8 +39,8 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 // workspace manifest, not a shipped package, so it is left alone.
 const PACKAGES = ['core-api/package.json', 'console/package.json']
 // Written into every file in PACKAGES. `license` is the SPDX id of LICENSE
-// (GNU GPL v3 — the README says v3.0, not "or later").
-const PACKAGE_FIELDS = { author: 'oasm-platform', license: 'GPL-3.0-only' }
+// (GNU AGPL v3 — the README says v3.0, not "or later").
+const PACKAGE_FIELDS = { author: 'oasm-platform', license: 'AGPL-3.0-only' }
 // `release` has to stay in the type list of .husky/commit-msg.
 const commitMessageFor = (tag) => `release(oasm): ${tag}`
 

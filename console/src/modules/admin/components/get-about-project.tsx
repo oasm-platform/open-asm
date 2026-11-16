@@ -44,7 +44,7 @@ const getLinks = (repoUrl: string) => [
   {
     icon: Scale,
     title: 'License',
-    description: 'GPL-3.0',
+    description: 'AGPL-3.0',
     href: `${repoUrl}/blob/main/LICENSE`,
   },
 ];
