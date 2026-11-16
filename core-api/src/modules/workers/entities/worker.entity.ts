@@ -94,6 +94,13 @@ export class WorkerInstance extends BaseEntity {
   @Column({ type: 'varchar', nullable: true })
   runMode: string | null;
 
+  /**
+   * Base64 HPKE public key the worker sent on Join; job secrets are sealed to
+   * it. Registered once and never replaced (see WorkersService.rejoinWorker).
+   */
+  @Column({ type: 'text', nullable: true })
+  encryptionPublicKey: string | null;
+
   @ApiProperty({ required: false })
   isOnline?: boolean;
 }

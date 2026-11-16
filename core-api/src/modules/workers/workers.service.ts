@@ -36,6 +36,7 @@ import type { EventEnvelopeData } from '../event-bridge/contracts/event-envelope
 import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
 import { InternalNetwork } from '../internal-networks/entities/internal-network.entity';
 import { NetworkInterface } from '../internal-networks/entities/network-interface.entity';
+import { isValidEncryptionPublicKey } from '../jobs-registry/job-secret-sealer';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
 import { ToolsService } from '../tools/tools.service';
@@ -757,6 +758,11 @@ export class WorkersService {
     const { apiKey, token, metadata, ipAddress } = dto;
     const runMode = this.mapRunMode(metadata?.mode);
     const name = normalizeWorkerName(metadata?.name);
+    const encryptionPublicKey =
+      dto.encryptionPublicKey?.length &&
+      (await isValidEncryptionPublicKey(dto.encryptionPublicKey))
+        ? dto.encryptionPublicKey.toString('base64')
+        : undefined;
 
     const existingWorker = token
       ? await this.repo.findOne({ where: { token } })
@@ -775,6 +781,7 @@ export class WorkersService {
       ) {
         return this.rejoinWorker(existingWorker, ipAddress, runMode, name, {
           joinKeyId: joinKey.id,
+          encryptionPublicKey,
         });
       }
       const worker = await this.createWorkspaceWorker(
@@ -782,6 +789,7 @@ export class WorkersService {
         { ...metadata, name },
         ipAddress,
         runMode,
+        encryptionPublicKey,
       );
       await this.publishWorkerEvent(EVENT_CATALOG.worker.joined, worker, {
         joinKeyId: joinKey.id,
@@ -791,12 +799,19 @@ export class WorkersService {
 
     // 2. Token rejoin
     if (existingWorker) {
-      return this.rejoinWorker(existingWorker, ipAddress, runMode, name);
+      return this.rejoinWorker(existingWorker, ipAddress, runMode, name, {
+        encryptionPublicKey,
+      });
     }
 
     // 3. Cloud worker
     if (isCloudKey) {
-      return this.createCloudWorker({ ...metadata, name }, ipAddress, runMode);
+      return this.createCloudWorker(
+        { ...metadata, name },
+        ipAddress,
+        runMode,
+        encryptionPublicKey,
+      );
     }
 
     throw new RpcException('Join key is invalid, expired or already used');
@@ -808,12 +823,24 @@ export class WorkersService {
     ipAddress: string | undefined,
     runMode: string | null,
     name: string | undefined,
-    extra?: { joinKeyId?: string },
+    extra?: { joinKeyId?: string; encryptionPublicKey?: string },
   ): Promise<WorkerInstance> {
     await this.fallbackWorkerRejoin(existingWorker.id);
     const updates: Record<string, unknown> = {};
     if (ipAddress) {
       updates.ipAddress = ipAddress;
+    }
+    // Registered once (a worker upgraded in place enrolls here). A different
+    // key is never taken: whoever stole the token could swap in their own and
+    // read every job's secrets. A worker that lost its key rejoins with a new
+    // join key instead.
+    const key = extra?.encryptionPublicKey;
+    if (key && !existingWorker.encryptionPublicKey) {
+      updates.encryptionPublicKey = key;
+    } else if (key && key !== existingWorker.encryptionPublicKey) {
+      this.logger.warn(
+        `worker ${existingWorker.id} rejoined with a different encryption key; keeping the registered one`,
+      );
     }
     // The worker reports WORKER_NAME (or its hostname) on every join, so a
     // renamed worker keeps its identity and only its name changes.
@@ -830,7 +857,7 @@ export class WorkersService {
     await this.publishWorkerEvent(
       EVENT_CATALOG.worker.rejoined,
       existingWorker,
-      extra,
+      extra?.joinKeyId ? { joinKeyId: extra.joinKeyId } : undefined,
     );
     return this.repo.findOne({
       where: { id: existingWorker.id },
@@ -847,6 +874,7 @@ export class WorkersService {
     metadata?: WorkerJoinDto['metadata'],
     ipAddress?: string,
     runMode?: string | null,
+    encryptionPublicKey?: string,
   ): Promise<WorkerInstance> {
     const workerId = randomUUID();
     const TOKEN_LENGTH = 48;
@@ -860,6 +888,7 @@ export class WorkersService {
       os: metadata?.os,
       ipAddress,
       runMode: runMode ?? null,
+      encryptionPublicKey: encryptionPublicKey ?? null,
     };
 
     await this.repo.save(data);
@@ -888,6 +917,7 @@ export class WorkersService {
     metadata?: WorkerJoinDto['metadata'],
     ipAddress?: string,
     runMode?: string | null,
+    encryptionPublicKey?: string,
   ): Promise<WorkerInstance> {
     const workerId = randomUUID();
     const TOKEN_LENGTH = 48;
@@ -902,6 +932,7 @@ export class WorkersService {
       os: metadata?.os,
       ipAddress,
       runMode: runMode ?? null,
+      encryptionPublicKey: encryptionPublicKey ?? null,
     };
 
     await this.repo.save(data);

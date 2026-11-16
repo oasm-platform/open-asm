@@ -677,6 +677,63 @@ describe('WorkersService', () => {
       );
     });
 
+    describe('encryption key', () => {
+      // A valid uncompressed P-256 point (the worker sealing fixture's key).
+      const workerKey = Buffer.from(
+        '048f2c1839582ec03f19e8d7c573e64ee1b4d53a6f89647491e3ecc54fbe5623cdce67bd25f51b6a46593576ebdfef573b5f4e95cb4ca8874de3e7b413037fd712',
+        'hex',
+      );
+      const rejoinAs = (stored: string | null) => {
+        const worker = { id: 'w-1', token: 'tok-1', encryptionPublicKey: stored };
+        (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue(worker);
+        (mockWorkerInstanceRepository.update as jest.Mock).mockResolvedValue(undefined);
+      };
+      const updatedFields = () =>
+        (mockWorkerInstanceRepository.update as jest.Mock).mock.calls.map(
+          ([, fields]: [unknown, Record<string, unknown>]) => fields,
+        );
+
+      it('stores the key of a new worker', async () => {
+        mockJoinKeyService.consume.mockResolvedValue({ id: 'jk-1', workspaceId: 'ws-1' });
+        (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue({ id: 'w-1' });
+
+        await service.join({ apiKey: 'join-key-1', encryptionPublicKey: workerKey });
+
+        const saved = (mockWorkerInstanceRepository.save as jest.Mock).mock.calls[0][0];
+        expect(saved.encryptionPublicKey).toBe(workerKey.toString('base64'));
+      });
+
+      it('enrolls the key of an existing worker that had none (upgraded worker)', async () => {
+        rejoinAs(null);
+
+        await service.join({ apiKey: 'x', token: 'tok-1', encryptionPublicKey: workerKey });
+
+        expect(updatedFields()).toContainEqual(
+          expect.objectContaining({ encryptionPublicKey: workerKey.toString('base64') }),
+        );
+      });
+
+      it('never replaces a registered key: a stolen token must not swap in its own', async () => {
+        rejoinAs('registered-key');
+
+        await service.join({ apiKey: 'x', token: 'tok-1', encryptionPublicKey: workerKey });
+
+        for (const fields of updatedFields()) {
+          expect(fields).not.toHaveProperty('encryptionPublicKey');
+        }
+      });
+
+      it('ignores a malformed key', async () => {
+        rejoinAs(null);
+
+        await service.join({ apiKey: 'x', token: 'tok-1', encryptionPublicKey: Buffer.alloc(65) });
+
+        for (const fields of updatedFields()) {
+          expect(fields).not.toHaveProperty('encryptionPublicKey');
+        }
+      });
+    });
+
     it('rejects a key that is unknown, expired, already used or a legacy DB key', async () => {
       mockJoinKeyService.consume.mockResolvedValue(null);
 

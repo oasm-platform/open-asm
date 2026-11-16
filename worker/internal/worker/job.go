@@ -623,6 +623,26 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 		cleanupCancel()
 		return true, false // hadJob=true (job was pulled), caller releases semaphore
 	}
+
+	// A sealed job carries its config and secret inputs encrypted to this
+	// worker's key (Job.sealed); they are added to the clear fields only here.
+	sealedConfig, sealedInputs, openErr := grpcClient.OpenJobSecrets(job)
+	if openErr != nil {
+		return failBackoff(fmt.Sprintf("cannot open the job secrets: %v (a worker that lost its key must rejoin with a new join key)", openErr))
+	}
+	for key, value := range sealedConfig {
+		if spec.Config == nil {
+			spec.Config = map[string]any{}
+		}
+		spec.Config[key] = value
+	}
+	for key, value := range sealedInputs {
+		if spec.Inputs == nil {
+			spec.Inputs = map[string]any{}
+		}
+		spec.Inputs[key] = value
+	}
+
 	waitUntil := time.Now().Add(imageBackoffWaitBudget)
 	for {
 		ok, retryIn := imageBackoff.Allow(spec.Image)

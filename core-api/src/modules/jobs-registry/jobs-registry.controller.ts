@@ -42,6 +42,7 @@ import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service
 import { getSensitiveFields } from '../tools/validators/tool-config-profiles.crypto';
 import { WorkerInstance } from '../workers/entities/worker.entity';
 import { secretReleaseDenial } from './job-secret-release.policy';
+import { sealJobSecrets } from './job-secret-sealer';
 import { WorkflowRunnerService } from './workflow-runner.service';
 import {
   buildConnectorInputs,
@@ -692,6 +693,28 @@ export class JobsRegistryController {
         configInband: connectorEntry.configInband === true,
         inputs: { fields: packStructFields(inputs) },
       };
+
+      // A worker that registered a key gets every secret sealed to it, and
+      // never in the clear: falling back would let a stolen token downgrade.
+      if (worker.encryptionPublicKey) {
+        const { token, username, ...clearInputs } = inputs;
+        try {
+          response.sealed = await sealJobSecrets(
+            Buffer.from(worker.encryptionPublicKey, 'base64'),
+            { config: config ?? {}, inputs: { username, token } },
+            job.id,
+            worker.id,
+          );
+        } catch {
+          await this.jobsRegistryService.failUndispatchableJob(
+            job.id,
+            'Not dispatched: the job secrets could not be sealed to the worker key',
+          );
+          return null;
+        }
+        response.inputs = { fields: packStructFields(clearInputs) };
+        return response;
+      }
 
       if (config && Object.keys(config).length > 0) {
         response.config = { fields: packStructFields(config) };

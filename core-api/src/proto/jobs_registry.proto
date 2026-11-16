@@ -60,6 +60,20 @@ message Job {
   // Manifest configInband: the connector reads its config from ExecuteJob,
   // so the worker keeps it out of the container environment (OASM_CONFIG).
   bool config_inband = 14;
+  // Set for a worker that registered an encryption key: the job's config
+  // and secret inputs, sealed to that key. `config` is then empty and
+  // `inputs` holds only the non-secret fields.
+  SealedSecrets sealed = 15;
+}
+
+// HPKE (RFC 9180) base mode, one shot. Plaintext is the JSON
+// {"config": {...}, "inputs": {...}}; info is "oasm job secrets v1" and the
+// AAD is "<job id>|<worker id>", so a sealed blob opens for no other job or
+// worker.
+message SealedSecrets {
+  string alg = 1;        // "DHKEM-P256-HKDF-SHA256/HKDF-SHA256/AES-256-GCM"
+  bytes enc = 2;         // encapsulated key
+  bytes ciphertext = 3;
 }
 
 // Request for the batched claim path. `limit` is the number of free

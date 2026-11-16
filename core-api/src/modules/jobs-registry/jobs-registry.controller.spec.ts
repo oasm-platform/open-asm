@@ -6,6 +6,12 @@ import {
 } from '@/common/enums/enum';
 import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
 import { Metadata } from '@grpc/grpc-js';
+import {
+  Aes256Gcm,
+  CipherSuite,
+  DhkemP256HkdfSha256,
+  HkdfSha256,
+} from '@hpke/core';
 import { Reflector } from '@nestjs/core';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
@@ -406,6 +412,59 @@ describe('JobsRegistryController', () => {
       );
       const [, data] = eventBridge.publishSafely.mock.calls[0];
       expect(JSON.stringify(data)).not.toContain('nessus-key');
+    });
+
+    it('seals the config and repository token to a worker that registered a key, sending neither in the clear', async () => {
+      // The Go worker's sealing fixture: open with its private key below.
+      authedWorker.encryptionPublicKey = Buffer.from(
+        '048f2c1839582ec03f19e8d7c573e64ee1b4d53a6f89647491e3ecc54fbe5623cdce67bd25f51b6a46593576ebdfef573b5f4e95cb4ca8874de3e7b413037fd712',
+        'hex',
+      ).toString('base64');
+      useNessusConnector();
+      mockJobsRegistryService.getNextJob.mockResolvedValue(
+        connectorJob({
+          asset: {
+            value: 'github.com/acme/web',
+            metadata: { url: 'https://github.com/acme/web', defaultBranch: 'main' },
+            target: { type: 'GIT_ORG', integrationId: 'int-1' },
+          },
+        }),
+      );
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({ apiKey: 'nessus-key' });
+      mockIntegrationsService.getIntegrationWithDecryptedConfig.mockResolvedValue({
+        integration: { appType: 'github' },
+        decryptedConfig: { apiToken: 'ghp-secret' },
+      });
+
+      const result = await controller.next({ id: 'worker-1' }, metadata);
+
+      expect(JSON.stringify(result)).not.toMatch(/nessus-key|ghp-secret/);
+      expect(result.config).toBeUndefined();
+      expect(Object.keys((result.inputs as { fields: object }).fields)).toEqual([
+        'repository',
+        'ref',
+      ]);
+      const sealed = result.sealed as { enc: Buffer; ciphertext: Buffer };
+      const suite = new CipherSuite({
+        kem: new DhkemP256HkdfSha256(),
+        kdf: new HkdfSha256(),
+        aead: new Aes256Gcm(),
+      });
+      const recipient = await suite.createRecipientContext({
+        recipientKey: await suite.kem.deserializePrivateKey(
+          Buffer.from('7585c485a1a72bc3b66395caaa37a1940848a5acba85dfff49a0a2b446792360', 'hex'),
+        ),
+        enc: sealed.enc,
+        info: new TextEncoder().encode('oasm job secrets v1'),
+      });
+      const opened = await recipient.open(
+        sealed.ciphertext,
+        new TextEncoder().encode('job-9|worker-1'),
+      );
+      expect(JSON.parse(new TextDecoder().decode(opened))).toEqual({
+        config: { apiKey: 'nessus-key' },
+        inputs: { username: 'x-access-token', token: 'ghp-secret' },
+      });
     });
 
     it('records nothing for a job that carries no secret', async () => {
