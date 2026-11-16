@@ -2,7 +2,10 @@ package worker
 
 import (
 	"context"
+	"crypto/ecdh"
+	"crypto/hpke"
 	"net"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -203,6 +206,8 @@ func newWorkerTestSetup(t *testing.T) (*grpcclient.Client, *testJobsServer, *run
 	pb.RegisterJobsRegistryServiceServer(grpcSrv, jobsSrv)
 	go func() { _ = grpcSrv.Serve(lis) }()
 
+	// Keep the worker token and encryption key out of the real ~/.oasm.
+	t.Setenv("WORKER_TOKEN_FILE", filepath.Join(t.TempDir(), ".worker-token"))
 	client, err := grpcclient.NewClient("test-key", "passthrough:///bufnet", "test-tools", &testLogger{},
 		grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) {
 			return lis.DialContext(ctx)
@@ -629,8 +634,62 @@ func TestProcessJobConnectorSubmitError(t *testing.T) {
 	}
 }
 
+// A job sealed to this worker's key reaches the connector with its config and
+// secret inputs; nothing of them travelled in the clear.
+func TestProcessJobOpensSealedSecrets(t *testing.T) {
+	resetWorkerGlobals()
+	client, jobsSrv, fakeRT := newWorkerTestSetup(t)
+
+	kem := hpke.DHKEM(ecdh.P256())
+	pub, err := kem.NewPublicKey(client.EncryptionPublicKey())
+	if err != nil {
+		t.Fatalf("worker public key: %v", err)
+	}
+	enc, sender, err := hpke.NewSender(pub, hpke.HKDFSHA256(), hpke.AES256GCM(), []byte("oasm job secrets v1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ct, err := sender.Seal([]byte("job-sealed|test-worker"), []byte(`{"config":{"apiKey":"k"},"inputs":{"token":"t"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	inputs, _ := structpb.NewStruct(map[string]any{"target": "https://example.com"})
+	jobsSrv.nextFn = func() (*pb.Job, error) {
+		return &pb.Job{
+			Id: "job-sealed", Tool: "nessus", Image: "img:x", Inputs: inputs,
+			Sealed: &pb.SealedSecrets{Enc: enc, Ciphertext: ct},
+		}, nil
+	}
+
+	proxy := connector.NewProxy()
+	released := make(chan struct{}, 1)
+	processJob(context.Background(), pullJob(t, client), client, nil, "", make(chan TuiEvent, 64),
+		execution.NewManager(fakeRT, 0), proxy, func() { released <- struct{}{} })
+	// End the drain now instead of leaving it waiting for a connector on the
+	// shared worker globals the next test resets.
+	t.Cleanup(func() {
+		proxy.OnConnectorDown("exec-1")
+		select {
+		case <-released:
+		case <-time.After(5 * time.Second):
+			t.Error("drain did not finish")
+		}
+	})
+
+	if fakeRT.CreateCount != 1 {
+		t.Fatalf("expected the connector to start, got %d creates (results %+v)", fakeRT.CreateCount, jobsSrv.getResults())
+	}
+	spec := fakeRT.CreateSpecs[0]
+	if spec.Config["apiKey"] != "k" || spec.Inputs["token"] != "t" || spec.Inputs["target"] != "https://example.com" {
+		t.Fatalf("sealed secrets not merged: config=%v inputs=%v", spec.Config, spec.Inputs)
+	}
+}
+
 func TestProcessJobConnectorCompletionReleasesSemaphore(t *testing.T) {
-	// Clean global state from prior tests.
+	// Clean global state from prior tests. Their drains may still back off this
+	// image once their health poll fires, so the test gets its own backoff.
+	oldBackoff := swapImageBackoff(execution.NewImageBackoff())
+	t.Cleanup(func() { swapImageBackoff(oldBackoff) })
 	bridgeMu.Lock()
 	bridge = make(map[string]*bridgeEntry)
 	bridgeMu.Unlock()

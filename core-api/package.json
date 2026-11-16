@@ -42,6 +42,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1048.0",
     "@grpc/grpc-js": "^1.14.5",
     "@grpc/reflection": "^1.0.4",
+    "@hpke/core": "^1.10.1",
     "@modelcontextprotocol/sdk": "^1.31.0",
     "@nestjs/axios": "^12.0.1",
     "@nestjs/bullmq": "^12.0.0",

@@ -12,6 +12,10 @@ message JoinRequest {
   reserved "signature";
   optional string token     = 3;
   optional WorkerMetadata metadata = 4;
+  // HPKE public key (DHKEM P-256, uncompressed point) the worker holds the
+  // private half of. Core seals job secrets to it (Job.sealed). Registered
+  // once per worker identity; a different key on rejoin is ignored.
+  optional bytes encryption_public_key = 5;
 }
 
 enum WorkerRunMode {

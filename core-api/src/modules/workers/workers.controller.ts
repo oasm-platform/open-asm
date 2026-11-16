@@ -298,6 +298,7 @@ export class WorkersController {
       apiKey: string;
       token?: string;
       metadata?: { name?: string; os?: string; mode?: number | string };
+      encryptionPublicKey?: Buffer;
     },
     grpcMetadata: Metadata,
     call: GrpcCall,
@@ -313,6 +314,7 @@ export class WorkersController {
       apiKey: requests.apiKey,
       token: requests.token,
       metadata: requests.metadata,
+      encryptionPublicKey: requests.encryptionPublicKey,
       ipAddress,
     });
 

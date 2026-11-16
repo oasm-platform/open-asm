@@ -146,7 +146,11 @@ type Job struct {
 	WorkspaceId string `protobuf:"bytes,13,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
 	// Manifest configInband: the connector reads its config from ExecuteJob,
 	// so the worker keeps it out of the container environment (OASM_CONFIG).
-	ConfigInband  bool `protobuf:"varint,14,opt,name=config_inband,json=configInband,proto3" json:"config_inband,omitempty"`
+	ConfigInband bool `protobuf:"varint,14,opt,name=config_inband,json=configInband,proto3" json:"config_inband,omitempty"`
+	// Set for a worker that registered an encryption key: the job's config
+	// and secret inputs, sealed to that key. `config` is then empty and
+	// `inputs` holds only the non-secret fields.
+	Sealed        *SealedSecrets `protobuf:"bytes,15,opt,name=sealed,proto3" json:"sealed,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -280,6 +284,77 @@ func (x *Job) GetConfigInband() bool {
 	return false
 }
 
+func (x *Job) GetSealed() *SealedSecrets {
+	if x != nil {
+		return x.Sealed
+	}
+	return nil
+}
+
+// HPKE (RFC 9180) base mode, one shot. Plaintext is the JSON
+// {"config": {...}, "inputs": {...}}; info is "oasm job secrets v1" and the
+// AAD is "<job id>|<worker id>", so a sealed blob opens for no other job or
+// worker.
+type SealedSecrets struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Alg           string                 `protobuf:"bytes,1,opt,name=alg,proto3" json:"alg,omitempty"` // "DHKEM-P256-HKDF-SHA256/HKDF-SHA256/AES-256-GCM"
+	Enc           []byte                 `protobuf:"bytes,2,opt,name=enc,proto3" json:"enc,omitempty"` // encapsulated key
+	Ciphertext    []byte                 `protobuf:"bytes,3,opt,name=ciphertext,proto3" json:"ciphertext,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SealedSecrets) Reset() {
+	*x = SealedSecrets{}
+	mi := &file_jobs_registry_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SealedSecrets) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SealedSecrets) ProtoMessage() {}
+
+func (x *SealedSecrets) ProtoReflect() protoreflect.Message {
+	mi := &file_jobs_registry_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SealedSecrets.ProtoReflect.Descriptor instead.
+func (*SealedSecrets) Descriptor() ([]byte, []int) {
+	return file_jobs_registry_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *SealedSecrets) GetAlg() string {
+	if x != nil {
+		return x.Alg
+	}
+	return ""
+}
+
+func (x *SealedSecrets) GetEnc() []byte {
+	if x != nil {
+		return x.Enc
+	}
+	return nil
+}
+
+func (x *SealedSecrets) GetCiphertext() []byte {
+	if x != nil {
+		return x.Ciphertext
+	}
+	return nil
+}
+
 // Request for the batched claim path. `limit` is the number of free
 // concurrency slots on the caller, so the server never hands back more jobs
 // than the worker can start immediately.
@@ -293,7 +368,7 @@ type NextBatchRequest struct {
 
 func (x *NextBatchRequest) Reset() {
 	*x = NextBatchRequest{}
-	mi := &file_jobs_registry_proto_msgTypes[2]
+	mi := &file_jobs_registry_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -305,7 +380,7 @@ func (x *NextBatchRequest) String() string {
 func (*NextBatchRequest) ProtoMessage() {}
 
 func (x *NextBatchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_jobs_registry_proto_msgTypes[2]
+	mi := &file_jobs_registry_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -318,7 +393,7 @@ func (x *NextBatchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NextBatchRequest.ProtoReflect.Descriptor instead.
 func (*NextBatchRequest) Descriptor() ([]byte, []int) {
-	return file_jobs_registry_proto_rawDescGZIP(), []int{2}
+	return file_jobs_registry_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *NextBatchRequest) GetId() string {
@@ -347,7 +422,7 @@ type JobList struct {
 
 func (x *JobList) Reset() {
 	*x = JobList{}
-	mi := &file_jobs_registry_proto_msgTypes[3]
+	mi := &file_jobs_registry_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -359,7 +434,7 @@ func (x *JobList) String() string {
 func (*JobList) ProtoMessage() {}
 
 func (x *JobList) ProtoReflect() protoreflect.Message {
-	mi := &file_jobs_registry_proto_msgTypes[3]
+	mi := &file_jobs_registry_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -372,7 +447,7 @@ func (x *JobList) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JobList.ProtoReflect.Descriptor instead.
 func (*JobList) Descriptor() ([]byte, []int) {
-	return file_jobs_registry_proto_rawDescGZIP(), []int{3}
+	return file_jobs_registry_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *JobList) GetValues() []*Job {
@@ -391,7 +466,7 @@ type JobResponse struct {
 
 func (x *JobResponse) Reset() {
 	*x = JobResponse{}
-	mi := &file_jobs_registry_proto_msgTypes[4]
+	mi := &file_jobs_registry_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -403,7 +478,7 @@ func (x *JobResponse) String() string {
 func (*JobResponse) ProtoMessage() {}
 
 func (x *JobResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_jobs_registry_proto_msgTypes[4]
+	mi := &file_jobs_registry_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -416,7 +491,7 @@ func (x *JobResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JobResponse.ProtoReflect.Descriptor instead.
 func (*JobResponse) Descriptor() ([]byte, []int) {
-	return file_jobs_registry_proto_rawDescGZIP(), []int{4}
+	return file_jobs_registry_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *JobResponse) GetSuccess() bool {
@@ -439,7 +514,7 @@ type SubdomainResultRequest struct {
 
 func (x *SubdomainResultRequest) Reset() {
 	*x = SubdomainResultRequest{}
-	mi := &file_jobs_registry_proto_msgTypes[5]
+	mi := &file_jobs_registry_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -451,7 +526,7 @@ func (x *SubdomainResultRequest) String() string {
 func (*SubdomainResultRequest) ProtoMessage() {}
 
 func (x *SubdomainResultRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_jobs_registry_proto_msgTypes[5]
+	mi := &file_jobs_registry_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -464,7 +539,7 @@ func (x *SubdomainResultRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubdomainResultRequest.ProtoReflect.Descriptor instead.
 func (*SubdomainResultRequest) Descriptor() ([]byte, []int) {
-	return file_jobs_registry_proto_rawDescGZIP(), []int{5}
+	return file_jobs_registry_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *SubdomainResultRequest) GetWorkerId() string {
@@ -515,7 +590,7 @@ type HttpProbeResultRequest struct {
 
 func (x *HttpProbeResultRequest) Reset() {
 	*x = HttpProbeResultRequest{}
-	mi := &file_jobs_registry_proto_msgTypes[6]
+	mi := &file_jobs_registry_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -527,7 +602,7 @@ func (x *HttpProbeResultRequest) String() string {
 func (*HttpProbeResultRequest) ProtoMessage() {}
 
 func (x *HttpProbeResultRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_jobs_registry_proto_msgTypes[6]
+	mi := &file_jobs_registry_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -540,7 +615,7 @@ func (x *HttpProbeResultRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HttpProbeResultRequest.ProtoReflect.Descriptor instead.
 func (*HttpProbeResultRequest) Descriptor() ([]byte, []int) {
-	return file_jobs_registry_proto_rawDescGZIP(), []int{6}
+	return file_jobs_registry_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *HttpProbeResultRequest) GetWorkerId() string {
@@ -591,7 +666,7 @@ type PortsResultRequest struct {
 
 func (x *PortsResultRequest) Reset() {
 	*x = PortsResultRequest{}
-	mi := &file_jobs_registry_proto_msgTypes[7]
+	mi := &file_jobs_registry_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -603,7 +678,7 @@ func (x *PortsResultRequest) String() string {
 func (*PortsResultRequest) ProtoMessage() {}
 
 func (x *PortsResultRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_jobs_registry_proto_msgTypes[7]
+	mi := &file_jobs_registry_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -616,7 +691,7 @@ func (x *PortsResultRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PortsResultRequest.ProtoReflect.Descriptor instead.
 func (*PortsResultRequest) Descriptor() ([]byte, []int) {
-	return file_jobs_registry_proto_rawDescGZIP(), []int{7}
+	return file_jobs_registry_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *PortsResultRequest) GetWorkerId() string {
@@ -667,7 +742,7 @@ type VulnerabilitiesResultRequest struct {
 
 func (x *VulnerabilitiesResultRequest) Reset() {
 	*x = VulnerabilitiesResultRequest{}
-	mi := &file_jobs_registry_proto_msgTypes[8]
+	mi := &file_jobs_registry_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -679,7 +754,7 @@ func (x *VulnerabilitiesResultRequest) String() string {
 func (*VulnerabilitiesResultRequest) ProtoMessage() {}
 
 func (x *VulnerabilitiesResultRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_jobs_registry_proto_msgTypes[8]
+	mi := &file_jobs_registry_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -692,7 +767,7 @@ func (x *VulnerabilitiesResultRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VulnerabilitiesResultRequest.ProtoReflect.Descriptor instead.
 func (*VulnerabilitiesResultRequest) Descriptor() ([]byte, []int) {
-	return file_jobs_registry_proto_rawDescGZIP(), []int{8}
+	return file_jobs_registry_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *VulnerabilitiesResultRequest) GetWorkerId() string {
@@ -742,7 +817,7 @@ type ScreenshotResultRequest struct {
 
 func (x *ScreenshotResultRequest) Reset() {
 	*x = ScreenshotResultRequest{}
-	mi := &file_jobs_registry_proto_msgTypes[9]
+	mi := &file_jobs_registry_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -754,7 +829,7 @@ func (x *ScreenshotResultRequest) String() string {
 func (*ScreenshotResultRequest) ProtoMessage() {}
 
 func (x *ScreenshotResultRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_jobs_registry_proto_msgTypes[9]
+	mi := &file_jobs_registry_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -767,7 +842,7 @@ func (x *ScreenshotResultRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScreenshotResultRequest.ProtoReflect.Descriptor instead.
 func (*ScreenshotResultRequest) Descriptor() ([]byte, []int) {
-	return file_jobs_registry_proto_rawDescGZIP(), []int{9}
+	return file_jobs_registry_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ScreenshotResultRequest) GetWorkerId() string {
@@ -808,7 +883,7 @@ type JobResultRequest struct {
 
 func (x *JobResultRequest) Reset() {
 	*x = JobResultRequest{}
-	mi := &file_jobs_registry_proto_msgTypes[10]
+	mi := &file_jobs_registry_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -820,7 +895,7 @@ func (x *JobResultRequest) String() string {
 func (*JobResultRequest) ProtoMessage() {}
 
 func (x *JobResultRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_jobs_registry_proto_msgTypes[10]
+	mi := &file_jobs_registry_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -833,7 +908,7 @@ func (x *JobResultRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JobResultRequest.ProtoReflect.Descriptor instead.
 func (*JobResultRequest) Descriptor() ([]byte, []int) {
-	return file_jobs_registry_proto_rawDescGZIP(), []int{10}
+	return file_jobs_registry_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *JobResultRequest) GetWorkerId() string {
@@ -860,7 +935,7 @@ type UpdateResultDto struct {
 
 func (x *UpdateResultDto) Reset() {
 	*x = UpdateResultDto{}
-	mi := &file_jobs_registry_proto_msgTypes[11]
+	mi := &file_jobs_registry_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -872,7 +947,7 @@ func (x *UpdateResultDto) String() string {
 func (*UpdateResultDto) ProtoMessage() {}
 
 func (x *UpdateResultDto) ProtoReflect() protoreflect.Message {
-	mi := &file_jobs_registry_proto_msgTypes[11]
+	mi := &file_jobs_registry_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -885,7 +960,7 @@ func (x *UpdateResultDto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateResultDto.ProtoReflect.Descriptor instead.
 func (*UpdateResultDto) Descriptor() ([]byte, []int) {
-	return file_jobs_registry_proto_rawDescGZIP(), []int{11}
+	return file_jobs_registry_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *UpdateResultDto) GetJobId() string {
@@ -919,7 +994,7 @@ type DataPayloadResult struct {
 
 func (x *DataPayloadResult) Reset() {
 	*x = DataPayloadResult{}
-	mi := &file_jobs_registry_proto_msgTypes[12]
+	mi := &file_jobs_registry_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -931,7 +1006,7 @@ func (x *DataPayloadResult) String() string {
 func (*DataPayloadResult) ProtoMessage() {}
 
 func (x *DataPayloadResult) ProtoReflect() protoreflect.Message {
-	mi := &file_jobs_registry_proto_msgTypes[12]
+	mi := &file_jobs_registry_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -944,7 +1019,7 @@ func (x *DataPayloadResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DataPayloadResult.ProtoReflect.Descriptor instead.
 func (*DataPayloadResult) Descriptor() ([]byte, []int) {
-	return file_jobs_registry_proto_rawDescGZIP(), []int{12}
+	return file_jobs_registry_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *DataPayloadResult) GetError() bool {
@@ -1041,7 +1116,7 @@ type AssetList struct {
 
 func (x *AssetList) Reset() {
 	*x = AssetList{}
-	mi := &file_jobs_registry_proto_msgTypes[13]
+	mi := &file_jobs_registry_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1053,7 +1128,7 @@ func (x *AssetList) String() string {
 func (*AssetList) ProtoMessage() {}
 
 func (x *AssetList) ProtoReflect() protoreflect.Message {
-	mi := &file_jobs_registry_proto_msgTypes[13]
+	mi := &file_jobs_registry_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1066,7 +1141,7 @@ func (x *AssetList) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssetList.ProtoReflect.Descriptor instead.
 func (*AssetList) Descriptor() ([]byte, []int) {
-	return file_jobs_registry_proto_rawDescGZIP(), []int{13}
+	return file_jobs_registry_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *AssetList) GetValues() []*Asset {
@@ -1085,7 +1160,7 @@ type NumberList struct {
 
 func (x *NumberList) Reset() {
 	*x = NumberList{}
-	mi := &file_jobs_registry_proto_msgTypes[14]
+	mi := &file_jobs_registry_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1097,7 +1172,7 @@ func (x *NumberList) String() string {
 func (*NumberList) ProtoMessage() {}
 
 func (x *NumberList) ProtoReflect() protoreflect.Message {
-	mi := &file_jobs_registry_proto_msgTypes[14]
+	mi := &file_jobs_registry_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1110,7 +1185,7 @@ func (x *NumberList) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NumberList.ProtoReflect.Descriptor instead.
 func (*NumberList) Descriptor() ([]byte, []int) {
-	return file_jobs_registry_proto_rawDescGZIP(), []int{14}
+	return file_jobs_registry_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *NumberList) GetValues() []int32 {
@@ -1129,7 +1204,7 @@ type VulnerabilityList struct {
 
 func (x *VulnerabilityList) Reset() {
 	*x = VulnerabilityList{}
-	mi := &file_jobs_registry_proto_msgTypes[15]
+	mi := &file_jobs_registry_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1141,7 +1216,7 @@ func (x *VulnerabilityList) String() string {
 func (*VulnerabilityList) ProtoMessage() {}
 
 func (x *VulnerabilityList) ProtoReflect() protoreflect.Message {
-	mi := &file_jobs_registry_proto_msgTypes[15]
+	mi := &file_jobs_registry_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1154,7 +1229,7 @@ func (x *VulnerabilityList) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VulnerabilityList.ProtoReflect.Descriptor instead.
 func (*VulnerabilityList) Descriptor() ([]byte, []int) {
-	return file_jobs_registry_proto_rawDescGZIP(), []int{15}
+	return file_jobs_registry_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *VulnerabilityList) GetValues() []*Vulnerability {
@@ -1180,7 +1255,7 @@ type Asset struct {
 
 func (x *Asset) Reset() {
 	*x = Asset{}
-	mi := &file_jobs_registry_proto_msgTypes[16]
+	mi := &file_jobs_registry_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1192,7 +1267,7 @@ func (x *Asset) String() string {
 func (*Asset) ProtoMessage() {}
 
 func (x *Asset) ProtoReflect() protoreflect.Message {
-	mi := &file_jobs_registry_proto_msgTypes[16]
+	mi := &file_jobs_registry_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1205,7 +1280,7 @@ func (x *Asset) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Asset.ProtoReflect.Descriptor instead.
 func (*Asset) Descriptor() ([]byte, []int) {
-	return file_jobs_registry_proto_rawDescGZIP(), []int{16}
+	return file_jobs_registry_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *Asset) GetId() string {
@@ -1306,7 +1381,7 @@ type HttpResponse struct {
 
 func (x *HttpResponse) Reset() {
 	*x = HttpResponse{}
-	mi := &file_jobs_registry_proto_msgTypes[17]
+	mi := &file_jobs_registry_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1318,7 +1393,7 @@ func (x *HttpResponse) String() string {
 func (*HttpResponse) ProtoMessage() {}
 
 func (x *HttpResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_jobs_registry_proto_msgTypes[17]
+	mi := &file_jobs_registry_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1331,7 +1406,7 @@ func (x *HttpResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HttpResponse.ProtoReflect.Descriptor instead.
 func (*HttpResponse) Descriptor() ([]byte, []int) {
-	return file_jobs_registry_proto_rawDescGZIP(), []int{17}
+	return file_jobs_registry_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *HttpResponse) GetId() string {
@@ -1623,7 +1698,7 @@ type Vulnerability struct {
 
 func (x *Vulnerability) Reset() {
 	*x = Vulnerability{}
-	mi := &file_jobs_registry_proto_msgTypes[18]
+	mi := &file_jobs_registry_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1635,7 +1710,7 @@ func (x *Vulnerability) String() string {
 func (*Vulnerability) ProtoMessage() {}
 
 func (x *Vulnerability) ProtoReflect() protoreflect.Message {
-	mi := &file_jobs_registry_proto_msgTypes[18]
+	mi := &file_jobs_registry_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1648,7 +1723,7 @@ func (x *Vulnerability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Vulnerability.ProtoReflect.Descriptor instead.
 func (*Vulnerability) Descriptor() ([]byte, []int) {
-	return file_jobs_registry_proto_rawDescGZIP(), []int{18}
+	return file_jobs_registry_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *Vulnerability) GetId() string {
@@ -1944,7 +2019,7 @@ type UrlDiscoveryResultRequest struct {
 
 func (x *UrlDiscoveryResultRequest) Reset() {
 	*x = UrlDiscoveryResultRequest{}
-	mi := &file_jobs_registry_proto_msgTypes[19]
+	mi := &file_jobs_registry_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1956,7 +2031,7 @@ func (x *UrlDiscoveryResultRequest) String() string {
 func (*UrlDiscoveryResultRequest) ProtoMessage() {}
 
 func (x *UrlDiscoveryResultRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_jobs_registry_proto_msgTypes[19]
+	mi := &file_jobs_registry_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1969,7 +2044,7 @@ func (x *UrlDiscoveryResultRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UrlDiscoveryResultRequest.ProtoReflect.Descriptor instead.
 func (*UrlDiscoveryResultRequest) Descriptor() ([]byte, []int) {
-	return file_jobs_registry_proto_rawDescGZIP(), []int{19}
+	return file_jobs_registry_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *UrlDiscoveryResultRequest) GetWorkerId() string {
@@ -2016,7 +2091,7 @@ type DiscoveredUrl struct {
 
 func (x *DiscoveredUrl) Reset() {
 	*x = DiscoveredUrl{}
-	mi := &file_jobs_registry_proto_msgTypes[20]
+	mi := &file_jobs_registry_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2028,7 +2103,7 @@ func (x *DiscoveredUrl) String() string {
 func (*DiscoveredUrl) ProtoMessage() {}
 
 func (x *DiscoveredUrl) ProtoReflect() protoreflect.Message {
-	mi := &file_jobs_registry_proto_msgTypes[20]
+	mi := &file_jobs_registry_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2041,7 +2116,7 @@ func (x *DiscoveredUrl) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DiscoveredUrl.ProtoReflect.Descriptor instead.
 func (*DiscoveredUrl) Descriptor() ([]byte, []int) {
-	return file_jobs_registry_proto_rawDescGZIP(), []int{20}
+	return file_jobs_registry_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *DiscoveredUrl) GetUrl() string {
@@ -2057,7 +2132,7 @@ const file_jobs_registry_proto_rawDesc = "" +
 	"\n" +
 	"\x13jobs_registry.proto\x12\rjobs_registry\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\"\x18\n" +
 	"\x06Worker\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\x8e\x04\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\xc4\x04\n" +
 	"\x03Job\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
 	"\x05asset\x18\x02 \x01(\v2\x14.jobs_registry.AssetR\x05asset\x12!\n" +
@@ -2073,12 +2148,19 @@ const file_jobs_registry_proto_rawDesc = "" +
 	"\x0ftimeout_seconds\x18\v \x01(\x05H\x03R\x0etimeoutSeconds\x88\x01\x01\x12#\n" +
 	"\rdirect_egress\x18\f \x01(\bR\fdirectEgress\x12!\n" +
 	"\fworkspace_id\x18\r \x01(\tR\vworkspaceId\x12#\n" +
-	"\rconfig_inband\x18\x0e \x01(\bR\fconfigInbandB\n" +
+	"\rconfig_inband\x18\x0e \x01(\bR\fconfigInband\x124\n" +
+	"\x06sealed\x18\x0f \x01(\v2\x1c.jobs_registry.SealedSecretsR\x06sealedB\n" +
 	"\n" +
 	"\b_commandB\x06\n" +
 	"\x04_cpuB\t\n" +
 	"\a_memoryB\x12\n" +
-	"\x10_timeout_seconds\"8\n" +
+	"\x10_timeout_seconds\"S\n" +
+	"\rSealedSecrets\x12\x10\n" +
+	"\x03alg\x18\x01 \x01(\tR\x03alg\x12\x10\n" +
+	"\x03enc\x18\x02 \x01(\fR\x03enc\x12\x1e\n" +
+	"\n" +
+	"ciphertext\x18\x03 \x01(\fR\n" +
+	"ciphertext\"8\n" +
 	"\x10NextBatchRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05limit\x18\x02 \x01(\x05R\x05limit\"5\n" +
@@ -2287,85 +2369,87 @@ func file_jobs_registry_proto_rawDescGZIP() []byte {
 }
 
 var file_jobs_registry_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_jobs_registry_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
+var file_jobs_registry_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_jobs_registry_proto_goTypes = []any{
 	(Severity)(0),                        // 0: jobs_registry.Severity
 	(*Worker)(nil),                       // 1: jobs_registry.Worker
 	(*Job)(nil),                          // 2: jobs_registry.Job
-	(*NextBatchRequest)(nil),             // 3: jobs_registry.NextBatchRequest
-	(*JobList)(nil),                      // 4: jobs_registry.JobList
-	(*JobResponse)(nil),                  // 5: jobs_registry.JobResponse
-	(*SubdomainResultRequest)(nil),       // 6: jobs_registry.SubdomainResultRequest
-	(*HttpProbeResultRequest)(nil),       // 7: jobs_registry.HttpProbeResultRequest
-	(*PortsResultRequest)(nil),           // 8: jobs_registry.PortsResultRequest
-	(*VulnerabilitiesResultRequest)(nil), // 9: jobs_registry.VulnerabilitiesResultRequest
-	(*ScreenshotResultRequest)(nil),      // 10: jobs_registry.ScreenshotResultRequest
-	(*JobResultRequest)(nil),             // 11: jobs_registry.JobResultRequest
-	(*UpdateResultDto)(nil),              // 12: jobs_registry.UpdateResultDto
-	(*DataPayloadResult)(nil),            // 13: jobs_registry.DataPayloadResult
-	(*AssetList)(nil),                    // 14: jobs_registry.AssetList
-	(*NumberList)(nil),                   // 15: jobs_registry.NumberList
-	(*VulnerabilityList)(nil),            // 16: jobs_registry.VulnerabilityList
-	(*Asset)(nil),                        // 17: jobs_registry.Asset
-	(*HttpResponse)(nil),                 // 18: jobs_registry.HttpResponse
-	(*Vulnerability)(nil),                // 19: jobs_registry.Vulnerability
-	(*UrlDiscoveryResultRequest)(nil),    // 20: jobs_registry.UrlDiscoveryResultRequest
-	(*DiscoveredUrl)(nil),                // 21: jobs_registry.DiscoveredUrl
-	(*structpb.Struct)(nil),              // 22: google.protobuf.Struct
-	(*timestamppb.Timestamp)(nil),        // 23: google.protobuf.Timestamp
+	(*SealedSecrets)(nil),                // 3: jobs_registry.SealedSecrets
+	(*NextBatchRequest)(nil),             // 4: jobs_registry.NextBatchRequest
+	(*JobList)(nil),                      // 5: jobs_registry.JobList
+	(*JobResponse)(nil),                  // 6: jobs_registry.JobResponse
+	(*SubdomainResultRequest)(nil),       // 7: jobs_registry.SubdomainResultRequest
+	(*HttpProbeResultRequest)(nil),       // 8: jobs_registry.HttpProbeResultRequest
+	(*PortsResultRequest)(nil),           // 9: jobs_registry.PortsResultRequest
+	(*VulnerabilitiesResultRequest)(nil), // 10: jobs_registry.VulnerabilitiesResultRequest
+	(*ScreenshotResultRequest)(nil),      // 11: jobs_registry.ScreenshotResultRequest
+	(*JobResultRequest)(nil),             // 12: jobs_registry.JobResultRequest
+	(*UpdateResultDto)(nil),              // 13: jobs_registry.UpdateResultDto
+	(*DataPayloadResult)(nil),            // 14: jobs_registry.DataPayloadResult
+	(*AssetList)(nil),                    // 15: jobs_registry.AssetList
+	(*NumberList)(nil),                   // 16: jobs_registry.NumberList
+	(*VulnerabilityList)(nil),            // 17: jobs_registry.VulnerabilityList
+	(*Asset)(nil),                        // 18: jobs_registry.Asset
+	(*HttpResponse)(nil),                 // 19: jobs_registry.HttpResponse
+	(*Vulnerability)(nil),                // 20: jobs_registry.Vulnerability
+	(*UrlDiscoveryResultRequest)(nil),    // 21: jobs_registry.UrlDiscoveryResultRequest
+	(*DiscoveredUrl)(nil),                // 22: jobs_registry.DiscoveredUrl
+	(*structpb.Struct)(nil),              // 23: google.protobuf.Struct
+	(*timestamppb.Timestamp)(nil),        // 24: google.protobuf.Timestamp
 }
 var file_jobs_registry_proto_depIdxs = []int32{
-	17, // 0: jobs_registry.Job.asset:type_name -> jobs_registry.Asset
-	22, // 1: jobs_registry.Job.inputs:type_name -> google.protobuf.Struct
-	22, // 2: jobs_registry.Job.config:type_name -> google.protobuf.Struct
-	2,  // 3: jobs_registry.JobList.values:type_name -> jobs_registry.Job
-	14, // 4: jobs_registry.SubdomainResultRequest.assets:type_name -> jobs_registry.AssetList
-	18, // 5: jobs_registry.HttpProbeResultRequest.http_response:type_name -> jobs_registry.HttpResponse
-	15, // 6: jobs_registry.PortsResultRequest.numbers:type_name -> jobs_registry.NumberList
-	16, // 7: jobs_registry.VulnerabilitiesResultRequest.vulnerabilities:type_name -> jobs_registry.VulnerabilityList
-	12, // 8: jobs_registry.JobResultRequest.data:type_name -> jobs_registry.UpdateResultDto
-	13, // 9: jobs_registry.UpdateResultDto.data:type_name -> jobs_registry.DataPayloadResult
-	14, // 10: jobs_registry.DataPayloadResult.assets:type_name -> jobs_registry.AssetList
-	18, // 11: jobs_registry.DataPayloadResult.http_response:type_name -> jobs_registry.HttpResponse
-	15, // 12: jobs_registry.DataPayloadResult.numbers:type_name -> jobs_registry.NumberList
-	16, // 13: jobs_registry.DataPayloadResult.vulnerabilities:type_name -> jobs_registry.VulnerabilityList
-	17, // 14: jobs_registry.AssetList.values:type_name -> jobs_registry.Asset
-	19, // 15: jobs_registry.VulnerabilityList.values:type_name -> jobs_registry.Vulnerability
-	23, // 16: jobs_registry.Asset.created_at:type_name -> google.protobuf.Timestamp
-	23, // 17: jobs_registry.Asset.updated_at:type_name -> google.protobuf.Timestamp
-	22, // 18: jobs_registry.Asset.dns_records:type_name -> google.protobuf.Struct
-	23, // 19: jobs_registry.HttpResponse.created_at:type_name -> google.protobuf.Timestamp
-	23, // 20: jobs_registry.HttpResponse.timestamp:type_name -> google.protobuf.Timestamp
-	22, // 21: jobs_registry.HttpResponse.tls:type_name -> google.protobuf.Struct
-	22, // 22: jobs_registry.HttpResponse.header:type_name -> google.protobuf.Struct
-	22, // 23: jobs_registry.HttpResponse.knowledgebase:type_name -> google.protobuf.Struct
-	0,  // 24: jobs_registry.Vulnerability.severity:type_name -> jobs_registry.Severity
-	23, // 25: jobs_registry.Vulnerability.publication_date:type_name -> google.protobuf.Timestamp
-	23, // 26: jobs_registry.Vulnerability.modification_date:type_name -> google.protobuf.Timestamp
-	21, // 27: jobs_registry.UrlDiscoveryResultRequest.urls:type_name -> jobs_registry.DiscoveredUrl
-	1,  // 28: jobs_registry.JobsRegistryService.Next:input_type -> jobs_registry.Worker
-	3,  // 29: jobs_registry.JobsRegistryService.NextBatch:input_type -> jobs_registry.NextBatchRequest
-	11, // 30: jobs_registry.JobsRegistryService.Result:input_type -> jobs_registry.JobResultRequest
-	6,  // 31: jobs_registry.JobsRegistryService.ResultSubdomains:input_type -> jobs_registry.SubdomainResultRequest
-	7,  // 32: jobs_registry.JobsRegistryService.ResultHttpProbe:input_type -> jobs_registry.HttpProbeResultRequest
-	8,  // 33: jobs_registry.JobsRegistryService.ResultPorts:input_type -> jobs_registry.PortsResultRequest
-	9,  // 34: jobs_registry.JobsRegistryService.ResultVulnerabilities:input_type -> jobs_registry.VulnerabilitiesResultRequest
-	10, // 35: jobs_registry.JobsRegistryService.ResultScreenshot:input_type -> jobs_registry.ScreenshotResultRequest
-	20, // 36: jobs_registry.JobsRegistryService.ResultUrlDiscovery:input_type -> jobs_registry.UrlDiscoveryResultRequest
-	2,  // 37: jobs_registry.JobsRegistryService.Next:output_type -> jobs_registry.Job
-	4,  // 38: jobs_registry.JobsRegistryService.NextBatch:output_type -> jobs_registry.JobList
-	5,  // 39: jobs_registry.JobsRegistryService.Result:output_type -> jobs_registry.JobResponse
-	5,  // 40: jobs_registry.JobsRegistryService.ResultSubdomains:output_type -> jobs_registry.JobResponse
-	5,  // 41: jobs_registry.JobsRegistryService.ResultHttpProbe:output_type -> jobs_registry.JobResponse
-	5,  // 42: jobs_registry.JobsRegistryService.ResultPorts:output_type -> jobs_registry.JobResponse
-	5,  // 43: jobs_registry.JobsRegistryService.ResultVulnerabilities:output_type -> jobs_registry.JobResponse
-	5,  // 44: jobs_registry.JobsRegistryService.ResultScreenshot:output_type -> jobs_registry.JobResponse
-	5,  // 45: jobs_registry.JobsRegistryService.ResultUrlDiscovery:output_type -> jobs_registry.JobResponse
-	37, // [37:46] is the sub-list for method output_type
-	28, // [28:37] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	18, // 0: jobs_registry.Job.asset:type_name -> jobs_registry.Asset
+	23, // 1: jobs_registry.Job.inputs:type_name -> google.protobuf.Struct
+	23, // 2: jobs_registry.Job.config:type_name -> google.protobuf.Struct
+	3,  // 3: jobs_registry.Job.sealed:type_name -> jobs_registry.SealedSecrets
+	2,  // 4: jobs_registry.JobList.values:type_name -> jobs_registry.Job
+	15, // 5: jobs_registry.SubdomainResultRequest.assets:type_name -> jobs_registry.AssetList
+	19, // 6: jobs_registry.HttpProbeResultRequest.http_response:type_name -> jobs_registry.HttpResponse
+	16, // 7: jobs_registry.PortsResultRequest.numbers:type_name -> jobs_registry.NumberList
+	17, // 8: jobs_registry.VulnerabilitiesResultRequest.vulnerabilities:type_name -> jobs_registry.VulnerabilityList
+	13, // 9: jobs_registry.JobResultRequest.data:type_name -> jobs_registry.UpdateResultDto
+	14, // 10: jobs_registry.UpdateResultDto.data:type_name -> jobs_registry.DataPayloadResult
+	15, // 11: jobs_registry.DataPayloadResult.assets:type_name -> jobs_registry.AssetList
+	19, // 12: jobs_registry.DataPayloadResult.http_response:type_name -> jobs_registry.HttpResponse
+	16, // 13: jobs_registry.DataPayloadResult.numbers:type_name -> jobs_registry.NumberList
+	17, // 14: jobs_registry.DataPayloadResult.vulnerabilities:type_name -> jobs_registry.VulnerabilityList
+	18, // 15: jobs_registry.AssetList.values:type_name -> jobs_registry.Asset
+	20, // 16: jobs_registry.VulnerabilityList.values:type_name -> jobs_registry.Vulnerability
+	24, // 17: jobs_registry.Asset.created_at:type_name -> google.protobuf.Timestamp
+	24, // 18: jobs_registry.Asset.updated_at:type_name -> google.protobuf.Timestamp
+	23, // 19: jobs_registry.Asset.dns_records:type_name -> google.protobuf.Struct
+	24, // 20: jobs_registry.HttpResponse.created_at:type_name -> google.protobuf.Timestamp
+	24, // 21: jobs_registry.HttpResponse.timestamp:type_name -> google.protobuf.Timestamp
+	23, // 22: jobs_registry.HttpResponse.tls:type_name -> google.protobuf.Struct
+	23, // 23: jobs_registry.HttpResponse.header:type_name -> google.protobuf.Struct
+	23, // 24: jobs_registry.HttpResponse.knowledgebase:type_name -> google.protobuf.Struct
+	0,  // 25: jobs_registry.Vulnerability.severity:type_name -> jobs_registry.Severity
+	24, // 26: jobs_registry.Vulnerability.publication_date:type_name -> google.protobuf.Timestamp
+	24, // 27: jobs_registry.Vulnerability.modification_date:type_name -> google.protobuf.Timestamp
+	22, // 28: jobs_registry.UrlDiscoveryResultRequest.urls:type_name -> jobs_registry.DiscoveredUrl
+	1,  // 29: jobs_registry.JobsRegistryService.Next:input_type -> jobs_registry.Worker
+	4,  // 30: jobs_registry.JobsRegistryService.NextBatch:input_type -> jobs_registry.NextBatchRequest
+	12, // 31: jobs_registry.JobsRegistryService.Result:input_type -> jobs_registry.JobResultRequest
+	7,  // 32: jobs_registry.JobsRegistryService.ResultSubdomains:input_type -> jobs_registry.SubdomainResultRequest
+	8,  // 33: jobs_registry.JobsRegistryService.ResultHttpProbe:input_type -> jobs_registry.HttpProbeResultRequest
+	9,  // 34: jobs_registry.JobsRegistryService.ResultPorts:input_type -> jobs_registry.PortsResultRequest
+	10, // 35: jobs_registry.JobsRegistryService.ResultVulnerabilities:input_type -> jobs_registry.VulnerabilitiesResultRequest
+	11, // 36: jobs_registry.JobsRegistryService.ResultScreenshot:input_type -> jobs_registry.ScreenshotResultRequest
+	21, // 37: jobs_registry.JobsRegistryService.ResultUrlDiscovery:input_type -> jobs_registry.UrlDiscoveryResultRequest
+	2,  // 38: jobs_registry.JobsRegistryService.Next:output_type -> jobs_registry.Job
+	5,  // 39: jobs_registry.JobsRegistryService.NextBatch:output_type -> jobs_registry.JobList
+	6,  // 40: jobs_registry.JobsRegistryService.Result:output_type -> jobs_registry.JobResponse
+	6,  // 41: jobs_registry.JobsRegistryService.ResultSubdomains:output_type -> jobs_registry.JobResponse
+	6,  // 42: jobs_registry.JobsRegistryService.ResultHttpProbe:output_type -> jobs_registry.JobResponse
+	6,  // 43: jobs_registry.JobsRegistryService.ResultPorts:output_type -> jobs_registry.JobResponse
+	6,  // 44: jobs_registry.JobsRegistryService.ResultVulnerabilities:output_type -> jobs_registry.JobResponse
+	6,  // 45: jobs_registry.JobsRegistryService.ResultScreenshot:output_type -> jobs_registry.JobResponse
+	6,  // 46: jobs_registry.JobsRegistryService.ResultUrlDiscovery:output_type -> jobs_registry.JobResponse
+	38, // [38:47] is the sub-list for method output_type
+	29, // [29:38] is the sub-list for method input_type
+	29, // [29:29] is the sub-list for extension type_name
+	29, // [29:29] is the sub-list for extension extendee
+	0,  // [0:29] is the sub-list for field type_name
 }
 
 func init() { file_jobs_registry_proto_init() }
@@ -2374,25 +2458,25 @@ func file_jobs_registry_proto_init() {
 		return
 	}
 	file_jobs_registry_proto_msgTypes[1].OneofWrappers = []any{}
-	file_jobs_registry_proto_msgTypes[5].OneofWrappers = []any{}
 	file_jobs_registry_proto_msgTypes[6].OneofWrappers = []any{}
 	file_jobs_registry_proto_msgTypes[7].OneofWrappers = []any{}
 	file_jobs_registry_proto_msgTypes[8].OneofWrappers = []any{}
 	file_jobs_registry_proto_msgTypes[9].OneofWrappers = []any{}
-	file_jobs_registry_proto_msgTypes[12].OneofWrappers = []any{
+	file_jobs_registry_proto_msgTypes[10].OneofWrappers = []any{}
+	file_jobs_registry_proto_msgTypes[13].OneofWrappers = []any{
 		(*DataPayloadResult_Assets)(nil),
 		(*DataPayloadResult_HttpResponse)(nil),
 		(*DataPayloadResult_Numbers)(nil),
 		(*DataPayloadResult_Vulnerabilities)(nil),
 	}
-	file_jobs_registry_proto_msgTypes[19].OneofWrappers = []any{}
+	file_jobs_registry_proto_msgTypes[20].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_jobs_registry_proto_rawDesc), len(file_jobs_registry_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   21,
+			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

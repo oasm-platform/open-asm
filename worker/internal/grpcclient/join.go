@@ -49,6 +49,9 @@ func (c *Client) Join(ctx context.Context) error {
 	if tok := c.auth.currentToken(); tok != "" {
 		req.Token = &tok
 	}
+	if c.encKey != nil {
+		req.EncryptionPublicKey = c.encKey.PublicKey()
+	}
 
 	resp, err := c.workers.Join(ctx, req)
 	if err != nil {

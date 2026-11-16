@@ -62,6 +62,10 @@ export class WorkerJoinDto {
   @ValidateNested()
   @Type(() => WorkerMetadataDto)
   metadata?: WorkerMetadataDto;
+
+  /** gRPC Join only: the worker's HPKE public key (see job-secret-sealer.ts). */
+  @IsOptional()
+  encryptionPublicKey?: Buffer;
 }
 
 export class WorkerAliveDto {

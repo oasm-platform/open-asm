@@ -18,6 +18,7 @@ import (
 	"oasm-worker/internal/filelock"
 	jobRegistryPb "oasm-worker/internal/gen/jobs_registry"
 	workerPb "oasm-worker/internal/gen/workers"
+	"oasm-worker/internal/security"
 )
 
 // tokenFileName is the persisted worker token's file name inside the per-user
@@ -43,6 +44,10 @@ type Client struct {
 	// tokenLock holds tokenFile's slot so no concurrent worker sharing the
 	// location resumes the same identity (see claimTokenFile). Nil = unlocked.
 	tokenLock *filelock.Lock
+	// encKey is the worker's HPKE key, stored at tokenFile+".key". Its public
+	// half goes out on Join and core-api seals job secrets to it (Job.sealed).
+	// Nil when it cannot be stored: the worker then gets secrets in the clear.
+	encKey *security.EncryptionKey
 
 	workers workerPb.WorkersServiceClient
 	jobs    jobRegistryPb.JobsRegistryServiceClient
@@ -143,8 +148,32 @@ func NewClient(apiKey, grpcHost, toolPath string, logger Logger, dialOpts ...grp
 		// reaps any orphaned IN_PROGRESS jobs, so a fresh identity is safe.
 		logger.Warning("no worker token file at %s — will register as a NEW worker on join (core auto-cleanup reaps orphaned jobs)", c.tokenFile)
 	}
+	if c.encKey, err = security.LoadOrCreateEncryptionKey(c.tokenFile + ".key"); err != nil {
+		logger.Warning("no encryption key (%v) — job secrets will arrive unsealed", err)
+	}
 
 	return c, nil
+}
+
+// EncryptionPublicKey is the key sent on Join, or nil without one.
+func (c *Client) EncryptionPublicKey() []byte {
+	if c.encKey == nil {
+		return nil
+	}
+	return c.encKey.PublicKey()
+}
+
+// OpenJobSecrets opens a job's sealed config and secret inputs (Job.sealed).
+// Both maps are nil when the job carries no sealed bundle.
+func (c *Client) OpenJobSecrets(job *jobRegistryPb.Job) (config, inputs map[string]any, err error) {
+	sealed := job.GetSealed()
+	if sealed == nil {
+		return nil, nil, nil
+	}
+	if c.encKey == nil {
+		return nil, nil, fmt.Errorf("job %s is sealed but this worker holds no encryption key", job.GetId())
+	}
+	return c.encKey.OpenJobSecrets(sealed.GetEnc(), sealed.GetCiphertext(), job.GetId(), c.WorkerID())
 }
 
 // resolveTokenFilePath returns WORKER_TOKEN_FILE when set, otherwise the
