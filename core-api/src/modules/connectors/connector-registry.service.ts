@@ -22,6 +22,11 @@ export interface ConnectorManifestEntry {
   configSchema?: Record<string, unknown>;
   /** "direct" skips the worker egress proxy (raw port scanners); omitted = proxy. */
   egress?: 'proxy' | 'direct';
+  /**
+   * True when the connector reads its config from ExecuteJob (SDK
+   * `connector.LoadConfig`), so the worker keeps it out of the container env.
+   */
+  configInband?: boolean;
   [key: string]: unknown;
 }
 

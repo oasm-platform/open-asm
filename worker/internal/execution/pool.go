@@ -53,6 +53,7 @@ type poolEntry struct {
 	ImageVersion   string    // resolved connector version
 	Tool           string    // connector/tool slug
 	PoolKey        string    // normalized image (lowercase) — the acquire key
+	Tenant         string    // workspace of the job that created it; reused only within it
 	Stream         string    // connector stream identity; set once the SDK registers
 	State          PoolState // idle | busy
 	CreatedAt      time.Time
@@ -212,25 +213,31 @@ func (p *PoolManager) unindexIdle(cid, key string) {
 // caller then creates a fresh container). MaxJobsPerContainer=1 is enforced
 // structurally: busy entries are not in the idle queue.
 func (p *PoolManager) Acquire(execID, image string) (string, bool) {
-	handle, ok := p.AcquireHandle(execID, image)
+	handle, ok := p.AcquireHandle(execID, image, "")
 	return handle.ID, ok
 }
 
 // AcquireHandle is Acquire with the stable container handle preserved. The
 // manager needs the name after a warm-pool reuse so telemetry can identify the
 // container even though the original Create call is no longer in the execution.
-func (p *PoolManager) AcquireHandle(execID, image string) (runtime.Handle, bool) {
+// Only a container created for the same tenant (workspace) is handed out: it
+// still carries the env and /tmp state of the jobs it ran.
+func (p *PoolManager) AcquireHandle(execID, image, tenant string) (runtime.Handle, bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	key := normalizePoolKey(image)
 	q := p.idleByKey[key]
-	for len(q) > 0 {
-		cid := q[0]
+	for i := 0; i < len(q); {
+		cid := q[i]
 		e, ok := p.byID[cid]
 		if !ok || e.State != PoolStateIdle {
 			// entry vanished or busy — drop from queue, try next
-			q = q[1:]
+			q = append(q[:i], q[i+1:]...)
 			p.idleByKey[key] = q
+			continue
+		}
+		if e.Tenant != tenant {
+			i++
 			continue
 		}
 		e.State = PoolStateBusy

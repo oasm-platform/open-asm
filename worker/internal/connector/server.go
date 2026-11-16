@@ -235,14 +235,12 @@ func (s *Server) Connect(stream pb.ConnectorService_ConnectServer) error {
 	s.mu.Unlock()
 	tokenOK := false
 	if lookup != nil {
+		// The worker mints a token for every execution it starts, so an
+		// execution without one is accepted only with the shared secret.
 		if tok, ok := lookup.ExecToken(reg.ExecutionId); ok {
 			tokenOK = reg.Token == tok
 		} else if s.token != "" {
 			tokenOK = reg.Token == s.token
-		} else {
-			// No per-execution token and no shared secret configured — accept
-			// only in this dev-mode combination.
-			tokenOK = true
 		}
 	} else if s.token != "" {
 		tokenOK = reg.Token == s.token

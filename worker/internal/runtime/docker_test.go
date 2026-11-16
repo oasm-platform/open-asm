@@ -321,6 +321,22 @@ func TestBuildContainerEnvOASMConfig(t *testing.T) {
 	}
 }
 
+// A connector that reads its config from ExecuteJob never gets it in the env,
+// where docker inspect, /proc/<pid>/environ and child processes can read it.
+func TestBuildContainerEnvKeepsInbandConfigOutOfEnv(t *testing.T) {
+	spec := JobSpec{
+		JobID:        "j-inband",
+		Tool:         "nessus",
+		Config:       map[string]any{"apiKey": "secret-key"},
+		ConfigInband: true,
+	}
+	for _, e := range buildContainerEnv(spec, "", "", "", EgressConfig{}) {
+		if strings.Contains(e, "secret-key") {
+			t.Fatalf("in-band config leaked into the container env: %q", e)
+		}
+	}
+}
+
 func TestBuildContainerEnvNilConfig(t *testing.T) {
 	spec := JobSpec{JobID: "j-no", Tool: "nuclei", TraceID: "tr-no"}
 	env := buildContainerEnv(spec, "", "", "", EgressConfig{})

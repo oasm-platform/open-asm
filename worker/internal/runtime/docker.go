@@ -1347,8 +1347,10 @@ func buildContainerEnv(spec JobSpec, connectorAddr, connectorToken, execID strin
 		env = append(env, "WORKER_EGRESS_PROXY=off")
 	}
 
-	// Inject connector config profile as OASM_CONFIG JSON when present.
-	if len(spec.Config) > 0 {
+	// Inject connector config profile as OASM_CONFIG JSON when present, for
+	// connectors built on an SDK that reads it only from the env. A connector
+	// whose manifest says configInband gets it in ExecuteJob only.
+	if len(spec.Config) > 0 && !spec.ConfigInband {
 		if b, err := json.Marshal(spec.Config); err == nil {
 			env = append(env, "OASM_CONFIG="+string(b))
 		} else {
