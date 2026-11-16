@@ -4,7 +4,7 @@
   "description": "",
   "author": "oasm-platform",
   "private": true,
-  "license": "GPL-3.0-only",
+  "license": "AGPL-3.0-only",
   "scripts": {
     "build": "nest build",
     "typeorm": "typeorm-ts-node-commonjs -r tsconfig-paths/register",

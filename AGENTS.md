@@ -239,7 +239,7 @@ What a real run does, in order — it stops at the first failure:
 
 1. **Pre-flight**: `git fetch --prune --prune-tags` (tags deleted on the remote are dropped locally), then refuses unless the working tree is completely clean (untracked files count), the current branch is `main`, HEAD equals `origin/main`, the tag exists neither locally nor on the remote, and the version is newer than the newest semver tag. Both package.json files are read and checked here too.
 2. **Checks**: `task lint` then `task test`, then the tree must still be clean (`api:lint` runs `--fix`). Commit any lint fixes and run the release again.
-3. **Stamp**: writes `version` (tag without `v`), `author: "oasm-platform"` and `license: "GPL-3.0-only"` into `core-api/package.json` and `console/package.json`. The root `package.json` is the workspace manifest and is not touched. Values live in `PACKAGES` / `PACKAGE_FIELDS` at the top of `scripts/release.mjs`.
+3. **Stamp**: writes `version` (tag without `v`), `author: "oasm-platform"` and `license: "AGPL-3.0-only"` into `core-api/package.json` and `console/package.json`. The root `package.json` is the workspace manifest and is not touched. Values live in `PACKAGES` / `PACKAGE_FIELDS` at the top of `scripts/release.mjs`.
 4. **Commit**: only those two files, on `main`, as `release(oasm): v0.13.0`. If the commit fails (e.g. the hook), both files are restored and nothing is tagged.
 5. **Tag**: annotated tag on the release commit; its message is the changelog since the previous tag.
 6. **Push**: `git push --atomic origin refs/heads/main refs/tags/v0.13.0` — both refs land or neither does. This is a direct push to protected `main`, so it only works for an account allowed to bypass the protection.

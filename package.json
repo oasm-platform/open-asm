@@ -7,7 +7,7 @@
     "url": "git+https://github.com/oasm-platform/open-asm.git"
   },
   "author": "oasm-platform",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "bugs": {
     "url": "https://github.com/oasm-platform/open-asm/issues"
   },
