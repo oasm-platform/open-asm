@@ -8,6 +8,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 
+import { parseCiphertext } from '@/common/utils/encryption.util';
 import { ConnectorRegistryService } from '@/modules/connectors/connector-registry.service';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { ToolConfigProfile } from './entities/tool-config-profiles.entity';
@@ -478,6 +479,31 @@ export class ToolConfigProfilesService {
     }
 
     return deepMerge(base, inlineConfig);
+  }
+
+  /**
+   * Encrypts a job's config for storage on the job row: the connector
+   * schema's sensitive fields go under the workspace DEK, the rest stays
+   * readable. `resolveConfigForJob` decrypts the same fields at dispatch.
+   * Values already encrypted are kept, so sealing twice changes nothing and
+   * the same object comes back when there is nothing to seal.
+   */
+  async sealJobConfig(
+    workspaceId: string,
+    toolName: string,
+    config: Record<string, unknown> | null | undefined,
+  ): Promise<Record<string, unknown> | null> {
+    if (!config) return null;
+    const fields = getSensitiveFields(
+      this.connectorRegistry.getConnector(toolName)?.configSchema,
+    ).filter((field) => {
+      const value = config[field];
+      return typeof value === 'string' && !parseCiphertext(value);
+    });
+    if (fields.length === 0) return config;
+
+    const dek = await this.encryptionService.getDEK(workspaceId);
+    return encryptProfile(config, fields, dek);
   }
 
   // ── Internals ────────────────────────────────────────────────────────

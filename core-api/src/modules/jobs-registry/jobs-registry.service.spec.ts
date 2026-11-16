@@ -118,6 +118,10 @@ describe('JobsRegistryService', () => {
     assertProfileOwnership: jest.fn(),
     resolveConfigForDispatch: jest.fn(),
     resolveConfigForJob: jest.fn(),
+    sealJobConfig: jest.fn(
+      (_workspaceId: string, _tool: string, config: unknown) =>
+        Promise.resolve(config ?? null),
+    ),
   };
 
   const mockWorkerStreamRegistry = {
@@ -1897,6 +1901,23 @@ describe('JobsRegistryService', () => {
 
   // ── SCREENSHOT live asset-service filter ─────────────────────────────
 
+  describe('failUndispatchableJob', () => {
+    it('fails the job only while it is still in progress and logs why', async () => {
+      await service.failUndispatchableJob('job-1', 'Not dispatched: reason');
+
+      expect(mockJobRepository.update).toHaveBeenCalledWith(
+        { id: 'job-1', status: JobStatus.IN_PROGRESS },
+        { status: JobStatus.FAILED },
+      );
+      expect(mockJobErrorLogRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          job: { id: 'job-1' },
+          logMessage: 'Not dispatched: reason',
+        }),
+      );
+    });
+  });
+
   describe('createNewJob', () => {
     const mockJobRepo = {
       create: jest
@@ -2010,6 +2031,30 @@ describe('JobsRegistryService', () => {
         { target: 'https://app.example.com:8443' },
       ]);
       expect(jobs.every((job) => job.command === undefined)).toBe(true);
+    });
+
+    it('stores the connector config sealed, never the decrypted secret', async () => {
+      mockConnectorRegistryService.getConnector.mockReturnValue({ image: 'ghcr.io/nikto' });
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({
+        apiKey: 'plain-key',
+        level: 1,
+      });
+      mockToolConfigProfilesService.sealJobConfig.mockResolvedValueOnce({
+        apiKey: 'v2:dek:sealed',
+        level: 1,
+      });
+
+      const jobs = await run({ tool: nikto });
+
+      expect(mockToolConfigProfilesService.sealJobConfig).toHaveBeenCalledWith(
+        'ws-1',
+        'nikto',
+        { apiKey: 'plain-key', level: 1 },
+      );
+      expect(jobs.map((job) => job.config)).toEqual([
+        { apiKey: 'v2:dek:sealed', level: 1 },
+        { apiKey: 'v2:dek:sealed', level: 1 },
+      ]);
     });
 
     it('binds a built-in command to the service, with no stored inputs', async () => {

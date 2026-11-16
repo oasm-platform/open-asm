@@ -417,6 +417,14 @@ export class JobsRegistryService {
 
     const jobRepo = this.dataSource.getRepository(Job);
     const jobsToInsert: Job[] = [];
+    // Stored with its secrets encrypted; decrypted again at dispatch.
+    const storedConfig = isConnector
+      ? await this.toolConfigProfilesService.sealJobConfig(
+          workspaceId,
+          tool.name,
+          mergedConfig ?? config,
+        )
+      : null;
 
     // Which jobs to create: the step's input kinds (its own `input`, else
     // the category's) over the run's scope. A tool only ever receives assets
@@ -455,7 +463,7 @@ export class JobsRegistryService {
             : bindingCommand(defaultCommand ?? '', planned.commandValues),
           inputs: isConnector ? planned.connectorInputs : null,
           configProfileId: isConnector ? configProfileId : undefined,
-          config: isConnector ? mergedConfig ?? config ?? null : null,
+          config: storedConfig,
           isSaveRawResult: isSaveRawResult ?? false,
           isPublishEvent,
         } as DeepPartial<Job>),
@@ -521,7 +529,12 @@ export class JobsRegistryService {
       priority: tool.priority ?? JobPriority.BACKGROUND,
       jobHistory,
       configProfileId,
-      config: config ?? null,
+      // The job never runs, so a config that cannot be sealed is dropped.
+      config: workspaceId
+        ? await this.toolConfigProfilesService
+            .sealJobConfig(workspaceId, tool.name, config)
+            .catch(() => null)
+        : null,
       completedAt: new Date(),
     } as DeepPartial<Job>);
     await jobRepo.save(failedJob);
@@ -981,6 +994,25 @@ export class JobsRegistryService {
     );
 
     return { jobId: bullJob.id ?? '', queueId: bullJob.queueName };
+  }
+
+  /**
+   * Fails a job its claimer must not run (see `secretReleaseDenial`). Like
+   * `handleJobError`, only an IN_PROGRESS job changes, so a cancel wins.
+   */
+  public async failUndispatchableJob(
+    jobId: string,
+    reason: string,
+  ): Promise<void> {
+    await this.repo.update(
+      { id: jobId, status: JobStatus.IN_PROGRESS },
+      { status: JobStatus.FAILED },
+    );
+    await this.jobErrorLogRepo.save({
+      job: { id: jobId } as Job,
+      logMessage: reason,
+      payload: '{}',
+    });
   }
 
   public async handleJobError(dto: UpdateResultDto, job: Job, error: Error) {

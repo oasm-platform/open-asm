@@ -39,7 +39,7 @@ The tool catalogue (built-in CLIs, manifest connectors, provider tools), per-wor
 - **Profile update.** An incoming masked value (`isMaskedValue`) keeps the stored ciphertext. A rename-only update saves without re-encrypting, because re-encrypting would double-encrypt the stored values.
 - The first profile for a workspace+tool becomes the default. Deleting the default promotes the oldest remaining profile. `setDefault` runs in a transaction.
 - Deleting a profile returns 409 while a job in the workspace or a workflow's `content.jobs` references it.
-- `resolveConfigForJob` takes the explicit profile, which must belong to the same workspace and tool (otherwise 404), or else the default profile. It then deep-merges the decrypted inline config. **The result is plaintext.**
+- `resolveConfigForJob` takes the explicit profile, which must belong to the same workspace and tool (otherwise 404), or else the default profile. It then deep-merges the decrypted inline config. **The result is plaintext.** `sealJobConfig` is its inverse for storage on a job row: it encrypts the schema's sensitive fields that are not ciphertext yet, and returns the same object when there is nothing to seal.
 - `uninstallTool` deletes the `workspace_tools` row and the workspace's profiles for that tool in one transaction.
 
 ## Tool sync (`ToolSyncService`, every boot)

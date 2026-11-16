@@ -9,6 +9,7 @@ Scan jobs and workflow runs: creates `jobs` rows, lets workers claim them, inges
 - `workflow-runner.service.ts`: the workflow engine (`startRun`, `retryRun`, `onJobTerminal`, `advanceRun`).
 - `workflow-run-reconciler.service.ts`, `job-result-cleanup.service.ts`, `job-retention.service.ts`: crons.
 - `processors/job-result.processor.ts`: `JobResultProcessor`. `processors/scan-schedule.processor.ts`: `AssetsDiscoveryScheduleConsumer`.
+- `job-secret-release.policy.ts`: `secretReleaseDenial`, which worker may receive a connector job's secrets. `job-config-seal.service.ts`: `JobConfigSealService`, encrypts plaintext `jobs.config` left by older versions, at boot.
 - `step-inputs.ts` (pure planner: which jobs a step creates), `step-scope.loader.ts` (`StepScopeLoader`, loads the scope rows; `URL_INPUTS_PER_HOST = 50`), `connector-inputs.ts` (connector `inputs` map, repository clone URL + credentials).
 - `entities/`: `Job`, `JobHistory`, `JobErrorLog`. `dto/`: request/response DTOs.
 
@@ -23,6 +24,7 @@ Scan jobs and workflow runs: creates `jobs` rows, lets workers claim them, inges
 | `GET :workerId/next`, `POST :workerId/result[/subdomains\|http-probe\|ports\|vulnerabilities\|screenshot\|url-discovery]` | `@Public()` + `@WorkerTokenAuth()` (`worker-token` header) |
 
 - gRPC `JobsRegistryService` (`src/proto/jobs_registry.proto`): `Next`, `NextBatch`, `Result` (deprecated), `ResultSubdomains`, `ResultHttpProbe`, `ResultPorts`, `ResultVulnerabilities`, `ResultScreenshot`, `ResultUrlDiscovery`. All use `GrpcWorkerTokenGuard`.
+- `Next` / `NextBatch` publish `job.secrets.released` (persisted, audit action wired to `nextBatch`) for each dispatched connector job that carries a secret: `metadata.fields` lists the field names (`inputs.token` for a repository token), never values.
 - Exports `JobsRegistryService` and `WorkflowRunnerService`. The module is `@Global()`.
 - Queues: registers and consumes `BullMQName.JOB_RESULT` (concurrency 10; enqueued with 3 attempts, exponential backoff, removed on complete/fail). Consumes `ASSETS_DISCOVERY_SCHEDULE`, which `targets` registers and fills; it calls `AssetsService.reScan` with `JobRunType.SCHEDULED`.
 - In-process events (EventEmitter2): `EventTriggerType.WORKFLOW_START` (from `startRun`, and from `createNewJob` when it creates its own history), `WORKFLOW_END` (after the commit that completes a run). Listeners: `statistic.service.ts`, `projects/project-run-events.listener.ts`, `assets/url-discovery.service.ts`.
@@ -39,7 +41,9 @@ Scan jobs and workflow runs: creates `jobs` rows, lets workers claim them, inges
 ## Invariants
 
 - **Tenant scoping.** Jobs have no `workspaceId`. Scope is `asset → target.workspaceId`. Runs are checked with `workflow.workspace` OR the jobs' targets (`loadJobHistoryInWorkspace`, `cancelJobHistory`), because runs without a workflow exist (custom-template runs).
-- **`jobs.config` holds decrypted secrets.** `createNewJob` stores the output of `ToolConfigProfilesService.resolveConfigForJob`. `getManyJobs` masks it with `maskJobConfig`. Any new read path must mask it too.
+- **`jobs.config` holds secrets encrypted.** `createNewJob` stores the output of `ToolConfigProfilesService.resolveConfigForJob` through `sealJobConfig`: the connector schema's sensitive fields are encrypted under the workspace DEK, and `resolveConfigForJob` decrypts them again at dispatch. Rows from older versions may still be plaintext until `JobConfigSealService` has run; `jobs.config` is in `SECRET_COLUMNS` for key rotation. `getManyJobs` still masks it with `maskJobConfig`, and any new read path must mask it too.
+- **Worker identity comes from the token.** gRPC handlers use `GrpcWorkerContext.requireWorker(metadata)`, HTTP handlers `@CurrentWorker()`. The `id` / `workerId` in the request or the `:workerId` path param is ignored (a mismatch is logged), so old workers that send their own id keep working.
+- **Secret release** (`mapJobToGrpcJob`): before decrypting anything, `secretReleaseDenial` must pass: a WORKSPACE worker only gets jobs of its workspace, a PROVIDER worker only of its tool, a CLOUD worker any. A denied job is failed with `failUndispatchableJob` (conditional on `IN_PROGRESS`) and left out of the response.
 - **Only `IN_PROGRESS` moves to a terminal state.** `JobResultProcessor` and `handleJobError` use conditional updates (`status = IN_PROGRESS`), so a cancel or re-run that happens during processing wins. `findJobForUpdate` matches `workerId + jobId + IN_PROGRESS`. A result that no longer matches is discarded and its staged file is deleted.
 - **Results are staged.** The payload is uploaded to storage bucket `job-results`. The BullMQ job carries only `resultRef` (`bucket/file`). A category mismatch throws `UnrecoverableError`. Built-in results go through `builtInTools[].parser`. Empty output, and the benign outcomes in `BENIGN_BUILT_IN_OUTCOMES`, complete the job with no data. Exception: naabu's "no valid ipv4 or ipv6 targets" for an asset whose `dnsRecords` has `A`/`AAAA` fails the job (`unresolvableButDiscoveredReason`): the same line is printed when the worker's resolver is unreachable.
 - **Claim** (`getNextJobs`): one transaction, at most `MAX_JOB_CLAIM_SIZE` (100), ordered by priority then oldest. BUILT_IN workers claim built-in tool names, plus connector slugs only when `runMode === 'node'`. Non-cloud workers claim only from their own workspace. A worker with `internalNetworkId` claims only targets on that network. PROVIDER workers claim only their own `tool.id`. The worker row is query-cached for `WORKER_CLAIM_CACHE_MS` (5 s).
@@ -50,7 +54,7 @@ Scan jobs and workflow runs: creates `jobs` rows, lets workers claim them, inges
 
 ## Coupling
 
-- Imports `ConnectorsModule`, `IntegrationsModule` and `WorkspacesModule`, and registers the `ToolConfigProfile` repository. `ToolsService`, `ToolConfigProfilesService`, `WorkerStreamRegistry`, storage, data-adapter, vulnerability lifecycle and `AssetsService` come from `@Global()` modules.
+- Imports `ConnectorsModule`, `IntegrationsModule` and `WorkspacesModule`, and registers the `ToolConfigProfile` repository. The controller injects `GrpcWorkerContext` (workers) and `EventBridgeService` (event-bridge), both global. `ToolsService`, `ToolConfigProfilesService`, `WorkerStreamRegistry`, storage, data-adapter, vulnerability lifecycle and `AssetsService` come from `@Global()` modules.
 - **Import cycle** tools.service → workers.service → jobs-registry.service → tools.service. `JobsRegistryService` injects `ToolsService` with `@Optional() @Inject(forwardRef(...))`, and `WorkersService` injects `JobsRegistryService` with `forwardRef`. Keep the module order in `combine.module.ts`.
 - Other code writes `jobs` directly. `WorkersService` uses `jobsRegistryService.repo` and raw SQL in `resetStuckAndFailedJobs`. `ToolSyncService.dedupeExistingTools` rewrites `toolId`. `ToolConfigProfilesService.remove` reads `jobs`. `AssetsModule` registers the `Job` repository.
 - `startRun` callers: `workflows/trigger-workflow.service.ts`, `projects/project-workflows.service.ts`, `assets/url-discovery.service.ts`, `vulnerabilities.service.ts`. `createNewJob` callers: `templates.service.ts`, `vulnerabilities.service.ts`. Agents call `getManyJobs`.
@@ -58,7 +62,6 @@ Scan jobs and workflow runs: creates `jobs` rows, lets workers claim them, inges
 ## Gotchas
 
 - `getNextJobs` comments mention `SKIP LOCKED`, but the query only does `setLock('pessimistic_write')` (plain `FOR UPDATE OF jobs`). Concurrent claims block each other instead of skipping rows.
-- Claim and result RPCs/routes trust the `workerId` in the request or path. The guards only check that the token is valid.
 - Asset-less FAILED jobs never match `getManyJobs` (`target.workspaceId` filter) or `verifyJobBelongsToWorkspace` (inner joins). They cannot be re-run, cancelled or deleted one by one, and `resetStuckAndFailedJobs` skips them (`assetId IS NOT NULL`).
 - Retention keeps `job_histories`. A run whose jobs were all pruned drops out of `GET histories`, which inner-joins `jobs`.
 - `Tool.name` is the connector slug. The gRPC `tool` field must be the slug, because the worker derives container names from it.
@@ -66,4 +69,4 @@ Scan jobs and workflow runs: creates `jobs` rows, lets workers claim them, inges
 
 ## Testing
 
-Specs are colocated: service, controller, `workflow-runner`, `workflow-run-reconciler`, `job-result-cleanup`, `processors/*`, `step-inputs`, `step-scope.loader`, `connector-inputs`, `dto/jobs-registry.dto.spec.ts`, plus `jobs-registry.audit-wiring.spec.ts`, which checks which handlers publish `job.cancelled`.
+Specs are colocated: service, controller, `job-secret-release.policy`, `job-config-seal.service`, `workflow-runner`, `workflow-run-reconciler`, `job-result-cleanup`, `processors/*`, `step-inputs`, `step-scope.loader`, `connector-inputs`, `dto/jobs-registry.dto.spec.ts`, plus `jobs-registry.audit-wiring.spec.ts`, which checks which handlers publish `job.cancelled`.

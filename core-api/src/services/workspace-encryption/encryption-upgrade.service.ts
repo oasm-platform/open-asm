@@ -27,6 +27,8 @@ interface SecretColumn {
   jsonb: boolean;
   /** System-wide tables have no workspace, so their secrets use the KEK */
   systemWide?: boolean;
+  /** For a table without a workspaceId column: SELECT id, "workspaceId", value */
+  rows?: string;
   map: (value: unknown, reencrypt: Reencrypt) => unknown;
 }
 
@@ -74,6 +76,18 @@ const SECRET_COLUMNS: SecretColumn[] = [
     table: 'tool_config_profiles',
     column: 'config',
     jsonb: true,
+    map: mapConfigStrings,
+  },
+  {
+    // A connector job's resolved config (JobsRegistryService.createNewJob)
+    table: 'jobs',
+    column: 'config',
+    jsonb: true,
+    rows: `SELECT j.id, tg."workspaceId", j.config AS value
+             FROM jobs j
+             JOIN assets a ON a.id = j."assetId"
+             JOIN targets tg ON tg.id = a."targetId"
+            WHERE j.config IS NOT NULL`,
     map: mapConfigStrings,
   },
   {
@@ -191,13 +205,14 @@ export class EncryptionUpgradeService implements OnApplicationBootstrap {
   }
 
   private async reencryptColumn(
-    { table, column, jsonb, systemWide, map }: SecretColumn,
+    { table, column, jsonb, systemWide, rows: rowsQuery, map }: SecretColumn,
     counts: UpgradeCounts,
   ): Promise<void> {
     const workspace = systemWide ? 'NULL' : '"workspaceId"';
     const rows: { id: string; workspaceId: string | null; value: unknown }[] =
       await this.dataSource.query(
-        `SELECT id, ${workspace} AS "workspaceId", "${column}" AS value FROM "${table}" WHERE "${column}" IS NOT NULL`,
+        rowsQuery ??
+          `SELECT id, ${workspace} AS "workspaceId", "${column}" AS value FROM "${table}" WHERE "${column}" IS NOT NULL`,
       );
 
     for (const { id, workspaceId, value } of rows) {
