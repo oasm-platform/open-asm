@@ -1,17 +1,38 @@
 import { WorkspacePermissions } from '@/common/decorators/workspace-permissions.decorator';
-import { ToolCategory } from '@/common/enums/enum';
+import {
+  ToolCategory,
+  WorkerScope,
+  WorkerType,
+} from '@/common/enums/enum';
 import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
+import { Metadata } from '@grpc/grpc-js';
 import { Reflector } from '@nestjs/core';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
+import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
+import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
+import type { WorkerInstance } from '../workers/entities/worker.entity';
 import { WorkersService } from '../workers/workers.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { JobsRegistryController } from './jobs-registry.controller';
 import { JobsRegistryService } from './jobs-registry.service';
 import { WorkflowRunnerService } from './workflow-runner.service';
+
+/** The worker GrpcWorkerTokenGuard / WorkerTokenGuard authenticated. */
+let authedWorker: WorkerInstance;
+const metadata = new Metadata();
+
+beforeEach(() => {
+  authedWorker = {
+    id: 'worker-1',
+    type: WorkerType.BUILT_IN,
+    scope: WorkerScope.WORKSPACE,
+    workspaceId: 'ws-1',
+  } as WorkerInstance;
+});
 
 describe('JobsRegistryController', () => {
   // ── Existing decorator tests ────────────────────────────────────────
@@ -64,10 +85,13 @@ describe('JobsRegistryController', () => {
     let mockConnectorRegistry: any;
     let mockToolConfigProfilesService: any;
     let mockIntegrationsService: { getIntegrationWithDecryptedConfig: jest.Mock };
+    let eventBridge: { publishSafely: jest.Mock };
 
     beforeEach(async () => {
       mockJobsRegistryService = {
         getNextJob: jest.fn(),
+        getNextJobs: jest.fn(),
+        failUndispatchableJob: jest.fn(),
       };
       mockConnectorRegistry = {
         getConnector: jest.fn(),
@@ -94,17 +118,19 @@ describe('JobsRegistryController', () => {
           { provide: WorkflowRunnerService, useValue: { retryRun: jest.fn() } },
           { provide: WorkspacesService, useValue: { getWorkspace: jest.fn() } },
           { provide: WorkersService, useValue: { validateWorkerToken: jest.fn() } },
-          { provide: GrpcWorkerContext, useValue: { setWorker: jest.fn() } },
+          { provide: GrpcWorkerContext, useValue: { requireWorker: () => authedWorker } },
+          { provide: EventBridgeService, useValue: { publishSafely: jest.fn() } },
         ],
       }).compile();
 
       controller = module.get(JobsRegistryController);
+      eventBridge = module.get(EventBridgeService);
     });
 
     it('should return empty stub when no job found', async () => {
       mockJobsRegistryService.getNextJob.mockResolvedValue(null);
 
-      const result = await controller.next({ id: 'worker-1' });
+      const result = await controller.next({ id: 'worker-1' }, metadata);
 
       expect(result).toEqual({ id: '', asset: {}, command: '' });
     });
@@ -131,7 +157,7 @@ describe('JobsRegistryController', () => {
       });
       mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({});
 
-      const result = await controller.next({ id: 'worker-1' });
+      const result = await controller.next({ id: 'worker-1' }, metadata);
 
       // Lookup still keys off the persisted tool name...
       expect(mockConnectorRegistry.getConnector).toHaveBeenCalledWith(
@@ -170,7 +196,7 @@ describe('JobsRegistryController', () => {
       });
       mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({});
 
-      const result = await controller.next({ id: 'worker-1' });
+      const result = await controller.next({ id: 'worker-1' }, metadata);
 
       expect(result.directEgress).toBe(true);
     });
@@ -192,7 +218,7 @@ describe('JobsRegistryController', () => {
       });
       mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({});
 
-      const result = await controller.next({ id: 'worker-1' });
+      const result = await controller.next({ id: 'worker-1' }, metadata);
 
       expect(result.inputs).toEqual({
         fields: { target: { stringValue: 'https://app.example.com:8443' } },
@@ -223,7 +249,7 @@ describe('JobsRegistryController', () => {
         decryptedConfig: { apiToken: 'glpat-secret' },
       });
 
-      const result = await controller.next({ id: 'worker-1' });
+      const result = await controller.next({ id: 'worker-1' }, metadata);
 
       expect(
         mockIntegrationsService.getIntegrationWithDecryptedConfig,
@@ -260,7 +286,7 @@ describe('JobsRegistryController', () => {
         new Error('not found'),
       );
 
-      const result = await controller.next({ id: 'worker-1' });
+      const result = await controller.next({ id: 'worker-1' }, metadata);
 
       expect(result.inputs).toEqual({
         fields: {
@@ -270,6 +296,105 @@ describe('JobsRegistryController', () => {
       });
     });
 
+    // ── Worker identity and secret release ──
+
+    const connectorJob = (overrides: Record<string, unknown> = {}) => ({
+      id: 'job-9',
+      workspaceId: 'ws-1',
+      category: 'vulnerabilities',
+      asset: { value: 'example.com' },
+      config: null,
+      tool: { id: 'tool-nessus', name: 'nessus' },
+      ...overrides,
+    });
+
+    const useNessusConnector = (): void => {
+      mockConnectorRegistry.getConnector.mockReturnValue({
+        slug: 'nessus',
+        image: 'ghcr.io/oasm-platform/connector-nessus:1',
+        configSchema: {
+          properties: { apiKey: { type: 'string' }, rate: { type: 'number' } },
+        },
+      });
+    };
+
+    it('claims as the authenticated worker, not the worker id in the request', async () => {
+      mockJobsRegistryService.getNextJob.mockResolvedValue(null);
+
+      await controller.next({ id: 'someone-elses-worker' }, metadata);
+
+      expect(mockJobsRegistryService.getNextJob).toHaveBeenCalledWith('worker-1');
+    });
+
+    it('batch-claims as the authenticated worker', async () => {
+      mockJobsRegistryService.getNextJobs.mockResolvedValue([]);
+
+      await controller.nextBatch({ id: 'someone-elses-worker', limit: 3 }, metadata);
+
+      expect(mockJobsRegistryService.getNextJobs).toHaveBeenCalledWith(
+        'worker-1',
+        3,
+      );
+    });
+
+    it('fails a claimed job the worker may not receive the secrets of, without decrypting them', async () => {
+      useNessusConnector();
+      mockJobsRegistryService.getNextJobs.mockResolvedValue([
+        connectorJob({ workspaceId: 'ws-2' }),
+        connectorJob({ id: 'job-10' }),
+      ]);
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({});
+
+      const { values } = await controller.nextBatch(
+        { id: 'worker-1', limit: 2 },
+        metadata,
+      );
+
+      expect(values.map((job) => job.id)).toEqual(['job-10']);
+      expect(mockJobsRegistryService.failUndispatchableJob).toHaveBeenCalledWith(
+        'job-9',
+        expect.stringMatching(/another workspace/),
+      );
+      expect(
+        mockToolConfigProfilesService.resolveConfigForJob,
+      ).toHaveBeenCalledTimes(1);
+    });
+
+    it('records which secret fields were released to which worker', async () => {
+      useNessusConnector();
+      mockJobsRegistryService.getNextJob.mockResolvedValue(connectorJob());
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({
+        apiKey: 'nessus-key',
+        rate: 5,
+      });
+
+      await controller.next({ id: 'worker-1' }, metadata);
+
+      expect(eventBridge.publishSafely).toHaveBeenCalledWith(
+        EVENT_CATALOG.job.secrets.released,
+        expect.objectContaining({
+          workspaceId: 'ws-1',
+          resourceType: 'job',
+          resourceId: 'job-9',
+          metadata: { workerId: 'worker-1', fields: ['apiKey'] },
+        }),
+        expect.anything(),
+      );
+      const [, data] = eventBridge.publishSafely.mock.calls[0];
+      expect(JSON.stringify(data)).not.toContain('nessus-key');
+    });
+
+    it('records nothing for a job that carries no secret', async () => {
+      useNessusConnector();
+      mockJobsRegistryService.getNextJob.mockResolvedValue(connectorJob());
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({
+        rate: 5,
+      });
+
+      await controller.next({ id: 'worker-1' }, metadata);
+
+      expect(eventBridge.publishSafely).not.toHaveBeenCalled();
+    });
   });
 
   // ── url_discovery: REST + gRPC delegation ───────────────────────────
@@ -306,7 +431,8 @@ describe('JobsRegistryController', () => {
           { provide: WorkflowRunnerService, useValue: { retryRun: jest.fn() } },
           { provide: WorkspacesService, useValue: { getWorkspace: jest.fn() } },
           { provide: WorkersService, useValue: { validateWorkerToken: jest.fn() } },
-          { provide: GrpcWorkerContext, useValue: { setWorker: jest.fn() } },
+          { provide: GrpcWorkerContext, useValue: { requireWorker: () => authedWorker } },
+          { provide: EventBridgeService, useValue: { publishSafely: jest.fn() } },
         ],
       }).compile();
 
@@ -321,8 +447,9 @@ describe('JobsRegistryController', () => {
       } as any;
 
       const result = await controller.updateUrlDiscoveryResult(
-        { workerId: 'worker-uuid' },
+        { workerId: 'worker-1' },
         dto,
+        authedWorker,
       );
 
       expect(mockJobsRegistryService.updateResultByCategory).toHaveBeenCalledTimes(
@@ -330,7 +457,7 @@ describe('JobsRegistryController', () => {
       );
       const [workerId, passedDto, category] =
         mockJobsRegistryService.updateResultByCategory.mock.calls[0];
-      expect(workerId).toBe('worker-uuid');
+      expect(workerId).toBe('worker-1');
       expect(passedDto).toBe(dto);
       expect(category).toBe(ToolCategory.URL_DISCOVERY);
       expect(result).toEqual({ jobId: 'bull-job-id', queueId: 'job-result' });
@@ -342,13 +469,16 @@ describe('JobsRegistryController', () => {
         { url: 'https://b.example.com' },
       ];
 
-      const result = await controller.resultUrlDiscovery({
-        workerId: 'worker-uuid',
-        jobId: 'job-uuid',
-        error: false,
-        raw: 'raw-out',
-        urls,
-      });
+      const result = await controller.resultUrlDiscovery(
+        {
+          workerId: 'worker-1',
+          jobId: 'job-uuid',
+          error: false,
+          raw: 'raw-out',
+          urls,
+        },
+        metadata,
+      );
 
       expect(mockJobsRegistryService.updateResultByCategory).toHaveBeenCalledTimes(
         1,
@@ -362,12 +492,36 @@ describe('JobsRegistryController', () => {
       expect(result).toEqual({ success: true });
     });
 
+    it('submits gRPC results as the authenticated worker, not the worker id in the request', async () => {
+      await controller.resultSubdomains(
+        { workerId: 'someone-elses-worker', jobId: 'job-uuid', error: false },
+        metadata,
+      );
+
+      const [workerId] =
+        mockJobsRegistryService.updateResultByCategory.mock.calls[0];
+      expect(workerId).toBe('worker-1');
+    });
+
+    it('submits HTTP results as the authenticated worker, not the :workerId path param', async () => {
+      const dto = { jobId: 'job-uuid', error: false, payload: [] } as any;
+
+      await controller.updateSubdomainResult(
+        { workerId: 'someone-elses-worker' },
+        dto,
+        authedWorker,
+      );
+
+      const [workerId] =
+        mockJobsRegistryService.updateResultByCategory.mock.calls[0];
+      expect(workerId).toBe('worker-1');
+    });
+
     it('S2 edge: urls undefined → payload [] (no throw)', async () => {
-      const result = await controller.resultUrlDiscovery({
-        workerId: 'worker-uuid',
-        jobId: 'job-uuid',
-        error: false,
-      });
+      const result = await controller.resultUrlDiscovery(
+        { workerId: 'worker-1', jobId: 'job-uuid', error: false },
+        metadata,
+      );
 
       const [, passedDto] =
         mockJobsRegistryService.updateResultByCategory.mock.calls[0];
@@ -378,7 +532,11 @@ describe('JobsRegistryController', () => {
     it('S3 regression: updatePortsResult still delegates with PORTS_SCANNER', async () => {
       const dto = { jobId: 'job-uuid', error: false, payload: [80, 443] } as any;
 
-      await controller.updatePortsResult({ workerId: 'worker-uuid' }, dto);
+      await controller.updatePortsResult(
+        { workerId: 'worker-1' },
+        dto,
+        authedWorker,
+      );
 
       const [, passedDto, category] =
         mockJobsRegistryService.updateResultByCategory.mock.calls[0];
@@ -420,7 +578,8 @@ describe('JobsRegistryController', () => {
           { provide: WorkflowRunnerService, useValue: { retryRun: jest.fn() } },
           { provide: WorkspacesService, useValue: { getWorkspace: jest.fn() } },
           { provide: WorkersService, useValue: { validateWorkerToken: jest.fn() } },
-          { provide: GrpcWorkerContext, useValue: { setWorker: jest.fn() } },
+          { provide: GrpcWorkerContext, useValue: { requireWorker: () => authedWorker } },
+          { provide: EventBridgeService, useValue: { publishSafely: jest.fn() } },
         ],
       }).compile();
 
@@ -436,12 +595,10 @@ describe('JobsRegistryController', () => {
         ],
       } as any;
 
-      const result = await controller.resultVulnerabilities({
-        workerId: 'worker-uuid',
-        jobId: 'job-uuid',
-        error: false,
-        vulnerabilities,
-      });
+      const result = await controller.resultVulnerabilities(
+        { workerId: 'worker-1', jobId: 'job-uuid', error: false, vulnerabilities },
+        metadata,
+      );
 
       const [, passedDto, category] =
         mockJobsRegistryService.updateResultByCategory.mock.calls[0];
@@ -457,12 +614,10 @@ describe('JobsRegistryController', () => {
         values: [{ name: 'CVE-1', severity: 'SEVERITY_UNSPECIFIED' }],
       } as any;
 
-      await controller.resultVulnerabilities({
-        workerId: 'worker-uuid',
-        jobId: 'job-uuid',
-        error: false,
-        vulnerabilities,
-      });
+      await controller.resultVulnerabilities(
+        { workerId: 'worker-1', jobId: 'job-uuid', error: false, vulnerabilities },
+        metadata,
+      );
 
       const [, passedDto] =
         mockJobsRegistryService.updateResultByCategory.mock.calls[0];

@@ -60,7 +60,7 @@ Scan worker nodes: join/identity, liveness, listing, the gRPC channels a worker 
 ## Gotchas
 
 - **The in-memory state is per process**: `RemoteExecuteSubscribeService`, `AliveStreamManager`, `WorkerStreamRegistry.outbound`, `GrpcWorkerContext`. A push succeeds only on the instance that holds the worker's subscribe stream. Results, cancels and job hints cross instances through Redis ("broadcast, holder acts"). `isOnline` reflects only the instance that answers the request.
-- `GrpcWorkerContext` caches the `WorkerInstance` per token from the last guarded call and is never pruned.
+- `GrpcWorkerContext` caches the `WorkerInstance` per token from the last guarded call and is never pruned. `requireWorker(metadata)` reads it back for the call's token; jobs-registry takes worker identity only from there (HTTP: `WorkerTokenGuard` sets `request.worker`, read with `@CurrentWorker()`).
 - `RedisService.subscribe` delivers every message to every callback, so each handler must check its own channel.
 - The gRPC loader uses `enums: String`. `mapRunMode` and `handleRemoteExecuteResult` accept both enum names and numbers. Image results are base64-encoded; other result types are UTF-8.
 - `Connect` must subscribe to the inbound stream synchronously and uses a `ReplaySubject`. It currently carries only register, heartbeat, `cancel` and `jobsAvailable`. Job pull, results and telemetry stay on their own RPCs.

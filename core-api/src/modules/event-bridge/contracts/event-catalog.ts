@@ -302,6 +302,12 @@ export const EVENT_CATALOG = {
       name: 'job.reset_stuck',
       summary: 'Stuck or failed jobs swept back to PENDING',
     },
+    secrets: {
+      released: {
+        name: 'job.secrets.released',
+        summary: 'Decrypted job credentials handed to a worker',
+      },
+    },
     result: {
       cleaned: {
         name: 'job.result.cleaned',

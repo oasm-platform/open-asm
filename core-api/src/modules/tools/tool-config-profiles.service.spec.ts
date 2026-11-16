@@ -796,4 +796,46 @@ describe('ToolConfigProfilesService', () => {
     const cfg = result[0].config;
     expect(cfg.apiKey).toBe('****3456');
   });
+
+  // ── sealJobConfig: job.config is stored with its secrets encrypted ──
+
+  describe('sealJobConfig', () => {
+    beforeEach(() => {
+      (connectorRegistry.getConnector as jest.Mock).mockReturnValue({
+        configSchema: schemaWithPassword,
+      });
+    });
+
+    it('encrypts the sensitive fields and leaves the rest readable', async () => {
+      const sealed = await service.sealJobConfig(wsId, 'nessus', {
+        apiKey: 'secret-key',
+        target: 'scan-1',
+      });
+
+      expect(sealed?.apiKey).toMatch(/^v2:dek:/);
+      expect(sealed?.target).toBe('scan-1');
+      // resolveConfigForJob opens it again at dispatch
+      expect(
+        decryptProfile(sealed!, ['apiKey'], Buffer.alloc(32)).apiKey,
+      ).toBe('secret-key');
+    });
+
+    it('keeps a value that is already encrypted, so sealing twice is harmless', async () => {
+      const once = await service.sealJobConfig(wsId, 'nessus', {
+        apiKey: 'secret-key',
+      });
+
+      const twice = await service.sealJobConfig(wsId, 'nessus', once);
+
+      expect(twice).toBe(once);
+    });
+
+    it('returns a config without secrets untouched and never loads the DEK', async () => {
+      const config = { target: 'scan-1' };
+
+      expect(await service.sealJobConfig(wsId, 'nessus', config)).toBe(config);
+      expect(await service.sealJobConfig(wsId, 'nessus', null)).toBeNull();
+      expect(encryptionService.getDEK).not.toHaveBeenCalled();
+    });
+  });
 });

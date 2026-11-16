@@ -1,10 +1,17 @@
 import { Public, WorkspaceId } from '@/common/decorators/app.decorator';
+import { CurrentWorker } from '@/common/decorators/current-worker.decorator';
 import { WorkerTokenAuth } from '@/common/decorators/worker-token-auth.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
-import { Severity, ToolCategory } from '@/common/enums/enum';
+import {
+  AuditActorType,
+  AuditOutcome,
+  Severity,
+  ToolCategory,
+} from '@/common/enums/enum';
+import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
 import { GrpcWorkerTokenGuard } from '@/common/guards/grpc-worker-token.guard';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { GetManyResponseDto } from '@/utils/getManyResponse';
@@ -19,9 +26,11 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import type { Metadata } from '@grpc/grpc-js';
 import { GrpcMethod } from '@nestjs/microservices';
 import { plainToInstance } from 'class-transformer';
 import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
+import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
 import { PublishEvent } from '../event-bridge/publishing/publish-event.decorator';
 import { Asset } from '../assets/entities/assets.entity';
 import { DiscoveredUrl } from '../assets/entities/discovered-url.entity';
@@ -30,6 +39,9 @@ import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity'
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
+import { getSensitiveFields } from '../tools/validators/tool-config-profiles.crypto';
+import { WorkerInstance } from '../workers/entities/worker.entity';
+import { secretReleaseDenial } from './job-secret-release.policy';
 import { WorkflowRunnerService } from './workflow-runner.service';
 import {
   buildConnectorInputs,
@@ -117,6 +129,8 @@ export class JobsRegistryController {
     private readonly toolConfigProfilesService: ToolConfigProfilesService,
     private readonly integrationsService: IntegrationsService,
     private readonly workflowRunnerService: WorkflowRunnerService,
+    private readonly grpcWorkerContext: GrpcWorkerContext,
+    private readonly eventBridge: EventBridgeService,
   ) {}
 
   @WorkspaceAccess('job.read')
@@ -165,8 +179,13 @@ export class JobsRegistryController {
   @WorkerTokenAuth()
   @Public()
   @Get('/:workerId/next')
-  async getNextJob(@Param() { workerId }: WorkerIdParams) {
-    const job = await this.jobsRegistryService.getNextJob(workerId);
+  async getNextJob(
+    @Param() { workerId }: WorkerIdParams,
+    @CurrentWorker() worker: WorkerInstance,
+  ) {
+    const job = await this.jobsRegistryService.getNextJob(
+      this.authenticatedWorkerId(worker, workerId),
+    );
     return job;
   }
 
@@ -180,8 +199,12 @@ export class JobsRegistryController {
   updateResult(
     @Param() { workerId }: WorkerIdParams,
     @Body() dto: UpdateResultDto,
+    @CurrentWorker() worker: WorkerInstance,
   ) {
-    return this.jobsRegistryService.updateResult(workerId, dto);
+    return this.jobsRegistryService.updateResult(
+      this.authenticatedWorkerId(worker, workerId),
+      dto,
+    );
   }
 
   // --- Category-Specific Result Endpoints ---
@@ -196,9 +219,10 @@ export class JobsRegistryController {
   updateSubdomainResult(
     @Param() { workerId }: WorkerIdParams,
     @Body() dto: SubdomainResultDto,
+    @CurrentWorker() worker: WorkerInstance,
   ) {
     return this.jobsRegistryService.updateResultByCategory(
-      workerId,
+      this.authenticatedWorkerId(worker, workerId),
       dto,
       ToolCategory.SUBDOMAINS,
     );
@@ -214,9 +238,10 @@ export class JobsRegistryController {
   updateHttpProbeResult(
     @Param() { workerId }: WorkerIdParams,
     @Body() dto: HttpProbeResultDto,
+    @CurrentWorker() worker: WorkerInstance,
   ) {
     return this.jobsRegistryService.updateResultByCategory(
-      workerId,
+      this.authenticatedWorkerId(worker, workerId),
       dto,
       ToolCategory.HTTP_PROBE,
     );
@@ -232,9 +257,10 @@ export class JobsRegistryController {
   updatePortsResult(
     @Param() { workerId }: WorkerIdParams,
     @Body() dto: PortsResultDto,
+    @CurrentWorker() worker: WorkerInstance,
   ) {
     return this.jobsRegistryService.updateResultByCategory(
-      workerId,
+      this.authenticatedWorkerId(worker, workerId),
       dto,
       ToolCategory.PORTS_SCANNER,
     );
@@ -250,9 +276,10 @@ export class JobsRegistryController {
   updateVulnerabilitiesResult(
     @Param() { workerId }: WorkerIdParams,
     @Body() dto: VulnerabilitiesResultDto,
+    @CurrentWorker() worker: WorkerInstance,
   ) {
     return this.jobsRegistryService.updateResultByCategory(
-      workerId,
+      this.authenticatedWorkerId(worker, workerId),
       dto,
       ToolCategory.VULNERABILITIES,
     );
@@ -268,9 +295,10 @@ export class JobsRegistryController {
   updateScreenshotResult(
     @Param() { workerId }: WorkerIdParams,
     @Body() dto: ScreenshotResultDto,
+    @CurrentWorker() worker: WorkerInstance,
   ) {
     return this.jobsRegistryService.updateResultByCategory(
-      workerId,
+      this.authenticatedWorkerId(worker, workerId),
       dto,
       ToolCategory.SCREENSHOT,
     );
@@ -286,9 +314,10 @@ export class JobsRegistryController {
   updateUrlDiscoveryResult(
     @Param() { workerId }: WorkerIdParams,
     @Body() dto: UrlDiscoveryResultDto,
+    @CurrentWorker() worker: WorkerInstance,
   ) {
     return this.jobsRegistryService.updateResultByCategory(
-      workerId,
+      this.authenticatedWorkerId(worker, workerId),
       dto,
       ToolCategory.URL_DISCOVERY,
     );
@@ -456,14 +485,17 @@ export class JobsRegistryController {
 
   @UseGuards(GrpcWorkerTokenGuard)
   @GrpcMethod('JobsRegistryService', 'Next')
-  async next(worker: { id: string }): Promise<Record<string, unknown>> {
-    const job = await this.jobsRegistryService.getNextJob(worker.id);
+  async next(
+    request: { id: string },
+    metadata: Metadata,
+  ): Promise<Record<string, unknown>> {
+    const worker = this.grpcWorkerContext.requireWorker(metadata);
+    const job = await this.jobsRegistryService.getNextJob(
+      this.authenticatedWorkerId(worker, request.id),
+    );
+    const mapped = job ? await this.mapJobToGrpcJob(job, worker) : null;
 
-    if (!job) {
-      return { id: '', asset: {}, command: '' };
-    }
-
-    return this.mapJobToGrpcJob(job);
+    return mapped ?? { id: '', asset: {}, command: '' };
   }
 
   /**
@@ -477,26 +509,69 @@ export class JobsRegistryController {
    */
   @UseGuards(GrpcWorkerTokenGuard)
   @GrpcMethod('JobsRegistryService', 'NextBatch')
-  async nextBatch(request: {
-    id: string;
-    limit: number;
-  }): Promise<{ values: Record<string, unknown>[] }> {
+  async nextBatch(
+    request: { id: string; limit: number },
+    metadata: Metadata,
+  ): Promise<{ values: Record<string, unknown>[] }> {
+    const worker = this.grpcWorkerContext.requireWorker(metadata);
     const jobs = await this.jobsRegistryService.getNextJobs(
-      request.id,
+      this.authenticatedWorkerId(worker, request.id),
       Number(request.limit) || 1,
     );
 
-    const values = await Promise.all(
-      jobs.map((job) => this.mapJobToGrpcJob(job)),
+    const mapped = await Promise.all(
+      jobs.map((job) => this.mapJobToGrpcJob(job, worker)),
     );
 
-    return { values };
+    return { values: mapped.filter((job) => job !== null) };
   }
 
   /**
-   * Maps one claimed job to the gRPC `Job` wire shape. Shared by `Next` and
-   * `NextBatch` so the two paths can never drift apart.
+   * The id of the worker the guard authenticated. Old workers send their own
+   * id in the request, so a different one is logged and never used: a valid
+   * token must not claim jobs, or submit results, as another worker.
    */
+  private authenticatedWorkerId(
+    worker: WorkerInstance,
+    claimedId?: string,
+  ): string {
+    if (claimedId && claimedId !== worker.id) {
+      this.logger.warn(
+        `worker ${worker.id} sent worker id ${claimedId}; using its own`,
+      );
+    }
+    return worker.id;
+  }
+
+  /**
+   * Audits a dispatch that hands the worker credentials: which fields, never
+   * their values. A job without secrets records nothing.
+   */
+  private async recordSecretRelease(
+    job: GetNextJobResult,
+    worker: WorkerInstance,
+    sensitiveFields: string[],
+    config: Record<string, unknown> | undefined,
+    inputs: Record<string, string>,
+  ): Promise<void> {
+    const fields = sensitiveFields.filter((field) => config?.[field]);
+    if (inputs.token) fields.push('inputs.token');
+    if (fields.length === 0 || !job.workspaceId) return;
+
+    await this.eventBridge.publishSafely(
+      EVENT_CATALOG.job.secrets.released,
+      {
+        workspaceId: job.workspaceId,
+        actor: { type: AuditActorType.System, id: worker.id, name: worker.name },
+        outcome: AuditOutcome.Success,
+        resourceType: 'job',
+        resourceId: job.id,
+        metadata: { workerId: worker.id, fields },
+      },
+      { subject: `workspace:${job.workspaceId}/job:${job.id}` },
+    );
+  }
+
   /**
    * Inputs of a connector job. A repository asset (GIT_ORG target) gets its
    * clone URL plus the integration's token, decrypted here for this dispatch
@@ -543,15 +618,33 @@ export class JobsRegistryController {
     }
   }
 
+  /**
+   * Maps one claimed job to the gRPC `Job` wire shape. Shared by `Next` and
+   * `NextBatch` so the two paths can never drift apart. Null when the job's
+   * secrets may not go to this worker: the job is failed instead.
+   */
   private async mapJobToGrpcJob(
     job: GetNextJobResult,
-  ): Promise<Record<string, unknown>> {
+    worker: WorkerInstance,
+  ): Promise<Record<string, unknown> | null> {
     // Connector path: tool metadata present → look up registry
     const connectorEntry = job.tool
       ? this.connectorRegistry.getConnector(job.tool.name)
       : null;
 
     if (connectorEntry?.image) {
+      const denial = secretReleaseDenial(worker, job);
+      if (denial) {
+        this.logger.error(
+          `job ${job.id} not dispatched to worker ${worker.id}: ${denial}`,
+        );
+        await this.jobsRegistryService.failUndispatchableJob(
+          job.id,
+          `Not dispatched: ${denial}`,
+        );
+        return null;
+      }
+
       let config: Record<string, unknown> | undefined;
       try {
         config =
@@ -570,6 +663,14 @@ export class JobsRegistryController {
       const defaults = this.connectorRegistry.getResourceDefaults(
         job.tool!.name,
       );
+      const inputs = await this.resolveConnectorInputs(job);
+      await this.recordSecretRelease(
+        job,
+        worker,
+        getSensitiveFields(connectorEntry.configSchema),
+        config,
+        inputs,
+      );
 
       const response: Record<string, unknown> = {
         id: job.id,
@@ -587,9 +688,7 @@ export class JobsRegistryController {
         memory: defaults.memory,
         timeoutSeconds: defaults.timeoutSeconds,
         directEgress: connectorEntry.egress === 'direct',
-        inputs: {
-          fields: packStructFields(await this.resolveConnectorInputs(job)),
-        },
+        inputs: { fields: packStructFields(inputs) },
       };
 
       if (config && Object.keys(config).length > 0) {
@@ -612,19 +711,17 @@ export class JobsRegistryController {
 
   @UseGuards(GrpcWorkerTokenGuard)
   @GrpcMethod('JobsRegistryService', 'Result')
-  async result({
-    workerId,
-    data,
-  }: {
-    workerId: string;
-    data: UpdateResultDto;
-  }): Promise<{ success: boolean }> {
+  async result(
+    { workerId, data }: { workerId: string; data: UpdateResultDto },
+    metadata: Metadata,
+  ): Promise<{ success: boolean }> {
+    const worker = this.grpcWorkerContext.requireWorker(metadata);
     const transformedData = plainToInstance(UpdateResultDto, data, {
       enableImplicitConversion: true,
       excludeExtraneousValues: true,
     });
     const result = await this.jobsRegistryService.updateResult(
-      workerId,
+      this.authenticatedWorkerId(worker, workerId),
       transformedData,
     );
     if (!result.jobId)
@@ -653,7 +750,8 @@ export class JobsRegistryController {
     error: boolean;
     raw?: string;
     assets?: { values: Asset[] };
-  }): Promise<{ success: boolean }> {
+  }, metadata: Metadata): Promise<{ success: boolean }> {
+    const worker = this.grpcWorkerContext.requireWorker(metadata);
     const dto = plainToInstance(SubdomainResultDto, {
       jobId,
       error,
@@ -661,7 +759,7 @@ export class JobsRegistryController {
       payload: assets?.values,
     });
     const result = await this.jobsRegistryService.updateResultByCategory(
-      workerId,
+      this.authenticatedWorkerId(worker, workerId),
       dto,
       ToolCategory.SUBDOMAINS,
     );
@@ -682,7 +780,8 @@ export class JobsRegistryController {
     error: boolean;
     raw?: string;
     httpResponse?: HttpResponse;
-  }): Promise<{ success: boolean }> {
+  }, metadata: Metadata): Promise<{ success: boolean }> {
+    const worker = this.grpcWorkerContext.requireWorker(metadata);
     const dto = plainToInstance(HttpProbeResultDto, {
       jobId,
       error,
@@ -690,7 +789,7 @@ export class JobsRegistryController {
       payload: httpResponse,
     });
     const result = await this.jobsRegistryService.updateResultByCategory(
-      workerId,
+      this.authenticatedWorkerId(worker, workerId),
       dto,
       ToolCategory.HTTP_PROBE,
     );
@@ -711,7 +810,8 @@ export class JobsRegistryController {
     error: boolean;
     raw?: string;
     numbers?: { values: number[] };
-  }): Promise<{ success: boolean }> {
+  }, metadata: Metadata): Promise<{ success: boolean }> {
+    const worker = this.grpcWorkerContext.requireWorker(metadata);
     const dto = plainToInstance(PortsResultDto, {
       jobId,
       error,
@@ -719,7 +819,7 @@ export class JobsRegistryController {
       payload: numbers?.values,
     });
     const result = await this.jobsRegistryService.updateResultByCategory(
-      workerId,
+      this.authenticatedWorkerId(worker, workerId),
       dto,
       ToolCategory.PORTS_SCANNER,
     );
@@ -740,7 +840,8 @@ export class JobsRegistryController {
     error: boolean;
     raw?: string;
     vulnerabilities?: { values: Vulnerability[] };
-  }): Promise<{ success: boolean }> {
+  }, metadata: Metadata): Promise<{ success: boolean }> {
+    const worker = this.grpcWorkerContext.requireWorker(metadata);
     const dto = plainToInstance(VulnerabilitiesResultDto, {
       jobId,
       error,
@@ -751,7 +852,7 @@ export class JobsRegistryController {
       })),
     });
     const result = await this.jobsRegistryService.updateResultByCategory(
-      workerId,
+      this.authenticatedWorkerId(worker, workerId),
       dto,
       ToolCategory.VULNERABILITIES,
     );
@@ -770,14 +871,15 @@ export class JobsRegistryController {
     jobId: string;
     error: boolean;
     raw?: string;
-  }): Promise<{ success: boolean }> {
+  }, metadata: Metadata): Promise<{ success: boolean }> {
+    const worker = this.grpcWorkerContext.requireWorker(metadata);
     const dto = plainToInstance(ScreenshotResultDto, {
       jobId,
       error,
       raw,
     });
     const result = await this.jobsRegistryService.updateResultByCategory(
-      workerId,
+      this.authenticatedWorkerId(worker, workerId),
       dto,
       ToolCategory.SCREENSHOT,
     );
@@ -798,7 +900,8 @@ export class JobsRegistryController {
     error: boolean;
     raw?: string;
     urls?: DiscoveredUrl[];
-  }): Promise<{ success: boolean }> {
+  }, metadata: Metadata): Promise<{ success: boolean }> {
+    const worker = this.grpcWorkerContext.requireWorker(metadata);
     const dto = plainToInstance(UrlDiscoveryResultDto, {
       jobId,
       error,
@@ -806,7 +909,7 @@ export class JobsRegistryController {
       payload: urls ?? [],
     });
     const result = await this.jobsRegistryService.updateResultByCategory(
-      workerId,
+      this.authenticatedWorkerId(worker, workerId),
       dto,
       ToolCategory.URL_DISCOVERY,
     );

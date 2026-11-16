@@ -1,3 +1,4 @@
+import type { WorkerInstance } from '@/modules/workers/entities/worker.entity';
 import { WorkersService } from '@/modules/workers/workers.service';
 import type { CanActivate, ExecutionContext } from '@nestjs/common';
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
@@ -36,6 +37,9 @@ export class WorkerTokenGuard implements CanActivate {
     if (!workerInstance) {
       throw new UnauthorizedException('Invalid worker token');
     }
+
+    // Read back with @CurrentWorker(): handlers take identity from the token.
+    (request as Request & { worker?: WorkerInstance }).worker = workerInstance;
 
     return true;
   }

@@ -91,7 +91,7 @@ describe('event catalog', () => {
       // issue updated/resolved/assigned/deleted/link.added/link.removed facts).
       // Asserting the
       // count means the removal cannot be half-reverted without failing here.
-      expect(EVENT_DEFINITIONS).toHaveLength(114);
+      expect(EVENT_DEFINITIONS).toHaveLength(115);
     });
 
     it('has no worker.alive leaf, so nothing can publish a heartbeat', () => {
@@ -190,7 +190,7 @@ describe('event catalog', () => {
 
     it('carries the audit action count', () => {
       // 47 + vulnerability.review.{approved,rejected,merged} + vulnerability.settings.updated
-      expect(AUDIT_ACTION_CATALOG).toHaveLength(51);
+      expect(AUDIT_ACTION_CATALOG).toHaveLength(52);
     });
   });
 
