@@ -12,6 +12,7 @@ import (
 	connectorpb "oasm-worker/internal/gen/connector"
 	pb "oasm-worker/internal/gen/jobs_registry"
 	"oasm-worker/internal/runtime"
+	"oasm-worker/internal/security"
 )
 
 // TestHandleConnectorResultAggregatesVulnerabilityChunks: N result chunks
@@ -576,6 +577,57 @@ func TestHandleConnectorResultFailureCarriesContainerLogs(t *testing.T) {
 	} {
 		if !strings.Contains(got.raw, want) {
 			t.Errorf("failure payload missing %q\n--- payload ---\n%s", want, got.raw)
+		}
+	}
+}
+
+// A connector that echoes its credentials (command line, config dump, error)
+// must not carry them to Core: raw chunks, container logs and the failure
+// message are masked with the job's secrets.
+func TestHandleConnectorResultMasksJobSecrets(t *testing.T) {
+	resetWorkerGlobals()
+	prevGrace := tailGrace
+	tailGrace = 20 * time.Millisecond
+	t.Cleanup(func() { tailGrace = prevGrace })
+
+	client, jobsSrv, fakeRT := newWorkerTestSetup(t)
+	proxy := connector.NewProxy()
+	fakeRT.SetLogLines([][]byte{[]byte("[runtime] calling api with key nessus-key-123\n")})
+	fakeRT.SetInspectFn(func() runtime.InspectResult { return runtime.InspectResult{Running: true} })
+	mgr := execution.NewManager(fakeRT, 0)
+	execID, err := mgr.Submit(context.Background(), execution.JobSpec{Tool: "nessus", Image: "img:x"})
+	if err != nil {
+		t.Fatalf("mgr.Submit: %v", err)
+	}
+	bridgeMu.Lock()
+	bridge[execID] = &bridgeEntry{
+		jobID: "job-mask", category: "subdomains", release: func() {},
+		mask: security.NewSecretMasker(map[string]any{"apiKey": "nessus-key-123"}, nil),
+	}
+	bridgeMu.Unlock()
+	resultCh := make(chan connector.ResultMsg, 4)
+	proxy.Register(execID, resultCh)
+
+	done := make(chan struct{})
+	go func() {
+		handleConnectorResult(context.Background(), execID, client, make(chan TuiEvent, 64), proxy, resultCh, time.Now(), time.Minute, mgr, &tailBuffer{})
+		close(done)
+	}()
+	proxy.ForwardResult(execID, []byte("debug: apiKey=nessus-key-123"), nil)
+	proxy.SetError(execID, "auth failed for nessus-key-123")
+	proxy.OnConnectorDown(execID)
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for handleConnectorResult")
+	}
+
+	for _, r := range jobsSrv.getResults() {
+		if strings.Contains(r.raw, "nessus-key-123") {
+			t.Fatalf("secret reached Core:\n%s", r.raw)
+		}
+		if !strings.Contains(r.raw, "***") {
+			t.Fatalf("expected the secret replaced by ***:\n%s", r.raw)
 		}
 	}
 }

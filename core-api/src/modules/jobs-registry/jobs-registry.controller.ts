@@ -688,6 +688,8 @@ export class JobsRegistryController {
         memory: defaults.memory,
         timeoutSeconds: defaults.timeoutSeconds,
         directEgress: connectorEntry.egress === 'direct',
+        workspaceId: job.workspaceId ?? '',
+        configInband: connectorEntry.configInband === true,
         inputs: { fields: packStructFields(inputs) },
       };
 

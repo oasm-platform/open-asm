@@ -199,6 +199,30 @@ describe('JobsRegistryController', () => {
       const result = await controller.next({ id: 'worker-1' }, metadata);
 
       expect(result.directEgress).toBe(true);
+      // Only manifests that declare it keep the config out of the env.
+      expect(result.configInband).toBe(false);
+    });
+
+    it('tells the worker the job workspace and whether the connector reads its config in-band', async () => {
+      mockJobsRegistryService.getNextJob.mockResolvedValue({
+        id: 'job-ws',
+        workspaceId: 'ws-1',
+        category: 'vulnerabilities',
+        asset: { value: 'example.com' },
+        config: null,
+        tool: { id: 'nuclei', name: 'nuclei' },
+      });
+      mockConnectorRegistry.getConnector.mockReturnValue({
+        slug: 'nuclei',
+        image: 'ghcr.io/oasm-platform/connector-nuclei:3',
+        configInband: true,
+      });
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({});
+
+      const result = await controller.next({ id: 'worker-1' }, metadata);
+
+      expect(result.workspaceId).toBe('ws-1');
+      expect(result.configInband).toBe(true);
     });
 
     it('sends the inputs a job was planned with, e.g. the URL of a web service', async () => {

@@ -21,6 +21,7 @@ import (
 	"oasm-worker/internal/dnsresolver"
 	"oasm-worker/internal/execution"
 	"oasm-worker/internal/grpcclient"
+	"oasm-worker/internal/security"
 )
 
 // bridgeEntry links a Docker execution back to the originating job.
@@ -31,6 +32,9 @@ type bridgeEntry struct {
 	category string
 	release  func() // semaphore release callback — called only by completion handler
 	image    string // image the execution ran (backoff bookkeeping)
+	// mask hides the job's secrets in what reaches the logs and Core; nil
+	// for a job without secrets.
+	mask *security.SecretMasker
 }
 
 var (
@@ -579,6 +583,8 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 		// boot's ReconcileOrphans recognize this worker's own containers.
 		WorkerID:     grpcClient.OwnerID(),
 		DirectEgress: job.GetDirectEgress(),
+		WorkspaceID:  job.GetWorkspaceId(),
+		ConfigInband: job.GetConfigInband(),
 	}
 
 	// Attach manifest resource limits (scheduling context from core-api) when
@@ -779,6 +785,7 @@ func processConnectorJob(ctx context.Context, job *pb.Job, grpcClient *grpcclien
 			category: category,
 			release:  releaseSem,
 			image:    spec.Image,
+			mask:     security.NewSecretMasker(spec.Config, spec.Inputs),
 		}
 		bridgeMu.Unlock()
 
@@ -945,7 +952,7 @@ drain:
 					ports = append(ports, findingTCPPorts(f)...)
 				}
 				log.Info("[%s] connector result chunk: exec=%s bytes=%d ports=%d", entry.jobID, execID, len(msg.Data), len(msg.Findings))
-			} else if err := submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, false, string(msg.Data)); err != nil {
+			} else if err := submitCategoryResult(ctx, grpcClient, entry.jobID, entry.category, false, entry.mask.Mask(string(msg.Data))); err != nil {
 				log.ErrorE(fmt.Sprintf("[%s] Failed to submit connector result", entry.jobID), err)
 			} else {
 				log.Info("[%s] connector result submitted: exec=%s bytes=%d", entry.jobID, execID, len(msg.Data))
@@ -958,6 +965,7 @@ drain:
 			if tail != nil {
 				// Log line budget: also keep the raw line in the per-exec tail.
 				for _, line := range splitLogChunk(chunk) {
+					line = entry.mask.Mask(line)
 					tail.append(line)
 					log.Info("[%s] container: %s", entry.jobID, line)
 				}
@@ -1083,7 +1091,7 @@ drain:
 					break finalTail
 				}
 				for _, line := range splitLogChunk(chunk) {
-					tail.append(line)
+					tail.append(entry.mask.Mask(line))
 				}
 			case <-graceC:
 				break finalTail
@@ -1094,6 +1102,7 @@ drain:
 
 	// Check if connector reported an error via Done message.
 	errMsg, hasError := proxy.PopError(execID)
+	errMsg = entry.mask.Mask(errMsg)
 	hadDone := proxy.PopDone(execID)
 
 	// A stop imposed by the PLATFORM (worker timeout cancel, container kill,

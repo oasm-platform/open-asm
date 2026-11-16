@@ -54,6 +54,12 @@ message Job {
   optional int32 timeout_seconds = 11;   // container timeout in seconds
   // Manifest egress: direct skips the worker egress proxy (raw port scanners).
   bool direct_egress = 12;
+  // Workspace the job belongs to. The worker reuses a warm container only
+  // for jobs of the same workspace; empty (older core-api) disables reuse.
+  string workspace_id = 13;
+  // Manifest configInband: the connector reads its config from ExecuteJob,
+  // so the worker keeps it out of the container environment (OASM_CONFIG).
+  bool config_inband = 14;
 }
 
 // Request for the batched claim path. `limit` is the number of free

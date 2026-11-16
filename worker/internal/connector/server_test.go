@@ -718,6 +718,24 @@ func TestServerTokenFromAnotherExecRejected(t *testing.T) {
 	}
 }
 
+// With per-execution tokens wired, a Register for an execution the worker never
+// minted a token for is rejected even without a shared secret: only the worker
+// starts executions, so an unknown one is a stray or forged connector.
+func TestServerUnknownExecRejectedWithoutSharedSecret(t *testing.T) {
+	srv, _ := startTestServerWithLookup(t, "", &fakeTokenLookup{
+		tokens: map[string]string{"exec-known": "t-known"},
+	})
+	conn := dialTestServer(t, srv)
+
+	stream, ack := connectAndRegisterWithExecID(t, conn, "", "exec-unknown")
+	if ack.GetAccepted() {
+		t.Fatal("expected accepted=false for an execution without a token")
+	}
+	if _, err := stream.Recv(); err != io.EOF {
+		t.Fatalf("expected EOF after rejected ack, got %v", err)
+	}
+}
+
 func TestServerNoPerExecTokenFallsBackToShared(t *testing.T) {
 	// An execution without a registered per-execution token falls back to the
 	// legacy shared secret — and the shared secret is still enforced there.

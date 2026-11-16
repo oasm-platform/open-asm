@@ -4,7 +4,7 @@ Scan jobs and workflow runs: creates `jobs` rows, lets workers claim them, inges
 
 ## Layout
 
-- `jobs-registry.controller.ts`: HTTP under `jobs-registry` plus the gRPC `JobsRegistryService`. `mapJobToGrpcJob` builds the worker wire shape (connector image, manifest resource limits, decrypted config, `inputs`); `packStructFields` packs records into `google.protobuf.Struct`.
+- `jobs-registry.controller.ts`: HTTP under `jobs-registry` plus the gRPC `JobsRegistryService`. `mapJobToGrpcJob` builds the worker wire shape (connector image, manifest resource limits, decrypted config, `inputs`, `workspaceId` for the worker's warm-pool isolation, manifest `configInband`); `packStructFields` packs records into `google.protobuf.Struct`.
 - `jobs-registry.service.ts`: `createNewJob`, the claim (`getNextJobs`), result enqueue, job/run listings and run detail, re-run, cancel, delete.
 - `workflow-runner.service.ts`: the workflow engine (`startRun`, `retryRun`, `onJobTerminal`, `advanceRun`).
 - `workflow-run-reconciler.service.ts`, `job-result-cleanup.service.ts`, `job-retention.service.ts`: crons.

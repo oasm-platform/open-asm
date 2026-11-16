@@ -304,8 +304,17 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 
 	var h runtime.Handle
 	reserved := false
+	// A registry job that carries config but no workspace (older core-api)
+	// never reuses a warm container: there is no telling whose credentials it
+	// still holds.
+	reusable := spec.Lane == AgentLane || spec.WorkspaceID != "" || len(spec.Config) == 0
 	if p != nil {
-		if acquired, ok := p.AcquireHandle(id, poolKey); ok {
+		var acquired runtime.Handle
+		ok := false
+		if reusable {
+			acquired, ok = p.AcquireHandle(id, poolKey, spec.WorkspaceID)
+		}
+		if ok {
 			h = acquired
 			cid := h.ID
 			poolLogs = append(poolLogs, fmt.Sprintf("pool reuse: container %s pool_key=%s", cid, poolKey))
@@ -402,6 +411,8 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 			// per-execution.
 			ConnectorToken: spec.ConnectorToken,
 			DirectEgress:   spec.DirectEgress,
+			WorkspaceID:    spec.WorkspaceID,
+			ConfigInband:   spec.ConfigInband,
 		}
 	}
 	m.mu.Unlock()
@@ -437,6 +448,7 @@ func (m *Manager) Submit(ctx context.Context, spec JobSpec) (string, error) {
 				ImageVersion:     spec.Version,
 				Tool:             spec.Tool,
 				PoolKey:          poolKey,
+				Tenant:           spec.WorkspaceID,
 				CPU:              cpuStr,
 				Memory:           memStr,
 				CPURequestMillis: cpuRequestMillis,

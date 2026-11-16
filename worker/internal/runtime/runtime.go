@@ -47,6 +47,12 @@ type JobSpec struct {
 	// DirectEgress (manifest egress: direct) skips the egress proxy: raw
 	// TCP/UDP probes (port scanners) cannot go through it.
 	DirectEgress bool
+	// WorkspaceID is the job's workspace (proto Job.workspace_id). A warm
+	// container is reused only for jobs of the workspace it was created for.
+	WorkspaceID string
+	// ConfigInband (manifest configInband) means the connector reads Config
+	// from ExecuteJob, so it stays out of the container env (OASM_CONFIG).
+	ConfigInband bool
 }
 
 type RuntimeOpts struct {

@@ -254,11 +254,13 @@ func TestProcessJobConnectorBranch(t *testing.T) {
 
 	jobsSrv.nextFn = func() (*pb.Job, error) {
 		return &pb.Job{
-			Id:     "job-conn-1",
-			Tool:   "nuclei",
-			Image:  "ghcr.io/open-asm/nuclei:1.0",
-			Inputs: inputs,
-			Config: cfg,
+			Id:           "job-conn-1",
+			Tool:         "nuclei",
+			Image:        "ghcr.io/open-asm/nuclei:1.0",
+			Inputs:       inputs,
+			Config:       cfg,
+			WorkspaceId:  "ws-1",
+			ConfigInband: true,
 		}, nil
 	}
 
@@ -294,6 +296,9 @@ func TestProcessJobConnectorBranch(t *testing.T) {
 	}
 	if spec.Config == nil || spec.Config["proxy"] != true {
 		t.Fatalf("expected Config.proxy=true, got %v", spec.Config)
+	}
+	if spec.WorkspaceID != "ws-1" || !spec.ConfigInband {
+		t.Fatalf("expected workspace ws-1 and in-band config, got %q / %t", spec.WorkspaceID, spec.ConfigInband)
 	}
 
 	// Bridge should be registered (keyed by execID from Manager.Submit, which is "exec-1").

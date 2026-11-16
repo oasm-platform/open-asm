@@ -38,7 +38,7 @@ func TestPoolAcquireHandlePreservesContainerName(t *testing.T) {
 		LastUsedAt: now,
 	})
 
-	handle, ok := p.AcquireHandle("exec-1", "nuclei")
+	handle, ok := p.AcquireHandle("exec-1", "nuclei", "")
 	if !ok {
 		t.Fatal("AcquireHandle must hit an idle container with a matching pool key")
 	}

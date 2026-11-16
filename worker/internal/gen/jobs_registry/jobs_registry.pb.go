@@ -140,7 +140,13 @@ type Job struct {
 	Memory         *string `protobuf:"bytes,10,opt,name=memory,proto3,oneof" json:"memory,omitempty"`                                        // e.g. "512Mi", "1Gi"
 	TimeoutSeconds *int32  `protobuf:"varint,11,opt,name=timeout_seconds,json=timeoutSeconds,proto3,oneof" json:"timeout_seconds,omitempty"` // container timeout in seconds
 	// Manifest egress: direct skips the worker egress proxy (raw port scanners).
-	DirectEgress  bool `protobuf:"varint,12,opt,name=direct_egress,json=directEgress,proto3" json:"direct_egress,omitempty"`
+	DirectEgress bool `protobuf:"varint,12,opt,name=direct_egress,json=directEgress,proto3" json:"direct_egress,omitempty"`
+	// Workspace the job belongs to. The worker reuses a warm container only
+	// for jobs of the same workspace; empty (older core-api) disables reuse.
+	WorkspaceId string `protobuf:"bytes,13,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	// Manifest configInband: the connector reads its config from ExecuteJob,
+	// so the worker keeps it out of the container environment (OASM_CONFIG).
+	ConfigInband  bool `protobuf:"varint,14,opt,name=config_inband,json=configInband,proto3" json:"config_inband,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -256,6 +262,20 @@ func (x *Job) GetTimeoutSeconds() int32 {
 func (x *Job) GetDirectEgress() bool {
 	if x != nil {
 		return x.DirectEgress
+	}
+	return false
+}
+
+func (x *Job) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *Job) GetConfigInband() bool {
+	if x != nil {
+		return x.ConfigInband
 	}
 	return false
 }
@@ -2037,7 +2057,7 @@ const file_jobs_registry_proto_rawDesc = "" +
 	"\n" +
 	"\x13jobs_registry.proto\x12\rjobs_registry\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\"\x18\n" +
 	"\x06Worker\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\xc6\x03\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\x8e\x04\n" +
 	"\x03Job\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
 	"\x05asset\x18\x02 \x01(\v2\x14.jobs_registry.AssetR\x05asset\x12!\n" +
@@ -2051,7 +2071,9 @@ const file_jobs_registry_proto_rawDesc = "" +
 	"\x06memory\x18\n" +
 	" \x01(\tH\x02R\x06memory\x88\x01\x01\x12,\n" +
 	"\x0ftimeout_seconds\x18\v \x01(\x05H\x03R\x0etimeoutSeconds\x88\x01\x01\x12#\n" +
-	"\rdirect_egress\x18\f \x01(\bR\fdirectEgressB\n" +
+	"\rdirect_egress\x18\f \x01(\bR\fdirectEgress\x12!\n" +
+	"\fworkspace_id\x18\r \x01(\tR\vworkspaceId\x12#\n" +
+	"\rconfig_inband\x18\x0e \x01(\bR\fconfigInbandB\n" +
 	"\n" +
 	"\b_commandB\x06\n" +
 	"\x04_cpuB\t\n" +
