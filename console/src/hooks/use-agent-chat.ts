@@ -159,6 +159,12 @@ interface SelectedModel {
 
 interface UseAgentChatOptions {
   conversationId: string | undefined;
+  /**
+   * The id was made on the client and the chat is only saved with its first
+   * message (a new chat in the AI panel): there is no history to load yet.
+   * Read once, on mount.
+   */
+  isNew?: boolean;
 }
 
 interface UseAgentChatReturn {
@@ -201,6 +207,8 @@ interface UseAgentChatReturn {
   onDismissError: () => void;
   onLoadMore: (() => void) | undefined;
   onWorkerSelect: (workerId: string | null) => void;
+  /** Picks the project of a new chat, before its first message */
+  onProjectChange: (project: ConversationProjectDto | null) => void;
   pendingApproval: PendingApproval | null;
   pendingApprovalCount: number;
   isDecidingApproval: boolean;
@@ -434,6 +442,7 @@ function mapDbMessagesToUI(
 
 export function useAgentChat({
   conversationId,
+  isNew = false,
 }: UseAgentChatOptions): UseAgentChatReturn {
   const location = useLocation();
   const navigate = useNavigate();
@@ -509,6 +518,7 @@ export function useAgentChat({
   // exists on the server once its first message streams. It has no history
   // to load, and fetching it early just 404s (and retries), so skip that.
   const [createdHereId, setCreatedHereId] = useState(() =>
+    isNew ||
     (location.state as { pendingMessage?: string } | null)?.pendingMessage
       ? conversationId
       : undefined,
@@ -1018,6 +1028,15 @@ export function useAgentChat({
     [sendMessage],
   );
 
+  // Read when the first message is sent: the chat is saved in this project
+  const handleProjectChange = useCallback(
+    (next: ConversationProjectDto | null) => {
+      setProject(next);
+      projectRef.current = next;
+    },
+    [],
+  );
+
   const handleSelectModel = useCallback(
     (provider: string, model: string, configId: string) => {
       hasUserSelectedModel.current = true;
@@ -1370,6 +1389,7 @@ export function useAgentChat({
     onDismissError: handleDismissError,
     onLoadMore: onLoadMoreAction,
     onWorkerSelect: setSelectedWorkerId,
+    onProjectChange: handleProjectChange,
     pendingApproval,
     pendingApprovalCount: approvalQueue.length,
     isDecidingApproval,

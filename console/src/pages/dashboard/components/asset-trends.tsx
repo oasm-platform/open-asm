@@ -139,7 +139,7 @@ export function AssetTrends() {
           </LineChart>
         </ChartContainer>
 
-        <div className="flex items-center gap-6 mt-6 pt-4 border-t border-border text-sm">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-6 pt-4 border-t border-border text-sm">
           <span className="text-muted-foreground text-xs">Current</span>
           {metricsOrder.map((key) => {
             const { label, color } = chartConfig[key];

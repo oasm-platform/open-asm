@@ -15,8 +15,8 @@ import {
   useProjectsControllerGetById,
   useProjectsControllerGetOverview,
 } from '@/services/apis/gen/queries';
-import { Link, useNavigate, useParams } from '@tanstack/react-router';
-import { ChevronDown, Play, Sparkles } from 'lucide-react';
+import { useNavigate, useParams } from '@tanstack/react-router';
+import { ChevronDown, Play } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { RunWorkflowDialog } from './components/run-workflow-dialog';
@@ -138,18 +138,6 @@ export default function ProjectDetail() {
       }
       header={
         <>
-          {/* A new AI Studio chat locked to this project */}
-          {/* Agent orange, as the Agent toggle it opens in */}
-          <Button
-            variant="outline"
-            asChild
-            className="border-orange-500 bg-orange-500/10 text-orange-500 hover:bg-orange-500/20 hover:text-orange-500 dark:border-orange-500 dark:bg-orange-500/10 dark:hover:bg-orange-500/20"
-          >
-            <Link to="/aistudio" search={{ projectId: id, mode: 'agent' }}>
-              <Sparkles className="size-4" />
-              Chat with agent
-            </Link>
-          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button disabled={archived || workflows.length === 0}>

@@ -9,70 +9,100 @@ import {
   type RefObject,
 } from 'react';
 
-/** Narrowest the chat may get beside the panel */
-export const CHAT_MIN_WIDTH = 420;
-/** Narrowest the side panel may get */
-export const SIDE_PANEL_MIN_WIDTH = 360;
-const STORAGE_KEY = 'agent-side-panel-width';
 const KEY_STEP = 24;
 
-const readWidth = (): number | null => {
+/** Narrowest each side of a split row may get */
+export interface PanelLimits {
+  /** The panel on the right */
+  panelMin: number;
+  /** Everything left of it */
+  restMin: number;
+}
+
+const readWidth = (storageKey: string): number | null => {
   try {
-    const n = Number(localStorage.getItem(STORAGE_KEY));
+    const n = Number(localStorage.getItem(storageKey));
     return Number.isFinite(n) && n > 0 ? n : null;
   } catch {
     return null;
   }
 };
 
-const saveWidth = (width: number | null) => {
+const saveWidth = (storageKey: string, width: number | null) => {
   try {
-    if (width === null) localStorage.removeItem(STORAGE_KEY);
-    else localStorage.setItem(STORAGE_KEY, String(Math.round(width)));
+    if (width === null) localStorage.removeItem(storageKey);
+    else localStorage.setItem(storageKey, String(Math.round(width)));
   } catch {
     // storage unavailable: the width lasts for this page only
   }
 };
 
 /** Keeps both sides at least their minimum inside a row `total` wide */
-export function clampPanelWidth(width: number, total: number): number {
-  const max = Math.max(SIDE_PANEL_MIN_WIDTH, total - CHAT_MIN_WIDTH);
-  return Math.min(Math.max(width, SIDE_PANEL_MIN_WIDTH), max);
+export function clampPanelWidth(
+  width: number,
+  total: number,
+  { panelMin, restMin }: PanelLimits,
+): number {
+  const max = Math.max(panelMin, total - restMin);
+  return Math.min(Math.max(width, panelMin), max);
+}
+
+interface SidePanelWidthOptions {
+  /** localStorage key the dragged width is kept under */
+  storageKey: string;
+  limits: PanelLimits;
 }
 
 /**
- * Width of the side panel in a split row, set by dragging the divider and
- * kept per browser. `null` until the user drags: the panel keeps its default
- * CSS width then.
+ * Width of a panel on the right of a split row, set by dragging the divider
+ * and kept per browser. `null` until the user drags: the panel keeps its
+ * default CSS width then.
  */
-export function useSidePanelWidth(rowRef: RefObject<HTMLElement | null>) {
-  const [width, setWidth] = useState<number | null>(readWidth);
+export function useSidePanelWidth(
+  rowRef: RefObject<HTMLElement | null>,
+  { storageKey, limits }: SidePanelWidthOptions,
+) {
+  const [width, setWidth] = useState<number | null>(() =>
+    readWidth(storageKey),
+  );
+  const { panelMin, restMin } = limits;
 
-  // A smaller window must not squeeze the chat under its minimum
+  // A smaller window must not squeeze the rest of the row under its minimum
   useEffect(() => {
     const row = rowRef.current;
     if (!row || typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(() => {
-      // Hidden below lg: nothing to clamp against
+      // Hidden (e.g. on small screens): nothing to clamp against
       if (row.clientWidth === 0) return;
-      setWidth((w) => (w === null ? w : clampPanelWidth(w, row.clientWidth)));
+      setWidth((w) =>
+        w === null
+          ? w
+          : clampPanelWidth(w, row.clientWidth, { panelMin, restMin }),
+      );
     });
     observer.observe(row);
     return () => observer.disconnect();
-  }, [rowRef]);
+  }, [rowRef, panelMin, restMin]);
 
   const update = useCallback(
     (next: number | null) => {
       const row = rowRef.current;
       const value =
-        next === null || !row ? next : clampPanelWidth(next, row.clientWidth);
+        next === null || !row
+          ? next
+          : clampPanelWidth(next, row.clientWidth, { panelMin, restMin });
       setWidth(value);
       return value;
     },
-    [rowRef],
+    [rowRef, panelMin, restMin],
   );
 
-  return { width, setWidth: update, save: saveWidth };
+  const save = useCallback(
+    (next: number | null) => saveWidth(storageKey, next),
+    [storageKey],
+  );
+
+  return { width, setWidth: update, save };
 }
 
 interface SidePanelResizerProps {
@@ -81,11 +111,18 @@ interface SidePanelResizerProps {
   width: number | null;
   onResize: (width: number | null) => number | null;
   onCommit: (width: number | null) => void;
+  /** Same limits as given to useSidePanelWidth */
+  limits: PanelLimits;
+  /** Accessible name of the divider */
+  label: string;
+  /** E.g. `hidden lg:block` to show it on large screens only */
+  className?: string;
 }
 
 /**
- * The divider between the chat and the side panel: drag it (or use the arrow
- * keys) to share the row, double-click to go back to the default split.
+ * The divider between the content of a split row and the panel on its right:
+ * drag it (or use the arrow keys) to share the row, double-click to go back
+ * to the default split.
  */
 export function SidePanelResizer({
   rowRef,
@@ -93,9 +130,12 @@ export function SidePanelResizer({
   width,
   onResize,
   onCommit,
+  limits,
+  label,
+  className,
 }: SidePanelResizerProps) {
   // While dragging, the width goes straight onto the panel's style: a React
-  // render of the whole chat page per pointer move is what makes a drag lag.
+  // render of the whole page per pointer move is what makes a drag lag.
   // It is written in the move itself, not a frame later: browsers already
   // deliver pointer moves once per frame, and nothing reads layout here, so
   // the edge stays under the pointer. State is set once, on release.
@@ -127,7 +167,11 @@ export function SidePanelResizer({
     const d = drag.current;
     if (!d) return;
     // The panel is on the right: moving left widens it
-    const next = clampPanelWidth(d.startWidth + (d.startX - e.clientX), d.total);
+    const next = clampPanelWidth(
+      d.startWidth + (d.startX - e.clientX),
+      d.total,
+      limits,
+    );
     if (next === d.last) return;
     d.last = next;
     if (panelRef.current) panelRef.current.style.width = `${next}px`;
@@ -169,14 +213,15 @@ export function SidePanelResizer({
     <div
       role="separator"
       aria-orientation="vertical"
-      aria-label="Resize side panel"
-      aria-valuemin={SIDE_PANEL_MIN_WIDTH}
-      aria-valuemax={total ? Math.max(SIDE_PANEL_MIN_WIDTH, total - CHAT_MIN_WIDTH) : undefined}
+      aria-label={label}
+      aria-valuemin={limits.panelMin}
+      aria-valuemax={total ? Math.max(limits.panelMin, total - limits.restMin) : undefined}
       aria-valuenow={width ?? undefined}
       tabIndex={0}
       title="Drag to resize, double-click to reset"
       className={cn(
-        'group relative z-10 -mx-1 hidden w-2 shrink-0 cursor-col-resize touch-none outline-none lg:block',
+        'group relative z-10 -mx-1 w-2 shrink-0 cursor-col-resize touch-none outline-none',
+        className,
       )}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}

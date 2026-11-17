@@ -5,6 +5,57 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Breakpoints of the page beside the AI chat panel.
+ * While the panel is open, the layout row left of it is the `ai-split`
+ * container ([data-ai-split]) and everything in SidebarInset (header and page)
+ * sizes by that row instead of the viewport: dragging the chat wider makes the
+ * page fall back to fewer columns, down to one. The app sidebar, dialogs and
+ * every page with the panel closed keep the plain viewport media queries.
+ * Redefined variants are emitted after the built-in ones, so the max-* ones
+ * are listed widest first: the narrowest still wins, as before.
+ */
+@custom-variant sm {
+  &:where(:not([data-ai-split] [data-slot=sidebar-inset] *)) { @media (width >= 40rem) { @slot; } }
+  @container ai-split (width >= 40rem) { &:where([data-ai-split] [data-slot=sidebar-inset] *) { @slot; } }
+}
+@custom-variant md {
+  &:where(:not([data-ai-split] [data-slot=sidebar-inset] *)) { @media (width >= 48rem) { @slot; } }
+  @container ai-split (width >= 48rem) { &:where([data-ai-split] [data-slot=sidebar-inset] *) { @slot; } }
+}
+@custom-variant lg {
+  &:where(:not([data-ai-split] [data-slot=sidebar-inset] *)) { @media (width >= 64rem) { @slot; } }
+  @container ai-split (width >= 64rem) { &:where([data-ai-split] [data-slot=sidebar-inset] *) { @slot; } }
+}
+@custom-variant xl {
+  &:where(:not([data-ai-split] [data-slot=sidebar-inset] *)) { @media (width >= 80rem) { @slot; } }
+  @container ai-split (width >= 80rem) { &:where([data-ai-split] [data-slot=sidebar-inset] *) { @slot; } }
+}
+@custom-variant 2xl {
+  &:where(:not([data-ai-split] [data-slot=sidebar-inset] *)) { @media (width >= 96rem) { @slot; } }
+  @container ai-split (width >= 96rem) { &:where([data-ai-split] [data-slot=sidebar-inset] *) { @slot; } }
+}
+@custom-variant max-2xl {
+  &:where(:not([data-ai-split] [data-slot=sidebar-inset] *)) { @media (width < 96rem) { @slot; } }
+  @container ai-split (width < 96rem) { &:where([data-ai-split] [data-slot=sidebar-inset] *) { @slot; } }
+}
+@custom-variant max-xl {
+  &:where(:not([data-ai-split] [data-slot=sidebar-inset] *)) { @media (width < 80rem) { @slot; } }
+  @container ai-split (width < 80rem) { &:where([data-ai-split] [data-slot=sidebar-inset] *) { @slot; } }
+}
+@custom-variant max-lg {
+  &:where(:not([data-ai-split] [data-slot=sidebar-inset] *)) { @media (width < 64rem) { @slot; } }
+  @container ai-split (width < 64rem) { &:where([data-ai-split] [data-slot=sidebar-inset] *) { @slot; } }
+}
+@custom-variant max-md {
+  &:where(:not([data-ai-split] [data-slot=sidebar-inset] *)) { @media (width < 48rem) { @slot; } }
+  @container ai-split (width < 48rem) { &:where([data-ai-split] [data-slot=sidebar-inset] *) { @slot; } }
+}
+@custom-variant max-sm {
+  &:where(:not([data-ai-split] [data-slot=sidebar-inset] *)) { @media (width < 40rem) { @slot; } }
+  @container ai-split (width < 40rem) { &:where([data-ai-split] [data-slot=sidebar-inset] *) { @slot; } }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

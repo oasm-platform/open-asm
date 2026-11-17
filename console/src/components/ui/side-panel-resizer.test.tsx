@@ -2,25 +2,33 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { useRef } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  CHAT_MIN_WIDTH,
   clampPanelWidth,
-  SIDE_PANEL_MIN_WIDTH,
   SidePanelResizer,
   useSidePanelWidth,
 } from './side-panel-resizer';
 
+const LIMITS = { panelMin: 360, restMin: 420 };
+const STORAGE_KEY = 'test-panel-width';
+
 describe('clampPanelWidth', () => {
-  it('keeps the panel and the chat at least their minimum', () => {
-    expect(clampPanelWidth(100, 1400)).toBe(SIDE_PANEL_MIN_WIDTH);
-    expect(clampPanelWidth(1300, 1400)).toBe(1400 - CHAT_MIN_WIDTH);
-    expect(clampPanelWidth(600, 1400)).toBe(600);
+  it('keeps the panel and the rest of the row at least their minimum', () => {
+    expect(clampPanelWidth(100, 1400, LIMITS)).toBe(LIMITS.panelMin);
+    expect(clampPanelWidth(1300, 1400, LIMITS)).toBe(1400 - LIMITS.restMin);
+    expect(clampPanelWidth(600, 1400, LIMITS)).toBe(600);
+  });
+
+  it('keeps the panel at its minimum when the row is too narrow for both', () => {
+    expect(clampPanelWidth(500, 600, LIMITS)).toBe(LIMITS.panelMin);
   });
 });
 
 function Split() {
   const rowRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLElement>(null);
-  const { width, setWidth, save } = useSidePanelWidth(rowRef);
+  const { width, setWidth, save } = useSidePanelWidth(rowRef, {
+    storageKey: STORAGE_KEY,
+    limits: LIMITS,
+  });
   return (
     <div ref={rowRef} data-testid="row">
       <SidePanelResizer
@@ -29,6 +37,8 @@ function Split() {
         width={width}
         onResize={setWidth}
         onCommit={save}
+        limits={LIMITS}
+        label="Resize side panel"
       />
       <aside
         ref={panelRef}
@@ -74,13 +84,13 @@ describe('SidePanelResizer', () => {
     expect(panel.style.width).toBe('600px');
     // Only the style moved: React state waits for the release
     expect(panel.dataset.width).toBe('default');
-    // Far left: the chat keeps its minimum
+    // Far left: the rest of the row keeps its minimum
     fireEvent.pointerMove(divider, { clientX: 0, pointerId: 1 });
-    expect(panel.style.width).toBe(`${1400 - CHAT_MIN_WIDTH}px`);
+    expect(panel.style.width).toBe(`${1400 - LIMITS.restMin}px`);
     fireEvent.pointerUp(divider, { clientX: 0, pointerId: 1 });
-    expect(panel.dataset.width).toBe(String(1400 - CHAT_MIN_WIDTH));
-    expect(localStorage.getItem('agent-side-panel-width')).toBe(
-      String(1400 - CHAT_MIN_WIDTH),
+    expect(panel.dataset.width).toBe(String(1400 - LIMITS.restMin));
+    expect(localStorage.getItem(STORAGE_KEY)).toBe(
+      String(1400 - LIMITS.restMin),
     );
   });
 
@@ -91,6 +101,6 @@ describe('SidePanelResizer', () => {
     expect(screen.getByTestId('panel').dataset.width).toBe('524');
     fireEvent.doubleClick(divider);
     expect(screen.getByTestId('panel').dataset.width).toBe('default');
-    expect(localStorage.getItem('agent-side-panel-width')).toBeNull();
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 });
