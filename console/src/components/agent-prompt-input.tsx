@@ -3,10 +3,10 @@ import {
   PromptInputBody,
   PromptInputFooter,
   PromptInputSubmit,
-  PromptInputTextarea,
   PromptInputTools,
   type PromptInputMessage,
 } from '@/components/ai-elements/prompt-input';
+import { AgentMentionTextarea } from '@/components/agent-mention-textarea';
 import { AgentModeToggle } from '@/components/ui/agent-mode-toggle';
 import { ApprovalModeSelect } from '@/components/ui/approval-mode-select';
 import { ChatModelSwitcher } from '@/components/ui/chat-model-switcher';
@@ -69,10 +69,10 @@ export default function AgentPromptInput({
     <div className={className}>
       <PromptInput onSubmit={handleSubmit} className="w-full">
         <PromptInputBody>
-          <PromptInputTextarea
+          <AgentMentionTextarea
             value={input}
             placeholder={placeholder}
-            onChange={(e) => setInput(e.currentTarget.value)}
+            onValueChange={setInput}
             disabled={isSending}
           />
         </PromptInputBody>
