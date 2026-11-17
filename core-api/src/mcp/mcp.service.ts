@@ -144,7 +144,12 @@ export class McpService implements OnModuleInit, OnModuleDestroy {
 
     for (const [name, toolInstance] of Object.entries(allTools)) {
       try {
-        this.registerToolOnServer(server, name, toolInstance as AiToolLike);
+        // Through unknown: comparing the AI SDK's Tool type is too deep
+        this.registerToolOnServer(
+          server,
+          name,
+          toolInstance as unknown as AiToolLike,
+        );
       } catch {
         // skip
       }

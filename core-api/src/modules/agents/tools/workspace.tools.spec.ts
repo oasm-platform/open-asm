@@ -7,8 +7,9 @@ import {
 import { getVulnerabilitiesSchema, listIssuesSchema } from '@/mcp/mcp.schema';
 import { VulnerabilityStatus } from '@/modules/vulnerabilities/vulnerability-status';
 
+import { agentFunctionWith } from '../agents.tools.testing';
 import type { ToolCallOptions } from './types';
-import { getVulnerabilitiesTool, listIssuesTool } from './workspace.tools';
+import { WorkspaceTools } from './workspace.tools';
 
 const W = 'w1';
 const V1 = '11111111-1111-4111-8111-111111111111';
@@ -55,9 +56,11 @@ describe('discover_vulnerabilities', () => {
         vulnerabilities: jest.fn().mockResolvedValue(page([])),
       },
     };
-    const tool = getVulnerabilitiesTool(
-      deps as never,
-      W,
+    const tool = agentFunctionWith(
+      WorkspaceTools,
+      'discover_vulnerabilities',
+      deps,
+      { workspaceId: W },
     ) as unknown as Executable;
     return { deps, tool };
   }
@@ -129,9 +132,12 @@ describe('enumerate_open_issues', () => {
     const deps = {
       issuesService: { getMany: jest.fn().mockResolvedValue(page([])) },
     };
-    const tool = listIssuesTool(deps as never, W, {
-      userId,
-    }) as unknown as Executable;
+    const tool = agentFunctionWith(
+      WorkspaceTools,
+      'enumerate_open_issues',
+      deps,
+      { workspaceId: W, userId },
+    ) as unknown as Executable;
     return { deps, tool };
   }
 

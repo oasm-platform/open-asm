@@ -12,13 +12,8 @@ import {
 } from '@/common/enums/enum';
 import { _resetValidatorCache } from '@/modules/tools/validators/tool-config-profiles.validator';
 
-import {
-  addProjectWorkflowTool,
-  addTargetsTool,
-  createProjectTool,
-  inspectPipelineToolTool,
-  updateProjectScopeTool,
-} from './project-build.tools';
+import { agentFunctionWith } from '../agents.tools.testing';
+import { ProjectBuildTools } from './project-build.tools';
 import type { ToolCallOptions, ToolScope } from './types';
 
 const call = { toolCallId: 't1' } as ToolCallOptions;
@@ -159,9 +154,13 @@ function setup(permissionKeys: string[] = ['*']) {
   };
   type Run = { execute: (p: unknown, o: ToolCallOptions) => Promise<unknown> };
   const run = (
-    build: (d: never, w: string, s: ToolScope) => unknown,
+    name: string,
     scope: ToolScope = { userId: 'u1', conversationId: 'c1' },
-  ) => build(deps as never, 'w1', scope) as Run;
+  ) =>
+    agentFunctionWith(ProjectBuildTools, name, deps, {
+      workspaceId: 'w1',
+      ...scope,
+    }) as unknown as Run;
   return { deps, run };
 }
 
@@ -174,7 +173,7 @@ describe('create_project', () => {
   it('builds the project from targets, tools and instruction, then links the chat', async () => {
     const { deps, run } = setup();
 
-    const result = await run(createProjectTool).execute(
+    const result = await run('create_project').execute(
       {
         name: 'Perimeter',
         instruction: 'Staging only',
@@ -226,7 +225,7 @@ describe('create_project', () => {
   it('creates only the new targets and reuses the existing ones', async () => {
     const { deps, run } = setup();
 
-    await run(createProjectTool).execute({ name: 'Perimeter', targets }, call);
+    await run('create_project').execute({ name: 'Perimeter', targets }, call);
 
     expect(deps.targetsService.createMultipleTargets).toHaveBeenCalledWith(
       { targets: [{ value: 'new.example.com', type: TargetType.DOMAIN }] },
@@ -238,7 +237,7 @@ describe('create_project', () => {
   it('takes a project over targets that all exist already', async () => {
     const { deps, run } = setup();
 
-    const result = await run(createProjectTool).execute(
+    const result = await run('create_project').execute(
       { name: 'P', targets: [{ value: 'old.example.com', type: TargetType.DOMAIN }] },
       call,
     );
@@ -258,7 +257,7 @@ describe('create_project', () => {
   it('needs target.write to add targets', async () => {
     const { deps, run } = setup(['project.write']);
 
-    const result = await run(createProjectTool).execute({ name: 'P', targets }, call);
+    const result = await run('create_project').execute({ name: 'P', targets }, call);
 
     expect(result).toContain('target.write');
     expect(deps.targetsService.createMultipleTargets).not.toHaveBeenCalled();
@@ -268,7 +267,7 @@ describe('create_project', () => {
   it('is refused in a chat that already belongs to a project', async () => {
     const { deps, run } = setup();
 
-    const result = await run(createProjectTool, { userId: 'u1', projectId: 'p0' }).execute(
+    const result = await run('create_project', { userId: 'u1', projectId: 'p0' }).execute(
       { name: 'P' },
       call,
     );
@@ -280,7 +279,7 @@ describe('create_project', () => {
   it('does nothing without a user to check', async () => {
     const { deps, run } = setup();
 
-    expect(await run(createProjectTool, {}).execute({ name: 'P' }, call)).toContain(
+    expect(await run('create_project', {}).execute({ name: 'P' }, call)).toContain(
       'no user',
     );
     expect(deps.projectsService.create).not.toHaveBeenCalled();
@@ -291,7 +290,7 @@ describe('project edits', () => {
   it("adds targets to the locked project's scope", async () => {
     const { deps, run } = setup();
 
-    await run(addTargetsTool, { userId: 'u1', projectId: P1 }).execute({ targets }, call);
+    await run('add_targets', { userId: 'u1', projectId: P1 }).execute({ targets }, call);
 
     const rules = deps.projectsService.replaceScope.mock.calls[0][2] as unknown[];
     expect(deps.projectsService.replaceScope.mock.calls[0][0]).toBe(P1);
@@ -305,7 +304,7 @@ describe('project edits', () => {
   it('keeps the other rules when one is removed', async () => {
     const { deps, run } = setup();
 
-    await run(updateProjectScopeTool, { userId: 'u1', projectId: P1 }).execute(
+    await run('update_project_scope', { userId: 'u1', projectId: P1 }).execute(
       { removeRuleIds: ['r2'], add: [{ mode: 'include', type: 'cidr', value: '10.0.0.0/24' }] },
       call,
     );
@@ -329,7 +328,7 @@ describe('project edits', () => {
   it('adds a scheduled workflow from a template', async () => {
     const { deps, run } = setup();
 
-    await run(addProjectWorkflowTool, { userId: 'u1', projectId: P1 }).execute(
+    await run('add_project_workflow', { userId: 'u1', projectId: P1 }).execute(
       { template: 'discovery.yaml', schedule: '0 3 * * *' },
       call,
     );
@@ -352,7 +351,7 @@ describe('pipeline steps with config', () => {
   it('passes stage, category, input, inline config and profile of each step', async () => {
     const { deps, run } = setup();
 
-    const result = await run(createProjectTool).execute(
+    const result = await run('create_project').execute(
       {
         name: 'Login paths',
         tools: [
@@ -402,7 +401,7 @@ describe('pipeline steps with config', () => {
   ])('refuses %s before changing anything', async (_case, step, mention) => {
     const { deps, run } = setup();
 
-    const result = await run(createProjectTool).execute(
+    const result = await run('create_project').execute(
       { name: 'P', targets, tools: [step] },
       call,
     );
@@ -419,7 +418,7 @@ describe('pipeline steps with config', () => {
     const { deps, run } = setup();
     deps.toolConfigProfiles.list.mockResolvedValue([]);
 
-    const result = await run(createProjectTool).execute(
+    const result = await run('create_project').execute(
       { name: 'P', tools: [{ toolId: 'tool-c', config: { url: 'https://acu.local' } }] },
       call,
     );
@@ -432,7 +431,7 @@ describe('pipeline steps with config', () => {
   it('refuses toolIds and tools together', async () => {
     const { deps, run } = setup();
 
-    const result = await run(createProjectTool).execute(
+    const result = await run('create_project').execute(
       { name: 'P', toolIds: ['tool-a'], tools: [{ toolId: 'tool-a' }] },
       call,
     );
@@ -444,7 +443,7 @@ describe('pipeline steps with config', () => {
   it('adds a configured workflow to a project', async () => {
     const { deps, run } = setup();
 
-    await run(addProjectWorkflowTool, { userId: 'u1', projectId: P1 }).execute(
+    await run('add_project_workflow', { userId: 'u1', projectId: P1 }).execute(
       { tools: [{ toolId: 'tool-b', config: { wordlist: 'login.txt' } }] },
       call,
     );
@@ -460,7 +459,7 @@ describe('inspect_pipeline_tool', () => {
   it('describes what a connector takes, finds and is configured with', async () => {
     const { deps, run } = setup();
 
-    const result = await run(inspectPipelineToolTool).execute({ toolId: 'tool-c' }, call);
+    const result = await run('inspect_pipeline_tool').execute({ toolId: 'tool-c' }, call);
 
     expect(deps.toolsService.getToolById).toHaveBeenCalledWith('tool-c', 'w1');
     expect(result).toEqual({
@@ -497,7 +496,7 @@ describe('inspect_pipeline_tool', () => {
   it('says a built-in tool takes no config', async () => {
     const { run } = setup();
 
-    const result = await run(inspectPipelineToolTool).execute({ toolId: 'tool-a' }, call);
+    const result = await run('inspect_pipeline_tool').execute({ toolId: 'tool-a' }, call);
 
     expect(result).toMatchObject({
       name: 'httpx',
@@ -514,7 +513,7 @@ describe('inspect_pipeline_tool', () => {
     const { run } = setup();
 
     await expect(
-      run(inspectPipelineToolTool).execute({ toolId: 'tool-x' }, call),
+      run('inspect_pipeline_tool').execute({ toolId: 'tool-x' }, call),
     ).resolves.toHaveProperty('error');
   });
 });

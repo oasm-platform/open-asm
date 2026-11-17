@@ -6,7 +6,8 @@ import type { RedisService } from '@/services/redis/redis.service';
 import { withoutDisabledTools } from './agents.config';
 import { AgentsMemoriesService } from './agents.memories';
 import type { AgentWorkspaceMemory } from './entities/agent-workspace-memory.entity';
-import { memoryTools } from './tools/memory.tools';
+import { agentFunctionsWith } from './agents.tools.testing';
+import { MemoryTools } from './tools/memory.tools';
 
 const WS = 'ws-1';
 const USER = 'user-1';
@@ -121,11 +122,10 @@ describe('long-term memory tools', () => {
         .mockResolvedValue({ data: [memory()], total: 1 }),
       ltmDeleteById: jest.fn().mockResolvedValue(undefined),
     };
-    tools = memoryTools(
-      { agentsMemories: memories as never },
-      WS,
-      USER,
-      'conv-1',
+    tools = agentFunctionsWith(
+      MemoryTools,
+      { agentsMemories: memories },
+      { workspaceId: WS, userId: USER, conversationId: 'conv-1' },
     ) as unknown as Record<string, { execute: Exec }>;
   });
 

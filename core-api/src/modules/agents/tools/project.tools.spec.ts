@@ -1,7 +1,8 @@
 import { AgentMode } from '@/common/enums/enum';
 
-import { AgentTool, READ_ONLY_TOOLS } from '../agents.tools';
-import { addAssetsToProjectTool } from './project.tools';
+import { READ_ONLY_TOOLS } from '../agents.tools';
+import { agentFunctionWith, agentToolWith } from '../agents.tools.testing';
+import { ProjectTools } from './project.tools';
 import type { ToolCallOptions } from './types';
 
 const P1 = '11111111-1111-4111-8111-111111111111';
@@ -31,10 +32,7 @@ function setup() {
       getMembershipWithPermissions: jest.fn().mockResolvedValue({ permissionKeys: ['*'] }),
     },
   };
-  const agentTool = Object.assign(
-    Object.create(AgentTool.prototype),
-    services,
-  ) as AgentTool;
+  const agentTool = agentToolWith(services);
   // Ungated: no approval settings
   const tools = (mode: AgentMode, projectId?: string) =>
     agentTool.getTools('w1', 'u1', mode, undefined, 'c1', undefined, projectId) as Record<
@@ -140,10 +138,11 @@ describe('project-aware tools', () => {
 
   it('acts on the locked project for a member who may write it', async () => {
     const { services } = setup();
-    const tool = addAssetsToProjectTool(
-      { ...services, workspacesService: member(['project.write']) } as never,
-      'w1',
-      { projectId: P1, userId: 'u1' },
+    const tool = agentFunctionWith(
+      ProjectTools,
+      'add_assets_to_project',
+      { ...services, workspacesService: member(['project.write']) },
+      { workspaceId: 'w1', projectId: P1, userId: 'u1' },
     ) as unknown as { execute: (p: unknown, o: ToolCallOptions) => Promise<unknown> };
 
     await tool.execute({ projectId: P2, assetIds: [P2] }, call);
@@ -153,10 +152,11 @@ describe('project-aware tools', () => {
 
   it('refuses a project action to a member who may only read', async () => {
     const { services } = setup();
-    const tool = addAssetsToProjectTool(
-      { ...services, workspacesService: member(['project.read']) } as never,
-      'w1',
-      { projectId: P1, userId: 'u1' },
+    const tool = agentFunctionWith(
+      ProjectTools,
+      'add_assets_to_project',
+      { ...services, workspacesService: member(['project.read']) },
+      { workspaceId: 'w1', projectId: P1, userId: 'u1' },
     ) as unknown as { execute: (p: unknown, o: ToolCallOptions) => Promise<unknown> };
 
     expect(await tool.execute({ assetIds: [P2] }, call)).toContain('project.write');
