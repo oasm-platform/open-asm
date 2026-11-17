@@ -37,6 +37,7 @@ No events, queues or exports.
 ## Coupling
 
 - Imports `TargetsModule` (`getTargetsInWorkspace`) and `AssetsModule` (`getManyAsssetServices`, with three s). Registers the `Vulnerability` repository itself and does not import `VulnerabilitiesModule`.
+- Besides the header search and the command palette, the agent chat's "@" mention picker (`console/src/components/agent-mention-textarea.tsx`) calls `GET /search`: each `SearchData` group is one mention prefix (`@target:`, `@asset:`, `@vulnerability:`). Adding or renaming a group means updating `MENTION_KINDS` and the agents module's `prompts/SYSTEM.md` (see its AGENTS.md).
 
 ## Gotchas
 
