@@ -215,10 +215,10 @@ export function listAssetsInTargetTool(
 ): Tool {
   return defineTool({
     description:
-      'List assets discovered from a specific target by targetId. Params: targetId, page, limit, value (filter), projectId.',
+      'List assets discovered from a specific target by targetId. Params: targetId, page, limit, value (filter), projectId. Each item: id, value, port, ipAddresses; use inspect_asset for the full record.',
     inputSchema: listAssetsInTargetInput,
-    execute: (params: z.infer<typeof listAssetsInTargetInput>) =>
-      deps.assetsService.getManyAsssetServices(
+    execute: async (params: z.infer<typeof listAssetsInTargetInput>) => {
+      const response = await deps.assetsService.getManyAsssetServices(
         {
           ...pageOf(params),
           ...NEWEST_FIRST,
@@ -227,7 +227,19 @@ export function listAssetsInTargetTool(
           ...assetsInProject(projectFor(scope, params)),
         },
         workspaceId,
-      ),
+      );
+      // Not the full record: httpResponses holds raw response bodies, often
+      // megabytes per asset, which no model request can carry
+      return {
+        ...response,
+        data: response.data.map((i) => ({
+          id: i.id,
+          value: i.value,
+          port: i.port,
+          ipAddresses: i.ipAddresses,
+        })),
+      };
+    },
   });
 }
 

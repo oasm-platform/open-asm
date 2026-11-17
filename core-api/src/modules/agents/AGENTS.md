@@ -21,7 +21,7 @@ The AI chat agent: LLM connections, conversations streamed over SSE, the tool se
 - `agents.mcp.ts`: lists tools from the workspace's external MCP servers. `agents.memories.ts`: STM (Redis) and LTM (DB). `agents.stream-buffer.ts`: Redis replay buffer for SSE. `agents.usage.ts`: raw-SQL usage report. `agents.models-catalog.ts` + `shared/models-dev.ts`: context window, cost and reasoning efforts from `resources/models-dev/catalog.json` (refresh with `task api:models:snapshot`).
 - `llm-provider-supported.ts`: provider list (`llmProviderSupported`), model handlers and model fetchers.
 - `prompts/*.md`: Mustache templates loaded at boot (`SYSTEM.md`, `ASK.md`/`AGENT.md` picked by `agentMode.toUpperCase()`, `PLAN.md`, title/goal/summary/vuln prompts).
-- `shared/`: context budget, step limit, token counter, turn stats, `updateConversationMetadata`.
+- `shared/`: context budget, step limit, stream timeouts (`streamTimeouts`), token counter, turn stats, `updateConversationMetadata`.
 
 ## Public surface
 
@@ -91,6 +91,8 @@ All routes: `@Controller('agents')`, `AuthGuard`, `@WorkspaceAccess('agent.read'
 - Several pieces of state live in process memory: `activeRuns`, pending command/plan prompts (`AgentsApprovalsService.pending` / `pendingPlans`), compaction joins. With more than one API instance, stop and approve/decide only work on the instance running the turn. "Allow all"/"allow tool" for a conversation live in Redis (`agents:approval:*`, 7-day TTL); approvals time out after `APPROVAL_TIMEOUT_MS` (5 min).
 - The workflow snapshot (`GET conversations/:id/workflow`) has no SSE of its own: the console refetches it when `data-subagents-updated` or `data-todos-updated` changes something.
 - Subagents run in-process (`SUBAGENT_MAX_CONCURRENCY = 4`), claimed with `FOR UPDATE SKIP LOCKED`, heartbeat every 30 s; `recoverStale` requeues or fails rows without a heartbeat (sweep every 30 s and on boot). Cancelling elsewhere is seen at the next heartbeat.
+- A chat turn's `streamText` gets `timeout: streamTimeouts(...)` (`shared/stream-timeouts.ts`): `firstChunkMs` (120 s) because `chunkMs` only starts at the first output, so a provider that never answers would otherwise hang the run until the user stops it; `chunkMs` is 30 s, or the approval window when a prompt can be pending.
+- Workspace list tools return summary fields, never whole entities: an asset's `httpResponses` holds raw response bodies (MBs per asset), and one `examine_target_assets` page of full records once made a 10 MB prompt that the provider dropped. Keep new list tools mapped the same way (`enumerate_assets`, `examine_target_assets`); details come from `inspect_*`.
 - Use `streamText`, never `generateText`, for one-shot completions: some OpenAI-compatible providers return SSE-framed bodies to non-streaming requests (`completeText` explains this).
 - Prompts, built-in agents and skills are read from `__dirname` at boot; `nest-cli.json` copies `**/*.md`. Any `.md` dropped into `prompts/` or `builtin-agents/` is loaded; a `SKILL.md` in a new `skills/<dir>/` becomes a built-in skill.
 - `load_skill` resolves a built-in skill before a workspace skill of the same name, and `createUserSkill` does not reject built-in names, so such a user skill is shadowed.

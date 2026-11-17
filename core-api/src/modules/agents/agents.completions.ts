@@ -32,7 +32,6 @@ const PROJECT_FILE_PROMPT_CHARS = 8_000;
 const PROJECT_FILES_PROMPT_CHARS = 30_000;
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import {
-  APPROVAL_TIMEOUT_MS,
   AgentsApprovalsService,
   type ApprovalRequestEvent,
   type ApprovalResolvedEvent,
@@ -73,6 +72,7 @@ import {
   updateConversationMetadata,
 } from './shared/conversation-metadata';
 import { DEFAULT_MAX_STEPS, stepLimit } from './shared/step-limit';
+import { streamTimeouts } from './shared/stream-timeouts';
 import { TokenCounter } from './shared/token-counter';
 import type { BrowserScreenshotEvent } from './tools/remote-execute.tool';
 import {
@@ -1826,17 +1826,9 @@ export class AgentsCompletionsService {
       allowSystemInMessages: true,
       // Retry transient provider errors (429 rate-limit, 500/502/503 server errors)
       maxRetries: 3,
-      // Detect stuck streams: abort if no chunk arrives within 30 seconds.
-      // A tool call may sit waiting for the user's approval (in any agent
-      // mode unless approvals are off), which emits no chunks, so allow for
-      // the approval window.
-      timeout: {
-        chunkMs:
-          options.agentMode === AgentMode.AGENT ||
-          options.approvalMode !== AgentApprovalMode.AUTO
-            ? APPROVAL_TIMEOUT_MS + 60_000
-            : 30_000,
-      },
+      // Detect stuck streams: a model call that never starts answering, or
+      // stalls once it has (see streamTimeouts)
+      timeout: streamTimeouts(options.agentMode, options.approvalMode),
       // Only include tools if available (models without tool support will error here)
       ...(tools
         ? {

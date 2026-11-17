@@ -8,7 +8,11 @@ import { getVulnerabilitiesSchema, listIssuesSchema } from '@/mcp/mcp.schema';
 import { VulnerabilityStatus } from '@/modules/vulnerabilities/vulnerability-status';
 
 import type { ToolCallOptions } from './types';
-import { getVulnerabilitiesTool, listIssuesTool } from './workspace.tools';
+import {
+  getVulnerabilitiesTool,
+  listAssetsInTargetTool,
+  listIssuesTool,
+} from './workspace.tools';
 
 const W = 'w1';
 const V1 = '11111111-1111-4111-8111-111111111111';
@@ -121,6 +125,54 @@ describe('discover_vulnerabilities', () => {
       }),
     );
     expect(result.data[0]).not.toHaveProperty('description');
+  });
+});
+
+describe('examine_target_assets', () => {
+  const asset = {
+    id: 'a1',
+    value: 'models.example.com:443',
+    port: 443,
+    isNew: false,
+    targetId: 't1',
+    ipAddresses: ['104.18.10.66'],
+    dnsRecords: { A: ['104.18.10.66'] },
+    // Raw response bodies can be megabytes per asset
+    httpResponses: { body: 'x'.repeat(2_000_000) },
+    screenshotPath: '/s.png',
+  };
+
+  function setup() {
+    const deps = {
+      assetsService: {
+        getManyAsssetServices: jest.fn().mockResolvedValue(page([asset])),
+      },
+    };
+    const tool = listAssetsInTargetTool(deps as never, W) as unknown as Executable;
+    return { deps, tool };
+  }
+
+  it('lists the target assets with summary fields, not the full record', async () => {
+    const { deps, tool } = setup();
+
+    const result = (await tool.execute({ targetId: 't1' }, call)) as {
+      data: Record<string, unknown>[];
+      total: number;
+    };
+
+    expect(deps.assetsService.getManyAsssetServices).toHaveBeenCalledWith(
+      expect.objectContaining({ targetIds: ['t1'] }),
+      W,
+    );
+    expect(result.total).toBe(1);
+    expect(result.data).toEqual([
+      {
+        id: 'a1',
+        value: 'models.example.com:443',
+        port: 443,
+        ipAddresses: ['104.18.10.66'],
+      },
+    ]);
   });
 });
 
