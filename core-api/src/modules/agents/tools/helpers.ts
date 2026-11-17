@@ -1,23 +1,9 @@
-import { tool, type Tool } from 'ai';
 import { z } from 'zod';
 
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 
 import type { ApprovalDecision } from '../agents.approvals';
-import type { ToolCallOptions, ToolScope } from './types';
-
-export interface ToolConfig {
-  description: string;
-  inputSchema: z.ZodTypeAny;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  execute: (params: any, options: ToolCallOptions) => unknown;
-}
-
-/** An AI SDK tool from a plain config, without tool()'s schema generics. */
-export function defineTool(config: ToolConfig): Tool {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return tool(config as any);
-}
+import type { ToolScope } from './types';
 
 export const errorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
@@ -131,3 +117,7 @@ const RENAMED_TOOLS: Readonly<Record<string, string>> = {
 
 export const currentToolName = (name: string): string =>
   RENAMED_TOOLS[name] ?? name;
+
+/** An old name a live tool must not take back. */
+export const isRenamedToolName = (name: string): boolean =>
+  Object.hasOwn(RENAMED_TOOLS, name);

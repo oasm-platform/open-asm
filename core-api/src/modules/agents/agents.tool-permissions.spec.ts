@@ -2,8 +2,8 @@ import { NotFoundException } from '@nestjs/common';
 
 import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
 
-import { TOOL_PERMISSIONS } from './agents.tool-permissions';
-import { AgentTool } from './agents.tools';
+import { TOOL_PERMISSIONS } from './agents.tools';
+import { agentToolWith } from './agents.tools.testing';
 import type { ToolCallOptions } from './tools/types';
 
 const call = { toolCallId: 't1' } as ToolCallOptions;
@@ -25,10 +25,7 @@ function setup(permissionKeys: string[] | Error = ['*']) {
     guard: { evaluate: jest.fn().mockResolvedValue({ action: 'pass' }) },
     approvals: { authorize: jest.fn().mockResolvedValue({ allowed: true }) },
   };
-  const agentTool = Object.assign(
-    Object.create(AgentTool.prototype),
-    services,
-  ) as AgentTool;
+  const agentTool = agentToolWith(services);
   const tools = (
     mode = AgentMode.AGENT,
     approval?: { userId: string; mode: AgentApprovalMode },

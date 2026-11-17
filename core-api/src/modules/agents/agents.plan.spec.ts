@@ -10,7 +10,8 @@ import {
 } from './agents.completions';
 import { SUBAGENT_MAX_ROUNDS_PER_TURN } from './agents.subagents';
 import { formatTodosToPrompt, type AgentTodoItem } from './agents.todo';
-import { AgentTool } from './agents.tools';
+import type { AgentTool } from './agents.tools';
+import { agentToolWith } from './agents.tools.testing';
 import type { TodoStatus } from './entities/agent-conversation-todo.entity';
 import { stepLimit } from './shared/step-limit';
 import { emptyStats } from './shared/turn-stats';
@@ -207,17 +208,12 @@ describe('AgentTool plan tools', () => {
       authorize: jest.fn(() => Promise.resolve({ allowed: true })),
     };
     emitter = new EventEmitter();
-    agentTool = new (
-      AgentTool as unknown as new (...args: unknown[]) => AgentTool
-    )(
-      ...(Array(9).fill(null) as unknown[]),
-      conversations,
-      repo,
-      null,
+    agentTool = agentToolWith({
+      conversationRepository: conversations,
+      todoRepository: repo,
+      agentsMemories: null,
       approvals,
-      { getAgentConnectors: () => [], getConnector: () => null },
-    );
-    Object.assign(agentTool, {
+      connectorRegistry: { getAgentConnectors: () => [], getConnector: () => null },
       guard: { evaluate: jest.fn().mockResolvedValue({ action: 'default' }) },
       workspacesService: {
         getMembershipWithPermissions: jest

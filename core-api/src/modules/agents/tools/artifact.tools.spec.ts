@@ -4,7 +4,8 @@ import { ArtifactSource, AuditActorType } from '@/common/enums/enum';
 import type { ArtifactsService } from '@/modules/artifacts/artifacts.service';
 import type { TemplatesService } from '@/modules/templates/templates.service';
 import type { WorkspacesService } from '@/modules/workspaces/workspaces.service';
-import { artifactTools } from './artifact.tools';
+import { agentFunctionsWith } from '../agents.tools.testing';
+import { ArtifactTools } from './artifact.tools';
 
 const membership = (permissionKeys: string[]) =>
   ({
@@ -13,15 +14,14 @@ const membership = (permissionKeys: string[]) =>
 
 describe('artifactTools save_file', () => {
   const run = (createFromBuffer: jest.Mock, permissionKeys = ['artifact.write']) => {
-    const { save_file } = artifactTools(
+    const { save_file } = agentFunctionsWith(
+      ArtifactTools,
       {
         artifactsService: { createFromBuffer } as unknown as ArtifactsService,
         workspacesService: membership(permissionKeys),
         templatesService: {} as TemplatesService,
       },
-      'ws-1',
-      'user-1',
-      'conv-1',
+      { workspaceId: 'ws-1', userId: 'user-1', conversationId: 'conv-1' },
     );
     return (
       save_file.execute as (params: unknown, options: unknown) => Promise<unknown>
@@ -91,15 +91,14 @@ describe('artifactTools save_template', () => {
       create: jest.fn().mockResolvedValue(saved),
       saveContent: jest.fn().mockResolvedValue(saved),
     };
-    const { save_template } = artifactTools(
+    const { save_template } = agentFunctionsWith(
+      ArtifactTools,
       {
         artifactsService: {} as ArtifactsService,
         workspacesService: membership(permissionKeys),
         templatesService: templatesService as unknown as TemplatesService,
       },
-      'ws-1',
-      'user-1',
-      'conv-1',
+      { workspaceId: 'ws-1', userId: 'user-1', conversationId: 'conv-1' },
     );
     const run = (params: Record<string, unknown>) =>
       (save_template.execute as (params: unknown, options: unknown) => Promise<unknown>)(

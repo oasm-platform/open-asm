@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { tool, type Tool } from 'ai';
+import type { Tool } from 'ai';
 import { In, Repository } from 'typeorm';
 import { z } from 'zod';
 import type {
@@ -16,6 +16,8 @@ import {
   type WorkflowNoteKind,
 } from './entities/agent-workflow-note.entity';
 import { SubagentStatus } from './enums/agent.enums';
+import { AgentFunction, buildAgentFunctions } from './tools/agent-function';
+import type { AgentFunctionContext } from './tools/types';
 import type {
   SubagentBrief,
   SubagentOutput,
@@ -226,20 +228,30 @@ export const HANDOFF_INSTRUCTIONS =
   '(each with a stable key), the candidate findings with their evidence, and the open questions. ' +
   'Then write your final answer as your role describes; it is the report the main agent reads alongside the structured result.';
 
+/** Hosts submit_result: built per subagent run, around that run's callback. */
+export class SubmitResultTools {
+  @AgentFunction({
+    name: SUBMIT_RESULT_TOOL,
+    description:
+      'Hand your structured result back to the main agent and the workflow notebook. Call it once, when your work is done, then write your final answer.',
+    inputSchema: submitResultSchema,
+    permissions: 'ungated',
+    gate: 'none',
+  })
+  submitResult(input: SubmitResultInput, ctx: AgentFunctionContext) {
+    ctx.onSubmitResult?.(toOutput(input));
+    return Promise.resolve({ recorded: true });
+  }
+}
+
 /** The tool a subagent ends its run with; `onSubmit` receives the result. */
 export function createSubmitResultTool(
   onSubmit: (output: SubagentOutput) => void,
 ): Tool {
-  const config = {
-    description:
-      'Hand your structured result back to the main agent and the workflow notebook. Call it once, when your work is done, then write your final answer.',
-    inputSchema: submitResultSchema,
-    execute: (input: SubmitResultInput) => {
-      onSubmit(toOutput(input));
-      return Promise.resolve({ recorded: true });
-    },
-  };
-  return tool(config as unknown as Parameters<typeof tool>[0]);
+  return buildAgentFunctions(new SubmitResultTools(), {
+    workspaceId: '',
+    onSubmitResult: onSubmit,
+  })[SUBMIT_RESULT_TOOL];
 }
 
 /**
@@ -352,40 +364,48 @@ export class AgentsWorkflowService {
     return blocks.join('\n\n');
   }
 
-  /** `add_workflow_note`: the main agent records a decision, fact or open issue. */
+  /** The main agent's notebook tool for one conversation. */
   createNoteTool(ctx: { conversationId: string }): Tool {
-    const config = {
-      description:
-        'Write an entry in the workflow notebook that every subagent dispatched later receives: ' +
-        'a decision (scope, what to skip and why), a verified fact, or an open issue. Append-only.',
-      inputSchema: z.object({
-        kind: z.enum(WORKFLOW_NOTE_KINDS as [WorkflowNoteKind, ...WorkflowNoteKind[]]),
-        key: z.string().max(200).optional().describe('Stable short key'),
-        content: z.string().min(1).max(WORKFLOW_NOTE_MAX_CHARS),
-      }),
-      execute: async (input: {
-        kind: WorkflowNoteKind;
-        key?: string;
-        content: string;
-      }) => {
-        const step = await this.todoRepository.findOne({
-          where: { conversationId: ctx.conversationId, status: 'in_progress' },
-          select: ['id'],
-        });
-        await this.addNotes([
-          {
-            conversationId: ctx.conversationId,
-            kind: input.kind,
-            key: input.key,
-            content: input.content,
-            author: 'main',
-            stepId: step?.id ?? null,
-          },
-        ]);
-        return { recorded: true };
+    return buildAgentFunctions(this, {
+      workspaceId: '',
+      conversationId: ctx.conversationId,
+    }).add_workflow_note;
+  }
+
+  /** The main agent records a decision, fact or open issue. */
+  @AgentFunction({
+    name: 'add_workflow_note',
+    description:
+      'Write an entry in the workflow notebook that every subagent dispatched later receives: ' +
+      'a decision (scope, what to skip and why), a verified fact, or an open issue. Append-only.',
+    inputSchema: z.object({
+      kind: z.enum(WORKFLOW_NOTE_KINDS as [WorkflowNoteKind, ...WorkflowNoteKind[]]),
+      key: z.string().max(200).optional().describe('Stable short key'),
+      content: z.string().min(1).max(WORKFLOW_NOTE_MAX_CHARS),
+    }),
+    permissions: 'ungated',
+    gate: 'none',
+  })
+  async addWorkflowNote(
+    input: { kind: WorkflowNoteKind; key?: string; content: string },
+    ctx: AgentFunctionContext,
+  ) {
+    const conversationId = ctx.conversationId ?? '';
+    const step = await this.todoRepository.findOne({
+      where: { conversationId, status: 'in_progress' },
+      select: ['id'],
+    });
+    await this.addNotes([
+      {
+        conversationId,
+        kind: input.kind,
+        key: input.key,
+        content: input.content,
+        author: 'main',
+        stepId: step?.id ?? null,
       },
-    };
-    return tool(config as unknown as Parameters<typeof tool>[0]);
+    ]);
+    return { recorded: true };
   }
 
   async getWorkflow(

@@ -1262,7 +1262,7 @@ export class AgentsCompletionsService {
       ctx.approval,
       ctx.todosEmitter,
       true,
-    ) as ToolSet;
+    );
   }
 
   /**

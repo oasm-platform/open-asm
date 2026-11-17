@@ -8,7 +8,8 @@ import {
 } from '@/common/enums/enum';
 import { AgentsCompletionsService } from './agents.completions';
 import { AgentsService } from './agents.service';
-import { listWorkersTool } from './tools/workspace.tools';
+import { agentFunctionWith } from './agents.tools.testing';
+import { WorkspaceTools } from './tools/workspace.tools';
 import type { SendMessageDto } from './dto/message.dto';
 
 const dto = {
@@ -165,9 +166,11 @@ describe('worker scope enforcement', () => {
           },
         ],
       });
-      const tool = listWorkersTool(
-        { workersService: { getWorkers } } as never,
-        'ws-1',
+      const tool = agentFunctionWith(
+        WorkspaceTools,
+        'list_active_workers',
+        { workersService: { getWorkers } },
+        { workspaceId: 'ws-1' },
       ) as unknown as {
         execute: (params: unknown, options: unknown) => Promise<unknown>;
       };
