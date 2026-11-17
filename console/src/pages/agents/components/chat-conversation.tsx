@@ -56,16 +56,28 @@ interface ChatConversationProps {
   hasMoreMessages?: boolean;
   isLoadingMoreMessages?: boolean;
   agentMode?: string;
+  /** Given only where the chat can still switch mode; shows the toggle */
+  onAgentModeChange?: (mode: string) => void;
   /** Inline permission prompt shown right above the input */
   approvalPrompt?: ReactNode;
   selectedWorkerId?: string | null;
   onWorkerSelect?: (workerId: string | null) => void;
   /** The project the chat is about, shown above the input */
   project?: ConversationProjectDto | null;
+  /** Given only while the chat can still pick its project */
+  onProjectChange?: (project: ConversationProjectDto | null) => void;
+  /** Controlled input text, e.g. to fill in a prompt for the user to finish */
+  inputValue?: string;
+  /** Required with `inputValue` */
+  onInputValueChange?: (value: string) => void;
   todos?: AgentTodoItem[];
   /** Goal of the plan, pinned in the todo panel */
   goal?: string | null;
   showTodoAboveInput?: boolean;
+  /** Shown by an empty chat instead of the "Security AI ready" note */
+  emptyState?: ReactNode;
+  /** Input placeholder while the chat is idle */
+  placeholder?: string;
   selectedToolCallId?: string | null;
   remoteExecuteEvents?: Map<string, RemoteExecuteStreamEvent[]>;
 }
@@ -92,13 +104,19 @@ export const ChatConversation = ({
   hasMoreMessages = false,
   isLoadingMoreMessages = false,
   agentMode = 'false',
+  onAgentModeChange,
   approvalPrompt,
   selectedWorkerId,
   onWorkerSelect,
   project = null,
+  onProjectChange,
+  inputValue,
+  onInputValueChange,
   todos,
   goal,
   showTodoAboveInput = true,
+  emptyState,
+  placeholder = 'Ask anything about security…',
   selectedToolCallId,
   remoteExecuteEvents,
 }: ChatConversationProps) => {
@@ -252,22 +270,24 @@ export const ChatConversation = ({
           {isLoadingHistory ? (
             <LoadingSkeleton />
           ) : isEmpty ? (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.4, ease: 'easeOut' }}
-            >
-              <ConversationEmptyState
-                icon={
-                  <div className="rounded-2xl bg-muted p-4 ring-1 ring-border">
-                    <ShieldAlert className="size-8" />
-                  </div>
-                }
-                title="Security AI ready"
-                description="Ask anything about vulnerabilities, secure coding, and best practices."
-                className="py-24"
-              />
-            </motion.div>
+            (emptyState ?? (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.4, ease: 'easeOut' }}
+              >
+                <ConversationEmptyState
+                  icon={
+                    <div className="rounded-2xl bg-muted p-4 ring-1 ring-border">
+                      <ShieldAlert className="size-8" />
+                    </div>
+                  }
+                  title="Security AI ready"
+                  description="Ask anything about vulnerabilities, secure coding, and best practices."
+                  className="py-24"
+                />
+              </motion.div>
+            ))
           ) : (
             <>
               <div ref={sentinelRef} className="h-px" aria-hidden="true" />
@@ -350,7 +370,7 @@ export const ChatConversation = ({
       <div className="shrink-0 px-4 pb-4">
         <div className="max-w-3xl mx-auto w-full flex flex-col">
           <div className="mb-1.5 flex items-center gap-2 px-3">
-            <ProjectScopeSelect value={project} />
+            <ProjectScopeSelect value={project} onChange={onProjectChange} />
             {agentMode === 'agent' && onWorkerSelect && (
               <WorkerSelect
                 value={selectedWorkerId ?? null}
@@ -386,12 +406,12 @@ export const ChatConversation = ({
               }
               onSelectModel={onSelectModel}
               agentMode={agentMode}
+              onAgentModeChange={onAgentModeChange}
+              onWorkerSelect={onWorkerSelect}
+              value={inputValue}
+              onValueChange={onInputValueChange}
               showSettingsButton={false}
-              placeholder={
-                isStreaming
-                  ? 'Waiting for response…'
-                  : 'Ask anything about security…'
-              }
+              placeholder={isStreaming ? 'Waiting for response…' : placeholder}
               // Same rounder box and round send button as the landing input
               className="[&_[data-slot=input-group]]:rounded-2xl [&_[data-slot=input-group]]:bg-card [&_[data-slot=input-group]]:shadow-sm [&_[data-slot=input-group]]:dark:bg-card [&_button[type=submit]]:rounded-full"
             />

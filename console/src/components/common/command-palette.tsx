@@ -96,11 +96,11 @@ export function CommandPalette() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Open command palette"
-        className="flex size-9 items-center justify-center gap-2 rounded-md border border-border/60 bg-muted/40 text-xs text-muted-foreground transition-colors hover:bg-muted md:h-8 md:w-full md:max-w-xs md:justify-start md:px-2 md:text-left"
+        className="flex size-9 shrink-0 items-center justify-center gap-2 rounded-md border border-border/60 bg-muted/40 text-sm text-muted-foreground transition-colors hover:bg-muted md:w-full md:max-w-sm md:shrink md:justify-start md:px-3 md:text-left"
       >
         <Search className="size-4 shrink-0" aria-hidden />
-        <span className="hidden flex-1 md:inline">Search or jump to…</span>
-        <kbd className="hidden rounded border bg-background px-1 font-mono text-[10px] md:inline">
+        <span className="hidden flex-1 truncate md:inline">Search or jump to…</span>
+        <kbd className="hidden rounded border bg-background px-1.5 py-0.5 font-mono text-[11px] leading-none md:inline">
           Ctrl K
         </kbd>
       </button>

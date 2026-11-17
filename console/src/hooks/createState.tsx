@@ -25,6 +25,11 @@ export default function createState<T>(
     const { data: state = initialValue } = useQuery<T>({
       queryKey: ['global', key],
       queryFn: () => initialValue,
+      // In the cache from the first render: with nothing to fetch, no
+      // queryFn result can land after a setState and undo it
+      initialData: initialValue,
+      // Older than anything: state restored from the persisted cache wins
+      initialDataUpdatedAt: 0,
       staleTime: Infinity,
     });
 

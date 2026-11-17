@@ -1,5 +1,6 @@
 // HeaderBar - Sticky header component without children wrapper
 
+import { AiChatPanelToggle } from '@/components/ai-chat-panel/ai-chat-panel-toggle';
 import { NotificationBell } from '@/components/notifications/notification-bell';
 import AppLogo from '@/components/ui/app-logo';
 import { NavUser } from '@/components/ui/nav-user';
@@ -30,8 +31,9 @@ export function HeaderBar({ className }: HeaderBarProps) {
             <SidebarTrigger className="max-md:scale-125" />
             {isMobile && <AppLogo type="small" />}
           </div>
-          <div className="flex flex-1 justify-center">
+          <div className="flex min-w-0 flex-1 items-center justify-center gap-2">
             <CommandPalette />
+            <AiChatPanelToggle />
           </div>
           <div className="flex items-center gap-1">
             <ThemeSwitch />
