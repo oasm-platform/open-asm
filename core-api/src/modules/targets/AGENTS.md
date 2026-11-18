@@ -23,7 +23,7 @@ Scan roots of a workspace: a domain, IP, CIDR or Git organization. A target owns
 | `POST targets/:id/re-scan` | `target.write`; delegates to `AssetsService.reScan` |
 | `DELETE targets/:id` | `target.write`, **and** workspace owner |
 
-- `@Global()`, exports `TargetsService`. It also provides `TriggerWorkflowService` (from `workflows/`), and this is the **only** module that provides it.
+- Exports `TargetsService`; imported by `IntegrationsModule`, `InternalNetworksModule`, `StatisticModule`, `SearchModule` and `AgentsModule`. It also provides `TriggerWorkflowService` (from `workflows/`), and this is the **only** module that provides it.
 - Event bridge: `@PublishEvent` sends `target.created` (bulk) and `target.updated` (PATCH). `target.deleted` is not on the stream: `deleteTarget` writes it only as an audit row via `AuditService.auditSafely`. After the create transaction, `createMultipleTargets` publishes `asset.discovered` once per target for its new assets.
 - In-process events (`EventEmitter2`): `target.<type>.create` for each created target (`target.domain.create`, `target.cidr.create`, `target.ip.create`, `target.git_org.create`), and `target.git_org.re-scan` when GIT_ORG settings change.
 - BullMQ: registers `ASSETS_DISCOVERY_SCHEDULE` and adds one repeatable job per scheduled target (job name = target id, data `{ id }`, `repeat.pattern` = the `CronSchedule` value). The consumer, `AssetsDiscoveryScheduleConsumer` (`processors/assets-discovery-schedule.processor.ts`), lives here too and calls `AssetsService.reScan` with `JobRunType.SCHEDULED`.
@@ -48,7 +48,7 @@ Scan roots of a workspace: a domain, IP, CIDR or Git organization. A target owns
 
 ## Coupling
 
-- `TargetsService` injects `AssetsService` (and exposes it as public `assetService`), `WorkspacesService`, `AuditService` and `EventBridgeService`. It writes `assets` rows directly inside its transaction.
+- Imports `AssetsModule` and `JobsRegistryModule` (`TriggerWorkflowService` uses `WorkflowRunnerService`). `TargetsService` injects `AssetsService` (and exposes it as public `assetService`), `WorkspacesService`, `AuditService` and `EventBridgeService`. It writes `assets` rows directly inside its transaction.
 - `TriggerWorkflowService.onModuleInit` subscribes with `eventEmitter.onAny`, so **every** in-process event in the app is treated as a possible workflow trigger: `<a>.<b>` is matched against `workflow.content.on.<a>` containing `<b>`, in the workspace of the payload's `workspaceId` (target events carry the `Target` row); a payload without one is skipped before any query. Project workflows (`project-%`, `group-%` file paths) are excluded.
 - Callers of `TargetsService`: integrations connectors (aws, cloudflare, vercel: `findByWorkspaceAndValues` then `createMultipleTargets`), `InternalNetworksService`, `SearchService`, agents tools. `StatisticModule` and `SearchModule` import `TargetsModule`.
 - Other code that touches `targets` directly: `AssetsService.reScan` updates `reScanCount` and `lastDiscoveredAt`. `WorkspacesService` bulk-deletes a workspace's targets and resolves `getWorkspaceIdByTargetId` (cached 60 s). `StatisticService` reads the table.

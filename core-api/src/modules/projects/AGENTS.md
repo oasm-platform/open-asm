@@ -1,6 +1,6 @@
 # projects module
 
-A project is a named set of workspace assets (picked by hand or selected by scope rules). It owns workflows with their own triggers (cron and events), and its runs, findings and chat-context files. `@Global()`, registered in `combine.module.ts` and also imported explicitly by `AgentsModule`.
+A project is a named set of workspace assets (picked by hand or selected by scope rules). It owns workflows with their own triggers (cron and events), and its runs, findings and chat-context files. Registered in `combine.module.ts` and imported by `AgentsModule` and `EventBridgeModule` (the projects lane injects its tokens).
 
 ## Layout
 
@@ -56,7 +56,7 @@ All routes use `@WorkspaceAccess`:
 
 ## Coupling
 
-- Imports `ConnectorsModule` and `ArtifactsModule`; uses the global `EventBridgeService`, `WorkflowsService` (saves project pipeline edits), `WorkflowRunnerService` (jobs-registry) and `RedisService`.
+- Imports `ConnectorsModule`, `ArtifactsModule`, `StorageModule` (project files), `ToolsModule`, `JobsRegistryModule` (`WorkflowRunnerService`) and `WorkflowsModule` (`WorkflowsService` saves project pipeline edits); uses the global `EventBridgeService` and `RedisService`.
 - `event-bridge/sinks/projects/projects.sink.ts` defines the two tokens and fact types this module implements.
 - Agent tools (`agents/tools/project*.tools.ts`, `agents.tools.ts`, `agents.completions.ts`) call these services and `findProjectOrFail` directly, and publish `project.*` events themselves.
 - Other modules query project tables with raw SQL: `vulnerabilities.service.ts`, `targets/target-overview.service.ts`, `assets/asset-filter.ts`. `templates.service.ts` injects the `ProjectAsset` repository. `provenance.ts` exports (`RUN_STATUS_SQL`, `SEVERITY_RANK_SQL`, `VulnerabilityProvenance`) are used by vulnerabilities and targets.

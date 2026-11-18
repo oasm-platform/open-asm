@@ -1,4 +1,4 @@
-import { Global, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { ConnectorsModule } from '../connectors/connectors.module';
@@ -21,7 +21,6 @@ import { WorkerStreamController } from './worker-stream.controller';
 import { WorkerStreamRegistry } from './worker-stream-registry.service';
 import { WorkerJoinKeyService } from './worker-join-key.service';
 
-@Global()
 @Module({
   imports: [
     TypeOrmModule.forFeature([

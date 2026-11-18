@@ -1,10 +1,10 @@
-import { Global, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
 import { DataAdapterService } from './data-adapter.service';
+import { StorageModule } from '../storage/storage.module';
 
-@Global()
 @Module({
-  imports: [WorkspacesModule],
+  imports: [WorkspacesModule, StorageModule],
   providers: [DataAdapterService],
   exports: [DataAdapterService],
 })

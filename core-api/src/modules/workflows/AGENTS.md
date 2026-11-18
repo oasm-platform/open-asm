@@ -1,6 +1,6 @@
 # workflows module
 
-Workflow definitions per workspace: a DAG of tool jobs stored as jsonb in `workflows.content`. It also covers the default workflows synced from YAML, and the pure graph logic the run engine (jobs-registry) uses. `@Global()`, registered in `combine.module.ts`.
+Workflow definitions per workspace: a DAG of tool jobs stored as jsonb in `workflows.content`. It also covers the default workflows synced from YAML, and the pure graph logic the run engine (jobs-registry) uses. Registered in `combine.module.ts` and imported by `AssetsModule`, `ProjectsModule` and `VulnerabilitiesModule`.
 
 ## Layout
 

@@ -21,7 +21,7 @@ Read side of the attack surface: hosts (`assets`), their open ports (`asset_serv
 | `GET assets/services/export` (CSV) | `asset.read` |
 | `PATCH assets/:id` (tags only), `POST assets/toggle`, `POST assets/service/tag/generate`, `POST assets/url/discover` | `asset.write` |
 
-- `@Global()`, exports `AssetsService` only (`UrlDiscoveryService` is internal).
+- Exports `AssetsService` only (`UrlDiscoveryService` is internal).
 - No `@PublishEvent` on any route. `UrlDiscoveryService.handleRunEnd` (`@OnEvent(EventTriggerType.WORKFLOW_END)`) publishes `asset.url.discovered` for `url_discovery` runs. `reScan` emits in-process `target.<type>.re-scan` (with `{ jobRunType }` as a third argument), or `target.git_org.re-scan` for GIT_ORG targets.
 - MCP/agent tools in `agents/tools/workspace.tools.ts`: `enumerate_assets`, `inspect_asset`, `examine_target_assets`, `list_network_ports`, `fingerprint_technologies`, `verify_tls_settings`. They call `getManyAsssetServices` (note the triple "s"), `getAssetById`, `getPortAssets`, `getTechnologyAssets`, `getManyTls`.
 
@@ -45,7 +45,7 @@ Read side of the attack surface: hosts (`assets`), their open ports (`asset_serv
 
 ## Coupling
 
-- Imports `TechnologyModule` (tech enrichment) and `WorkspacesModule`. Uses global `StorageService`, `GeoIpService`, `WorkspaceEncryptionService`, `WorkflowsService`, `WorkflowRunnerService` and `EventBridgeService`. Registers the `Job`, `Target`, `AgentLLMConfig` and `AgentConfig` repositories itself.
+- Imports `TechnologyModule` (tech enrichment), `WorkspacesModule`, `StorageModule`, and `WorkflowsModule` + `JobsRegistryModule` (`UrlDiscoveryService`). Uses the global `GeoIpService`, `WorkspaceEncryptionService` and `EventBridgeService`. Imported by `TargetsModule`, `StatisticModule`, `SearchModule` and `AgentsModule`. Registers the `Job`, `Target`, `AgentLLMConfig` and `AgentConfig` repositories itself.
 - Users of `AssetsService`: `TargetsService` (and `POST targets/:id/re-scan`), `AssetsDiscoveryScheduleConsumer` (`reScan`), `projects` (`ProjectAssetsService`, `ProjectsController`), `SearchService`, agents tools.
 - Writers of these tables outside the module: `DataAdapterService` (`data-adapter/`) ingests every scan result into `assets`, `asset_services`, `http_responses` and the child tables. `TargetsService.createMultipleTargets` inserts the primary/CIDR assets. `RepositorySyncService` creates GIT_ORG repository assets. `step-scope.loader.ts`, `StatisticService` and the reports read them directly.
 - `project_assets` (projects module) cascades from `assets`.

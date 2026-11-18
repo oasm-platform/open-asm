@@ -9,7 +9,7 @@ import { TemplatesModule } from '@/modules/templates/templates.module';
 import { VulnerabilitiesModule } from '@/modules/vulnerabilities/vulnerabilities.module';
 import { RemoteExecuteModule } from '@/modules/remote-execute/remote-execute.module';
 import { WorkersModule } from '@/modules/workers/workers.module';
-import { Global, Module, type OnModuleInit } from '@nestjs/common';
+import { Module, type OnModuleInit } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentsCompletionsService } from './agents.completions';
 import { AgentsController } from './agents.controller';
@@ -44,6 +44,9 @@ import { AgentsGuardService } from './agents.guard';
 import { AgentWorkflowNote } from './entities/agent-workflow-note.entity';
 import { HttpModule } from '@nestjs/axios';
 import { VulnerabilityAnalyzerAdapter } from './vulnerability-analyzer.adapter';
+import { IssuesModule } from '../issues/issues.module';
+import { ToolsModule } from '../tools/tools.module';
+import { JobsRegistryModule } from '../jobs-registry/jobs-registry.module';
 
 /** Every class with @AgentFunction methods: their names must not collide. */
 export const AGENT_FUNCTION_HOSTS = [
@@ -54,7 +57,6 @@ export const AGENT_FUNCTION_HOSTS = [
   AgentsSkillsService,
 ];
 
-@Global()
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -85,6 +87,9 @@ export const AGENT_FUNCTION_HOSTS = [
     ConnectorsModule,
     ProjectsModule,
     TemplatesModule,
+    IssuesModule,
+    ToolsModule,
+    JobsRegistryModule,
   ],
   controllers: [AgentsController],
   providers: [

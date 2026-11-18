@@ -36,7 +36,7 @@ Workers attach over gRPC with `WorkersService/ConnectInternalNetwork`, which is 
 
 ## Coupling
 
-- Imports `WorkspacesModule` (it is also global). `TargetsService` comes from the global `TargetsModule`.
+- Imports `WorkspacesModule` (it is also global) and `TargetsModule` (`TargetsService`).
 - `WorkersModule` registers `InternalNetwork` and `NetworkInterface` and writes both tables directly (`connectInternalNetwork`). `Target` and `WorkerInstance` carry FKs to `internal_networks`. A schema change here touches those entities too.
 
 ## Testing

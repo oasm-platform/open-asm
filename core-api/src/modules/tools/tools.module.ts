@@ -1,4 +1,4 @@
-import { Global, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { ConnectorsModule } from '../connectors/connectors.module';
@@ -12,12 +12,13 @@ import { ToolConfigProfilesService } from './tool-config-profiles.service';
 import { ToolSyncService } from './tool-sync.service';
 import { ToolsController } from './tools.controller';
 import { ToolsService } from './tools.service';
+import { StorageModule } from '../storage/storage.module';
 
-@Global()
 @Module({
   imports: [
     TypeOrmModule.forFeature([Tool, WorkspaceTool, Asset, Vulnerability, ToolConfigProfile, WorkerInstance]),
     ConnectorsModule,
+    StorageModule,
   ],
   controllers: [ToolsController, ToolConfigProfilesController],
   providers: [ToolsService, ToolConfigProfilesService, ToolSyncService],

@@ -1,4 +1,4 @@
-import { Global, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Tool } from '../tools/entities/tools.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
@@ -7,7 +7,6 @@ import { WorkflowsController } from './workflows.controller';
 import { WorkflowsService } from './workflows.service';
 import { WorkflowTemplateService } from './workflow-template.service';
 
-@Global()
 @Module({
   imports: [
     TypeOrmModule.forFeature([Workflow, Workspace, Tool]),

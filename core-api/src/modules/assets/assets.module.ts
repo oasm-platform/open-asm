@@ -1,4 +1,4 @@
-import { Global, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentConfig } from '../agents/entities/agent-config.entity';
 import { AgentLLMConfig } from '../agents/entities/agent-llm-config.entity';
@@ -18,8 +18,10 @@ import { HttpStatusCode } from './entities/http-status-code.entity';
 import { IpObservation } from './entities/ip-observation.entity';
 import { TlsCertificate } from './entities/tls-certificate.entity';
 import { UrlDiscoveryService } from './url-discovery.service';
+import { StorageModule } from '../storage/storage.module';
+import { WorkflowsModule } from '../workflows/workflows.module';
+import { JobsRegistryModule } from '../jobs-registry/jobs-registry.module';
 
-@Global()
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -39,6 +41,9 @@ import { UrlDiscoveryService } from './url-discovery.service';
     ]),
     TechnologyModule,
     WorkspacesModule,
+    StorageModule,
+    WorkflowsModule,
+    JobsRegistryModule,
   ],
   controllers: [AssetsController],
   providers: [AssetsService, UrlDiscoveryService],

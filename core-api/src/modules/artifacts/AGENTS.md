@@ -49,7 +49,7 @@ Workspace files ("Files" in the console): objects in the `artifacts` bucket, the
 
 ## Coupling
 
-- Imported by `workspaces`, `projects`, `templates`, `agents`, `admin/workspaces`. Uses global `StorageService`, `EventBridgeService`, and the `WorkspaceMembers` repository through `DataSource`.
+- Imported by `workspaces`, `projects`, `templates`, `agents`, `admin/workspaces`. Imports `StorageModule`; uses the global `EventBridgeService`, and the `WorkspaceMembers` repository through `DataSource`.
 - `ArtifactFoldersService` injects `ArtifactsService`, not the reverse.
 - `jobs-registry/jobs-registry.service.ts` reads `Artifact` rows directly (`signCustomTemplates`) and `templates` queries `artifacts` directly; keep `source`, `status`, `bucket`, `objectKey` and `updatedAt` semantics stable.
 

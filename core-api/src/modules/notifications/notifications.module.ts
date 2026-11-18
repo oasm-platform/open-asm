@@ -1,4 +1,4 @@
-import { Global, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '../auth/entities/user.entity';
 import { NotificationRecipient } from './entities/notification-recipient.entity';
@@ -18,7 +18,6 @@ import { NotificationsController } from './notifications.controller';
  * hand-picked set of user ids (workspace invitations) and therefore cannot be
  * derived from a domain event.
  */
-@Global()
 @Module({
   imports: [TypeOrmModule.forFeature([Notification, NotificationRecipient, User])],
   controllers: [NotificationsController],

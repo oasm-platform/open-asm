@@ -1,6 +1,6 @@
 import { BullMQName } from '@/common/enums/enum';
 import { BullModule } from '@nestjs/bullmq';
-import { Global, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -16,8 +16,10 @@ import { VulnerabilityLifecycleService } from './vulnerability-lifecycle.service
 import { VulnerabilityReviewService } from './vulnerability-review.service';
 import { VulnerabilityRiskExpiryCron } from './vulnerability-risk-expiry.cron';
 import { VulnerabilityAnalyzerRegistry } from './vulnerability-analyzer';
+import { JobsRegistryModule } from '../jobs-registry/jobs-registry.module';
+import { ToolsModule } from '../tools/tools.module';
+import { WorkflowsModule } from '../workflows/workflows.module';
 
-@Global()
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -36,6 +38,9 @@ import { VulnerabilityAnalyzerRegistry } from './vulnerability-analyzer';
         removeOnFail: true,
       },
     }),
+    JobsRegistryModule,
+    ToolsModule,
+    WorkflowsModule,
   ],
   controllers: [VulnerabilitiesController],
   providers: [

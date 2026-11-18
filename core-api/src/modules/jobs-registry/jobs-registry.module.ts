@@ -1,6 +1,6 @@
 import { BullMQName } from '@/common/enums/enum';
 import { BullModule } from '@nestjs/bullmq';
-import { Global, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConnectorsModule } from '../connectors/connectors.module';
 import { IntegrationConfigModule } from '../integrations/integration-config.module';
@@ -17,8 +17,11 @@ import { JobRetentionService } from './job-retention.service';
 import { JobResultProcessor } from './processors/job-result.processor';
 import { WorkflowRunReconcilerService } from './workflow-run-reconciler.service';
 import { WorkflowRunnerService } from './workflow-runner.service';
+import { ToolsModule } from '../tools/tools.module';
+import { StorageModule } from '../storage/storage.module';
+import { WorkersModule } from '../workers/workers.module';
+import { DataAdapterModule } from '../data-adapter/data-adapter.module';
 
-@Global()
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -33,6 +36,10 @@ import { WorkflowRunnerService } from './workflow-runner.service';
     BullModule.registerQueue({
       name: BullMQName.JOB_RESULT,
     }),
+    ToolsModule,
+    StorageModule,
+    WorkersModule,
+    DataAdapterModule,
   ],
   controllers: [JobsRegistryController],
   providers: [

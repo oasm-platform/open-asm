@@ -26,7 +26,7 @@ Findings on assets: list/detail/statistics, the lifecycle (new → active → fi
 
 - `GET activity` (`getActivity`, dashboard feed) pages `vulnerability_events` of the whole workspace, newest first, optional `types[]` filter. It filters on both `e."workspaceId"` (index `IDX_vulnerability_events_workspaceId_occurredAt`) and the target join. Static routes like `activity` must stay above `:id`.
 - Comment routes for findings live in the `comments` module.
-- `@Global()`, exports `VulnerabilitiesService`, `VulnerabilityLifecycleService`, `VulnerabilityReviewService`.
+- Exports `VulnerabilitiesService`, `VulnerabilityLifecycleService`, `VulnerabilityReviewService` and `VulnerabilityAnalyzerRegistry`; imported by `AgentsModule` and `StatisticModule`.
 - Events through `@PublishEvent`: `vulnerability.status.updated` (`dismiss` and `claim-fix`), `vulnerability.bulk_updated` (`reopen`), `vulnerability.settings.updated`, `vulnerability.review.approved|rejected|merged` (the bulk routes publish one event with `{ action: 'bulk', count, ids }` of the decided ids). Published from services: `vulnerability.proposed` (propose), `vulnerability.detected` (approve, so issue rules run on approved AI findings), `vulnerability.fixed` (auto-close), `vulnerability.analysis.completed` (processor, addressed to the requesting user). `vulnerability.dismissed`, `vulnerability.reopened`, `analysis.started` and `analysis.failed` are in the catalog, but nothing publishes them.
 - BullMQ `VULNERABILITY_ANALYSIS` (`vulnerability-analysis`): job name = vulnerability id, data = the analysis payload plus `workspaceId` and `userId`, removed on complete and on fail.
 - Consumes the in-process `JOB_RESULT_SYNCED_EVENT` (`@OnEvent`, `promisify: true`) in `VulnerabilityLifecycleService.onJobResultSynced`.
@@ -57,7 +57,7 @@ Findings on assets: list/detail/statistics, the lifecycle (new → active → fi
 ## Coupling
 
 - No import of `AgentsModule`: AI analysis runs through `VulnerabilityAnalyzerRegistry` (`vulnerability-analyzer.ts`, exported), in which the agents module's `VulnerabilityAnalyzerAdapter` registers itself on init (`get()` throws if nothing registered). Agents depends on this module: `VulnerabilityReviewService` (`propose_vulnerability`) and `VulnerabilitiesService`. `VulnerabilityReviewService` injects the global `RedisService` and reads the agents' tool-output keys (`toolOutputKey`).
-- Imports `NotificationsModule`. Uses global `JobsRegistryService`, `WorkflowRunnerService`, `WorkflowsService`, `ToolsService`, `EventBridgeService`. Registers `Asset` and `Target` repositories itself.
+- Imports `NotificationsModule`, `JobsRegistryModule` (`JobsRegistryService`, `WorkflowRunnerService`), `ToolsModule` and `WorkflowsModule`. Uses the global `EventBridgeService`. Registers `Asset` and `Target` repositories itself.
 - `scan` runs the first job of `vulnerability_scan_basic.yaml` (nuclei) for host targets, and the whole `repository_scan.yaml` for GIT_ORG targets. Both workflows must exist in the workspace, or the call returns 404.
 - Writers outside: `DataAdapterService` inserts and upserts findings, `vulnerability_events` (`DETECTED`) and `vulnerability_sources`, and publishes `vulnerability.detected` / `vulnerability.resurfaced`.
 - The list reads `issue_links` / `issues` with raw SQL (`openIssues`). The issues lane consumes `vulnerability.detected|resurfaced|fixed`. Projects, reports, statistic, search, comments and target overview all query `vulnerabilities` directly.

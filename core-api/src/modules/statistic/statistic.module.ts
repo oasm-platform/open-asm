@@ -9,6 +9,7 @@ import { Statistic } from './entities/statistic.entity';
 import { StatisticCronService } from './statistic-cron.service';
 import { StatisticController } from './statistic.controller';
 import { StatisticService } from './statistic.service';
+import { TechnologyModule } from '../technology/technology.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { StatisticService } from './statistic.service';
     VulnerabilitiesModule,
     TypeOrmModule.forFeature([Statistic, Workspace]),
     NotificationsModule,
+    TechnologyModule,
   ],
   controllers: [StatisticController],
   providers: [StatisticService, StatisticCronService],

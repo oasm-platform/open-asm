@@ -4,7 +4,7 @@ Tenants: workspaces, their members, permission groups and invitations. It also o
 
 ## Layout
 
-- `workspaces.module.ts`: `@Global()`, exports `WorkspacesService`. Imports `ApiKeysModule`, `ArtifactsModule`.
+- `workspaces.module.ts`: `@Global()` on purpose: `WorkspacePermissionGuard` (behind `@WorkspaceAccess`, on controllers in some 20 modules) injects `WorkspacesService`, so this module is the tenancy kernel, like `AuthModule`. Exports `WorkspacesService`. Imports `ApiKeysModule`, `ArtifactsModule`, `NotificationsModule`.
 - `workspaces.controller.ts`: all `/workspaces` routes.
 - `workspaces.service.ts`: CRUD, members, permission groups, invitations, `getMembershipWithPermissions`.
 - `permission-catalog.json`: the list of valid `resource.action` keys. Read from disk at call time by `getPermissionCatalog()` (shipped to `dist/` through the `**/*.json` asset rule in `nest-cli.json`).
@@ -66,7 +66,7 @@ Service methods other modules call: `getMembershipWithPermissions` (guard, event
 ## Coupling
 
 - No dependency on the workflows module: `createWorkspace` emits `WORKSPACE_INITIALIZING_EVENT` (`workspace.events.ts`) with `emitAsync` after the transaction commits and awaits it. `WorkflowTemplateService` creates the default workflows on it; its failure fails the creation (`suppressErrors: false`).
-- Uses the global `NotificationsService`, `AuditService`, `WorkspaceEncryptionService` without importing their modules.
+- Imports `NotificationsModule` for `NotificationsService`; uses the global `AuditService` and `WorkspaceEncryptionService`.
 - These write the `workspaces` table directly: `admin/workspaces` (name, description, configs, `archivedAt`), `WorkspaceEncryptionService` (`dek`), plus reads in reports, statistic, artifact quota and workflow-template. `admin/users` and `artifacts` read `workspace_members`.
 - Writes `targets` directly (`deleteAllTargetsFromWorkspace`).
 

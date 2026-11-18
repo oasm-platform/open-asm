@@ -19,6 +19,8 @@ import { TelegramConnectService } from './telegram-connect.service';
 import { TelegramWebhookService } from './telegram-webhook.service';
 import { TelegramPollingService } from './telegram-polling.service';
 import { TelegramBotService } from './telegram-bot.service';
+import { TargetsModule } from '../targets/targets.module';
+import { DataAdapterModule } from '../data-adapter/data-adapter.module';
 
 @Module({
   imports: [
@@ -36,6 +38,8 @@ import { TelegramBotService } from './telegram-bot.service';
       name: BullMQName.REPOSITORY_SYNC,
       defaultJobOptions: { removeOnComplete: true, removeOnFail: true },
     }),
+    TargetsModule,
+    DataAdapterModule,
   ],
   controllers: [IntegrationsController],
   providers: [

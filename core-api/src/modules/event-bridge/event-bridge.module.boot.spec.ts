@@ -14,6 +14,19 @@ import { NotificationsSink } from './sinks/notifications/notifications.sink';
 import { ProjectionSink } from './sinks/projection/projection.sink';
 import { ProjectsSink } from './sinks/projects/projects.sink';
 
+// The domain modules the bridge imports for its lanes. Their graphs
+// (controllers, guards, better-auth) play no part in the wiring read here,
+// and better-auth's ESM build does not load under Jest.
+jest.mock('../integrations/integrations.module', () => ({
+  IntegrationsModule: class IntegrationsModule {},
+}));
+jest.mock('../projects/projects.module', () => ({
+  ProjectsModule: class ProjectsModule {},
+}));
+jest.mock('../issues/issues.module', () => ({
+  IssuesModule: class IssuesModule {},
+}));
+
 /**
  * Guards the one wiring mistake that is invisible everywhere else: a lane
  * declared in `SUBSCRIPTIONS` and the enum, but whose sink never reaches the

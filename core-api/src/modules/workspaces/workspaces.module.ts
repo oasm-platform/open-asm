@@ -9,6 +9,7 @@ import { WorkspaceMemberPermission } from './entities/workspace-member-permissio
 import { WorkspaceInvitation } from './entities/workspace-invitation.entity';
 import { WorkspacesController } from './workspaces.controller';
 import { WorkspacesService } from './workspaces.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 @Global()
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { WorkspacesService } from './workspaces.service';
     ]),
     ApiKeysModule,
     ArtifactsModule,
+    NotificationsModule,
   ],
   controllers: [WorkspacesController],
   providers: [WorkspacesService],

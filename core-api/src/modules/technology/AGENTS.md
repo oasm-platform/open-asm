@@ -10,7 +10,7 @@ Read-only technology catalogue: turns a detected technology name into its descri
 
 ## Public surface
 
-- `@Global()` module, exports `TechnologyForwarderService`. Outside callers only use `enrichTechnologies(names)` (`AssetsService`, `StatisticService`). `fetchTechnologyInfo` and `getCachedTechnologyInfo` have no outside callers.
+- Exports `TechnologyForwarderService`. Outside callers only use `enrichTechnologies(names)` (`AssetsService`, `StatisticService`). `fetchTechnologyInfo` and `getCachedTechnologyInfo` have no outside callers.
 - No HTTP routes, events, queues or gRPC.
 
 ## Data model (Redis)
@@ -34,4 +34,4 @@ Read-only technology catalogue: turns a detected technology name into its descri
 
 ## Coupling
 
-- Injects `RedisService` and `StorageService` (global `StorageModule`). Imported explicitly by `AssetsModule` and registered in `combine.module.ts`.
+- Injects `RedisService` and `StorageService` (imports `StorageModule`). Imported by `AssetsModule` and `StatisticModule`, and registered in `combine.module.ts`.
