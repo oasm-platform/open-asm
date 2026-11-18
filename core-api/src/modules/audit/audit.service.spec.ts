@@ -52,6 +52,7 @@ const CONTROLLER_FILES: Record<string, string> = {
   VulnerabilitiesController: '@/modules/vulnerabilities/vulnerabilities.controller',
   ReportsController: '@/modules/reports/reports.controller',
   JobsRegistryController: '@/modules/jobs-registry/jobs-registry.controller',
+  JobsRegistryGrpcController: '@/modules/jobs-registry/jobs-registry.grpc.controller',
   WorkflowsController: '@/modules/workflows/workflows.controller',
   IntegrationsController: '@/modules/integrations/integrations.controller',
   ApiKeysController: '@/modules/apikeys/apikeys.controller',

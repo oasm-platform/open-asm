@@ -4,13 +4,15 @@ Scan jobs and workflow runs: creates `jobs` rows, lets workers claim them, inges
 
 ## Layout
 
-- `jobs-registry.controller.ts`: HTTP under `jobs-registry` plus the gRPC `JobsRegistryService`. `mapJobToGrpcJob` builds the worker wire shape (connector image, manifest resource limits, decrypted config, `inputs`, `workspaceId` for the worker's warm-pool isolation, manifest `configInband`); `packStructFields` packs records into `google.protobuf.Struct`.
+- `jobs-registry.controller.ts`: HTTP under `jobs-registry` (user routes and the worker-token HTTP routes).
+- `jobs-registry.grpc.controller.ts` (`JobsRegistryGrpcController`): the gRPC `JobsRegistryService`. `mapJobToGrpcJob` builds the worker wire shape (connector image, manifest resource limits, decrypted config, `inputs`, `workspaceId` for the worker's warm-pool isolation, manifest `configInband`); `packStructFields` packs records into `google.protobuf.Struct`.
 - `jobs-registry.service.ts`: `createNewJob`, result enqueue, `handleJobError` / `failUndispatchableJob`, the job listing (`getManyJobs`), re-run, cancel, delete.
 - `job-dispatch.service.ts` (`JobDispatchService`): the worker side of the queue, used by the controller only: the claim (`getNextJob` / `getNextJobs`), custom-template signing (`attachCustomTemplates`) and the worker payload (`toGetNextJobResult`). It fails a job whose templates are gone through `JobsRegistryService.handleJobError`.
 - `job-history-query.service.ts` (`JobHistoryQueryService`): read side of runs, used by the controller only: the jobs timeline, the run list with its rolled-up status (`JOB_HISTORY_STATUS_SQL`), run detail (steps, tools, ETA, failure reason) and the run's workflow. Writes nothing.
 - `workflow-runner.service.ts`: the workflow engine (`startRun`, `retryRun`, `onJobTerminal`, `advanceRun`).
 - `workflow-run-reconciler.service.ts`, `job-result-cleanup.service.ts`, `job-retention.service.ts`: crons.
 - `processors/job-result.processor.ts`: `JobResultProcessor`.
+- `worker-identity.ts`: `authenticatedWorkerId`, shared by both controllers (the worker comes from the token; a different id in the request is logged and ignored).
 - `job.events.ts`: `JOB_RESULT_SYNCED_EVENT` and its payload `JobResultSyncedEvent`.
 - `job-secret-release.policy.ts`: `secretReleaseDenial`, which worker may receive a connector job's secrets. `job-config-seal.service.ts`: `JobConfigSealService`, encrypts plaintext `jobs.config` left by older versions, at boot.
 - `step-inputs.ts` (pure planner: which jobs a step creates), `step-scope.loader.ts` (`StepScopeLoader`, loads the scope rows; `URL_INPUTS_PER_HOST = 50`), `connector-inputs.ts` (connector `inputs` map, repository clone URL + credentials).
@@ -73,4 +75,4 @@ Scan jobs and workflow runs: creates `jobs` rows, lets workers claim them, inges
 
 ## Testing
 
-Specs are colocated: service, `job-history-query.service`, `job-dispatch.service`, controller, `job-secret-release.policy`, `job-config-seal.service`, `workflow-runner`, `workflow-run-reconciler`, `job-result-cleanup`, `processors/job-result.processor`, `step-inputs`, `step-scope.loader`, `connector-inputs`, `dto/jobs-registry.dto.spec.ts`, plus `jobs-registry.audit-wiring.spec.ts`, which checks which handlers publish `job.cancelled`.
+Specs are colocated: service, `job-history-query.service`, `job-dispatch.service`, controller (`jobs-registry.controller.spec.ts` covers both controllers), `job-secret-release.policy`, `job-config-seal.service`, `workflow-runner`, `workflow-run-reconciler`, `job-result-cleanup`, `processors/job-result.processor`, `step-inputs`, `step-scope.loader`, `connector-inputs`, `dto/jobs-registry.dto.spec.ts`, plus `jobs-registry.audit-wiring.spec.ts`, which checks which handlers publish `job.cancelled`.
