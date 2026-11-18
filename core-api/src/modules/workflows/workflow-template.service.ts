@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
@@ -6,6 +7,10 @@ import * as path from 'path';
 import { Repository } from 'typeorm';
 import { Workflow } from './entities/workflow.entity';
 import { Workspace } from '../workspaces/entities/workspace.entity';
+import {
+  WORKSPACE_INITIALIZING_EVENT,
+  type WorkspaceInitializingEvent,
+} from '../workspaces/workspace.events';
 import {
   normalizeWorkflowContent,
   WorkflowGraphError,
@@ -58,6 +63,14 @@ export class WorkflowTemplateService implements OnModuleInit {
     } catch (error) {
       this.logger.error('Error initializing workflows:', error);
     }
+  }
+
+  /** A new workspace gets the default workflows before its creation returns. */
+  @OnEvent(WORKSPACE_INITIALIZING_EVENT, { promisify: true, suppressErrors: false })
+  async onWorkspaceInitializing({
+    workspaceId,
+  }: WorkspaceInitializingEvent): Promise<void> {
+    await this.createDefaultWorkflows(workspaceId);
   }
 
   /**
@@ -214,14 +227,14 @@ export class WorkflowTemplateService implements OnModuleInit {
 
   private normalizeOn(obj: Record<string, unknown>): Record<string, unknown> {
     if (!obj.on) return obj;
+    const on = obj.on as Record<string, unknown>;
 
-    for (const key of Object.keys(obj.on)) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const value = obj.on[key];
+    for (const key of Object.keys(on)) {
+      const value = on[key];
       if (Array.isArray(value)) {
-        obj.on[key] = value.map(String);
+        on[key] = value.map(String);
       } else if (typeof value === 'string') {
-        obj.on[key] = [value];
+        on[key] = [value];
       } else {
         throw new Error(
           `Invalid type for on.${key}, must be string or array of string`,

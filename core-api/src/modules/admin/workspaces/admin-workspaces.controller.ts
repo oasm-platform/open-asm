@@ -9,7 +9,7 @@ import {
 import { EVENT_CATALOG } from '@/modules/event-bridge/contracts/event-catalog';
 import { PublishEvent } from '@/modules/event-bridge/publishing/publish-event.decorator';
 import { ArchiveWorkspaceDto } from '@/modules/workspaces/dto/workspaces.dto';
-import { GetManyResponseDto } from '@/utils/getManyResponse';
+import { GetManyResponseDto } from '@/common/utils/get-many-response.util';
 import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { AdminWorkspacesService } from './admin-workspaces.service';

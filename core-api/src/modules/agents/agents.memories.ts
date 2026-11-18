@@ -1,8 +1,9 @@
 import { RedisService } from '@/services/redis/redis.service';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AgentWorkspaceMemory } from './entities/agent-workspace-memory.entity';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 export interface STMEntry {
   key: string;
@@ -47,7 +48,7 @@ export class AgentsMemoriesService {
       );
     } catch (error) {
       this.logger.warn(
-        `STM set failed [conv=${conversationId}, key=${key}]: ${error}`,
+        `STM set failed [conv=${conversationId}, key=${key}]: ${String(error)}`,
       );
     }
   }
@@ -60,7 +61,7 @@ export class AgentsMemoriesService {
       return JSON.parse(raw) as STMEntry;
     } catch (error) {
       this.logger.warn(
-        `STM get failed [conv=${conversationId}, key=${key}]: ${error}`,
+        `STM get failed [conv=${conversationId}, key=${key}]: ${String(error)}`,
       );
       return null;
     }
@@ -72,7 +73,7 @@ export class AgentsMemoriesService {
       await this.redisService.cacheClient.hdel(redisKey, key);
     } catch (error) {
       this.logger.warn(
-        `STM delete failed [conv=${conversationId}, key=${key}]: ${error}`,
+        `STM delete failed [conv=${conversationId}, key=${key}]: ${String(error)}`,
       );
     }
   }
@@ -84,7 +85,7 @@ export class AgentsMemoriesService {
       if (!raw) return [];
       return Object.values(raw).map((v) => JSON.parse(v) as STMEntry);
     } catch (error) {
-      this.logger.warn(`STM getAll failed [conv=${conversationId}]: ${error}`);
+      this.logger.warn(`STM getAll failed [conv=${conversationId}]: ${String(error)}`);
       return [];
     }
   }
@@ -94,7 +95,7 @@ export class AgentsMemoriesService {
     try {
       await this.redisService.cacheClient.del(redisKey);
     } catch (error) {
-      this.logger.warn(`STM clear failed [conv=${conversationId}]: ${error}`);
+      this.logger.warn(`STM clear failed [conv=${conversationId}]: ${String(error)}`);
     }
   }
 
@@ -173,7 +174,7 @@ export class AgentsMemoriesService {
     assertLtmContent(content);
     const record = await this.ltmGetById(id, workspaceId, userId);
     if (!record) {
-      throw new NotFoundException('Memory record not found');
+      throw new NotFoundError('Memory record not found');
     }
     record.content = content;
     return this.ltmRepository.save(record);
@@ -192,7 +193,7 @@ export class AgentsMemoriesService {
   async ltmDeleteById(id: string, workspaceId: string, userId: string): Promise<void> {
     const record = await this.ltmGetById(id, workspaceId, userId);
     if (!record) {
-      throw new NotFoundException('Memory record not found');
+      throw new NotFoundError('Memory record not found');
     }
     await this.ltmRepository.remove(record);
   }

@@ -1,9 +1,9 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+
 import type { Queue } from 'bullmq';
 import type { Repository } from 'typeorm';
 import { IntegrationSyncService } from './integrations-sync.service';
 import type { Integration } from './entities/integration.entity';
-import type { IntegrationsService } from './integrations.service';
+import type { IntegrationConfigReader } from './integration-config.reader';
 import type { TargetsService } from '@/modules/targets/targets.service';
 import type { DataAdapterService } from '@/modules/data-adapter/data-adapter.service';
 import type { WorkspacesService } from '@/modules/workspaces/workspaces.service';
@@ -22,6 +22,7 @@ jest.mock('./connectors/connector.factory', () => ({
   runConnector: jest.fn(),
 }));
 import { runConnector } from './connectors/connector.factory';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 const runConnectorMock = runConnector as jest.Mock;
 
@@ -37,7 +38,7 @@ describe('IntegrationSyncService', () => {
     save: jest.Mock;
     update: jest.Mock;
   };
-  let integrationsServiceMock: { getIntegrationWithDecryptedConfig: jest.Mock };
+  let configReaderMock: { getIntegrationWithDecryptedConfig: jest.Mock };
   let targetsServiceMock: TargetsService;
   let dataAdapterServiceMock: DataAdapterService;
   let workspacesServiceMock: { getWorkspacesByIds: jest.Mock };
@@ -75,7 +76,7 @@ describe('IntegrationSyncService', () => {
       save: jest.fn().mockImplementation((entity: Integration) => entity),
       update: jest.fn().mockResolvedValue(undefined),
     };
-    integrationsServiceMock = {
+    configReaderMock = {
       getIntegrationWithDecryptedConfig: jest.fn(),
     };
     targetsServiceMock = {} as unknown as TargetsService;
@@ -100,7 +101,7 @@ describe('IntegrationSyncService', () => {
     service = new IntegrationSyncService(
       queueMock as unknown as Queue,
       repoMock as unknown as Repository<Integration>,
-      integrationsServiceMock as unknown as IntegrationsService,
+      configReaderMock as unknown as IntegrationConfigReader,
       targetsServiceMock,
       dataAdapterServiceMock,
       workspacesServiceMock as unknown as WorkspacesService,
@@ -301,7 +302,7 @@ describe('IntegrationSyncService', () => {
     };
 
     beforeEach(() => {
-      integrationsServiceMock.getIntegrationWithDecryptedConfig.mockResolvedValue({
+      configReaderMock.getIntegrationWithDecryptedConfig.mockResolvedValue({
         integration: integration(),
         decryptedConfig: { apiToken: 'tok' },
       });
@@ -376,15 +377,14 @@ describe('IntegrationSyncService', () => {
 
     it('SC-USER-1: rejects before dispatching when owner AND creator are both missing', async () => {
       workspacesServiceMock.getWorkspacesByIds.mockResolvedValue([{}]);
-      integrationsServiceMock.getIntegrationWithDecryptedConfig.mockResolvedValue(
+      configReaderMock.getIntegrationWithDecryptedConfig.mockResolvedValue(
         {
           integration: integration({ createdById: null }),
           decryptedConfig: { apiToken: 'tok' },
         },
       );
 
-      await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(
-        BadRequestException,
+      await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(InvalidInputError,
       );
       await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(
         'acting user',
@@ -393,26 +393,24 @@ describe('IntegrationSyncService', () => {
     });
 
     it('rejects a sync for a non-cloud integration before dispatching the connector', async () => {
-      integrationsServiceMock.getIntegrationWithDecryptedConfig.mockResolvedValue(
+      configReaderMock.getIntegrationWithDecryptedConfig.mockResolvedValue(
         {
           integration: integration({ category: IntegrationType.NOTIFICATION }),
           decryptedConfig: { webhookUrl: 'https://hooks.slack.com/services/x' },
         },
       );
 
-      await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(
-        BadRequestException,
+      await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(InvalidInputError,
       );
       expect(runConnectorMock).not.toHaveBeenCalled();
     });
 
     it('propagates NotFoundException when the integration is missing or in another workspace', async () => {
-      integrationsServiceMock.getIntegrationWithDecryptedConfig.mockRejectedValue(
-        new NotFoundException('Integration not found'),
+      configReaderMock.getIntegrationWithDecryptedConfig.mockRejectedValue(
+        new NotFoundError('Integration not found'),
       );
 
-      await expect(service.runSync('nope', 'ws-1')).rejects.toThrow(
-        NotFoundException,
+      await expect(service.runSync('nope', 'ws-1')).rejects.toThrow(NotFoundError,
       );
       expect(runConnectorMock).not.toHaveBeenCalled();
     });
@@ -424,8 +422,7 @@ describe('IntegrationSyncService', () => {
         error: 'boom',
       });
 
-      await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(
-        BadRequestException,
+      await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(InvalidInputError,
       );
       await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(
         'boom',
@@ -551,7 +548,7 @@ describe('IntegrationSyncService', () => {
     });
 
     it('rejects a scheduled AWS workloadIdentity sync before dispatching the connector', async () => {
-      integrationsServiceMock.getIntegrationWithDecryptedConfig.mockResolvedValue(
+      configReaderMock.getIntegrationWithDecryptedConfig.mockResolvedValue(
         {
           integration: integration({
             appType: 'aws',
@@ -566,8 +563,7 @@ describe('IntegrationSyncService', () => {
         },
       );
 
-      await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(
-        BadRequestException,
+      await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(InvalidInputError,
       );
       await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(
         'workloadIdentity',
@@ -576,7 +572,7 @@ describe('IntegrationSyncService', () => {
     });
 
     it('allows a manual/dry-run AWS workloadIdentity sync (schedule disabled)', async () => {
-      integrationsServiceMock.getIntegrationWithDecryptedConfig.mockResolvedValue(
+      configReaderMock.getIntegrationWithDecryptedConfig.mockResolvedValue(
         {
           integration: integration({
             appType: 'aws',
@@ -598,7 +594,7 @@ describe('IntegrationSyncService', () => {
     });
 
     it('allows a non-dry-run manual AWS workloadIdentity sync when the schedule is disabled', async () => {
-      integrationsServiceMock.getIntegrationWithDecryptedConfig.mockResolvedValue(
+      configReaderMock.getIntegrationWithDecryptedConfig.mockResolvedValue(
         {
           integration: integration({
             appType: 'aws',
@@ -634,7 +630,7 @@ describe('IntegrationSyncService', () => {
 
       await expect(
         service.runSync('integration-1', 'ws-1', { dryRun: true }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
       await expect(
         service.runSync('integration-1', 'ws-1', { dryRun: true }),
       ).rejects.toThrow('already in progress');
@@ -709,10 +705,7 @@ describe('IntegrationSyncService', () => {
         IntegrationSyncService,
       ) as Array<{ name?: string } | undefined>;
       const names = paramTypes.map((t) => t?.name);
-      // WrapperType<IntegrationsService> resolves to Object under SWC (type
-      // aliases are not expanded for decorator metadata); DI correctness for
-      // that param comes from the @Inject(forwardRef(...)) token, asserted
-      // separately below.
+      expect(names[2]).toBe('IntegrationConfigReader');
       expect(names[3]).toBe('TargetsService');
       expect(names[4]).toBe('DataAdapterService');
       expect(names[5]).toBe('WorkspacesService');
@@ -720,17 +713,13 @@ describe('IntegrationSyncService', () => {
       expect(names[7]).toBe('WorkspaceEncryptionService');
     });
 
-    it('injects IntegrationsService via a forwardRef token (circular pair)', () => {
+    it('needs no forwardRef: it no longer depends on IntegrationsService', () => {
       const tokens = Reflect.getMetadata(
         'self:paramtypes',
         IntegrationSyncService,
       ) as Array<{ index: number; param: unknown }> | undefined;
-      const entry = tokens?.find((t) => t.index === 2);
-      const resolved = (entry?.param as { forwardRef?: () => unknown })
-        ?.forwardRef?.();
-      expect((resolved as { name?: string } | undefined)?.name).toBe(
-        'IntegrationsService',
-      );
+      // Only @InjectQueue (0) and @InjectRepository (1) carry a custom token
+      expect((tokens ?? []).map((t) => t.index).sort()).toEqual([0, 1]);
     });
   });
 });

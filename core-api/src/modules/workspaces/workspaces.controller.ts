@@ -11,7 +11,7 @@ import {
   RequestWithMetadata,
   UserContextPayload,
 } from '@/common/interfaces/app.interface';
-import { GetManyResponseDto } from '@/utils/getManyResponse';
+import { GetManyResponseDto } from '@/common/utils/get-many-response.util';
 import {
   Body,
   Controller,
@@ -55,6 +55,10 @@ import { WorkspaceInvitation } from './entities/workspace-invitation.entity';
 import { WorkspaceMembers } from './entities/workspace-members.entity';
 import { WorkspacePermission } from './entities/workspace-permission.entity';
 import { Workspace } from './entities/workspace.entity';
+import { WorkspaceInvitationsService } from './workspace-invitations.service';
+import { WorkspaceMembersService } from './workspace-members.service';
+import { WorkspaceMembershipService } from './workspace-membership.service';
+import { WorkspacePermissionGroupsService } from './workspace-permission-groups.service';
 import { WorkspacesService } from './workspaces.service';
 
 @ApiTags('Workspaces')
@@ -63,6 +67,10 @@ export class WorkspacesController {
   constructor(
     private readonly workspacesService: WorkspacesService,
     private readonly auditService: AuditService,
+    private readonly membership: WorkspaceMembershipService,
+    private readonly permissionGroups: WorkspacePermissionGroupsService,
+    private readonly members: WorkspaceMembersService,
+    private readonly invitations: WorkspaceInvitationsService,
   ) {}
 
   @Doc({
@@ -195,7 +203,7 @@ export class WorkspacesController {
     @WorkspaceId() workspaceId: string,
     @UserContext() userContext: UserContextPayload,
   ) {
-    return this.workspacesService.getCurrentPermission(
+    return this.membership.getCurrentPermission(
       workspaceId,
       userContext.id,
     );
@@ -215,7 +223,7 @@ export class WorkspacesController {
   @WorkspaceAccess('member.read')
   @Get('members')
   getWorkspaceMembers(@WorkspaceId() workspaceId: string) {
-    return this.workspacesService.getMembersWithPermissions(workspaceId);
+    return this.members.getMembersWithPermissions(workspaceId);
   }
 
   @Doc({
@@ -234,7 +242,7 @@ export class WorkspacesController {
     @UserContext() user: UserContextPayload,
     @Req() req: NodeRequest,
   ) {
-    return this.workspacesService.updateMemberPermissions(
+    return this.members.updateMemberPermissions(
       workspaceId,
       memberId,
       dto.permissionIds,
@@ -258,7 +266,7 @@ export class WorkspacesController {
     @UserContext() user: UserContextPayload,
     @Req() req: NodeRequest,
   ) {
-    return this.workspacesService.removeMember(
+    return this.members.removeMember(
       workspaceId,
       memberId,
       user.id,
@@ -282,7 +290,7 @@ export class WorkspacesController {
   @WorkspaceAccess('member.read')
   @Get('permissions/catalog')
   getPermissionCatalog() {
-    return this.workspacesService.getPermissionCatalog();
+    return this.permissionGroups.getPermissionCatalog();
   }
 
   @Doc({
@@ -295,7 +303,7 @@ export class WorkspacesController {
   @WorkspaceAccess('member.read')
   @Get('permissions')
   getPermissionGroups(@WorkspaceId() workspaceId: string) {
-    return this.workspacesService.getPermissionGroups(workspaceId);
+    return this.permissionGroups.getPermissionGroups(workspaceId);
   }
 
   @Doc({
@@ -313,7 +321,7 @@ export class WorkspacesController {
     @UserContext() user: UserContextPayload,
     @Req() req: NodeRequest,
   ) {
-    return this.workspacesService.createPermissionGroup(
+    return this.permissionGroups.createPermissionGroup(
       workspaceId,
       dto,
       user.id,
@@ -337,7 +345,7 @@ export class WorkspacesController {
     @UserContext() user: UserContextPayload,
     @Req() req: NodeRequest,
   ) {
-    return this.workspacesService.updatePermissionGroup(
+    return this.permissionGroups.updatePermissionGroup(
       workspaceId,
       permissionId,
       dto,
@@ -360,7 +368,7 @@ export class WorkspacesController {
     @Param('permissionId') permissionId: string,
     @Req() req: NodeRequest,
   ) {
-    return this.workspacesService.deletePermissionGroup(
+    return this.permissionGroups.deletePermissionGroup(
       workspaceId,
       permissionId,
       this.auditService.buildActorContext(req as RequestWithMetadata),
@@ -393,7 +401,7 @@ export class WorkspacesController {
     @Body() dto: CreateInvitationsDto,
     @UserContext() user: UserContextPayload,
   ) {
-    return this.workspacesService.createInvitations(
+    return this.invitations.createInvitations(
       workspaceId,
       user.id,
       dto,
@@ -410,7 +418,7 @@ export class WorkspacesController {
   @WorkspaceAccess('member.read')
   @Get('invitations')
   listInvitations(@WorkspaceId() workspaceId: string) {
-    return this.workspacesService.listInvitations(workspaceId);
+    return this.invitations.listInvitations(workspaceId);
   }
 
   @Doc({
@@ -431,7 +439,7 @@ export class WorkspacesController {
     @WorkspaceId() workspaceId: string,
     @Param('invitationId') invitationId: string,
   ) {
-    return this.workspacesService.cancelInvitation(workspaceId, invitationId);
+    return this.invitations.cancelInvitation(workspaceId, invitationId);
   }
 
   @Doc({
@@ -445,7 +453,7 @@ export class WorkspacesController {
     @Body() dto: InvitationTokenDto,
     @UserContext() user: UserContextPayload,
   ) {
-    return this.workspacesService.acceptInvitation(dto.token, user);
+    return this.invitations.acceptInvitation(dto.token, user);
   }
 
   @Doc({
@@ -459,7 +467,7 @@ export class WorkspacesController {
     @Body() dto: InvitationTokenDto,
     @UserContext() user: UserContextPayload,
   ) {
-    return this.workspacesService.declineInvitation(dto.token, user);
+    return this.invitations.declineInvitation(dto.token, user);
   }
 
   @Doc({
@@ -471,7 +479,7 @@ export class WorkspacesController {
   @Public()
   @Get('invitations/:token')
   getInvitationPreview(@Param('token') token: string) {
-    return this.workspacesService.getInvitationPreview(token);
+    return this.invitations.getInvitationPreview(token);
   }
 
   @Doc({

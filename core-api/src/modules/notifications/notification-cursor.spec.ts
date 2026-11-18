@@ -1,8 +1,9 @@
-import { BadRequestException } from '@nestjs/common';
+
 import {
   decodeNotificationCursor,
   encodeNotificationCursor,
 } from './notification-cursor';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 describe('notification cursor', () => {
   const ID = '6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b';
@@ -32,6 +33,6 @@ describe('notification cursor', () => {
     ['an impossible date', encode(`2026-02-30T10:00:00.123456|${ID}`)],
     ['a non-uuid id', encode('2026-10-28T10:00:00.123456|1 OR 1=1')],
   ])('rejects %s', (_, cursor) => {
-    expect(() => decodeNotificationCursor(cursor)).toThrow(BadRequestException);
+    expect(() => decodeNotificationCursor(cursor)).toThrow(InvalidInputError);
   });
 });

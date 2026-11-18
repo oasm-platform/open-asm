@@ -26,7 +26,7 @@ function fakeDataSource(respond: Responder) {
           try {
             return Promise.resolve(respond(sql, params));
           } catch (error) {
-            return Promise.reject(error as Error);
+            return Promise.reject(error instanceof Error ? error : new Error(String(error)));
           }
         }),
         connection: {

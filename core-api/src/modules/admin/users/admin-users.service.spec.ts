@@ -3,12 +3,13 @@ import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { Role } from '@/common/enums/enum';
 import { User } from '@/modules/auth/entities/user.entity';
 import { UserPresenceService } from '@/modules/auth/user-presence.service';
-import { NotFoundException } from '@nestjs/common';
+
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AdminUsersService, toAdminUserDto } from './admin-users.service';
 import { GetManyAdminUsersDto } from './dto/admin-users.dto';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 const userRow = {
   id: 'user-1',
@@ -148,8 +149,7 @@ describe('AdminUsersService', () => {
     it('throws NotFound for an unknown id', async () => {
       usersRepository.findOneBy.mockResolvedValue(null);
 
-      await expect(service.getUser('missing')).rejects.toBeInstanceOf(
-        NotFoundException,
+      await expect(service.getUser('missing')).rejects.toBeInstanceOf(NotFoundError,
       );
     });
   });

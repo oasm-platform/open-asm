@@ -1,9 +1,6 @@
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
-import { InvitationStatus, Role } from '@/common/enums/enum';
-import {
-  BadRequestException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Role } from '@/common/enums/enum';
+
 import type { TestingModule } from '@nestjs/testing';
 import type { NodeRequest, NodeResponse } from '@nestjs/platform-node';
 import { Test } from '@nestjs/testing';
@@ -15,13 +12,17 @@ import { WorkspaceEncryptionService } from '@/services/workspace-encryption/work
 import { ApiKeysService } from '../apikeys/apikeys.service';
 import { ArtifactsService } from '../artifacts/artifacts.service';
 import { AuditService } from '../audit/audit.service';
-import { NotificationsService } from '../notifications/notifications.service';
-import { WorkflowTemplateService } from '../workflows/workflow-template.service';
-import { WorkspaceInvitation } from './entities/workspace-invitation.entity';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import {
+  WORKSPACE_DELETING_EVENT,
+  WORKSPACE_INITIALIZING_EVENT,
+} from './workspace.events';
 import { WorkspaceMemberPermission } from './entities/workspace-member-permission.entity';
 import { WorkspaceMembers } from './entities/workspace-members.entity';
 import { WorkspacePermission } from './entities/workspace-permission.entity';
 import { Workspace } from './entities/workspace.entity';
+import { WorkspaceMembershipService } from './workspace-membership.service';
+import { WorkspacePermissionGroupsService } from './workspace-permission-groups.service';
 import { WorkspacesService } from './workspaces.service';
 
 describe('WorkspacesService', () => {
@@ -30,10 +31,8 @@ describe('WorkspacesService', () => {
   let mockWorkspaceMembersRepository: Partial<Repository<WorkspaceMembers>>;
   let mockPermissionRepository: Partial<Repository<WorkspacePermission>>;
   let mockMemberPermissionRepository: Partial<Repository<WorkspaceMemberPermission>>;
-  let mockInvitationRepository: Partial<Repository<WorkspaceInvitation>>;
   let mockApiKeysService: Partial<ApiKeysService>;
-  let mockNotificationsService: Partial<NotificationsService>;
-  let mockWorkflowTemplateService: Partial<WorkflowTemplateService>;
+  let mockEvents: { emitAsync: jest.Mock };
   let mockAuditService: {
     recordInTx: jest.Mock;
     pseudonymizeActor: jest.Mock;
@@ -176,21 +175,6 @@ describe('WorkspacesService', () => {
       delete: jest.fn().mockResolvedValue({ affected: 1 }),
     };
 
-    mockInvitationRepository = {
-      save: jest.fn().mockImplementation((data: unknown) => Promise.resolve(data)),
-      findOne: jest.fn(),
-      find: jest.fn().mockResolvedValue([]),
-      update: jest.fn().mockResolvedValue({ affected: 1 }),
-      delete: jest.fn().mockResolvedValue({ affected: 1 }),
-      createQueryBuilder: jest.fn().mockReturnValue({
-        update: jest.fn().mockReturnThis(),
-        set: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        execute: jest.fn().mockResolvedValue({ affected: 0 }),
-      }),
-    };
-
     fixedTransactionalRepository = {
       find: jest.fn().mockResolvedValue([]),
       findOne: jest.fn().mockResolvedValue(null),
@@ -216,14 +200,7 @@ describe('WorkspacesService', () => {
       getCurrentApiKey: jest.fn(),
     };
 
-    mockNotificationsService = {
-      createNotification: jest.fn(),
-      deleteByRef: jest.fn(),
-    };
-
-    mockWorkflowTemplateService = {
-      createDefaultWorkflows: jest.fn(),
-    };
+    mockEvents = { emitAsync: jest.fn().mockResolvedValue([]) };
 
     mockAuditService = {
       recordInTx: jest.fn().mockResolvedValue({ id: randomUUID() }),
@@ -263,20 +240,12 @@ describe('WorkspacesService', () => {
           useValue: mockMemberPermissionRepository,
         },
         {
-          provide: getRepositoryToken(WorkspaceInvitation),
-          useValue: mockInvitationRepository,
-        },
-        {
           provide: ApiKeysService,
           useValue: mockApiKeysService,
         },
         {
-          provide: NotificationsService,
-          useValue: mockNotificationsService,
-        },
-        {
-          provide: WorkflowTemplateService,
-          useValue: mockWorkflowTemplateService,
+          provide: EventEmitter2,
+          useValue: mockEvents,
         },
         {
           provide: AuditService,
@@ -294,6 +263,10 @@ describe('WorkspacesService', () => {
           provide: ArtifactsService,
           useValue: mockArtifactsService,
         },
+        // Real: the guard-facing lookup the grant checks go through
+        WorkspaceMembershipService,
+        // Real: seeds the Admin group at creation, checks grants of members/invites
+        WorkspacePermissionGroupsService,
       ],
     }).compile();
 
@@ -302,6 +275,19 @@ describe('WorkspacesService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  it('answers the guard through WorkspaceMembershipService', async () => {
+    (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue({
+      memberPermissions: [{ permission: { permissions: ['project.read'] } }],
+    });
+
+    const result = await service.getMembershipWithPermissions(
+      testWorkspaceId,
+      testUserId,
+    );
+
+    expect(result.permissionKeys).toEqual(['project.read']);
   });
 
   describe('getWorkspaces', () => {
@@ -628,526 +614,7 @@ describe('WorkspacesService', () => {
     });
   });
 
-  describe('permission groups', () => {
-    const holderMembership = {
-      memberPermissions: [
-        { permission: { permissions: ['project.read', 'target.read'] } },
-      ],
-    };
-
-    it('should create a permission group', async () => {
-      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue(
-        holderMembership,
-      );
-
-      const result = await service.createPermissionGroup(
-        testWorkspaceId,
-        {
-          name: 'Viewer',
-          permissions: ['project.read', 'target.read'],
-        },
-        testUserId,
-      );
-
-      expect(result).toEqual(
-        expect.objectContaining({
-          name: 'Viewer',
-          permissions: ['project.read', 'target.read'],
-          isSystem: false,
-        }),
-      );
-      // The insert now runs on the transaction manager so the audit row can
-      // commit atomically with the group (M4.1 explicit event wiring).
-      expect(mockManager.save).toHaveBeenCalledWith(
-        WorkspacePermission,
-        expect.objectContaining({ workspace: { id: testWorkspaceId } }),
-      );
-    });
-
-    it('should reject wildcard "*" for non-system groups', async () => {
-      await expect(
-        service.createPermissionGroup(
-          testWorkspaceId,
-          {
-            name: 'Hacker',
-            permissions: ['*'],
-          },
-          testUserId,
-        ),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should reject unknown permission keys not present in the catalog', async () => {
-      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue(
-        holderMembership,
-      );
-
-      await expect(
-        service.createPermissionGroup(
-          testWorkspaceId,
-          {
-            name: 'Sneaky',
-            permissions: ['project.read', 'target.own'],
-          },
-          testUserId,
-        ),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should forbid granting permission keys the creator does not hold', async () => {
-      // Creator only holds project.read, tries to grant member.write too.
-      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue({
-        memberPermissions: [{ permission: { permissions: ['project.read'] } }],
-      });
-
-      await expect(
-        service.createPermissionGroup(
-          testWorkspaceId,
-          {
-            name: 'Escalator',
-            permissions: ['project.read', 'member.write'],
-          },
-          testUserId,
-        ),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should allow a wildcard holder to create any group', async () => {
-      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue({
-        memberPermissions: [{ permission: { permissions: ['*'] } }],
-      });
-
-      const result = await service.createPermissionGroup(
-        testWorkspaceId,
-        {
-          name: 'Power',
-          permissions: ['member.write', 'workspace.write'],
-        },
-        testUserId,
-      );
-
-      expect(result).toEqual(
-        expect.objectContaining({ name: 'Power', isSystem: false }),
-      );
-    });
-
-    it('should reject a duplicate group name case-insensitively', async () => {
-      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue(
-        holderMembership,
-      );
-      (mockPermissionRepository.find as jest.Mock).mockResolvedValue([
-        { id: randomUUID(), name: 'viewer' },
-      ]);
-
-      await expect(
-        service.createPermissionGroup(
-          testWorkspaceId,
-          {
-            name: 'Viewer',
-            permissions: ['project.read'],
-          },
-          testUserId,
-        ),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should reject a concurrent duplicate insert with 23505 as 400', async () => {
-      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue(
-        holderMembership,
-      );
-      (mockManager.save as jest.Mock).mockRejectedValue({ code: '23505' });
-
-      await expect(
-        service.createPermissionGroup(
-          testWorkspaceId,
-          {
-            name: 'Viewer',
-            permissions: ['project.read'],
-          },
-          testUserId,
-        ),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should forbid modifying a system group', async () => {
-      (mockPermissionRepository.findOne as jest.Mock).mockResolvedValue({
-        id: randomUUID(),
-        name: 'Admin',
-        isSystem: true,
-        permissions: ['*'],
-      });
-
-      await expect(
-        service.updatePermissionGroup(testWorkspaceId, randomUUID(), {
-          name: 'Renamed',
-        }, testUserId),
-      ).rejects.toThrow(ForbiddenException);
-    });
-
-    it('updatePermissionGroup drops retired template keys', async () => {
-      const group = {
-        id: randomUUID(),
-        name: 'Viewer',
-        isSystem: false,
-        permissions: ['asset.read', 'template.read'],
-      };
-      (mockPermissionRepository.findOne as jest.Mock).mockResolvedValue(group);
-      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue({
-        memberPermissions: [{ permission: { permissions: ['*'] } }],
-      });
-
-      await service.updatePermissionGroup(
-        testWorkspaceId,
-        group.id,
-        { permissions: ['asset.read', 'template.write'] },
-        testUserId,
-      );
-
-      expect(group.permissions).toEqual(['asset.read']);
-    });
-
-    it('updatePermissionGroup still rejects other unknown keys', async () => {
-      (mockPermissionRepository.findOne as jest.Mock).mockResolvedValue({
-        id: randomUUID(),
-        name: 'Viewer',
-        isSystem: false,
-        permissions: ['project.read'],
-      });
-
-      await expect(
-        service.updatePermissionGroup(
-          testWorkspaceId,
-          randomUUID(),
-          { permissions: ['foo.bar'] },
-          testUserId,
-        ),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('createPermissionGroup drops retired template keys', async () => {
-      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue(
-        holderMembership,
-      );
-
-      const result = await service.createPermissionGroup(
-        testWorkspaceId,
-        { name: 'Viewer', permissions: ['project.read', 'template.read'] },
-        testUserId,
-      );
-
-      expect(result.permissions).toEqual(['project.read']);
-    });
-
-    it('should reject an empty update body', async () => {
-      (mockPermissionRepository.findOne as jest.Mock).mockResolvedValue({
-        id: randomUUID(),
-        name: 'Viewer',
-        isSystem: false,
-        permissions: ['project.read'],
-      });
-
-      await expect(
-        service.updatePermissionGroup(testWorkspaceId, randomUUID(), {}, testUserId),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should forbid deleting a system group', async () => {
-      (mockPermissionRepository.findOne as jest.Mock).mockResolvedValue({
-        id: randomUUID(),
-        name: 'Admin',
-        isSystem: true,
-        permissions: ['*'],
-      });
-
-      await expect(
-        service.deletePermissionGroup(testWorkspaceId, randomUUID()),
-      ).rejects.toThrow(ForbiddenException);
-    });
-  });
-
-  describe('members', () => {
-    const memberId = randomUUID();
-    const anotherUserId = randomUUID();
-
-    const makeMember = (overrides: Record<string, unknown> = {}) => ({
-      id: memberId,
-      user: { id: anotherUserId, name: 'Other', image: null },
-      memberPermissions: [
-        { permission: { isSystem: false, permissions: ['project.read'] } },
-      ],
-      ...overrides,
-    });
-
-    it('should aggregate permission keys across groups', async () => {
-      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue({
-        memberPermissions: [
-          { permission: { permissions: ['project.read'] } },
-          { permission: { permissions: ['target.read', '*'] } },
-        ],
-      });
-
-      const result = await service.getMembershipWithPermissions(
-        testWorkspaceId,
-        testUserId,
-      );
-
-      expect(result.permissionKeys.sort()).toEqual([
-        '*',
-        'project.read',
-        'target.read',
-      ]);
-    });
-
-    it('should throw NotFound for a non-member', async () => {
-      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue(
-        null,
-      );
-
-      await expect(
-        service.getMembershipWithPermissions(testWorkspaceId, testUserId),
-      ).rejects.toThrow('Workspace member not found');
-    });
-
-    describe('getCurrentPermission', () => {
-      it('should return the union of permission keys for the member', async () => {
-        (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue(
-          {
-            memberPermissions: [
-              { permission: { permissions: ['project.read'] } },
-              { permission: { permissions: ['target.read', '*'] } },
-            ],
-          },
-        );
-
-        const result = await service.getCurrentPermission(
-          testWorkspaceId,
-          testUserId,
-        );
-
-        expect(result.currentPermission.sort()).toEqual([
-          '*',
-          'project.read',
-          'target.read',
-        ]);
-      });
-
-      it('should return an empty list when membership has no permission groups', async () => {
-        (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue(
-          {
-            memberPermissions: [],
-          },
-        );
-
-        const result = await service.getCurrentPermission(
-          testWorkspaceId,
-          testUserId,
-        );
-
-        expect(result).toEqual({ currentPermission: [] });
-      });
-
-      it('should throw NotFound for a non-member', async () => {
-        (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue(
-          null,
-        );
-
-        await expect(
-          service.getCurrentPermission(testWorkspaceId, testUserId),
-        ).rejects.toThrow('Workspace member not found');
-      });
-    });
-
-    it('should update member permissions', async () => {
-      const permissionId = randomUUID();
-      (mockWorkspaceMembersRepository.findOne as jest.Mock)
-        .mockResolvedValueOnce(makeMember())
-        .mockResolvedValueOnce(makeMember())
-        .mockResolvedValueOnce({
-          memberPermissions: [
-            { permission: { permissions: ['project.read'] } },
-          ],
-        });
-      (mockPermissionRepository.find as jest.Mock).mockResolvedValue([
-        { id: permissionId, permissions: ['project.read'] },
-      ]);
-
-      await service.updateMemberPermissions(
-        testWorkspaceId,
-        memberId,
-        [permissionId],
-        testUserId,
-      );
-
-      // Replacement happens inside a transaction via the manager
-      expect(mockManager.delete).toHaveBeenCalledWith(
-        WorkspaceMemberPermission,
-        { member: { id: memberId } },
-      );
-      expect(mockManager.save).toHaveBeenCalledWith(
-        WorkspaceMemberPermission,
-        expect.objectContaining({
-          member: { id: memberId },
-          permission: { id: permissionId },
-        }),
-      );
-    });
-
-    it('ignores retired template keys still stored on a group being assigned', async () => {
-      const legacyGroupId = randomUUID();
-      (mockWorkspaceMembersRepository.findOne as jest.Mock)
-        .mockResolvedValueOnce(makeMember())
-        .mockResolvedValueOnce(makeMember())
-        .mockResolvedValueOnce({
-          memberPermissions: [{ permission: { permissions: ['project.read'] } }],
-        });
-      (mockPermissionRepository.find as jest.Mock).mockResolvedValue([
-        { id: legacyGroupId, permissions: ['project.read', 'template.read'] },
-      ]);
-
-      await service.updateMemberPermissions(
-        testWorkspaceId,
-        memberId,
-        [legacyGroupId],
-        testUserId,
-      );
-
-      expect(mockManager.save).toHaveBeenCalledWith(
-        WorkspaceMemberPermission,
-        expect.objectContaining({ permission: { id: legacyGroupId } }),
-      );
-    });
-
-    it('should reject an empty permission list instead of stripping permissions', async () => {
-      await expect(
-        service.updateMemberPermissions(
-          testWorkspaceId,
-          memberId,
-          [],
-          testUserId,
-        ),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should reject unknown permission group ids instead of silently dropping them', async () => {
-      const validId = randomUUID();
-      const unknownId = randomUUID();
-      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue(
-        makeMember(),
-      );
-      (mockPermissionRepository.find as jest.Mock).mockResolvedValue([
-        { id: validId, permissions: ['project.read'] },
-      ]);
-
-      await expect(
-        service.updateMemberPermissions(
-          testWorkspaceId,
-          memberId,
-          [validId, unknownId],
-          testUserId,
-        ),
-      ).rejects.toThrow(BadRequestException);
-      // No replacement happened — no silent partial write.
-      expect(mockManager.delete).not.toHaveBeenCalled();
-    });
-
-    it('should forbid assigning a group whose keys the assigner does not hold', async () => {
-      const powerfulGroupId = randomUUID();
-      (mockWorkspaceMembersRepository.findOne as jest.Mock)
-        .mockResolvedValueOnce(makeMember())
-        .mockResolvedValueOnce({
-          // Assigner only holds project.read
-          memberPermissions: [
-            { permission: { permissions: ['project.read'] } },
-          ],
-        });
-      (mockPermissionRepository.find as jest.Mock).mockResolvedValue([
-        {
-          id: powerfulGroupId,
-          name: 'Powerful',
-          permissions: ['member.write'],
-        },
-      ]);
-
-      await expect(
-        service.updateMemberPermissions(
-          testWorkspaceId,
-          memberId,
-          [powerfulGroupId],
-          testUserId,
-        ),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should forbid modifying your own membership', async () => {
-      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue(
-        makeMember({ user: { id: testUserId } }),
-      );
-
-      await expect(
-        service.updateMemberPermissions(
-          testWorkspaceId,
-          memberId,
-          [randomUUID()],
-          testUserId,
-        ),
-      ).rejects.toThrow(ForbiddenException);
-    });
-
-    it('should forbid modifying the owner (system group holder)', async () => {
-      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue(
-        makeMember({
-          memberPermissions: [
-            { permission: { isSystem: true, permissions: ['*'] } },
-          ],
-        }),
-      );
-
-      await expect(
-        service.updateMemberPermissions(
-          testWorkspaceId,
-          memberId,
-          [randomUUID()],
-          testUserId,
-        ),
-      ).rejects.toThrow(ForbiddenException);
-    });
-
-    it('should forbid modifying the owner even when the system group is missing', async () => {
-      // Simulates a workspace whose seeding failed: the owner holds no Admin
-      // group, but the workspace.ownerId still matches the member.
-      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue(
-        makeMember({ memberPermissions: [] }),
-      );
-      (mockWorkspaceRepository.findOne as jest.Mock).mockResolvedValue({
-        id: testWorkspaceId,
-        owner: { id: anotherUserId },
-      });
-
-      await expect(
-        service.updateMemberPermissions(
-          testWorkspaceId,
-          memberId,
-          [randomUUID()],
-          testUserId,
-        ),
-      ).rejects.toThrow(ForbiddenException);
-    });
-
-    it('should forbid removing yourself', async () => {
-      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue(
-        makeMember({ user: { id: testUserId } }),
-      );
-
-      await expect(
-        service.removeMember(testWorkspaceId, memberId, testUserId),
-      ).rejects.toThrow(ForbiddenException);
-    });
-  });
-
   describe('audit wiring — explicit events (M4.1)', () => {
-    const memberId = randomUUID();
-    const removedUserId = randomUUID();
-
     // The controller passes this into the service (built via
     // AuditService.buildActorContext(req)); the service must never call
     // buildActorContext itself.
@@ -1161,31 +628,11 @@ describe('WorkspacesService', () => {
       requestId: 'req-1',
     };
 
-    const makeMember = (overrides: Record<string, unknown> = {}) => ({
-      id: memberId,
-      user: { id: removedUserId, name: 'Removed', image: null },
-      memberPermissions: [
-        { permission: { isSystem: false, permissions: ['project.read'] } },
-      ],
-      ...overrides,
-    });
-
     it('deleteWorkspace records workspace.deleted in the same tx as the workspace delete', async () => {
       (mockWorkspaceRepository.findOne as jest.Mock).mockResolvedValue({
         id: testWorkspaceId,
         name: 'Doomed',
       });
-      // deleteAllTargetsFromWorkspace runs first (its own tx); stub its
-      // createQueryBuilder delete chain so only the workspace delete matters.
-      mockManager.getRepository.mockReturnValue({
-        createQueryBuilder: jest.fn().mockReturnValue({
-          delete: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          returning: jest.fn().mockReturnThis(),
-          execute: jest.fn().mockResolvedValue({ raw: [] }),
-        }),
-      });
-
       const result = await service.deleteWorkspace(
         testWorkspaceId,
         testUserContext,
@@ -1193,6 +640,14 @@ describe('WorkspacesService', () => {
       );
 
       expect(result).toEqual({ message: 'Workspace deleted successfully' });
+      // Other modules remove their rows first (targets: its own tx)
+      expect(mockEvents.emitAsync).toHaveBeenCalledWith(
+        WORKSPACE_DELETING_EVENT,
+        { workspaceId: testWorkspaceId },
+      );
+      expect(mockEvents.emitAsync.mock.invocationCallOrder[0]).toBeLessThan(
+        mockDataSource.transaction.mock.invocationCallOrder[0],
+      );
       expect(mockManager.delete).toHaveBeenCalledWith(Workspace, {
         id: testWorkspaceId,
       });
@@ -1214,18 +669,25 @@ describe('WorkspacesService', () => {
       );
     });
 
-    it('deleteWorkspace rolls back when the audit write fails mid-transaction (no success response, no committed state)', async () => {
+    it('deleteWorkspace keeps the workspace when a module fails to remove its rows', async () => {
       (mockWorkspaceRepository.findOne as jest.Mock).mockResolvedValue({
         id: testWorkspaceId,
         name: 'Doomed',
       });
-      mockManager.getRepository.mockReturnValue({
-        createQueryBuilder: jest.fn().mockReturnValue({
-          delete: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          returning: jest.fn().mockReturnThis(),
-          execute: jest.fn().mockResolvedValue({ raw: [] }),
-        }),
+      mockEvents.emitAsync.mockRejectedValueOnce(new Error('targets delete failed'));
+
+      await expect(
+        service.deleteWorkspace(testWorkspaceId, testUserContext, auditContext),
+      ).rejects.toThrow('targets delete failed');
+
+      expect(mockManager.delete).not.toHaveBeenCalled();
+      expect(mockAuditService.recordInTx).not.toHaveBeenCalled();
+    });
+
+    it('deleteWorkspace rolls back when the audit write fails mid-transaction (no success response, no committed state)', async () => {
+      (mockWorkspaceRepository.findOne as jest.Mock).mockResolvedValue({
+        id: testWorkspaceId,
+        name: 'Doomed',
       });
       (mockAuditService.recordInTx).mockRejectedValueOnce(
         new Error('audit write failed'),
@@ -1250,14 +712,6 @@ describe('WorkspacesService', () => {
         id: testWorkspaceId,
         name: 'Doomed',
       });
-      mockManager.getRepository.mockReturnValue({
-        createQueryBuilder: jest.fn().mockReturnValue({
-          delete: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          returning: jest.fn().mockReturnThis(),
-          execute: jest.fn().mockResolvedValue({ raw: [] }),
-        }),
-      });
       (mockManager.delete as jest.Mock).mockRejectedValueOnce(
         new Error('workspace delete failed'),
       );
@@ -1271,786 +725,6 @@ describe('WorkspacesService', () => {
       expect(mockArtifactsService.deleteWorkspaceObjects).not.toHaveBeenCalled();
     });
 
-    it('removeMember records member.removed in the tx and pseudonymizes the removed user after commit (scenario 9)', async () => {
-      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue(
-        makeMember(),
-      );
-
-      const result = await service.removeMember(
-        testWorkspaceId,
-        memberId,
-        testUserId,
-        auditContext,
-      );
-
-      expect(result).toEqual({ message: 'Member removed successfully' });
-      // In-transaction audit row: actor = the acting user, target = removed
-      expect(mockManager.delete).toHaveBeenCalledWith(WorkspaceMembers, {
-        id: memberId,
-      });
-      expect(mockAuditService.recordInTx).toHaveBeenCalledWith(
-        mockManager,
-        expect.objectContaining({
-          workspaceId: testWorkspaceId,
-          action: 'member.removed',
-          resourceType: 'member',
-          resourceId: memberId,
-          metadata: { targetUserId: removedUserId },
-          actorId: testUserId,
-        }),
-      );
-      // GDPR sweep runs AFTER the tx commits; the removed user's PII is
-      // swept from their own rows AND from the member.removed event row
-      // (metadata.targetUserId) via the event id returned by recordInTx.
-      expect(mockAuditService.pseudonymizeActor).toHaveBeenCalledWith(
-        removedUserId,
-        expect.any(String),
-      );
-    });
-
-    it('removeMember still succeeds when pseudonymization fails (audit must not break the business request)', async () => {
-      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue(
-        makeMember(),
-      );
-      (mockAuditService.pseudonymizeActor).mockRejectedValue(
-        new Error('trigger blocked'),
-      );
-
-      await expect(
-        service.removeMember(testWorkspaceId, memberId, testUserId, auditContext),
-      ).resolves.toEqual({ message: 'Member removed successfully' });
-    });
-
-    it('updateMemberPermissions records member.permissions.updated with the before/after group ids', async () => {
-      const oldGroupId = randomUUID();
-      const newGroupId = randomUUID();
-      (mockWorkspaceMembersRepository.findOne as jest.Mock)
-        .mockResolvedValueOnce(
-          makeMember({
-            memberPermissions: [
-              {
-                permission: {
-                  id: oldGroupId,
-                  isSystem: false,
-                  permissions: ['project.read'],
-                },
-              },
-            ],
-          }),
-        )
-        .mockResolvedValueOnce({
-          memberPermissions: [
-            { permission: { permissions: ['*'] } },
-          ],
-        })
-        .mockResolvedValueOnce(makeMember());
-      (mockPermissionRepository.find as jest.Mock).mockResolvedValue([
-        { id: newGroupId, permissions: ['project.read'] },
-      ]);
-
-      await service.updateMemberPermissions(
-        testWorkspaceId,
-        memberId,
-        [newGroupId],
-        testUserId,
-        auditContext,
-      );
-
-      expect(mockAuditService.recordInTx).toHaveBeenCalledWith(
-        mockManager,
-        expect.objectContaining({
-          workspaceId: testWorkspaceId,
-          action: 'member.permissions.updated',
-          resourceType: 'member',
-          resourceId: memberId,
-          changes: {
-            permissionIds: { before: [oldGroupId], after: [newGroupId] },
-          },
-          actorId: testUserId,
-        }),
-      );
-    });
-
-    it('createPermissionGroup records permission_group.created with name and permissions', async () => {
-      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue({
-        memberPermissions: [{ permission: { permissions: ['*'] } }],
-      });
-
-      const result = await service.createPermissionGroup(
-        testWorkspaceId,
-        { name: 'Viewer', permissions: ['project.read'] },
-        testUserId,
-        auditContext,
-      );
-
-      expect(result).toEqual(
-        expect.objectContaining({ name: 'Viewer', isSystem: false }),
-      );
-      expect(mockAuditService.recordInTx).toHaveBeenCalledWith(
-        mockManager,
-        expect.objectContaining({
-          workspaceId: testWorkspaceId,
-          action: 'permission_group.created',
-          resourceType: 'permission_group',
-          changes: {
-            name: { after: 'Viewer' },
-            permissions: { after: ['project.read'] },
-          },
-          actorId: testUserId,
-        }),
-      );
-    });
-
-    it('updatePermissionGroup records permission_group.updated with before/after permissions', async () => {
-      const group = {
-        id: randomUUID(),
-        name: 'Viewer',
-        isSystem: false,
-        permissions: ['project.read'],
-      };
-      (mockPermissionRepository.findOne as jest.Mock).mockResolvedValue(group);
-      // The updater holds "*" so the privilege-subset guard passes
-      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue({
-        memberPermissions: [{ permission: { permissions: ['*'] } }],
-      });
-
-      await service.updatePermissionGroup(
-        testWorkspaceId,
-        group.id,
-        { permissions: ['project.read', 'target.read'] },
-        testUserId,
-        auditContext,
-      );
-
-      expect(mockAuditService.recordInTx).toHaveBeenCalledWith(
-        mockManager,
-        expect.objectContaining({
-          workspaceId: testWorkspaceId,
-          action: 'permission_group.updated',
-          resourceType: 'permission_group',
-          resourceId: group.id,
-          changes: {
-            permissions: {
-              before: ['project.read'],
-              after: ['project.read', 'target.read'],
-            },
-          },
-          actorId: testUserId,
-        }),
-      );
-    });
-
-    it('deletePermissionGroup records permission_group.deleted with the group name', async () => {
-      const group = {
-        id: randomUUID(),
-        name: 'Viewer',
-        isSystem: false,
-        permissions: ['project.read'],
-      };
-      (mockPermissionRepository.findOne as jest.Mock).mockResolvedValue(group);
-
-      const result = await service.deletePermissionGroup(
-        testWorkspaceId,
-        group.id,
-        auditContext,
-      );
-
-      expect(result).toEqual({ message: 'Permission group deleted successfully' });
-      expect(mockManager.delete).toHaveBeenCalledWith(WorkspacePermission, {
-        id: group.id,
-        workspace: { id: testWorkspaceId },
-      });
-      expect(mockAuditService.recordInTx).toHaveBeenCalledWith(
-        mockManager,
-        expect.objectContaining({
-          workspaceId: testWorkspaceId,
-          action: 'permission_group.deleted',
-          resourceType: 'permission_group',
-          resourceId: group.id,
-          changes: { name: { before: 'Viewer' } },
-          actorId: testUserId,
-        }),
-      );
-    });
-  });
-
-  describe('invitations', () => {
-    const inviteeEmail = 'invitee@example.com';
-    const makeInvitation = (overrides: Record<string, unknown> = {}) => ({
-      id: randomUUID(),
-      workspace: { id: testWorkspaceId, name: 'Test Workspace' },
-      invitedBy: { id: randomUUID() },
-      email: inviteeEmail,
-      permissionIds: [],
-      tokenHash: 'x'.repeat(64),
-      status: InvitationStatus.PENDING,
-      expiresAt: new Date(Date.now() + 60_000),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      ...overrides,
-    });
-
-    // The inviter holds "*" (Admin) so the privilege-subset guard passes.
-    const stubWildcardInviter = () => {
-      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue({
-        memberPermissions: [{ permission: { permissions: ['*'] } }],
-      });
-    };
-
-    it('should invite existing users and skip unknown emails', async () => {
-      (mockWorkspaceRepository.findOne as jest.Mock).mockResolvedValue({
-        id: testWorkspaceId,
-        name: 'Test Workspace',
-      });
-      stubWildcardInviter();
-      mockManager.getRepository.mockReturnValue({
-        find: jest.fn().mockResolvedValue([
-          { id: testUserId, email: inviteeEmail },
-        ]),
-      });
-
-      const result = await service.createInvitations(
-        testWorkspaceId,
-        testUserId,
-        {
-          emails: [inviteeEmail, 'nobody@example.com'],
-          permissionIds: [],
-        },
-      );
-
-      expect(result).toEqual({ invited: 1, skipped: 1 });
-      const saved = (mockManager.save as jest.Mock).mock.calls[0][1];
-      expect(saved.tokenHash).toHaveLength(64);
-      expect(saved.status).toBe(InvitationStatus.PENDING);
-      expect(mockNotificationsService.createNotification).toHaveBeenCalledWith(
-        expect.objectContaining({
-          recipients: [testUserId],
-          scope: 'SYSTEM',
-          metadata: expect.objectContaining({
-            token: expect.stringMatching(/^[0-9a-f]{64}$/),
-            action: 'created',
-          }),
-        }),
-      );
-      expect(mockNotificationsService.createNotification).toHaveBeenCalledWith(
-        expect.not.objectContaining({ workspaceId: expect.anything() }),
-      );
-    });
-
-    it('should expire previous pending invitations on re-invite', async () => {
-      (mockWorkspaceRepository.findOne as jest.Mock).mockResolvedValue({
-        id: testWorkspaceId,
-        name: 'Test Workspace',
-      });
-      stubWildcardInviter();
-      mockManager.getRepository.mockReturnValue({
-        find: jest.fn().mockResolvedValue([
-          { id: testUserId, email: inviteeEmail },
-        ]),
-      });
-
-      await service.createInvitations(testWorkspaceId, testUserId, {
-        emails: [inviteeEmail],
-        permissionIds: [],
-      });
-
-      expect(mockManager.update).toHaveBeenCalledWith(
-        WorkspaceInvitation,
-        {
-          workspace: { id: testWorkspaceId },
-          email: inviteeEmail,
-          status: InvitationStatus.PENDING,
-        },
-        { status: InvitationStatus.EXPIRED },
-      );
-    });
-
-    it('should skip emails of users who are already members', async () => {
-      (mockWorkspaceRepository.findOne as jest.Mock).mockResolvedValue({
-        id: testWorkspaceId,
-        name: 'Test Workspace',
-      });
-      stubWildcardInviter();
-      mockManager.getRepository.mockReturnValue({
-        find: jest.fn().mockResolvedValue([
-          { id: testUserId, email: inviteeEmail },
-        ]),
-      });
-      (mockWorkspaceMembersRepository.find as jest.Mock).mockResolvedValue([
-        { user: { id: testUserId } },
-      ]);
-
-      const result = await service.createInvitations(
-        testWorkspaceId,
-        testUserId,
-        {
-          emails: [inviteeEmail],
-          permissionIds: [],
-        },
-      );
-
-      expect(result).toEqual({ invited: 0, skipped: 1 });
-      expect(mockManager.save).not.toHaveBeenCalled();
-    });
-
-    it('should never grant system permission groups via invitations', async () => {
-      (mockWorkspaceRepository.findOne as jest.Mock).mockResolvedValue({
-        id: testWorkspaceId,
-        name: 'Test Workspace',
-      });
-      stubWildcardInviter();
-      mockManager.getRepository.mockReturnValue({
-        find: jest.fn().mockResolvedValue([
-          { id: testUserId, email: inviteeEmail },
-        ]),
-      });
-      // findValidPermissionGroups returns only non-system groups
-      (mockPermissionRepository.find as jest.Mock).mockResolvedValue([]);
-
-      await service.createInvitations(testWorkspaceId, testUserId, {
-        emails: [inviteeEmail],
-        permissionIds: ['system-group-id'],
-      });
-
-      const saved = (mockManager.save as jest.Mock).mock.calls[0][1];
-      expect(saved.permissionIds).toEqual([]);
-      expect(mockPermissionRepository.find).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ isSystem: false }),
-        }),
-      );
-    });
-
-    it('should reject inviting into an archived workspace', async () => {
-      (mockWorkspaceRepository.findOne as jest.Mock).mockResolvedValue({
-        id: testWorkspaceId,
-        name: 'Archived',
-        archivedAt: new Date(),
-      });
-      stubWildcardInviter();
-
-      await expect(
-        service.createInvitations(testWorkspaceId, testUserId, {
-          emails: [inviteeEmail],
-          permissionIds: [],
-        }),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should forbid inviting with a group whose keys the inviter does not hold', async () => {
-      (mockWorkspaceRepository.findOne as jest.Mock).mockResolvedValue({
-        id: testWorkspaceId,
-        name: 'Test Workspace',
-      });
-      // Inviter only holds project.read, group grants member.write
-      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue({
-        memberPermissions: [{ permission: { permissions: ['project.read'] } }],
-      });
-      (mockPermissionRepository.find as jest.Mock).mockResolvedValue([
-        { id: randomUUID(), name: 'Powerful', permissions: ['member.write'] },
-      ]);
-
-      await expect(
-        service.createInvitations(testWorkspaceId, testUserId, {
-          emails: [inviteeEmail],
-          permissionIds: ['powerful-group'],
-        }),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should still succeed when the invite notification fails to enqueue', async () => {
-      (mockWorkspaceRepository.findOne as jest.Mock).mockResolvedValue({
-        id: testWorkspaceId,
-        name: 'Test Workspace',
-      });
-      stubWildcardInviter();
-      mockManager.getRepository.mockReturnValue({
-        find: jest.fn().mockResolvedValue([
-          { id: testUserId, email: inviteeEmail },
-        ]),
-      });
-      (mockNotificationsService.createNotification as jest.Mock).mockRejectedValue(
-        new Error('queue down'),
-      );
-
-      const result = await service.createInvitations(testWorkspaceId, testUserId, {
-        emails: [inviteeEmail],
-        permissionIds: [],
-      });
-
-      expect(result).toEqual({ invited: 1, skipped: 0 });
-    });
-
-    it('should accept a valid invitation', async () => {
-      (mockInvitationRepository.findOne as jest.Mock).mockResolvedValue(
-        makeInvitation(),
-      );
-
-      const result = await service.acceptInvitation(
-        'a'.repeat(64),
-        { ...testUserContext, email: inviteeEmail },
-      );
-
-      expect(result).toEqual({ message: 'Invitation accepted successfully' });
-      expect(mockManager.update).toHaveBeenCalledWith(
-        WorkspaceInvitation,
-        { id: expect.any(String), status: InvitationStatus.PENDING },
-        { status: InvitationStatus.ACCEPTED },
-      );
-      expect(mockNotificationsService.createNotification).toHaveBeenCalledWith(
-        expect.objectContaining({
-          metadata: expect.objectContaining({
-            action: 'accepted',
-          }),
-        }),
-      );
-    });
-
-    it('should reuse the existing membership when a concurrent accept wins the unique-constraint race', async () => {
-      (mockInvitationRepository.findOne as jest.Mock).mockResolvedValue(
-        makeInvitation(),
-      );
-      const existingMember = { id: randomUUID() };
-      const memberRepo = {
-        findOne: jest
-          .fn()
-          .mockResolvedValueOnce(null)
-          .mockResolvedValueOnce(existingMember),
-        save: jest.fn().mockRejectedValue({ code: '23505' }),
-      };
-      const permissionRepo = { find: jest.fn().mockResolvedValue([]) };
-      const groupRepo = { find: jest.fn().mockResolvedValue([]) };
-      mockManager.getRepository
-        .mockReturnValueOnce(memberRepo)
-        .mockReturnValueOnce(permissionRepo)
-        .mockReturnValueOnce(groupRepo);
-
-      const result = await service.acceptInvitation('a'.repeat(64), {
-        ...testUserContext,
-        email: inviteeEmail,
-      });
-
-      expect(result).toEqual({ message: 'Invitation accepted successfully' });
-      expect(memberRepo.save).toHaveBeenCalledTimes(1);
-      expect(memberRepo.findOne).toHaveBeenCalledTimes(2);
-      expect(
-        mockNotificationsService.createNotification,
-      ).toHaveBeenCalledWith(
-        expect.objectContaining({
-          metadata: expect.objectContaining({ action: 'accepted' }),
-        }),
-      );
-    });
-
-    it('should reject accepting into an archived workspace', async () => {
-      (mockInvitationRepository.findOne as jest.Mock).mockResolvedValue(
-        makeInvitation({
-          workspace: {
-            id: testWorkspaceId,
-            name: 'Archived',
-            archivedAt: new Date(),
-          },
-        }),
-      );
-
-      await expect(
-        service.acceptInvitation('a'.repeat(64), {
-          ...testUserContext,
-          email: inviteeEmail,
-        }),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should not remove existing permission groups on accept', async () => {
-      (mockInvitationRepository.findOne as jest.Mock).mockResolvedValue(
-        makeInvitation({ permissionIds: ['group-2'] }),
-      );
-      mockManager.getRepository
-        .mockReturnValueOnce({
-          findOne: jest.fn().mockResolvedValue({
-            id: 'member-1',
-          }),
-        })
-        .mockReturnValueOnce({
-          find: jest.fn().mockResolvedValue([
-            { permission: { id: 'group-1' } },
-          ]),
-        })
-        .mockReturnValueOnce({
-          find: jest.fn().mockResolvedValue([{ id: 'group-2' }]),
-        });
-
-      await service.acceptInvitation('a'.repeat(64), {
-        ...testUserContext,
-        email: inviteeEmail,
-      });
-
-      // Never wipes groups the member already holds (e.g. a system Admin group)
-      expect(mockManager.delete).not.toHaveBeenCalledWith(
-        WorkspaceMemberPermission,
-        expect.anything(),
-      );
-      expect(mockManager.save).not.toHaveBeenCalledWith(
-        WorkspaceMemberPermission,
-        expect.objectContaining({ permission: { id: 'group-1' } }),
-      );
-      expect(mockManager.save).toHaveBeenCalledWith(
-        WorkspaceMemberPermission,
-        expect.objectContaining({ permission: { id: 'group-2' } }),
-      );
-    });
-
-    it('should reject accept when the email does not match', async () => {
-      (mockInvitationRepository.findOne as jest.Mock).mockResolvedValue(
-        makeInvitation(),
-      );
-
-      await expect(
-        service.acceptInvitation('a'.repeat(64), testUserContext),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should reject accept when the invitation is expired', async () => {
-      (mockInvitationRepository.findOne as jest.Mock).mockResolvedValue(
-        makeInvitation({
-          expiresAt: new Date(Date.now() - 60_000),
-        }),
-      );
-
-      await expect(
-        service.acceptInvitation('a'.repeat(64), {
-          ...testUserContext,
-          email: inviteeEmail,
-        }),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should reject accept when the token is already used', async () => {
-      (mockInvitationRepository.findOne as jest.Mock).mockResolvedValue(
-        makeInvitation({ status: InvitationStatus.ACCEPTED }),
-      );
-
-      await expect(
-        service.acceptInvitation('a'.repeat(64), {
-          ...testUserContext,
-          email: inviteeEmail,
-        }),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should reject accept for a cancelled invitation', async () => {
-      (mockInvitationRepository.findOne as jest.Mock).mockResolvedValue(
-        makeInvitation({ status: InvitationStatus.CANCELLED }),
-      );
-
-      await expect(
-        service.acceptInvitation('a'.repeat(64), {
-          ...testUserContext,
-          email: inviteeEmail,
-        }),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should reject accept for an expired (persisted) invitation', async () => {
-      (mockInvitationRepository.findOne as jest.Mock).mockResolvedValue(
-        makeInvitation({ status: InvitationStatus.EXPIRED }),
-      );
-
-      await expect(
-        service.acceptInvitation('a'.repeat(64), {
-          ...testUserContext,
-          email: inviteeEmail,
-        }),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should reject a concurrent double accept', async () => {
-      (mockInvitationRepository.findOne as jest.Mock).mockResolvedValue(
-        makeInvitation(),
-      );
-      (mockManager.update as jest.Mock).mockResolvedValue({ affected: 0 });
-
-      await expect(
-        service.acceptInvitation('a'.repeat(64), {
-          ...testUserContext,
-          email: inviteeEmail,
-        }),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should decline an invitation and notify the inviter', async () => {
-      (mockInvitationRepository.findOne as jest.Mock).mockResolvedValue(
-        makeInvitation(),
-      );
-
-      const result = await service.declineInvitation('a'.repeat(64), {
-        ...testUserContext,
-        email: inviteeEmail,
-      });
-
-      expect(result).toEqual({ message: 'Invitation declined successfully' });
-      expect(mockInvitationRepository.update).toHaveBeenCalledWith(
-        { id: expect.any(String), status: InvitationStatus.PENDING },
-        { status: InvitationStatus.DECLINED },
-      );
-      expect(mockNotificationsService.createNotification).toHaveBeenCalledWith(
-        expect.objectContaining({
-          metadata: expect.objectContaining({ action: 'declined' }),
-        }),
-      );
-    });
-
-    it('should cancel a pending invitation by setting status to CANCELLED', async () => {
-      const result = await service.cancelInvitation(
-        testWorkspaceId,
-        randomUUID(),
-      );
-
-      expect(mockInvitationRepository.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: expect.any(String),
-          workspace: { id: testWorkspaceId },
-          status: InvitationStatus.PENDING,
-        }),
-        { status: InvitationStatus.CANCELLED },
-      );
-      expect(mockInvitationRepository.delete).not.toHaveBeenCalled();
-      expect(result).toEqual({ message: 'Invitation cancelled successfully' });
-    });
-
-    it('should 404 when cancelling an already handled invitation', async () => {
-      (mockInvitationRepository.update as jest.Mock).mockResolvedValue({
-        affected: 0,
-      });
-
-      await expect(
-        service.cancelInvitation(testWorkspaceId, randomUUID()),
-      ).rejects.toThrow('Invitation not found or already handled');
-    });
-
-    it('should list only pending invitations', async () => {
-      const futureExpiry = new Date(Date.now() + 60_000);
-      const pendingInvitation = {
-        ...makeInvitation({ expiresAt: futureExpiry }),
-        toJSON: () => ({
-          id: randomUUID(),
-          email: inviteeEmail,
-          permissionIds: [],
-          status: InvitationStatus.PENDING,
-          expiresAt: futureExpiry,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          workspace: { id: testWorkspaceId, name: 'Test Workspace' },
-          invitedBy: { id: randomUUID() },
-        }),
-      };
-      (mockInvitationRepository.find as jest.Mock).mockResolvedValue([
-        pendingInvitation,
-      ]);
-
-      const result = await service.listInvitations(testWorkspaceId);
-
-      expect(mockInvitationRepository.find).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            status: InvitationStatus.PENDING,
-          }),
-        }),
-      );
-      // No expiry sweep needed anymore — only PENDING rows are listed.
-      expect(mockInvitationRepository.createQueryBuilder).not.toHaveBeenCalled();
-      expect(result).toHaveLength(1);
-      expect(result[0].status).toBe(InvitationStatus.PENDING);
-    });
-
-    it('should exclude expired/cancelled invitations from the list', async () => {
-      (mockInvitationRepository.find as jest.Mock).mockResolvedValue([]);
-
-      const result = await service.listInvitations(testWorkspaceId);
-
-      expect(mockInvitationRepository.find).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            status: InvitationStatus.PENDING,
-          }),
-        }),
-      );
-      expect(result).toEqual([]);
-    });
-
-    it('should expose no secrets in the public preview', async () => {
-      (mockInvitationRepository.findOne as jest.Mock).mockResolvedValue(
-        makeInvitation(),
-      );
-
-      const result = await service.getInvitationPreview('a'.repeat(64));
-
-      expect(result).toEqual(
-        expect.objectContaining({
-          workspaceId: testWorkspaceId,
-          workspaceName: 'Test Workspace',
-          email: inviteeEmail,
-        }),
-      );
-      expect(JSON.stringify(result)).not.toContain('tokenHash');
-    });
-
-    it('should report a persisted EXPIRED status in the preview', async () => {
-      (mockInvitationRepository.findOne as jest.Mock).mockResolvedValue(
-        makeInvitation({ status: InvitationStatus.EXPIRED }),
-      );
-
-      const result = await service.getInvitationPreview('a'.repeat(64));
-
-      expect(result.status).toBe(InvitationStatus.EXPIRED);
-    });
-  });
-
-  describe('seedOwnerPermissionGroup', () => {
-    it('should create the system Admin group and assign it to the creator', async () => {
-      const memberId = randomUUID();
-      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue({
-        id: memberId,
-      });
-
-      await service.seedOwnerPermissionGroup(testWorkspaceId, testUserId);
-
-      expect(mockPermissionRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'Admin',
-          permissions: ['*'],
-          isSystem: true,
-        }),
-      );
-      expect(mockMemberPermissionRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          member: { id: memberId },
-        }),
-      );
-    });
-
-    it('should be idempotent when the Admin group already exists', async () => {
-      const memberId = randomUUID();
-      const adminGroup = { id: randomUUID(), name: 'Admin' };
-      (mockPermissionRepository.findOne as jest.Mock).mockResolvedValue(
-        adminGroup,
-      );
-      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue({
-        id: memberId,
-      });
-      (mockMemberPermissionRepository.findOne as jest.Mock).mockResolvedValue({
-        id: randomUUID(),
-      });
-
-      const result = await service.seedOwnerPermissionGroup(
-        testWorkspaceId,
-        testUserId,
-      );
-
-      expect(mockPermissionRepository.save).not.toHaveBeenCalled();
-      expect(mockMemberPermissionRepository.save).not.toHaveBeenCalled();
-      expect(result).toBe(adminGroup);
-    });
   });
 
   describe('createWorkspace', () => {
@@ -2083,6 +757,33 @@ describe('WorkspacesService', () => {
       );
     });
 
+    it('lets other modules add their defaults once the workspace is committed', async () => {
+      (mockWorkspaceRepository.count as jest.Mock).mockResolvedValue(0);
+      (mockWorkspaceRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 'ws-new',
+        name: 'New Workspace',
+      });
+
+      await service.createWorkspace({ name: 'New Workspace' }, testUserContext);
+
+      expect(mockEvents.emitAsync).toHaveBeenCalledWith(
+        WORKSPACE_INITIALIZING_EVENT,
+        { workspaceId: expect.any(String) as string },
+      );
+      expect(mockDataSource.transaction.mock.invocationCallOrder[0]).toBeLessThan(
+        mockEvents.emitAsync.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('fails the creation when adding the defaults fails', async () => {
+      (mockWorkspaceRepository.count as jest.Mock).mockResolvedValue(0);
+      mockEvents.emitAsync.mockRejectedValue(new Error('templates unreadable'));
+
+      await expect(
+        service.createWorkspace({ name: 'New Workspace' }, testUserContext),
+      ).rejects.toThrow('templates unreadable');
+    });
+
     it('should roll back the whole workspace creation when seeding fails', async () => {
       (mockWorkspaceRepository.count as jest.Mock).mockResolvedValue(0);
       fixedTransactionalRepository.save.mockRejectedValueOnce(
@@ -2096,7 +797,7 @@ describe('WorkspacesService', () => {
       // The transaction was started — a partial workspace + missing Admin
       // group can no longer be left behind.
       expect(mockDataSource.transaction).toHaveBeenCalled();
-      expect(mockWorkflowTemplateService.createDefaultWorkflows).not.toHaveBeenCalled();
+      expect(mockEvents.emitAsync).not.toHaveBeenCalled();
     });
 
     it('should enforce the workspace creation limit', async () => {
@@ -2105,35 +806,6 @@ describe('WorkspacesService', () => {
       await expect(
         service.createWorkspace({ name: 'Too Many' }, testUserContext),
       ).rejects.toThrow('limit');
-    });
-  });
-
-  describe('permission catalog', () => {
-    it('should return resources with unique, valid domain.action keys and labels', () => {
-      const catalog = service.getPermissionCatalog();
-
-      expect(catalog.length).toBeGreaterThan(0);
-      const keys = catalog.flatMap((resource) =>
-        resource.actions.map((action) => `${resource.resource}.${action.action}`),
-      );
-      expect(keys.length).toBeGreaterThan(0);
-      expect(new Set(keys).size).toBe(keys.length);
-      for (const key of keys) {
-        expect(key).toMatch(/^[a-z]+\.[a-z]+$/);
-      }
-      for (const resource of catalog) {
-        for (const action of resource.actions) {
-          expect(action.description.trim().length).toBeGreaterThan(0);
-        }
-      }
-    });
-
-    it('catalog includes audit.read for the audit log endpoints', () => {
-      const catalog = service.getPermissionCatalog();
-      const audit = catalog.find((resource) => resource.resource === 'audit');
-      expect(audit).toBeDefined();
-      expect(audit!.actions.map((action) => action.action)).toContain('read');
-      expect(`${audit!.resource}.read`).toMatch(/^[a-z]+\.[a-z]+$/);
     });
   });
 

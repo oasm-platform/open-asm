@@ -1,11 +1,12 @@
 import { IntegrationType } from '@/common/enums/enum';
-import { BadRequestException, Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import type {
   BaseConnector,
   ConnectorConfig,
   SourceCodeCapable,
 } from './connector.abstract';
 import { getConnectorClass } from './connector.registry';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 /**
  * Response from a connector test execution.
@@ -191,7 +192,7 @@ export function resolveSourceCodeConnector(appType: string): SourceCodeCapable {
     typeof (connector as Partial<SourceCodeCapable>).listRepositories !==
       'function'
   ) {
-    throw new BadRequestException(
+    throw new InvalidInputError(
       `Integration app "${appType}" cannot list repositories`,
     );
   }

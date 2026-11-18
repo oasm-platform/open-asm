@@ -8,7 +8,7 @@ import type {
   RequestWithMetadata,
   UserContextPayload,
 } from '@/common/interfaces/app.interface';
-import { GetManyResponseDto } from '@/utils/getManyResponse';
+import { GetManyResponseDto } from '@/common/utils/get-many-response.util';
 import {
   Body,
   Controller,

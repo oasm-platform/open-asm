@@ -292,7 +292,7 @@ export class RemoteExecuteService {
           }
         }
       } catch (err) {
-        this.logger.warn(`Failed to parse Redis message: ${err}`);
+        this.logger.warn(`Failed to parse Redis message: ${String(err)}`);
       }
     });
 

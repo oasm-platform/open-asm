@@ -1,7 +1,7 @@
-import { Global, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Comment } from '../comments/entities/comment.entity';
-import { ISSUE_VULNERABILITY_EVENTS } from '../event-bridge/sinks/issues/issues.sink';
+import { IssuesSink } from './event-lane/issues.sink';
 import { IssueLink } from './entities/issue-link.entity';
 import { IssueCounter } from './entities/issue-counter.entity';
 import { IssueRule } from './entities/issue-rule.entity';
@@ -17,14 +17,12 @@ import { IssuesService } from './issues.service';
 import { IssueRuleEngine } from './rules/issue-rule-engine.service';
 import { IssueRulesService } from './rules/issue-rules.service';
 
-@Global()
 @Module({
   imports: [TypeOrmModule.forFeature([
       Issue,
       IssueLink,
       IssueRule,
       IssueCounter,
-      Comment,
     ])],
   // Rules first: `/issues/rules` must not be matched as `/issues/:id`.
   controllers: [IssueRulesController, IssuesController],
@@ -38,9 +36,9 @@ import { IssueRulesService } from './rules/issue-rules.service';
     VulnerabilityRemediationHandler,
     TaskHandler,
     IssueAutomationService,
-    // The event bridge's issues lane hands finding events here.
-    { provide: ISSUE_VULNERABILITY_EVENTS, useExisting: IssueAutomationService },
+    // The `issues` lane of the event bus (found by EventConsumersService)
+    IssuesSink,
   ],
-  exports: [IssuesService, ISSUE_VULNERABILITY_EVENTS],
+  exports: [IssuesService],
 })
 export class IssuesModule {}

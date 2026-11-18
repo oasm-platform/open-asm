@@ -1,5 +1,5 @@
 import { IntegrationType } from '@/common/enums/enum';
-import { BadRequestException } from '@nestjs/common';
+
 
 import { AwsConnector } from '../connectors/aws.connector';
 import { getConnectorClass } from '../connectors/connector.registry';
@@ -9,6 +9,7 @@ import {
   validateIntegrationConfig,
 } from '../validators/integration.validator';
 import { awsSchema } from './aws.schema';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 const CATEGORY = IntegrationType.CLOUD_PROVIDER;
 
@@ -109,7 +110,7 @@ describe('awsSchema', () => {
             ...partial,
           },
         }),
-      ).toThrow(BadRequestException);
+      ).toThrow(InvalidInputError);
     },
   );
 

@@ -1,12 +1,13 @@
 import { ToolCategory, WorkerType } from '@/common/enums/enum';
-import { BadRequestException } from '@nestjs/common';
+
 import { randomUUID } from 'crypto';
 import type { Repository } from 'typeorm';
 import { And, ILike, In, Not } from 'typeorm';
 import type { Tool } from './entities/tools.entity';
 import { ToolConfigProfile } from './entities/tool-config-profiles.entity';
-import type { WorkspaceTool } from './entities/workspace_tools.entity';
+import type { WorkspaceTool } from './entities/workspace-tools.entity';
 import { ToolsService } from './tools.service';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 // ── Mock factories ──────────────────────────────────────────────────
 const mockRepo = () => ({
@@ -73,9 +74,7 @@ describe('ToolsService — readiness flags', () => {
     service = new ToolsService(
       toolsRepo as unknown as Repository<Tool>,
       workspaceToolRepo as unknown as Repository<WorkspaceTool>,
-      {} as any, // assetRepo
-      {} as any, // vulnerabilityRepo
-      workersService as any,
+      workersService.repo as any,
       profilesRepo,
       connectorRegistry as any,
     );
@@ -625,9 +624,7 @@ describe('ToolsService — readiness flags', () => {
       const instance = new ToolsService(
         toolsRepo as unknown as Repository<Tool>,
         workspaceToolRepo as unknown as Repository<WorkspaceTool>,
-        {} as any,
-        {} as any,
-        workersService as any,
+        workersService.repo as any,
         profilesRepo,
         connectorRegistry as any,
       );
@@ -772,9 +769,7 @@ describe('uninstallTool — cascades config profile deletion', () => {
     service = new ToolsService(
       mockRepo() as unknown as Repository<Tool>,
       workspaceToolRepo as unknown as Repository<WorkspaceTool>,
-      {} as any, // assetRepo
-      {} as any, // vulnerabilityRepo
-      mockWorkersService() as any,
+      mockWorkersService().repo as any,
       profilesRepo,
       {} as any, // connectorRegistry
     );
@@ -840,8 +835,7 @@ describe('uninstallTool — cascades config profile deletion', () => {
 
     await expect(
       service.uninstallTool({ toolId: 'tool-003' }, 'ws-003'),
-    ).rejects.toThrow(
-      new BadRequestException('Tool is not installed in this workspace.'),
+    ).rejects.toThrow(new InvalidInputError('Tool is not installed in this workspace.'),
     );
 
     expect(workspaceToolRepo.manager.transaction).not.toHaveBeenCalled();

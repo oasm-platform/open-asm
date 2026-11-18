@@ -18,7 +18,7 @@ Public, unauthenticated endpoints at the API root: the health check, system meta
 
 ## Coupling
 
-- Imports `UsersModule` (`usersService.usersRepository`) and `SystemConfigsModule` (`getConfig`, `isSignUpAllowed`). `StorageService` and `RedisService` are global.
+- Imports `UsersModule` (`usersService.usersRepository`) and `SystemConfigsModule` (`getConfig`, `isSignUpAllowed`). It also imports `StorageModule`; `RedisService` is global.
 - Imported only by `combine.module.ts`. Nothing injects `RootService`.
 
 ## Gotchas

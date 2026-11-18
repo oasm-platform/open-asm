@@ -1,26 +1,27 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { TargetsService } from '../targets/targets.service';
-import { CreateInternalNetworkDto } from './dtos/create-internal-network.dto';
-import { CreateTargetsFromInterfacesDto } from './dtos/create-targets-from-interfaces.dto';
+import { CreateInternalNetworkDto } from './dto/create-internal-network.dto';
+import { CreateTargetsFromInterfacesDto } from './dto/create-targets-from-interfaces.dto';
 import {
   GetInternalNetworkResponseDto,
   GetManyInternalNetworksQueryDto,
   GetManyInternalNetworksResponseDto,
-} from './dtos/get-many-internal-networks.dto';
+} from './dto/get-many-internal-networks.dto';
 import { Target, TargetSource, TargetType } from '../targets/entities/target.entity';
 import {
   GetManyNetworkInterfacesQueryDto,
   GetManyNetworkInterfacesResponseDto,
-} from './dtos/get-many-network-interfaces.dto';
-import { UpdateInternalNetworkDto } from './dtos/update-internal-network.dto';
+} from './dto/get-many-network-interfaces.dto';
+import { UpdateInternalNetworkDto } from './dto/update-internal-network.dto';
 import { InternalNetwork } from './entities/internal-network.entity';
 import { NetworkInterface } from './entities/network-interface.entity';
 import { WorkerInstance } from '../workers/entities/worker.entity';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 @Injectable()
 export class InternalNetworksService {
@@ -125,7 +126,7 @@ export class InternalNetworksService {
       relations: ['workspace'],
     });
     if (!internalNetwork) {
-      throw new NotFoundException('Internal network not found');
+      throw new NotFoundError('Internal network not found');
     }
     // Check workspace ownership
 
@@ -155,7 +156,7 @@ export class InternalNetworksService {
       relations: ['workspace'],
     });
     if (!internalNetwork) {
-      throw new NotFoundException('Internal network not found');
+      throw new NotFoundError('Internal network not found');
     }
     // Check workspace ownership
 
@@ -180,7 +181,7 @@ export class InternalNetworksService {
       where: { id: internalNetworkId, workspaceId },
     });
     if (!internalNetwork) {
-      throw new NotFoundException('Internal network not found');
+      throw new NotFoundError('Internal network not found');
     }
 
     const { page, limit, sortBy, sortOrder, search } = query;
@@ -272,7 +273,7 @@ export class InternalNetworksService {
       relations: ['creator', 'workers'],
     });
     if (!network) {
-      throw new NotFoundException('Internal network not found');
+      throw new NotFoundError('Internal network not found');
     }
 
     return {
@@ -298,14 +299,14 @@ export class InternalNetworksService {
     );
 
     if (interfaces.length === 0) {
-      throw new NotFoundException('No network interfaces found');
+      throw new NotFoundError('No network interfaces found');
     }
 
     const networkIds = [...new Set(interfaces.map((i) => i.internalNetworkId))];
     const networks = await this.internalNetworkRepository.findByIds(networkIds);
 
     if (networks.length !== networkIds.length) {
-      throw new NotFoundException('One or more internal networks not found');
+      throw new NotFoundError('One or more internal networks not found');
     }
 
     const networkMap = new Map(networks.map((n) => [n.id, n]));

@@ -7,12 +7,11 @@ Ingest layer for scan results: turns a finished job's tool output into rows in t
 - `data-adapter.service.ts`: `DataAdapterService` plus exported pure helpers (`mergeDnsRecords`, `toDnsFacetRows`, `vulnerabilityFingerprint`, `rescanConflictClause`, `splitTechString`, `toTlsCertificateRow`, `VULNERABILITY_INSERT_CHUNK_SIZE`).
 - `url-owner.ts`: `serviceForUrl`, picks the `asset_services` row a discovered URL belongs to when the job ran on a whole host.
 - `data-adapter.interface.ts`: `DataAdapterInput<T>` (`{ data, job }`).
-- `data-adapter.controller.ts`: `@Controller('data-adapter')` with no routes.
 - Specs: `data-adapter.service.spec.ts`, `url-owner.spec.ts`, `vulnerability-fingerprint.spec.ts`.
 
 ## Public surface
 
-- No HTTP routes, no gRPC, no queues. `@Global()` module (registered in `combine.module.ts`); exports `DataAdapterService`.
+- No HTTP routes, no gRPC, no queues. Registered in `combine.module.ts` and imported by `JobsRegistryModule` and `IntegrationsModule`; exports `DataAdapterService`.
 - `syncData({ job, data })` is the entry point. It dispatches on `job.category` (`ToolCategory`): `PORTS_SCANNER` → `portsScanner`, `SUBDOMAINS` → `subdomains`, `HTTP_PROBE` → `httpResponses`, `VULNERABILITIES` → `vulnerabilities`, `SCREENSHOT` → `screenshot`, `URL_DISCOVERY` → `urlDiscovery`. Any other category throws. Only `SCREENSHOT` runs class-validator (`ScreenshotPayload`).
 - `upsertAssetsByTargetId(targetId, assets, isEnabled?, { replaceDnsRecords, jobHistoryId })` is also called directly by integration connectors.
 - Events published (global `EventBridgeService.publishSafely`, always after the commit):
@@ -45,7 +44,7 @@ Ingest layer for scan results: turns a finished job's tool output into rows in t
 ## Coupling
 
 - Callers: `jobs-registry/processors/job-result.processor.ts` (`syncData`, only when `job.isSaveData`), and the AWS and Cloudflare connectors in `integrations/connectors/` (`upsertAssetsByTargetId` with `replaceDnsRecords: true`, via `integrations-sync.service.ts`).
-- Imports `WorkspacesModule`; uses the global `StorageService` and `EventBridgeService`. Writes `assets`/`vulnerabilities` entities directly through `DataSource`, not through `AssetsService` or `VulnerabilitiesService`.
+- Imports `WorkspacesModule` and `StorageModule`; uses the global `EventBridgeService`. Writes `assets`/`vulnerabilities` entities directly through `DataSource`, not through `AssetsService` or `VulnerabilitiesService`.
 - Reuses lifecycle helpers from `vulnerabilities/vulnerability-lifecycle.ts` (`insertInChunks`, `loadVulnerabilitySettings`, `scanScopeKey`) and `vulnerability-settings.ts` (`computeDueAt`). Changes to the vulnerability lifecycle must stay in step with this file.
 
 ## Gotchas

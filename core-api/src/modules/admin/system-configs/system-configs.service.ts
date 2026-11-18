@@ -5,7 +5,6 @@ import { encrypt } from '@/common/utils/encryption.util';
 import { isIpInRanges } from '@/common/utils/ip-range.util';
 import { RedisService } from '@/services/redis/redis.service';
 import {
-  BadRequestException,
   Injectable,
   Logger,
   OnModuleInit,
@@ -24,6 +23,7 @@ import {
   UpdateSystemConfigDto,
 } from './dto/system-configs.dto';
 import { SystemConfig, SystemSettings } from './entities/system-config.entity';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 /** Stored `settings.mailServer`; `password` is encrypted */
 export interface MailServerConfig {
@@ -258,7 +258,7 @@ export class SystemConfigsService implements OnModuleInit {
 
     const merged = { ...(await this.getMailServer()), ...patch };
     if (merged.enabled && (!merged.host || !merged.fromEmail)) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'Set a host and a sender email before turning on the mail server',
       );
     }
@@ -277,7 +277,7 @@ export class SystemConfigsService implements OnModuleInit {
 
     const allowedIps = [...new Set(dto.allowedIps.map((ip) => ip.trim()))];
     if (allowedIps.length > 0 && !isIpInRanges(requesterIp, allowedIps)) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `Add your current IP address (${requesterIp ?? 'unknown'}) to the list, or you lose admin access`,
       );
     }

@@ -1,18 +1,16 @@
 import { JobStatus, WorkerScope, WorkerType } from '@/common/enums/enum';
 import { ConfigService } from '@nestjs/config';
-import { NotFoundException } from '@nestjs/common';
+
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
-import { Asset } from '../assets/entities/assets.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
 import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
-import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
+import { Job } from '../jobs-registry/entities/job.entity';
 import { InternalNetwork } from '../internal-networks/entities/internal-network.entity';
 import { NetworkInterface } from '../internal-networks/entities/network-interface.entity';
-import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
 import { ToolsService } from '../tools/tools.service';
 import { RedisService } from '@/services/redis/redis.service';
 import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
@@ -21,15 +19,14 @@ import { WorkerInstance } from './entities/worker.entity';
 import { WORKER_NAME_MAX_LENGTH, WorkersService } from './workers.service';
 import { WorkerJoinKeyService } from './worker-join-key.service';
 import { WorkerTelemetryService } from './worker-telemetry.service';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 describe('WorkersService', () => {
   let service: WorkersService;
   let mockWorkerInstanceRepository: Partial<Repository<WorkerInstance>>;
-  let mockAssetRepository: Partial<Repository<any>>;
-  let mockWorkspaceToolRepository: Partial<Repository<any>>;
   let mockInternalNetworkRepository: Partial<Repository<any>>;
   let mockNetworkInterfaceRepository: Partial<Repository<any>>;
-  let mockJobsRegistryService: Partial<JobsRegistryService>;
+  let mockJobsRegistryService: { repo: Record<string, jest.Mock> };
   let mockJoinKeyService: { consume: jest.Mock };
   let mockConfigService: Partial<ConfigService>;
   let mockToolsService: Partial<ToolsService>;
@@ -62,14 +59,6 @@ describe('WorkersService', () => {
       exists: jest.fn(),
     } as any;
 
-    mockAssetRepository = {
-      findOne: jest.fn(),
-    } as any;
-
-    mockWorkspaceToolRepository = {
-      findOne: jest.fn(),
-    } as any;
-
     mockInternalNetworkRepository = {
       findOne: jest.fn(),
     } as any;
@@ -87,7 +76,7 @@ describe('WorkersService', () => {
         andWhere: jest.fn().mockReturnThis(),
         execute: jest.fn(),
       },
-    } as any;
+    };
 
     mockJoinKeyService = { consume: jest.fn().mockResolvedValue(null) };
 
@@ -133,14 +122,6 @@ describe('WorkersService', () => {
           useValue: mockWorkerInstanceRepository,
         },
         {
-          provide: getRepositoryToken(Asset),
-          useValue: mockAssetRepository,
-        },
-        {
-          provide: getRepositoryToken(WorkspaceTool),
-          useValue: mockWorkspaceToolRepository,
-        },
-        {
           provide: getRepositoryToken(InternalNetwork),
           useValue: mockInternalNetworkRepository,
         },
@@ -149,8 +130,8 @@ describe('WorkersService', () => {
           useValue: mockNetworkInterfaceRepository,
         },
         {
-          provide: JobsRegistryService,
-          useValue: mockJobsRegistryService,
+          provide: getRepositoryToken(Job),
+          useValue: mockJobsRegistryService.repo,
         },
         {
           provide: WorkerJoinKeyService,
@@ -1492,7 +1473,7 @@ describe('WorkersService', () => {
     it('throws NotFoundException when the worker does not exist', async () => {
       await expect(
         runGetWorkerById(null, builtInToolFixtures, connectorFixtures),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
     });
 
     it('throws NotFoundException when the worker belongs to another workspace', async () => {
@@ -1505,7 +1486,7 @@ describe('WorkersService', () => {
           },
           builtInToolFixtures,
         ),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
     });
 
     const cloudWorker = {
@@ -1531,7 +1512,7 @@ describe('WorkersService', () => {
     it('hides a cloud worker, and the jobs of other workspaces on it, from other callers', async () => {
       await expect(
         runGetWorkerById(cloudWorker, builtInToolFixtures),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
       expect(
         (mockJobsRegistryService.repo as any).createQueryBuilder,
       ).not.toHaveBeenCalled();

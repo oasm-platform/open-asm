@@ -1,4 +1,4 @@
-import { AgentMode } from '@/common/enums/enum';
+import { AgentMode } from '@/modules/agents/enums/agent.enums';
 import { z } from 'zod';
 
 import {

@@ -1,4 +1,4 @@
-import { AgentMode } from '@/common/enums/enum';
+import { AgentMode } from '@/modules/agents/enums/agent.enums';
 
 import { AgentsSkillsService } from './agents.skills';
 import { AgentsSubagentsService } from './agents.subagents';

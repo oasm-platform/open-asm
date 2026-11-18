@@ -1,8 +1,9 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import type { Repository } from 'typeorm';
 import type { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { IntegrationType } from '@/common/enums/enum';
 import type { Integration } from './entities/integration.entity';
+import { IntegrationConfigReader } from './integration-config.reader';
 import { IntegrationsService } from './integrations.service';
 import type { IntegrationSyncService } from './integrations-sync.service';
 
@@ -17,6 +18,7 @@ import {
   runConnector,
   testConnectorConnection,
 } from './connectors/connector.factory';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 const runConnectorMock = runConnector as jest.Mock;
 const testConnectorConnectionMock = testConnectorConnection as jest.Mock;
@@ -94,6 +96,10 @@ describe('IntegrationsService', () => {
       repoMock as unknown as Repository<Integration>,
       workspaceEncryptionMock as unknown as WorkspaceEncryptionService,
       integrationSyncServiceMock as unknown as IntegrationSyncService,
+      new IntegrationConfigReader(
+        repoMock as unknown as Repository<Integration>,
+        workspaceEncryptionMock as unknown as WorkspaceEncryptionService,
+      ),
     );
   });
 
@@ -206,7 +212,7 @@ describe('IntegrationsService', () => {
 
       await expect(
         service.updateIntegration('nope', 'ws-1', { syncSchedule: 'disabled' }),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
       expect(integrationSyncServiceMock.applySchedule).not.toHaveBeenCalled();
     });
   });
@@ -229,7 +235,7 @@ describe('IntegrationsService', () => {
           ...notificationArgs,
           syncSchedule: '0 0 * * *',
         }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
       expect(integrationSyncServiceMock.applySchedule).not.toHaveBeenCalled();
     });
 
@@ -260,7 +266,7 @@ describe('IntegrationsService', () => {
         service.updateIntegration('integration-1', 'ws-1', {
           syncSchedule: '0 0 * * *',
         }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
       expect(integrationSyncServiceMock.applySchedule).not.toHaveBeenCalled();
     });
   });
@@ -289,7 +295,7 @@ describe('IntegrationsService', () => {
           ...awsCreateArgs,
           syncSchedule: '0 0 * * *',
         }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
       expect(integrationSyncServiceMock.applySchedule).not.toHaveBeenCalled();
     });
 
@@ -340,7 +346,7 @@ describe('IntegrationsService', () => {
         service.updateIntegration('integration-1', 'ws-1', {
           syncSchedule: '0 2 * * *',
         }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
       expect(integrationSyncServiceMock.applySchedule).not.toHaveBeenCalled();
     });
 
@@ -354,7 +360,7 @@ describe('IntegrationsService', () => {
           config: workloadIdentityConfig,
           syncSchedule: '0 2 * * *',
         }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
       expect(integrationSyncServiceMock.applySchedule).not.toHaveBeenCalled();
     });
 
@@ -389,7 +395,7 @@ describe('IntegrationsService', () => {
         service.updateIntegration('integration-1', 'ws-1', {
           config: workloadIdentityConfig,
         }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
       expect(integrationSyncServiceMock.applySchedule).not.toHaveBeenCalled();
       expect(repoMock.save).not.toHaveBeenCalled();
     });
@@ -430,7 +436,7 @@ describe('IntegrationsService', () => {
 
       await expect(
         service.deleteIntegration('nope', 'ws-1'),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
       expect(integrationSyncServiceMock.removeJobScheduler).not.toHaveBeenCalled();
     });
   });
@@ -516,7 +522,7 @@ describe('IntegrationsService', () => {
 
       await expect(
         service.syncIntegration('integration-1', 'ws-1'),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
       expect(integrationSyncServiceMock.enqueueManualSync).not.toHaveBeenCalled();
     });
 
@@ -525,7 +531,7 @@ describe('IntegrationsService', () => {
 
       await expect(
         service.syncIntegration('nope', 'ws-1'),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
       expect(integrationSyncServiceMock.enqueueManualSync).not.toHaveBeenCalled();
     });
   });
@@ -583,7 +589,7 @@ describe('IntegrationsService', () => {
             workspaceId: 'ws-1',
             userId: 'user-1',
           }),
-        ).rejects.toThrow(BadRequestException);
+        ).rejects.toThrow(InvalidInputError);
         expect(repoMock.save).not.toHaveBeenCalled();
       });
 
@@ -621,7 +627,7 @@ describe('IntegrationsService', () => {
             ...githubArgs,
             capabilities: [IntegrationType.NOTIFICATION],
           }),
-        ).rejects.toThrow(BadRequestException);
+        ).rejects.toThrow(InvalidInputError);
       });
 
       it('requires capability-scoped fields only while that capability is enabled', async () => {
@@ -686,7 +692,7 @@ describe('IntegrationsService', () => {
           service.testIntegration('integration-1', 'ws-1', {
             capability: IntegrationType.TICKETING,
           }),
-        ).rejects.toThrow(BadRequestException);
+        ).rejects.toThrow(InvalidInputError);
       });
 
       it('lists repositories through the SOURCE_CODE connector', async () => {
@@ -718,7 +724,7 @@ describe('IntegrationsService', () => {
 
         await expect(
           service.listRepositories('integration-1', 'ws-1', { page: 1, limit: 30 }),
-        ).rejects.toThrow(BadRequestException);
+        ).rejects.toThrow(InvalidInputError);
         expect(resolveSourceCodeConnectorMock).not.toHaveBeenCalled();
       });
     });

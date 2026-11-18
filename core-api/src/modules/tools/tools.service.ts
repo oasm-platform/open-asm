@@ -1,23 +1,14 @@
-import type { WrapperType } from '@/common/types/app.types';
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { ToolCategory, WorkerScope, WorkerType } from '@/common/enums/enum';
-import { getManyResponse } from '@/utils/getManyResponse';
-import {
-  BadRequestException,
-  forwardRef,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type {
   FindOperator,
   FindOptionsWhere,
 } from 'typeorm';
 import { And, ILike, In, Not, Raw, Repository } from 'typeorm';
-import { Asset } from '../assets/entities/assets.entity';
-import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
-import { WorkersService } from '../workers/workers.service';
+import { WorkerInstance } from '../workers/entities/worker.entity';
 import { CreateToolDto } from './dto/create-tool.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
 import {
@@ -28,10 +19,11 @@ import { ToolsQueryDto } from './dto/tools-query.dto';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
 import { Tool } from './entities/tools.entity';
 import { ToolConfigProfile } from './entities/tool-config-profiles.entity';
-import { WorkspaceTool } from './entities/workspace_tools.entity';
+import { WorkspaceTool } from './entities/workspace-tools.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { categorySpec } from './tool-categories';
 import { DEFAULT_TOOL_TARGET_TYPES } from './tool-target-types';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 /** WHERE fragment: the tool declares `category` among its categories. */
 const hasCategory = (category: ToolCategory) =>
@@ -75,14 +67,12 @@ export class ToolsService {
     @InjectRepository(WorkspaceTool)
     private readonly workspaceToolRepository: Repository<WorkspaceTool>,
 
-    @InjectRepository(Asset)
-    public readonly assetRepo: Repository<Asset>,
 
-    @InjectRepository(Vulnerability)
-    public readonly vulnerabilityRepo: Repository<Vulnerability>,
 
-    @Inject(forwardRef(() => WorkersService))
-    private readonly workersService: WrapperType<WorkersService>,
+    // Read model: worker availability per tool. A direct read keeps tools
+    // from depending on WorkersService, which depends on tools.
+    @InjectRepository(WorkerInstance)
+    private readonly workerRepository: Repository<WorkerInstance>,
 
     @InjectRepository(ToolConfigProfile)
     private readonly profilesRepo: Repository<ToolConfigProfile>,
@@ -98,7 +88,7 @@ export class ToolsService {
    * @returns The number of available BUILT_IN workers.
    */
   private async countBuiltInWorkers(workspaceId: string): Promise<number> {
-    return this.workersService.repo
+    return this.workerRepository
       .createQueryBuilder('w')
       .where('(w."workspaceId" = :workspaceId OR w."scope" = :cloudScope)', {
         workspaceId,
@@ -125,7 +115,7 @@ export class ToolsService {
     if (toolIds.length === 0) return counts;
 
     const rows: Array<{ toolId: string | null; count: string }> =
-      await this.workersService.repo
+      await this.workerRepository
         .createQueryBuilder('w')
         .select('w."toolId"', 'toolId')
         .addSelect('COUNT(*)', 'count')
@@ -238,7 +228,7 @@ export class ToolsService {
       this.connectorRegistry.getConnector(tool.name) === null &&
       tool.type !== WorkerType.BUILT_IN
     ) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `Unknown connector slug "${tool.name}"`,
       );
     }
@@ -262,7 +252,7 @@ export class ToolsService {
     });
 
     if (existingEntry) {
-      throw new BadRequestException('Tool already exists in this workspace.');
+      throw new InvalidInputError('Tool already exists in this workspace.');
     }
 
     const newWorkspaceTool = this.workspaceToolRepository.create({
@@ -290,7 +280,7 @@ export class ToolsService {
     });
 
     if (existingEntry) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'Tool already installed in this workspace.',
       );
     }
@@ -301,7 +291,7 @@ export class ToolsService {
       where: { id: dto.toolId },
     });
     if (!tool) {
-      throw new NotFoundException(`Tool with ID "${dto.toolId}" not found.`);
+      throw new NotFoundError(`Tool with ID "${dto.toolId}" not found.`);
     }
 
     // Create and save the new workspace-tool entry
@@ -330,7 +320,7 @@ export class ToolsService {
     });
 
     if (!existingEntry) {
-      throw new BadRequestException('Tool is not installed in this workspace.');
+      throw new InvalidInputError('Tool is not installed in this workspace.');
     }
 
     // Remove the workspace_tools row AND cascade its ToolConfigProfile rows
@@ -705,7 +695,7 @@ export class ToolsService {
     });
 
     if (!tool) {
-      throw new NotFoundException(`Tool with ID "${id}" not found.`);
+      throw new NotFoundError(`Tool with ID "${id}" not found.`);
     }
 
     tool.agentTool = this.isAgentTool(tool);
@@ -757,7 +747,7 @@ export class ToolsService {
     });
 
     if (existingTool) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `A tool with the name "${dto.name}" already exists.`,
       );
     }

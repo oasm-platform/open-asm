@@ -1,12 +1,13 @@
 import { BullMQName } from '@/common/enums/enum';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Logger, NotFoundException } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import {
   type EventTriggerJobData,
   type ProjectScheduleJobData,
   ProjectTriggersService,
 } from '../project-triggers.service';
+import { isNotFound } from '@/common/errors/error-checks';
 
 /** Cron triggers of project workflows. */
 @Processor(BullMQName.PROJECT_WORKFLOW_SCHEDULE)
@@ -24,7 +25,7 @@ export class ProjectScheduleConsumer extends WorkerHost {
       // The job is orphaned: its trigger, workflow or project was removed
       // without the BullMQ scheduler. Drop the scheduler instead of letting
       // it fail on every repeat.
-      if (error instanceof NotFoundException) {
+      if (isNotFound(error)) {
         this.logger.warn(
           `Scheduled project job ${JSON.stringify(job.data)} no longer resolves, removing its scheduler`,
         );

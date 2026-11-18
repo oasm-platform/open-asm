@@ -1,5 +1,5 @@
 import { encrypt } from '@/common/utils/encryption.util';
-import { BadRequestException } from '@nestjs/common';
+
 import type { Auth } from 'better-auth';
 import { createTransport } from 'nodemailer';
 import { MailProvider } from './dto/system-configs.dto';
@@ -8,6 +8,7 @@ import type {
   MailServerConfig,
   SystemConfigsService,
 } from './system-configs.service';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 jest.mock('nodemailer', () => ({ createTransport: jest.fn() }));
 
@@ -129,7 +130,7 @@ describe('MailService', () => {
 
       const result = service.sendTest('admin@example.com');
 
-      await expect(result).rejects.toBeInstanceOf(BadRequestException);
+      await expect(result).rejects.toBeInstanceOf(InvalidInputError);
       await expect(result).rejects.toThrow(
         'Test email failed: Invalid login: 535 Bad credentials',
       );

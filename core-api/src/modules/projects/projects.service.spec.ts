@@ -1,6 +1,7 @@
 import { JobRunType, ProjectTriggerType } from '@/common/enums/enum';
 import { BadRequestException } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 const WORKSPACE_ID = 'ws-1';
 
@@ -112,7 +113,7 @@ describe('ProjectsService', () => {
       ctx.projectRepo.findOne.mockResolvedValue({ id: 'other' });
       await expect(
         ctx.service.create({ name: 'Acme' }, WORKSPACE_ID),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
       expect(ctx.projectRepo.save).not.toHaveBeenCalled();
     });
 
@@ -120,7 +121,7 @@ describe('ProjectsService', () => {
       const ctx = setup();
       await expect(
         ctx.service.create({ name: 'Acme', schedule: '0 2 * * 1' }, WORKSPACE_ID),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
       expect(ctx.projectRepo.save).not.toHaveBeenCalled();
     });
 
@@ -174,7 +175,7 @@ describe('ProjectsService', () => {
       });
       await expect(
         ctx.service.update('p-1', { name: 'x' }, WORKSPACE_ID),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
     });
   });
 
@@ -314,7 +315,7 @@ describe('ProjectsService', () => {
 
       await expect(
         ctx.service.addWorkflow('p-1', WORKSPACE_ID, { template: 'x.yaml', on: { schedule: [{ cron: 'disabled' }] } }),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
       expect(ctx.workflows.create).toHaveBeenCalledTimes(1);
     });
 

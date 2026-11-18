@@ -5,11 +5,13 @@ import { InternalNetwork } from './entities/internal-network.entity';
 import { NetworkInterface } from './entities/network-interface.entity';
 import { InternalNetworksController } from './internal-networks.controller';
 import { InternalNetworksService } from './internal-networks.service';
+import { TargetsModule } from '../targets/targets.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([InternalNetwork, NetworkInterface]),
     WorkspacesModule,
+    TargetsModule,
   ],
   controllers: [InternalNetworksController],
   providers: [InternalNetworksService],

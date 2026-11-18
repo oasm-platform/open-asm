@@ -1,11 +1,9 @@
-import { forwardRef, Global, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Asset } from '../assets/entities/assets.entity';
 import { ConnectorsModule } from '../connectors/connectors.module';
 import { InternalNetwork } from '../internal-networks/entities/internal-network.entity';
 import { NetworkInterface } from '../internal-networks/entities/network-interface.entity';
 import { Job } from '../jobs-registry/entities/job.entity';
-import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
 import { ToolsModule } from '../tools/tools.module';
 import { AgentConversation } from '@/modules/agents/entities/agent-conversation.entity';
 import { AliveStreamManager } from './alive-stream-manager.service';
@@ -21,19 +19,16 @@ import { WorkerStreamController } from './worker-stream.controller';
 import { WorkerStreamRegistry } from './worker-stream-registry.service';
 import { WorkerJoinKeyService } from './worker-join-key.service';
 
-@Global()
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       WorkerInstance,
       Job,
-      Asset,
-      WorkspaceTool,
       NetworkInterface,
       InternalNetwork,
       AgentConversation,
     ]),
-    forwardRef(() => ToolsModule),
+    ToolsModule,
     ConnectorsModule,
   ],
   controllers: [WorkersController, WorkerStreamController],

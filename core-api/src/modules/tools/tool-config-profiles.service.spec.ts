@@ -1,9 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
-import {
-  BadRequestException,
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
+
 
 import type { ConnectorRegistryService } from '@/modules/connectors/connector-registry.service';
 import { _resetValidatorCache } from '@/modules/tools/validators/tool-config-profiles.validator';
@@ -16,6 +12,7 @@ import {
   encryptProfile,
 } from './validators/tool-config-profiles.crypto';
 import { ToolConfigProfilesService } from './tool-config-profiles.service';
+import { ConflictError, InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 // --- Mocks ---
 const mockRepo = () => ({
@@ -137,7 +134,7 @@ describe('ToolConfigProfilesService', () => {
 
     await expect(
       service.create(wsId, toolId, { name: 'default', config: {} }),
-    ).rejects.toThrow(ConflictException);
+    ).rejects.toThrow(ConflictError);
   });
 
   it('create — invalid config returns 400 with Ajv error paths', async () => {
@@ -152,7 +149,7 @@ describe('ToolConfigProfilesService', () => {
         name: 'bad',
         config: { severity: ['invalid'] },
       }),
-    ).rejects.toThrow(BadRequestException);
+    ).rejects.toThrow(InvalidInputError);
   });
 
   it('create — unknown tool throws', async () => {
@@ -488,7 +485,7 @@ describe('ToolConfigProfilesService', () => {
 
     await expect(
       service.remove(wsId, 'prof-linked'),
-    ).rejects.toThrow(new ConflictException('Cannot delete profile prof-linked: referenced by Job #job-ref'));
+    ).rejects.toThrow(new ConflictError('Cannot delete profile prof-linked: referenced by Job #job-ref'));
   });
 
   it('remove — job-ref query reaches workspace via asset→target join (no jobs.workspaceId)', async () => {
@@ -520,7 +517,7 @@ describe('ToolConfigProfilesService', () => {
 
     await expect(
       service.remove(wsId, 'prof-wf'),
-    ).rejects.toThrow(new ConflictException('Cannot delete profile prof-wf: referenced by Workflow my-workflow (#wf-1)'));
+    ).rejects.toThrow(new ConflictError('Cannot delete profile prof-wf: referenced by Workflow my-workflow (#wf-1)'));
 
     // Regression: the workflow query must bind BOTH params ($1 workspaceId,
     // $2 jsonb array of jobs) — previously it passed 2 params but only had $1.
@@ -659,7 +656,7 @@ describe('ToolConfigProfilesService', () => {
 
     await expect(
       service.resolveConfigForDispatch(wsId, toolId, 'orphan-profile-id'),
-    ).rejects.toThrow(new NotFoundException('ToolConfigProfile orphan-profile-id not found'));
+    ).rejects.toThrow(new NotFoundError('ToolConfigProfile orphan-profile-id not found'));
   });
 
   it('resolveConfigForDispatch — cross-tool profileId throws 404', async () => {
@@ -675,7 +672,7 @@ describe('ToolConfigProfilesService', () => {
 
     await expect(
       service.resolveConfigForDispatch(wsId, toolId, 'prof-other-tool'),
-    ).rejects.toThrow(new NotFoundException('ToolConfigProfile prof-other-tool not found'));
+    ).rejects.toThrow(new NotFoundError('ToolConfigProfile prof-other-tool not found'));
   });
 
   it('resolveConfigForDispatch — cross-workspace profileId throws 404', async () => {
@@ -691,7 +688,7 @@ describe('ToolConfigProfilesService', () => {
 
     await expect(
       service.resolveConfigForDispatch(wsId, toolId, 'prof-other-ws'),
-    ).rejects.toThrow(new NotFoundException('ToolConfigProfile prof-other-ws not found'));
+    ).rejects.toThrow(new NotFoundError('ToolConfigProfile prof-other-ws not found'));
   });
 
   it('resolveConfigForDispatch — default profile branch (no explicit profileId) returns decrypted config', async () => {

@@ -1,11 +1,8 @@
 import { IssueCommentType } from '@/common/enums/enum';
-import {
-  BadRequestException,
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
+
 import { CommentsService } from './comments.service';
 import type { Comment } from './entities/comment.entity';
+import { ForbiddenError, InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 const WS = 'ws-1';
 const USER = 'user-1';
@@ -89,7 +86,7 @@ describe('CommentsService', () => {
       issuesRepository.findOne.mockResolvedValue(null);
       await expect(
         service.create({ kind: 'issue', id: ISSUE }, { content: 'x' }, USER, WS),
-      ).rejects.toBeInstanceOf(NotFoundException);
+      ).rejects.toBeInstanceOf(NotFoundError);
       expect(issuesRepository.findOne).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: ISSUE, workspaceId: WS } }),
       );
@@ -122,7 +119,7 @@ describe('CommentsService', () => {
       (vuln.qb.getOne as jest.Mock).mockResolvedValue(null);
       await expect(
         service.list({ kind: 'vulnerability', id: VULN }, { page: 1, limit: 10 } as never, WS),
-      ).rejects.toBeInstanceOf(NotFoundException);
+      ).rejects.toBeInstanceOf(NotFoundError);
     });
 
     it('answers 404 for a comment whose subject is in another workspace', async () => {
@@ -131,7 +128,7 @@ describe('CommentsService', () => {
       issuesRepository.findOne.mockResolvedValue(null);
       await expect(
         service.update('c-1', { content: 'y' }, USER, WS),
-      ).rejects.toBeInstanceOf(NotFoundException);
+      ).rejects.toBeInstanceOf(NotFoundError);
       expect(commentsRepository.save).not.toHaveBeenCalled();
     });
   });
@@ -200,7 +197,7 @@ describe('CommentsService', () => {
           USER,
           WS,
         ),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
       expect(commentsRepository.save).not.toHaveBeenCalled();
     });
 
@@ -216,7 +213,7 @@ describe('CommentsService', () => {
           USER,
           WS,
         ),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
       commentsRepository.findOne.mockResolvedValueOnce(null);
       await expect(
         service.create(
@@ -225,7 +222,7 @@ describe('CommentsService', () => {
           USER,
           WS,
         ),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
     });
   });
 
@@ -249,7 +246,7 @@ describe('CommentsService', () => {
       commentsRepository.findOne.mockResolvedValue(comment());
       await expect(
         service.update('c-1', { content: 'x' }, 'user-2', WS),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      ).rejects.toBeInstanceOf(ForbiddenError);
       expect(commentsRepository.save).not.toHaveBeenCalled();
     });
 
@@ -260,9 +257,8 @@ describe('CommentsService', () => {
       );
       await expect(
         service.update('c-1', { content: 'x' }, USER, WS),
-      ).rejects.toBeInstanceOf(ForbiddenException);
-      await expect(service.delete('c-1', USER, WS)).rejects.toBeInstanceOf(
-        ForbiddenException,
+      ).rejects.toBeInstanceOf(ForbiddenError);
+      await expect(service.delete('c-1', USER, WS)).rejects.toBeInstanceOf(ForbiddenError,
       );
       expect(commentsRepository.softDelete).not.toHaveBeenCalled();
     });
@@ -277,8 +273,7 @@ describe('CommentsService', () => {
     it('404s an unknown comment', async () => {
       const { service, commentsRepository } = setup();
       commentsRepository.findOne.mockResolvedValue(null);
-      await expect(service.delete('nope', USER, WS)).rejects.toBeInstanceOf(
-        NotFoundException,
+      await expect(service.delete('nope', USER, WS)).rejects.toBeInstanceOf(NotFoundError,
       );
     });
   });

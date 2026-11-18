@@ -1,4 +1,4 @@
-import { BadRequestException, Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { QueryFailedError } from 'typeorm';
 import { IntegrationType } from '@/common/enums/enum';
 import type { CreateMultipleTargetsDto } from '../../targets/dto/targets.dto';
@@ -43,6 +43,7 @@ import {
   type DnsRecordType,
   type DnsRecords,
 } from './aws/aws.discovery';
+import { isInvalidInput } from '@/common/errors/error-checks';
 
 /** Lookup page size for the pre-create existence check. */
 export const TARGET_LOOKUP_BATCH = 500;
@@ -824,7 +825,7 @@ export class AwsConnector extends CloudProviderConnector {
 
   /** True when a create-target failure means the batch must be re-looked-up. */
   private isDuplicateTargetError(error: unknown): boolean {
-    if (error instanceof BadRequestException) return true;
+    if (isInvalidInput(error)) return true;
     if (error instanceof QueryFailedError) {
       const driverError = error.driverError as { code?: string } | undefined;
       return driverError?.code === '23505';

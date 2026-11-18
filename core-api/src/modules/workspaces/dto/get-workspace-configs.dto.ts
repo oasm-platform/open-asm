@@ -1,4 +1,4 @@
-import { SwaggerPropertyMetadata } from '@/utils/getSwaggerMetadata';
+import { SwaggerPropertyMetadata } from '@/common/utils/get-swagger-metadata.util';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class GetWorkspaceConfigsDto {

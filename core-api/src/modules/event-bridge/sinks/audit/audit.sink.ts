@@ -1,12 +1,10 @@
+import { EventLane } from '../../consuming/event-lane.decorator';
 import {
   EVENT_BUS_AUDIT_LOCK_KEY,
   EVENT_BUS_AUDIT_LOCK_TTL_MS,
 } from '@/common/constants/app.constants';
-import {
-  AuditActorType,
-  AuditOutcome,
-  EventBusGroup,
-} from '@/common/enums/enum';
+import { AuditActorType, AuditOutcome } from '@/common/enums/enum';
+import { EventBusGroup } from '@/modules/event-bridge/enums/event-bridge.enums';
 import { AuditEvent } from '@/modules/audit/entities/audit-event.entity';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -34,6 +32,7 @@ import { SUBSCRIPTIONS } from '../../routing/subscriptions';
  * list would interleave rows. The other lanes are order-independent and run on
  * every replica.
  */
+@EventLane()
 @Injectable()
 export class AuditSink implements EventSink {
   readonly group = EventBusGroup.Audit;

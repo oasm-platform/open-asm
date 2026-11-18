@@ -1,7 +1,7 @@
 // First: AppModule loads the module graph in the order main.ts does, so the
 // agents files below are already evaluated when this spec imports them.
 import { closeTestApp, createTestApp, type TestApp } from './helpers/app';
-import { AgentMode } from '@/common/enums/enum';
+import { AgentMode } from '@/modules/agents/enums/agent.enums';
 import {
   AgentTool,
   MCP_TOOLS,

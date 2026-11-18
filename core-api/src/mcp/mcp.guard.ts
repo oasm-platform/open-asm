@@ -4,6 +4,7 @@ import { RequestWithMetadata } from '@/common/interfaces/app.interface';
 import { ApiKeysService } from '@/modules/apikeys/apikeys.service';
 import type { CanActivate, ExecutionContext } from '@nestjs/common';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { isUnauthenticated } from '@/common/errors/error-checks';
 
 @Injectable()
 export class McpGuard implements CanActivate {
@@ -26,7 +27,7 @@ export class McpGuard implements CanActivate {
       request.workspaceId = keyEntity.ref;
       return true;
     } catch (error) {
-      if (error instanceof UnauthorizedException) throw error;
+      if (isUnauthenticated(error)) throw error;
       throw new UnauthorizedException('Invalid workspace API key');
     }
   }

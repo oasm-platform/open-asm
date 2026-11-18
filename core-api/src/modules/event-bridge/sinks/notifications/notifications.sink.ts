@@ -1,9 +1,6 @@
-import {
-  EventBusGroup,
-  NotificationScope,
-  NotificationStatus,
-  NotificationType,
-} from '@/common/enums/enum';
+import { EventLane } from '../../consuming/event-lane.decorator';
+import { NotificationScope, NotificationStatus, NotificationType } from '@/common/enums/enum';
+import { EventBusGroup } from '@/modules/event-bridge/enums/event-bridge.enums';
 import { User } from '@/modules/auth/entities/user.entity';
 import { NotificationRecipient } from '@/modules/notifications/entities/notification-recipient.entity';
 import { Notification } from '@/modules/notifications/entities/notification.entity';
@@ -44,6 +41,7 @@ export const notificationChannel = (userId: string): string =>
  * event (a workspace invitation) stay on the direct `NotificationsService`
  * path, which reuses {@link deliver} so both routes write identical rows.
  */
+@EventLane()
 @Injectable()
 export class NotificationsSink implements EventSink {
   readonly group = EventBusGroup.Notifications;

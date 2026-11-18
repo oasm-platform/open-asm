@@ -5,8 +5,6 @@ Small module that seeds the bot user and exposes the `User` repository. The user
 ## Layout
 
 - `users.service.ts`: `UsersService` with a **public** `usersRepository`. `onModuleInit` creates the bot user (`BOT_ID`, `BOT_NAME` "Cai", `BOT_EMAIL`, `Role.BOT`) when it is missing.
-- `users.controller.ts`: `@Controller('users')` with no routes.
-- `dto/users.dto.ts`: empty file.
 
 ## Public surface
 

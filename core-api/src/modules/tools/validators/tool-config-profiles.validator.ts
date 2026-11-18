@@ -1,8 +1,9 @@
-import { BadRequestException } from '@nestjs/common';
+
 import Ajv from 'ajv/dist/2020';
 import addFormats from 'ajv-formats';
 
 import type { ConnectorRegistryService } from '@/modules/connectors/connector-registry.service';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 const ajv = new Ajv({ strict: false, allErrors: true });
 addFormats(ajv);
@@ -37,14 +38,14 @@ function getValidatorFor(
 
   const entry = registryService.getConnector(toolName);
   if (!entry) {
-    throw new BadRequestException(
+    throw new InvalidInputError(
       `Unknown tool "${toolName}" — cannot validate config`,
     );
   }
 
   const schema = entry.configSchema;
   if (!schema) {
-    throw new BadRequestException(
+    throw new InvalidInputError(
       `Tool "${toolName}" has no config schema or inputs schema -- cannot validate config`,
     );
   }
@@ -94,7 +95,7 @@ function validateOrThrow(
       const path = err.instancePath ? err.instancePath : '/';
       return `${path}: ${err.message ?? 'invalid value'}`;
     });
-    throw new BadRequestException(
+    throw new InvalidInputError(
       `Invalid config for tool "${toolName}": ${errors.join('; ')}`,
     );
   }

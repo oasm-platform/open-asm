@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 
 import { Lock } from '@/services/redis/lock.decorator';
-import { StatisticService } from './statistic.service';
+import { StatisticSnapshotService } from './statistic-snapshot.service';
 
 /**
  * Cron service for calculating and storing periodic statistics for workspaces.
@@ -15,7 +15,7 @@ import { StatisticService } from './statistic.service';
 export class StatisticCronService {
   private readonly logger = new Logger(StatisticCronService.name);
 
-  constructor(private readonly statisticService: StatisticService) {}
+  constructor(private readonly snapshots: StatisticSnapshotService) {}
 
   /**
    * Handles the cron task to calculate and store statistics.
@@ -27,6 +27,6 @@ export class StatisticCronService {
   @Cron('0 0 * * *')
   @Lock('cron:statistic-daily', { ttl: 600_000 })
   async handleCron(): Promise<void> {
-    await this.statisticService.calculateAndStoreStatistics();
+    await this.snapshots.calculateAndStoreStatistics();
   }
 }

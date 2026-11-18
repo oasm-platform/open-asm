@@ -1,9 +1,5 @@
-import {
-  IssuePriority,
-  IssueRuleGroupBy,
-  IssueType,
-  Severity,
-} from '@/common/enums/enum';
+import { IssuePriority, IssueType, Severity } from '@/common/enums/enum';
+import { IssueRuleGroupBy } from '@/modules/issues/enums/issue.enums';
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {

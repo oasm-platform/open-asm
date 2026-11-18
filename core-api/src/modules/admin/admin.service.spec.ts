@@ -1,13 +1,14 @@
 import { Role } from '@/common/enums/enum';
 import { RedisLockService } from '@/services/redis/distributed-lock.service';
 import { RedisService } from '@/services/redis/redis.service';
-import { ConflictException, ForbiddenException, Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuthService } from '../auth/auth.service';
 import { User } from '../auth/entities/user.entity';
 import { AdminService } from './admin.service';
+import { ConflictError, ForbiddenError } from '@/common/errors/domain.errors';
 
 type StoredUser = {
   id: string;
@@ -136,8 +137,7 @@ describe('AdminService', () => {
         emailVerified: true,
       });
 
-      await expect(service.createFirstAdmin(dto)).rejects.toBeInstanceOf(
-        ForbiddenException,
+      await expect(service.createFirstAdmin(dto)).rejects.toBeInstanceOf(ForbiddenError,
       );
       expect(authApi.signUpEmail).not.toHaveBeenCalled();
       expect(usersRepository.update).not.toHaveBeenCalled();
@@ -159,7 +159,7 @@ describe('AdminService', () => {
       expect(fulfilled).toHaveLength(1);
       expect(rejected).toHaveLength(4);
       for (const r of rejected) {
-        expect(r.reason).toBeInstanceOf(ConflictException);
+        expect(r.reason).toBeInstanceOf(ConflictError);
       }
       // Losers never reach sign-up, so no stray account exists to promote later.
       expect(authApi.signUpEmail).toHaveBeenCalledTimes(1);
@@ -176,7 +176,7 @@ describe('AdminService', () => {
           email: 'late@example.com',
           password: 'secret-password',
         }),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      ).rejects.toBeInstanceOf(ForbiddenError);
       expect(adminCount()).toBe(1);
     });
 

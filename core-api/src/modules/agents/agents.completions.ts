@@ -1,8 +1,10 @@
+import { ActiveRunRegistry } from './active-run.registry';
+import { LlmConfigResolver } from './llm-config.resolver';
+import { ConversationTitleService } from './conversation-title.service';
+import { ContextCompactionService } from './context-compaction.service';
 import {
-  BadRequestException,
   Injectable,
   Logger,
-  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type {
@@ -14,13 +16,12 @@ import type {
   UIMessageChunk,
 } from 'ai';
 import { streamText, toUIMessageStream } from 'ai';
-import * as fs from 'fs';
-import * as Mustache from 'mustache';
 import { EventEmitter } from 'node:events';
 import * as path from 'path';
 import { Repository } from 'typeorm';
 
-import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
+import { AgentApprovalMode, AgentMode } from '@/modules/agents/enums/agent.enums';
+import { PromptRegistry } from '@/common/utils/prompt-registry.util';
 import { RemoteExecuteSubscribeService } from '@/modules/workers/remote-execute-subscribe.service';
 import { WorkersService } from '@/modules/workers/workers.service';
 import { Project } from '@/modules/projects/entities/project.entity';
@@ -38,13 +39,7 @@ import {
   type ApprovalResolvedEvent,
   type ApprovalSettings,
 } from './agents.approvals';
-import {
-  AgentsConfigService,
-  formatUserInstructions,
-  type ResolvedLLMConfig,
-  withAgentConfig,
-  withoutDisabledTools,
-} from './agents.config';
+import { AgentsConfigService, formatUserInstructions, type ResolvedLLMConfig, withoutDisabledTools } from './agents.config';
 import { AgentsMcpService } from './agents.mcp';
 import { AgentsMemoriesService } from './agents.memories';
 import { AgentsModelsCatalogService } from './agents.models-catalog';
@@ -61,19 +56,15 @@ import { SendMessageDto } from './dto/message.dto';
 import type { AgentConfig } from './entities/agent-config.entity';
 import { AgentConversation } from './entities/agent-conversation.entity';
 import { AgentConversationTodo } from './entities/agent-conversation-todo.entity';
-import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { AgentMessage } from './entities/agent-message.entity';
 import { AgentMessageToolCall } from './entities/tool-call.entity';
-import { LLMProvider, MessageRole, MessageType } from './enums/agent.enums';
-import { getReasoningProviderOptions } from './llm-provider-supported';
-import { ContextBudgetManager } from './shared/context-budget-manager';
+import { MessageRole, MessageType } from './enums/agent.enums';
 import {
   type ConversationMetadata,
   type TurnStats,
   updateConversationMetadata,
 } from './shared/conversation-metadata';
 import { DEFAULT_MAX_STEPS, stepLimit } from './shared/step-limit';
-import { TokenCounter } from './shared/token-counter';
 import type { BrowserScreenshotEvent } from './tools/remote-execute.tool';
 import {
   addSteps,
@@ -83,6 +74,7 @@ import {
   mergeStats,
   type StatsAccumulator,
 } from './shared/turn-stats';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 /**
  * Whether this run may plan. Agent mode keeps its own plan (`track`): every
@@ -366,39 +358,16 @@ export class AgentsCompletionsService {
   private readonly logger = new Logger(AgentsCompletionsService.name);
 
   /**
-   * Active streaming runs by conversation id. A run outlives the HTTP request
-   * that started it (so navigating away does not kill it); only an explicit
-   * stop, or a newer run on the same conversation, aborts it.
-   */
-  private readonly activeRuns = new Map<string, AbortController>();
-
-  /** Registers the run so a later stop can find it; supersedes any older run. */
-  registerActiveRun(conversationId: string, controller: AbortController): void {
-    const previous = this.activeRuns.get(conversationId);
-    if (previous && previous !== controller) previous.abort();
-    this.activeRuns.set(conversationId, controller);
-  }
-
-  /** Unregisters the run, but only if it is still the current one. */
-  clearActiveRun(conversationId: string, controller: AbortController): void {
-    if (this.activeRuns.get(conversationId) === controller) {
-      this.activeRuns.delete(conversationId);
-    }
-  }
-
-  /**
    * Aborts the active run of a conversation and cancels its pending and
    * running subagents, also when the run itself already ended. Returns false
    * if there was nothing to stop. The run stays registered (so `running`
-   * stays true) until it has saved its stopped state; clearActiveRun removes
-   * it then.
+   * stays true) until it has saved its stopped state and cleared itself from
+   * the `ActiveRunRegistry`.
    */
   async stopRun(conversationId: string): Promise<boolean> {
-    const controller = this.activeRuns.get(conversationId);
-    const aborted = !!controller && !controller.signal.aborted;
+    // First, so the run queues no subagent after the cancel below
+    const aborted = this.activeRuns.abort(conversationId);
     if (aborted) {
-      // First, so the run queues no subagent after the cancel below
-      controller.abort();
       // A user stop leaves no step running: reset the in_progress step back
       // to pending so the todo list stops spinning (the live stream is
       // closing, so the client reflects this optimistically / on its next
@@ -413,33 +382,11 @@ export class AgentsCompletionsService {
     return aborted || cancelled > 0;
   }
 
-  /**
-   * True while a run of the conversation is in progress, including the gaps
-   * between continuation iterations where no message is 'streaming'.
-   */
-  isRunActive(conversationId: string): boolean {
-    return this.activeRuns.has(conversationId);
-  }
-
-  /** Conversations whose title is being generated */
-  private readonly titling = new Set<string>();
-  /** Conversations whose goal is being generated */
-  private readonly goaling = new Set<string>();
-  /** Compaction in progress by conversation id: a second trigger joins it */
-  private readonly compactions = new Map<string, Promise<void>>();
-
-  private readonly prompts = new Map<string, string>();
-  private static readonly PROMPTS_DIR = 'prompts';
-  private readonly toolCapableModelsCache = new Map<string, Set<string>>();
-  private toolCapableCacheExpiry = 0;
-  private static readonly TOOL_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
-  // Default context window (128k) - used for compaction threshold calculation
-  private static readonly DEFAULT_CONTEXT_WINDOW = 128000;
-  private static readonly COMPACTION_THRESHOLD_RATIO = 0.6;
+  private readonly prompts = PromptRegistry.forDirectory(
+    path.join(__dirname, 'prompts'),
+  );
 
   constructor(
-    @InjectRepository(AgentLLMConfig)
-    private readonly llmConfigRepository: Repository<AgentLLMConfig>,
     @InjectRepository(AgentConversation)
     private readonly conversationRepository: Repository<AgentConversation>,
     @InjectRepository(AgentMessage)
@@ -462,284 +409,14 @@ export class AgentsCompletionsService {
     private readonly agentsConfig: AgentsConfigService,
     private readonly modelsCatalog: AgentsModelsCatalogService,
     private readonly subagents: AgentsSubagentsService,
-  ) {
-    this.loadAllPrompts();
-  }
-
-  /**
-   * Loads all prompt files from the prompts directory at startup.
-   * Searches recursively to handle NestJS asset copy behavior where
-   * .md files may be placed in subdirectories (e.g., default/).
-   */
-  private loadAllPrompts(): void {
-    const promptsDir = path.join(
-      __dirname,
-      AgentsCompletionsService.PROMPTS_DIR,
-    );
-    try {
-      this.loadPromptsRecursive(promptsDir);
-    } catch (error) {
-      this.logger.error('Failed to load prompts directory', error);
-    }
-  }
-
-  /**
-   * Recursively walks a directory and loads all .md files found.
-   * Keys are stored in lowercase for case-insensitive lookup.
-   */
-  private loadPromptsRecursive(dir: string): void {
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        this.loadPromptsRecursive(fullPath);
-      } else if (entry.name.endsWith('.md')) {
-        try {
-          const key = entry.name.toLowerCase();
-          this.prompts.set(key, fs.readFileSync(fullPath, 'utf-8'));
-        } catch (error) {
-          this.logger.error(`Failed to load prompt: ${entry.name}`, error);
-        }
-      }
-    }
-  }
+    private readonly activeRuns: ActiveRunRegistry,
+    private readonly llmConfigs: LlmConfigResolver,
+    private readonly titles: ConversationTitleService,
+    private readonly compaction: ContextCompactionService,
+  ) {}
 
   private getPrompt(fileName: string, data?: Record<string, unknown>): string {
-    const key = fileName.toLowerCase();
-    const template = this.prompts.get(key) ?? '';
-    if (data) {
-      return Mustache.render(template, data);
-    }
-    return template;
-  }
-
-  private async resolveLLMConfig(
-    workspaceId: string,
-    userId: string,
-    provider?: string,
-    model?: string,
-  ): Promise<ResolvedLLMConfig> {
-    const agentConfig = await this.agentsConfig.find(workspaceId, userId);
-
-    if (model && provider) {
-      const llmConfig = await this.llmConfigRepository.findOne({
-        where: {
-          workspaceId,
-          userId,
-          provider: provider as LLMProvider,
-        },
-      });
-      if (llmConfig) return withAgentConfig(llmConfig, agentConfig);
-    }
-
-    const llmConfig = await this.agentsConfig.getDefaultLLMConfig(
-      workspaceId,
-      userId,
-      agentConfig,
-    );
-    if (!llmConfig) {
-      throw new BadRequestException(
-        'No LLM provider connected. Please connect a provider first.',
-      );
-    }
-
-    return llmConfig;
-  }
-
-  /**
-   * Validates that the model supports tool calling for providers that require it.
-   * Uses an in-memory cache (10 min TTL) to avoid repeated API calls per message.
-   * Throws BadRequestException BEFORE the stream starts so the caller can still
-   * return a proper HTTP 400 response.
-   */
-  private async validateToolSupport(config: AgentLLMConfig): Promise<void> {
-    if (config.provider !== LLMProvider.OPENROUTER) {
-      return;
-    }
-
-    const now = Date.now();
-    let toolModels = this.toolCapableModelsCache.get('openrouter');
-
-    if (!toolModels || now > this.toolCapableCacheExpiry) {
-      try {
-        const response = await fetch('https://openrouter.ai/api/v1/models');
-        if (response.ok) {
-          const data = (await response.json()) as {
-            data: Array<{ id: string; supported_parameters?: string[] }>;
-          };
-          toolModels = new Set(
-            data.data
-              .filter((m) => m.supported_parameters?.includes('tools'))
-              .map((m) => m.id),
-          );
-          this.toolCapableModelsCache.set('openrouter', toolModels);
-          this.toolCapableCacheExpiry =
-            now + AgentsCompletionsService.TOOL_CACHE_TTL_MS;
-        }
-      } catch (err) {
-        this.logger.warn('Failed to fetch OpenRouter model capabilities', err);
-        return; // Assume capable if check fails
-      }
-    }
-
-    if (toolModels && !toolModels.has(config.model)) {
-      throw new BadRequestException(
-        `The selected model "${config.model}" does not support tool calling. ` +
-          'Please switch to a model that supports tools (e.g. gpt-4o, claude-3-5-sonnet, gemini-2.0-flash).',
-      );
-    }
-  }
-
-  private createLanguageModel(
-    config: AgentLLMConfig,
-    workspaceId: string,
-  ): Promise<LanguageModel> {
-    return this.agentsConfig.createLanguageModel(config, workspaceId);
-  }
-
-  /**
-   * One-shot text completion for background helpers (title, summary, vuln
-   * analysis). Uses streamText, not generateText: some OpenAI-compatible
-   * providers answer a non-streaming request with an SSE-framed body that
-   * generateText cannot parse (see the custom-provider note).
-   */
-  private async completeText(
-    model: LanguageModel,
-    prompt: string,
-    provider?: LLMProvider,
-  ): Promise<string> {
-    const options = provider
-      ? getReasoningProviderOptions(provider)
-      : undefined;
-    const result = streamText({
-      model,
-      messages: [{ role: 'user', content: prompt }],
-      maxRetries: 2,
-      ...(options ? { providerOptions: options } : {}),
-    });
-    return (await result.text).trim();
-  }
-
-  /**
-   * Titles the conversation once, while its title is still the placeholder
-   * (the first question) set at creation. A titled or renamed conversation
-   * keeps its title, so later turns and iterations cost no LLM call.
-   */
-  private async generateTitle(
-    conversationId: string,
-    llmConfig: ResolvedLLMConfig,
-  ): Promise<void> {
-    // Iterations of one run finish before the title is written
-    if (this.titling.has(conversationId)) return;
-    this.titling.add(conversationId);
-    try {
-      const [conversation, messages] = await Promise.all([
-        this.conversationRepository.findOne({
-          where: { id: conversationId },
-          select: ['id', 'title'],
-        }),
-        this.messageRepository.find({
-          where: { conversationId },
-          order: { createdAt: 'ASC' },
-          take: 2,
-          select: ['id', 'role', 'content'],
-        }),
-      ]);
-
-      if (messages.length < 2) {
-        return;
-      }
-      const question = messages.find((m) => m.role === MessageRole.USER);
-      if (!question || conversation?.title !== question.content.slice(0, 500)) {
-        return;
-      }
-
-      const conversationContent = messages
-        .map((msg) => `${msg.role}: ${msg.content}`)
-        .join('\n\n');
-
-      const prompt = this.getPrompt('TITLE_GENERATE.md', {
-        CONVERSATION_CONTENT: conversationContent,
-      });
-
-      const model = await this.createLanguageModel(
-        llmConfig,
-        llmConfig.workspaceId,
-      );
-
-      const titleText = await this.completeText(
-        model,
-        prompt,
-        llmConfig.provider,
-      );
-
-      const title = titleText.trim().slice(0, 500);
-
-      if (title) {
-        await this.conversationRepository.update(
-          { id: conversationId },
-          { title },
-        );
-      }
-    } catch (error) {
-      this.logger.error('Failed to generate title', error);
-    } finally {
-      this.titling.delete(conversationId);
-    }
-  }
-
-  /**
-   * Generates the goal of an Agent-mode turn from the user's question and
-   * streams it to the client right away (like the title), so the pinned goal
-   * appears before the agent has built its plan. Writes it to the
-   * conversation metadata, where the pinned-goal prompt and later turns read
-   * it; the agent's `formulate_plan` can still refine it. Fire-and-forget:
-   * never blocks the run, and only one generation per conversation at a time.
-   */
-  private async generateGoal(
-    conversationId: string,
-    llmConfig: ResolvedLLMConfig,
-    question: string,
-    emitter: EventEmitter,
-  ): Promise<void> {
-    if (this.goaling.has(conversationId)) return;
-    this.goaling.add(conversationId);
-    try {
-      const prompt = this.getPrompt('GOAL_GENERATE.md', {
-        QUESTION: question.slice(0, 2000),
-      });
-      const model = await this.createLanguageModel(
-        llmConfig,
-        llmConfig.workspaceId,
-      );
-      const text = await this.completeText(model, prompt, llmConfig.provider);
-      // One line, no stray quotes, bounded like the stored column
-      const goal = text
-        .split('\n')[0]
-        .trim()
-        .replace(/^["']|["']$/g, '')
-        .trim()
-        .slice(0, 500);
-      if (!goal) return;
-
-      // A plan the agent started meanwhile owns the goal: don't clobber it
-      const active = await this.todoRepository.exists({
-        where: { conversationId, status: 'in_progress' },
-      });
-      if (active) return;
-
-      await updateConversationMetadata(
-        this.conversationRepository.manager,
-        conversationId,
-        { goal },
-      );
-      const todos = await this.loadTodoItems(conversationId);
-      emitter.emit('todos-updated', todos, goal);
-    } catch (error) {
-      this.logger.error('Failed to generate goal', error);
-    } finally {
-      this.goaling.delete(conversationId);
-    }
+    return this.prompts.render(fileName, data);
   }
 
   private async handleStreamFinish(
@@ -765,7 +442,7 @@ export class AgentsCompletionsService {
       );
       // An answer just completed. Fire-and-forget: title generation should
       // not block stream closure, and it skips an already titled conversation
-      this.generateTitle(conversationId, llmConfig).catch((err) =>
+      this.titles.generateTitle(conversationId, llmConfig).catch((err) =>
         this.logger.error('Error generating title', err),
       );
     } catch (error) {
@@ -853,13 +530,13 @@ export class AgentsCompletionsService {
     userId: string,
   ): Promise<string> {
     try {
-      const llmConfig = await this.resolveLLMConfig(workspaceId, userId);
+      const llmConfig = await this.llmConfigs.resolveLLMConfig(workspaceId, userId);
 
       const prompt = this.getPrompt('VUL_ANALYZE.md', {
         VULNERABILITY_JSON: vulnerabilityJson,
       });
 
-      const model = await this.createLanguageModel(llmConfig, workspaceId);
+      const model = await this.llmConfigs.createLanguageModel(llmConfig, workspaceId);
       const tools = withoutDisabledTools(
         this.agentTool.getTools(workspaceId, userId, AgentMode.AGENT),
         await this.agentsConfig.find(workspaceId, userId),
@@ -919,13 +596,13 @@ export class AgentsCompletionsService {
           return existing; // Return existing conversation
         }
         // Conversation belongs to another member — never reuse or expose it
-        throw new NotFoundException('Conversation not found');
+        throw new NotFoundError('Conversation not found');
       }
     }
 
     // No conversationId provided, or the provided one does not exist yet —
     // create a new conversation (reusing the client-generated ID when given)
-    const llmConfig = await this.resolveLLMConfig(
+    const llmConfig = await this.llmConfigs.resolveLLMConfig(
       workspaceId,
       userId,
       dto.provider,
@@ -938,7 +615,7 @@ export class AgentsCompletionsService {
         workspaceId,
       ))
     ) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'Worker is not available to agents in this workspace',
       );
     }
@@ -947,7 +624,7 @@ export class AgentsCompletionsService {
       dto.workerId &&
       !this.remoteExecuteSubscribe.isAgentReady(dto.workerId, workspaceId)
     ) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'Worker is offline; choose an online worker or Auto',
       );
     }
@@ -1009,56 +686,6 @@ export class AgentsCompletionsService {
   }
 
   /**
-   * Resolves the final LLM config after applying DTO overrides.
-   * - Starts from the conversation's default config
-   * - If user switches provider → find config for that provider
-   * - If user changes model (same provider) → override model in memory (no DB write)
-   */
-  private async resolveLLMConfigWithOverrides(
-    conversation: AgentConversation,
-    dto: SendMessageDto,
-    workspaceId: string,
-    userId: string,
-    loadedAgentConfig?: AgentConfig | null,
-  ): Promise<ResolvedLLMConfig> {
-    // Get the base config from the conversation
-    let llmConfig = await this.llmConfigRepository.findOne({
-      where: { id: conversation.llmConfigId, workspaceId, userId },
-    });
-
-    if (!llmConfig) {
-      throw new NotFoundException('LLM config not found');
-    }
-
-    // If user switched to a different provider, resolve the correct config
-    if (dto.provider && dto.provider !== llmConfig.provider) {
-      const switchedConfig = await this.llmConfigRepository.findOne({
-        where: { workspaceId, userId, provider: dto.provider },
-      });
-      if (switchedConfig) {
-        llmConfig = switchedConfig;
-      }
-    }
-
-    // If user changed model within the same provider, override in memory only
-    // (Avoids writing to DB which would affect other conversations).
-    // Otherwise the default connection runs the agent's default model.
-    const agentConfig =
-      loadedAgentConfig !== undefined
-        ? loadedAgentConfig
-        : await this.agentsConfig.find(workspaceId, userId);
-    const defaultRef = agentConfig?.modelsConfig.default;
-    const model =
-      dto.model && dto.provider === llmConfig.provider
-        ? dto.model
-        : defaultRef?.llmConfigId === llmConfig.id
-          ? defaultRef.model
-          : llmConfig.model;
-
-    return withAgentConfig(llmConfig, agentConfig, model);
-  }
-
-  /**
    * Maps DB messages to AI SDK message format.
    * Only keeps role and content, strips unnecessary fields.
    */
@@ -1069,111 +696,6 @@ export class AgentsCompletionsService {
       role: msg.role,
       content: msg.content,
     }));
-  }
-
-  /**
-   * Smart context pruning based on token budget.
-   * Instead of fixed message counts, dynamically selects how many messages to keep
-   * based on the model's context window and current token usage.
-   *
-   * @param messages - Full conversation history from DB
-   * @param contextParts - System context strings (prompts, memory, etc.)
-   * @param hasSummary - Whether a conversation summary exists
-   * @param contextWindow - Model's context window size
-   * @returns Pruned messages array fitting within budget
-   */
-  private pruneContextByBudget(
-    messages: AgentMessage[],
-    contextParts: string[],
-    hasSummary: boolean,
-    contextWindow: number,
-  ): AgentMessage[] {
-    if (messages.length === 0) return messages;
-
-    const modelMessages = this.mapHistoryToModelMessages(messages);
-    const strategy = ContextBudgetManager.getPruningStrategy(
-      contextParts,
-      modelMessages,
-      contextWindow,
-    );
-
-    this.logger.debug(
-      `[ContextPruning] maxMessages=${strategy.maxMessages}, ` +
-        `pruneToolDetails=${strategy.pruneToolDetails}, ` +
-        `totalMessages=${messages.length}`,
-    );
-
-    if (strategy.maxMessages >= messages.length && !strategy.pruneToolDetails) {
-      return messages;
-    }
-
-    let pruned = messages.slice(-strategy.maxMessages);
-
-    if (strategy.pruneToolDetails && pruned.length > 2) {
-      pruned = pruned.map((msg, index) => {
-        if (index >= pruned.length - 2) return msg;
-        if (msg.content.length > 2000) {
-          return {
-            ...msg,
-            content:
-              msg.content.slice(0, 2000) +
-              '\n[...truncated for context management]',
-          };
-        }
-        return msg;
-      });
-    }
-
-    return pruned;
-  }
-
-  /**
-   * Checks if context budget is exceeded before a continuation iteration.
-   * If exceeded, triggers compaction (summarization) to free up context space.
-   * This runs BEFORE each continuation iteration to prevent context overflow.
-   *
-   * @param conversationId - Current conversation ID
-   * @param llmConfig - LLM configuration for summarization
-   * @param contextParts - Current system context parts
-   * @param modelMessages - Current conversation history
-   * @returns true if compaction was triggered, false otherwise
-   */
-  private async checkAndCompactMidLoop(
-    conversationId: string,
-    llmConfig: ResolvedLLMConfig,
-    contextParts: string[],
-    modelMessages: Array<{ role: string; content: string }>,
-  ): Promise<boolean> {
-    try {
-      const contextWindow = this.getModelContextWindow(llmConfig);
-      const budgetCheck = ContextBudgetManager.checkBudget(
-        contextParts,
-        modelMessages,
-        contextWindow,
-      );
-
-      this.logger.debug(
-        `[MidLoopCompaction] conversation=${conversationId}, ` +
-          `tokens=${budgetCheck.totalTokens}/${budgetCheck.budget.availableForInput}, ` +
-          `needsCompaction=${budgetCheck.needsCompaction}`,
-      );
-
-      if (budgetCheck.needsCompaction) {
-        this.logger.log(
-          `[MidLoopCompaction] Triggering mid-loop compaction for ${conversationId} ` +
-            `(${budgetCheck.totalTokens} tokens >= ${budgetCheck.budget.compactionThreshold} threshold)`,
-        );
-        await this.compactConversation(conversationId, llmConfig);
-        return true;
-      }
-
-      return false;
-    } catch (error) {
-      this.logger.warn(
-        `[MidLoopCompaction] Error checking budget, skipping compaction: ${error}`,
-      );
-      return false;
-    }
   }
 
   /**
@@ -1481,154 +1003,6 @@ export class AgentsCompletionsService {
       catalogEstimated: window.estimated,
       reasoningEffort: this.modelsCatalog.effortFor(llmConfig) ?? null,
     };
-  }
-
-  /**
-   * Determines whether the conversation should be compacted based on
-   * estimated token usage vs the model's context window threshold (70%).
-   */
-  private shouldCompact(
-    llmConfig: ResolvedLLMConfig,
-    contextParts: string[],
-    modelMessages: Array<{ role: string; content: string }>,
-  ): boolean {
-    try {
-      // Estimate total tokens from system context
-      const systemTokens = TokenCounter.estimate(contextParts.join('\n\n'));
-
-      // Estimate tokens from conversation history
-      const historyTokens = TokenCounter.estimateParts(
-        modelMessages.map((m) => `${m.role}: ${m.content}`),
-        '\n',
-      );
-
-      const totalTokens = systemTokens + historyTokens;
-
-      // Get model context window
-      const modelContext = this.getModelContextWindow(llmConfig);
-      const softLimit = Math.floor(
-        modelContext * AgentsCompletionsService.COMPACTION_THRESHOLD_RATIO,
-      );
-
-      this.logger.debug(
-        `[Compaction] tokens=${totalTokens}, modelContext=${modelContext}, ` +
-          `softLimit=${softLimit}, shouldCompact=${totalTokens > softLimit}`,
-      );
-
-      return totalTokens > softLimit;
-    } catch (error) {
-      this.logger.warn('Error in shouldCompact, skipping compaction', error);
-      return false;
-    }
-  }
-
-  /**
-   * Generates a summary of the conversation history and saves it to the
-   * conversation's `summary` field. A compaction already running for the
-   * conversation (post-stream and mid-loop can both trigger one) is joined
-   * rather than started again.
-   */
-  private compactConversation(
-    conversationId: string,
-    llmConfig: ResolvedLLMConfig,
-  ): Promise<void> {
-    const running = this.compactions.get(conversationId);
-    if (running) return running;
-    const job = this.runCompaction(conversationId, llmConfig).finally(() =>
-      this.compactions.delete(conversationId),
-    );
-    this.compactions.set(conversationId, job);
-    return job;
-  }
-
-  private async runCompaction(
-    conversationId: string,
-    llmConfig: ResolvedLLMConfig,
-  ): Promise<void> {
-    try {
-      // Fetch recent messages for summarization, and the summary they extend
-      const [messages, conversation] = await Promise.all([
-        this.messageRepository.find({
-          where: { conversationId },
-          order: { createdAt: 'DESC' } as const,
-          take: 20,
-          select: ['id', 'role', 'content'],
-        }),
-        this.conversationRepository.findOne({
-          where: { id: conversationId },
-          select: ['id', 'summary'],
-        }),
-      ]);
-
-      if (messages.length < 2) {
-        return; // Not enough messages to summarize
-      }
-
-      // Format messages into a conversation string
-      const conversationContent = messages
-        .reverse()
-        .map((msg) => `${msg.role}: ${msg.content}`)
-        .join('\n\n');
-
-      // Get the summarization prompt. The previous summary is merged in, so
-      // what it covered is not lost when older messages leave the window
-      const prompt = this.getPrompt('SUMMARY_GENERATE.md', {
-        CONVERSATION_CONTENT: conversationContent,
-        PREVIOUS_SUMMARY: conversation?.summary ?? '',
-      });
-
-      // Create a model instance for summarization
-      const model = await this.createLanguageModel(
-        llmConfig,
-        llmConfig.workspaceId,
-      );
-
-      // Generate the summary
-      const cleanedSummary = await this.completeText(
-        model,
-        prompt,
-        llmConfig.provider,
-      );
-
-      if (cleanedSummary) {
-        await this.conversationRepository.update(
-          { id: conversationId },
-          { summary: cleanedSummary },
-        );
-        this.logger.log(
-          `[Compaction] Summary saved for conversation ${conversationId}`,
-        );
-      }
-    } catch (error) {
-      this.logger.error(
-        `Failed to compact conversation ${conversationId}`,
-        error,
-      );
-    }
-  }
-
-  /**
-   * Post-stream handler that checks if compaction is needed and triggers it.
-   * Runs asynchronously to avoid blocking the stream response.
-   */
-  private async handlePostStreamCompaction(
-    conversationId: string,
-    llmConfig: ResolvedLLMConfig,
-    contextParts: string[],
-    modelMessages: Array<{ role: string; content: string }>,
-  ): Promise<void> {
-    const needsCompaction = this.shouldCompact(
-      llmConfig,
-      contextParts,
-      modelMessages,
-    );
-
-    if (needsCompaction) {
-      this.logger.log(
-        `[Compaction] Triggering compaction for conversation ${conversationId}`,
-      );
-      await this.compactConversation(conversationId, llmConfig);
-    }
   }
 
   /**
@@ -2082,7 +1456,7 @@ export class AgentsCompletionsService {
               );
             }
 
-            this.handlePostStreamCompaction(
+            this.compaction.handlePostStreamCompaction(
               conversationId,
               llmConfig,
               contextParts,
@@ -2451,7 +1825,7 @@ export class AgentsCompletionsService {
 
           // Mid-loop compaction: check budget before each iteration
           if (continuesPlan && iteration > 0) {
-            const compacted = await this.checkAndCompactMidLoop(
+            const compacted = await this.compaction.checkAndCompactMidLoop(
               conversationId,
               llmConfig,
               currentContextParts,
@@ -2650,7 +2024,7 @@ export class AgentsCompletionsService {
             conversationId,
             false,
           );
-          const prunedMessages = this.pruneContextByBudget(
+          const prunedMessages = this.compaction.pruneContextByBudget(
             updatedMessages,
             currentContextParts,
             !!conversation?.summary,
@@ -2810,7 +2184,7 @@ export class AgentsCompletionsService {
     ]);
 
     // Step 4: Resolve the final LLM config with user overrides
-    const llmConfig = await this.resolveLLMConfigWithOverrides(
+    const llmConfig = await this.llmConfigs.resolveLLMConfigWithOverrides(
       conversation,
       dto,
       workspaceId,
@@ -2831,10 +2205,10 @@ export class AgentsCompletionsService {
     const modelMessages = this.mapHistoryToModelMessages(historyMessages);
 
     // Step 6: Validate that the model supports tool calling
-    await this.validateToolSupport(llmConfig);
+    await this.llmConfigs.validateToolSupport(llmConfig);
 
     // Step 7: Create a LanguageModel instance from the config
-    const model = await this.createLanguageModel(llmConfig, workspaceId);
+    const model = await this.llmConfigs.createLanguageModel(llmConfig, workspaceId);
 
     // Check if request was aborted before creating assistant message
     if (abortSignal?.aborted) {
@@ -2899,11 +2273,14 @@ export class AgentsCompletionsService {
       (t) => t.status === 'pending' || t.status === 'in_progress',
     );
     if (agentMode === AgentMode.AGENT && !hasActivePlan) {
-      void this.generateGoal(
+      void this.titles.generateGoal(
         conversation.id,
         llmConfig,
         dto.question,
-        todosEmitter,
+        async (goal) => {
+          const todos = await this.loadTodoItems(conversation.id);
+          todosEmitter.emit('todos-updated', todos, goal);
+        },
       );
     }
 

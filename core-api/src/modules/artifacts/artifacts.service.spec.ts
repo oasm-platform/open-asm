@@ -5,14 +5,7 @@ import {
   AuditActorType,
 } from '@/common/enums/enum';
 import type { StorageService } from '@/modules/storage/storage.service';
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  InternalServerErrorException,
-  NotFoundException,
-  PayloadTooLargeException,
-} from '@nestjs/common';
+import { ConflictException, InternalServerErrorException, NotFoundException, PayloadTooLargeException } from '@nestjs/common';
 import type { DataSource, Repository } from 'typeorm';
 import type { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
 import type { ArtifactQuotaService } from './artifact-quota.service';
@@ -25,6 +18,7 @@ import {
 import type { ArtifactFolder } from './entities/artifact-folder.entity';
 import type { ArtifactShare } from './entities/artifact-share.entity';
 import type { Artifact } from './entities/artifact.entity';
+import { ConflictError, ForbiddenError, InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 const WS = '11111111-1111-4111-8111-111111111111';
 const OWNER = 'owner-id';
@@ -188,7 +182,7 @@ describe('ArtifactsService', () => {
           contentType: 'text/plain',
           parentFolderId: 'folder-x',
         }),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
       expect(quota.reserve).toHaveBeenCalledTimes(1);
     });
 
@@ -232,8 +226,7 @@ describe('ArtifactsService', () => {
       manager.findOne.mockResolvedValue(pending());
       storage.headObject.mockResolvedValue({ contentLength: 999 });
 
-      await expect(service.completeUpload(WS, OWNER, 'artifact-1')).rejects.toThrow(
-        ConflictException,
+      await expect(service.completeUpload(WS, OWNER, 'artifact-1')).rejects.toThrow(ConflictError,
       );
       expect(storage.deleteFile).toHaveBeenCalledWith(pending().objectKey, 'artifacts');
       expect(quota.releaseReserved).toHaveBeenCalledWith(manager, WS, 100);
@@ -245,16 +238,14 @@ describe('ArtifactsService', () => {
       manager.findOne.mockResolvedValue(pending());
       storage.headObject.mockRejectedValue(new NotFoundException());
 
-      await expect(service.completeUpload(WS, OWNER, 'artifact-1')).rejects.toThrow(
-        BadRequestException,
+      await expect(service.completeUpload(WS, OWNER, 'artifact-1')).rejects.toThrow(InvalidInputError,
       );
       expect(quota.commit).not.toHaveBeenCalled();
     });
 
     it('returns 404 for a file the caller did not create', async () => {
       manager.findOne.mockResolvedValue(null);
-      await expect(service.completeUpload(WS, OTHER, 'artifact-1')).rejects.toThrow(
-        NotFoundException,
+      await expect(service.completeUpload(WS, OTHER, 'artifact-1')).rejects.toThrow(NotFoundError,
       );
     });
   });
@@ -262,8 +253,7 @@ describe('ArtifactsService', () => {
   describe('visibility', () => {
     it('hides a private file from other members', async () => {
       artifactRepo.findOne.mockResolvedValue(makeArtifact());
-      await expect(service.getDownloadUrl(WS, OTHER, 'artifact-1')).rejects.toThrow(
-        NotFoundException,
+      await expect(service.getDownloadUrl(WS, OTHER, 'artifact-1')).rejects.toThrow(NotFoundError,
       );
     });
 
@@ -291,8 +281,7 @@ describe('ArtifactsService', () => {
         makeArtifact({ shareType: ArtifactShareType.SHARED }),
       );
       shareRepo.existsBy.mockResolvedValue(false);
-      await expect(service.getDownloadUrl(WS, OTHER, 'artifact-1')).rejects.toThrow(
-        NotFoundException,
+      await expect(service.getDownloadUrl(WS, OTHER, 'artifact-1')).rejects.toThrow(NotFoundError,
       );
     });
 
@@ -302,8 +291,7 @@ describe('ArtifactsService', () => {
       await expect(
         service.getById(WS, OTHER, 'artifact-1', ['artifact.manage']),
       ).resolves.toMatchObject({ id: 'artifact-1', isOwner: false });
-      await expect(service.getDownloadUrl(WS, OTHER, 'artifact-1')).rejects.toThrow(
-        NotFoundException,
+      await expect(service.getDownloadUrl(WS, OTHER, 'artifact-1')).rejects.toThrow(NotFoundError,
       );
     });
 
@@ -315,8 +303,7 @@ describe('ArtifactsService', () => {
 
     it('serves public downloads only for public ready files', async () => {
       artifactRepo.findOneBy.mockResolvedValue(null);
-      await expect(service.getPublicDownloadUrl('artifact-1')).rejects.toThrow(
-        NotFoundException,
+      await expect(service.getPublicDownloadUrl('artifact-1')).rejects.toThrow(NotFoundError,
       );
       expect(artifactRepo.findOneBy).toHaveBeenCalledWith({
         id: 'artifact-1',
@@ -333,7 +320,7 @@ describe('ArtifactsService', () => {
       );
       await expect(
         service.update(WS, OTHER, 'artifact-1', { shareType: ArtifactShareType.PRIVATE }),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(ForbiddenError);
       expect(artifactRepo.update).not.toHaveBeenCalled();
     });
 
@@ -381,7 +368,7 @@ describe('ArtifactsService', () => {
 
       await expect(
         service.update(WS, OWNER, 'artifact-1', { parentFolderId: 'folder-x' }),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
       expect(artifactRepo.update).not.toHaveBeenCalled();
     });
   });
@@ -421,14 +408,14 @@ describe('ArtifactsService', () => {
       );
       await expect(
         service.remove(WS, OTHER, 'artifact-1', ['artifact.write']),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(ForbiddenError);
     });
 
     it('refuses the owner without artifact.write', async () => {
       artifactRepo.findOne.mockResolvedValue(makeArtifact());
       await expect(
         service.remove(WS, OWNER, 'artifact-1', ['artifact.read']),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(ForbiddenError);
       expect(artifactRepo.update).not.toHaveBeenCalled();
     });
 
@@ -619,7 +606,7 @@ describe('ArtifactsService', () => {
           mimeType: 'text/markdown',
           buffer: Buffer.from('hello'),
         }),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
       expect(quota.commit).not.toHaveBeenCalled();
       expect(storage.deleteFile).toHaveBeenCalledWith(
         expect.stringMatching(/notes\.md$/),
@@ -712,8 +699,7 @@ describe('ArtifactsService', () => {
 
     it('rejects a non-owner', async () => {
       manager.findOne.mockResolvedValue(row({ createdByUserId: OTHER }));
-      await expect(service.replaceContent(WS, OWNER, 'artifact-1', buffer)).rejects.toThrow(
-        ForbiddenException,
+      await expect(service.replaceContent(WS, OWNER, 'artifact-1', buffer)).rejects.toThrow(ForbiddenError,
       );
       expect(quota.reserve).not.toHaveBeenCalled();
       expect(storage.uploadFile).not.toHaveBeenCalled();
@@ -721,16 +707,14 @@ describe('ArtifactsService', () => {
 
     it('404s for missing or non-ready rows', async () => {
       manager.findOne.mockResolvedValue(null);
-      await expect(service.replaceContent(WS, OWNER, 'artifact-1', buffer)).rejects.toThrow(
-        NotFoundException,
+      await expect(service.replaceContent(WS, OWNER, 'artifact-1', buffer)).rejects.toThrow(NotFoundError,
       );
     });
 
     it('leaves object and usage untouched when quota is full', async () => {
       manager.findOne.mockResolvedValue(row());
       quota.reserve.mockRejectedValue(new ConflictException('full'));
-      await expect(service.replaceContent(WS, OWNER, 'artifact-1', buffer)).rejects.toThrow(
-        ConflictException,
+      await expect(service.replaceContent(WS, OWNER, 'artifact-1', buffer)).rejects.toThrow(ConflictException,
       );
       // releaseUsed runs first but shares the transaction, so the rollback undoes it.
       expect(storage.uploadFile).not.toHaveBeenCalled();

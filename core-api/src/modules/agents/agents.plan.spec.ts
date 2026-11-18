@@ -1,4 +1,4 @@
-import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
+import { AgentApprovalMode, AgentMode } from '@/modules/agents/enums/agent.enums';
 import type { ApprovalSettings } from './agents.approvals';
 import { Logger } from '@nestjs/common';
 import { EventEmitter } from 'node:events';
@@ -8,6 +8,7 @@ import {
   type PlanningState,
   withStepResults,
 } from './agents.completions';
+import { ConversationTitleService } from './conversation-title.service';
 import { SUBAGENT_MAX_ROUNDS_PER_TURN } from './agents.subagents';
 import { formatTodosToPrompt, type AgentTodoItem } from './agents.todo';
 import type { AgentTool } from './agents.tools';
@@ -622,9 +623,12 @@ describe('AgentsCompletionsService plan execution', () => {
     service.conversationRepository = {
       findOne: jest.fn(() => Promise.resolve({ id: 'c1', summary: null })),
     };
-    service.checkAndCompactMidLoop = jest.fn(() => Promise.resolve(false));
+    service.compaction = {
+      checkAndCompactMidLoop: jest.fn(() => Promise.resolve(false)),
+      pruneContextByBudget: jest.fn(() => []),
+      handlePostStreamCompaction: jest.fn(() => Promise.resolve()),
+    };
     service.getConversationHistory = jest.fn(() => Promise.resolve([]));
-    service.pruneContextByBudget = jest.fn(() => []);
     service.mapHistoryToModelMessages = jest.fn(() => []);
     service.getModelContextWindow = jest.fn(() => 128_000);
     service.saveAssistantMessage = jest.fn(() =>
@@ -1376,12 +1380,12 @@ describe('planning state', () => {
   });
 });
 
-describe('generateGoal', () => {
+describe('ConversationTitleService.generateGoal', () => {
   const makeService = (overrides: Record<string, unknown> = {}) => {
-    const service: any = Object.create(AgentsCompletionsService.prototype);
+    const service: any = Object.create(ConversationTitleService.prototype);
     service.goaling = new Set<string>();
-    service.getPrompt = jest.fn(() => 'prompt');
-    service.createLanguageModel = jest.fn(() => Promise.resolve({}));
+    service.prompts = { render: jest.fn(() => 'prompt') };
+    service.llmConfigs = { createLanguageModel: jest.fn(() => Promise.resolve({})) };
     service.completeText = jest.fn(() =>
       Promise.resolve(
         '"Find the open ports of example.com"\nignored second line',
@@ -1414,6 +1418,11 @@ describe('generateGoal', () => {
   };
 
   const llmConfig = { workspaceId: 'w1', provider: 'openai' } as never;
+  // What the completions service passes: stream the plan with the new goal
+  const emitTodos = (emitter: EventEmitter) => (goal: string) => {
+    emitter.emit('todos-updated', [], goal);
+    return Promise.resolve();
+  };
 
   it('streams a one-line goal and pins it on the conversation', async () => {
     const { service, meta } = makeService();
@@ -1421,7 +1430,7 @@ describe('generateGoal', () => {
     const emitted = jest.fn();
     emitter.on('todos-updated', emitted);
 
-    await service.generateGoal('c1', llmConfig, 'scan example.com', emitter);
+    await service.generateGoal('c1', llmConfig, 'scan example.com', emitTodos(emitter));
 
     // First line, surrounding quotes stripped
     expect(emitted).toHaveBeenCalledWith(
@@ -1444,7 +1453,7 @@ describe('generateGoal', () => {
     const emitted = jest.fn();
     emitter.on('todos-updated', emitted);
 
-    await service.generateGoal('c1', llmConfig, 'scan example.com', emitter);
+    await service.generateGoal('c1', llmConfig, 'scan example.com', emitTodos(emitter));
 
     expect(emitted).not.toHaveBeenCalled();
     expect(meta()).toBeNull();

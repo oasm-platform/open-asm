@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { TelegramConnectStatus } from '@/common/enums/enum';
+import { TelegramConnectStatus } from '@/modules/integrations/enums/integration.enums';
 
 export class TelegramConnectDto {
   @ApiProperty()

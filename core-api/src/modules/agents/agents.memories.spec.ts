@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+
 import type { Repository } from 'typeorm';
 
 import type { RedisService } from '@/services/redis/redis.service';
@@ -8,6 +8,7 @@ import { AgentsMemoriesService } from './agents.memories';
 import type { AgentWorkspaceMemory } from './entities/agent-workspace-memory.entity';
 import { agentFunctionsWith } from './agents.tools.testing';
 import { MemoryTools } from './tools/memory.tools';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 const WS = 'ws-1';
 const USER = 'user-1';
@@ -77,8 +78,7 @@ describe('AgentsMemoriesService long-term memory', () => {
   });
 
   it('refuses to update a record the user does not own', async () => {
-    await expect(service.ltmUpdate(ID, WS, USER, 'x')).rejects.toThrow(
-      NotFoundException,
+    await expect(service.ltmUpdate(ID, WS, USER, 'x')).rejects.toThrow(NotFoundError,
     );
     expect(repo.save).not.toHaveBeenCalled();
   });

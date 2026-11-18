@@ -3,20 +3,21 @@ import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { TargetsService } from '../targets/targets.service';
-import type { CreateInternalNetworkDto } from './dtos/create-internal-network.dto';
-import type { GetManyInternalNetworksQueryDto } from './dtos/get-many-internal-networks.dto';
+import type { CreateInternalNetworkDto } from './dto/create-internal-network.dto';
+import type { GetManyInternalNetworksQueryDto } from './dto/get-many-internal-networks.dto';
 import type {
   GetManyNetworkInterfacesQueryDto,
-} from './dtos/get-many-network-interfaces.dto';
-import type { UpdateInternalNetworkDto } from './dtos/update-internal-network.dto';
+} from './dto/get-many-network-interfaces.dto';
+import type { UpdateInternalNetworkDto } from './dto/update-internal-network.dto';
 import { InternalNetwork } from './entities/internal-network.entity';
 import { NetworkInterface } from './entities/network-interface.entity';
 import { InternalNetworksService } from './internal-networks.service';
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { TargetType, TargetSource } from '../targets/entities/target.entity';
+import { ForbiddenError, NotFoundError } from '@/common/errors/domain.errors';
 
 describe('InternalNetworksService', () => {
   let service: InternalNetworksService;
@@ -138,12 +139,12 @@ describe('InternalNetworksService', () => {
       jest
         .spyOn(workspacesService, 'getWorkspaceByIdAndOwner')
         .mockRejectedValue(
-          new ForbiddenException('You are not the owner of this workspace'),
+          new ForbiddenError('You are not the owner of this workspace'),
         );
 
       await expect(
         service.createInternalNetwork(dto, workspaceId, user as any),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(ForbiddenError);
     });
 
     it('should throw ForbiddenException if user is not owner', async () => {
@@ -156,12 +157,12 @@ describe('InternalNetworksService', () => {
       jest
         .spyOn(workspacesService, 'getWorkspaceByIdAndOwner')
         .mockRejectedValue(
-          new ForbiddenException('You are not the owner of this workspace'),
+          new ForbiddenError('You are not the owner of this workspace'),
         );
 
       await expect(
         service.createInternalNetwork(dto, workspaceId, user as any),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(ForbiddenError);
     });
   });
 
@@ -207,7 +208,7 @@ describe('InternalNetworksService', () => {
 
       await expect(
         service.updateInternalNetworkById(id, dto, user as any),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
     });
 
     it('should throw ForbiddenException if user is not owner', async () => {
@@ -226,12 +227,12 @@ describe('InternalNetworksService', () => {
       jest
         .spyOn(workspacesService, 'getWorkspaceByIdAndOwner')
         .mockRejectedValue(
-          new ForbiddenException('You are not the owner of this workspace'),
+          new ForbiddenError('You are not the owner of this workspace'),
         );
 
       await expect(
         service.updateInternalNetworkById(id, dto, user as any),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(ForbiddenError);
     });
   });
 
@@ -269,7 +270,7 @@ describe('InternalNetworksService', () => {
 
       await expect(
         service.deleteInternalNetwork(id, user as any),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
     });
 
     it('should throw ForbiddenException if user is not owner', async () => {
@@ -287,12 +288,12 @@ describe('InternalNetworksService', () => {
       jest
         .spyOn(workspacesService, 'getWorkspaceByIdAndOwner')
         .mockRejectedValue(
-          new ForbiddenException('You are not the owner of this workspace'),
+          new ForbiddenError('You are not the owner of this workspace'),
         );
 
       await expect(
         service.deleteInternalNetwork(id, user as any),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(ForbiddenError);
     });
   });
 
@@ -486,8 +487,7 @@ describe('InternalNetworksService', () => {
 
       jest.spyOn(internalNetworkRepo, 'findOne').mockResolvedValue(null);
 
-      await expect(service.getManyNetworkInterfaces(internalNetworkId, query, workspaceId)).rejects.toThrow(
-        NotFoundException,
+      await expect(service.getManyNetworkInterfaces(internalNetworkId, query, workspaceId)).rejects.toThrow(NotFoundError,
       );
     });
   });
@@ -532,7 +532,7 @@ describe('InternalNetworksService', () => {
 
       jest.spyOn(internalNetworkRepo, 'findOne').mockResolvedValue(null);
 
-      await expect(service.getInternalNetworkById(id, workspaceId)).rejects.toThrow(NotFoundException);
+      await expect(service.getInternalNetworkById(id, workspaceId)).rejects.toThrow(NotFoundError);
     });
   });
 

@@ -1,7 +1,7 @@
 import type { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import { containsLikePattern } from '@/common/utils/like-pattern.util';
-import { getManyResponse } from '@/utils/getManyResponse';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AssetsService } from '../assets/assets.service';
@@ -15,6 +15,7 @@ import {
 } from './dto/search.dto';
 import { SearchHistory } from './entities/search-history.entity';
 import { approvedVulnerabilityCondition } from '../vulnerabilities/open-vulnerability';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 const VULNERABILITY_SEARCH_LIMIT = 5;
 
@@ -238,7 +239,7 @@ export class SearchService {
     });
 
     if (!searchHistory) {
-      throw new NotFoundException('Search history not found');
+      throw new NotFoundError('Search history not found');
     }
 
     await this.searchHistoryRepo.delete(id);

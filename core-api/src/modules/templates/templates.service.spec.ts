@@ -5,9 +5,6 @@ import {
   AuditActorType,
 } from '@/common/enums/enum';
 import {
-  BadRequestException,
-  ForbiddenException,
-  NotFoundException,
   PayloadTooLargeException,
 } from '@nestjs/common';
 import { Readable } from 'stream';
@@ -21,6 +18,7 @@ import type { ProjectAsset } from '../projects/entities/project-asset.entity';
 import type { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import type { ToolsService } from '../tools/tools.service';
 import { JobRunType } from '@/common/enums/enum';
+import { ForbiddenError, InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 const WS = 'ws-1';
 const ME = 'me';
@@ -120,7 +118,7 @@ describe('TemplatesService', () => {
     it('rejects bad extension', async () => {
       await expect(
         service.create(WS, ME, { name: 'a.txt', content: 'id: a' }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
       expect(artifacts.createFromBuffer).not.toHaveBeenCalled();
     });
 
@@ -133,7 +131,7 @@ describe('TemplatesService', () => {
     it('rejects YAML without string id', async () => {
       await expect(
         service.create(WS, ME, { name: 'a.yaml', content: 'info: {}' }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
 
     it('rejects content over 256 KB', async () => {
@@ -149,15 +147,14 @@ describe('TemplatesService', () => {
   describe('outside the templates folder', () => {
     it('404s for artifact outside templates folder', async () => {
       repo.find.mockResolvedValue([row({ parentFolderId: 'other' })]);
-      await expect(service.getContent(WS, ME, 'a1')).rejects.toThrow(
-        NotFoundException,
+      await expect(service.getContent(WS, ME, 'a1')).rejects.toThrow(NotFoundError,
       );
       await expect(
         service.saveContent(WS, ME, 'a1', { content: 'id: a' }),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
       await expect(
         service.rename(WS, ME, 'a1', { name: 'b.yaml' }),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
       expect(artifacts.replaceContent).not.toHaveBeenCalled();
       expect(artifacts.update).not.toHaveBeenCalled();
     });
@@ -165,20 +162,20 @@ describe('TemplatesService', () => {
 
   describe('saveContent / rename', () => {
     it('rejects save by non-owner', async () => {
-      artifacts.replaceContent.mockRejectedValue(new ForbiddenException());
+      artifacts.replaceContent.mockRejectedValue(new ForbiddenError());
       await expect(
         service.saveContent(WS, 'other', 'a1', { content: 'id: a' }),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(ForbiddenError);
     });
 
     it('404s save and rename for a template the user cannot read', async () => {
       artifacts.canRead.mockResolvedValue(false);
       await expect(
         service.saveContent(WS, 'other', 'a1', { content: 'id: a' }),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
       await expect(
         service.rename(WS, 'other', 'a1', { name: 'b.yaml' }),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
       expect(artifacts.replaceContent).not.toHaveBeenCalled();
       expect(artifacts.update).not.toHaveBeenCalled();
     });
@@ -189,10 +186,10 @@ describe('TemplatesService', () => {
     });
 
     it('rename by non-owner', async () => {
-      artifacts.update.mockRejectedValue(new ForbiddenException());
+      artifacts.update.mockRejectedValue(new ForbiddenError());
       await expect(
         service.rename(WS, 'other', 'a1', { name: 'b.yaml' }),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(ForbiddenError);
     });
   });
 
@@ -205,15 +202,13 @@ describe('TemplatesService', () => {
 
     it('404s for a template the user cannot read', async () => {
       artifacts.canRead.mockResolvedValue(false);
-      await expect(service.getContent(WS, 'other', 'a1')).rejects.toThrow(
-        NotFoundException,
+      await expect(service.getContent(WS, 'other', 'a1')).rejects.toThrow(NotFoundError,
       );
     });
 
     it('does not let artifact.manage read a private template', async () => {
       artifacts.canRead.mockResolvedValue(false);
-      await expect(service.getContent(WS, 'other', 'a1')).rejects.toThrow(
-        NotFoundException,
+      await expect(service.getContent(WS, 'other', 'a1')).rejects.toThrow(NotFoundError,
       );
     });
   });
@@ -287,7 +282,7 @@ describe('TemplatesService', () => {
     it('rejects an empty group instead of scanning every asset', async () => {
       await expect(
         service.run(WS, ME, { templateIds: [T1], projectIds: ['g1'] }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
       expect(jobs.createNewJob).not.toHaveBeenCalled();
     });
 
@@ -296,8 +291,7 @@ describe('TemplatesService', () => {
       [{ targetIds: ['t'], assetIds: ['a'] }],
       [{ targetIds: [], assetIds: [] }],
     ])('requires exactly one scope (%p)', async (scope) => {
-      await expect(service.run(WS, ME, { templateIds: [T1], ...scope })).rejects.toThrow(
-        BadRequestException,
+      await expect(service.run(WS, ME, { templateIds: [T1], ...scope })).rejects.toThrow(InvalidInputError,
       );
     });
 
@@ -305,7 +299,7 @@ describe('TemplatesService', () => {
       artifacts.canRead.mockImplementation((a: Artifact) => Promise.resolve(a.id === T1));
       await expect(
         service.run(WS, ME, { templateIds: [T1, T2], assetIds: ['a'] }),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
       expect(jobs.createNewJob).not.toHaveBeenCalled();
     });
 
@@ -313,7 +307,7 @@ describe('TemplatesService', () => {
       jobs.createNewJob.mockResolvedValue([]);
       await expect(
         service.run(WS, ME, { templateIds: [T1], assetIds: ['a'] }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
   });
 });

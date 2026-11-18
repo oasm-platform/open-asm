@@ -1,9 +1,10 @@
 import { JobRunType } from '@/common/enums/enum';
-import { BadRequestException } from '@nestjs/common';
+
 import { Workflow } from '../workflows/entities/workflow.entity';
 import { Project } from './entities/project.entity';
 import { ProjectWorkflow } from './entities/project-workflow.entity';
 import { ProjectWorkflowsService } from './project-workflows.service';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 const PROJECT_ID = 'p-1';
 const WORKSPACE_ID = 'ws-1';
@@ -129,7 +130,7 @@ describe('ProjectWorkflowsService', () => {
       ctx.dataSource.query.mockResolvedValue([]);
       await expect(
         ctx.service.startBindingRun(binding, { jobRunType: JobRunType.MANUAL }),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
       expect(ctx.runner.startRun).not.toHaveBeenCalled();
     });
 
@@ -155,7 +156,7 @@ describe('ProjectWorkflowsService', () => {
       const ctx = setup();
       await expect(
         ctx.service.create(PROJECT_ID, WORKSPACE_ID, dto),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
     });
 
     it('copies a template into a project-owned workflow without its triggers', async () => {
@@ -201,7 +202,7 @@ describe('ProjectWorkflowsService', () => {
       });
       await expect(
         ctx.service.update(PROJECT_ID, WORKSPACE_ID, 'b-1', { name: 'x' }),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
       expect(ctx.workflowsService.updateWorkflow).not.toHaveBeenCalled();
     });
 

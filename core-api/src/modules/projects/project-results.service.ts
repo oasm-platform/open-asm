@@ -11,8 +11,8 @@ import {
   activeDismissalCondition,
   vulnerabilityStatusCondition,
 } from '@/modules/vulnerabilities/vulnerability-status';
-import { getManyResponse } from '@/utils/getManyResponse';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import {
@@ -43,6 +43,7 @@ import {
   SEVERITY_RANK_SQL,
   VulnerabilityProvenance,
 } from './provenance';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 const SEVERITIES = Object.values(Severity);
 
@@ -362,7 +363,7 @@ export class ProjectResultsService {
       [projectId, vulnerabilityId],
     );
     if (!row) {
-      throw new NotFoundException(
+      throw new NotFoundError(
         `Vulnerability "${vulnerabilityId}" not found in this project`,
       );
     }

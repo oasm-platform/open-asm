@@ -56,7 +56,7 @@ type SkippableMethod<T extends (...args: never) => Promise<unknown>> =
  *
  * @Lock('admin:first', {
  *   ttl: 60_000,
- *   onLocked: () => new ConflictException('Admin initialization already in progress'),
+ *   onLocked: () => new ConflictError('Admin initialization already in progress'),
  * })
  * private async bootstrapAdmin(email: string, password: string): Promise<true> {}
  */

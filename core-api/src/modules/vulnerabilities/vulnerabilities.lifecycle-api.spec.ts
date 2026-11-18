@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+
 import type { Queue } from 'bullmq';
 import type { DataSource, Repository } from 'typeorm';
 import {
@@ -7,7 +7,7 @@ import {
   VulnerabilityAnalyzeStatus,
   VulnerabilityDiscoveredBy,
 } from '@/common/enums/enum';
-import type { AgentsCompletionsService } from '../agents/agents.completions';
+import type { VulnerabilityAnalyzerRegistry } from './vulnerability-analyzer';
 import type { User } from '../auth/entities/user.entity';
 import type { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import type { WorkflowRunnerService } from '../jobs-registry/workflow-runner.service';
@@ -24,6 +24,7 @@ import { openVulnerabilityCondition } from './open-vulnerability';
 import { VulnerabilitiesService } from './vulnerabilities.service';
 import { VulnerabilityProvenance } from '../projects/provenance';
 import { vulnerabilityStatusCondition } from './vulnerability-status';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 const WS = 'ws-1';
 const user = { id: 'u-1', name: 'Ana', email: 'ana@x.io' } as User;
@@ -75,7 +76,7 @@ function setup() {
     {} as JobsRegistryService,
     {} as ToolsService,
     {} as WorkflowsService,
-    {} as AgentsCompletionsService,
+    {} as VulnerabilityAnalyzerRegistry,
     {} as NotificationsService,
     {} as Repository<Target>,
     {} as WorkflowRunnerService,
@@ -279,7 +280,7 @@ describe('VulnerabilitiesService lifecycle API', () => {
       const { service, vulnRepo } = setup();
       vulnRepo.createQueryBuilder.mockReturnValue(queryBuilder({ one: undefined }));
 
-      await expect(service.getVulnerability('v-1', WS)).rejects.toThrow(NotFoundException);
+      await expect(service.getVulnerability('v-1', WS)).rejects.toThrow(NotFoundError);
     });
 
     it('includes every source with its tool, agent and evidence', async () => {
@@ -336,7 +337,7 @@ describe('VulnerabilitiesService lifecycle API', () => {
     it('404s for a finding of another workspace', async () => {
       const { service, dataSource } = setup();
 
-      await expect(service.getVulnerabilityTimeline('v-1', WS)).rejects.toThrow(NotFoundException);
+      await expect(service.getVulnerabilityTimeline('v-1', WS)).rejects.toThrow(NotFoundError);
       expect(dataSource.query).not.toHaveBeenCalled();
     });
 
@@ -428,7 +429,7 @@ describe('VulnerabilitiesService lifecycle API', () => {
       const { service } = setup();
       await expect(
         service.bulkDismissVulnerabilities(['v-1'], WS, user, { reason: DismissReason.RISK_ACCEPTED }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
 
     it('rejects an acceptance beyond riskAcceptMaxDays or in the past', async () => {
@@ -446,7 +447,7 @@ describe('VulnerabilitiesService lifecycle API', () => {
           reason: DismissReason.RISK_ACCEPTED,
           expiresAt: new Date(Date.now() - DAY).toISOString(),
         }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
 
     it('rejects expiresAt for any other reason', async () => {
@@ -600,7 +601,7 @@ describe('VulnerabilitiesService lifecycle API', () => {
 
     it('404s outside the workspace', async () => {
       const { service } = setup();
-      await expect(service.claimFix(['v-1'], WS, user)).rejects.toThrow(NotFoundException);
+      await expect(service.claimFix(['v-1'], WS, user)).rejects.toThrow(NotFoundError);
     });
   });
 
@@ -622,7 +623,7 @@ describe('VulnerabilitiesService lifecycle API', () => {
       const { service, vulnRepo } = setup();
       vulnRepo.findOne.mockResolvedValue({ id: 'v-1', asset: { target: { workspaceId: 'ws-2' } } });
 
-      await expect(service.deleteVulnerabilityAnalysis('v-1', WS)).rejects.toThrow(NotFoundException);
+      await expect(service.deleteVulnerabilityAnalysis('v-1', WS)).rejects.toThrow(NotFoundError);
       expect(vulnRepo.update).not.toHaveBeenCalled();
     });
   });

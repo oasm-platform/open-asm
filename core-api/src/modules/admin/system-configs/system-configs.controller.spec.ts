@@ -14,6 +14,7 @@ import type { DataSource } from 'typeorm';
 import { MailService } from './mail.service';
 import { SystemConfigsController } from './system-configs.controller';
 import { SystemConfigsService } from './system-configs.service';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 const LOGO_MAX_SIZE_BYTES = 5 * 1024 * 1024;
 const reflector = new Reflector();
@@ -254,7 +255,7 @@ describe('SystemConfigsController', () => {
 
         await expect(
           controller.presignLogoUpload({ fileName }),
-        ).rejects.toBeInstanceOf(BadRequestException);
+        ).rejects.toBeInstanceOf(InvalidInputError);
 
         expect(storageService.getPresignedUploadUrl).not.toHaveBeenCalled();
       },
@@ -265,7 +266,7 @@ describe('SystemConfigsController', () => {
 
       await expect(
         controller.presignLogoUpload({ fileName: 'logo' }),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
 
       expect(storageService.getPresignedUploadUrl).not.toHaveBeenCalled();
     });

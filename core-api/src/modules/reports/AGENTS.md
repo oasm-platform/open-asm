@@ -43,9 +43,9 @@ PDF reports for a workspace: a summary (attack surface) report and a vulnerabili
 
 ## Coupling
 
-- Imports `StatisticModule` (uses `getCountForWorkspace`, `getSeverityCounts`, `getVulnerabilityTrends`, `getTopAssetsWithVulnerabilities`, `getTargetVulnerabilityStats`) and registers repositories for `Vulnerability`, `Target`, `AssetService`, `AssetTag`, `Workspace` to query those tables directly.
+- Imports `StatisticModule` (`ReportStatisticsService`: `getCountForWorkspace`, `getSeverityCounts`, `getVulnerabilityTrends`, `getTopAssetsWithVulnerabilities`, `getTargetVulnerabilityStats`) and registers repositories for `Vulnerability`, `Target`, `AssetService`, `AssetTag`, `Workspace` to query those tables directly.
 - Imports `AttackSurfaceQueryModule` (`AsqSavedQueriesService`) for query reports; the route uses `AsqErrorInterceptor` so query errors keep their status.
-- Uses the global `StorageService`. Audit actions for these routes are listed in `audit/constants/audit-events.ts`.
+- Imports `StorageModule` for `StorageService`. Audit actions for these routes are listed in `audit/constants/audit-events.ts`.
 
 ## Gotchas
 
