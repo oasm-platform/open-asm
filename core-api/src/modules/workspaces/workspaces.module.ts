@@ -8,6 +8,7 @@ import { WorkspacePermission } from './entities/workspace-permission.entity';
 import { WorkspaceMemberPermission } from './entities/workspace-member-permission.entity';
 import { WorkspaceInvitation } from './entities/workspace-invitation.entity';
 import { WorkspacesController } from './workspaces.controller';
+import { WorkspaceMembersService } from './workspace-members.service';
 import { WorkspaceMembershipService } from './workspace-membership.service';
 import { WorkspacePermissionGroupsService } from './workspace-permission-groups.service';
 import { WorkspacesService } from './workspaces.service';
@@ -31,6 +32,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     WorkspacesService,
     WorkspaceMembershipService,
     WorkspacePermissionGroupsService,
+    WorkspaceMembersService,
   ],
   exports: [WorkspacesService],
 })

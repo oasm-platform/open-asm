@@ -5,6 +5,7 @@ import { WorkspacePermissions } from '@/common/decorators/workspace-permissions.
 import { PUBLISH_EVENT_KEY, type PublishEventConfig } from '../event-bridge/publishing/publish-event.decorator';
 import type { AuditContext, AuditService } from '../audit/audit.service';
 import { WorkspacesController } from './workspaces.controller';
+import type { WorkspaceMembersService } from './workspace-members.service';
 import type { WorkspaceMembershipService } from './workspace-membership.service';
 import type { WorkspacePermissionGroupsService } from './workspace-permission-groups.service';
 import type { WorkspacesService } from './workspaces.service';
@@ -130,6 +131,8 @@ describe('WorkspacesController audit context pass-through (M4.1 explicit events)
 
   let workspacesService: {
     deleteWorkspace: jest.Mock;
+  };
+  let members: {
     removeMember: jest.Mock;
     updateMemberPermissions: jest.Mock;
   };
@@ -144,6 +147,8 @@ describe('WorkspacesController audit context pass-through (M4.1 explicit events)
   beforeEach(() => {
     workspacesService = {
       deleteWorkspace: jest.fn(),
+    };
+    members = {
       removeMember: jest.fn(),
       updateMemberPermissions: jest.fn(),
     };
@@ -160,6 +165,7 @@ describe('WorkspacesController audit context pass-through (M4.1 explicit events)
       auditService as unknown as AuditService,
       {} as WorkspaceMembershipService,
       permissionGroups as unknown as WorkspacePermissionGroupsService,
+      members as unknown as WorkspaceMembersService,
     );
   });
 
@@ -176,7 +182,7 @@ describe('WorkspacesController audit context pass-through (M4.1 explicit events)
   it('removeMember passes the actor context derived from the request', async () => {
     await controller.removeMember('ws-1', 'member-1', user, req);
     expect(auditService.buildActorContext).toHaveBeenCalledWith(req);
-    expect(workspacesService.removeMember).toHaveBeenCalledWith(
+    expect(members.removeMember).toHaveBeenCalledWith(
       'ws-1',
       'member-1',
       user.id,
@@ -193,7 +199,7 @@ describe('WorkspacesController audit context pass-through (M4.1 explicit events)
       req,
     );
     expect(auditService.buildActorContext).toHaveBeenCalledWith(req);
-    expect(workspacesService.updateMemberPermissions).toHaveBeenCalledWith(
+    expect(members.updateMemberPermissions).toHaveBeenCalledWith(
       'ws-1',
       'member-1',
       ['pg-1'],

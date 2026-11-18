@@ -55,6 +55,7 @@ import { WorkspaceInvitation } from './entities/workspace-invitation.entity';
 import { WorkspaceMembers } from './entities/workspace-members.entity';
 import { WorkspacePermission } from './entities/workspace-permission.entity';
 import { Workspace } from './entities/workspace.entity';
+import { WorkspaceMembersService } from './workspace-members.service';
 import { WorkspaceMembershipService } from './workspace-membership.service';
 import { WorkspacePermissionGroupsService } from './workspace-permission-groups.service';
 import { WorkspacesService } from './workspaces.service';
@@ -67,6 +68,7 @@ export class WorkspacesController {
     private readonly auditService: AuditService,
     private readonly membership: WorkspaceMembershipService,
     private readonly permissionGroups: WorkspacePermissionGroupsService,
+    private readonly members: WorkspaceMembersService,
   ) {}
 
   @Doc({
@@ -219,7 +221,7 @@ export class WorkspacesController {
   @WorkspaceAccess('member.read')
   @Get('members')
   getWorkspaceMembers(@WorkspaceId() workspaceId: string) {
-    return this.workspacesService.getMembersWithPermissions(workspaceId);
+    return this.members.getMembersWithPermissions(workspaceId);
   }
 
   @Doc({
@@ -238,7 +240,7 @@ export class WorkspacesController {
     @UserContext() user: UserContextPayload,
     @Req() req: NodeRequest,
   ) {
-    return this.workspacesService.updateMemberPermissions(
+    return this.members.updateMemberPermissions(
       workspaceId,
       memberId,
       dto.permissionIds,
@@ -262,7 +264,7 @@ export class WorkspacesController {
     @UserContext() user: UserContextPayload,
     @Req() req: NodeRequest,
   ) {
-    return this.workspacesService.removeMember(
+    return this.members.removeMember(
       workspaceId,
       memberId,
       user.id,
