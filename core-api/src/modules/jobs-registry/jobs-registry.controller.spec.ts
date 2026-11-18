@@ -24,6 +24,7 @@ import type { WorkerInstance } from '../workers/entities/worker.entity';
 import { WorkersService } from '../workers/workers.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { JobsRegistryController } from './jobs-registry.controller';
+import { JobDispatchService } from './job-dispatch.service';
 import { JobHistoryQueryService } from './job-history-query.service';
 import { JobsRegistryService } from './jobs-registry.service';
 import { WorkflowRunnerService } from './workflow-runner.service';
@@ -120,6 +121,8 @@ describe('JobsRegistryController', () => {
         providers: [
           { provide: JobsRegistryService, useValue: mockJobsRegistryService },
           { provide: JobHistoryQueryService, useValue: {} },
+          // One bag of mocks: getNextJob(s) on the dispatch side, the rest on the registry
+          { provide: JobDispatchService, useValue: mockJobsRegistryService },
           { provide: ConnectorRegistryService, useValue: mockConnectorRegistry },
           { provide: ToolConfigProfilesService, useValue: mockToolConfigProfilesService },
           { provide: IntegrationConfigReader, useValue: mockIntegrationConfig },
@@ -502,6 +505,8 @@ describe('JobsRegistryController', () => {
         providers: [
           { provide: JobsRegistryService, useValue: mockJobsRegistryService },
           { provide: JobHistoryQueryService, useValue: {} },
+          // One bag of mocks: getNextJob(s) on the dispatch side, the rest on the registry
+          { provide: JobDispatchService, useValue: mockJobsRegistryService },
           {
             provide: ConnectorRegistryService,
             useValue: { getConnector: jest.fn(), getResourceDefaults: jest.fn() },
@@ -650,6 +655,8 @@ describe('JobsRegistryController', () => {
         providers: [
           { provide: JobsRegistryService, useValue: mockJobsRegistryService },
           { provide: JobHistoryQueryService, useValue: {} },
+          // One bag of mocks: getNextJob(s) on the dispatch side, the rest on the registry
+          { provide: JobDispatchService, useValue: mockJobsRegistryService },
           {
             provide: ConnectorRegistryService,
             useValue: { getConnector: jest.fn(), getResourceDefaults: jest.fn() },

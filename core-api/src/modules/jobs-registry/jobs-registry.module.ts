@@ -9,6 +9,7 @@ import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
 import { JobsRegistryController } from './jobs-registry.controller';
+import { JobDispatchService } from './job-dispatch.service';
 import { JobHistoryQueryService } from './job-history-query.service';
 import { JobsRegistryService } from './jobs-registry.service';
 import { JobResultCleanupService } from './job-result-cleanup.service';
@@ -44,6 +45,7 @@ import { DataAdapterModule } from '../data-adapter/data-adapter.module';
   providers: [
     JobsRegistryService,
     JobHistoryQueryService,
+    JobDispatchService,
     WorkflowRunnerService,
     WorkflowRunReconcilerService,
     JobResultProcessor,

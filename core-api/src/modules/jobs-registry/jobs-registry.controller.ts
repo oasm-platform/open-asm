@@ -69,6 +69,7 @@ import {
   VulnerabilitiesResultDto,
   WorkerIdParams,
 } from './dto/jobs-registry.dto';
+import { JobDispatchService } from './job-dispatch.service';
 import { JobHistoryQueryService } from './job-history-query.service';
 import { JobsRegistryService } from './jobs-registry.service';
 
@@ -134,6 +135,7 @@ export class JobsRegistryController {
     private readonly grpcWorkerContext: GrpcWorkerContext,
     private readonly eventBridge: EventBridgeService,
     private readonly jobHistoryQuery: JobHistoryQueryService,
+    private readonly jobDispatch: JobDispatchService,
   ) {}
 
   @WorkspaceAccess('job.read')
@@ -186,7 +188,7 @@ export class JobsRegistryController {
     @Param() { workerId }: WorkerIdParams,
     @CurrentWorker() worker: WorkerInstance,
   ) {
-    const job = await this.jobsRegistryService.getNextJob(
+    const job = await this.jobDispatch.getNextJob(
       this.authenticatedWorkerId(worker, workerId),
     );
     return job;
@@ -493,7 +495,7 @@ export class JobsRegistryController {
     metadata: Metadata,
   ): Promise<Record<string, unknown>> {
     const worker = this.grpcWorkerContext.requireWorker(metadata);
-    const job = await this.jobsRegistryService.getNextJob(
+    const job = await this.jobDispatch.getNextJob(
       this.authenticatedWorkerId(worker, request.id),
     );
     const mapped = job ? await this.mapJobToGrpcJob(job, worker) : null;
@@ -517,7 +519,7 @@ export class JobsRegistryController {
     metadata: Metadata,
   ): Promise<{ values: Record<string, unknown>[] }> {
     const worker = this.grpcWorkerContext.requireWorker(metadata);
-    const jobs = await this.jobsRegistryService.getNextJobs(
+    const jobs = await this.jobDispatch.getNextJobs(
       this.authenticatedWorkerId(worker, request.id),
       Number(request.limit) || 1,
     );
