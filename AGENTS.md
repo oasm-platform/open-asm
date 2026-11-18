@@ -124,7 +124,11 @@ task release -- patch --dry-run          # preview: prints every change and comm
 task release -- v0.13.0                  # stamp package.json files, commit, tag, push main + tag
 ```
 
-Missing entries: `console:test:coverage`, `console:e2e`, `api:test:watch`, `api:test:cov` exist as package scripts but have **no** task entry — add one instead of calling the script.
+Missing entries: `console:test:coverage`, `console:e2e`, `api:test:watch` exist as package scripts but have **no** task entry — add one instead of calling the script.
+
+`task api:test:cov` runs the unit suite with coverage under the same limits as `api:test`, and fails below `jest.coverageThreshold` in `core-api/package.json` (the measured baseline; raise it when coverage goes up, never lower it). `api:test` itself collects no coverage, so CI does not enforce the threshold yet.
+
+`core-api/src/architecture.spec.ts` pins module coupling: the `@Global()` modules, `forwardRef` per file, entities registered outside their module, and cross-module imports. Adding or removing any of them fails the spec until its list is updated in the same change.
 
 ## Database Migrations — HARD RULE
 
