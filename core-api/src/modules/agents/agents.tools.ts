@@ -1,5 +1,5 @@
 import { firstMissingPermission } from '@/common/utils/permission-keys.util';
-import { Injectable, NotFoundException, type Type } from '@nestjs/common';
+import { Injectable, type Type } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import type { Tool } from 'ai';
 import type { EventEmitter } from 'node:events';
@@ -35,6 +35,7 @@ import type {
 import { VulnerabilityProposalTools } from './tools/vulnerability-proposal.tool';
 import { WebFetchTools } from './tools/web-fetch.tool';
 import { WorkspaceTools } from './tools/workspace.tools';
+import { isNotFound } from '@/common/errors/error-checks';
 
 /**
  * The built-in tool classes, in the order the model sees their functions
@@ -360,7 +361,7 @@ export class AgentTool {
           userId,
         ));
     } catch (error) {
-      if (error instanceof NotFoundException) {
+      if (isNotFound(error)) {
         return 'Not executed: the user is not a member of this workspace.';
       }
       throw error;

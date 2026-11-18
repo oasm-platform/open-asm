@@ -32,6 +32,7 @@ import type {
 import { ArtifactFolder } from './entities/artifact-folder.entity';
 import { ArtifactShare } from './entities/artifact-share.entity';
 import { Artifact } from './entities/artifact.entity';
+import { isNotFound } from '@/common/errors/error-checks';
 
 export const TEMPLATES_FOLDER_NAME = 'custom-templates';
 export const TEMPLATE_NAME_RE = /\.ya?ml$/i;
@@ -152,7 +153,7 @@ export class ArtifactsService {
           artifact.objectKey,
         ));
       } catch (error) {
-        if (error instanceof NotFoundException) {
+        if (isNotFound(error)) {
           throw new BadRequestException('File has not been uploaded yet');
         }
         throw error;
@@ -596,7 +597,7 @@ export class ArtifactsService {
       await this.storageService.deleteFile(artifact.objectKey, artifact.bucket);
     } catch (error) {
       // Already gone is fine; anything else keeps the row so the sweep retries.
-      if (!(error instanceof NotFoundException)) {
+      if (!isNotFound(error)) {
         throw error;
       }
     }

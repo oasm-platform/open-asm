@@ -1,5 +1,6 @@
 import { resolveTrustedOrigins } from '@/common/config/allowed-origins';
 import { API_GLOBAL_PREFIX, AUTH_INSTANCE_KEY, CACHE_STATIC_RESOURCE } from '@/common/constants/app.constants';
+import { DomainExceptionFilter } from '@/common/filters/domain-exception.filter';
 import { AuthGuard } from '@/common/guards/auth.guard';
 import { requestIdMiddleware } from '@/common/middleware/request-id.middleware';
 import { UserPresenceService } from '@/modules/auth/user-presence.service';
@@ -94,6 +95,10 @@ export function configureApp(app: NestNodeApplication): void {
       },
     }),
   );
+
+  // Domain errors thrown by services, and client-caused database errors,
+  // answered with the status and body Nest gives its own HTTP exceptions
+  app.useGlobalFilters(new DomainExceptionFilter(app.getHttpAdapter()));
 
   // Configure global validation
   app.useGlobalPipes(

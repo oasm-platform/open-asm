@@ -6,7 +6,7 @@ import {
 import { Target } from '@/modules/targets/entities/target.entity';
 import { Lock } from '@/services/redis/lock.decorator';
 import { InjectQueue } from '@nestjs/bullmq';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Queue } from 'bullmq';
@@ -17,6 +17,7 @@ import type { SourceRepository } from './connectors/connector.abstract';
 import { resolveSourceCodeConnector } from './connectors/connector.factory';
 import { IntegrationsService } from './integrations.service';
 import { gitOrgOwner, planRepositorySync } from './repository-sync.plan';
+import { isNotFound } from '@/common/errors/error-checks';
 
 /** Upper bound on one sync; the listing stops paging past it. */
 const MAX_SYNC_DURATION_MS = 10 * 60 * 1000;
@@ -145,7 +146,7 @@ export class RepositorySyncService {
         workspaceId,
       );
     } catch (error) {
-      if (error instanceof NotFoundException) {
+      if (isNotFound(error)) {
         return skipped('integration not found');
       }
       throw error;

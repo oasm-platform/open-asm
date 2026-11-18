@@ -52,6 +52,7 @@ import {
   severityProperties,
   universalIntegrationSchema,
 } from './schemas';
+import { isInvalidInput } from '@/common/errors/error-checks';
 
 /**
  * Derives the Telegram webhook `secret_token` from the bot token.
@@ -443,7 +444,7 @@ export class IntegrationsService {
           timestamp: new Date().toISOString(),
         };
       } catch (error) {
-        if (error instanceof BadRequestException) {
+        if (isInvalidInput(error)) {
           return {
             success: false,
             category: integration.category,

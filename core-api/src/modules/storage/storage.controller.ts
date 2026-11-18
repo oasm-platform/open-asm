@@ -26,6 +26,7 @@ import {
   PresignUploadResponseDto,
 } from './dto/presign-storage.dto';
 import { StorageService } from './storage.service';
+import { isNotFound } from '@/common/errors/error-checks';
 
 @Controller('storage')
 @ApiTags('Storage')
@@ -150,7 +151,7 @@ export class StorageController {
             );
             return;
           } catch (error) {
-            if (!(error instanceof NotFoundException)) {
+            if (!isNotFound(error)) {
               throw error;
             }
           }

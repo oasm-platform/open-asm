@@ -35,6 +35,7 @@ import {
   parseStorageConfig,
   StorageConfig,
 } from './storage.config';
+import { isInvalidInput, isNotFound } from '@/common/errors/error-checks';
 
 type BucketAccess =
   'public' | 'authenticated' | 'tenant' | 'private' | 'blocked';
@@ -989,8 +990,8 @@ export class StorageService implements OnModuleInit {
       return { buffer, contentType };
     } catch (error) {
       if (
-        error instanceof BadRequestException ||
-        error instanceof NotFoundException
+        isInvalidInput(error) ||
+        isNotFound(error)
       ) {
         throw error;
       }

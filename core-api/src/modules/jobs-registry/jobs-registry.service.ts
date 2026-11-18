@@ -91,6 +91,7 @@ import {
 import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
+import { isNotFound } from '@/common/errors/error-checks';
 
 /**
  * Sortable columns for Job, whitelisted to prevent SQL injection via
@@ -1726,7 +1727,7 @@ export class JobsRegistryService {
       return job;
     } catch (error) {
       // If it's already a NotFoundException, re-throw it
-      if (error instanceof NotFoundException) {
+      if (isNotFound(error)) {
         throw error;
       }
       // For other errors (like database errors), re-throw them as-is

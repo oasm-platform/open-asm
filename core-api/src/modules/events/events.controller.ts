@@ -9,7 +9,6 @@ import {
   BadRequestException,
   Controller,
   ForbiddenException,
-  NotFoundException,
   Req,
   Sse,
   UseGuards,
@@ -19,6 +18,7 @@ import { isUUID } from 'class-validator';
 import type { NodeRequest } from '@nestjs/platform-node';
 import type { Observable } from 'rxjs';
 import { EventsService } from './events.service';
+import { isNotFound } from '@/common/errors/error-checks';
 
 @ApiTags('Events')
 @Controller('events')
@@ -73,7 +73,7 @@ export class EventsController {
       );
     } catch (error) {
       // Non-members get 403, never revealing whether the workspace exists.
-      if (error instanceof NotFoundException) {
+      if (isNotFound(error)) {
         throw new ForbiddenException(
           'You do not have permission to perform this action',
         );
