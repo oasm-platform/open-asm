@@ -9,6 +9,7 @@ import { WorkspaceMemberPermission } from './entities/workspace-member-permissio
 import { WorkspaceInvitation } from './entities/workspace-invitation.entity';
 import { WorkspacesController } from './workspaces.controller';
 import { WorkspaceMembershipService } from './workspace-membership.service';
+import { WorkspacePermissionGroupsService } from './workspace-permission-groups.service';
 import { WorkspacesService } from './workspaces.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 @Global()
@@ -26,7 +27,11 @@ import { NotificationsModule } from '../notifications/notifications.module';
     NotificationsModule,
   ],
   controllers: [WorkspacesController],
-  providers: [WorkspacesService, WorkspaceMembershipService],
+  providers: [
+    WorkspacesService,
+    WorkspaceMembershipService,
+    WorkspacePermissionGroupsService,
+  ],
   exports: [WorkspacesService],
 })
 export class WorkspacesModule {}

@@ -6,7 +6,8 @@ Tenants: workspaces, their members, permission groups and invitations. It also o
 
 - `workspaces.module.ts`: `@Global()` on purpose: `WorkspacePermissionGuard` (behind `@WorkspaceAccess`, on controllers in some 20 modules) injects `WorkspacesService`, so this module is the tenancy kernel, like `AuthModule`. Exports `WorkspacesService`. Imports `ApiKeysModule`, `ArtifactsModule`, `NotificationsModule`.
 - `workspaces.controller.ts`: all `/workspaces` routes.
-- `workspaces.service.ts`: CRUD, members, permission groups, invitations; `getMembershipWithPermissions` delegates to the membership service and stays here for the guard and other modules.
+- `workspaces.service.ts`: CRUD, configs, api key, members, invitations; `getMembershipWithPermissions` delegates to the membership service and stays here for the guard and other modules.
+- `workspace-permission-groups.service.ts` (`WorkspacePermissionGroupsService`): the permission catalog, group CRUD, `seedOwnerPermissionGroup` (called inside the creation transaction), and the no-escalation checks members and invitations share (`assertCanGrantGroups`, `findValidPermissionGroups`). Exports `OWNER_PERMISSION_GROUP_NAME` and `WILDCARD_PERMISSION`.
 - `workspace-membership.service.ts` (`WorkspaceMembershipService`): the membership row plus the union of the member's permission keys (`getMembershipWithPermissions`), and `getCurrentPermission`.
 - `permission-catalog.json`: the list of valid `resource.action` keys. Read from disk at call time by `getPermissionCatalog()` (shipped to `dist/` through the `**/*.json` asset rule in `nest-cli.json`).
 - `entities/`: `Workspace`, `WorkspaceMembers`, `WorkspacePermission`, `WorkspaceMemberPermission`, `WorkspaceInvitation`.
@@ -74,4 +75,4 @@ Service methods other modules call: `getMembershipWithPermissions` (guard, event
 
 ## Testing
 
-`workspaces.service.spec.ts` (large), `workspace-membership.service.spec.ts`, `workspaces.controller.spec.ts` (permission metadata and audit wiring). The guard and decorators have specs in `src/common/guards/` and `src/common/decorators/`.
+`workspaces.service.spec.ts` (large), `workspace-membership.service.spec.ts`, `workspace-permission-groups.service.spec.ts`, `workspaces.controller.spec.ts` (permission metadata and audit wiring). The guard and decorators have specs in `src/common/guards/` and `src/common/decorators/`.

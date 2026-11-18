@@ -6,6 +6,7 @@ import { PUBLISH_EVENT_KEY, type PublishEventConfig } from '../event-bridge/publ
 import type { AuditContext, AuditService } from '../audit/audit.service';
 import { WorkspacesController } from './workspaces.controller';
 import type { WorkspaceMembershipService } from './workspace-membership.service';
+import type { WorkspacePermissionGroupsService } from './workspace-permission-groups.service';
 import type { WorkspacesService } from './workspaces.service';
 
 describe('WorkspacesController permission metadata', () => {
@@ -131,6 +132,8 @@ describe('WorkspacesController audit context pass-through (M4.1 explicit events)
     deleteWorkspace: jest.Mock;
     removeMember: jest.Mock;
     updateMemberPermissions: jest.Mock;
+  };
+  let permissionGroups: {
     createPermissionGroup: jest.Mock;
     updatePermissionGroup: jest.Mock;
     deletePermissionGroup: jest.Mock;
@@ -143,6 +146,8 @@ describe('WorkspacesController audit context pass-through (M4.1 explicit events)
       deleteWorkspace: jest.fn(),
       removeMember: jest.fn(),
       updateMemberPermissions: jest.fn(),
+    };
+    permissionGroups = {
       createPermissionGroup: jest.fn(),
       updatePermissionGroup: jest.fn(),
       deletePermissionGroup: jest.fn(),
@@ -154,6 +159,7 @@ describe('WorkspacesController audit context pass-through (M4.1 explicit events)
       workspacesService as unknown as WorkspacesService,
       auditService as unknown as AuditService,
       {} as WorkspaceMembershipService,
+      permissionGroups as unknown as WorkspacePermissionGroupsService,
     );
   });
 
@@ -200,7 +206,7 @@ describe('WorkspacesController audit context pass-through (M4.1 explicit events)
     const dto = { name: 'Viewer', permissions: ['asset.read'] };
     await controller.createPermissionGroup('ws-1', dto, user, req);
     expect(auditService.buildActorContext).toHaveBeenCalledWith(req);
-    expect(workspacesService.createPermissionGroup).toHaveBeenCalledWith(
+    expect(permissionGroups.createPermissionGroup).toHaveBeenCalledWith(
       'ws-1',
       dto,
       user.id,
@@ -212,7 +218,7 @@ describe('WorkspacesController audit context pass-through (M4.1 explicit events)
     const dto = { name: 'Viewer', permissions: ['asset.read'] };
     await controller.updatePermissionGroup('ws-1', 'pg-1', dto, user, req);
     expect(auditService.buildActorContext).toHaveBeenCalledWith(req);
-    expect(workspacesService.updatePermissionGroup).toHaveBeenCalledWith(
+    expect(permissionGroups.updatePermissionGroup).toHaveBeenCalledWith(
       'ws-1',
       'pg-1',
       dto,
@@ -224,7 +230,7 @@ describe('WorkspacesController audit context pass-through (M4.1 explicit events)
   it('deletePermissionGroup passes the actor context derived from the request', async () => {
     await controller.deletePermissionGroup('ws-1', 'pg-1', req);
     expect(auditService.buildActorContext).toHaveBeenCalledWith(req);
-    expect(workspacesService.deletePermissionGroup).toHaveBeenCalledWith(
+    expect(permissionGroups.deletePermissionGroup).toHaveBeenCalledWith(
       'ws-1',
       'pg-1',
       auditContext,
