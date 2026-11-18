@@ -1,4 +1,3 @@
-// Trigger rebuild to update OpenAPI spec
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';

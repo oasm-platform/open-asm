@@ -50,11 +50,11 @@ async function bootstrap() {
     .addTag('Authentication')
     .build();
 
-  const documentFactory = () =>
-    mergeBetterAuthSpec(SwaggerModule.createDocument(app, config));
+  // Built once: Scalar serves it and the codegen file below is written from it
+  const document = mergeBetterAuthSpec(SwaggerModule.createDocument(app, config));
 
   const renderApiReference = apiReference({
-    content: documentFactory(),
+    content: document,
     darkMode: true,
   }) as (req: NodeRequest, res: NodeResponse) => void;
   // Scalar replies with res.send(html), which the Node adapter sends as
@@ -75,7 +75,7 @@ async function bootstrap() {
     fs.mkdirSync(directoryPath, { recursive: true });
   }
 
-  fs.writeFileSync(pathOutputOpenApi, JSON.stringify(documentFactory()));
+  fs.writeFileSync(pathOutputOpenApi, JSON.stringify(document));
   const grpcPort = process.env.GRPC_PORT ?? DEFAULT_GRPC_PORT;
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.GRPC,
