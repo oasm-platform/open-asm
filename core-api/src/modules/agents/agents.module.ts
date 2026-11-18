@@ -1,3 +1,4 @@
+import { ActiveRunRegistry } from './active-run.registry';
 import { ArtifactsModule } from '@/modules/artifacts/artifacts.module';
 import { AssetsModule } from '@/modules/assets/assets.module';
 import { ConnectorsModule } from '@/modules/connectors/connectors.module';
@@ -95,6 +96,7 @@ export const AGENT_FUNCTION_HOSTS = [
   providers: [
     AgentsService,
     AgentsCompletionsService,
+    ActiveRunRegistry,
     AgentTool,
     AgentsGuardService,
     AgentsMcpService,

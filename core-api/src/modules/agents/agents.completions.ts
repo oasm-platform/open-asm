@@ -1,3 +1,4 @@
+import { ActiveRunRegistry } from './active-run.registry';
 import {
   Injectable,
   Logger,
@@ -364,39 +365,16 @@ export class AgentsCompletionsService {
   private readonly logger = new Logger(AgentsCompletionsService.name);
 
   /**
-   * Active streaming runs by conversation id. A run outlives the HTTP request
-   * that started it (so navigating away does not kill it); only an explicit
-   * stop, or a newer run on the same conversation, aborts it.
-   */
-  private readonly activeRuns = new Map<string, AbortController>();
-
-  /** Registers the run so a later stop can find it; supersedes any older run. */
-  registerActiveRun(conversationId: string, controller: AbortController): void {
-    const previous = this.activeRuns.get(conversationId);
-    if (previous && previous !== controller) previous.abort();
-    this.activeRuns.set(conversationId, controller);
-  }
-
-  /** Unregisters the run, but only if it is still the current one. */
-  clearActiveRun(conversationId: string, controller: AbortController): void {
-    if (this.activeRuns.get(conversationId) === controller) {
-      this.activeRuns.delete(conversationId);
-    }
-  }
-
-  /**
    * Aborts the active run of a conversation and cancels its pending and
    * running subagents, also when the run itself already ended. Returns false
    * if there was nothing to stop. The run stays registered (so `running`
-   * stays true) until it has saved its stopped state; clearActiveRun removes
-   * it then.
+   * stays true) until it has saved its stopped state and cleared itself from
+   * the `ActiveRunRegistry`.
    */
   async stopRun(conversationId: string): Promise<boolean> {
-    const controller = this.activeRuns.get(conversationId);
-    const aborted = !!controller && !controller.signal.aborted;
+    // First, so the run queues no subagent after the cancel below
+    const aborted = this.activeRuns.abort(conversationId);
     if (aborted) {
-      // First, so the run queues no subagent after the cancel below
-      controller.abort();
       // A user stop leaves no step running: reset the in_progress step back
       // to pending so the todo list stops spinning (the live stream is
       // closing, so the client reflects this optimistically / on its next
@@ -409,14 +387,6 @@ export class AgentsCompletionsService {
     const cancelled =
       await this.subagents.cancelForConversation(conversationId);
     return aborted || cancelled > 0;
-  }
-
-  /**
-   * True while a run of the conversation is in progress, including the gaps
-   * between continuation iterations where no message is 'streaming'.
-   */
-  isRunActive(conversationId: string): boolean {
-    return this.activeRuns.has(conversationId);
   }
 
   /** Conversations whose title is being generated */
@@ -461,6 +431,7 @@ export class AgentsCompletionsService {
     private readonly agentsConfig: AgentsConfigService,
     private readonly modelsCatalog: AgentsModelsCatalogService,
     private readonly subagents: AgentsSubagentsService,
+    private readonly activeRuns: ActiveRunRegistry,
   ) {}
 
   private getPrompt(fileName: string, data?: Record<string, unknown>): string {

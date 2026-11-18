@@ -1,3 +1,4 @@
+import { ActiveRunRegistry } from './active-run.registry';
 import { UserId, WorkspaceId } from '@/common/decorators/app.decorator';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
@@ -118,6 +119,7 @@ export class AgentsController {
     private readonly agentsStreamBuffer: AgentsStreamBufferService,
     private readonly agentsUsageService: AgentsUsageService,
     private readonly agentsGuardService: AgentsGuardService,
+    private readonly activeRuns: ActiveRunRegistry,
   ) {}
 
   @WorkspaceAccess('agent.read')
@@ -501,7 +503,7 @@ export class AgentsController {
       result.data.map(async (conversation) => ({
         ...conversation,
         running:
-          this.agentsCompletionsService.isRunActive(conversation.id) ||
+          this.activeRuns.isActive(conversation.id) ||
           (await this.agentsStreamBuffer.isStreaming(conversation.id)),
       })),
     );
@@ -609,7 +611,7 @@ export class AgentsController {
     // ends, including the gaps between continuation iterations. Read before
     // the messages: `running: false` then means they were read after the
     // run saved its final state.
-    const running = this.agentsCompletionsService.isRunActive(id);
+    const running = this.activeRuns.isActive(id);
     const result = await this.agentsService.getMessages(
       id,
       workspaceId,
@@ -663,7 +665,7 @@ export class AgentsController {
       activeConversationId = conversationId;
       runSettled = settled;
       if (conversationId) {
-        this.agentsCompletionsService.registerActiveRun(
+        this.activeRuns.register(
           conversationId,
           abortController,
         );
@@ -785,7 +787,7 @@ export class AgentsController {
         // the resumable buffer so any reconnecting client stops waiting.
         void this.agentsStreamBuffer.finish(conversationId);
         const clear = () =>
-          this.agentsCompletionsService.clearActiveRun(
+          this.activeRuns.clear(
             conversationId,
             abortController,
           );
@@ -861,7 +863,7 @@ export class AgentsController {
     }
 
     const stream = await this.agentsStreamBuffer.createResumeStream(id, () =>
-      this.agentsCompletionsService.isRunActive(id),
+      this.activeRuns.isActive(id),
     );
     if (!stream) {
       res.status(HttpStatus.NO_CONTENT).end();

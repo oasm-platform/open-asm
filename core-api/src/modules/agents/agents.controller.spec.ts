@@ -106,7 +106,7 @@ describe('AgentsController.resumeStream', () => {
       {
         agentsService: { getConversation },
         agentsStreamBuffer: { createResumeStream },
-        agentsCompletionsService: { isRunActive: jest.fn() },
+        activeRuns: { isActive: jest.fn() },
       },
     );
     const end = jest.fn();
@@ -156,7 +156,7 @@ describe('AgentsController.getConversations', () => {
           }),
         },
         agentsStreamBuffer: { isStreaming },
-        agentsCompletionsService: { isRunActive },
+        activeRuns: { isActive: isRunActive },
       },
     );
 
