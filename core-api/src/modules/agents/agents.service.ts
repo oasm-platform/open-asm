@@ -23,10 +23,8 @@ import { WorkspaceEncryptionService } from '@/services/workspace-encryption/work
 import { getManyResponse } from '@/common/utils/get-many-response.util';
 import { HttpService } from '@nestjs/axios';
 import {
-  BadRequestException,
   Injectable,
   Logger,
-  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { firstValueFrom } from 'rxjs';
@@ -81,6 +79,7 @@ import {
   getLLMProviderConfig,
   llmProviderSupported,
 } from './llm-provider-supported';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 /** The conversation's project as the API returns it; needs `project` loaded. */
 function projectOf(
@@ -218,7 +217,7 @@ export class AgentsService {
     // Validate API key by fetching models
     const provider = getLLMProviderConfig(dto.provider);
     if (!provider) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `Provider ${dto.provider} is not supported`,
       );
     }
@@ -226,7 +225,7 @@ export class AgentsService {
     const models = await provider.fetchModels(dto.apiKey, dto.apiUrl);
 
     if (models.length === 0) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `Cannot connect to ${provider.name}: invalid API key or unable to reach the provider. Please double-check your API key and try again.`,
       );
     }
@@ -359,7 +358,7 @@ export class AgentsService {
     });
 
     if (!config) {
-      throw new NotFoundException('LLM config not found');
+      throw new NotFoundError('LLM config not found');
     }
 
     const dek = await this.workspaceEncryption.getDEK(workspaceId);
@@ -406,7 +405,7 @@ export class AgentsService {
     });
 
     if (!config) {
-      throw new NotFoundException('LLM config not found');
+      throw new NotFoundError('LLM config not found');
     }
 
     await this.llmConfigRepository.remove(config);
@@ -423,7 +422,7 @@ export class AgentsService {
     });
 
     if (!config) {
-      throw new NotFoundException('LLM config not found');
+      throw new NotFoundError('LLM config not found');
     }
 
     await this.agentsConfig.setDefaultModel(
@@ -448,7 +447,7 @@ export class AgentsService {
     });
 
     if (!config) {
-      throw new NotFoundException('LLM config not found');
+      throw new NotFoundError('LLM config not found');
     }
 
     // Try to get from cache first
@@ -504,7 +503,7 @@ export class AgentsService {
     });
 
     if (!conversation) {
-      throw new NotFoundException('Conversation not found');
+      throw new NotFoundError('Conversation not found');
     }
 
     const todoEntities = await this.todoRepository.find({
@@ -583,7 +582,7 @@ export class AgentsService {
       select: ['id'],
     });
     if (!conversation) {
-      throw new NotFoundException('Conversation not found');
+      throw new NotFoundError('Conversation not found');
     }
     return this.subagents.listForConversation(id);
   }
@@ -599,11 +598,11 @@ export class AgentsService {
       select: ['id'],
     });
     if (!conversation) {
-      throw new NotFoundException('Conversation not found');
+      throw new NotFoundError('Conversation not found');
     }
     const detail = await this.subagents.getDetail(id, subagentId);
     if (!detail) {
-      throw new NotFoundException('Subagent not found');
+      throw new NotFoundError('Subagent not found');
     }
     return detail;
   }
@@ -620,11 +619,11 @@ export class AgentsService {
       select: ['id'],
     });
     if (!conversation) {
-      throw new NotFoundException('Conversation not found');
+      throw new NotFoundError('Conversation not found');
     }
     const cancelled = await this.subagents.cancelOne(id, subagentId);
     if (!cancelled) {
-      throw new BadRequestException('The subagent is not pending or running');
+      throw new InvalidInputError('The subagent is not pending or running');
     }
     return { message: 'Subagent cancelled' };
   }
@@ -640,7 +639,7 @@ export class AgentsService {
       select: ['id', 'metadata'],
     });
     if (!conversation) {
-      throw new NotFoundException('Conversation not found');
+      throw new NotFoundError('Conversation not found');
     }
     return this.workflow.getWorkflow(id, conversation.metadata?.goal ?? null);
   }
@@ -701,7 +700,7 @@ export class AgentsService {
     });
 
     if (!conversation) {
-      throw new NotFoundException('Conversation not found');
+      throw new NotFoundError('Conversation not found');
     }
 
     if (dto.title !== undefined) {
@@ -731,7 +730,7 @@ export class AgentsService {
     });
 
     if (!conversation) {
-      throw new NotFoundException('Conversation not found');
+      throw new NotFoundError('Conversation not found');
     }
 
     await this.conversationRepository.remove(conversation);
@@ -804,7 +803,7 @@ export class AgentsService {
     });
 
     if (!conversation) {
-      throw new NotFoundException('Conversation not found');
+      throw new NotFoundError('Conversation not found');
     }
 
     const limit = query?.limit || 10;
@@ -871,7 +870,7 @@ export class AgentsService {
     });
 
     if (!conversation) {
-      throw new NotFoundException('Conversation not found');
+      throw new NotFoundError('Conversation not found');
     }
 
     const message = await this.messageRepository.findOne({
@@ -879,7 +878,7 @@ export class AgentsService {
     });
 
     if (!message) {
-      throw new NotFoundException('Message not found');
+      throw new NotFoundError('Message not found');
     }
 
     await this.messageRepository.remove(message);
@@ -895,7 +894,7 @@ export class AgentsService {
       name === 'constructor' ||
       name === 'prototype'
     ) {
-      throw new BadRequestException('Invalid MCP server name');
+      throw new InvalidInputError('Invalid MCP server name');
     }
   }
 
@@ -989,7 +988,7 @@ export class AgentsService {
     this.assertSafeMCPServerName(name);
     const config = await this.getOrCreateMCPConfig(workspaceId);
     if (!config.configJson.mcpServers[name]) {
-      throw new NotFoundException(`MCP server "${name}" not found`);
+      throw new NotFoundError(`MCP server "${name}" not found`);
     }
     delete config.configJson.mcpServers[name];
     await this.mcpConfigRepository.save(config);
@@ -1003,7 +1002,7 @@ export class AgentsService {
     this.assertSafeMCPServerName(name);
     const config = await this.getOrCreateMCPConfig(workspaceId);
     if (!config.configJson.mcpServers[name]) {
-      throw new NotFoundException(`MCP server "${name}" not found`);
+      throw new NotFoundError(`MCP server "${name}" not found`);
     }
     config.configJson.mcpServers[name].disabled = disabled;
     await this.mcpConfigRepository.save(config);
@@ -1018,7 +1017,7 @@ export class AgentsService {
     const config = await this.getOrCreateMCPConfig(workspaceId);
     const server = config.configJson.mcpServers[name];
     if (!server) {
-      throw new NotFoundException(`MCP server "${name}" not found`);
+      throw new NotFoundError(`MCP server "${name}" not found`);
     }
 
     if (server.disabled) {

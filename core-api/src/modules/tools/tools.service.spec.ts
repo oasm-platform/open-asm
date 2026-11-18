@@ -1,5 +1,5 @@
 import { ToolCategory, WorkerType } from '@/common/enums/enum';
-import { BadRequestException } from '@nestjs/common';
+
 import { randomUUID } from 'crypto';
 import type { Repository } from 'typeorm';
 import { And, ILike, In, Not } from 'typeorm';
@@ -7,6 +7,7 @@ import type { Tool } from './entities/tools.entity';
 import { ToolConfigProfile } from './entities/tool-config-profiles.entity';
 import type { WorkspaceTool } from './entities/workspace-tools.entity';
 import { ToolsService } from './tools.service';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 // ── Mock factories ──────────────────────────────────────────────────
 const mockRepo = () => ({
@@ -840,8 +841,7 @@ describe('uninstallTool — cascades config profile deletion', () => {
 
     await expect(
       service.uninstallTool({ toolId: 'tool-003' }, 'ws-003'),
-    ).rejects.toThrow(
-      new BadRequestException('Tool is not installed in this workspace.'),
+    ).rejects.toThrow(new InvalidInputError('Tool is not installed in this workspace.'),
     );
 
     expect(workspaceToolRepo.manager.transaction).not.toHaveBeenCalled();

@@ -10,7 +10,7 @@ import {
   WorkerType,
 } from '@/common/enums/enum';
 import { getQueueToken } from '@nestjs/bullmq';
-import { NotFoundException } from '@nestjs/common';
+
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
@@ -30,6 +30,7 @@ import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
 import { JobsRegistryService } from './jobs-registry.service';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 const HOST = [TargetType.DOMAIN, TargetType.IP, TargetType.CIDR];
 
@@ -288,7 +289,7 @@ describe('JobsRegistryService', () => {
 
       await expect(
         service.reRunJob(mockWorkspaceId, mockJobId),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
       await expect(
         service.reRunJob(mockWorkspaceId, mockJobId),
       ).rejects.toThrow('Job not found in workspace');
@@ -474,7 +475,7 @@ describe('JobsRegistryService', () => {
 
       await expect(
         service.cancelJob(mockWorkspaceId, mockJobId),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
       await expect(
         service.cancelJob(mockWorkspaceId, mockJobId),
       ).rejects.toThrow('Job not found in workspace');
@@ -653,7 +654,7 @@ describe('JobsRegistryService', () => {
 
       await expect(
         service.cancelJobHistory(mockWorkspaceId, mockHistoryId),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
 
       expect(qr.rollbackTransaction).toHaveBeenCalled();
       expect(qr.updateBuilder.execute).not.toHaveBeenCalled();
@@ -666,7 +667,7 @@ describe('JobsRegistryService', () => {
 
       await expect(
         service.cancelJobHistory(mockWorkspaceId, 'missing-history'),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
       expect(qr.commitTransaction).not.toHaveBeenCalled();
     });
   });
@@ -733,7 +734,7 @@ describe('JobsRegistryService', () => {
 
       await expect(
         service.deleteJob(mockWorkspaceId, mockJobId),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
       await expect(
         service.deleteJob(mockWorkspaceId, mockJobId),
       ).rejects.toThrow('Job not found in workspace');
@@ -1128,7 +1129,7 @@ describe('JobsRegistryService', () => {
 
       await expect(
         service.getJobHistoryDetail(mockWorkspaceId, mockHistoryId),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
     });
 
     it('should throw NotFoundException when job history not in workspace', async () => {
@@ -1142,7 +1143,7 @@ describe('JobsRegistryService', () => {
 
       await expect(
         service.getJobHistoryDetail(mockWorkspaceId, mockHistoryId),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
     });
 
     it('should not crash when job history has no workflow', async () => {
@@ -1317,7 +1318,7 @@ describe('JobsRegistryService', () => {
 
       await expect(
         service.getJobHistoryWorkflow(mockWorkspaceId, mockHistoryId),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
     });
   });
 

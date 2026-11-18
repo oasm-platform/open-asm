@@ -1,7 +1,8 @@
-import { BadRequestException, PayloadTooLargeException } from '@nestjs/common';
+import { PayloadTooLargeException } from '@nestjs/common';
 import { Readable } from 'node:stream';
 
 import { ProjectFilesService, PROJECT_FILE_LIMIT } from './project-files.service';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 const P1 = 'p1';
 const W1 = 'w1';
@@ -68,7 +69,7 @@ describe('ProjectFilesService', () => {
 
     await expect(
       service.presign(P1, W1, 'u1', { fileName, sizeBytes: 10 }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    ).rejects.toBeInstanceOf(InvalidInputError);
     expect(artifacts.presignUpload).not.toHaveBeenCalled();
   });
 

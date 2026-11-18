@@ -1,9 +1,7 @@
 import { AgentApprovalMode, AgentMode } from '@/modules/agents/enums/agent.enums';
 import {
-  BadRequestException,
   Injectable,
   Logger,
-  NotFoundException,
   type OnModuleDestroy,
   type OnModuleInit,
 } from '@nestjs/common';
@@ -59,6 +57,7 @@ import {
 } from './shared/conversation-metadata';
 import { DEFAULT_MAX_STEPS, stepLimit } from './shared/step-limit';
 import { addSteps, emptyStats, finalizeStats } from './shared/turn-stats';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 /**
  * Background runs per process. Wide enough that one conversation can fan out
@@ -389,29 +388,29 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
   ): Promise<AgentSubagent> {
     const { def, names } = await this.find(ctx.workspaceId, ctx.userId, name);
     if (!def) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `Unknown subagent "${name}". Available: ${names.join(', ')}`,
       );
     }
     const text = (task ?? '').trim();
-    if (!text) throw new BadRequestException('The task is empty');
+    if (!text) throw new InvalidInputError('The task is empty');
     const maxChars = options.brief
       ? SUBAGENT_BRIEF_MAX_CHARS
       : SUBAGENT_TASK_MAX_CHARS;
     if (text.length > maxChars) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `The task is longer than ${maxChars} characters`,
       );
     }
     const after = [...new Set(options.after ?? [])];
     if (after.length > SUBAGENT_MAX_DEPENDENCIES) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `A subagent can wait for at most ${SUBAGENT_MAX_DEPENDENCIES} others`,
       );
     }
     const derivedFrom = [...new Set(options.derivedFrom ?? [])];
     if (derivedFrom.length > SUBAGENT_MAX_DEPENDENCIES) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `A subagent can derive from at most ${SUBAGENT_MAX_DEPENDENCIES} others`,
       );
     }
@@ -429,18 +428,18 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
           lock: { mode: 'pessimistic_write' },
         });
         if (!conversation)
-          throw new NotFoundException('Conversation not found');
+          throw new NotFoundError('Conversation not found');
         // Checked under the lock: a stop that took it first has already
         // cancelled the conversation's subagents and would miss this row
         if (signal?.aborted) {
-          throw new BadRequestException('The run was stopped');
+          throw new InvalidInputError('The run was stopped');
         }
 
         const active = await m.count(AgentSubagent, {
           where: { conversationId: ctx.conversationId, status: In(ACTIVE) },
         });
         if (active >= SUBAGENT_MAX_ACTIVE_PER_CONVERSATION) {
-          throw new BadRequestException(
+          throw new InvalidInputError(
             `At most ${SUBAGENT_MAX_ACTIVE_PER_CONVERSATION} subagents can be active per conversation; wait for running ones to finish`,
           );
         }
@@ -458,7 +457,7 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
           const known = new Set(found.map((r) => r.id));
           const missing = linked.filter((id) => !known.has(id));
           if (missing.length > 0) {
-            throw new BadRequestException(
+            throw new InvalidInputError(
               `Unknown subagent id(s) in this conversation: ${missing.join(', ')}`,
             );
           }
@@ -472,7 +471,7 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
           select: ['id'],
         });
         if (options.stepId && !step) {
-          throw new BadRequestException(
+          throw new InvalidInputError(
             `Unknown plan step "${options.stepId}"`,
           );
         }

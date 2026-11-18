@@ -14,11 +14,8 @@ import { WorkspaceEncryptionService } from '@/services/workspace-encryption/work
 import { getManyResponse } from '@/common/utils/get-many-response.util';
 import { SwaggerPropertyMetadata } from '@/common/utils/get-swagger-metadata.util';
 import {
-  BadRequestException,
-  ForbiddenException,
   Injectable,
   Logger,
-  NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -56,6 +53,7 @@ import { WorkspacePermission } from './entities/workspace-permission.entity';
 import { Workspace } from './entities/workspace.entity';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { ForbiddenError, InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 // Retired with the move of templates onto artifacts; stripped so groups that still hold them stay editable.
 const RETIRED_PERMISSION_KEYS = new Set(['template.read', 'template.write']);
@@ -126,7 +124,7 @@ export class WorkspacesService implements OnModuleInit {
     });
 
     if (currentNumberOfWorkspace >= LIMIT_WORKSPACE_CREATE) {
-      throw new BadRequestException('You have reached the limit of workspaces');
+      throw new InvalidInputError('You have reached the limit of workspaces');
     }
 
     const newWorkspaceId = randomUUID();
@@ -160,7 +158,7 @@ export class WorkspacesService implements OnModuleInit {
 
     const created = await this.repo.findOne({ where: { id: newWorkspaceId } });
     if (!created) {
-      throw new BadRequestException('Failed to create workspace');
+      throw new InvalidInputError('Failed to create workspace');
     }
 
     return created;
@@ -358,7 +356,7 @@ export class WorkspacesService implements OnModuleInit {
   ): Promise<DefaultMessageResponseDto> {
     const workspace = await this.repo.findOne({ where: { id } });
     if (!workspace) {
-      throw new NotFoundException('Workspace not found');
+      throw new NotFoundError('Workspace not found');
     }
 
     // Delete all targets associated with the workspace first (own tx — the
@@ -409,7 +407,7 @@ export class WorkspacesService implements OnModuleInit {
     });
 
     if (!workspace) {
-      throw new NotFoundException('Workspace not found');
+      throw new NotFoundError('Workspace not found');
     }
 
     workspace.apiKey = apiKey;
@@ -433,7 +431,7 @@ export class WorkspacesService implements OnModuleInit {
     });
 
     if (!workspace) {
-      throw new NotFoundException('Workspace not found');
+      throw new NotFoundError('Workspace not found');
     }
 
     const configKeys: (keyof GetWorkspaceConfigsDto)[] = [
@@ -522,7 +520,7 @@ export class WorkspacesService implements OnModuleInit {
     });
 
     if (!workspace) {
-      throw new NotFoundException('Workspace not found');
+      throw new NotFoundError('Workspace not found');
     }
 
     return workspace;
@@ -593,7 +591,7 @@ export class WorkspacesService implements OnModuleInit {
     });
 
     if (!isMember) {
-      throw new NotFoundException('Workspace not found');
+      throw new NotFoundError('Workspace not found');
     }
 
     // Load workspace with owner and members
@@ -603,7 +601,7 @@ export class WorkspacesService implements OnModuleInit {
     });
 
     if (!workspace) {
-      throw new NotFoundException('Workspace not found');
+      throw new NotFoundError('Workspace not found');
     }
 
     if (permissions !== undefined) {
@@ -635,7 +633,7 @@ export class WorkspacesService implements OnModuleInit {
     });
 
     if (!workspace || workspace.owner.id !== userContext.id) {
-      throw new ForbiddenException('You are not the owner of this workspace');
+      throw new ForbiddenError('You are not the owner of this workspace');
     }
 
     return workspace;
@@ -687,7 +685,7 @@ export class WorkspacesService implements OnModuleInit {
     });
 
     if (!workspaceMember) {
-      throw new NotFoundException('Workspace member not found');
+      throw new NotFoundError('Workspace member not found');
     }
 
     return workspaceMember;
@@ -727,7 +725,7 @@ export class WorkspacesService implements OnModuleInit {
     });
 
     if (!membership) {
-      throw new NotFoundException('Workspace member not found');
+      throw new NotFoundError('Workspace member not found');
     }
 
     const keys = new Set<string>();
@@ -850,7 +848,7 @@ export class WorkspacesService implements OnModuleInit {
     auditContext?: AuditContext,
   ): Promise<WorkspacePermission> {
     if (dto.permissions.includes(WILDCARD_PERMISSION)) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'Wildcard "*" is reserved for the system Admin group',
       );
     }
@@ -863,7 +861,7 @@ export class WorkspacesService implements OnModuleInit {
 
     const existing = await this.findPermissionGroupByNameCI(workspaceId, dto.name);
     if (existing) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'A permission group with this name already exists',
       );
     }
@@ -896,7 +894,7 @@ export class WorkspacesService implements OnModuleInit {
     } catch (error) {
       // Concurrent insert raced the unique (workspace, name) constraint.
       if ((error as { code?: string })?.code === '23505') {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           'A permission group with this name already exists',
         );
       }
@@ -917,17 +915,17 @@ export class WorkspacesService implements OnModuleInit {
     );
 
     if (group.isSystem) {
-      throw new ForbiddenException('System permission groups cannot be modified');
+      throw new ForbiddenError('System permission groups cannot be modified');
     }
     if (dto.permissions?.includes(WILDCARD_PERMISSION)) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'Wildcard "*" is reserved for the system Admin group',
       );
     }
 
     // Reject an empty PATCH body instead of silently succeeding.
     if (dto.name === undefined && dto.permissions === undefined) {
-      throw new BadRequestException('Nothing to update');
+      throw new InvalidInputError('Nothing to update');
     }
 
     if (dto.permissions !== undefined) {
@@ -945,7 +943,7 @@ export class WorkspacesService implements OnModuleInit {
     if (dto.name !== undefined && dto.name !== group.name) {
       const duplicate = await this.findPermissionGroupByNameCI(workspaceId, dto.name);
       if (duplicate && duplicate.id !== permissionId) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           'A permission group with this name already exists',
         );
       }
@@ -976,7 +974,7 @@ export class WorkspacesService implements OnModuleInit {
       });
     } catch (error) {
       if ((error as { code?: string })?.code === '23505') {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           'A permission group with this name already exists',
         );
       }
@@ -995,7 +993,7 @@ export class WorkspacesService implements OnModuleInit {
     );
 
     if (group.isSystem) {
-      throw new ForbiddenException('System permission groups cannot be deleted');
+      throw new ForbiddenError('System permission groups cannot be deleted');
     }
 
     // Delete + audit row (event 12, explicit) commit atomically.
@@ -1029,7 +1027,7 @@ export class WorkspacesService implements OnModuleInit {
       where: { id: permissionId, workspace: { id: workspaceId } },
     });
     if (!group) {
-      throw new NotFoundException('Permission group not found');
+      throw new NotFoundError('Permission group not found');
     }
     return group;
   }
@@ -1067,7 +1065,7 @@ export class WorkspacesService implements OnModuleInit {
     const valid = this.getAllPermissionKeys();
     const unknown = [...new Set(keys)].filter((key) => !valid.has(key));
     if (unknown.length > 0) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `Unknown permission key(s): ${unknown.join(', ')}`,
       );
     }
@@ -1096,7 +1094,7 @@ export class WorkspacesService implements OnModuleInit {
     const holderKeys = new Set(permissionKeys);
     const missing = [...new Set(keys)].filter((key) => !holderKeys.has(key));
     if (missing.length > 0) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `You can only grant permission keys you already hold. Missing: ${missing.join(', ')}`,
       );
     }
@@ -1120,7 +1118,7 @@ export class WorkspacesService implements OnModuleInit {
       ),
     );
     if (offending.length > 0) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `You can only grant permission groups whose keys you hold. Offending group(s): ${offending.map((group) => group.name).join(', ')}`,
       );
     }
@@ -1153,7 +1151,7 @@ export class WorkspacesService implements OnModuleInit {
     auditContext?: AuditContext,
   ): Promise<WorkspaceMembers> {
     if (permissionIds.length === 0) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'At least one permission group is required',
       );
     }
@@ -1163,7 +1161,7 @@ export class WorkspacesService implements OnModuleInit {
       relations: ['user', 'memberPermissions', 'memberPermissions.permission'],
     });
     if (!member) {
-      throw new NotFoundException('Workspace member not found');
+      throw new NotFoundError('Workspace member not found');
     }
     await this.assertMemberMutable(member, currentUserId, workspaceId);
 
@@ -1180,7 +1178,7 @@ export class WorkspacesService implements OnModuleInit {
     const validIds = new Set(groups.map((group) => group.id));
     const invalidIds = permissionIds.filter((id) => !validIds.has(id));
     if (invalidIds.length > 0) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `Unknown permission group(s): ${invalidIds.join(', ')}`,
       );
     }
@@ -1225,7 +1223,7 @@ export class WorkspacesService implements OnModuleInit {
       relations: ['user', 'memberPermissions', 'memberPermissions.permission'],
     });
     if (!updated) {
-      throw new NotFoundException('Workspace member not found');
+      throw new NotFoundError('Workspace member not found');
     }
     return updated;
   }
@@ -1241,7 +1239,7 @@ export class WorkspacesService implements OnModuleInit {
       relations: ['user', 'memberPermissions', 'memberPermissions.permission'],
     });
     if (!member) {
-      throw new NotFoundException('Workspace member not found');
+      throw new NotFoundError('Workspace member not found');
     }
     await this.assertMemberMutable(member, currentUserId, workspaceId);
 
@@ -1295,19 +1293,19 @@ export class WorkspacesService implements OnModuleInit {
     workspaceId: string,
   ): Promise<void> {
     if (member.user?.id === currentUserId) {
-      throw new ForbiddenException('You cannot modify your own membership');
+      throw new ForbiddenError('You cannot modify your own membership');
     }
     const hasOwnerGroup =
       member.memberPermissions?.some((mp) => mp.permission?.isSystem) ?? false;
     if (hasOwnerGroup) {
-      throw new ForbiddenException('The workspace owner cannot be modified');
+      throw new ForbiddenError('The workspace owner cannot be modified');
     }
     const workspace = await this.repo.findOne({
       where: { id: workspaceId },
       relations: ['owner'],
     });
     if (workspace?.owner?.id === member.user?.id) {
-      throw new ForbiddenException('The workspace owner cannot be modified');
+      throw new ForbiddenError('The workspace owner cannot be modified');
     }
   }
 
@@ -1349,10 +1347,10 @@ export class WorkspacesService implements OnModuleInit {
 
     const workspace = await this.repo.findOne({ where: { id: workspaceId } });
     if (!workspace) {
-      throw new NotFoundException('Workspace not found');
+      throw new NotFoundError('Workspace not found');
     }
     if (workspace.archivedAt) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'Cannot invite members to an archived workspace',
       );
     }
@@ -1478,7 +1476,7 @@ export class WorkspacesService implements OnModuleInit {
 
     const invitation = await this.findInvitationByToken(token);
     if (!invitation) {
-      throw new NotFoundException('Invitation not found');
+      throw new NotFoundError('Invitation not found');
     }
 
     return {
@@ -1496,10 +1494,10 @@ export class WorkspacesService implements OnModuleInit {
   ): Promise<DefaultMessageResponseDto> {
     const invitation = await this.findInvitationByToken(token);
     if (!this.canAcceptInvitation(invitation, user.email)) {
-      throw new BadRequestException('Invitation is invalid or expired');
+      throw new InvalidInputError('Invitation is invalid or expired');
     }
     if (invitation!.workspace.archivedAt) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'Cannot join an archived workspace',
       );
     }
@@ -1512,7 +1510,7 @@ export class WorkspacesService implements OnModuleInit {
         { status: InvitationStatus.ACCEPTED },
       );
       if (!consumed.affected) {
-        throw new BadRequestException('Invitation is invalid or expired');
+        throw new InvalidInputError('Invitation is invalid or expired');
       }
 
       const memberRepository = manager.getRepository(WorkspaceMembers);
@@ -1605,7 +1603,7 @@ export class WorkspacesService implements OnModuleInit {
   ): Promise<DefaultMessageResponseDto> {
     const invitation = await this.findInvitationByToken(token);
     if (!this.canAcceptInvitation(invitation, user.email)) {
-      throw new BadRequestException('Invitation is invalid or expired');
+      throw new InvalidInputError('Invitation is invalid or expired');
     }
 
     const declined = await this.invitationRepository.update(
@@ -1613,7 +1611,7 @@ export class WorkspacesService implements OnModuleInit {
       { status: InvitationStatus.DECLINED },
     );
     if (!declined.affected) {
-      throw new BadRequestException('Invitation is invalid or expired');
+      throw new InvalidInputError('Invitation is invalid or expired');
     }
 
     await this.notifySafely({
@@ -1654,7 +1652,7 @@ export class WorkspacesService implements OnModuleInit {
       { status: InvitationStatus.CANCELLED },
     );
     if (!updated.affected) {
-      throw new NotFoundException('Invitation not found or already handled');
+      throw new NotFoundError('Invitation not found or already handled');
     }
 
     // The pending-invite notification sent to the invitee is no longer

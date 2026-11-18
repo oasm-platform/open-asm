@@ -1,10 +1,7 @@
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { Role } from '@/common/enums/enum';
 import { InvitationStatus } from '@/modules/workspaces/enums/workspace.enums';
-import {
-  BadRequestException,
-  ForbiddenException,
-} from '@nestjs/common';
+
 import type { TestingModule } from '@nestjs/testing';
 import type { NodeRequest, NodeResponse } from '@nestjs/platform-node';
 import { Test } from '@nestjs/testing';
@@ -24,6 +21,7 @@ import { WorkspaceMembers } from './entities/workspace-members.entity';
 import { WorkspacePermission } from './entities/workspace-permission.entity';
 import { Workspace } from './entities/workspace.entity';
 import { WorkspacesService } from './workspaces.service';
+import { ForbiddenError, InvalidInputError } from '@/common/errors/domain.errors';
 
 describe('WorkspacesService', () => {
   let service: WorkspacesService;
@@ -675,7 +673,7 @@ describe('WorkspacesService', () => {
           },
           testUserId,
         ),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
 
     it('should reject unknown permission keys not present in the catalog', async () => {
@@ -692,7 +690,7 @@ describe('WorkspacesService', () => {
           },
           testUserId,
         ),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
 
     it('should forbid granting permission keys the creator does not hold', async () => {
@@ -710,7 +708,7 @@ describe('WorkspacesService', () => {
           },
           testUserId,
         ),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
 
     it('should allow a wildcard holder to create any group', async () => {
@@ -749,7 +747,7 @@ describe('WorkspacesService', () => {
           },
           testUserId,
         ),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
 
     it('should reject a concurrent duplicate insert with 23505 as 400', async () => {
@@ -767,7 +765,7 @@ describe('WorkspacesService', () => {
           },
           testUserId,
         ),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
 
     it('should forbid modifying a system group', async () => {
@@ -782,7 +780,7 @@ describe('WorkspacesService', () => {
         service.updatePermissionGroup(testWorkspaceId, randomUUID(), {
           name: 'Renamed',
         }, testUserId),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(ForbiddenError);
     });
 
     it('updatePermissionGroup drops retired template keys', async () => {
@@ -822,7 +820,7 @@ describe('WorkspacesService', () => {
           { permissions: ['foo.bar'] },
           testUserId,
         ),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
 
     it('createPermissionGroup drops retired template keys', async () => {
@@ -849,7 +847,7 @@ describe('WorkspacesService', () => {
 
       await expect(
         service.updatePermissionGroup(testWorkspaceId, randomUUID(), {}, testUserId),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
 
     it('should forbid deleting a system group', async () => {
@@ -862,7 +860,7 @@ describe('WorkspacesService', () => {
 
       await expect(
         service.deletePermissionGroup(testWorkspaceId, randomUUID()),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(ForbiddenError);
     });
   });
 
@@ -1026,7 +1024,7 @@ describe('WorkspacesService', () => {
           [],
           testUserId,
         ),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
 
     it('should reject unknown permission group ids instead of silently dropping them', async () => {
@@ -1046,7 +1044,7 @@ describe('WorkspacesService', () => {
           [validId, unknownId],
           testUserId,
         ),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
       // No replacement happened — no silent partial write.
       expect(mockManager.delete).not.toHaveBeenCalled();
     });
@@ -1076,7 +1074,7 @@ describe('WorkspacesService', () => {
           [powerfulGroupId],
           testUserId,
         ),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
 
     it('should forbid modifying your own membership', async () => {
@@ -1091,7 +1089,7 @@ describe('WorkspacesService', () => {
           [randomUUID()],
           testUserId,
         ),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(ForbiddenError);
     });
 
     it('should forbid modifying the owner (system group holder)', async () => {
@@ -1110,7 +1108,7 @@ describe('WorkspacesService', () => {
           [randomUUID()],
           testUserId,
         ),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(ForbiddenError);
     });
 
     it('should forbid modifying the owner even when the system group is missing', async () => {
@@ -1131,7 +1129,7 @@ describe('WorkspacesService', () => {
           [randomUUID()],
           testUserId,
         ),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(ForbiddenError);
     });
 
     it('should forbid removing yourself', async () => {
@@ -1141,7 +1139,7 @@ describe('WorkspacesService', () => {
 
       await expect(
         service.removeMember(testWorkspaceId, memberId, testUserId),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(ForbiddenError);
     });
   });
 
@@ -1635,7 +1633,7 @@ describe('WorkspacesService', () => {
           emails: [inviteeEmail],
           permissionIds: [],
         }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
 
     it('should forbid inviting with a group whose keys the inviter does not hold', async () => {
@@ -1656,7 +1654,7 @@ describe('WorkspacesService', () => {
           emails: [inviteeEmail],
           permissionIds: ['powerful-group'],
         }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
 
     it('should still succeed when the invite notification fails to enqueue', async () => {
@@ -1759,7 +1757,7 @@ describe('WorkspacesService', () => {
           ...testUserContext,
           email: inviteeEmail,
         }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
 
     it('should not remove existing permission groups on accept', async () => {
@@ -1808,7 +1806,7 @@ describe('WorkspacesService', () => {
 
       await expect(
         service.acceptInvitation('a'.repeat(64), testUserContext),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
 
     it('should reject accept when the invitation is expired', async () => {
@@ -1823,7 +1821,7 @@ describe('WorkspacesService', () => {
           ...testUserContext,
           email: inviteeEmail,
         }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
 
     it('should reject accept when the token is already used', async () => {
@@ -1836,7 +1834,7 @@ describe('WorkspacesService', () => {
           ...testUserContext,
           email: inviteeEmail,
         }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
 
     it('should reject accept for a cancelled invitation', async () => {
@@ -1849,7 +1847,7 @@ describe('WorkspacesService', () => {
           ...testUserContext,
           email: inviteeEmail,
         }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
 
     it('should reject accept for an expired (persisted) invitation', async () => {
@@ -1862,7 +1860,7 @@ describe('WorkspacesService', () => {
           ...testUserContext,
           email: inviteeEmail,
         }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
 
     it('should reject a concurrent double accept', async () => {
@@ -1876,7 +1874,7 @@ describe('WorkspacesService', () => {
           ...testUserContext,
           email: inviteeEmail,
         }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
 
     it('should decline an invitation and notify the inviter', async () => {

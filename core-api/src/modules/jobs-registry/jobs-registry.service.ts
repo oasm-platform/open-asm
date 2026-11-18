@@ -22,12 +22,10 @@ import { getManyResponse } from '@/common/utils/get-many-response.util';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { WrapperType } from '@/common/types/app.types';
 import {
-  BadRequestException,
   forwardRef,
   Inject,
   Injectable,
   Logger,
-  NotFoundException,
   Optional,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -92,6 +90,7 @@ import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
 import { isNotFound } from '@/common/errors/error-checks';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 /**
  * Sortable columns for Job, whitelisted to prevent SQL injection via
@@ -351,7 +350,7 @@ export class JobsRegistryService {
           const entry = this.connectorRegistry.getConnector(tool.name);
           const schema = entry?.configSchema;
           if (schema) {
-            throw new BadRequestException(
+            throw new InvalidInputError(
               `missing/default profile for connector "${tool.name}": tool requires configuration but no profile was provided or found`,
             );
           }
@@ -601,7 +600,7 @@ export class JobsRegistryService {
     });
 
     if (!worker) {
-      throw new NotFoundException('Worker not found');
+      throw new NotFoundError('Worker not found');
     }
 
     const isBuiltInTools = worker.type === WorkerType.BUILT_IN;
@@ -1350,7 +1349,7 @@ export class JobsRegistryService {
     });
 
     if (!jobHistory) {
-      throw new NotFoundException('Job history not found');
+      throw new NotFoundError('Job history not found');
     }
 
     // Histories created outside a workflow (e.g. custom-template runs) have no
@@ -1371,7 +1370,7 @@ export class JobsRegistryService {
       .getExists();
 
     if (!belongsToWorkspace) {
-      throw new NotFoundException('Job history not found in workspace');
+      throw new NotFoundError('Job history not found in workspace');
     }
 
     return jobHistory;
@@ -1721,7 +1720,7 @@ export class JobsRegistryService {
         .getOne();
 
       if (!job) {
-        throw new NotFoundException('Job not found in workspace');
+        throw new NotFoundError('Job not found in workspace');
       }
 
       return job;
@@ -1867,7 +1866,7 @@ export class JobsRegistryService {
         .getExists();
 
       if (!belongsToWorkspace) {
-        throw new NotFoundException('Job history not found in workspace');
+        throw new NotFoundError('Job history not found in workspace');
       }
 
       // Capture which jobs are executing right now BEFORE the bulk update: only

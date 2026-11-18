@@ -1,9 +1,10 @@
 import { HttpService } from '@nestjs/axios';
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiProperty } from '@nestjs/swagger';
 import { AxiosResponse } from 'axios';
 import { firstValueFrom } from 'rxjs';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 export class GeoIp {
   @ApiProperty()
@@ -95,7 +96,7 @@ export class GeoIpService {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       this.logger.error(`Error fetching geo IP data: ${errorMessage}`, error);
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `Failed to fetch geo IP data: ${errorMessage}`,
       );
     }

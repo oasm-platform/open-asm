@@ -188,6 +188,7 @@ Migration location: `core-api/src/database/migrations/` (88 files, newest last).
 
 ### core-api
 - **Controller → Service → Repository/Entity**. Controllers do validation + mapping only.
+- **Errors**: services throw domain errors (`common/errors/domain.errors.ts`: `InvalidInputError`, `UnauthenticatedError`, `ForbiddenError`, `NotFoundError`, `ConflictError`), never Nest HTTP exceptions, because the same services run under gRPC, BullMQ and agent tools. `DomainExceptionFilter` (registered in `configureApp`) answers them on HTTP with the exact status and body of the matching Nest exception, plus 409 for an uncaught Postgres unique violation and 400 for `22P02`. Controllers, guards and pipes keep Nest exceptions. To act on a caught error use `isNotFound` / `isInvalidInput` / `isUnauthenticated` (`common/errors/error-checks.ts`), not `instanceof`. A response that needs a custom body (e.g. `ArtifactQuotaService`'s `{ code: STORAGE_QUOTA_EXCEEDED }`) stays a Nest exception.
 - DTOs for every request/response (`class-validator` + `class-transformer`); Swagger decorators are required or orval generates unusable types.
 - Entities in module folders (`BaseEntity` in `src/common/entities/`); `dataSourceOptions.entities` globs `**/*.entity{.ts,.js}`.
 - **User data responses expose only `id`, `name`, `image`** — enforce in services, not controllers.

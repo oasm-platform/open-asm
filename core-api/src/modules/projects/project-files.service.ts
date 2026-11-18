@@ -3,9 +3,7 @@ import { ArtifactsService } from '@/modules/artifacts/artifacts.service';
 import { Artifact } from '@/modules/artifacts/entities/artifact.entity';
 import { StorageService } from '@/modules/storage/storage.service';
 import {
-  BadRequestException,
   Injectable,
-  NotFoundException,
   PayloadTooLargeException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -18,6 +16,7 @@ import type {
 import { ProjectArtifact } from './entities/project-artifact.entity';
 import { Project } from './entities/project.entity';
 import { findProjectOrFail } from './project-access';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 export const PROJECT_FILE_LIMIT = 5;
 export const PROJECT_FILE_MAX_BYTES = 10 * 1024 * 1024;
@@ -75,7 +74,7 @@ export class ProjectFilesService {
     });
     const contentType = PROJECT_FILE_TYPES[extensionOf(dto.fileName)];
     if (!contentType) {
-      throw new BadRequestException('Only .md, .txt and .csv files can be attached');
+      throw new InvalidInputError('Only .md, .txt and .csv files can be attached');
     }
     if (dto.sizeBytes > PROJECT_FILE_MAX_BYTES) {
       throw new PayloadTooLargeException('A project file can be at most 10 MB');
@@ -108,7 +107,7 @@ export class ProjectFilesService {
         where: { projectId, artifact: { status: ArtifactStatus.READY } },
       });
       if (count >= PROJECT_FILE_LIMIT) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           `A project can have at most ${PROJECT_FILE_LIMIT} files; the upload stays in Files`,
         );
       }
@@ -147,7 +146,7 @@ export class ProjectFilesService {
       where: { projectId, artifactId, artifact: { status: ArtifactStatus.READY } },
       relations: { artifact: true },
     });
-    if (!link) throw new NotFoundException('File not found in this project');
+    if (!link) throw new NotFoundError('File not found in this project');
     return this.textOf(link.artifact);
   }
 
@@ -182,7 +181,7 @@ export class ProjectFilesService {
       where: { projectId, artifact: { status: ArtifactStatus.READY } },
     });
     if (count >= PROJECT_FILE_LIMIT) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `A project can have at most ${PROJECT_FILE_LIMIT} files`,
       );
     }

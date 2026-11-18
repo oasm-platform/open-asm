@@ -5,7 +5,7 @@ import {
 import { ProjectAssetSource } from '@/modules/projects/enums/project.enums';
 import { openVulnerabilityCondition } from '@/modules/vulnerabilities/open-vulnerability';
 import { getManyResponse } from '@/common/utils/get-many-response.util';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
@@ -16,6 +16,7 @@ import type {
 import { Project } from './entities/project.entity';
 import { findProjectOrFail } from './project-access';
 import { ProjectScopeService } from './project-scope.service';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 const ALLOWED_ASSET_SORT_FIELDS = ['createdAt', 'updatedAt', 'value'] as const;
 
@@ -58,7 +59,7 @@ export class ProjectAssetsService {
     const found = new Set(assets.map((asset) => asset.id));
     const missing = assetIds.filter((id) => !found.has(id));
     if (missing.length > 0) {
-      throw new NotFoundException(
+      throw new NotFoundError(
         `One or more assets with IDs "${missing.join(', ')}" not found`,
       );
     }

@@ -12,10 +12,7 @@ import { EVENT_CATALOG } from '@/modules/event-bridge/contracts/event-catalog';
 import type { EventEnvelopeData } from '@/modules/event-bridge/contracts/event-envelope';
 import { getManyResponse } from '@/common/utils/get-many-response.util';
 import {
-  BadRequestException,
-  ConflictException,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { Brackets, DataSource, Repository } from 'typeorm';
@@ -49,6 +46,7 @@ import {
   writeSystemComment,
 } from './issue-activity';
 import { IssueLinksService } from './issue-links.service';
+import { ConflictError, InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 const toUser = (
   user: { id: string; name: string; image?: string | null } | null | undefined,
@@ -166,7 +164,7 @@ export class IssuesService {
       });
     }
     if (query.mine) {
-      if (!userId) throw new BadRequestException('"mine" needs a user');
+      if (!userId) throw new InvalidInputError('"mine" needs a user');
       qb.andWhere('issue.assigneeId = :me', { me: userId });
     }
     if (query.overdue) {
@@ -177,7 +175,7 @@ export class IssuesService {
     }
     if (query.resourceType || query.resourceId) {
       if (!query.resourceType || !query.resourceId) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           'resourceType and resourceId must be given together',
         );
       }
@@ -230,7 +228,7 @@ export class IssuesService {
       where: { id, workspaceId },
       relations: { assignee: true, createdBy: true, links: true },
     });
-    if (!issue) throw new NotFoundException(`Issue with ID ${id} not found`);
+    if (!issue) throw new NotFoundError(`Issue with ID ${id} not found`);
 
     const links = [...(issue.links ?? [])].sort(
       (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
@@ -335,7 +333,7 @@ export class IssuesService {
     const issue = await this.findInWorkspace(id, workspaceId);
     const closing = isFinal(dto.status);
     if (closing && !dto.resolution) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `A resolution is required to mark an issue ${dto.status}`,
       );
     }
@@ -369,7 +367,7 @@ export class IssuesService {
       });
     } catch (error) {
       if (isUniqueViolation(error)) {
-        throw new ConflictException(
+        throw new ConflictError(
           'Another open issue already tracks the same group; link its resources there instead',
         );
       }
@@ -430,7 +428,7 @@ export class IssuesService {
     const link = await this.linksRepository.findOne({
       where: { id: linkId, issueId: issue.id },
     });
-    if (!link) throw new NotFoundException(`Link with ID ${linkId} not found`);
+    if (!link) throw new NotFoundError(`Link with ID ${linkId} not found`);
     await this.linksRepository.delete({ id: link.id });
     await this.events.publish(
       EVENT_CATALOG.issue.link.removed,
@@ -457,7 +455,7 @@ export class IssuesService {
     const issue = await this.issuesRepository.findOne({
       where: { id, workspaceId },
     });
-    if (!issue) throw new NotFoundException(`Issue with ID ${id} not found`);
+    if (!issue) throw new NotFoundError(`Issue with ID ${id} not found`);
     return issue;
   }
 

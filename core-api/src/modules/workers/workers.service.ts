@@ -17,8 +17,6 @@ import {
   Inject,
   Injectable,
   Logger,
-  NotFoundException,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RpcException } from '@nestjs/microservices';
@@ -59,6 +57,7 @@ import {
   WorkerToolJobDto,
 } from './dto/workers.dto';
 import { WorkerInstance } from './entities/worker.entity';
+import { NotFoundError, UnauthenticatedError } from '@/common/errors/domain.errors';
 
 /** Longest worker name stored; a worker reports it, so it is untrusted input. */
 export const WORKER_NAME_MAX_LENGTH = 128;
@@ -132,7 +131,7 @@ export class WorkersService {
     });
 
     if (!worker) {
-      throw new UnauthorizedException('Invalid token');
+      throw new UnauthenticatedError('Invalid token');
     }
 
     await this.repo.update({ token: dto.token }, { lastSeenAt: new Date() });
@@ -548,7 +547,7 @@ export class WorkersService {
     });
 
     if (!worker) {
-      throw new NotFoundException('Worker not found');
+      throw new NotFoundError('Worker not found');
     }
 
     const isVisible =
@@ -556,7 +555,7 @@ export class WorkersService {
         ? canReadGlobal
         : worker.workspaceId === workspaceId;
     if (!isVisible) {
-      throw new NotFoundException('Worker not found');
+      throw new NotFoundError('Worker not found');
     }
 
     const [{ data: builtInTools }, telemetry] = await Promise.all([

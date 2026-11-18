@@ -8,10 +8,8 @@ import {
 import { RedisService } from '@/services/redis/redis.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import {
-  BadRequestException,
   Injectable,
   Logger,
-  NotFoundException,
   type OnApplicationBootstrap,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -49,6 +47,7 @@ import {
   WorkflowOnError,
   type WorkflowOnInput,
 } from './workflow-on';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 /** Payload of a cron scheduler job: the trigger, or a pre-trigger binding. */
 export interface ProjectScheduleJobData {
@@ -211,7 +210,7 @@ export class ProjectTriggersService
       added = { key: cronKey(cron), type: ProjectTriggerType.CRON, cron };
     } else {
       if (!dto.event) {
-        throw new BadRequestException('An event trigger needs an event');
+        throw new InvalidInputError('An event trigger needs an event');
       }
       added = {
         key: eventKey(dto.event),
@@ -222,7 +221,7 @@ export class ProjectTriggersService
     }
     await this.writeOn(binding, manager, (defined) => {
       if (defined.some((t) => t.key === added.key)) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           added.type === ProjectTriggerType.CRON
             ? 'This workflow already runs on this schedule'
             : `This workflow already runs on ${added.event}`,
@@ -262,14 +261,14 @@ export class ProjectTriggersService
 
     if (dto.cron !== undefined) {
       if (trigger.type !== ProjectTriggerType.CRON) {
-        throw new BadRequestException('Only a cron trigger has a schedule');
+        throw new InvalidInputError('Only a cron trigger has a schedule');
       }
       assertCron(dto.cron);
       const cron = dto.cron.trim();
       const oldKey = keyOfRow(trigger);
       await this.writeOn(binding, this.dataSource.manager, (defined) => {
         if (cronKey(cron) !== oldKey && defined.some((t) => t.key === cronKey(cron))) {
-          throw new BadRequestException('This workflow already runs on this schedule');
+          throw new InvalidInputError('This workflow already runs on this schedule');
         }
         return defined.map((t) =>
           t.key === oldKey ? { key: cronKey(cron), type: t.type, cron } : t,
@@ -283,7 +282,7 @@ export class ProjectTriggersService
     if (dto.config !== undefined) {
       const event = trigger.event;
       if (trigger.type !== ProjectTriggerType.EVENT || !event) {
-        throw new BadRequestException('Only an event trigger has settings');
+        throw new InvalidInputError('Only an event trigger has settings');
       }
       const config = normalizeEventConfig(event, { ...trigger.config, ...dto.config });
       await this.writeOn(binding, this.dataSource.manager, (defined) =>
@@ -379,7 +378,7 @@ export class ProjectTriggersService
       where: { id: bindingId },
       relations: { workflow: true, project: true },
     });
-    if (!binding) throw new NotFoundException(`Project workflow "${bindingId}" not found`);
+    if (!binding) throw new NotFoundError(`Project workflow "${bindingId}" not found`);
     const repo = manager.getRepository(ProjectWorkflowTrigger);
     const rows = await repo.find({
       where: { projectWorkflowId: bindingId },
@@ -505,7 +504,7 @@ export class ProjectTriggersService
   ): Promise<void> {
     const trigger = await this.resolveCronTrigger(data, repeatJobKey);
     if (!trigger) {
-      throw new NotFoundException(
+      throw new NotFoundError(
         `No project trigger for scheduled job ${JSON.stringify(data)}`,
       );
     }
@@ -831,10 +830,10 @@ export class ProjectTriggersService
       relations: { workflow: true },
     });
     if (!binding?.workflow) {
-      throw new NotFoundException(`Project workflow "${bindingId}" not found`);
+      throw new NotFoundError(`Project workflow "${bindingId}" not found`);
     }
     if (!isProjectOwnedWorkflow(binding.workflow.filePath, projectId)) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'This workflow is not owned by the project: copy it into the project to give it triggers',
       );
     }
@@ -847,7 +846,7 @@ export class ProjectTriggersService
       return triggersOfOn(binding.workflow?.content?.on);
     } catch (error) {
       if (error instanceof WorkflowOnError) {
-        throw new BadRequestException(`Invalid workflow triggers: ${error.message}`);
+        throw new InvalidInputError(`Invalid workflow triggers: ${error.message}`);
       }
       throw error;
     }
@@ -881,7 +880,7 @@ export class ProjectTriggersService
       .andWhere('binding.projectId = :projectId', { projectId })
       .getOne();
     if (!trigger) {
-      throw new NotFoundException(`Trigger "${triggerId}" not found`);
+      throw new NotFoundError(`Trigger "${triggerId}" not found`);
     }
     return trigger;
   }
@@ -902,7 +901,7 @@ export class ProjectTriggersService
 /** A cron trigger needs a real expression; "disabled" is `enabled: false`. */
 function assertCron(cron: string | undefined): void {
   if (!cron || cron.trim() === 'disabled') {
-    throw new BadRequestException(
+    throw new InvalidInputError(
       'A cron trigger needs a cron expression; disable the trigger to stop it',
     );
   }
@@ -914,7 +913,7 @@ export function definedTriggersOfInput(input: WorkflowOnInput): DefinedTrigger[]
     return triggersOfInput(input);
   } catch (error) {
     if (error instanceof WorkflowOnError) {
-      throw new BadRequestException(`Invalid workflow triggers: ${error.message}`);
+      throw new InvalidInputError(`Invalid workflow triggers: ${error.message}`);
     }
     throw error;
   }

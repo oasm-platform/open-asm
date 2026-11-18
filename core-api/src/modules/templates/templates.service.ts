@@ -8,9 +8,7 @@ import type { DefaultMessageResponseDto } from '@/common/dtos/default-message-re
 import type { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import { getManyResponse } from '@/common/utils/get-many-response.util';
 import {
-  BadRequestException,
   Injectable,
-  NotFoundException,
   PayloadTooLargeException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -36,6 +34,7 @@ import type {
   SaveTemplateContentDto,
   TemplateContentDto,
 } from './dto/templates.dto';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 export const MAX_TEMPLATE_BYTES = 256 * 1024;
 const SORTABLE = new Set(['createdAt', 'updatedAt', 'name']);
@@ -44,7 +43,7 @@ const SORTABLE = new Set(['createdAt', 'updatedAt', 'name']);
 export function validateTemplate(name?: string, content?: string): void {
   if (name !== undefined) {
     if (!name || name.length > 200 || !TEMPLATE_NAME_RE.test(name)) {
-      throw new BadRequestException(TEMPLATE_NAME_ERROR);
+      throw new InvalidInputError(TEMPLATE_NAME_ERROR);
     }
   }
   if (content === undefined) return;
@@ -59,14 +58,14 @@ export function validateTemplate(name?: string, content?: string): void {
   } catch (error) {
     const e = error as { mark?: { line?: number }; reason?: string };
     const line = e.mark?.line;
-    throw new BadRequestException(
+    throw new InvalidInputError(
       `Invalid YAML${line !== undefined ? ` at line ${line + 1}` : ''}: ${e.reason ?? 'parse error'}`,
     );
   }
   /* eslint-enable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
   const id = (doc as { id?: unknown } | null)?.id;
   if (!doc || typeof doc !== 'object' || Array.isArray(doc) || typeof id !== 'string' || !id) {
-    throw new BadRequestException(
+    throw new InvalidInputError(
       'Template must be a YAML mapping with a string "id"',
     );
   }
@@ -215,7 +214,7 @@ export class TemplatesService {
     // as "no filter" — so exactly one non-empty scope, never zero.
     const scopes = [targetIds, assetIds, projectIds].filter((ids) => ids?.length);
     if (scopes.length !== 1) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'Choose exactly one of targetIds, assetIds or projectIds',
       );
     }
@@ -226,12 +225,12 @@ export class TemplatesService {
       ? await this.groupAssetIds(workspaceId, projectIds)
       : assetIds;
     if (projectIds?.length && !scopedAssetIds?.length) {
-      throw new BadRequestException('The selected projects have no assets');
+      throw new InvalidInputError('The selected projects have no assets');
     }
 
     const [nuclei] = await this.tools.getToolByNames({ names: ['nuclei'] });
     if (!nuclei) {
-      throw new NotFoundException('Nuclei is not available');
+      throw new NotFoundError('Nuclei is not available');
     }
     const jobs = await this.jobs.createNewJob({
       tool: nuclei,
@@ -247,7 +246,7 @@ export class TemplatesService {
       customTemplateIds: templateIds,
     });
     if (jobs.length === 0) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'Nothing to scan: custom templates run on enabled domain, IP and CIDR assets',
       );
     }
@@ -295,7 +294,7 @@ export class TemplatesService {
           artifact.parentFolderId !== folder.id ||
           !(await this.artifacts.canRead(artifact, userId))
         ) {
-          throw new NotFoundException('Template not found');
+          throw new NotFoundError('Template not found');
         }
         return artifact;
       }),

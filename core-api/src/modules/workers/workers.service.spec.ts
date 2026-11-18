@@ -1,6 +1,6 @@
 import { JobStatus, WorkerScope, WorkerType } from '@/common/enums/enum';
 import { ConfigService } from '@nestjs/config';
-import { NotFoundException } from '@nestjs/common';
+
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -21,6 +21,7 @@ import { WorkerInstance } from './entities/worker.entity';
 import { WORKER_NAME_MAX_LENGTH, WorkersService } from './workers.service';
 import { WorkerJoinKeyService } from './worker-join-key.service';
 import { WorkerTelemetryService } from './worker-telemetry.service';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 describe('WorkersService', () => {
   let service: WorkersService;
@@ -1492,7 +1493,7 @@ describe('WorkersService', () => {
     it('throws NotFoundException when the worker does not exist', async () => {
       await expect(
         runGetWorkerById(null, builtInToolFixtures, connectorFixtures),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
     });
 
     it('throws NotFoundException when the worker belongs to another workspace', async () => {
@@ -1505,7 +1506,7 @@ describe('WorkersService', () => {
           },
           builtInToolFixtures,
         ),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
     });
 
     const cloudWorker = {
@@ -1531,7 +1532,7 @@ describe('WorkersService', () => {
     it('hides a cloud worker, and the jobs of other workspaces on it, from other callers', async () => {
       await expect(
         runGetWorkerById(cloudWorker, builtInToolFixtures),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundError);
       expect(
         (mockJobsRegistryService.repo as any).createQueryBuilder,
       ).not.toHaveBeenCalled();

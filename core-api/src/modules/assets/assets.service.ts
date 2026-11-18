@@ -9,10 +9,8 @@ import { getManyResponse } from '@/common/utils/get-many-response.util';
 import { containsLikePattern } from '@/common/utils/like-pattern.util';
 import { generateText } from 'ai';
 import {
-  BadRequestException,
   Injectable,
   Logger,
-  NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -67,6 +65,7 @@ import {
   IpObservationSource,
 } from './entities/ip-observation.entity';
 import { TlsCertificate } from './entities/tls-certificate.entity';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 /** IP sources that belong to an asset (its DNS A/AAAA records). */
 const DNS_IP_SOURCES: IpObservationSource[] = ['dns_a', 'dns_aaaa'];
@@ -152,14 +151,14 @@ export class AssetsService {
     );
 
     if (!llmConfig) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'No LLM provider connected. Please connect a provider first.',
       );
     }
 
     const providerConfig = getLLMProviderConfig(llmConfig.provider);
     if (!providerConfig) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `Unsupported LLM provider: ${String(llmConfig.provider)}`,
       );
     }
@@ -561,7 +560,7 @@ export class AssetsService {
     });
 
     if (!target) {
-      throw new NotFoundException('Target not found');
+      throw new NotFoundError('Target not found');
     }
 
     // A Git organization has no primary host asset: "re-scan" means re-sync
@@ -583,7 +582,7 @@ export class AssetsService {
     });
 
     if (!asset) {
-      throw new NotFoundException('Asset not found');
+      throw new NotFoundError('Asset not found');
     }
 
     const reScanCount = target.reScanCount + 1;
@@ -1233,7 +1232,7 @@ export class AssetsService {
       .getOne();
 
     if (!assetService) {
-      throw new NotFoundException('Asset service not found');
+      throw new NotFoundError('Asset service not found');
     }
 
     // Update tags - tags belong to AssetService
@@ -1427,7 +1426,7 @@ export class AssetsService {
       .getOne();
 
     if (!assetService) {
-      throw new NotFoundException('Asset service not found');
+      throw new NotFoundError('Asset service not found');
     }
 
     const latestHttpResponse = assetService.httpResponses?.[0];
@@ -1468,7 +1467,7 @@ export class AssetsService {
     );
 
     if (tags.length === 0) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'AI model did not generate any tags. Ensure an LLM config is set up for your account.',
       );
     }
@@ -1486,7 +1485,7 @@ export class AssetsService {
     });
 
     if (!asset) {
-      throw new NotFoundException('Asset not found');
+      throw new NotFoundError('Asset not found');
     }
 
     // Update the asset's enabled status
@@ -2069,7 +2068,7 @@ export class AssetsService {
       where: { id: assetId, target: { workspaceId } },
     });
     if (!asset) {
-      throw new NotFoundException('Asset not found');
+      throw new NotFoundError('Asset not found');
     }
 
     // 2. Services of this asset (workspace scope already guaranteed by the

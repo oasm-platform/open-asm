@@ -1,15 +1,12 @@
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { IssueCommentType, IssueLinkResourceType, IssuePriority, IssueStatus, IssueType } from '@/common/enums/enum';
 import { IssueResolution } from '@/modules/issues/enums/issue.enums';
-import {
-  BadRequestException,
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
+
 import { QueryFailedError } from 'typeorm';
 import type { Issue } from './entities/issue.entity';
 import { nextIssueNo } from './issue-activity';
 import { IssuesService } from './issues.service';
+import { ConflictError, InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 const WS = 'ws-1';
 const USER = 'user-1';
@@ -176,10 +173,10 @@ describe('IssuesService', () => {
 
     it('refuses links to resources outside the workspace before writing', async () => {
       const { service, links, dataSource } = setup();
-      links.assertInWorkspace.mockRejectedValue(new NotFoundException());
+      links.assertInWorkspace.mockRejectedValue(new NotFoundError());
       await expect(
         service.createIssue({ title: 'x', links: [LINK_V] }, WS, USER),
-      ).rejects.toBeInstanceOf(NotFoundException);
+      ).rejects.toBeInstanceOf(NotFoundError);
       expect(dataSource.transaction).not.toHaveBeenCalled();
     });
 
@@ -188,7 +185,7 @@ describe('IssuesService', () => {
       dataSource.query.mockResolvedValue([]);
       await expect(
         service.createIssue({ title: 'x', assigneeId: 'stranger' }, WS, USER),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
       expect(dataSource.transaction).not.toHaveBeenCalled();
     });
   });
@@ -263,7 +260,7 @@ describe('IssuesService', () => {
       const { service } = setup();
       await expect(
         service.getMany({ page: 1, limit: 10, resourceId: 'v-1' } as never, WS),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
     });
   });
 
@@ -271,8 +268,7 @@ describe('IssuesService', () => {
     it('404s outside the workspace', async () => {
       const { service, issuesRepository } = setup();
       issuesRepository.findOne.mockResolvedValue(null);
-      await expect(service.getById('i-1', 'ws-2')).rejects.toBeInstanceOf(
-        NotFoundException,
+      await expect(service.getById('i-1', 'ws-2')).rejects.toBeInstanceOf(NotFoundError,
       );
       expect(issuesRepository.findOne).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'i-1', workspaceId: 'ws-2' } }),
@@ -317,7 +313,7 @@ describe('IssuesService', () => {
       dataSource.query.mockResolvedValue([]);
       await expect(
         service.update('i-1', { assigneeId: 'stranger' }, USER, WS),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
       expect(issuesRepository.save).not.toHaveBeenCalled();
     });
 
@@ -334,10 +330,10 @@ describe('IssuesService', () => {
       const { service } = setup();
       await expect(
         service.changeStatus('i-1', { status: IssueStatus.RESOLVED }, USER, WS),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
       await expect(
         service.changeStatus('i-1', { status: IssueStatus.CLOSED }, USER, WS),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
     });
 
     it('resolves with a resolution, a system comment and issue.resolved', async () => {
@@ -409,7 +405,7 @@ describe('IssuesService', () => {
       dataSource.transaction.mockRejectedValue(uniqueViolation());
       await expect(
         service.changeStatus('i-1', { status: IssueStatus.OPEN }, USER, WS),
-      ).rejects.toBeInstanceOf(ConflictException);
+      ).rejects.toBeInstanceOf(ConflictError);
       expect(events.publish).not.toHaveBeenCalled();
     });
   });
@@ -437,7 +433,7 @@ describe('IssuesService', () => {
       linksRepository.findOne.mockResolvedValue(null);
       await expect(
         service.removeLink('i-1', 'l-x', USER, WS),
-      ).rejects.toBeInstanceOf(NotFoundException);
+      ).rejects.toBeInstanceOf(NotFoundError);
       expect(linksRepository.findOne).toHaveBeenCalledWith({
         where: { id: 'l-x', issueId: 'i-1' },
       });

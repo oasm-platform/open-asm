@@ -22,12 +22,10 @@ import {
 import { getManyResponse } from '@/common/utils/get-many-response.util';
 import { InjectQueue } from '@nestjs/bullmq';
 import {
-  BadRequestException,
   Inject,
   forwardRef,
   Injectable,
   Logger,
-  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
@@ -77,6 +75,7 @@ import {
   loadVulnerabilitySettings,
 } from './vulnerability-lifecycle';
 import { vulnerabilityStatusCondition } from './vulnerability-status';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -163,7 +162,7 @@ export class VulnerabilitiesService {
       select: { id: true, type: true, value: true },
     });
     if (targets.length === 0) {
-      throw new NotFoundException('No targets found in the workspace.');
+      throw new NotFoundError('No targets found in the workspace.');
     }
 
     const gitOrgTargets = targets.filter((t) => t.type === TargetType.GIT_ORG);
@@ -225,7 +224,7 @@ export class VulnerabilitiesService {
       where: { workspace: { id: workspaceId }, filePath },
     });
     if (!workflow) {
-      throw new NotFoundException(
+      throw new NotFoundError(
         `Scanning workflow ${filePath} not found in the workspace.`,
       );
     }
@@ -422,7 +421,7 @@ export class VulnerabilitiesService {
       .getOne();
 
     if (!vulnerability) {
-      throw new NotFoundException(
+      throw new NotFoundError(
         `Vulnerability with id ${id} not found in workspace`,
       );
     }
@@ -765,13 +764,13 @@ export class VulnerabilitiesService {
     let expiresAt: Date | null = null;
     if (dismiss.reason === DismissReason.RISK_ACCEPTED) {
       if (!dismiss.expiresAt) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           'expiresAt is required when accepting a risk',
         );
       }
       expiresAt = new Date(dismiss.expiresAt);
       if (Number.isNaN(expiresAt.getTime()) || expiresAt <= now) {
-        throw new BadRequestException('expiresAt must be in the future');
+        throw new InvalidInputError('expiresAt must be in the future');
       }
       const settings = await loadVulnerabilitySettings(
         this.dataSource,
@@ -779,12 +778,12 @@ export class VulnerabilitiesService {
       );
       const max = new Date(now.getTime() + settings.riskAcceptMaxDays * DAY_MS);
       if (expiresAt > max) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           `A risk acceptance may last at most ${settings.riskAcceptMaxDays} days`,
         );
       }
     } else if (dismiss.expiresAt) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'expiresAt only applies to the risk_accepted reason',
       );
     }
@@ -795,7 +794,7 @@ export class VulnerabilitiesService {
       (v) => v.reviewStatus !== VulnerabilityReviewStatus.APPROVED,
     );
     if (notApproved.length > 0) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `Only approved findings can be dismissed: ${notApproved.map((v) => v.id).join(', ')}`,
       );
     }
@@ -807,7 +806,7 @@ export class VulnerabilitiesService {
       (d) => !d.expiresAt || d.expiresAt > now,
     );
     if (alreadyDismissed.length > 0) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `Vulnerabilities already dismissed: ${alreadyDismissed.map((d) => d.vulnerabilityId).join(', ')}`,
       );
     }
@@ -871,7 +870,7 @@ export class VulnerabilitiesService {
     const found = new Set(dismissals.map((d) => d.vulnerabilityId));
     const notFoundIds = unique.filter((id) => !found.has(id));
     if (notFoundIds.length > 0) {
-      throw new NotFoundException(
+      throw new NotFoundError(
         `Dismissed vulnerabilities not found: ${notFoundIds.join(', ')}`,
       );
     }
@@ -920,7 +919,7 @@ export class VulnerabilitiesService {
         !OPEN_DETECTION_STATUSES.has(v.detectionStatus),
     );
     if (notOpen.length > 0) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `Only open, approved findings can be claimed fixed: ${notOpen.map((v) => v.id).join(', ')}`,
       );
     }
@@ -973,7 +972,7 @@ export class VulnerabilitiesService {
     const found = new Set(vulnerabilities.map((v) => v.id));
     const notFoundIds = ids.filter((id) => !found.has(id));
     if (notFoundIds.length > 0) {
-      throw new NotFoundException(
+      throw new NotFoundError(
         `Vulnerabilities not found: ${notFoundIds.join(', ')}`,
       );
     }
@@ -1108,12 +1107,12 @@ export class VulnerabilitiesService {
       .getOne();
 
     if (!vulnerability) {
-      throw new NotFoundException(`Vulnerability with id ${id} not found`);
+      throw new NotFoundError(`Vulnerability with id ${id} not found`);
     }
 
     if (!forceRerun) {
       if (vulnerability.analyzeStatus === VulnerabilityAnalyzeStatus.RUNNING) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           'Analysis is already running for this vulnerability',
         );
       }
@@ -1269,13 +1268,13 @@ export class VulnerabilitiesService {
     });
 
     if (!vulnerability) {
-      throw new NotFoundException(`Vulnerability with id ${id} not found`);
+      throw new NotFoundError(`Vulnerability with id ${id} not found`);
     }
 
     // Only asset.target is loaded: compare its workspaceId column (reading
     // target.workspace, a relation never loaded here, made every call 404).
     if (vulnerability.asset?.target?.workspaceId !== workspaceId) {
-      throw new NotFoundException(
+      throw new NotFoundError(
         `Vulnerability with id ${id} not found in workspace`,
       );
     }

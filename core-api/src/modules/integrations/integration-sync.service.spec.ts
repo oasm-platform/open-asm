@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+
 import type { Queue } from 'bullmq';
 import type { Repository } from 'typeorm';
 import { IntegrationSyncService } from './integrations-sync.service';
@@ -22,6 +22,7 @@ jest.mock('./connectors/connector.factory', () => ({
   runConnector: jest.fn(),
 }));
 import { runConnector } from './connectors/connector.factory';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 const runConnectorMock = runConnector as jest.Mock;
 
@@ -383,8 +384,7 @@ describe('IntegrationSyncService', () => {
         },
       );
 
-      await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(
-        BadRequestException,
+      await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(InvalidInputError,
       );
       await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(
         'acting user',
@@ -400,19 +400,17 @@ describe('IntegrationSyncService', () => {
         },
       );
 
-      await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(
-        BadRequestException,
+      await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(InvalidInputError,
       );
       expect(runConnectorMock).not.toHaveBeenCalled();
     });
 
     it('propagates NotFoundException when the integration is missing or in another workspace', async () => {
       integrationsServiceMock.getIntegrationWithDecryptedConfig.mockRejectedValue(
-        new NotFoundException('Integration not found'),
+        new NotFoundError('Integration not found'),
       );
 
-      await expect(service.runSync('nope', 'ws-1')).rejects.toThrow(
-        NotFoundException,
+      await expect(service.runSync('nope', 'ws-1')).rejects.toThrow(NotFoundError,
       );
       expect(runConnectorMock).not.toHaveBeenCalled();
     });
@@ -424,8 +422,7 @@ describe('IntegrationSyncService', () => {
         error: 'boom',
       });
 
-      await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(
-        BadRequestException,
+      await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(InvalidInputError,
       );
       await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(
         'boom',
@@ -566,8 +563,7 @@ describe('IntegrationSyncService', () => {
         },
       );
 
-      await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(
-        BadRequestException,
+      await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(InvalidInputError,
       );
       await expect(service.runSync('integration-1', 'ws-1')).rejects.toThrow(
         'workloadIdentity',
@@ -634,7 +630,7 @@ describe('IntegrationSyncService', () => {
 
       await expect(
         service.runSync('integration-1', 'ws-1', { dryRun: true }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
       await expect(
         service.runSync('integration-1', 'ws-1', { dryRun: true }),
       ).rejects.toThrow('already in progress');

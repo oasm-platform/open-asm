@@ -1,8 +1,6 @@
 import {
-  BadRequestException,
   Injectable,
   Logger,
-  NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -17,6 +15,7 @@ import { TelegramConnect } from './entities/telegram-connect.entity';
 import { IntegrationsService } from './integrations.service';
 import { TelegramBotService } from './telegram-bot.service';
 import type { TelegramConnectDto } from './dto/telegram-connect.dto';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 const CONNECT_TOKEN_LENGTH = 48;
 const TOKEN_TTL_MS = 10 * 60 * 1000; // 10 minutes
@@ -63,7 +62,7 @@ export class TelegramConnectService implements OnModuleInit {
         workspaceId,
       );
     if (integration.appType !== 'telegram') {
-      throw new BadRequestException('Integration is not a Telegram bot');
+      throw new InvalidInputError('Integration is not a Telegram bot');
     }
 
     const botToken = decryptedConfig.botToken as string | undefined;
@@ -165,7 +164,7 @@ export class TelegramConnectService implements OnModuleInit {
           '❌ <b>Connection Failed</b>\n\nThe pairing token is invalid or has expired. Please generate a new pairing code in OpenASM and try again.',
         );
       }
-      throw new NotFoundException('Invalid or expired connect token');
+      throw new NotFoundError('Invalid or expired connect token');
     }
 
     // Check if this Telegram chat is already connected to this integration
@@ -189,7 +188,7 @@ export class TelegramConnectService implements OnModuleInit {
           '🔁 <b>Already Connected</b>\n\nThis Telegram account is already linked to your workspace. You are already receiving notifications here.\n\nIf you want to reconnect, please disconnect first from the OpenASM dashboard.',
         );
       }
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'Telegram chat is already connected to this integration',
       );
     }
@@ -203,7 +202,7 @@ export class TelegramConnectService implements OnModuleInit {
         );
       }
       await this.connectRepo.delete(connect.id);
-      throw new BadRequestException('Connect token has expired');
+      throw new InvalidInputError('Connect token has expired');
     }
 
     // Fetch workspace & user names for the welcome message
@@ -273,7 +272,7 @@ You'll now receive security alerts and notifications here. Stay safe! 🔒`,
     const integration = await this.integrationRepo.findOne({
       where: { id: integrationId, workspaceId },
     });
-    if (!integration) throw new NotFoundException('Integration not found');
+    if (!integration) throw new NotFoundError('Integration not found');
 
     const entities = await this.connectRepo.find({
       where: { integrationId, userId },
@@ -294,7 +293,7 @@ You'll now receive security alerts and notifications here. Stay safe! 🔒`,
     const integration = await this.integrationRepo.findOne({
       where: { id: integrationId, workspaceId },
     });
-    if (!integration) throw new NotFoundException('Integration not found');
+    if (!integration) throw new NotFoundError('Integration not found');
 
     // Fetch connect BEFORE deleting so we can send a final message
     const connect = await this.connectRepo.findOne({
@@ -302,7 +301,7 @@ You'll now receive security alerts and notifications here. Stay safe! 🔒`,
       select: ['id', 'telegramChatId'],
     });
     if (!connect) {
-      throw new NotFoundException('Telegram connect not found');
+      throw new NotFoundError('Telegram connect not found');
     }
 
     // Resolve workspace name for the goodbye message

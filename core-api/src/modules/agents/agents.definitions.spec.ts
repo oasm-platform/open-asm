@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+
 import * as fs from 'fs';
 import * as path from 'path';
 import type { Repository } from 'typeorm';
@@ -11,6 +11,7 @@ import {
   AgentDefinitionMode,
   AgentDefinitionScope,
 } from './enums/agent.enums';
+import { ConflictError, NotFoundError } from '@/common/errors/domain.errors';
 
 const BUILTIN_DIR = path.join(__dirname, 'builtin-agents');
 
@@ -78,7 +79,7 @@ describe('AgentsDefinitionsService', () => {
   it('reserves built-in names', async () => {
     await expect(
       service.create('ws', 'u1', { ...dto, name: 'pentest' }),
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).rejects.toBeInstanceOf(ConflictError);
     expect(repo.exists).not.toHaveBeenCalled();
   });
 
@@ -105,7 +106,7 @@ describe('AgentsDefinitionsService', () => {
     repo.exists.mockResolvedValue(true);
     await expect(
       service.create('ws', 'u1', { ...dto, scope: AgentDefinitionScope.WORKSPACE }),
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).rejects.toBeInstanceOf(ConflictError);
     const { where } = repo.exists.mock.calls[0][0] as { where: object[] };
     expect(where).toEqual([{ workspaceId: 'ws', name: 'my-agent' }]);
   });
@@ -121,14 +122,13 @@ describe('AgentsDefinitionsService', () => {
 
   it('only lets the creator delete a custom agent', async () => {
     repo.findOne.mockResolvedValue(null);
-    await expect(service.delete('ws', 'u2', 'c1')).rejects.toBeInstanceOf(
-      NotFoundException,
+    await expect(service.delete('ws', 'u2', 'c1')).rejects.toBeInstanceOf(NotFoundError,
     );
     expect(repo.findOne).toHaveBeenCalledWith({
       where: { id: 'c1', workspaceId: 'ws', createdBy: 'u2' },
     });
     await expect(
       service.delete('ws', 'u1', 'builtin-pentest'),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 });

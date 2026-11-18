@@ -5,7 +5,7 @@ import {
 } from '@/common/dtos/get-many-base.dto';
 import { RedisService } from '@/services/redis/redis.service';
 import { getManyResponse } from '@/common/utils/get-many-response.util';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomUUID } from 'node:crypto';
 import type { EventEmitter } from 'node:events';
@@ -17,6 +17,7 @@ import {
   type GetCommandApprovalsQueryDto,
 } from './dto/command-approval.dto';
 import { AgentCommandApproval } from './entities/agent-command-approval.entity';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 /** Match `search` literally: `%` and `_` are LIKE wildcards. */
 function escapeLike(value: string): string {
@@ -400,7 +401,7 @@ export class AgentsApprovalsService {
   ): void {
     const request = this.pendingPlans.get(id);
     if (request?.userId !== userId || request.workspaceId !== workspaceId) {
-      throw new NotFoundException('Plan approval not found');
+      throw new NotFoundError('Plan approval not found');
     }
     request.settle(
       decision.allowed
@@ -480,7 +481,7 @@ export class AgentsApprovalsService {
     const row = live
       ? await this.repo.findOne({ where: { id: live.rowId, userId } })
       : await this.findOwned(id, workspaceId, userId);
-    if (!row) throw new NotFoundException('Approval not found');
+    if (!row) throw new NotFoundError('Approval not found');
 
     row.status = status;
     const saved = await this.repo.save(row);
@@ -688,7 +689,7 @@ export class AgentsApprovalsService {
     userId: string,
   ): Promise<AgentCommandApproval> {
     const row = await this.repo.findOne({ where: { id, workspaceId, userId } });
-    if (!row) throw new NotFoundException('Approval not found');
+    if (!row) throw new NotFoundError('Approval not found');
     return row;
   }
 }

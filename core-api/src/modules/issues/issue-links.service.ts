@@ -1,11 +1,12 @@
 import { IssueLinkResourceType } from '@/common/enums/enum';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import type {
   IssueLinkInputDto,
   IssueLinkResourceSummaryDto,
 } from './dto/issue-link.dto';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 type Row = Record<string, unknown> & { id: string };
 
@@ -111,7 +112,7 @@ export class IssueLinksService {
       }
     }
     if (missing.length > 0) {
-      throw new NotFoundException(
+      throw new NotFoundError(
         `Resources not found in this workspace: ${[...new Set(missing)].join(', ')}`,
       );
     }

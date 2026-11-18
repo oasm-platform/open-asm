@@ -1,5 +1,5 @@
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Tool } from '../tools/entities/tools.entity';
@@ -21,6 +21,7 @@ import {
   normalizeWorkflowContent,
   WorkflowGraphError,
 } from './workflow-graph';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 const ALLOWED_WORKFLOW_SORT_FIELDS = ['createdAt', 'updatedAt', 'name'] as const;
 
@@ -130,7 +131,7 @@ export class WorkflowsService {
       return normalizeWorkflowContent(content);
     } catch (error) {
       if (error instanceof WorkflowGraphError) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           `Invalid workflow content: ${error.errors.join('; ')}`,
         );
       }
@@ -196,7 +197,7 @@ export class WorkflowsService {
           ];
     });
     if (errors.length > 0) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `Invalid workflow content: ${errors.join('; ')}`,
       );
     }

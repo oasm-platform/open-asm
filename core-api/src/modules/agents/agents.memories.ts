@@ -1,8 +1,9 @@
 import { RedisService } from '@/services/redis/redis.service';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AgentWorkspaceMemory } from './entities/agent-workspace-memory.entity';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 export interface STMEntry {
   key: string;
@@ -173,7 +174,7 @@ export class AgentsMemoriesService {
     assertLtmContent(content);
     const record = await this.ltmGetById(id, workspaceId, userId);
     if (!record) {
-      throw new NotFoundException('Memory record not found');
+      throw new NotFoundError('Memory record not found');
     }
     record.content = content;
     return this.ltmRepository.save(record);
@@ -192,7 +193,7 @@ export class AgentsMemoriesService {
   async ltmDeleteById(id: string, workspaceId: string, userId: string): Promise<void> {
     const record = await this.ltmGetById(id, workspaceId, userId);
     if (!record) {
-      throw new NotFoundException('Memory record not found');
+      throw new NotFoundError('Memory record not found');
     }
     await this.ltmRepository.remove(record);
   }

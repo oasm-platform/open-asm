@@ -1,12 +1,13 @@
 import { API_KEY_LENGTH } from '@/common/constants/app.constants';
 import { ApiKeyType } from '@/common/enums/enum';
 import { generateToken } from '@/common/utils/gen-token.util';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateApiKeyDto } from './dto/create-apikey.dto';
 import { UpdateApiKeyDto } from './dto/update-apikey.dto';
 import { ApiKey } from './entities/apikey.entity';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 /**
  * Service for managing API keys
@@ -30,7 +31,7 @@ export class ApiKeysService {
       where: { key, isRevoked: false },
     });
     if (!apiKey) {
-      throw new NotFoundException(`API key with key ${key} not found`);
+      throw new NotFoundError(`API key with key ${key} not found`);
     }
     return apiKey;
   }
@@ -94,7 +95,7 @@ export class ApiKeysService {
   async findOne(id: string): Promise<ApiKey> {
     const apiKey = await this.apiKeysRepository.findOne({ where: { id } });
     if (!apiKey) {
-      throw new NotFoundException(`API key with ID ${id} not found`);
+      throw new NotFoundError(`API key with ID ${id} not found`);
     }
     return apiKey;
   }

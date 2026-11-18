@@ -2,7 +2,6 @@ import { AUTH_INSTANCE_KEY } from '@/common/constants/app.constants';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { decrypt } from '@/common/utils/encryption.util';
 import {
-  BadRequestException,
   Inject,
   Injectable,
   Logger,
@@ -11,6 +10,7 @@ import {
 import type { Auth } from 'better-auth';
 import { createTransport } from 'nodemailer';
 import { SystemConfigsService } from './system-configs.service';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 export interface MailMessage {
   to: string;
@@ -92,7 +92,7 @@ export class MailService implements OnModuleInit {
         text: `Your mail server is set up correctly. ${name} can send email.`,
       });
     } catch (error) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `Test email failed: ${error instanceof Error ? error.message : 'unknown error'}`,
       );
     }

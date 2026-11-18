@@ -1,8 +1,6 @@
 import {
-  BadRequestException,
   Injectable,
   Logger,
-  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type {
@@ -82,6 +80,7 @@ import {
   mergeStats,
   type StatsAccumulator,
 } from './shared/turn-stats';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 /**
  * Whether this run may plan. Agent mode keeps its own plan (`track`): every
@@ -493,7 +492,7 @@ export class AgentsCompletionsService {
       agentConfig,
     );
     if (!llmConfig) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'No LLM provider connected. Please connect a provider first.',
       );
     }
@@ -538,7 +537,7 @@ export class AgentsCompletionsService {
     }
 
     if (toolModels && !toolModels.has(config.model)) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `The selected model "${config.model}" does not support tool calling. ` +
           'Please switch to a model that supports tools (e.g. gpt-4o, claude-3-5-sonnet, gemini-2.0-flash).',
       );
@@ -874,7 +873,7 @@ export class AgentsCompletionsService {
           return existing; // Return existing conversation
         }
         // Conversation belongs to another member — never reuse or expose it
-        throw new NotFoundException('Conversation not found');
+        throw new NotFoundError('Conversation not found');
       }
     }
 
@@ -893,7 +892,7 @@ export class AgentsCompletionsService {
         workspaceId,
       ))
     ) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'Worker is not available to agents in this workspace',
       );
     }
@@ -902,7 +901,7 @@ export class AgentsCompletionsService {
       dto.workerId &&
       !this.remoteExecuteSubscribe.isAgentReady(dto.workerId, workspaceId)
     ) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'Worker is offline; choose an online worker or Auto',
       );
     }
@@ -982,7 +981,7 @@ export class AgentsCompletionsService {
     });
 
     if (!llmConfig) {
-      throw new NotFoundException('LLM config not found');
+      throw new NotFoundError('LLM config not found');
     }
 
     // If user switched to a different provider, resolve the correct config

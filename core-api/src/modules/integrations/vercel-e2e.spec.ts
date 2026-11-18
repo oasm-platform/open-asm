@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+
 import type { Queue } from 'bullmq';
 import type { Repository } from 'typeorm';
 import { IntegrationType } from '@/common/enums/enum';
@@ -16,6 +16,7 @@ import { IntegrationsService } from './integrations.service';
 import { VercelConnector } from './connectors/vercel.connector';
 import { getConnectorClass } from './connectors/connector.registry';
 import type { AwsSsoService } from './connectors/aws/aws-sso.service';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 /**
  * F3 — Vercel mocked end-to-end QA.
@@ -232,7 +233,7 @@ describe('Vercel integration — mocked end-to-end through IntegrationSyncServic
         .runSync('integration-1', 'ws-1', { dryRun: true })
         .catch((e: unknown) => e);
 
-      expect(error).toBeInstanceOf(BadRequestException);
+      expect(error).toBeInstanceOf(InvalidInputError);
       expect((error as Error).message).toContain('Vercel API error 401');
       expect((error as Error).message).toContain('invalid access token');
       expect(fetchSpy).toHaveBeenCalledTimes(1); // no retry on 401
@@ -250,7 +251,7 @@ describe('Vercel integration — mocked end-to-end through IntegrationSyncServic
         .runSync('integration-1', 'ws-1', { dryRun: true })
         .catch((e: unknown) => e);
 
-      expect(error).toBeInstanceOf(BadRequestException);
+      expect(error).toBeInstanceOf(InvalidInputError);
       expect((error as Error).message).toContain('Vercel API error 403');
       expect((error as Error).message).toContain('forbidden');
       expect(fetchSpy).toHaveBeenCalledTimes(1);

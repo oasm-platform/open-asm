@@ -15,7 +15,7 @@ import {
 } from '@/modules/vulnerabilities/open-vulnerability';
 import { getManyResponse } from '@/common/utils/get-many-response.util';
 import { InjectQueue } from '@nestjs/bullmq';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
 import { DataSource, Repository } from 'typeorm';
@@ -37,6 +37,7 @@ import {
   type TargetTopVulnerabilityDto,
 } from './dto/target-overview.dto';
 import { Target } from './entities/target.entity';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 const SEVERITIES = Object.values(Severity);
 
@@ -160,7 +161,7 @@ export class TargetOverviewService {
 
   private async findTargetOrFail(id: string, workspaceId: string): Promise<Target> {
     const target = await this.repo.findOneBy({ id, workspaceId });
-    if (!target) throw new NotFoundException('Target not found');
+    if (!target) throw new NotFoundError('Target not found');
     return target;
   }
 

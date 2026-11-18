@@ -3,11 +3,9 @@ import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { ToolCategory, WorkerScope, WorkerType } from '@/common/enums/enum';
 import { getManyResponse } from '@/common/utils/get-many-response.util';
 import {
-  BadRequestException,
   forwardRef,
   Inject,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type {
@@ -32,6 +30,7 @@ import { WorkspaceTool } from './entities/workspace-tools.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { categorySpec } from './tool-categories';
 import { DEFAULT_TOOL_TARGET_TYPES } from './tool-target-types';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 /** WHERE fragment: the tool declares `category` among its categories. */
 const hasCategory = (category: ToolCategory) =>
@@ -238,7 +237,7 @@ export class ToolsService {
       this.connectorRegistry.getConnector(tool.name) === null &&
       tool.type !== WorkerType.BUILT_IN
     ) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `Unknown connector slug "${tool.name}"`,
       );
     }
@@ -262,7 +261,7 @@ export class ToolsService {
     });
 
     if (existingEntry) {
-      throw new BadRequestException('Tool already exists in this workspace.');
+      throw new InvalidInputError('Tool already exists in this workspace.');
     }
 
     const newWorkspaceTool = this.workspaceToolRepository.create({
@@ -290,7 +289,7 @@ export class ToolsService {
     });
 
     if (existingEntry) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'Tool already installed in this workspace.',
       );
     }
@@ -301,7 +300,7 @@ export class ToolsService {
       where: { id: dto.toolId },
     });
     if (!tool) {
-      throw new NotFoundException(`Tool with ID "${dto.toolId}" not found.`);
+      throw new NotFoundError(`Tool with ID "${dto.toolId}" not found.`);
     }
 
     // Create and save the new workspace-tool entry
@@ -330,7 +329,7 @@ export class ToolsService {
     });
 
     if (!existingEntry) {
-      throw new BadRequestException('Tool is not installed in this workspace.');
+      throw new InvalidInputError('Tool is not installed in this workspace.');
     }
 
     // Remove the workspace_tools row AND cascade its ToolConfigProfile rows
@@ -705,7 +704,7 @@ export class ToolsService {
     });
 
     if (!tool) {
-      throw new NotFoundException(`Tool with ID "${id}" not found.`);
+      throw new NotFoundError(`Tool with ID "${id}" not found.`);
     }
 
     tool.agentTool = this.isAgentTool(tool);
@@ -757,7 +756,7 @@ export class ToolsService {
     });
 
     if (existingTool) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `A tool with the name "${dto.name}" already exists.`,
       );
     }

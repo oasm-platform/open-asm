@@ -7,9 +7,7 @@ import { getManyResponse } from '@/common/utils/get-many-response.util';
 import { containsLikePattern } from '@/common/utils/like-pattern.util';
 import { InjectQueue } from '@nestjs/bullmq';
 import {
-  BadRequestException,
   Injectable,
-  NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -48,6 +46,7 @@ import {
 import { resolveTargetLogo } from './target-logo';
 import { STALE_DAYS } from './target-overview.service';
 import { TargetSourceDto, toTargetSourceDto } from './target-source.dto';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 /** Rows per INSERT — 4 bind params each, well under PostgreSQL's 65535 limit. */
 export const ASSET_INSERT_CHUNK = 1000;
@@ -120,7 +119,7 @@ export class TargetsService implements OnModuleInit {
   ): void {
     if (type === TargetType.GIT_ORG) {
       if (!GIT_ORG_VALUE_REGEX.test(value)) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           `Invalid Git organization: "${value}" must look like github.com/<owner> or gitlab.example.com/<group>[/<subgroup>].`,
         );
       }
@@ -130,7 +129,7 @@ export class TargetsService implements OnModuleInit {
       // Validate root domain: must not be an IP address
       const ipRegex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
       if (ipRegex.test(value)) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           `Invalid domain: "${value}" is an IP address. Use type IP for single IP addresses or CIDR for IP ranges.`,
         );
       }
@@ -138,7 +137,7 @@ export class TargetsService implements OnModuleInit {
       // Validate domain format: must be a valid root domain
       const domainRegex = /^(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/;
       if (!domainRegex.test(value)) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           `Invalid domain: "${value}" is not a valid root domain.`,
         );
       }
@@ -149,7 +148,7 @@ export class TargetsService implements OnModuleInit {
       const match = value.match(cidrRegex);
 
       if (!match) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           `Invalid CIDR: "${value}" is not a valid CIDR notation. Expected format: x.x.x.x/y`,
         );
       }
@@ -163,7 +162,7 @@ export class TargetsService implements OnModuleInit {
       ];
       for (const octet of octets) {
         if (octet < 0 || octet > 255) {
-          throw new BadRequestException(
+          throw new InvalidInputError(
             `Invalid CIDR: "${value}" contains invalid IP octet. Each octet must be 0-255.`,
           );
         }
@@ -172,12 +171,12 @@ export class TargetsService implements OnModuleInit {
       // Validate prefix is /24../32, unless the source is trusted (AWS).
       const prefix = parseInt(match[5]);
       if (!isTrustedCidrSource && (prefix < MIN_CIDR_PREFIX || prefix > 32)) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           `Invalid CIDR: "${value}" must use a prefix between /${MIN_CIDR_PREFIX} and /32.`,
         );
       }
       if (isTrustedCidrSource && (prefix < 1 || prefix > 32)) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           `Invalid CIDR: "${value}" contains an invalid prefix. Prefix must be 1-32.`,
         );
       }
@@ -188,7 +187,7 @@ export class TargetsService implements OnModuleInit {
         !isTrustedCidrSource &&
         this.isPrivateIP(octets[0], octets[1])
       ) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           `Invalid CIDR: "${value}" is a private/reserved IP range. Only public IP ranges are allowed.`,
         );
       }
@@ -198,7 +197,7 @@ export class TargetsService implements OnModuleInit {
       const match = value.match(ipRegex);
 
       if (!match) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           `Invalid IP: "${value}" is not a valid IPv4 address. Expected format: x.x.x.x`,
         );
       }
@@ -212,7 +211,7 @@ export class TargetsService implements OnModuleInit {
       ];
       for (const octet of octets) {
         if (octet < 0 || octet > 255) {
-          throw new BadRequestException(
+          throw new InvalidInputError(
             `Invalid IP: "${value}" contains invalid IP octet. Each octet must be 0-255.`,
           );
         }
@@ -220,7 +219,7 @@ export class TargetsService implements OnModuleInit {
 
       // Validate IP is public (not private/localhost/reserved) unless it's an internal network
       if (!isInternalNetwork && this.isPrivateIP(octets[0], octets[1])) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           `Invalid IP: "${value}" is a private/reserved IP address. Only public IP addresses are allowed.`,
         );
       }
@@ -276,7 +275,7 @@ export class TargetsService implements OnModuleInit {
   private expandCIDRToIPs(cidr: string): string[] {
     const parsed = parseCidr(cidr);
     if (!parsed) {
-      throw new BadRequestException(`Invalid CIDR format: ${cidr}`);
+      throw new InvalidInputError(`Invalid CIDR format: ${cidr}`);
     }
 
     const count = 2 ** (32 - parsed.prefix);
@@ -327,7 +326,7 @@ export class TargetsService implements OnModuleInit {
     }
 
     if (conflicts.length > 0) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `Overlapping CIDR ranges: ${conflicts.join(', ')}`,
       );
     }
@@ -500,7 +499,7 @@ export class TargetsService implements OnModuleInit {
         });
 
         if (duplicateValues.length > 0) {
-          throw new BadRequestException(
+          throw new InvalidInputError(
             `Target already exists: ${duplicateValues.join(', ')}`,
           );
         }
@@ -678,7 +677,7 @@ export class TargetsService implements OnModuleInit {
     const sources = new Map<string, TargetSource>();
     for (const target of targets) {
       if (target.type !== TargetType.GIT_ORG && target.integrationId) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           `integrationId only applies to GIT_ORG targets ("${target.value}")`,
         );
       }
@@ -689,7 +688,7 @@ export class TargetsService implements OnModuleInit {
 
     const missing = gitOrgs.filter((t) => !t.integrationId);
     if (missing.length > 0) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `A Git organization needs a source-code integration: ${missing.map((t) => t.value).join(', ')}`,
       );
     }
@@ -703,19 +702,19 @@ export class TargetsService implements OnModuleInit {
     for (const target of gitOrgs) {
       const integration = byId.get(target.integrationId!);
       if (!integration) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           `Integration ${target.integrationId} not found in this workspace`,
         );
       }
       if (!hasCapability(integration, IntegrationType.SOURCE_CODE)) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           `Integration "${integration.name}" does not have the SOURCE_CODE capability`,
         );
       }
       // baseUrl is not a secret, so the stored config is readable as-is.
       const host = sourceCodeHost(integration.appType, integration.config);
       if (!target.value.startsWith(`${host}/`)) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           `"${target.value}" is not on ${host}, the host of integration "${integration.name}"`,
         );
       }
@@ -980,7 +979,7 @@ export class TargetsService implements OnModuleInit {
     const target = await this.repo.findOneBy({ id, workspaceId });
 
     if (!target) {
-      throw new NotFoundException('Target not found in workspace');
+      throw new NotFoundError('Target not found in workspace');
     }
 
     await this.repo.delete(id);
@@ -1025,11 +1024,11 @@ export class TargetsService implements OnModuleInit {
   ) {
     const target = await this.repo.findOneBy({ id, workspaceId });
     if (!target) {
-      throw new NotFoundException('Target not found');
+      throw new NotFoundError('Target not found');
     }
 
     if (dto.settings !== undefined && target.type !== TargetType.GIT_ORG) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'settings only apply to Git organization targets',
       );
     }
@@ -1082,10 +1081,10 @@ export class TargetsService implements OnModuleInit {
   ): Promise<GetManyBaseResponseDto<TargetRepositoryDto>> {
     const target = await this.repo.findOneBy({ id, workspaceId });
     if (!target) {
-      throw new NotFoundException('Target not found');
+      throw new NotFoundError('Target not found');
     }
     if (target.type !== TargetType.GIT_ORG) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'Repositories only exist on Git organization targets',
       );
     }

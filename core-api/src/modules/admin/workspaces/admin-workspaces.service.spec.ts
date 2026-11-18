@@ -1,11 +1,12 @@
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
-import { NotFoundException } from '@nestjs/common';
+
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AdminWorkspacesService } from './admin-workspaces.service';
 import { GetManyAdminWorkspacesDto } from './dto/admin-workspaces.dto';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 const owner = {
   id: 'user-1',
@@ -171,8 +172,7 @@ describe('AdminWorkspacesService', () => {
     it('throws NotFound for an unknown id', async () => {
       workspacesRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.getWorkspace('missing')).rejects.toBeInstanceOf(
-        NotFoundException,
+      await expect(service.getWorkspace('missing')).rejects.toBeInstanceOf(NotFoundError,
       );
     });
   });
@@ -203,7 +203,7 @@ describe('AdminWorkspacesService', () => {
 
       await expect(
         service.updateWorkspace('missing', { name: 'x' }),
-      ).rejects.toBeInstanceOf(NotFoundException);
+      ).rejects.toBeInstanceOf(NotFoundError);
       expect(workspacesRepository.update).not.toHaveBeenCalled();
     });
   });
@@ -246,8 +246,7 @@ describe('AdminWorkspacesService', () => {
     it('throws NotFound for an unknown id', async () => {
       workspacesRepository.findOneBy.mockResolvedValue(null);
 
-      await expect(service.setArchived('missing', true)).rejects.toBeInstanceOf(
-        NotFoundException,
+      await expect(service.setArchived('missing', true)).rejects.toBeInstanceOf(NotFoundError,
       );
     });
   });
