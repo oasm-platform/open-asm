@@ -5,6 +5,7 @@ import { WorkspacePermissions } from '@/common/decorators/workspace-permissions.
 import { PUBLISH_EVENT_KEY, type PublishEventConfig } from '../event-bridge/publishing/publish-event.decorator';
 import type { AuditContext, AuditService } from '../audit/audit.service';
 import { WorkspacesController } from './workspaces.controller';
+import type { WorkspaceInvitationsService } from './workspace-invitations.service';
 import type { WorkspaceMembersService } from './workspace-members.service';
 import type { WorkspaceMembershipService } from './workspace-membership.service';
 import type { WorkspacePermissionGroupsService } from './workspace-permission-groups.service';
@@ -166,6 +167,7 @@ describe('WorkspacesController audit context pass-through (M4.1 explicit events)
       {} as WorkspaceMembershipService,
       permissionGroups as unknown as WorkspacePermissionGroupsService,
       members as unknown as WorkspaceMembersService,
+      {} as WorkspaceInvitationsService,
     );
   });
 

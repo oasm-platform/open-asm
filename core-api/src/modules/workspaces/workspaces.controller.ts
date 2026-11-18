@@ -55,6 +55,7 @@ import { WorkspaceInvitation } from './entities/workspace-invitation.entity';
 import { WorkspaceMembers } from './entities/workspace-members.entity';
 import { WorkspacePermission } from './entities/workspace-permission.entity';
 import { Workspace } from './entities/workspace.entity';
+import { WorkspaceInvitationsService } from './workspace-invitations.service';
 import { WorkspaceMembersService } from './workspace-members.service';
 import { WorkspaceMembershipService } from './workspace-membership.service';
 import { WorkspacePermissionGroupsService } from './workspace-permission-groups.service';
@@ -69,6 +70,7 @@ export class WorkspacesController {
     private readonly membership: WorkspaceMembershipService,
     private readonly permissionGroups: WorkspacePermissionGroupsService,
     private readonly members: WorkspaceMembersService,
+    private readonly invitations: WorkspaceInvitationsService,
   ) {}
 
   @Doc({
@@ -399,7 +401,7 @@ export class WorkspacesController {
     @Body() dto: CreateInvitationsDto,
     @UserContext() user: UserContextPayload,
   ) {
-    return this.workspacesService.createInvitations(
+    return this.invitations.createInvitations(
       workspaceId,
       user.id,
       dto,
@@ -416,7 +418,7 @@ export class WorkspacesController {
   @WorkspaceAccess('member.read')
   @Get('invitations')
   listInvitations(@WorkspaceId() workspaceId: string) {
-    return this.workspacesService.listInvitations(workspaceId);
+    return this.invitations.listInvitations(workspaceId);
   }
 
   @Doc({
@@ -437,7 +439,7 @@ export class WorkspacesController {
     @WorkspaceId() workspaceId: string,
     @Param('invitationId') invitationId: string,
   ) {
-    return this.workspacesService.cancelInvitation(workspaceId, invitationId);
+    return this.invitations.cancelInvitation(workspaceId, invitationId);
   }
 
   @Doc({
@@ -451,7 +453,7 @@ export class WorkspacesController {
     @Body() dto: InvitationTokenDto,
     @UserContext() user: UserContextPayload,
   ) {
-    return this.workspacesService.acceptInvitation(dto.token, user);
+    return this.invitations.acceptInvitation(dto.token, user);
   }
 
   @Doc({
@@ -465,7 +467,7 @@ export class WorkspacesController {
     @Body() dto: InvitationTokenDto,
     @UserContext() user: UserContextPayload,
   ) {
-    return this.workspacesService.declineInvitation(dto.token, user);
+    return this.invitations.declineInvitation(dto.token, user);
   }
 
   @Doc({
@@ -477,7 +479,7 @@ export class WorkspacesController {
   @Public()
   @Get('invitations/:token')
   getInvitationPreview(@Param('token') token: string) {
-    return this.workspacesService.getInvitationPreview(token);
+    return this.invitations.getInvitationPreview(token);
   }
 
   @Doc({

@@ -6,7 +6,8 @@ Tenants: workspaces, their members, permission groups and invitations. It also o
 
 - `workspaces.module.ts`: `@Global()` on purpose: `WorkspacePermissionGuard` (behind `@WorkspaceAccess`, on controllers in some 20 modules) injects `WorkspacesService`, so this module is the tenancy kernel, like `AuthModule`. Exports `WorkspacesService`. Imports `ApiKeysModule`, `ArtifactsModule`, `NotificationsModule`.
 - `workspaces.controller.ts`: all `/workspaces` routes.
-- `workspaces.service.ts`: CRUD, configs, api key, invitations; `getMembershipWithPermissions` delegates to the membership service and stays here for the guard and other modules.
+- `workspaces.service.ts`: CRUD, configs, api key, archive; `getMembershipWithPermissions` delegates to the membership service and stays here for the guard and other modules.
+- `workspace-invitations.service.ts` (`WorkspaceInvitationsService`): create, list, preview, accept, decline and cancel invitations, and the invitation notifications.
 - `workspace-members.service.ts` (`WorkspaceMembersService`): list members with their groups, replace a member's groups, remove a member (`assertMemberMutable`, audit rows in the same transaction, pseudonymization after commit).
 - `workspace-permission-groups.service.ts` (`WorkspacePermissionGroupsService`): the permission catalog, group CRUD, `seedOwnerPermissionGroup` (called inside the creation transaction), and the no-escalation checks members and invitations share (`assertCanGrantGroups`, `findValidPermissionGroups`). Exports `OWNER_PERMISSION_GROUP_NAME` and `WILDCARD_PERMISSION`.
 - `workspace-membership.service.ts` (`WorkspaceMembershipService`): the membership row plus the union of the member's permission keys (`getMembershipWithPermissions`), and `getCurrentPermission`.
@@ -70,10 +71,11 @@ Service methods other modules call: `getMembershipWithPermissions` (guard, event
 ## Coupling
 
 - No dependency on the workflows module: `createWorkspace` emits `WORKSPACE_INITIALIZING_EVENT` (`workspace.events.ts`) with `emitAsync` after the transaction commits and awaits it. `WorkflowTemplateService` creates the default workflows on it; its failure fails the creation (`suppressErrors: false`).
-- Imports `NotificationsModule` for `NotificationsService`; uses the global `AuditService` and `WorkspaceEncryptionService`.
+- Imports `NotificationsModule` for `NotificationsService` (used by `WorkspaceInvitationsService` only); uses the global `AuditService` and `WorkspaceEncryptionService`.
+- The controller calls each service directly. Only `WorkspacesService` is exported; other modules reach membership through its `getMembershipWithPermissions`.
 - These write the `workspaces` table directly: `admin/workspaces` (name, description, configs, `archivedAt`), `WorkspaceEncryptionService` (`dek`), plus reads in reports, statistic, artifact quota and workflow-template. `admin/users` and `artifacts` read `workspace_members`.
 - Writes no other module's table. `deleteWorkspace` emits `WORKSPACE_DELETING_EVENT` (`workspace.events.ts`) with `emitAsync` before the workspace row goes; `TargetsService.onWorkspaceDeleting` (`suppressErrors: false`) removes the targets, and a failure there keeps the workspace. It still reads `targets` (`getWorkspaceIdByTargetId`) and `jobs` (`getMemberOfWorkspaceByJobId`).
 
 ## Testing
 
-`workspaces.service.spec.ts` (large), `workspace-membership.service.spec.ts`, `workspace-members.service.spec.ts`, `workspace-permission-groups.service.spec.ts`, `workspaces.controller.spec.ts` (permission metadata and audit wiring). The guard and decorators have specs in `src/common/guards/` and `src/common/decorators/`.
+`workspaces.service.spec.ts` (large), `workspace-invitations.service.spec.ts`, `workspace-membership.service.spec.ts`, `workspace-members.service.spec.ts`, `workspace-permission-groups.service.spec.ts`, `workspaces.controller.spec.ts` (permission metadata and audit wiring). The guard and decorators have specs in `src/common/guards/` and `src/common/decorators/`.
