@@ -43,7 +43,7 @@ export class TelegramConnect extends BaseEntity {
   @Column('uuid')
   integrationId: string;
 
-  @ManyToOne(() => User, (user) => user.telegramConnects, {
+  @ManyToOne(() => User, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'userId' })
