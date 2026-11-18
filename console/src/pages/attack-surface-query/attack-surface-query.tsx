@@ -85,6 +85,10 @@ function ErrorPanel({ error }: { error: AsqErrorBody }) {
  * Attack surface query playground: write a JSON query batch, run or explain
  * it, page through results, run it as a report job, and keep it as a saved
  * query.
+ *
+ * Not released yet: no route or menu entry points here. To ship it, add
+ * `routes/_authed/attack-surface-query.tsx` rendering this page and a "Query"
+ * item in `components/common/layout/menu-bar.tsx` (permission `asset.read`).
  */
 export default function AttackSurfaceQuery() {
   const { resolvedTheme } = useTheme();

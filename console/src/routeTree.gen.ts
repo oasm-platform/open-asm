@@ -17,7 +17,6 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
-import { Route as AuthedAttackSurfaceQueryRouteImport } from './routes/_authed/attack-surface-query'
 import { Route as AuthedReportsRouteImport } from './routes/_authed/reports'
 import { Route as AuthedSearchRouteImport } from './routes/_authed/search'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
@@ -114,12 +113,6 @@ const AuthedIndexRoute = AuthedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedAttackSurfaceQueryRoute =
-  AuthedAttackSurfaceQueryRouteImport.update({
-    id: '/attack-surface-query',
-    path: '/attack-surface-query',
-    getParentRoute: () => AuthedRoute,
-  } as any)
 const AuthedReportsRoute = AuthedReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -420,7 +413,6 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRouteWithChildren
   '/signup': typeof SignupRoute
-  '/attack-surface-query': typeof AuthedAttackSurfaceQueryRoute
   '/reports': typeof AuthedReportsRoute
   '/search': typeof AuthedSearchRoute
   '/admin/about': typeof AdminAboutRoute
@@ -483,7 +475,6 @@ export interface FileRoutesByTo {
   '/init-admin': typeof InitAdminRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
-  '/attack-surface-query': typeof AuthedAttackSurfaceQueryRoute
   '/reports': typeof AuthedReportsRoute
   '/search': typeof AuthedSearchRoute
   '/admin/about': typeof AdminAboutRoute
@@ -551,7 +542,6 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRouteWithChildren
   '/signup': typeof SignupRoute
-  '/_authed/attack-surface-query': typeof AuthedAttackSurfaceQueryRoute
   '/_authed/reports': typeof AuthedReportsRoute
   '/_authed/search': typeof AuthedSearchRoute
   '/admin/about': typeof AdminAboutRoute
@@ -620,7 +610,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/settings'
     | '/signup'
-    | '/attack-surface-query'
     | '/reports'
     | '/search'
     | '/admin/about'
@@ -683,7 +672,6 @@ export interface FileRouteTypes {
     | '/init-admin'
     | '/login'
     | '/signup'
-    | '/attack-surface-query'
     | '/reports'
     | '/search'
     | '/admin/about'
@@ -750,7 +738,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/settings'
     | '/signup'
-    | '/_authed/attack-surface-query'
     | '/_authed/reports'
     | '/_authed/search'
     | '/admin/about'
@@ -877,13 +864,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AuthedIndexRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/attack-surface-query': {
-      id: '/_authed/attack-surface-query'
-      path: '/attack-surface-query'
-      fullPath: '/attack-surface-query'
-      preLoaderRoute: typeof AuthedAttackSurfaceQueryRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/reports': {
@@ -1282,7 +1262,6 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthedRouteChildren {
-  AuthedAttackSurfaceQueryRoute: typeof AuthedAttackSurfaceQueryRoute
   AuthedReportsRoute: typeof AuthedReportsRoute
   AuthedSearchRoute: typeof AuthedSearchRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
@@ -1329,7 +1308,6 @@ interface AuthedRouteChildren {
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
-  AuthedAttackSurfaceQueryRoute: AuthedAttackSurfaceQueryRoute,
   AuthedReportsRoute: AuthedReportsRoute,
   AuthedSearchRoute: AuthedSearchRoute,
   AuthedIndexRoute: AuthedIndexRoute,

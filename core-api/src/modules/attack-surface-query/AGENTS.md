@@ -20,7 +20,8 @@ AttackSurfaceQuery (ASQ): a JSON query language over the attack surface tables (
 | `POST/PATCH/DELETE attack-surface/saved-queries[/:id]` | `report.write` |
 
 - `POST query` with `options.mode = "report"` queues BullMQ `ASQ_REPORT` (`asq-report`, concurrency 1) and returns `{ jobId, status }`; the state and result live in Redis `asq:report:<workspaceId>:<jobId>` for 1 h (`REPORT_RESULT_TTL_S`). Report mode is HTTP only.
-- Agent/MCP tools (agents module, `tools/attack-surface-query.tools.ts`): `describe_attack_surface`, `query_attack_surface` (read-only, on MCP).
+- Agent/MCP tools (agents module, `tools/attack-surface-query.tools.ts`): `describe_attack_surface`, `query_attack_surface` (read-only, on MCP, membership-gated; this module checks the per-resource keys). They are the agent's only way to list the attack surface; the built-in skill `agents/skills/attack-surface-query/SKILL.md` documents the language for the model and must change with the catalog (resources, fields, operators, limits).
+- Console: the playground (`console/src/pages/attack-surface-query/`) is not released: no route or menu entry. The REST routes stay.
 - Cron `AsqRollupsService.refreshAll`: `*/15 * * * *`, `@Lock('cron:asq-rollups')`.
 - Exports `AttackSurfaceQueryService`, `AsqSavedQueriesService` (used by `agents` and `reports`).
 - Env (optional): `ASQ_READ_REPLICA_URL` (report mode reads from it); `BETTER_AUTH_SECRET` keys the cursor HMAC (`asq-cursor-v1` label).
