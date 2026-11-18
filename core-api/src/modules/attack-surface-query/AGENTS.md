@@ -25,7 +25,7 @@ AttackSurfaceQuery (ASQ): a JSON query language over the attack surface tables (
 - Console: the playground (`console/src/pages/attack-surface-query/`) is not released: no route or menu entry. The REST routes stay.
 - Cron `AsqRollupsService.refreshAll`: `*/15 * * * *`, `@Lock('cron:asq-rollups')`.
 - Exports `AttackSurfaceQueryService`, `AsqSavedQueriesService` (used by `agents` and `reports`).
-- Env (optional): `ASQ_READ_REPLICA_URL` (report mode reads from it); `BETTER_AUTH_SECRET` keys the cursor HMAC (`asq-cursor-v1` label).
+- Env (optional): `ASQ_READ_REPLICA_URL` (report mode reads from it); `BETTER_AUTH_SECRET` keys the cursor HMAC (`asq-cursor-v1` label) through `resolveSigningSecret` (auth module): required when deployed, better-auth's public fallback in local and test runs, so the CI e2e job (no secret) boots.
 
 ## Data model
 

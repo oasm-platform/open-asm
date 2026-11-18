@@ -7,6 +7,8 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 
+import { resolveSigningSecret } from '@/modules/auth/auth-env';
+
 import { assertCatalog, CATALOG } from './catalog/catalog';
 import { Semaphore } from './engine/concurrency';
 import { CursorCodec } from './engine/cursor';
@@ -35,7 +37,14 @@ export class AsqConnectionsService implements OnModuleInit, OnModuleDestroy {
     readonly dataSource: DataSource,
     private readonly config: ConfigService,
   ) {
-    this.codec = new CursorCodec(this.config.get<string>('BETTER_AUTH_SECRET') ?? '');
+    // Same rule as the session secret: required when deployed, better-auth's
+    // fallback in local and test runs.
+    this.codec = new CursorCodec(
+      resolveSigningSecret({
+        NODE_ENV: process.env.NODE_ENV,
+        BETTER_AUTH_SECRET: this.config.get<string>('BETTER_AUTH_SECRET'),
+      }),
+    );
   }
 
   async onModuleInit(): Promise<void> {
