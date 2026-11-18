@@ -7,6 +7,7 @@ import { TechnologyModule } from '../technology/technology.module';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
 import { AssetsController } from './assets.controller';
 import { AssetsService } from './assets.service';
+import { RepositoryAssetsService } from './repository-assets.service';
 import { AssetService } from './entities/asset-services.entity';
 import { Asset } from './entities/assets.entity';
 import { DiscoveredUrl } from './entities/discovered-url.entity';
@@ -44,7 +45,7 @@ import { JobsRegistryModule } from '../jobs-registry/jobs-registry.module';
     JobsRegistryModule,
   ],
   controllers: [AssetsController],
-  providers: [AssetsService, UrlDiscoveryService],
-  exports: [AssetsService],
+  providers: [AssetsService, UrlDiscoveryService, RepositoryAssetsService],
+  exports: [AssetsService, RepositoryAssetsService],
 })
 export class AssetsModule {}

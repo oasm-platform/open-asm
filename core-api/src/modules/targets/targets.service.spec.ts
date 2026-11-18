@@ -222,6 +222,27 @@ describe('TargetsService', () => {
     });
   });
 
+  describe('findInWorkspace / markDiscovered', () => {
+    it('finds a target only inside its workspace', async () => {
+      mockTargetRepository.findOne = jest.fn().mockResolvedValue(null);
+
+      await expect(service.findInWorkspace('t-1', 'ws-1')).resolves.toBeNull();
+      expect(mockTargetRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 't-1', workspaceId: 'ws-1' },
+      });
+    });
+
+    it('stamps the time of the latest discovery', async () => {
+      mockTargetRepository.update = jest.fn().mockResolvedValue({});
+
+      await service.markDiscovered('t-1');
+
+      expect(mockTargetRepository.update).toHaveBeenCalledWith('t-1', {
+        lastDiscoveredAt: expect.any(Date) as Date,
+      });
+    });
+  });
+
   describe('createMultipleTargets', () => {
     const workspaceId = randomUUID();
     const userContext = {

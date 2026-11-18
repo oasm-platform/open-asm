@@ -1,11 +1,11 @@
 import { IntegrationType, TargetType } from '@/common/enums/enum';
-import type { Asset } from '@/modules/assets/entities/assets.entity';
+import type { RepositoryAssetsService } from '@/modules/assets/repository-assets.service';
 import type { Target } from '@/modules/targets/entities/target.entity';
 import { RedisLockService } from '@/services/redis/distributed-lock.service';
 import { NotFoundException } from '@nestjs/common';
 import type { EventEmitter2 } from '@nestjs/event-emitter';
 import type { Queue } from 'bullmq';
-import type { Repository } from 'typeorm';
+import type { TargetsService } from '@/modules/targets/targets.service';
 import type { IntegrationsService } from './integrations.service';
 import {
   RepositorySyncService,
@@ -30,12 +30,8 @@ describe('RepositorySyncService', () => {
     settings: { includeArchived: false, includeForks: false },
   } as unknown as Target;
 
-  let targetRepository: { findOne: jest.Mock; update: jest.Mock };
-  let assetWrites: { update: jest.Mock; insert: jest.Mock };
-  let assetRepository: {
-    find: jest.Mock;
-    manager: { transaction: jest.Mock };
-  };
+  let targetsService: { findInWorkspace: jest.Mock; markDiscovered: jest.Mock };
+  let repositoryAssets: { list: jest.Mock; apply: jest.Mock };
   let integrationsService: { getIntegrationWithDecryptedConfig: jest.Mock };
   let redisLockService: { withLock: jest.Mock };
   let eventEmitter: { emit: jest.Mock };
@@ -59,18 +55,13 @@ describe('RepositorySyncService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    targetRepository = {
-      findOne: jest.fn().mockResolvedValue(target),
-      update: jest.fn().mockResolvedValue(undefined),
+    targetsService = {
+      findInWorkspace: jest.fn().mockResolvedValue(target),
+      markDiscovered: jest.fn().mockResolvedValue(undefined),
     };
-    assetWrites = { update: jest.fn(), insert: jest.fn() };
-    assetRepository = {
-      find: jest.fn().mockResolvedValue([]),
-      manager: {
-        transaction: jest.fn((fn: (m: unknown) => Promise<unknown>) =>
-          fn({ getRepository: () => assetWrites }),
-        ),
-      },
+    repositoryAssets = {
+      list: jest.fn().mockResolvedValue([]),
+      apply: jest.fn().mockResolvedValue(undefined),
     };
     integrationsService = {
       getIntegrationWithDecryptedConfig: jest.fn().mockResolvedValue({
@@ -99,8 +90,8 @@ describe('RepositorySyncService', () => {
     resolveConnectorMock.mockReturnValue({ listRepositories });
 
     service = new RepositorySyncService(
-      targetRepository as unknown as Repository<Target>,
-      assetRepository as unknown as Repository<Asset>,
+      targetsService as unknown as TargetsService,
+      repositoryAssets as unknown as RepositoryAssetsService,
       integrationsService as unknown as IntegrationsService,
       eventEmitter as unknown as EventEmitter2,
       queue as unknown as Queue<RepositorySyncJob>,
@@ -129,20 +120,21 @@ describe('RepositorySyncService', () => {
       { apiToken: 'ghp_x' },
       { owner: 'acme', page: 1, limit: 100 },
     );
-    expect(assetWrites.insert).toHaveBeenCalledWith([
+    expect(targetsService.findInWorkspace).toHaveBeenCalledWith('target-1', workspaceId);
+    expect(repositoryAssets.list).toHaveBeenCalledWith('target-1');
+    expect(repositoryAssets.apply).toHaveBeenCalledWith(
+      'target-1',
       expect.objectContaining({
-        value: 'github.com/acme/web',
-        isEnabled: true,
-        isPrimary: false,
-        targetId: 'target-1',
+        inserts: [
+          expect.objectContaining({ value: 'github.com/acme/web', isEnabled: true }),
+          // Archived: recorded, but not scanned.
+          expect.objectContaining({ value: 'github.com/acme/old', isEnabled: false }),
+        ],
+        disableIds: [],
       }),
-      // Archived: recorded, but not scanned.
-      expect.objectContaining({ value: 'github.com/acme/old', isEnabled: false }),
-    ]);
+    );
     expect(result).toMatchObject({ status: 'synced', created: 2, truncated: false });
-    expect(targetRepository.update).toHaveBeenCalledWith('target-1', {
-      lastDiscoveredAt: expect.any(Date),
-    });
+    expect(targetsService.markDiscovered).toHaveBeenCalledWith('target-1');
     expect(eventEmitter.emit).toHaveBeenCalledWith('target.git_org.synced', target);
   });
 
@@ -158,7 +150,7 @@ describe('RepositorySyncService', () => {
   });
 
   it('skips a target whose integration was removed', async () => {
-    targetRepository.findOne.mockResolvedValue({ ...target, integrationId: null });
+    targetsService.findInWorkspace.mockResolvedValue({ ...target, integrationId: null });
 
     const result = await service.syncTarget('target-1', workspaceId);
 
@@ -178,7 +170,7 @@ describe('RepositorySyncService', () => {
   });
 
   it('skips non-GIT_ORG targets', async () => {
-    targetRepository.findOne.mockResolvedValue({ ...target, type: TargetType.DOMAIN });
+    targetsService.findInWorkspace.mockResolvedValue({ ...target, type: TargetType.DOMAIN });
 
     const result = await service.syncTarget('target-1', workspaceId);
 
@@ -192,6 +184,8 @@ describe('RepositorySyncService', () => {
     const result = await service.syncTarget('target-1', workspaceId);
 
     expect(result).toMatchObject({ status: 'skipped', reason: 'sync already in progress' });
+    expect(repositoryAssets.apply).not.toHaveBeenCalled();
+    expect(targetsService.markDiscovered).not.toHaveBeenCalled();
     expect(eventEmitter.emit).not.toHaveBeenCalled();
   });
 });

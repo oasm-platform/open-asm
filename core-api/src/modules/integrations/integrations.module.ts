@@ -3,8 +3,6 @@ import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '@/modules/auth/entities/user.entity';
-import { Asset } from '@/modules/assets/entities/assets.entity';
-import { Target } from '@/modules/targets/entities/target.entity';
 import { Integration } from './entities/integration.entity';
 import { TelegramConnect } from './entities/telegram-connect.entity';
 import { IntegrationSyncProcessor } from './integration-sync.processor';
@@ -19,13 +17,15 @@ import { TelegramConnectService } from './telegram-connect.service';
 import { TelegramWebhookService } from './telegram-webhook.service';
 import { TelegramPollingService } from './telegram-polling.service';
 import { TelegramBotService } from './telegram-bot.service';
+import { AssetsModule } from '../assets/assets.module';
 import { TargetsModule } from '../targets/targets.module';
 import { DataAdapterModule } from '../data-adapter/data-adapter.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Integration, TelegramConnect, User, Target, Asset]),
+    TypeOrmModule.forFeature([Integration, TelegramConnect, User]),
     IntegrationConfigModule,
+    AssetsModule,
     BullModule.registerQueue({
       name: BullMQName.INTEGRATION_SYNC_SCHEDULE,
       defaultJobOptions: {

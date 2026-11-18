@@ -98,6 +98,16 @@ export class TargetsService implements OnModuleInit {
     await this.handleUpdateScanSchedule();
   }
 
+  /** The target, or null when it is not in this workspace. */
+  findInWorkspace(id: string, workspaceId: string): Promise<Target | null> {
+    return this.repo.findOne({ where: { id, workspaceId } });
+  }
+
+  /** Records that discovery (a scan or a repository sync) just ran on the target. */
+  async markDiscovered(id: string): Promise<void> {
+    await this.repo.update(id, { lastDiscoveredAt: new Date() });
+  }
+
   /**
    * Re-runs discovery on a target: counts the re-scan and emits
    * `target.<type>.re-scan` for the matching workflow. A Git organization is

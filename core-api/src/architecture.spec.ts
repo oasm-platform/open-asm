@@ -149,8 +149,6 @@ const FOREIGN_ENTITIES = [
   'modules/event-bridge <- Notification (modules/notifications)',
   'modules/event-bridge <- NotificationRecipient (modules/notifications)',
   'modules/event-bridge <- User (modules/auth)',
-  'modules/integrations <- Asset (modules/assets)',
-  'modules/integrations <- Target (modules/targets)',
   'modules/integrations <- User (modules/auth)',
   'modules/projects <- Asset (modules/assets)',
   'modules/projects <- Workflow (modules/workflows)',
