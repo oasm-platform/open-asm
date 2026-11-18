@@ -1,6 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 
-import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
+import { AgentApprovalMode, AgentMode } from '@/modules/agents/enums/agent.enums';
 
 import { TOOL_PERMISSIONS } from './agents.tools';
 import { agentToolWith } from './agents.tools.testing';

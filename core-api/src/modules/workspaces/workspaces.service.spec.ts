@@ -1,5 +1,6 @@
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
-import { InvitationStatus, Role } from '@/common/enums/enum';
+import { Role } from '@/common/enums/enum';
+import { InvitationStatus } from '@/modules/workspaces/enums/workspace.enums';
 import {
   BadRequestException,
   ForbiddenException,

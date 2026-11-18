@@ -1,7 +1,7 @@
 import type { EventEmitter } from 'node:events';
 import type { Repository } from 'typeorm';
 
-import type { AgentMode } from '@/common/enums/enum';
+import type { AgentMode } from '@/modules/agents/enums/agent.enums';
 import type { WrapperType } from '@/common/types/app.types';
 import type { ArtifactsService } from '@/modules/artifacts/artifacts.service';
 import type { AssetsService } from '@/modules/assets/assets.service';

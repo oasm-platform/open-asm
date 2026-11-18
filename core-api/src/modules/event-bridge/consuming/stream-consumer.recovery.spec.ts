@@ -1,4 +1,4 @@
-import { EventBusGroup } from '@/common/enums/enum';
+import { EventBusGroup } from '@/modules/event-bridge/enums/event-bridge.enums';
 import type { RedisService } from '@/services/redis/redis.service';
 import { AuditSink } from '../sinks/audit/audit.sink';
 import { StreamConsumer } from './stream-consumer';

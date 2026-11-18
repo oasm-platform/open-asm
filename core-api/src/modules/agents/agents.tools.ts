@@ -4,7 +4,7 @@ import { ModuleRef } from '@nestjs/core';
 import type { Tool } from 'ai';
 import type { EventEmitter } from 'node:events';
 
-import { AgentMode } from '@/common/enums/enum';
+import { AgentMode } from '@/modules/agents/enums/agent.enums';
 import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
 
 import {

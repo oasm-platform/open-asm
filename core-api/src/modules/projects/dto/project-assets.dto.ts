@@ -1,10 +1,7 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
-import {
-  ProjectAssetSource,
-  ProjectScopeRuleType,
-  TargetType,
-} from '@/common/enums/enum';
+import { ProjectScopeRuleType, TargetType } from '@/common/enums/enum';
+import { ProjectAssetSource } from '@/modules/projects/enums/project.enums';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   ArrayMaxSize,

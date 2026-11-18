@@ -5,13 +5,8 @@ import {
 import { getWorkspaceIdFromRequest } from '@/common/decorators/workspace-id.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
-import {
-  ApiKeyType,
-  AuditOutcome,
-  InvitationStatus,
-  NotificationScope,
-  NotificationType,
-} from '@/common/enums/enum';
+import { ApiKeyType, AuditOutcome, NotificationScope, NotificationType } from '@/common/enums/enum';
+import { InvitationStatus } from '@/modules/workspaces/enums/workspace.enums';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { User } from '@/modules/auth/entities/user.entity';
 import { Job } from '@/modules/jobs-registry/entities/job.entity';

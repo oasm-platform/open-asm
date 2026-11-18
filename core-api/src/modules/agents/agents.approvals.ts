@@ -1,7 +1,4 @@
-import {
-  AgentApprovalMode,
-  AgentCommandApprovalStatus,
-} from '@/common/enums/enum';
+import { AgentApprovalMode, AgentCommandApprovalStatus } from '@/modules/agents/enums/agent.enums';
 import {
   GetManyBaseResponseDto,
   SortOrder,

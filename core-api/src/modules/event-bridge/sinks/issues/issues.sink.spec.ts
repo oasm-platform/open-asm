@@ -1,4 +1,4 @@
-import { EventBusGroup } from '@/common/enums/enum';
+import { EventBusGroup } from '@/modules/event-bridge/enums/event-bridge.enums';
 import type { ConsumedEvent } from '../../contracts/event-envelope';
 import { SUBSCRIPTIONS } from '../../routing/subscriptions';
 import { issueFactOf, IssuesSink } from './issues.sink';

@@ -1,9 +1,5 @@
-import {
-  IssueLinkResourceType,
-  IssueRuleGroupBy,
-  IssueType,
-  Severity,
-} from '@/common/enums/enum';
+import { IssueLinkResourceType, IssueType, Severity } from '@/common/enums/enum';
+import { IssueRuleGroupBy } from '@/modules/issues/enums/issue.enums';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DEFAULT_ISSUE_RULE, IssueRulesService } from './issue-rules.service';
 

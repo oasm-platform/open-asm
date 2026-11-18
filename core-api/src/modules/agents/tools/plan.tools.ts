@@ -4,7 +4,7 @@ import type { EventEmitter } from 'node:events';
 import { Repository } from 'typeorm';
 import { z } from 'zod';
 
-import { AgentApprovalMode } from '@/common/enums/enum';
+import { AgentApprovalMode } from '@/modules/agents/enums/agent.enums';
 
 import {
   AgentsApprovalsService,
@@ -192,7 +192,6 @@ async function switchApprovalMode(
   approval.mode = mode;
   emitter?.emit('approval-mode-changed', { mode });
 }
-
 
 const formulatePlanInput = z.object({
   goal: z

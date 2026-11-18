@@ -1,9 +1,5 @@
-import {
-  IssueLinkResourceType,
-  IssueRuleGroupBy,
-  IssueType,
-  Severity,
-} from '@/common/enums/enum';
+import { IssueLinkResourceType, IssueType, Severity } from '@/common/enums/enum';
+import { IssueRuleGroupBy } from '@/modules/issues/enums/issue.enums';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';

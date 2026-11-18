@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
-import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
+import { AgentApprovalMode, AgentMode } from '@/modules/agents/enums/agent.enums';
 import { AgentsService } from './agents.service';
 
 const conversation = {

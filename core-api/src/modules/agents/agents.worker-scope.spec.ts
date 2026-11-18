@@ -1,11 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/require-await */
 import { BadRequestException } from '@nestjs/common';
-import {
-  AgentApprovalMode,
-  AgentMode,
-  WorkerScope,
-  WorkerType,
-} from '@/common/enums/enum';
+import { WorkerScope, WorkerType } from '@/common/enums/enum';
+import { AgentApprovalMode, AgentMode } from '@/modules/agents/enums/agent.enums';
 import { AgentsCompletionsService } from './agents.completions';
 import { AgentsService } from './agents.service';
 import { agentFunctionWith } from './agents.tools.testing';

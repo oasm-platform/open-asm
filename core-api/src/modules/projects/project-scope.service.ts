@@ -1,8 +1,5 @@
-import {
-  ProjectAssetSource,
-  ProjectScopeRuleMode,
-  ProjectScopeRuleType,
-} from '@/common/enums/enum';
+import { ProjectScopeRuleMode, ProjectScopeRuleType } from '@/common/enums/enum';
+import { ProjectAssetSource } from '@/modules/projects/enums/project.enums';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';

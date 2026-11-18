@@ -1,12 +1,6 @@
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
-import {
-  IssueCommentType,
-  IssueLinkResourceType,
-  IssuePriority,
-  IssueResolution,
-  IssueStatus,
-  IssueType,
-} from '@/common/enums/enum';
+import { IssueCommentType, IssueLinkResourceType, IssuePriority, IssueStatus, IssueType } from '@/common/enums/enum';
+import { IssueResolution } from '@/modules/issues/enums/issue.enums';
 import {
   BadRequestException,
   ConflictException,

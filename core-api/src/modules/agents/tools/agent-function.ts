@@ -3,7 +3,7 @@ import { MetadataScanner, Reflector } from '@nestjs/core';
 import { tool, type Tool } from 'ai';
 import { z } from 'zod';
 
-import type { AgentMode } from '@/common/enums/enum';
+import type { AgentMode } from '@/modules/agents/enums/agent.enums';
 
 import { isRenamedToolName } from './helpers';
 import type {

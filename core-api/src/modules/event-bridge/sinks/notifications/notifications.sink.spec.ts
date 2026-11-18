@@ -4,7 +4,7 @@ import type { Repository } from 'typeorm';
 import type { Notification } from '../../../notifications/entities/notification.entity';
 import type { NotificationRecipient } from '../../../notifications/entities/notification-recipient.entity';
 import type { User } from '../../../auth/entities/user.entity';
-import { EventBusGroup } from '@/common/enums/enum';
+import { EventBusGroup } from '@/modules/event-bridge/enums/event-bridge.enums';
 import type { StreamEntry } from '@/services/redis/redis.service';
 import { StreamConsumer } from '../../consuming/stream-consumer';
 import { NotificationsSink } from './notifications.sink';

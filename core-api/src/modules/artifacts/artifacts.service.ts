@@ -1,11 +1,5 @@
-import {
-  ArtifactListScope,
-  ArtifactShareType,
-  ArtifactSource,
-  ArtifactStatus,
-  AuditActorType,
-  AuditOutcome,
-} from '@/common/enums/enum';
+import { ArtifactShareType, ArtifactSource, ArtifactStatus, AuditActorType, AuditOutcome } from '@/common/enums/enum';
+import { ArtifactListScope } from '@/modules/artifacts/enums/artifact.enums';
 import { getManyResponse } from '@/common/utils/get-many-response.util';
 import type { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import { StorageService } from '@/modules/storage/storage.service';

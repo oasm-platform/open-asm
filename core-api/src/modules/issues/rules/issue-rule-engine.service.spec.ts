@@ -1,11 +1,6 @@
 import { BOT_ID } from '@/common/constants/app.constants';
-import {
-  IssuePriority,
-  IssueRuleGroupBy,
-  IssueStatus,
-  IssueType,
-  Severity,
-} from '@/common/enums/enum';
+import { IssuePriority, IssueStatus, IssueType, Severity } from '@/common/enums/enum';
+import { IssueRuleGroupBy } from '@/modules/issues/enums/issue.enums';
 import { QueryFailedError } from 'typeorm';
 import type { IssueRule } from '../entities/issue-rule.entity';
 import { IssueAutomationService } from '../issue-automation.service';

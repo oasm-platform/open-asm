@@ -1,4 +1,4 @@
-import { AgentMode } from '@/common/enums/enum';
+import { AgentMode } from '@/modules/agents/enums/agent.enums';
 
 import { READ_ONLY_TOOLS } from '../agents.tools';
 import { agentFunctionWith, agentToolWith } from '../agents.tools.testing';

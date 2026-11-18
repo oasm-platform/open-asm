@@ -7,7 +7,7 @@ import {
   GetManyBaseResponseDto,
 } from '@/common/dtos/get-many-base.dto';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
-import { AgentCommandApprovalStatus } from '@/common/enums/enum';
+import { AgentCommandApprovalStatus } from '@/modules/agents/enums/agent.enums';
 import { AuthGuard } from '@/common/guards/auth.guard';
 import { GetManyResponseDto } from '@/common/utils/get-many-response.util';
 import {

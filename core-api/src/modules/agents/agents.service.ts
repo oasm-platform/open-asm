@@ -8,7 +8,8 @@ import {
   GetManyBaseResponseDto,
   SortOrder,
 } from '@/common/dtos/get-many-base.dto';
-import { AgentMode, WorkerScope } from '@/common/enums/enum';
+import { WorkerScope } from '@/common/enums/enum';
+import { AgentMode } from '@/modules/agents/enums/agent.enums';
 import { encrypt } from '@/common/utils/encryption.util';
 import {
   decryptWithDEK,

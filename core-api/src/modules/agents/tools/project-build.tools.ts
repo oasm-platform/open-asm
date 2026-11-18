@@ -3,20 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { z } from 'zod';
 
-import {
-  AgentMode,
-  AuditActorType,
-  AuditOutcome,
-  DataKind,
-  ProjectChange,
-  ProjectScopeRuleMode,
-  ProjectScopeRuleType,
-  ProjectTriggerEvent,
-  ProjectTriggerType,
-  TargetType,
-  ToolCategory,
-  WorkerType,
-} from '@/common/enums/enum';
+import { AuditActorType, AuditOutcome, DataKind, ProjectChange, ProjectScopeRuleMode, ProjectScopeRuleType, ProjectTriggerEvent, ProjectTriggerType, TargetType, ToolCategory, WorkerType } from '@/common/enums/enum';
+import { AgentMode } from '@/modules/agents/enums/agent.enums';
 import type { UserContextPayload } from '@/common/interfaces/app.interface';
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import type { WrapperType } from '@/common/types/app.types';

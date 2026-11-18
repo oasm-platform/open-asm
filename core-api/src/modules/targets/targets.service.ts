@@ -1,13 +1,6 @@
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
-import {
-  AuditOutcome,
-  BullMQName,
-  CronSchedule,
-  IntegrationType,
-  JobStatus,
-  Severity,
-  TargetScopeType,
-} from '@/common/enums/enum';
+import { AuditOutcome, BullMQName, CronSchedule, IntegrationType, JobStatus, Severity } from '@/common/enums/enum';
+import { TargetScopeType } from '@/modules/targets/enums/target.enums';
 import { openVulnerabilityCondition } from '@/modules/vulnerabilities/open-vulnerability';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { getManyResponse } from '@/common/utils/get-many-response.util';

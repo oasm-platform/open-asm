@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
-import { AgentMode } from '@/common/enums/enum';
+import { AgentMode } from '@/modules/agents/enums/agent.enums';
 import { RemoteExecuteService } from '@/modules/remote-execute/remote-execute.service';
 import { RedisService } from '@/services/redis/redis.service';
 

@@ -1,8 +1,5 @@
-import {
-  IssuePriority,
-  IssueRuleGroupBy,
-  Severity,
-} from '@/common/enums/enum';
+import { IssuePriority, Severity } from '@/common/enums/enum';
+import { IssueRuleGroupBy } from '@/modules/issues/enums/issue.enums';
 import type { IssueRuleConditions } from '../entities/issue-rule.entity';
 
 /** A finding as the rule engine evaluates it. */

@@ -1,4 +1,5 @@
-import { EventBusGroup, IntegrationType } from '@/common/enums/enum';
+import { IntegrationType } from '@/common/enums/enum';
+import { EventBusGroup } from '@/modules/event-bridge/enums/event-bridge.enums';
 import { runConnector } from '@/modules/integrations/connectors/connector.factory';
 import { IntegrationsService } from '@/modules/integrations/integrations.service';
 import { decryptSensitiveConfigFields } from '@/modules/integrations/validators/integration.validator';

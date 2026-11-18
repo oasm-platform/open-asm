@@ -1,9 +1,5 @@
-import {
-  EventBusGroup,
-  ProjectTriggerEvent,
-  RunOutcome,
-  Severity,
-} from '@/common/enums/enum';
+import { ProjectTriggerEvent, RunOutcome, Severity } from '@/common/enums/enum';
+import { EventBusGroup } from '@/modules/event-bridge/enums/event-bridge.enums';
 import { RedisService } from '@/services/redis/redis.service';
 import { Inject, Injectable } from '@nestjs/common';
 import type { EventSink } from '../../consuming/event-sink';

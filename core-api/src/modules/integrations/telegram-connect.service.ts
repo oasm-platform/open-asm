@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { TelegramConnectStatus } from '@/common/enums/enum';
+import { TelegramConnectStatus } from '@/modules/integrations/enums/integration.enums';
 import { generateToken } from '@/common/utils/gen-token.util';
 import { User } from '@/modules/auth/entities/user.entity';
 import { WorkspacesService } from '@/modules/workspaces/workspaces.service';

@@ -1,4 +1,4 @@
-import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
+import { AgentApprovalMode, AgentMode } from '@/modules/agents/enums/agent.enums';
 import type { ApprovalSettings } from './agents.approvals';
 import { Logger } from '@nestjs/common';
 import { EventEmitter } from 'node:events';

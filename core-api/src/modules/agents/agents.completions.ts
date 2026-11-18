@@ -18,7 +18,7 @@ import { EventEmitter } from 'node:events';
 import * as path from 'path';
 import { Repository } from 'typeorm';
 
-import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
+import { AgentApprovalMode, AgentMode } from '@/modules/agents/enums/agent.enums';
 import { PromptRegistry } from '@/common/utils/prompt-registry.util';
 import { RemoteExecuteSubscribeService } from '@/modules/workers/remote-execute-subscribe.service';
 import { WorkersService } from '@/modules/workers/workers.service';

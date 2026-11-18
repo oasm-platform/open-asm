@@ -1,5 +1,5 @@
 import { BaseEntity } from '@/common/entities/base.entity';
-import { InvitationStatus } from '@/common/enums/enum';
+import { InvitationStatus } from '@/modules/workspaces/enums/workspace.enums';
 import { User } from '@/modules/auth/entities/user.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { Column, Entity, Index, ManyToOne, Relation } from 'typeorm';

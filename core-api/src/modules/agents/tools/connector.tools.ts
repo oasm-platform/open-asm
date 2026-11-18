@@ -2,7 +2,8 @@ import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
-import { AgentMode, WorkerType } from '@/common/enums/enum';
+import { WorkerType } from '@/common/enums/enum';
+import { AgentMode } from '@/modules/agents/enums/agent.enums';
 import type { WrapperType } from '@/common/types/app.types';
 import { ConnectorRegistryService } from '@/modules/connectors/connector-registry.service';
 import { RemoteExecuteService } from '@/modules/remote-execute/remote-execute.service';
@@ -166,7 +167,6 @@ const listToolConfigProfilesSchema = z.object({
     .max(100)
     .describe('Connector slug (name from display_available_tools)'),
 });
-
 
 /**
  * A JSON line (an object, or an array of objects as nuclei prints) cut down

@@ -1,10 +1,6 @@
 import { BaseEntity } from '@/common/entities/base.entity';
-import {
-  IssuePriority,
-  IssueRuleGroupBy,
-  IssueType,
-  Severity,
-} from '@/common/enums/enum';
+import { IssuePriority, IssueType, Severity } from '@/common/enums/enum';
+import { IssueRuleGroupBy } from '@/modules/issues/enums/issue.enums';
 import { User } from '@/modules/auth/entities/user.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { ApiProperty } from '@nestjs/swagger';

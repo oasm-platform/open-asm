@@ -2,7 +2,7 @@ import {
   GetManyBaseQueryParams,
   SortOrder,
 } from '@/common/dtos/get-many-base.dto';
-import { ProjectAssetSource } from '@/common/enums/enum';
+import { ProjectAssetSource } from '@/modules/projects/enums/project.enums';
 import { openVulnerabilityCondition } from '@/modules/vulnerabilities/open-vulnerability';
 import { getManyResponse } from '@/common/utils/get-many-response.util';
 import { Injectable, NotFoundException } from '@nestjs/common';

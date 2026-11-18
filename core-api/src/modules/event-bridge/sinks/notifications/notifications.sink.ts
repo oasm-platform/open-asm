@@ -1,9 +1,5 @@
-import {
-  EventBusGroup,
-  NotificationScope,
-  NotificationStatus,
-  NotificationType,
-} from '@/common/enums/enum';
+import { NotificationScope, NotificationStatus, NotificationType } from '@/common/enums/enum';
+import { EventBusGroup } from '@/modules/event-bridge/enums/event-bridge.enums';
 import { User } from '@/modules/auth/entities/user.entity';
 import { NotificationRecipient } from '@/modules/notifications/entities/notification-recipient.entity';
 import { Notification } from '@/modules/notifications/entities/notification.entity';
