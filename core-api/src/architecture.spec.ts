@@ -164,8 +164,6 @@ const FORWARD_REFS = [
   'modules/workers/remote-execute-subscribe.service.ts: 1',
   'modules/workers/workers.module.ts: 1',
   'modules/workers/workers.service.ts: 2',
-  'modules/workflows/workflows.module.ts: 1',
-  'modules/workspaces/workspaces.module.ts: 1',
 ];
 
 /** `<module> <- <Entity> (<owner>)`: a repository used outside its own module. */

@@ -4,7 +4,6 @@ import { Target } from '@/modules/targets/entities/target.entity';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
-import { WorkspacesService } from '../workspaces/workspaces.service';
 import { Workflow } from './entities/workflow.entity';
 import { jobEntries } from './workflow-graph';
 
@@ -23,7 +22,6 @@ export interface TriggerOptions {
 export class TriggerWorkflowService implements OnModuleInit {
   private readonly logger = new Logger(TriggerWorkflowService.name);
   constructor(
-    private workspaceService: WorkspacesService,
     private workflowRunnerService: WorkflowRunnerService,
     private dataSource: DataSource,
     private eventEmitter: EventEmitter2,
@@ -117,12 +115,13 @@ export class TriggerWorkflowService implements OnModuleInit {
    * @returns Workflow object
    */
   private async getWorkflowByEvent(event: string, payload: Target) {
+    // Every in-process event lands here; only target events carry the Target
+    // row (loaded from the database, so with its workspaceId).
+    const workspaceId = (payload as Partial<Target> | undefined)?.workspaceId;
+    if (!workspaceId) return null;
     const dotIndex = event.indexOf('.');
     const target = event.substring(0, dotIndex);
     const action = event.substring(dotIndex + 1);
-    const workspaceId = await this.workspaceService.getWorkspaceIdByTargetId(
-      payload.id,
-    );
     return this.dataSource
       .getRepository(Workflow)
       .createQueryBuilder('workflow')

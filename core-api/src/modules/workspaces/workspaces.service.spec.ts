@@ -14,7 +14,8 @@ import { ApiKeysService } from '../apikeys/apikeys.service';
 import { ArtifactsService } from '../artifacts/artifacts.service';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { WorkflowTemplateService } from '../workflows/workflow-template.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { WORKSPACE_INITIALIZING_EVENT } from './workspace.events';
 import { WorkspaceInvitation } from './entities/workspace-invitation.entity';
 import { WorkspaceMemberPermission } from './entities/workspace-member-permission.entity';
 import { WorkspaceMembers } from './entities/workspace-members.entity';
@@ -32,7 +33,7 @@ describe('WorkspacesService', () => {
   let mockInvitationRepository: Partial<Repository<WorkspaceInvitation>>;
   let mockApiKeysService: Partial<ApiKeysService>;
   let mockNotificationsService: Partial<NotificationsService>;
-  let mockWorkflowTemplateService: Partial<WorkflowTemplateService>;
+  let mockEvents: { emitAsync: jest.Mock };
   let mockAuditService: {
     recordInTx: jest.Mock;
     pseudonymizeActor: jest.Mock;
@@ -220,9 +221,7 @@ describe('WorkspacesService', () => {
       deleteByRef: jest.fn(),
     };
 
-    mockWorkflowTemplateService = {
-      createDefaultWorkflows: jest.fn(),
-    };
+    mockEvents = { emitAsync: jest.fn().mockResolvedValue([]) };
 
     mockAuditService = {
       recordInTx: jest.fn().mockResolvedValue({ id: randomUUID() }),
@@ -274,8 +273,8 @@ describe('WorkspacesService', () => {
           useValue: mockNotificationsService,
         },
         {
-          provide: WorkflowTemplateService,
-          useValue: mockWorkflowTemplateService,
+          provide: EventEmitter2,
+          useValue: mockEvents,
         },
         {
           provide: AuditService,
@@ -2082,6 +2081,33 @@ describe('WorkspacesService', () => {
       );
     });
 
+    it('lets other modules add their defaults once the workspace is committed', async () => {
+      (mockWorkspaceRepository.count as jest.Mock).mockResolvedValue(0);
+      (mockWorkspaceRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 'ws-new',
+        name: 'New Workspace',
+      });
+
+      await service.createWorkspace({ name: 'New Workspace' }, testUserContext);
+
+      expect(mockEvents.emitAsync).toHaveBeenCalledWith(
+        WORKSPACE_INITIALIZING_EVENT,
+        { workspaceId: expect.any(String) as string },
+      );
+      expect(mockDataSource.transaction.mock.invocationCallOrder[0]).toBeLessThan(
+        mockEvents.emitAsync.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('fails the creation when adding the defaults fails', async () => {
+      (mockWorkspaceRepository.count as jest.Mock).mockResolvedValue(0);
+      mockEvents.emitAsync.mockRejectedValue(new Error('templates unreadable'));
+
+      await expect(
+        service.createWorkspace({ name: 'New Workspace' }, testUserContext),
+      ).rejects.toThrow('templates unreadable');
+    });
+
     it('should roll back the whole workspace creation when seeding fails', async () => {
       (mockWorkspaceRepository.count as jest.Mock).mockResolvedValue(0);
       fixedTransactionalRepository.save.mockRejectedValueOnce(
@@ -2095,7 +2121,7 @@ describe('WorkspacesService', () => {
       // The transaction was started — a partial workspace + missing Admin
       // group can no longer be left behind.
       expect(mockDataSource.transaction).toHaveBeenCalled();
-      expect(mockWorkflowTemplateService.createDefaultWorkflows).not.toHaveBeenCalled();
+      expect(mockEvents.emitAsync).not.toHaveBeenCalled();
     });
 
     it('should enforce the workspace creation limit', async () => {

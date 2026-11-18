@@ -36,11 +36,11 @@ Workflow definitions per workspace: a DAG of tool jobs stored as jsonb in `workf
   - template rows have `filePath` = template file name, one per workspace;
   - project-owned workflows are `project-<projectId>-<uuid>.yaml` (legacy `group-<projectId>.yaml`);
   - `url-discovery.service.ts` and `VulnerabilitiesService.findScanWorkflow` look up default workflows by `DefaultWorkflow` file name.
-- Template sync: `onModuleInit` runs `createDefaultWorkflows` for every workspace on every boot, and `WorkspacesService` runs it for a new workspace. A row whose content or name differs from the YAML is overwritten, so edits to a template row are lost at the next boot. An invalid template is logged and skipped. `normalizeOn` wraps a string under any `on` key into an array.
+- Template sync: `onModuleInit` runs `createDefaultWorkflows` for every workspace on every boot, and `onWorkspaceInitializing` runs it for a new workspace (`@OnEvent(WORKSPACE_INITIALIZING_EVENT, { promisify: true, suppressErrors: false })`, emitted and awaited by `WorkspacesService.createWorkspace`). A row whose content or name differs from the YAML is overwritten, so edits to a template row are lost at the next boot. An invalid template is logged and skipped. `normalizeOn` wraps a string under any `on` key into an array.
 
 ## Coupling
 
-- `forwardRef` cycle with `WorkspacesModule` in both directions.
+- No module dependency on `WorkspacesModule` (the old `forwardRef` cycle is gone): new workspaces reach this module through `WORKSPACE_INITIALIZING_EVENT`, and `TriggerWorkflowService` takes the workspace from the event's `Target` (`payload.workspaceId`; a payload without one is not a target event and is ignored).
 - `TriggerWorkflowService` subscribes with `EventEmitter2.onAny` to **every** in-process event. It splits the name at the first dot into (`on` key, action) and runs the first matching workflow of the target's workspace through `WorkflowRunnerService.startRun`, skipping `project-%` and `group-%` workflows. A third emit argument `{ jobRunType: SCHEDULED }` marks scheduled runs; anything else is `MANUAL`. The jsonb query relies on the GIN index from migration `AddPerformanceIndexes`.
 - `workflow-graph.ts` is imported by jobs-registry (`workflow-runner.service.ts`, `jobs-registry.service.ts`, `job-history.entity.ts`), projects, statistic and vulnerabilities.
 - Projects writes `workflows` rows directly (`ProjectWorkflowsService.create`, `ProjectTriggersService.writeOn`) and saves pipeline edits through `WorkflowsService.updateWorkflow`. The entity file imports projects' `ProjectWorkflow` and `EventTriggerConfig`.

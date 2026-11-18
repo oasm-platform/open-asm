@@ -1,8 +1,7 @@
-import { forwardRef, Global, Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ApiKeysModule } from '../apikeys/apikeys.module';
 import { ArtifactsModule } from '../artifacts/artifacts.module';
-import { WorkflowsModule } from '../workflows/workflows.module';
 import { WorkspaceMembers } from './entities/workspace-members.entity';
 import { Workspace } from './entities/workspace.entity';
 import { WorkspacePermission } from './entities/workspace-permission.entity';
@@ -22,7 +21,6 @@ import { WorkspacesService } from './workspaces.service';
     ]),
     ApiKeysModule,
     ArtifactsModule,
-    forwardRef(() => WorkflowsModule),
   ],
   controllers: [WorkspacesController],
   providers: [WorkspacesService],

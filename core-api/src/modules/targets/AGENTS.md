@@ -48,7 +48,7 @@ Scan roots of a workspace: a domain, IP, CIDR or Git organization. A target owns
 ## Coupling
 
 - `TargetsService` injects `AssetsService` (and exposes it as public `assetService`), `WorkspacesService`, `AuditService` and `EventBridgeService`. It writes `assets` rows directly inside its transaction.
-- `TriggerWorkflowService.onModuleInit` subscribes with `eventEmitter.onAny`, so **every** in-process event in the app is treated as a possible workflow trigger: `<a>.<b>` is matched against `workflow.content.on.<a>` containing `<b>`, and the payload is resolved to a workspace through `payload.id` as a target id. Project workflows (`project-%`, `group-%` file paths) are excluded.
+- `TriggerWorkflowService.onModuleInit` subscribes with `eventEmitter.onAny`, so **every** in-process event in the app is treated as a possible workflow trigger: `<a>.<b>` is matched against `workflow.content.on.<a>` containing `<b>`, in the workspace of the payload's `workspaceId` (target events carry the `Target` row); a payload without one is skipped before any query. Project workflows (`project-%`, `group-%` file paths) are excluded.
 - Callers of `TargetsService`: integrations connectors (aws, cloudflare, vercel: `findByWorkspaceAndValues` then `createMultipleTargets`), `InternalNetworksService`, `SearchService`, agents tools. `StatisticModule` and `SearchModule` import `TargetsModule`.
 - Other code that touches `targets` directly: `AssetsService.reScan` updates `reScanCount` and `lastDiscoveredAt`. `WorkspacesService` bulk-deletes a workspace's targets and resolves `getWorkspaceIdByTargetId` (cached 60 s). `StatisticService` reads the table.
 

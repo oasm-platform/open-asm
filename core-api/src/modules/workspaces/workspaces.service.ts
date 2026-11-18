@@ -18,6 +18,7 @@ import {
   Logger,
   OnModuleInit,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import type { NodeRequest, NodeResponse } from '@nestjs/platform-node';
@@ -28,7 +29,6 @@ import { AuditContext, AuditService } from '../audit/audit.service';
 import { CreateNotificationDto } from '../notifications/dto/create-notification.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { Target } from '../targets/entities/target.entity';
-import { WorkflowTemplateService } from '../workflows/workflow-template.service';
 import { GetWorkspaceConfigsDto } from './dto/get-workspace-configs.dto';
 import { UpdateWorkspaceConfigsDto } from './dto/update-workspace-configs.dto';
 import {
@@ -51,6 +51,10 @@ import { WorkspaceInvitation } from './entities/workspace-invitation.entity';
 import { WorkspaceMemberPermission } from './entities/workspace-member-permission.entity';
 import { WorkspacePermission } from './entities/workspace-permission.entity';
 import { Workspace } from './entities/workspace.entity';
+import {
+  WORKSPACE_INITIALIZING_EVENT,
+  type WorkspaceInitializingEvent,
+} from './workspace.events';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { ForbiddenError, InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
@@ -97,7 +101,7 @@ export class WorkspacesService implements OnModuleInit {
     private readonly invitationRepository: Repository<WorkspaceInvitation>,
     private apiKeyService: ApiKeysService,
     private notificationsService: NotificationsService,
-    private workflowTemplateService: WorkflowTemplateService,
+    private events: EventEmitter2,
     private workspaceEncryptionService: WorkspaceEncryptionService,
     private auditService: AuditService,
     private artifactsService: ArtifactsService,
@@ -154,7 +158,9 @@ export class WorkspacesService implements OnModuleInit {
       await this.seedOwnerPermissionGroup(newWorkspaceId, id, manager);
     });
 
-    await this.workflowTemplateService.createDefaultWorkflows(newWorkspaceId);
+    await this.events.emitAsync(WORKSPACE_INITIALIZING_EVENT, {
+      workspaceId: newWorkspaceId,
+    } satisfies WorkspaceInitializingEvent);
 
     const created = await this.repo.findOne({ where: { id: newWorkspaceId } });
     if (!created) {

@@ -5,7 +5,6 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
-import { WorkspacesService } from '../workspaces/workspaces.service';
 import type { Workflow } from './entities/workflow.entity';
 import { TriggerWorkflowService } from './trigger-workflow.service';
 
@@ -16,10 +15,6 @@ describe('TriggerWorkflowService', () => {
 
   const mockWorkflowRunner = {
     startRun: jest.fn(),
-  };
-
-  const mockWorkspacesService = {
-    getWorkspaceIdByTargetId: jest.fn(),
   };
 
   const mockEventEmitter = {
@@ -36,6 +31,7 @@ describe('TriggerWorkflowService', () => {
   const mockTarget = {
     id: 'target-uuid',
     value: 'example.com',
+    workspaceId: 'workspace-uuid',
   } as Target;
 
   const mockWorkflow = {
@@ -59,10 +55,6 @@ describe('TriggerWorkflowService', () => {
         {
           provide: WorkflowRunnerService,
           useValue: mockWorkflowRunner,
-        },
-        {
-          provide: WorkspacesService,
-          useValue: mockWorkspacesService,
         },
         {
           provide: EventEmitter2,
@@ -89,9 +81,6 @@ describe('TriggerWorkflowService', () => {
     });
     mockQueryBuilder.getOne.mockResolvedValue(mockWorkflow);
 
-    mockWorkspacesService.getWorkspaceIdByTargetId.mockResolvedValue(
-      'workspace-uuid',
-    );
     mockWorkflowRunner.startRun.mockResolvedValue({
       jobHistory: { id: 'history-1' },
       dispatched: 1,
@@ -160,6 +149,27 @@ describe('TriggerWorkflowService', () => {
       service.onModuleInit();
       await invokeHandler('target.domain.create', mockTarget);
 
+      expect(mockWorkflowRunner.startRun).not.toHaveBeenCalled();
+    });
+
+    it('looks the workflow up in the workspace the target event carries', async () => {
+      service.onModuleInit();
+      await invokeHandler('target.domain.create', mockTarget);
+
+      const builder = (
+        mockDataSource.getRepository('').createQueryBuilder as jest.Mock
+      )() as { andWhere: jest.Mock };
+      expect(builder.andWhere).toHaveBeenCalledWith(
+        expect.stringContaining('workspaceId'),
+        expect.objectContaining({ workspaceId: 'workspace-uuid' }),
+      );
+    });
+
+    it('ignores an event whose payload is not a target', async () => {
+      service.onModuleInit();
+      await invokeHandler('project.deleting', { projectId: 'p-1' });
+
+      expect(mockDataSource.getRepository).not.toHaveBeenCalled();
       expect(mockWorkflowRunner.startRun).not.toHaveBeenCalled();
     });
 
