@@ -49,6 +49,14 @@ tasks:
         msg: SPEC must identify one test file
     cmds:
       - pnpm run test -- --runTestsByPath {{.SPEC}}
+  # Unit tests with coverage, under the same worker and memory limits as
+  # `task api:test`. Report in core-api/coverage/; jest.coverageThreshold in
+  # package.json fails the run when coverage drops below the baseline.
+  test:cov:
+    cmds:
+      # pnpm hands everything after the script name to jest; a `--` would be
+      # forwarded too and turn the flag into a test path pattern.
+      - pnpm run test --coverage --coverageReporters=text-summary --coverageReporters=json-summary
   # Run e2e tests (boots full AppModule; needs postgres+redis running)
   test:e2e:
     cmds:
