@@ -10,8 +10,8 @@ import {
 import { isPublicIp, unmapIpv4 } from '@/common/utils/ip-range.util';
 import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
 import { RedisService } from '@/services/redis/redis.service';
-import { generateToken } from '@/utils/genToken';
-import { getManyResponse } from '@/utils/getManyResponse';
+import { generateToken } from '@/common/utils/gen-token.util';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
 import {
   forwardRef,
   Inject,
@@ -38,7 +38,7 @@ import { InternalNetwork } from '../internal-networks/entities/internal-network.
 import { NetworkInterface } from '../internal-networks/entities/network-interface.entity';
 import { isValidEncryptionPublicKey } from '../jobs-registry/job-secret-sealer';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
-import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
+import { WorkspaceTool } from '../tools/entities/workspace-tools.entity';
 import { ToolsService } from '../tools/tools.service';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import {

@@ -17,8 +17,8 @@ import {
   WorkerScope,
   WorkerType,
 } from '@/common/enums/enum';
-import bindingCommand from '@/utils/bindingCommand';
-import { getManyResponse } from '@/utils/getManyResponse';
+import bindingCommand from '@/common/utils/binding-command.util';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { WrapperType } from '@/common/types/app.types';
 import {
@@ -65,8 +65,8 @@ import {
 import { WorkerInstance } from '../workers/entities/worker.entity';
 import { WorkerStreamRegistry } from '../workers/worker-stream-registry.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
-import { GetManyJobHistoriesRequestDto } from './dto/get-many-job-histories-dto';
-import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
+import { GetManyJobHistoriesRequestDto } from './dto/get-many-job-histories.dto';
+import { GetManyJobsRequestDto } from './dto/get-many-jobs.dto';
 import {
   JobHistoryDetailResponseDto,
   ToolWithStatusDto,

@@ -1,7 +1,7 @@
 import { WorkspaceId } from '@/common/decorators/app.decorator';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
-import { GetManyResponseDto } from '@/utils/getManyResponse';
+import { GetManyResponseDto } from '@/common/utils/get-many-response.util';
 import {
   BadRequestException,
   Body,
@@ -29,7 +29,7 @@ import {
 import { ToolsQueryDto } from './dto/tools-query.dto';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
 import { Tool } from './entities/tools.entity';
-import { WorkspaceTool } from './entities/workspace_tools.entity';
+import { WorkspaceTool } from './entities/workspace-tools.entity';
 import { ToolsService } from './tools.service';
 
 @ApiTags('Tools')

@@ -7,7 +7,7 @@ import {
   SortOrder,
 } from '@/common/dtos/get-many-base.dto';
 import { RedisService } from '@/services/redis/redis.service';
-import { getManyResponse } from '@/utils/getManyResponse';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomUUID } from 'node:crypto';

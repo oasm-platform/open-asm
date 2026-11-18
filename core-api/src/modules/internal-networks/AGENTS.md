@@ -7,7 +7,7 @@ Named private networks inside a workspace. Workers attach to one and report thei
 - `internal-networks.controller.ts`: `/internal-networks` routes.
 - `internal-networks.service.ts`: CRUD, interface listing, `createTargetsFromInterfaces`.
 - `entities/internal-network.entity.ts`, `entities/network-interface.entity.ts`.
-- `dtos/`: request/response DTOs. The list queries extend `GetManyBaseQueryParams`, whose `sortBy` must match `SAFE_SORT_IDENTIFIER` (the service interpolates it into `ORDER BY`).
+- `dto/`: request/response DTOs. The list queries extend `GetManyBaseQueryParams`, whose `sortBy` must match `SAFE_SORT_IDENTIFIER` (the service interpolates it into `ORDER BY`).
 
 ## Public surface
 

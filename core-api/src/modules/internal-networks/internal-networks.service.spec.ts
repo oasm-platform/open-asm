@@ -6,12 +6,12 @@ import { randomUUID } from 'crypto';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { TargetsService } from '../targets/targets.service';
-import type { CreateInternalNetworkDto } from './dtos/create-internal-network.dto';
-import type { GetManyInternalNetworksQueryDto } from './dtos/get-many-internal-networks.dto';
+import type { CreateInternalNetworkDto } from './dto/create-internal-network.dto';
+import type { GetManyInternalNetworksQueryDto } from './dto/get-many-internal-networks.dto';
 import type {
   GetManyNetworkInterfacesQueryDto,
-} from './dtos/get-many-network-interfaces.dto';
-import type { UpdateInternalNetworkDto } from './dtos/update-internal-network.dto';
+} from './dto/get-many-network-interfaces.dto';
+import type { UpdateInternalNetworkDto } from './dto/update-internal-network.dto';
 import { InternalNetwork } from './entities/internal-network.entity';
 import { NetworkInterface } from './entities/network-interface.entity';
 import { InternalNetworksService } from './internal-networks.service';

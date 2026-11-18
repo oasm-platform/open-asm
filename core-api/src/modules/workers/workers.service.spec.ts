@@ -12,7 +12,7 @@ import { EventBridgeService } from '../event-bridge/publishing/event-bridge.serv
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { InternalNetwork } from '../internal-networks/entities/internal-network.entity';
 import { NetworkInterface } from '../internal-networks/entities/network-interface.entity';
-import { WorkspaceTool } from '../tools/entities/workspace_tools.entity';
+import { WorkspaceTool } from '../tools/entities/workspace-tools.entity';
 import { ToolsService } from '../tools/tools.service';
 import { RedisService } from '@/services/redis/redis.service';
 import { GeoIpService } from '@/services/geo-ip/geo-ip.service';

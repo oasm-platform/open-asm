@@ -6,7 +6,7 @@ import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity'
 import { WorkersModule } from '../workers/workers.module';
 import { ToolConfigProfile } from './entities/tool-config-profiles.entity';
 import { Tool } from './entities/tools.entity';
-import { WorkspaceTool } from './entities/workspace_tools.entity';
+import { WorkspaceTool } from './entities/workspace-tools.entity';
 import { ToolConfigProfilesController } from './tool-config-profiles.controller';
 import { ToolConfigProfilesService } from './tool-config-profiles.service';
 import { ToolSyncService } from './tool-sync.service';

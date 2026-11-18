@@ -1,6 +1,6 @@
 import type { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import { containsLikePattern } from '@/common/utils/like-pattern.util';
-import { getManyResponse } from '@/utils/getManyResponse';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';

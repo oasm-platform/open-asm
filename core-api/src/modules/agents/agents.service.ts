@@ -19,7 +19,7 @@ import { RemoteExecuteSubscribeService } from '@/modules/workers/remote-execute-
 import { WorkersService } from '@/modules/workers/workers.service';
 import { RedisService } from '@/services/redis/redis.service';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
-import { getManyResponse } from '@/utils/getManyResponse';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
 import { HttpService } from '@nestjs/axios';
 import {
   BadRequestException,

@@ -23,7 +23,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { ToolCategorySpec } from '../tool-categories';
-import { WorkspaceTool } from './workspace_tools.entity';
+import { WorkspaceTool } from './workspace-tools.entity';
 
 @Entity('tools')
 @Unique(['name'])

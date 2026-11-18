@@ -1,6 +1,6 @@
 import { API_KEY_LENGTH } from '@/common/constants/app.constants';
 import { ApiKeyType } from '@/common/enums/enum';
-import { generateToken } from '@/utils/genToken';
+import { generateToken } from '@/common/utils/gen-token.util';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';

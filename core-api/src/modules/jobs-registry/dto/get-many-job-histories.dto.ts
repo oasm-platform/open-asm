@@ -1,4 +1,4 @@
-import { GetManyJobsRequestDto } from './get-many-jobs-dto';
+import { GetManyJobsRequestDto } from './get-many-jobs.dto';
 import { JobRunType } from '@/common/enums/enum';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsDateString, IsIn, IsOptional } from 'class-validator';

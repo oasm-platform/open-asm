@@ -11,7 +11,7 @@ import {
   activeDismissalCondition,
   vulnerabilityStatusCondition,
 } from '@/modules/vulnerabilities/vulnerability-status';
-import { getManyResponse } from '@/utils/getManyResponse';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';

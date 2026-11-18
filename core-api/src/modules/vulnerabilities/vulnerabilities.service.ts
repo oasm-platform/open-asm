@@ -19,7 +19,7 @@ import {
   VulnerabilityReviewStatus,
   VulnerabilitySourceKind,
 } from '@/common/enums/enum';
-import { getManyResponse } from '@/utils/getManyResponse';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
 import { InjectQueue } from '@nestjs/bullmq';
 import {
   BadRequestException,

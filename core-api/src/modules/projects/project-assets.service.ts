@@ -4,7 +4,7 @@ import {
 } from '@/common/dtos/get-many-base.dto';
 import { ProjectAssetSource } from '@/common/enums/enum';
 import { openVulnerabilityCondition } from '@/modules/vulnerabilities/open-vulnerability';
-import { getManyResponse } from '@/utils/getManyResponse';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';

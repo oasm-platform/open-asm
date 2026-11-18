@@ -6,7 +6,7 @@ import {
 } from '@/common/enums/enum';
 import type { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import type { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
-import { getManyResponse } from '@/utils/getManyResponse';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
 import {
   BadRequestException,
   Injectable,

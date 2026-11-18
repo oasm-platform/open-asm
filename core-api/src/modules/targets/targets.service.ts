@@ -10,7 +10,7 @@ import {
 } from '@/common/enums/enum';
 import { openVulnerabilityCondition } from '@/modules/vulnerabilities/open-vulnerability';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
-import { getManyResponse } from '@/utils/getManyResponse';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
 import { containsLikePattern } from '@/common/utils/like-pattern.util';
 import { InjectQueue } from '@nestjs/bullmq';
 import {

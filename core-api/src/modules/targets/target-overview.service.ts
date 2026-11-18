@@ -13,7 +13,7 @@ import {
   fixedVulnerabilityCondition,
   openVulnerabilityCondition,
 } from '@/modules/vulnerabilities/open-vulnerability';
-import { getManyResponse } from '@/utils/getManyResponse';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';

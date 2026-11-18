@@ -5,7 +5,7 @@ import type { Repository } from 'typeorm';
 import { And, ILike, In, Not } from 'typeorm';
 import type { Tool } from './entities/tools.entity';
 import { ToolConfigProfile } from './entities/tool-config-profiles.entity';
-import type { WorkspaceTool } from './entities/workspace_tools.entity';
+import type { WorkspaceTool } from './entities/workspace-tools.entity';
 import { ToolsService } from './tools.service';
 
 // ── Mock factories ──────────────────────────────────────────────────

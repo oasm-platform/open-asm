@@ -1,7 +1,7 @@
 import type { WrapperType } from '@/common/types/app.types';
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { ToolCategory, WorkerScope, WorkerType } from '@/common/enums/enum';
-import { getManyResponse } from '@/utils/getManyResponse';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
 import {
   BadRequestException,
   forwardRef,
@@ -28,7 +28,7 @@ import { ToolsQueryDto } from './dto/tools-query.dto';
 import { AddToolToWorkspaceDto } from './dto/tools.dto';
 import { Tool } from './entities/tools.entity';
 import { ToolConfigProfile } from './entities/tool-config-profiles.entity';
-import { WorkspaceTool } from './entities/workspace_tools.entity';
+import { WorkspaceTool } from './entities/workspace-tools.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { categorySpec } from './tool-categories';
 import { DEFAULT_TOOL_TARGET_TYPES } from './tool-target-types';

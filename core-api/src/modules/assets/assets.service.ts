@@ -6,7 +6,7 @@ import * as path from 'path';
 import * as Mustache from 'mustache';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
-import { getManyResponse } from '@/utils/getManyResponse';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
 import { containsLikePattern } from '@/common/utils/like-pattern.util';
 import { generateText } from 'ai';
 import {

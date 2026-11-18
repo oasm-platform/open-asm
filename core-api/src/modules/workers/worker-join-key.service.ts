@@ -5,7 +5,7 @@ import {
   WORKER_JOIN_KEY_TTL_SECONDS,
 } from '@/common/constants/app.constants';
 import { RedisService } from '@/services/redis/redis.service';
-import { generateToken } from '@/utils/genToken';
+import { generateToken } from '@/common/utils/gen-token.util';
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import type { WorkerJoinKeyResponseDto } from './dto/workers.dto';

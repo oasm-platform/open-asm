@@ -9,7 +9,7 @@ import {
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
 import { AgentCommandApprovalStatus } from '@/common/enums/enum';
 import { AuthGuard } from '@/common/guards/auth.guard';
-import { GetManyResponseDto } from '@/utils/getManyResponse';
+import { GetManyResponseDto } from '@/common/utils/get-many-response.util';
 import {
   BadRequestException,
   Body,

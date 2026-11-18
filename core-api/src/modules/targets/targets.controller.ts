@@ -7,7 +7,7 @@ import {
   RequestWithMetadata,
   UserContextPayload,
 } from '@/common/interfaces/app.interface';
-import { GetManyResponseDto } from '@/utils/getManyResponse';
+import { GetManyResponseDto } from '@/common/utils/get-many-response.util';
 import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
 import { PublishEvent } from '../event-bridge/publishing/publish-event.decorator';
 import { AuditService } from '../audit/audit.service';

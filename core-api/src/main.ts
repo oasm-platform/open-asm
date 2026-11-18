@@ -24,7 +24,7 @@ import {
   DEFAULT_PORT,
 } from './common/constants/app.constants';
 import { assertEncryptionKeys } from './common/utils/encryption.util';
-import { mergeBetterAuthSpec } from './utils/mergeBetterAuth';
+import { mergeBetterAuthSpec } from './common/utils/merge-better-auth.util';
 async function bootstrap() {
   // Before anything reads or writes a stored credential
   assertEncryptionKeys();

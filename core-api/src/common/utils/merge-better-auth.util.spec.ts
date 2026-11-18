@@ -1,4 +1,4 @@
-import { mergeBetterAuthSpec, normalizeSchemaType } from './mergeBetterAuth';
+import { mergeBetterAuthSpec, normalizeSchemaType } from './merge-better-auth.util';
 
 describe('normalizeSchemaType', () => {
   it('converts array-form type ["object","null"] to type + nullable', () => {

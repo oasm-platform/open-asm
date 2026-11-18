@@ -15,7 +15,7 @@ import type { EventEnvelopeData } from '@/modules/event-bridge/contracts/event-e
 import { EventBridgeService } from '@/modules/event-bridge/publishing/event-bridge.service';
 import { Issue } from '@/modules/issues/entities/issue.entity';
 import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.entity';
-import { getManyResponse } from '@/utils/getManyResponse';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
 import {
   BadRequestException,
   ForbiddenException,

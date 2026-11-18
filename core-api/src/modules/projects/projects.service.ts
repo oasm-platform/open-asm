@@ -11,7 +11,7 @@ import {
 } from '@/common/enums/enum';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { openVulnerabilityCondition } from '@/modules/vulnerabilities/open-vulnerability';
-import { getManyResponse } from '@/utils/getManyResponse';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
 import {
   BadRequestException,
   Injectable,

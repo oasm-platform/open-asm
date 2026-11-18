@@ -10,7 +10,7 @@ import {
 } from '@/common/enums/enum';
 import { EVENT_CATALOG } from '@/modules/event-bridge/contracts/event-catalog';
 import type { EventEnvelopeData } from '@/modules/event-bridge/contracts/event-envelope';
-import { getManyResponse } from '@/utils/getManyResponse';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
 import {
   BadRequestException,
   ConflictException,

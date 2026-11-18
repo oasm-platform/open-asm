@@ -6,7 +6,7 @@ import {
   AuditActorType,
   AuditOutcome,
 } from '@/common/enums/enum';
-import { getManyResponse } from '@/utils/getManyResponse';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
 import type { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import { StorageService } from '@/modules/storage/storage.service';
 import { WorkspaceMembers } from '@/modules/workspaces/entities/workspace-members.entity';

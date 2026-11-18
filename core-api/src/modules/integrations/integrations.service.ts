@@ -10,7 +10,7 @@ import {
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { IntegrationType } from '@/common/enums/enum';
 import type { WrapperType } from '@/common/types/app.types';
-import { getManyResponse } from '@/utils/getManyResponse';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
 import {
   BadRequestException,
   forwardRef,

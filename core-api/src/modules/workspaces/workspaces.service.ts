@@ -16,8 +16,8 @@ import { UserContextPayload } from '@/common/interfaces/app.interface';
 import { User } from '@/modules/auth/entities/user.entity';
 import { Job } from '@/modules/jobs-registry/entities/job.entity';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
-import { getManyResponse } from '@/utils/getManyResponse';
-import { SwaggerPropertyMetadata } from '@/utils/getSwaggerMetadata';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
+import { SwaggerPropertyMetadata } from '@/common/utils/get-swagger-metadata.util';
 import {
   BadRequestException,
   ForbiddenException,

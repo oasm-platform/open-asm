@@ -14,7 +14,7 @@ import {
 import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
 import { GrpcWorkerTokenGuard } from '@/common/guards/grpc-worker-token.guard';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
-import { GetManyResponseDto } from '@/utils/getManyResponse';
+import { GetManyResponseDto } from '@/common/utils/get-many-response.util';
 import {
   Body,
   Controller,
@@ -49,8 +49,8 @@ import {
   isRepositoryAsset,
   repositoryUsername,
 } from './connector-inputs';
-import { GetManyJobHistoriesRequestDto } from './dto/get-many-job-histories-dto';
-import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
+import { GetManyJobHistoriesRequestDto } from './dto/get-many-job-histories.dto';
+import { GetManyJobsRequestDto } from './dto/get-many-jobs.dto';
 import { JobListItemDto } from './dto/job-list-item.dto';
 import { RetryRunResponseDto } from './dto/retry-run-response.dto';
 import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';

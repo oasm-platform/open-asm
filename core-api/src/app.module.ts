@@ -10,7 +10,7 @@ import {
   QueryResolver,
 } from 'nestjs-i18n';
 import * as path from 'path';
-import { icuFormatter } from './utils/icu-formatter';
+import { icuFormatter } from './common/utils/icu-formatter.util';
 import { DatabaseModule } from './database/database.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { CombineModule } from './modules/combine.module';

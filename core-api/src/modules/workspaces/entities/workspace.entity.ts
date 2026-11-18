@@ -2,7 +2,7 @@ import { BaseEntity } from '@/common/entities/base.entity';
 import { ApiKey } from '@/modules/apikeys/entities/apikey.entity';
 import { User } from '@/modules/auth/entities/user.entity';
 import { Statistic } from '@/modules/statistic/entities/statistic.entity';
-import { WorkspaceTool } from '@/modules/tools/entities/workspace_tools.entity';
+import { WorkspaceTool } from '@/modules/tools/entities/workspace-tools.entity';
 import { WorkerInstance } from '@/modules/workers/entities/worker.entity';
 import { Workflow } from '@/modules/workflows/entities/workflow.entity';
 import { InternalNetwork } from '@/modules/internal-networks/entities/internal-network.entity';
