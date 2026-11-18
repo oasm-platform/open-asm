@@ -1,3 +1,7 @@
+import {
+  resolveTrustedOrigins,
+  trustedRequestOrigins,
+} from '@/common/config/allowed-origins';
 import { parseTrustedProxies } from '@/common/config/trusted-proxies';
 import {
   AUTH_IGNORE_ROUTERS,
@@ -12,7 +16,15 @@ import 'dotenv/config';
 import { Pool } from 'pg';
 import { resolveAuthSecret } from './auth-env';
 import { logBetterAuth } from './auth-logger';
+import { createRateLimitStorage } from './rate-limit-storage';
 import { createSessionRedis, createSessionStorage } from './session-storage';
+
+// Redis for the session cache and the rate limiter. The connection is its
+// own: this instance is built at import time, outside Nest DI, before
+// RedisService.
+const authRedis = createSessionRedis(process.env.REDIS_URL);
+const trustedOrigins = resolveTrustedOrigins();
+const RATE_LIMIT_WINDOW_SECONDS = 60;
 
 export const auth: unknown = betterAuth({
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
@@ -24,10 +36,9 @@ export const auth: unknown = betterAuth({
   secret: resolveAuthSecret(),
   logger: { log: logBetterAuth },
   // Sessions are resolved from Redis first; the database is only queried on a
-  // cache miss. See session-storage.ts. The connection is its own: this
-  // instance is built at import time, outside Nest DI, before RedisService.
+  // cache miss. See session-storage.ts.
   secondaryStorage: createSessionStorage(
-    createSessionRedis(process.env.REDIS_URL),
+    authRedis,
     () => (auth as Auth).$context,
   ),
   plugins: [
@@ -42,8 +53,13 @@ export const auth: unknown = betterAuth({
       path: '/docs',
     }),
   ],
-  trustedOrigins: ['*'],
+  // A cookie-carrying POST is refused unless its Origin is trusted: BASE_URL,
+  // TRUSTED_ORIGINS, or the request's own origin (see trustedRequestOrigins).
+  trustedOrigins: (request) => trustedRequestOrigins(trustedOrigins, request),
   advanced: {
+    // better-auth skips its origin and CSRF checks under NODE_ENV=test unless
+    // told otherwise; keeping them on lets the e2e suite exercise them.
+    disableOriginCheck: false,
     database: {
       generateId: () => randomUUID(),
     },
@@ -56,23 +72,24 @@ export const auth: unknown = betterAuth({
     cookies: {
       session_token: {
         name: 'session',
+        // better-auth adds SameSite=Lax, and Secure with the `__Secure-` name
+        // prefix when BASE_URL is https (or unset under NODE_ENV=production).
         attributes: {
           httpOnly: true,
-          // secure: true,
-          // sameSite: 'strict',
         },
       },
     },
   },
   rateLimit: {
-    // The limiter is 100 req / 60s in-memory. An e2e suite that signs up users
-    // and fires auth guard matrices trips it and then fails on rate limit
+    // The limiter is 100 req / 60s. An e2e suite that signs up users and
+    // fires auth guard matrices trips it and then fails on rate limit
     // instead of on the behaviour under test. Only the e2e harness sets this
     // flag (core-api/test/pin-test-env.ts); no deployed environment does.
     enabled: process.env.AUTH_RATE_LIMIT_DISABLED !== 'true',
-    window: 60,
+    window: RATE_LIMIT_WINDOW_SECONDS,
     max: 100,
-    storage: 'memory',
+    // Counted in Redis, so every API replica shares one budget per client
+    customStorage: createRateLimitStorage(authRedis, RATE_LIMIT_WINDOW_SECONDS),
     modelName: 'auth-rate-limit',
   },
   emailAndPassword: {

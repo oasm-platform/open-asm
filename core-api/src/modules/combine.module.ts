@@ -36,6 +36,9 @@ import { ArtifactsModule } from './artifacts/artifacts.module';
   imports: [
     AuthModule.forRoot({
       disableExceptionFilter: true,
+      // CORS for every route, /api/auth included, is set once in
+      // configure-app.ts from the same trusted origins
+      disableTrustedOriginsCors: true,
     }),
     TargetsModule,
     WorkspacesModule,

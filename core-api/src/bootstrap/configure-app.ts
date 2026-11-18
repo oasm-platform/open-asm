@@ -1,3 +1,4 @@
+import { resolveTrustedOrigins } from '@/common/config/allowed-origins';
 import { API_GLOBAL_PREFIX, AUTH_INSTANCE_KEY, CACHE_STATIC_RESOURCE } from '@/common/constants/app.constants';
 import { AuthGuard } from '@/common/guards/auth.guard';
 import { requestIdMiddleware } from '@/common/middleware/request-id.middleware';
@@ -9,23 +10,23 @@ import type { NestNodeApplication, NodeResponse } from '@nestjs/platform-node';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import * as path from 'path';
-import { parse as parseQueryString } from 'qs';
+import { parseQuery } from './query-parser';
 
 /**
  * Creates the HTTP adapter `main.ts` and the e2e harness both boot on, so the
  * options below are exercised by the tests too.
  *
- * - Query strings are parsed with `qs`, with the options Express' "extended"
- *   query parser used, so `?ids=a&ids=b` and `?filter[x]=1` keep arriving as
- *   an array and a nested object (the adapter's default parser keeps
- *   `filter[x]` as a flat key).
+ * - Query strings are parsed by `parseQuery` (qs, like Express' "extended"
+ *   parser), so `?ids=a&ids=b` and `?filter[x]=1` keep arriving as an array
+ *   and a nested object (the adapter's default parser keeps `filter[x]` as a
+ *   flat key).
  * - Route parameters may be up to 256 characters instead of the adapter's
  *   default 100: some are user-chosen names (e.g. `mcp-configs/:name`) with no
  *   length limit of their own, and a longer one would get a 414.
  */
 export function createHttpAdapter(): NodeAdapter {
   return new NodeAdapter({
-    querystringParser: (query) => parseQueryString(query, { allowPrototypes: true }),
+    querystringParser: parseQuery,
     maxParamLength: 256,
   });
 }
@@ -61,9 +62,11 @@ export function configureApp(app: NestNodeApplication): void {
     },
   });
 
-  // Configure CORS
+  // Only trusted origins get CORS headers, so no other site can read
+  // responses made with a user's session. The console needs none: it reaches
+  // the API through its own origin (nginx, or the Vite proxy in development).
   app.enableCors({
-    origin: true,
+    origin: resolveTrustedOrigins(),
     credentials: true,
   });
 
