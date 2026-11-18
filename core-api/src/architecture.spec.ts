@@ -135,41 +135,81 @@ const GLOBAL_MODULES = [
 /** `forwardRef(` per file: each one is a dependency cycle being papered over. */
 const FORWARD_REFS: string[] = [];
 
-/** `<module> <- <Entity> (<owner>)`: a repository used outside its own module. */
+/**
+ * `<module> <- <Entity> (<owner>)`: a repository used outside its own module.
+ * Each entry says why. `read` entries are lookups or read models; `WRITE`
+ * entries are the exceptions to "only the owning module writes its table",
+ * each blocked from going through the owner by the dependency direction or
+ * by a transaction the owner does not take part in. A new WRITE entry needs
+ * the same kind of reason, or a call to the owning service instead.
+ */
 const FOREIGN_ENTITIES = [
+  // WRITE: admin bootstrap sets the first admin's role and removes a
+  // half-created one (better-auth owns accounts, no service writes users)
   'modules/admin <- User (modules/auth)',
+  // WRITE: platform admins update and archive any tenant's workspace,
+  // outside membership rules
   'modules/admin <- Workspace (modules/workspaces)',
+  // read: the conversation's project, for the prompt context
   'modules/agents <- Project (modules/projects)',
+  // read: the user's default LLM for tag suggestions (agents imports assets)
   'modules/assets <- AgentConfig (modules/agents)',
   'modules/assets <- AgentLLMConfig (modules/agents)',
+  // read: tenant scope of asset queries
   'modules/assets <- Target (modules/targets)',
+  // read: the commented issue / finding must exist in the workspace
   'modules/comments <- Issue (modules/issues)',
   'modules/comments <- Vulnerability (modules/vulnerabilities)',
+  // WRITE: the audit lane is the writer of audit_events (with AuditService's
+  // in-transaction rows)
   'modules/event-bridge <- AuditEvent (modules/audit)',
+  // WRITE: the notifications lane is the write side of notifications;
+  // NotificationsModule is the read side
   'modules/event-bridge <- Notification (modules/notifications)',
   'modules/event-bridge <- NotificationRecipient (modules/notifications)',
+  // read: recipients of a notification
   'modules/event-bridge <- User (modules/auth)',
+  // read: Telegram pairing resolves the user
   'modules/integrations <- User (modules/auth)',
+  // read: project scope rules select assets
   'modules/projects <- Asset (modules/assets)',
+  // WRITE: project-owned workflows (project-<id>-<uuid>.yaml) are created,
+  // edited and deleted with their bindings in the project's transactions
   'modules/projects <- Workflow (modules/workflows)',
+  // read model: PDF reports
   'modules/reports <- AssetService (modules/assets)',
   'modules/reports <- AssetTag (modules/assets)',
   'modules/reports <- Target (modules/targets)',
   'modules/reports <- Vulnerability (modules/vulnerabilities)',
   'modules/reports <- Workspace (modules/workspaces)',
+  // read model: global search
   'modules/search <- Vulnerability (modules/vulnerabilities)',
+  // read: a GIT_ORG target must name a SOURCE_CODE integration
   'modules/targets <- Integration (modules/integrations)',
+  // read: custom templates and the project assets a template run targets
   'modules/templates <- Artifact (modules/artifacts)',
   'modules/templates <- ProjectAsset (modules/projects)',
+  // read model: available workers per tool (workers imports tools)
   'modules/tools <- WorkerInstance (modules/workers)',
+  // WRITE: seeds the bot user (no service owns user rows besides better-auth)
   'modules/users <- User (modules/auth)',
+  // read: GIT_ORG and host targets of a scan request
   'modules/vulnerabilities <- Target (modules/targets)',
+  // WRITE: conversation -> worker pin (agents imports workers)
   'modules/workers <- AgentConversation (modules/agents)',
+  // read: the network a worker joins must be in its workspace
   'modules/workers <- InternalNetwork (modules/internal-networks)',
+  // WRITE: a lost or rejoining worker's jobs go back to PENDING
+  // (jobs-registry imports workers)
   'modules/workers <- Job (modules/jobs-registry)',
+  // WRITE: a worker records its interfaces on an internal network
+  // (internal-networks reaches workers through targets and jobs-registry)
   'modules/workers <- NetworkInterface (modules/internal-networks)',
+  // read: a workflow step's tool must exist and fit
   'modules/workflows <- Tool (modules/tools)',
+  // read: default workflows are synced for every workspace at boot
   'modules/workflows <- Workspace (modules/workspaces)',
+  // WRITE: WorkspaceEncryptionService is the store of workspace DEKs
   'services <- Workspace (modules/workspaces)',
 ];
 
