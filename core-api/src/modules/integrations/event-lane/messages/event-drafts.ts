@@ -2,14 +2,14 @@ import { AuditOutcome, Severity } from '@/common/enums/enum';
 import {
   getEventDefinition,
   type EventName,
-} from '../../../contracts/event-catalog';
-import type { ConsumedEvent } from '../../../contracts/event-envelope';
+} from '@/modules/event-bridge/contracts/event-catalog';
+import type { ConsumedEvent } from '@/modules/event-bridge/contracts/event-envelope';
 import {
   hasUnfinishedSteps,
   readPayload,
   type DetectedVulnerability,
-} from '../../../contracts/event-payloads';
-import { describeIncompleteSteps } from '../../shared/run-steps';
+} from '@/modules/event-bridge/contracts/event-payloads';
+import { describeIncompleteSteps } from '@/modules/event-bridge/sinks/shared/run-steps';
 import type { Line, MessageDraft } from './message-draft';
 
 /**

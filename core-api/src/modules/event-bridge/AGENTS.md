@@ -8,23 +8,24 @@ The event bus. Domain events are written as CloudEvents to one Redis Stream (`EV
 - `contracts/`: `EVENT_CATALOG` (the only place an event is declared), `EventEnvelopeData` / `ConsumedEvent`, payload types in `event-payloads.ts` (`readPayload`).
 - `routing/`: `EVENT_POLICY` (`persist`, `severity` per event) and `SUBSCRIPTIONS` (domains per lane).
 - `transport/stream-codec.ts`: `toStreamFields`, `readEvent`, `parseData`. The one place that knows the entry layout.
-- `consuming/`: `StreamConsumer` (loop, retry, DLQ, lock), `EventConsumersService` (one consumer per sink), `EventSink` interface, Redis idempotency helpers.
-- `sinks/<lane>/`: what each lane does. `sinks/shared/run-steps.ts` holds wording shared by notifications and integrations.
+- `consuming/`: `StreamConsumer` (loop, retry, DLQ, lock), `EventConsumersService` (discovers the lanes, one consumer per lane), the `@EventLane()` decorator, `EventSink` interface, Redis idempotency helpers.
+- `sinks/<lane>/`: the lanes of the bus itself (audit, projection, notifications). `sinks/shared/run-steps.ts` holds wording shared by notifications and the integrations lane.
+- Domain lanes live in their modules: `integrations/event-lane/` (`IntegrationsSink`, message drafts, outbound envelope), `projects/event-lane/projects.sink.ts`, `issues/event-lane/issues.sink.ts`.
 
 ## Public surface
 
 - Exports `EventBridgeService`, `EVENT_CATALOG_TOKEN` and `NotificationsSink` (used by `NotificationsService`). No HTTP routes.
 - `EventPublishInterceptor` is registered here as `APP_INTERCEPTOR`, so `@PublishEvent(EVENT_CATALOG.<path>, config)` works on any controller handler in the app.
-- Lanes (`SINKS` in `event-bridge.module.ts`):
+- Lanes: every provider marked `@EventLane()`, in any module. `EventConsumersService.onApplicationBootstrap` finds them with Nest's `DiscoveryService` and refuses to boot unless each `EventBusGroup` has exactly one. `SINKS` in `event-bridge.module.ts` lists only the three this module registers.
 
 | Group | Domains | Handles | Effect | Idempotency |
 |---|---|---|---|---|
 | `audit` | `*` | `isPersisted(name)` | insert `audit_events` | `orIgnore` on unique `eventId`; exclusive Redis lock `EVENT_BUS_AUDIT_LOCK_KEY` |
 | `projection` | 7 domains | nothing (`accepts` returns false) | placeholder for future read models | n/a |
 | `notifications` | 8 domains | keys of `NOTIFICATION_RULES` | `notifications` rows + pub/sub `notification:<userId>` | `claimEventOnce` per `<eventId>:<type>` |
-| `integrations` | 6 domains | `isPushable` | connectors of TICKETING / NOTIFICATION integrations | `claimEventOnce(eventId)`; `eventId` is sent to receivers |
-| `projects` | asset, project, vulnerability | `asset.discovered`, `project.assets.added`, `project.run.completed`, `vulnerability.detected` | `PROJECT_ASSET_DISCOVERY` / `PROJECT_TRIGGER_EVENTS` | trigger events: `wasEventHandled` then `markEventHandled` after the work |
-| `issues` | vulnerability | `vulnerability.detected`, `.resurfaced`, `.fixed` | `ISSUE_VULNERABILITY_EVENTS` | same check-then-mark |
+| `integrations` (integrations module) | 6 domains | `isPushable` | connectors of TICKETING / NOTIFICATION integrations | `claimEventOnce(eventId)`; `eventId` is sent to receivers |
+| `projects` (projects module) | asset, project, vulnerability | `asset.discovered`, `project.assets.added`, `project.run.completed`, `vulnerability.detected` | `ProjectsService.addDiscoveredAssets` / `ProjectTriggersService.onTriggerEvent` | trigger events: `wasEventHandled` then `markEventHandled` after the work |
+| `issues` (issues module) | vulnerability | `vulnerability.detected`, `.resurfaced`, `.fixed` | `IssueAutomationService.onVulnerabilityEvent` | same check-then-mark |
 
 - Redis keys: stream `oasm:events` (`MAXLEN` 100k, 7-day `EXPIRE` refreshed on every write), DLQ `oasm:events:dlq:<workspaceId>`, markers `event-bus:handled:<group>:<key>` (7 days).
 
@@ -41,8 +42,8 @@ The event bus. Domain events are written as CloudEvents to one Redis Stream (`EV
 
 ## Coupling
 
-- Imports `ServicesModule` (Redis, `RedisLockService`), `IntegrationsModule`, `ProjectsModule` and `IssuesModule` (the domain modules behind the integrations, projects and issues lanes); registers `AuditEvent`, `Notification`, `NotificationRecipient`, `User` and writes `audit_events`, `notifications`, `notification_recipients` directly.
-- The `projects` and `issues` lanes inject DI tokens exported by `ProjectsModule` and `IssuesModule` (`useExisting` on `ProjectsService`, `ProjectTriggersService`, `IssueAutomationService`). Loading this module therefore loads those modules' graphs (and, through `WorkspacesModule` → `NotificationsModule`, better-auth); `event-bridge.module.boot.spec.ts` mocks the three domain modules. Moving those lanes into the modules that own them, so the bridge depends on no domain module, is a follow-up.
+- Imports `ServicesModule` (Redis, `RedisLockService`) and `DiscoveryModule`, and no domain module; registers `AuditEvent`, `Notification`, `NotificationRecipient`, `User` and writes `audit_events`, `notifications`, `notification_recipients` directly.
+- The integrations, projects and issues lanes are providers of `IntegrationsModule`, `ProjectsModule` and `IssuesModule`. They import from this module (`EventSink`, idempotency, contracts, `SUBSCRIPTIONS`), never the other way round. A new domain lane is an `@EventLane()` provider in its own module plus its `EventBusGroup` and `SUBSCRIPTIONS` entry.
 - The events module imports `NOTIFICATION_CHANNEL_PREFIX` and `parseData`; the notifications module injects `NotificationsSink.deliver`.
 - Over a dozen services publish directly (projects, vulnerabilities, data-adapter, workers, issues, comments, agents tools, …) and over a dozen controllers use `@PublishEvent`. Grep `publishSafely(` and `@PublishEvent` before changing an envelope field.
 - The 47 persisted names mirror the audit module's action catalog; `event-catalog.spec.ts` asserts parity. Some audit rows bypass the bus entirely: `AuditService` writes them inside the caller's transaction (workspace delete, member removal/permissions, permission groups, `audit.exported`). Do not also decorate those handlers, or the action gets two rows.
@@ -58,4 +59,4 @@ The event bus. Domain events are written as CloudEvents to one Redis Stream (`EV
 
 ## Testing
 
-Specs sit next to the code (`publishing/`, `consuming/`, `routing/`, `contracts/`, most sinks). `event-bridge.module.boot.spec.ts` checks that every `EventBusGroup` has a sink wired into `EVENT_SINKS`. `consuming/stream-consumer.spec.ts` covers ack, retry and DLQ with a stub sink. There are no specs for `EventConsumersService`, `ProjectionSink`, `IntegrationsSink` itself or `stream-codec.ts`.
+Specs sit next to the code (`publishing/`, `consuming/`, `routing/`, `contracts/`, most sinks). `event-bridge.module.boot.spec.ts` checks that every lane class is marked `@EventLane()` and covers each `EventBusGroup` once, and that the module imports no domain module. `consuming/event-consumers.service.spec.ts` covers discovery across modules and the boot failures (missing or duplicated lane). `consuming/stream-consumer.spec.ts` covers ack, retry and DLQ with a stub sink. There are no specs for `ProjectionSink`, `IntegrationsSink` itself or `stream-codec.ts`.

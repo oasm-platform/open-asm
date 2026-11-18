@@ -1,14 +1,14 @@
 import { AuditActorType, AuditOutcome, Severity } from '@/common/enums/enum';
-import type { DetectedVulnerability } from '../../../contracts/event-payloads';
-import type { ConsumedEvent } from '../../../contracts/event-envelope';
-import { describeIncompleteSteps } from '../../shared/run-steps';
+import type { DetectedVulnerability } from '@/modules/event-bridge/contracts/event-payloads';
+import type { ConsumedEvent } from '@/modules/event-bridge/contracts/event-envelope';
+import { describeIncompleteSteps } from '@/modules/event-bridge/sinks/shared/run-steps';
 import { draftMessage } from './event-drafts';
 import { formatForAppType, renderMessage } from './render';
 
 /**
  * The view layer: full event payloads in, rendered chat text out.
  *
- * Run: task api:test:one SPEC=src/modules/event-bridge/sinks/integrations/messages/event-drafts.spec.ts
+ * Run: task api:test:one SPEC=src/modules/integrations/event-lane/messages/event-drafts.spec.ts
  */
 describe('event drafts + render', () => {
   const base: ConsumedEvent = {

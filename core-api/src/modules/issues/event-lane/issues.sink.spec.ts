@@ -1,6 +1,6 @@
 import { EventBusGroup } from '@/modules/event-bridge/enums/event-bridge.enums';
-import type { ConsumedEvent } from '../../contracts/event-envelope';
-import { SUBSCRIPTIONS } from '../../routing/subscriptions';
+import type { ConsumedEvent } from '@/modules/event-bridge/contracts/event-envelope';
+import { SUBSCRIPTIONS } from '@/modules/event-bridge/routing/subscriptions';
 import { issueFactOf, IssuesSink } from './issues.sink';
 
 const event = (payload: unknown, eventId = 'e-1'): ConsumedEvent => ({

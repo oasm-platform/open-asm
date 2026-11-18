@@ -2,12 +2,15 @@ import { ProjectTriggerEvent, RunOutcome, Severity } from '@/common/enums/enum';
 import { EventBusGroup } from '@/modules/event-bridge/enums/event-bridge.enums';
 import { RedisService } from '@/services/redis/redis.service';
 import { Inject, Injectable } from '@nestjs/common';
-import type { EventSink } from '../../consuming/event-sink';
-import { markEventHandled, wasEventHandled } from '../../consuming/idempotency';
-import type { EventName } from '../../contracts/event-catalog';
-import type { ConsumedEvent } from '../../contracts/event-envelope';
-import { readPayload } from '../../contracts/event-payloads';
-import { SUBSCRIPTIONS } from '../../routing/subscriptions';
+import type { EventSink } from '@/modules/event-bridge/consuming/event-sink';
+import { markEventHandled, wasEventHandled } from '@/modules/event-bridge/consuming/idempotency';
+import type { EventName } from '@/modules/event-bridge/contracts/event-catalog';
+import type { ConsumedEvent } from '@/modules/event-bridge/contracts/event-envelope';
+import { readPayload } from '@/modules/event-bridge/contracts/event-payloads';
+import { SUBSCRIPTIONS } from '@/modules/event-bridge/routing/subscriptions';
+import { EventLane } from '@/modules/event-bridge/consuming/event-lane.decorator';
+import { ProjectTriggersService } from '../project-triggers.service';
+import { ProjectsService } from '../projects.service';
 
 /** What the projects lane hands a discovery batch to. */
 export interface ProjectAssetDiscovery {
@@ -58,15 +61,6 @@ export interface ProjectTriggerEvents {
   onTriggerEvent(fact: ProjectTriggerFact): Promise<void>;
 }
 
-/**
- * DI tokens for {@link ProjectAssetDiscovery} and {@link ProjectTriggerEvents},
- * provided by `ProjectsModule`. Tokens rather than the classes, so loading the
- * bridge does not load the project services (and the tool/runner graph
- * behind them) at import time.
- */
-export const PROJECT_ASSET_DISCOVERY = Symbol('PROJECT_ASSET_DISCOVERY');
-export const PROJECT_TRIGGER_EVENTS = Symbol('PROJECT_TRIGGER_EVENTS');
-
 const TRIGGER_EVENTS: ReadonlySet<string> = new Set(
   Object.values(ProjectTriggerEvent),
 );
@@ -90,15 +84,16 @@ const isString = (value: unknown): value is string =>
  *
  * Not exclusive: both paths are safe to run on every replica.
  */
+@EventLane()
 @Injectable()
 export class ProjectsSink implements EventSink {
   readonly group = EventBusGroup.Projects;
   readonly domains = SUBSCRIPTIONS[EventBusGroup.Projects];
 
   constructor(
-    @Inject(PROJECT_ASSET_DISCOVERY)
+    @Inject(ProjectsService)
     private readonly projects: ProjectAssetDiscovery,
-    @Inject(PROJECT_TRIGGER_EVENTS)
+    @Inject(ProjectTriggersService)
     private readonly triggers: ProjectTriggerEvents,
     private readonly redis: RedisService,
   ) {}

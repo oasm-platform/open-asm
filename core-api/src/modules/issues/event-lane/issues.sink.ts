@@ -1,12 +1,14 @@
 import { EventBusGroup } from '@/modules/event-bridge/enums/event-bridge.enums';
 import { RedisService } from '@/services/redis/redis.service';
 import { Inject, Injectable } from '@nestjs/common';
-import type { EventSink } from '../../consuming/event-sink';
-import { markEventHandled, wasEventHandled } from '../../consuming/idempotency';
-import type { EventName } from '../../contracts/event-catalog';
-import type { ConsumedEvent } from '../../contracts/event-envelope';
-import { readPayload } from '../../contracts/event-payloads';
-import { SUBSCRIPTIONS } from '../../routing/subscriptions';
+import type { EventSink } from '@/modules/event-bridge/consuming/event-sink';
+import { markEventHandled, wasEventHandled } from '@/modules/event-bridge/consuming/idempotency';
+import type { EventName } from '@/modules/event-bridge/contracts/event-catalog';
+import type { ConsumedEvent } from '@/modules/event-bridge/contracts/event-envelope';
+import { readPayload } from '@/modules/event-bridge/contracts/event-payloads';
+import { SUBSCRIPTIONS } from '@/modules/event-bridge/routing/subscriptions';
+import { EventLane } from '@/modules/event-bridge/consuming/event-lane.decorator';
+import { IssueAutomationService } from '../issue-automation.service';
 
 /** A finding event the issues lane acts on, read from its payload. */
 export type IssueVulnerabilityFact =
@@ -31,13 +33,6 @@ export interface IssueVulnerabilityEvents {
   onVulnerabilityEvent(fact: IssueVulnerabilityFact): Promise<void>;
 }
 
-/**
- * DI token for {@link IssueVulnerabilityEvents}, provided by `IssuesModule`.
- * A token rather than the class so loading the bridge does not load the issue
- * services at import time.
- */
-export const ISSUE_VULNERABILITY_EVENTS = Symbol('ISSUE_VULNERABILITY_EVENTS');
-
 const HANDLED: ReadonlySet<string> = new Set([
   'vulnerability.detected',
   'vulnerability.resurfaced',
@@ -61,13 +56,14 @@ const isString = (value: unknown): value is string =>
  * event id is marked after the work so a redelivery is a no-op. Not
  * exclusive: the open-groupKey unique index settles races between replicas.
  */
+@EventLane()
 @Injectable()
 export class IssuesSink implements EventSink {
   readonly group = EventBusGroup.Issues;
   readonly domains = SUBSCRIPTIONS[EventBusGroup.Issues];
 
   constructor(
-    @Inject(ISSUE_VULNERABILITY_EVENTS)
+    @Inject(IssueAutomationService)
     private readonly issues: IssueVulnerabilityEvents,
     private readonly redis: RedisService,
   ) {}

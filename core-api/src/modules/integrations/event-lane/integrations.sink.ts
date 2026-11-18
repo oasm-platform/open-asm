@@ -6,11 +6,12 @@ import { decryptSensitiveConfigFields } from '@/modules/integrations/validators/
 import { RedisService } from '@/services/redis/redis.service';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { Injectable, Logger } from '@nestjs/common';
-import type { EventSink } from '../../consuming/event-sink';
-import { claimEventOnce } from '../../consuming/idempotency';
-import type { EventName } from '../../contracts/event-catalog';
-import type { ConsumedEvent } from '../../contracts/event-envelope';
-import { SUBSCRIPTIONS } from '../../routing/subscriptions';
+import { EventLane } from '@/modules/event-bridge/consuming/event-lane.decorator';
+import type { EventSink } from '@/modules/event-bridge/consuming/event-sink';
+import { claimEventOnce } from '@/modules/event-bridge/consuming/idempotency';
+import type { EventName } from '@/modules/event-bridge/contracts/event-catalog';
+import type { ConsumedEvent } from '@/modules/event-bridge/contracts/event-envelope';
+import { SUBSCRIPTIONS } from '@/modules/event-bridge/routing/subscriptions';
 import {
   eventForIntegration,
   isPushable,
@@ -54,6 +55,7 @@ const PUSHABLE_CAPABILITIES: IntegrationType[] = [
  * duplicates generated OUTSIDE our process (proxy retry, at-least-once
  * gateway).
  */
+@EventLane()
 @Injectable()
 export class IntegrationsSink implements EventSink {
   readonly group = EventBusGroup.Integrations;

@@ -1,15 +1,15 @@
 import { AuditOutcome, NotificationType, Severity } from '@/common/enums/enum';
-import type { VulnerabilityDetectedPayload } from '../../contracts/event-payloads';
+import type { VulnerabilityDetectedPayload } from '@/modules/event-bridge/contracts/event-payloads';
 import {
   eventForIntegration,
   isPushable,
   isTicketable,
   notificationTypeFor,
 } from './integration-delivery';
-import type { ConsumedEvent } from '../../contracts/event-envelope';
+import type { ConsumedEvent } from '@/modules/event-bridge/contracts/event-envelope';
 
 /**
- * Run: task api:test:one SPEC=src/modules/event-bridge/sinks/integrations/integration-delivery.spec.ts
+ * Run: task api:test:one SPEC=src/modules/integrations/event-lane/integration-delivery.spec.ts
  */
 describe('integration delivery policy', () => {
   const base: ConsumedEvent = {

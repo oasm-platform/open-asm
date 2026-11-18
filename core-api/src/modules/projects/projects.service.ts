@@ -22,7 +22,7 @@ import type { EventEnvelopeData } from '../event-bridge/contracts/event-envelope
 import type { ProjectAssetsAddedPayload } from '../event-bridge/contracts/event-payloads';
 import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
 import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
-import type { ProjectAssetDiscovery } from '../event-bridge/sinks/projects/projects.sink';
+import type { ProjectAssetDiscovery } from './event-lane/projects.sink';
 import type { CreateProjectDto } from './dto/create-project.dto';
 import {
   type GetProjectsQueryDto,

@@ -1,5 +1,5 @@
-import type { EventName } from '../../contracts/event-catalog';
-import type { ConsumedEvent } from '../../contracts/event-envelope';
+import type { EventName } from '@/modules/event-bridge/contracts/event-catalog';
+import type { ConsumedEvent } from '@/modules/event-bridge/contracts/event-envelope';
 
 /**
  * The structured body sent to an integration alongside the rendered `text`.

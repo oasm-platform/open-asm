@@ -1,3 +1,4 @@
+import { EventLane } from '../../consuming/event-lane.decorator';
 import {
   EVENT_BUS_AUDIT_LOCK_KEY,
   EVENT_BUS_AUDIT_LOCK_TTL_MS,
@@ -31,6 +32,7 @@ import { SUBSCRIPTIONS } from '../../routing/subscriptions';
  * list would interleave rows. The other lanes are order-independent and run on
  * every replica.
  */
+@EventLane()
 @Injectable()
 export class AuditSink implements EventSink {
   readonly group = EventBusGroup.Audit;

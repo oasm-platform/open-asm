@@ -5,12 +5,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ArtifactsModule } from '../artifacts/artifacts.module';
 import { Asset } from '../assets/entities/assets.entity';
 import { ConnectorsModule } from '../connectors/connectors.module';
-import {
-  PROJECT_ASSET_DISCOVERY,
-  PROJECT_TRIGGER_EVENTS,
-} from '../event-bridge/sinks/projects/projects.sink';
 import { Workflow } from '../workflows/entities/workflow.entity';
 import { Project } from './entities/project.entity';
+import { ProjectsSink } from './event-lane/projects.sink';
 import { ProjectArtifact } from './entities/project-artifact.entity';
 import { ProjectAsset } from './entities/project-asset.entity';
 import { ProjectScopeRule } from './entities/project-scope-rule.entity';
@@ -71,14 +68,10 @@ import { WorkflowsModule } from '../workflows/workflows.module';
     ProjectScheduleConsumer,
     ProjectTriggerEventsConsumer,
     ProjectRunEventsListener,
-    // The event bridge's projects lane hands discovery batches and the
-    // events of triggers here.
-    { provide: PROJECT_ASSET_DISCOVERY, useExisting: ProjectsService },
-    { provide: PROJECT_TRIGGER_EVENTS, useExisting: ProjectTriggersService },
+    // The `projects` lane of the event bus (found by EventConsumersService)
+    ProjectsSink,
   ],
   exports: [
-    PROJECT_ASSET_DISCOVERY,
-    PROJECT_TRIGGER_EVENTS,
     ProjectsService,
     ProjectAssetsService,
     ProjectFilesService,

@@ -1,6 +1,6 @@
 import { ProjectTriggerEvent, RunOutcome, Severity } from '@/common/enums/enum';
 import { EventBusGroup } from '@/modules/event-bridge/enums/event-bridge.enums';
-import type { ConsumedEvent } from '../../contracts/event-envelope';
+import type { ConsumedEvent } from '@/modules/event-bridge/contracts/event-envelope';
 import { factOf, ProjectsSink } from './projects.sink';
 
 const event = (payload: unknown, eventId = 'e-1'): ConsumedEvent => ({

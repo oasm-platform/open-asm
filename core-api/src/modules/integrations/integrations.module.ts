@@ -9,6 +9,7 @@ import { IntegrationSyncProcessor } from './integration-sync.processor';
 import { IntegrationsController } from './integrations.controller';
 import { AwsSsoService } from './connectors/aws/aws-sso.service';
 import { IntegrationConfigModule } from './integration-config.module';
+import { IntegrationsSink } from './event-lane/integrations.sink';
 import { IntegrationSyncService } from './integrations-sync.service';
 import { IntegrationsService } from './integrations.service';
 import { RepositorySyncProcessor } from './repository-sync.processor';
@@ -53,6 +54,8 @@ import { DataAdapterModule } from '../data-adapter/data-adapter.module';
     TelegramPollingService,
     TelegramBotService,
     AwsSsoService,
+    // The `integrations` lane of the event bus (found by EventConsumersService)
+    IntegrationsSink,
   ],
   exports: [IntegrationsService, TelegramConnectService],
 })
