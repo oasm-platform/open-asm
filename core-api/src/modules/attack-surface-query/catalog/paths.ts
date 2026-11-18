@@ -87,7 +87,7 @@ export function resolvePath(
             : `${current.name} has no field "${segment}".${suggest(segment, [
                 ...Object.keys(current.fields),
                 ...Object.keys(current.one).map((r) => `${r}.`),
-              ])}`,
+              ])} ${namesOf(current)}`,
         };
       }
       return { ok: true, value: { path, hops, owner: current, fieldName: segment, field } };
@@ -130,6 +130,18 @@ export function resolvePath(
     };
   }
   return { ok: false, code: 'UNKNOWN_FIELD', message: `"${path}" is empty` };
+}
+
+/**
+ * Every name valid on `res`, so a caller (the agent) fixes a wrong name in one
+ * step instead of guessing again.
+ */
+export function namesOf(res: ResourceDef): string {
+  const one = Object.keys(res.one);
+  const many = Object.keys(res.many);
+  return `(fields of ${res.name}: ${Object.keys(res.fields).join(', ')}${
+    one.length ? `; related rows: ${one.map((r) => `${r}.<field>`).join(', ')}` : ''
+  }${many.length ? `; lists (include or where only): ${many.join(', ')}` : ''})`;
 }
 
 function defaultFieldOf(catalog: Catalog, res: ResourceDef, relation: string): string {

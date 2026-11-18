@@ -58,7 +58,10 @@ const AGENT: AsqLimits = {
   maxLimit: 200,
   defaultIncludeLimit: 5,
   maxIncludeLimit: 20,
-  costBudget: 300,
+  // A full page (200 rows) of any resource, all time, with a total, and an
+  // all-time count fit; include fan-out and unindexed searches over large
+  // pages do not. The pre-flight EXPLAIN (maxPlannerCost) gates real size.
+  costBudget: 1000,
   maxPlannerCost: 50_000,
   maxSortRows: 50_000,
   statementTimeoutMs: 3_000,

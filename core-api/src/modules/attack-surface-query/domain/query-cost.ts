@@ -58,8 +58,13 @@ export function estimateCost(query: NormalizedQuery): QueryCostBreakdown {
   const joins = joinChains(allPaths).size;
   let cost = 10 + query.limit * (1 + 0.2 * joins);
 
-  cost += query.include.reduce((sum, inc) => sum + includeCost(query.limit, inc, query.limit), 0);
-  if (query.include.length > 0 && query.limit > 200) hints.add('lower limit: every included list is fetched for each row');
+  const includes = query.include.reduce((sum, inc) => sum + includeCost(query.limit, inc, query.limit), 0);
+  cost += includes;
+  if (includes > 200) {
+    hints.add(
+      'each include fetches up to its own limit per row: keep limit × include limit small (e.g. limit 50 with include limit 5), or query the child resource directly with a filter',
+    );
+  }
 
   const conds = conditions(query.where);
   for (const c of conds) {

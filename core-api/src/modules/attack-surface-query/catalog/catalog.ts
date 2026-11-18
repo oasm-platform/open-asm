@@ -156,6 +156,53 @@ export function buildCatalog(resources: readonly ResourceDef[]): Catalog {
 /** The catalog every query is checked against. */
 export const CATALOG: Catalog = buildCatalog(RESOURCES);
 
+/** Short type label of a field for the cheat sheet (text has none). */
+function typeLabel(field: FieldDef): string {
+  if (field.enumValues) return `:${field.enumValues.join('|')}`;
+  switch (field.type) {
+    case 'int':
+      return ':int';
+    case 'float':
+      return ':number';
+    case 'bool':
+      return ':bool';
+    case 'timestamp':
+      return ':time';
+    case 'ip':
+      return ':ip';
+    case 'uuid':
+      return ':id';
+    case 'textArray':
+      return ':list';
+    default:
+      return '';
+  }
+}
+
+/**
+ * One line per resource with its exact field names, types and relations, for
+ * the agent's tool description: the model sees the real names on every turn
+ * instead of guessing them. Never SQL or table names; `id` is left out (every
+ * resource has it).
+ */
+export function catalogCheatSheet(catalog: Catalog): string[] {
+  return Object.values(catalog)
+    .filter((res) => !res.global)
+    .map((res) => {
+      const fields = Object.entries(res.fields).filter(([name]) => name !== 'id');
+      const light = fields.filter(([, f]) => !f.heavy).map(([name, f]) => `${name}${typeLabel(f)}`);
+      const heavy = fields.filter(([, f]) => f.heavy).map(([name]) => name);
+      const one = Object.keys(res.one);
+      const parts = [
+        light.join(', '),
+        ...(heavy.length ? [`too large for the agent: ${heavy.join(', ')}`] : []),
+        ...(one.length ? [`related: ${one.join(', ')}`] : []),
+        ...(Object.keys(res.many).length ? [`lists: ${Object.keys(res.many).join(', ')}`] : []),
+      ];
+      return `${res.name}${res.root ? '' : ' (only through a relation)'}: ${parts.join('; ')}`;
+    });
+}
+
 export interface FieldDescription {
   name: string;
   type: FieldType;

@@ -1,13 +1,22 @@
 ---
 name: attack-surface-query
-description: How to read the workspace's attack surface with query_attack_surface — targets, hosts, open ports, HTTP titles and status codes, technologies, TLS certificates, URLs, IPs, DNS records, findings and counts. Covers the query language (from, select, include, where, window, groupBy/aggregate, orderBy, limit, cursor), the operators of each field type, the limits, the errors and ready-made queries. Load before the first query of a task, or when a query comes back with an error.
+description: How to read the workspace's attack surface with query_attack_surface — targets, hosts, open ports, HTTP titles and status codes, technologies, TLS certificates, URLs, IPs, DNS records, findings and counts. The rules that make the first call succeed, every field and operator, the cost budget, the errors and how to fix them, and ready-made queries. Load before the first query of a conversation, and again when a query comes back with an error.
 ---
 
 # Attack surface queries
 
-`query_attack_surface` is the one tool for reading what the workspace has recorded about its attack surface. It replaces the old per-topic lookups (`enumerate_assets`, `inspect_asset`, `examine_target_assets`, `list_network_ports`, `fingerprint_technologies`, `verify_tls_settings`, `discover_vulnerabilities`, `retrieve_targets`). Full details of one finding (description, PoC, remediation, evidence, timeline) still come from `investigate_vulnerability`; the dashboard score and trends from `gather_statistics`.
+`query_attack_surface` is the **only** way to read what the workspace recorded about its attack surface: targets, hosts, services (open ports), HTTP responses, technologies, TLS, URLs, IPs, DNS records, findings and counts. Any question about them — "which targets do I have", "what is open on X", "who runs nginx", "what is critical" — is answered with this tool, never from memory or from what an earlier message said. Full details of one finding (description, PoC, remediation, evidence, timeline) come from `investigate_vulnerability` with a finding `id`; the dashboard score and trends from `gather_statistics`.
 
-`describe_attack_surface` returns every resource, field, operator and relation you may use (only the ones your permissions allow). Call it when you are unsure of a name; the error of a wrong name also suggests the right one.
+## Rules — read before the first call
+
+1. **Only real names.** Use the resource and field names of this skill (the tool description lists them too). Never invent a field: `targets` has no `lastSeen`, `services` has no `host` field (it is the relation `host.value`). Unsure? `describe_attack_surface`.
+2. **One call per question.** Put every sub-question into one call as named queries (up to 5). Do not send a probing call first.
+3. **select vs include vs where.** `select` takes fields of the row and of its *related rows* (`host.value`, `http.title`, `target.value`). *Lists* (`services`, `technologies`, `vulnerabilities`, `urls`…) never go in `select`: fetch them with `include`, or test them in `where`.
+4. **Time.** No `window` = all time. Set `"window": { "since": "now-7d" }` only when the question is about something recent ("new", "this week").
+5. **Size.** `limit` ≤ 200 (default 50). Each `include` fetches up to its own `limit` (≤ 20, default 5) **per row**: keep `limit × include limit` small (50 × 5). For a big inventory, query the child resource directly with a filter instead of including it under 200 parents.
+6. **Totals only when needed.** `"withTotal": true` costs extra; a count is cheaper as an aggregate.
+7. **On an error, fix everything at once.** The error lists every problem with its path and the valid names. Fix all of them and resend the whole call once. Do not loop on guesses.
+8. **Quote, do not dump.** Answer from the rows (host, port, title, version, dates). Keep ids for follow-up calls (`investigate_vulnerability`, `propose_vulnerability`'s `assetId` = a host `id`), not for the user.
 
 ## The shape of a call
 
@@ -16,132 +25,119 @@ description: How to read the workspace's attack surface with query_attack_surfac
   "window": { "since": "now-7d" },
   "projectId": "<optional: restrict to one project's assets>",
   "queries": {
-    "<name>": { "from": "<resource>", "select": [...], "where": {...}, "limit": 50 },
-    "<other name>": { ... }
+    "<name>": { "from": "<resource>", "select": ["<field>", "<relation>.<field>"], "where": { "logic": "and", "items": [] }, "limit": 50 },
+    "<other name>": { "from": "<resource>", "groupBy": ["<field>"], "aggregate": { "n": { "fn": "count" } } }
   }
 }
 ```
 
-- One call runs up to **5 named queries**; each comes back under its name: `{ rows, nextCursor, total?, truncated }` or `{ error }`. One failing query does not stop the others. Batch related questions into one call.
+- Each query comes back under its name: `{ rows, nextCursor, total?, truncated }` or `{ error }`. One failing query does not stop the others.
 - The workspace is always the conversation's. In a project conversation every query is locked to that project; `projectId` only applies outside one. `rollups` cannot be read inside a project.
-- Every row has an `id`. Related rows come back nested: `"host.value"` lands in `{ "host": { "value": … } }`; a missing related row is `null`.
+- Rows are nested: `"host.value"` comes back as `{ "host": { "value": … } }`; a missing related row is `null`. Every row has an `id`.
 
-## Resources
+## Resources and fields
 
-| from | what a row is | time field (for `window`) |
-|---|---|---|
-| `targets` | a scan root: domain, IP, CIDR, Git organization | `firstSeen` |
-| `hosts` | a domain, subdomain, IP (or repository) found under a target | `firstSeen` |
-| `services` | one open port of a host | `firstSeen` |
-| `technologies` | a technology seen in a service's **latest** HTTP response | `firstSeen` |
-| `tls` | the TLS certificate of a service's **latest** HTTP response | `firstSeen` |
-| `urls` | a URL discovered on a service | `firstSeen` |
-| `ips` | an IP a host resolves to (DNS A/AAAA) | `firstSeen` |
-| `dnsRecords` | a DNS record of a host | `firstSeen` |
-| `vulnerabilities` | an approved finding (AI proposals under review never appear) | `firstSeen` |
-| `rollups` | pre-computed counts: `metric` (port, technology, webserver, statusCode, tlsVersion), `key`, `value` | none |
+| from | a row is | fields (`id` on every row) | related (select `x.field`) | lists (include / where) |
+|---|---|---|---|---|
+| `targets` | a scan root | `value`, `type` (DOMAIN, CIDR, IP, GIT_ORG), `firstSeen` | – | `hosts` |
+| `hosts` | a domain, subdomain, IP or repository under a target | `value`, `kind` (domain, ip, repository), `isPrimary`, `isEnabled`, `firstSeen`, `lastSeen`, `isNew` | `target` | `services`, `ips`, `dnsRecords`, `vulnerabilities` |
+| `services` | one open port of a host | `value` (host:port), `port`, `isErrorPage`, `firstSeen`, `lastSeen`, `isNew` | `host`, `target`, `http` | `technologies`, `tls`, `statusCodes`, `urls`, `tags` |
+| `technologies` | a technology in a service's latest HTTP response | `name`, `version`, `firstSeen` | `service` | – |
+| `tls` | the certificate of a service's latest HTTP response | `host`, `port`, `tlsVersion`, `cipher`, `subjectCn`, `issuerCn`, `notBefore`, `notAfter`, `daysToExpiry`, `wildcard`, `fingerprintSha256`, `firstSeen` | `service` | – |
+| `urls` | a URL discovered on a service | `url`, `firstSeen`, `isNew` | `service` | – |
+| `ips` | an IP a host resolves to | `ip`, `source` (dns_a, dns_aaaa), `firstSeen` | `host` | – |
+| `dnsRecords` | a DNS record of a host | `recordType`, `value`, `firstSeen` | `host` | – |
+| `vulnerabilities` | an approved finding | `name`, `severity` (info, low, medium, high, critical), `cvssScore`, `epssScore`, `cve`, `cwe`, `tags`, `ports`, `affectedUrl`, `detectionStatus` (new, active, resurfaced, fixed), `isOpen`, `firstSeen`, `lastSeen`, `fixedAt` | `host`, `tool` | – |
+| `rollups` | a pre-computed count | `metric` (port, technology, webserver, statusCode, tlsVersion), `key`, `value`, `computedAt` | – | – |
 
-Reached only through a relation: `http` (a service's latest HTTP response), `statusCodes`, `tags`, `tools`.
+Only through a relation: `http` = a service's latest HTTP response (`url`, `title`, `statusCode`, `webserver`, `scheme`, `contentType`, `contentLength`, `faviconMd5`, `failed`, `probedAt`; `body`/`rawHeader`/`header` are too large for the agent), `statusCodes` (`statusCode`, `isPrimary`, `chainIndex`), `tags` (`tag`), `tools` (`name`).
 
-### Fields
-
-- **targets**: `value`, `type` (DOMAIN, IP, CIDR, GIT_ORG), `firstSeen`.
-- **hosts**: `value`, `kind` (domain | ip | repository), `isPrimary`, `isEnabled`, `firstSeen`, `lastSeen`, `isNew`.
-- **services**: `value` (host:port), `port`, `isErrorPage`, `firstSeen`, `lastSeen`, `isNew`.
-- **http**: `url`, `title`, `statusCode`, `webserver`, `scheme`, `contentType`, `contentLength`, `faviconMd5`, `failed`, `probedAt`. (`body`, `rawHeader`, `header` are too large: refused to the agent.)
-- **technologies**: `name`, `version`, `firstSeen`.
-- **tls**: `host`, `port`, `tlsVersion`, `cipher`, `subjectCn`, `issuerCn`, `notBefore`, `notAfter`, `daysToExpiry` (negative when expired), `wildcard`, `fingerprintSha256`, `firstSeen`.
-- **statusCodes**: `statusCode`, `isPrimary` (false = a redirect hop), `chainIndex`. **tags**: `tag`.
-- **urls**: `url`, `firstSeen`, `isNew`. **ips**: `ip`, `source` (dns_a | dns_aaaa), `firstSeen`. **dnsRecords**: `recordType`, `value`, `firstSeen`.
-- **vulnerabilities**: `name`, `severity` (info | low | medium | high | critical), `cvssScore`, `epssScore`, `cve`, `cwe`, `tags`, `ports` (lists), `affectedUrl`, `detectionStatus` (new | active | resurfaced | fixed), `isOpen` (approved, still detected and not dismissed: the "open" count of every screen), `firstSeen`, `lastSeen`, `fixedAt`.
-
-`isNew` = found by the latest finished run of its workflow on that target (the "new" badge of the console).
-
-### Relations
-
-| from | single related row (select `name.field`) | lists (`include`, or test in `where`) |
-|---|---|---|
-| targets | – | `hosts` |
-| hosts | `target` | `services`, `ips`, `dnsRecords`, `vulnerabilities` |
-| services | `host`, `target`, `http` | `technologies`, `tls`, `statusCodes`, `urls`, `tags` |
-| technologies, tls, urls | `service` | – |
-| ips, dnsRecords | `host` | – |
-| vulnerabilities | `host`, `tool` | – |
-
-Dot paths chain single relations, at most two hops in `select` (`service.host.value`, `host.target.value`).
-
-## select and include
-
-- `select`: fields of the resource and of its single related rows. Omit it to get a small default set. At most 20 fields.
-- `include`: lists of related rows per result row, each with its own `select`, `where`, `orderBy` and `limit` (default 5, max 20 per row), nested at most 2 levels, 3 per query.
-
-```json
-{ "from": "hosts", "select": ["value", "target.value"],
-  "include": { "services": { "select": ["port", "http.title"], "limit": 10 } } }
-```
-
-A list relation in `select` is an error (`"technologies" is a list … use include.technologies`).
+- `isNew`: found by the latest finished run of its workflow on that target (the "new" badge).
+- `isOpen`: approved, still detected and not dismissed — the "open" count of every screen. AI proposals under review never appear.
+- `cve`, `cwe`, `tags`, `ports` of a finding are lists of strings.
+- Dot paths chain at most two related rows in `select` (`service.host.value`).
 
 ## where
 
 ```json
-{ "logic": "and", "items": [
+{ "queries": { "exposed": { "from": "services", "select": ["host.value", "port", "http.title"], "where": { "logic": "and", "items": [
   { "field": "port", "op": "in", "value": ["80", "443", "8080"] },
   { "logic": "or", "conditions": [
     { "field": "http.title", "op": "contains", "value": "admin" },
-    { "field": "technologies.name", "op": "eq", "value": "Jenkins" } ] } ] }
+    { "field": "technologies.name", "op": "eq", "value": "Jenkins" } ] } ] } } } }
 ```
 
-- Up to 20 items; an item is a condition or one group (`logic` + `conditions`). Values are strings, or arrays of strings for `in`/`notIn`/`inSubnet`.
-- A **list path** (`technologies.name`, `vulnerabilities.severity`, `services.port`) means "has at least one related row that matches". With a negative operator (`neq`, `notIn`, `notContains`) it means "has **no** related row that matches".
+- Up to 20 items; an item is a condition or one group (`logic` + `conditions`). Values are **strings**, or arrays of strings for `in`/`notIn`/`inSubnet`.
+- A **list path** (`technologies.name`, `vulnerabilities.severity`, `services.port`) means "has at least one related row that matches"; with `neq`/`notIn`/`notContains` it means "has **no** related row that matches".
 
 | field type | operators | value |
 |---|---|---|
 | text | eq, neq, contains, notContains, in, notIn | `contains` is case-insensitive |
-| int | eq, neq, in, notIn, gt, gte, lt, lte | `"443"` |
-| float | eq, neq, gt, gte, lt, lte | `"7.5"` |
-| bool | eq | `"true"` / `"false"` |
-| enum | eq, neq, in, notIn | one of the listed values |
-| uuid (`id`) | eq, neq, in, notIn | an id |
+| int (`port`, `statusCode`…) | eq, neq, in, notIn, gt, gte, lt, lte | `"443"` |
+| number (`cvssScore`, `epssScore`) | eq, neq, gt, gte, lt, lte | `"7.5"` |
+| bool (`isOpen`, `isNew`…) | eq | `"true"` / `"false"` |
+| enum (`type`, `kind`, `severity`…) | eq, neq, in, notIn | one of the listed values |
+| id | eq, neq, in, notIn | an id from an earlier row |
 | ip | eq, neq, in, notIn, inSubnet | `"10.0.0.1"`; inSubnet takes CIDRs: `["10.0.0.0/8"]` |
-| timestamp | gt, gte, lt, lte | a time (below) |
-| list (cve, cwe, tags, ports) | eq, neq, contains, in, notIn | eq/in: contains that element |
+| time | gt, gte, lt, lte | a time (below) |
+| list (`cve`, `cwe`, `tags`, `ports`) | eq, neq, contains, in, notIn | eq/in: contains that element |
+
+`contains` on `value`, `url`, `title`, `name` of findings is slower than `eq`/`in`: prefer exact values when you have them.
 
 ## Time
 
 - A time is `now`, `now-<n><m|h|d|w>` (`now-30m`, `now-24h`, `now-7d`, `now-2w`), `now+<n><unit>` in filters only (`notAfter lt now+30d`), or ISO 8601 **with an offset** (`2026-11-01T00:00:00Z`).
-- `window: { since, until? }` keeps rows whose time field is in `[since, until)`; on the batch it applies to every query, on a query it overrides the batch. The field is the resource's time field, or `windowField` (e.g. `"windowField": "lastSeen"`). `"window": null` on a query means all time.
-- `rollups` has no time field: give it `"window": null` when the batch has a window.
+- `window: { since, until? }` keeps rows whose time field (`firstSeen`, or `windowField`, e.g. `"windowField": "lastSeen"`) is in `[since, until)`. On the call it applies to every query; on a query it overrides the call's; `"window": null` on a query means all time.
+- `rollups` has no time field: give it `"window": null` when the call has a window.
 
 ## Counting and grouping
 
-```json
-{ "from": "services", "groupBy": ["port"],
-  "aggregate": { "hosts": { "fn": "countDistinct", "field": "host.id" } },
-  "orderBy": [{ "field": "hosts", "dir": "desc" }], "limit": 20 }
-```
-
-- `fn`: `count` (no field = rows), `countDistinct`, `min`, `max`, `avg` (numbers). Up to 5 aggregates and 3 group keys.
-- Group a time with a bucket: `{ "field": "firstSeen", "bucket": "hour" | "day" | "week" | "month" }`.
-- An aggregate query has no `select`, `include`, `cursor` or `withTotal`; its `orderBy` names a group key or an aggregate.
-- For workspace-wide distributions prefer `rollups` (refreshed every 15 minutes, instant).
+- `aggregate: { "<name>": { "fn": "count" | "countDistinct" | "min" | "max" | "avg", "field"?: "…" } }` (count without a field counts rows; avg needs a number). Up to 5 aggregates, 3 group keys.
+- `groupBy` takes groupable fields, related ones too (`target.value`, `host.value`). A time needs a bucket: `{ "field": "firstSeen", "bucket": "hour" | "day" | "week" | "month" }`.
+- An aggregate query has no `select`, `include`, `cursor` or `withTotal`; its `orderBy` names a group key or an aggregate name.
+- Workspace-wide distributions (ports, technologies, webservers, status codes, TLS versions) are instant in `rollups` (refreshed every 15 minutes).
 
 ## Order, paging, totals
 
-- `orderBy: [{ "field", "dir": "asc" | "desc" }]`, at most 3. Default: newest first. Sorting on fields marked `sortable` in `describe_attack_surface`; sorting on a related row's field is allowed only when the filter keeps the row set small.
-- `limit`: default 50, max 200. When more rows exist, `nextCursor` is set: repeat the **same** query with `"cursor": "<nextCursor>"` (a cursor of another query or filter is refused).
-- `"withTotal": true` adds `total` (capped at 10 000, `totalCapped`). It costs extra: ask only when you need the number.
+- `orderBy: [{ "field", "dir": "asc" | "desc" }]`, at most 3. Default newest first. Sortable: `firstSeen`, `lastSeen`, `port`, `notAfter`, `value` (targets, hosts), `name` (technologies), `title` / `statusCode` (http), `cvssScore` / `epssScore` (findings), `value` (rollups).
+- More rows than `limit`: `nextCursor` is set; resend the **same** query with `"cursor": "<nextCursor>"`.
+- `"withTotal": true` adds `total` (capped at 10 000).
 
-## Limits and errors
+## Limits and cost
 
-- Agent limits: 5 queries per call, 200 rows per query, a cost budget per query, 3 s per statement, 64 KB per response (strings over 512 characters are cut, `truncated: true`).
-- `INVALID_QUERY`: `issues: [{ path, code, message }]`, every problem at once, with "Did you mean" hints. Fix all of them and call again.
-- `COST_EXCEEDED`: the query is too broad; `hints` say what to change (add a window, filter on an indexed field with eq/in instead of contains, lower the limit, fewer includes).
-- `PERMISSION_DENIED`: the member cannot read a resource the query touches (e.g. `vulnerabilities` without vulnerability.read). Drop that part.
-- `QUERY_TIMEOUT` / `BUSY`: narrow the query, or retry once.
-- Never guess field names from the old tools' output: use the names above or `describe_attack_surface`.
+- Per call: 5 queries; per query: 200 rows, 20 selected fields, 3 includes in total (nested ones count) at most 2 deep, include limit 20; 3 s per statement; 64 KB per answer (long strings are cut, `truncated: true`).
+- Every query has a cost budget. A full page of any resource over all time with a total, or an all-time count, fits. What does not: includes that multiply rows (200 parents × 20 children), `contains` searches on large pages, too many related fields on 200 rows.
+- `COST_EXCEEDED` comes with `hints`: follow them (lower `limit` or the include `limit`, use `eq`/`in`, query the child resource directly).
+
+## Errors and how to fix them
+
+| error | typical cause | fix |
+|---|---|---|
+| `UNKNOWN_FIELD` | a guessed name (`targets.lastSeen`) | use a name from the message: it lists every field of that resource |
+| `UNKNOWN_RELATION` / "is a list" | a list in `select` (`technologies.name`) | move it to `include`, or test it in `where` |
+| `NOT_GROUPABLE` / `NOT_SORTABLE` | a field that cannot be grouped or sorted | pick one from the list in the message; a time needs a bucket |
+| `OP_NOT_ALLOWED` / `INVALID_VALUE` | `contains` on a number, a non-string value, a bad enum | see the operator table; values are strings |
+| `INVALID_TIME` | `"7 days ago"`, an ISO time without offset | `now-7d`, `2026-11-01T00:00:00Z` |
+| `COST_EXCEEDED` | include fan-out, broad `contains` | follow `hints` |
+| `PERMISSION_DENIED` | the member cannot read that resource | drop that query and say what you could not read |
+| `QUERY_TIMEOUT` / `BUSY` | a heavy query, a busy database | narrow it, or retry once |
 
 ## Recipes
+
+Targets, with how many hosts each has:
+
+```json
+{ "queries": {
+  "targets": { "from": "targets", "select": ["value", "type", "firstSeen"], "limit": 200 },
+  "hostsPerTarget": { "from": "hosts", "groupBy": ["target.value"], "aggregate": { "hosts": { "fn": "count" } }, "orderBy": [{ "field": "hosts", "dir": "desc" }], "limit": 200 } } }
+```
+
+The hosts of one target:
+
+```json
+{ "queries": { "hosts": { "from": "hosts", "select": ["value", "kind", "isPrimary", "lastSeen"], "limit": 200,
+  "where": { "logic": "and", "items": [{ "field": "target.value", "op": "eq", "value": "example.com" }] } } } }
+```
 
 What was found recently:
 
@@ -154,84 +150,78 @@ What was found recently:
                    "where": { "logic": "and", "items": [{ "field": "isOpen", "op": "eq", "value": "true" }] } } } }
 ```
 
-Targets and the hosts under one target:
+Everything known about one host (at most 3 includes per query, nested ones count: the IPs are a second query of the same call):
 
 ```json
 { "queries": {
-  "targets": { "from": "targets", "select": ["value", "type"], "window": null, "limit": 200 },
-  "hosts": { "from": "hosts", "select": ["value", "isPrimary"], "window": null,
-             "where": { "logic": "and", "items": [{ "field": "target.value", "op": "eq", "value": "example.com" }] } } } }
+  "host": { "from": "hosts", "select": ["value", "kind", "firstSeen", "lastSeen", "target.value"], "limit": 1,
+    "where": { "logic": "and", "items": [{ "field": "value", "op": "eq", "value": "api.example.com" }] },
+    "include": {
+      "services": { "select": ["port", "http.title", "http.statusCode", "http.webserver"], "limit": 20,
+                    "include": { "technologies": { "select": ["name", "version"] } } },
+      "vulnerabilities": { "select": ["name", "severity", "detectionStatus"], "limit": 20 } } },
+  "ips": { "from": "ips", "select": ["ip", "source"],
+           "where": { "logic": "and", "items": [{ "field": "host.value", "op": "eq", "value": "api.example.com" }] } } } }
 ```
 
-Everything known about one host (instead of inspect_asset):
+Inventory overview (counts, no rows):
 
 ```json
-{ "queries": { "host": { "from": "hosts", "select": ["value", "kind", "firstSeen", "lastSeen", "target.value"], "window": null,
-  "where": { "logic": "and", "items": [{ "field": "value", "op": "eq", "value": "api.example.com" }] },
-  "include": {
-    "services": { "select": ["port", "http.title", "http.statusCode", "http.webserver"], "limit": 20,
-                  "include": { "technologies": { "select": ["name", "version"] } } },
-    "ips": { "select": ["ip"] },
-    "vulnerabilities": { "select": ["name", "severity", "detectionStatus"], "limit": 20 } } } } }
+{ "queries": {
+  "hostsByKind": { "from": "hosts", "groupBy": ["kind"], "aggregate": { "n": { "fn": "count" } } },
+  "portsOpen": { "from": "services", "groupBy": ["port"], "aggregate": { "hosts": { "fn": "countDistinct", "field": "host.id" } }, "orderBy": [{ "field": "hosts", "dir": "desc" }], "limit": 20 },
+  "openBySeverity": { "from": "vulnerabilities", "groupBy": ["severity"], "aggregate": { "n": { "fn": "count" } },
+                      "where": { "logic": "and", "items": [{ "field": "isOpen", "op": "eq", "value": "true" }] } },
+  "topTech": { "from": "rollups", "select": ["key", "value"], "limit": 20,
+               "where": { "logic": "and", "items": [{ "field": "metric", "op": "eq", "value": "technology" }] } } } }
 ```
 
 Exposure checks:
 
 ```json
 { "queries": {
-  "adminPanels": { "from": "services", "select": ["host.value", "port", "http.title"], "window": null,
+  "adminPanels": { "from": "services", "select": ["host.value", "port", "http.title"], "limit": 100,
                    "where": { "logic": "or", "items": [
                      { "field": "http.title", "op": "contains", "value": "admin" },
                      { "field": "http.title", "op": "contains", "value": "login" } ] } },
-  "riskyPorts": { "from": "services", "select": ["host.value", "port"], "window": null,
+  "riskyPorts": { "from": "services", "select": ["host.value", "port", "http.title"], "limit": 200,
                   "where": { "logic": "and", "items": [{ "field": "port", "op": "in", "value": ["21", "23", "445", "3306", "3389", "5432", "6379", "9200", "27017"] }] } },
-  "expiringTls": { "from": "tls", "select": ["host", "port", "notAfter", "issuerCn"], "window": null,
+  "expiringTls": { "from": "tls", "select": ["host", "port", "notAfter", "issuerCn"],
                    "where": { "logic": "and", "items": [{ "field": "notAfter", "op": "lt", "value": "now+30d" }] },
                    "orderBy": [{ "field": "notAfter", "dir": "asc" }] },
-  "inRange": { "from": "ips", "select": ["ip", "host.value"], "window": null,
+  "inRange": { "from": "ips", "select": ["ip", "host.value"],
                "where": { "logic": "and", "items": [{ "field": "ip", "op": "inSubnet", "value": ["203.0.113.0/24"] }] } } } }
 ```
 
-Who runs a technology (and which version):
+Who runs a technology, and which versions:
 
 ```json
 { "queries": {
-  "nginx": { "from": "technologies", "select": ["name", "version", "service.host.value", "service.port"], "window": null,
-             "where": { "logic": "and", "items": [{ "field": "name", "op": "eq", "value": "nginx" }] }, "limit": 100 },
+  "nginx": { "from": "technologies", "select": ["name", "version", "service.host.value", "service.port"], "limit": 100,
+             "where": { "logic": "and", "items": [{ "field": "name", "op": "eq", "value": "nginx" }] } },
   "versions": { "from": "technologies", "groupBy": ["name", "version"], "aggregate": { "services": { "fn": "count" } },
-                "orderBy": [{ "field": "services", "dir": "desc" }], "window": null, "limit": 50 } } }
+                "orderBy": [{ "field": "services", "dir": "desc" }], "limit": 50 } } }
 ```
 
-Findings (instead of discover_vulnerabilities; then `investigate_vulnerability` with an `id` for the details):
+Findings (then `investigate_vulnerability` with an `id` for the details):
 
 ```json
 { "queries": {
-  "open": { "from": "vulnerabilities", "select": ["name", "severity", "cvssScore", "cve", "host.value", "detectionStatus"], "window": null,
+  "open": { "from": "vulnerabilities", "select": ["name", "severity", "cvssScore", "cve", "host.value", "detectionStatus"], "limit": 100,
             "where": { "logic": "and", "items": [
               { "field": "isOpen", "op": "eq", "value": "true" },
               { "field": "severity", "op": "in", "value": ["critical", "high"] } ] },
             "orderBy": [{ "field": "cvssScore", "dir": "desc" }] },
-  "byCve": { "from": "vulnerabilities", "select": ["name", "host.value"], "window": null,
+  "byCve": { "from": "vulnerabilities", "select": ["name", "host.value"],
              "where": { "logic": "and", "items": [{ "field": "cve", "op": "eq", "value": "CVE-2024-3400" }] } },
-  "bySeverity": { "from": "vulnerabilities", "groupBy": ["severity"], "aggregate": { "n": { "fn": "count" } }, "window": null,
-                  "where": { "logic": "and", "items": [{ "field": "isOpen", "op": "eq", "value": "true" }] } },
-  "hostsWithCritical": { "from": "hosts", "select": ["value"], "window": null,
+  "hostsWithCritical": { "from": "hosts", "select": ["value", "target.value"],
                          "where": { "logic": "and", "items": [{ "field": "vulnerabilities.severity", "op": "eq", "value": "critical" }] } } } }
 ```
 
-Trends and distributions:
+Trends:
 
 ```json
 { "window": { "since": "now-30d" }, "queries": {
   "hostsPerDay": { "from": "hosts", "groupBy": [{ "field": "firstSeen", "bucket": "day" }], "aggregate": { "n": { "fn": "count" } }, "limit": 31 },
-  "topPorts": { "from": "rollups", "select": ["key", "value"], "window": null,
-                "where": { "logic": "and", "items": [{ "field": "metric", "op": "eq", "value": "port" }] }, "limit": 20 } } }
+  "findingsPerWeek": { "from": "vulnerabilities", "groupBy": [{ "field": "firstSeen", "bucket": "week" }, "severity"], "aggregate": { "n": { "fn": "count" } }, "limit": 50 } } }
 ```
-
-## Method
-
-1. Start from what the workspace already knows: one batched call that answers the whole question beats many small ones.
-2. Ask for the fields you will use, not everything; add `include` only when you need the related rows of each result.
-3. Filter in the query (`where`, `window`), not in your head: a 200-row page you then skim is slower and less complete.
-4. When `nextCursor` is set and you need the rest, page with it; otherwise say how many you looked at (`withTotal`) instead of implying you saw everything.
-5. Quote values from the rows (host, port, title, version, dates) in your answer; ids are for follow-up calls (`investigate_vulnerability`, `propose_vulnerability`'s `assetId` = a host's `id`), not for the user.

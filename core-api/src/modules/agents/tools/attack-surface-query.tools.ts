@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
 
 import { AttackSurfaceQueryService } from '@/modules/attack-surface-query/attack-surface-query.service';
+import { CATALOG, catalogCheatSheet } from '@/modules/attack-surface-query/catalog/catalog';
 import { AsqError } from '@/modules/attack-surface-query/domain/query-errors';
 import type { QueryScope } from '@/modules/attack-surface-query/domain/query.types';
 import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
@@ -25,13 +26,12 @@ const queryInput = z.object({
 });
 
 const QUERY_DESCRIPTION = [
-  "Read the workspace's attack surface: targets, hosts, services (open ports), the latest HTTP response, technologies, TLS certificates, discovered URLs, IPs, DNS records, findings (vulnerabilities) and pre-computed counts (rollups). Use it for every listing, filter, lookup by id and count of these.",
-  'Load the attack-surface-query skill (load_skill) before the first query of a task: it explains the language and has ready-made queries. describe_attack_surface lists every resource, field and operator you may use.',
-  'Each query: from (resource), select (fields; dot paths reach a related row: "host.value", "http.title"), include (lists of related rows: { "technologies": { "select": ["name"], "limit": 5 } }),',
-  'where ({ "logic": "and"|"or", "items": [ { "field", "op": eq|neq|contains|notContains|in|notIn|inSubnet|gt|gte|lt|lte, "value": string | string[] } ] }; "technologies.name" in where means "has a related row"),',
-  'window ({ "since": "now-5d" } on firstSeen; "window": null for all time), groupBy + aggregate ({ "n": { "fn": "count" } }, countDistinct/min/max/avg), orderBy, limit (max 200), cursor (from nextCursor).',
-  'Times: now, now-<n><m|h|d|w>, or ISO 8601 with an offset. projectId restricts every query to that project\'s assets. Errors come back as { error: { code, issues: [{ path, message }] } }: fix the query and call again.',
-  'Example: { "window": { "since": "now-5d" }, "queries": { "newPorts": { "from": "services", "select": ["port", "host.value", "http.title"] }, "byPort": { "from": "services", "groupBy": ["port"], "aggregate": { "hosts": { "fn": "countDistinct", "field": "host.id" } } } } }',
+  "The only tool for the workspace's attack surface: targets, hosts, services (open ports), HTTP responses, technologies, TLS certificates, URLs, IPs, DNS records, findings (vulnerabilities) and counts (rollups). Use it for every question about them (lists, lookups, filters, counts); never answer one from memory or from earlier messages.",
+  'Rules: (1) use only the resource and field names listed below, unknown names are errors; (2) answer the whole question in one call, up to 5 named queries; (3) select = fields of the row or of a related row ("host.value", "http.title"); lists (technologies, services, vulnerabilities…) go in include or where, never in select; (4) no window = all time, "window": { "since": "now-7d" } = recent only (on firstSeen); (5) limit ≤ 200, include limit ≤ 20, keep limit × include limit small; (6) on an error, read every issue (it lists the valid names) and resend the whole call fixed, once.',
+  'Shape: { "queries": { "<name>": { "from": "<resource>", "select": [...], "where": { "logic": "and", "items": [ { "field": "port", "op": "in", "value": ["80", "443"] } ] }, "include": { "<list>": { "select": [...], "limit": 5 } }, "orderBy": [ { "field": "firstSeen", "dir": "desc" } ], "limit": 50 } } }. Count: { "from": "services", "groupBy": ["port"], "aggregate": { "n": { "fn": "count" } } }. Values are strings; times are now, now-<n><m|h|d|w> or ISO 8601 with an offset. More rows: resend the same query with "cursor": <nextCursor>.',
+  'Resources (name:type, text when no type; every row also has id; related: select "<relation>.<field>"; lists: include or where):',
+  ...catalogCheatSheet(CATALOG),
+  'Operators per type, aggregates, paging and ready-made queries: load_skill "attack-surface-query". projectId restricts every query to that project\'s assets.',
 ];
 
 /**

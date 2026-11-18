@@ -1,6 +1,7 @@
 import { CATALOG } from '../catalog/catalog';
 import { AsqError } from './query-errors';
-import { estimateCost } from './query-cost';
+import { assertWithinBudget, estimateCost } from './query-cost';
+import { limitsFor } from './query-limits';
 import type { QueryScope } from './query.types';
 import { parseBatch, validateBatch } from './query-validator';
 
@@ -215,6 +216,71 @@ describe('validateBatch', () => {
       .queries[0].signature;
     expect(a).toBe(b);
     expect(a).not.toBe(c);
+  });
+});
+
+describe('errors an agent can fix in one step', () => {
+  it('lists the fields of the resource when a field is unknown', () => {
+    const [issue] = issuesOf(() => validate({ queries: { t: { from: 'targets', select: ['lastSeen'] } } }));
+    expect(issue.code).toBe('UNKNOWN_FIELD');
+    expect(issue.message).toMatch(/fields of targets: id, value, type, firstSeen/);
+  });
+
+  it('lists the groupable fields when a group key is not one', () => {
+    const [issue] = issuesOf(() =>
+      validate({ queries: { h: { from: 'hosts', groupBy: ['isPrimary'], aggregate: { n: { fn: 'count' } } } } }),
+    );
+    expect(issue.code).toBe('NOT_GROUPABLE');
+    expect(issue.message).toMatch(/groupable: value, kind, firstSeen \(with a bucket\), lastSeen \(with a bucket\)/);
+  });
+
+  it('lists the sortable fields when a sort key is not one', () => {
+    const [issue] = issuesOf(() =>
+      validate({ queries: { s: { from: 'services', orderBy: [{ field: 'isErrorPage', dir: 'asc' }] } } }),
+    );
+    expect(issue.code).toBe('NOT_SORTABLE');
+    expect(issue.message).toMatch(/sortable: port, firstSeen, lastSeen/);
+  });
+
+  it('groups hosts by their target', () => {
+    expect(() =>
+      validate({ queries: { h: { from: 'hosts', groupBy: ['target.value'], aggregate: { n: { fn: 'count' } }, window: null } } }),
+    ).not.toThrow();
+  });
+});
+
+describe('agent cost budget', () => {
+  const AGENT: QueryScope = { ...ALL, caller: 'agent' };
+  const agentLimits = limitsFor('agent', 'interactive');
+  const roots = Object.values(CATALOG).filter((r) => r.root);
+
+  it.each(roots.map((r) => r.name))('lets the agent list a full page of %s, all time, with a total', (from) => {
+    const [query] = validate({ queries: { q: { from, limit: 200, window: null, withTotal: true } } }, AGENT).queries;
+    expect(() => assertWithinBudget(query, agentLimits)).not.toThrow();
+  });
+
+  it.each(roots.map((r) => r.name))('lets the agent count %s over all time', (from) => {
+    const res = CATALOG[from];
+    const plain = Object.entries(res.fields).find(([, f]) => f.groupable && f.type !== 'timestamp');
+    // A resource without a plain group key (urls) is counted per day.
+    const key = plain ? plain[0] : { field: res.defaultTimeField!, bucket: 'day' };
+    const [query] = validate({ queries: { q: { from, groupBy: [key], aggregate: { n: { fn: 'count' } }, window: null } } }, AGENT).queries;
+    expect(() => assertWithinBudget(query, agentLimits)).not.toThrow();
+  });
+
+  it('refuses an include that multiplies rows, and says so', () => {
+    const [query] = validate(
+      { queries: { h: { from: 'hosts', limit: 200, window: null, include: { services: { limit: 20 } } } } },
+      AGENT,
+    ).queries;
+    expect(() => assertWithinBudget(query, agentLimits)).toThrow(
+      expect.objectContaining({
+        code: 'COST_EXCEEDED',
+        details: expect.objectContaining({
+          hints: expect.arrayContaining([expect.stringMatching(/include.*per row.*limit × include limit/)]),
+        }),
+      }),
+    );
   });
 });
 

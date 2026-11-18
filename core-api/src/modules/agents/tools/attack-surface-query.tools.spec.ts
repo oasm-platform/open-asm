@@ -1,6 +1,9 @@
 import type { Tool } from 'ai';
 
+import { CATALOG } from '@/modules/attack-surface-query/catalog/catalog';
 import { AsqError } from '@/modules/attack-surface-query/domain/query-errors';
+
+import { agentFunctionsOf } from './agent-function';
 
 import { agentFunctionWith } from '../agents.tools.testing';
 import { AttackSurfaceQueryTools } from './attack-surface-query.tools';
@@ -21,6 +24,29 @@ function setup(permissionKeys = ['asset.read']) {
   };
   return { attackSurfaceQuery, workspacesService };
 }
+
+describe('query_attack_surface description', () => {
+  const description = () => {
+    const fn = agentFunctionsOf(AttackSurfaceQueryTools).find((f) => f.options.name === 'query_attack_surface')!;
+    const d = fn.options.description;
+    return Array.isArray(d) ? d.join('\n') : String(d);
+  };
+
+  it('carries the exact field names of every resource, from the catalog', () => {
+    const text = description();
+    for (const res of Object.values(CATALOG).filter((r) => !r.global)) {
+      for (const field of Object.keys(res.fields)) expect(text).toContain(field);
+      expect(text).toContain(`${res.name}`);
+    }
+    expect(text).toContain('targets: value, type:DOMAIN|CIDR|IP|GIT_ORG, firstSeen:time; lists: hosts');
+    expect(text).toContain('http (only through a relation): url, title, statusCode:int');
+    expect(text).toContain('too large for the agent: body, rawHeader, header');
+  });
+
+  it('never exposes SQL or table names', () => {
+    expect(description()).not.toMatch(/asset_services|http_responses|\{a\}|SELECT /);
+  });
+});
 
 describe('AttackSurfaceQueryTools', () => {
   it('runs with the member permissions and the conversation project, never input scope', async () => {

@@ -10,7 +10,7 @@ import { firstMissingPermission } from '@/common/utils/permission-keys.util';
 import type { ZodIssue } from 'zod';
 
 import { checkFieldValue, fieldOps } from '../catalog/catalog';
-import type { Catalog, ResourceDef } from '../catalog/catalog.types';
+import type { Catalog, FieldDef, ResourceDef } from '../catalog/catalog.types';
 import { resolvePath, resourcesOf, type ResolvedPath } from '../catalog/paths';
 import { AsqError, invalidQuery, type AsqIssue } from './query-errors';
 import { limitsFor, type AsqLimits } from './query-limits';
@@ -42,6 +42,18 @@ const WHERE_RULES = { allowMany: true, maxOneHops: 3 };
 
 const MIN_MAX_TYPES = new Set(['int', 'float', 'timestamp', 'text', 'enum']);
 const AVG_TYPES = new Set(['int', 'float']);
+
+/** Names of the fields of `res` that pass `keep`, for error messages. */
+function fieldsWhere(
+  res: ResourceDef,
+  keep: (field: FieldDef) => boolean,
+  note: (field: FieldDef) => string = () => '',
+): string {
+  const names = Object.entries(res.fields)
+    .filter(([, f]) => keep(f))
+    .map(([name, f]) => `${name}${note(f)}`);
+  return names.length ? names.join(', ') : 'none';
+}
 
 /** Turns zod issues into ASQ issues with a dotted path. */
 export function zodIssues(issues: ZodIssue[]): AsqIssue[] {
@@ -228,7 +240,11 @@ function resolveListOrder(
       continue;
     }
     if (!resolved.value.field.sortable) {
-      ctx.issues.add(`${at}[${i}].field`, 'NOT_SORTABLE', `"${field}" cannot be sorted on`);
+      ctx.issues.add(
+        `${at}[${i}].field`,
+        'NOT_SORTABLE',
+        `"${field}" cannot be sorted on (sortable: ${fieldsWhere(resolved.value.owner, (f) => !!f.sortable)})`,
+      );
       continue;
     }
     for (const r of resourcesOf(resolved.value)) ctx.resources.add(r.name);
@@ -368,7 +384,15 @@ function normalizeAggregate(
     }
     const f = resolved.value.field;
     if (!f.groupable) {
-      ctx.issues.add(`${at}.groupBy[${i}]`, 'NOT_GROUPABLE', `"${field}" cannot be grouped by`);
+      ctx.issues.add(
+        `${at}.groupBy[${i}]`,
+        'NOT_GROUPABLE',
+        `"${field}" cannot be grouped by (groupable: ${fieldsWhere(
+          resolved.value.owner,
+          (g) => !!g.groupable,
+          (g) => (g.type === 'timestamp' ? ' (with a bucket)' : ''),
+        )})`,
+      );
       continue;
     }
     if (f.type === 'timestamp' && !bucket) {

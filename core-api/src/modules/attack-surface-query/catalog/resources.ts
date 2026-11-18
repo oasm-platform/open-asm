@@ -48,7 +48,14 @@ export const targetsResource: ResourceDef = {
   projectScope: `EXISTS (SELECT 1 FROM "assets" asq_pt JOIN "project_assets" asq_pa ON asq_pa."assetId" = asq_pt.id WHERE asq_pt."targetId" = {a}.id AND asq_pa."projectId" = {project})`,
   fields: {
     id,
-    value: { sql: '{a}.value', type: 'text', description: 'Domain, IP, CIDR or organization URL', sortable: 'bounded' },
+    value: {
+      sql: '{a}.value',
+      type: 'text',
+      description: 'Domain, IP, CIDR or organization URL',
+      sortable: 'bounded',
+      // "hosts per target": groupBy target.value from hosts, services, …
+      groupable: true,
+    },
     type: {
       sql: '{a}.type',
       type: 'enum',
