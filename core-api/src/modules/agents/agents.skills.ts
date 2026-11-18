@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Tool } from 'ai';
 import * as fs from 'fs';
@@ -13,6 +13,7 @@ import { CreateSkillDto, UpdateSkillDto } from './dto/skill.dto';
 import { AgentSkill } from './entities/agent-skill.entity';
 import { AgentFunction, buildAgentFunctions } from './tools/agent-function';
 import type { AgentFunctionContext } from './tools/types';
+import { ConflictError, NotFoundError } from '@/common/errors/domain.errors';
 
 interface BuiltinSkill {
   name: string;
@@ -297,7 +298,7 @@ export class AgentsSkillsService {
     });
 
     if (existing) {
-      throw new ConflictException(
+      throw new ConflictError(
         `Skill with name "${dto.name}" already exists in this workspace`,
       );
     }
@@ -342,7 +343,7 @@ export class AgentsSkillsService {
     });
 
     if (!skill) {
-      throw new NotFoundException('Skill not found');
+      throw new NotFoundError('Skill not found');
     }
 
     if (dto.name !== undefined && dto.name !== skill.name) {
@@ -350,7 +351,7 @@ export class AgentsSkillsService {
         where: { workspaceId, name: dto.name },
       });
       if (existing) {
-        throw new ConflictException(
+        throw new ConflictError(
           `Skill with name "${dto.name}" already exists in this workspace`,
         );
       }
@@ -389,7 +390,7 @@ export class AgentsSkillsService {
     });
 
     if (!skill) {
-      throw new NotFoundException('Skill not found');
+      throw new NotFoundError('Skill not found');
     }
 
     await this.skillRepository.remove(skill);
@@ -411,7 +412,7 @@ export class AgentsSkillsService {
     });
 
     if (!skill) {
-      throw new NotFoundException('Skill not found');
+      throw new NotFoundError('Skill not found');
     }
 
     skill.isEnabled = isEnabled;

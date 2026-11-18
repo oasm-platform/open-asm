@@ -11,12 +11,10 @@ import {
 } from '@/common/enums/enum';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { openVulnerabilityCondition } from '@/modules/vulnerabilities/open-vulnerability';
-import { getManyResponse } from '@/utils/getManyResponse';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
 import {
-  BadRequestException,
   Injectable,
   Logger,
-  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -53,6 +51,7 @@ import {
   ProjectTriggersService,
 } from './project-triggers.service';
 import { ProjectWorkflowsService } from './project-workflows.service';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 /** List sort keys beyond plain columns. */
 const LIST_SORT: Record<string, string> = {
@@ -227,19 +226,19 @@ export class ProjectsService implements ProjectAssetDiscovery {
       id: workspaceId,
     });
     if (!workspace) {
-      throw new NotFoundException(`Workspace with ID "${workspaceId}" not found`);
+      throw new NotFoundError(`Workspace with ID "${workspaceId}" not found`);
     }
     const existing = await this.projectRepo.findOne({
       where: { name: dto.name, workspace: { id: workspaceId } },
     });
     if (existing) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `A project named "${dto.name}" already exists in this workspace`,
       );
     }
     const hasPipeline = !!dto.tools?.length || !!dto.template;
     if ((dto.on || dto.schedule || dto.runNow) && !hasPipeline) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'on, schedule and runNow need a pipeline (tools or template)',
       );
     }
@@ -317,7 +316,7 @@ export class ProjectsService implements ProjectAssetDiscovery {
         where: { name: dto.name, workspace: { id: workspaceId } },
       });
       if (clash) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           `A project named "${dto.name}" already exists in this workspace`,
         );
       }

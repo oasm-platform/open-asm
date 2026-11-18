@@ -1,10 +1,6 @@
 import { BaseEntity } from '@/common/entities/base.entity';
-import {
-  IssuePriority,
-  IssueResolution,
-  IssueStatus,
-  IssueType,
-} from '@/common/enums/enum';
+import { IssuePriority, IssueStatus, IssueType } from '@/common/enums/enum';
+import { IssueResolution } from '@/modules/issues/enums/issue.enums';
 import { User } from '@/modules/auth/entities/user.entity';
 import { Comment } from '@/modules/comments/entities/comment.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';

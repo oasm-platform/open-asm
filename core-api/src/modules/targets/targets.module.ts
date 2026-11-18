@@ -1,28 +1,35 @@
 import { BullMQName } from '@/common/enums/enum';
 import { BullModule } from '@nestjs/bullmq';
-import { Global, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Asset } from '../assets/entities/assets.entity';
 import { Integration } from '../integrations/entities/integration.entity';
 import { TriggerWorkflowService } from '../workflows/trigger-workflow.service';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
 import { Target } from './entities/target.entity';
-import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
+import { AssetsDiscoveryScheduleConsumer } from './processors/assets-discovery-schedule.processor';
 import { TargetsController } from './targets.controller';
 import { TargetOverviewService } from './target-overview.service';
 import { TargetsService } from './targets.service';
+import { AssetsModule } from '../assets/assets.module';
+import { JobsRegistryModule } from '../jobs-registry/jobs-registry.module';
 
-@Global()
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Target, Workspace, Asset, Integration]),
+    TypeOrmModule.forFeature([Target, Integration]),
     WorkspacesModule,
     BullModule.registerQueue({
       name: BullMQName.ASSETS_DISCOVERY_SCHEDULE,
     }),
+    AssetsModule,
+    JobsRegistryModule,
   ],
   controllers: [TargetsController],
-  providers: [TargetsService, TargetOverviewService, TriggerWorkflowService],
+  providers: [
+    TargetsService,
+    TargetOverviewService,
+    TriggerWorkflowService,
+    AssetsDiscoveryScheduleConsumer,
+  ],
   exports: [TargetsService],
 })
 export class TargetsModule {}

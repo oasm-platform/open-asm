@@ -4,7 +4,7 @@ Stores API keys in the `api_keys` table. Today it is used only for workspace key
 
 ## Layout
 
-- `apikeys.module.ts`: `@Global()`, exports `ApiKeysService`.
+- `apikeys.module.ts`: exports `ApiKeysService`; imported by `WorkspacesModule` and `McpServerModule` (`McpGuard`).
 - `apikeys.service.ts`: `create`, `findByKey`, `getCurrentApiKey`, `findOne`, `update`, `remove`, `revoke`. `apiKeysRepository` is public.
 - `apikeys.controller.ts`: `@Controller('api-keys')` with no routes.
 - `entities/apikey.entity.ts`: `ApiKey`.

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
 
-import { AgentMode } from '@/common/enums/enum';
+import { AgentMode } from '@/modules/agents/enums/agent.enums';
 import { getManyBaseRequestSchema } from '@/mcp/mcp.schema';
 import type { ProjectStatusFilter } from '@/modules/projects/dto/get-projects.dto';
 import { ProjectAssetsService } from '@/modules/projects/project-assets.service';

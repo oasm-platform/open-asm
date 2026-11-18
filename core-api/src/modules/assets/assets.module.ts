@@ -1,13 +1,13 @@
-import { Global, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentConfig } from '../agents/entities/agent-config.entity';
 import { AgentLLMConfig } from '../agents/entities/agent-llm-config.entity';
-import { Job } from '../jobs-registry/entities/job.entity';
 import { Target } from '../targets/entities/target.entity';
 import { TechnologyModule } from '../technology/technology.module';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
 import { AssetsController } from './assets.controller';
 import { AssetsService } from './assets.service';
+import { RepositoryAssetsService } from './repository-assets.service';
 import { AssetService } from './entities/asset-services.entity';
 import { Asset } from './entities/assets.entity';
 import { DiscoveredUrl } from './entities/discovered-url.entity';
@@ -18,13 +18,14 @@ import { HttpStatusCode } from './entities/http-status-code.entity';
 import { IpObservation } from './entities/ip-observation.entity';
 import { TlsCertificate } from './entities/tls-certificate.entity';
 import { UrlDiscoveryService } from './url-discovery.service';
+import { StorageModule } from '../storage/storage.module';
+import { WorkflowsModule } from '../workflows/workflows.module';
+import { JobsRegistryModule } from '../jobs-registry/jobs-registry.module';
 
-@Global()
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       Asset,
-      Job,
       Target,
       HttpResponse,
       DiscoveredUrl,
@@ -39,9 +40,12 @@ import { UrlDiscoveryService } from './url-discovery.service';
     ]),
     TechnologyModule,
     WorkspacesModule,
+    StorageModule,
+    WorkflowsModule,
+    JobsRegistryModule,
   ],
   controllers: [AssetsController],
-  providers: [AssetsService, UrlDiscoveryService],
-  exports: [AssetsService],
+  providers: [AssetsService, UrlDiscoveryService, RepositoryAssetsService],
+  exports: [AssetsService, RepositoryAssetsService],
 })
 export class AssetsModule {}

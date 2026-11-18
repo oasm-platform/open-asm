@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository } from 'typeorm';
 import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.entity';
@@ -15,6 +15,7 @@ import {
 import { Severity, VulnerabilityAnalyzeStatus, JobStatus } from '@/common/enums/enum';
 import type { TargetType } from '@/modules/targets/entities/target.entity';
 import type { ReportData } from '../types/report-data.type';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 type RiskLevel = Exclude<Severity, Severity.INFO>;
 type ScanStatus = VulnerabilityAnalyzeStatus | Exclude<JobStatus, JobStatus.CANCELLED>;
@@ -50,7 +51,7 @@ export class SummaryReportService {
     // Fetch workspace name
     const workspace = await this.workspaceRepo.findOne({ where: { id: workspaceId } });
     if (!workspace) {
-      throw new NotFoundException('Workspace not found');
+      throw new NotFoundError('Workspace not found');
     }
 
     // Calculate date ranges for weekly and monthly comparisons

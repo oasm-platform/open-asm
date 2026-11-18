@@ -1,9 +1,9 @@
-import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
-import { AgentMode, WorkerType } from '@/common/enums/enum';
-import type { WrapperType } from '@/common/types/app.types';
+import { WorkerType } from '@/common/enums/enum';
+import { AgentMode } from '@/modules/agents/enums/agent.enums';
 import { ConnectorRegistryService } from '@/modules/connectors/connector-registry.service';
 import { RemoteExecuteService } from '@/modules/remote-execute/remote-execute.service';
 import { validateTemplate } from '@/modules/templates/templates.service';
@@ -167,7 +167,6 @@ const listToolConfigProfilesSchema = z.object({
     .describe('Connector slug (name from display_available_tools)'),
 });
 
-
 /**
  * A JSON line (an object, or an array of objects as nuclei prints) cut down
  * to `fields`; any other line is returned as is.
@@ -306,8 +305,7 @@ type RunConnectorParams = z.infer<ReturnType<typeof runConnectorInput>>;
 export class ConnectorTools {
   constructor(
     readonly connectorRegistry: ConnectorRegistryService,
-    @Inject(forwardRef(() => ToolsService))
-    readonly toolsService: WrapperType<ToolsService>,
+    readonly toolsService: ToolsService,
     readonly toolConfigProfiles: ToolConfigProfilesService,
     readonly remoteExecuteSubscribe: RemoteExecuteSubscribeService,
     readonly remoteExecuteService: RemoteExecuteService,

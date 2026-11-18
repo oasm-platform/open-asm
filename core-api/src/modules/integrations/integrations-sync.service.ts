@@ -1,20 +1,12 @@
 import { BullMQName, IntegrationType } from '@/common/enums/enum';
 import type { UserContextPayload } from '@/common/interfaces/app.interface';
-import type { WrapperType } from '@/common/types/app.types';
 import { DataAdapterService } from '@/modules/data-adapter/data-adapter.service';
 import { TargetsService } from '@/modules/targets/targets.service';
 import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
 import { Lock } from '@/services/redis/lock.decorator';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { InjectQueue } from '@nestjs/bullmq';
-import {
-  BadRequestException,
-  forwardRef,
-  Inject,
-  Injectable,
-  Logger,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Queue } from 'bullmq';
 import { ArrayContains, IsNull, Not } from 'typeorm';
@@ -30,11 +22,12 @@ import {
   runConnector,
 } from './connectors/connector.factory';
 import { Integration } from './entities/integration.entity';
-import { IntegrationsService } from './integrations.service';
+import { IntegrationConfigReader } from './integration-config.reader';
 import {
   decryptSensitiveConfigFields,
   encryptSensitiveConfigFields,
 } from './validators/integration.validator';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 /**
  * Hard ceiling on a single sync run. The distributed lock TTL must be at least
@@ -58,8 +51,7 @@ export class IntegrationSyncService implements OnModuleInit {
     private readonly queue: Queue,
     @InjectRepository(Integration)
     private readonly integrationRepository: Repository<Integration>,
-    @Inject(forwardRef(() => IntegrationsService))
-    private readonly integrationsService: WrapperType<IntegrationsService>,
+    private readonly configReader: IntegrationConfigReader,
     private readonly targetsService: TargetsService,
     private readonly dataAdapterService: DataAdapterService,
     private readonly workspacesService: WorkspacesService,
@@ -216,7 +208,7 @@ export class IntegrationSyncService implements OnModuleInit {
     opts?: { dryRun?: boolean },
   ): Promise<ConnectorSyncResult> {
     const { integration, decryptedConfig } =
-      await this.integrationsService.getIntegrationWithDecryptedConfig(
+      await this.configReader.getIntegrationWithDecryptedConfig(
         integrationId,
         workspaceId,
       );
@@ -226,7 +218,7 @@ export class IntegrationSyncService implements OnModuleInit {
     // dispatch below is hardcoded to CLOUD_PROVIDER, so anything else would
     // fail every tick with "connector.syncAssets is not a function" (F3).
     if (!hasCapability(integration, IntegrationType.CLOUD_PROVIDER)) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'syncSchedule is only supported for CLOUD_PROVIDER integrations',
       );
     }
@@ -243,7 +235,7 @@ export class IntegrationSyncService implements OnModuleInit {
       integration.syncSchedule !== 'disabled' &&
       !opts?.dryRun
     ) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'AWS workloadIdentity integrations do not support scheduled syncs; the OIDC token is short-lived. Set syncSchedule to "disabled" and run manual syncs.',
       );
     }
@@ -293,7 +285,7 @@ export class IntegrationSyncService implements OnModuleInit {
 
     if (result === undefined) {
       if (opts?.dryRun) {
-        throw new BadRequestException('integration sync already in progress');
+        throw new InvalidInputError('integration sync already in progress');
       }
       this.logger.warn(
         `Sync already in progress for integration ${integrationId}; skipping`,
@@ -334,7 +326,7 @@ export class IntegrationSyncService implements OnModuleInit {
       // BadRequestException (not a plain Error) so callers can distinguish a
       // failed connector run (e.g. dry-run test → success:false result) from
       // a programming error, and the HTTP layer maps it to a 400.
-      throw new BadRequestException(
+      throw new InvalidInputError(
         connectorResult.error ?? connectorResult.message,
       );
     }
@@ -375,7 +367,7 @@ export class IntegrationSyncService implements OnModuleInit {
     ]);
     const ownerId = workspace?.owner?.id ?? integration.createdById;
     if (!ownerId) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'Cannot resolve acting user for integration sync — workspace owner and integration creator are both missing',
       );
     }

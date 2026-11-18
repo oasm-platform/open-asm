@@ -1,4 +1,4 @@
-import { AgentApprovalMode } from '@/common/enums/enum';
+import { AgentApprovalMode } from '@/modules/agents/enums/agent.enums';
 import { EventEmitter } from 'node:events';
 import { agentFunctionWith } from '../agents.tools.testing';
 import { RemoteExecuteTools, browserSessionOf } from './remote-execute.tool';

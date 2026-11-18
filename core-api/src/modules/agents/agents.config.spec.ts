@@ -1,5 +1,5 @@
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
-import { BadRequestException } from '@nestjs/common';
+
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
@@ -12,6 +12,7 @@ import {
 import { AgentConfig } from './entities/agent-config.entity';
 import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { LLMProvider, ReasoningEffort, SearchProvider } from './enums/agent.enums';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 jest.mock('@/common/utils/workspace-encryption.util', () => ({
   decryptWithDEK: (text: string) => text.replace(/^enc\((.*)\)$/, '$1'),
@@ -103,7 +104,7 @@ describe('AgentsConfigService', () => {
           small: { llmConfigId: 'b', model: 'mini' },
         },
       }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    ).rejects.toBeInstanceOf(InvalidInputError);
     expect(llmRepo.count).toHaveBeenCalledWith({
       where: expect.objectContaining({ workspaceId: WS, userId: USER }),
     });
@@ -202,7 +203,7 @@ describe('AgentsConfigService', () => {
           { provider: SearchProvider.EXA, apiKey: 'b' },
         ],
       }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    ).rejects.toBeInstanceOf(InvalidInputError);
     await expect(
       service.upsert(WS, USER, {
         searchProviders: [
@@ -210,7 +211,7 @@ describe('AgentsConfigService', () => {
           { provider: SearchProvider.FIRECRAWL, apiKey: 'b', isDefault: true },
         ],
       }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    ).rejects.toBeInstanceOf(InvalidInputError);
   });
 
   it('only changes the fields sent and clears with null', async () => {

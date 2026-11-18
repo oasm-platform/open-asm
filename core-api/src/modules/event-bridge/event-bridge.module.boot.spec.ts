@@ -1,5 +1,6 @@
 import { APP_INTERCEPTOR } from '@nestjs/core';
-import { BullMQName, EventBusGroup } from '@/common/enums/enum';
+import { BullMQName } from '@/common/enums/enum';
+import { EventBusGroup } from '@/modules/event-bridge/enums/event-bridge.enums';
 import { EventConsumersService } from './consuming/event-consumers.service';
 import { EVENT_SINKS } from './consuming/event-sink';
 import { EventBridgeModule, SINKS } from './event-bridge.module';
@@ -12,6 +13,19 @@ import { IssuesSink } from './sinks/issues/issues.sink';
 import { NotificationsSink } from './sinks/notifications/notifications.sink';
 import { ProjectionSink } from './sinks/projection/projection.sink';
 import { ProjectsSink } from './sinks/projects/projects.sink';
+
+// The domain modules the bridge imports for its lanes. Their graphs
+// (controllers, guards, better-auth) play no part in the wiring read here,
+// and better-auth's ESM build does not load under Jest.
+jest.mock('../integrations/integrations.module', () => ({
+  IntegrationsModule: class IntegrationsModule {},
+}));
+jest.mock('../projects/projects.module', () => ({
+  ProjectsModule: class ProjectsModule {},
+}));
+jest.mock('../issues/issues.module', () => ({
+  IssuesModule: class IssuesModule {},
+}));
 
 /**
  * Guards the one wiring mistake that is invisible everywhere else: a lane

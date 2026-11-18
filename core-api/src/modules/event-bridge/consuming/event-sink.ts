@@ -1,4 +1,4 @@
-import type { EventBusGroup } from '@/common/enums/enum';
+import type { EventBusGroup } from '@/modules/event-bridge/enums/event-bridge.enums';
 import type { EventName } from '../contracts/event-catalog';
 import type { ConsumedEvent } from '../contracts/event-envelope';
 import type { DomainSubscription } from '../routing/subscriptions';

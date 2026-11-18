@@ -1,12 +1,13 @@
 import { UserContextPayload } from '@/common/interfaces/app.interface';
-import { getManyResponse } from '@/utils/getManyResponse';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository } from 'typeorm';
 import { CreateProviderDto } from './dto/create-provider.dto';
 import { ProvidersQueryDto } from './dto/providers-query.dto';
 import { UpdateProviderDto } from './dto/update-provider.dto';
 import { ToolProvider } from './entities/provider.entity';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 @Injectable()
 export class ProvidersService {
@@ -85,7 +86,7 @@ export class ProvidersService {
     });
 
     if (!provider) {
-      throw new NotFoundException(`Provider with ID ${id} not found`);
+      throw new NotFoundError(`Provider with ID ${id} not found`);
     }
 
     return provider;
@@ -106,7 +107,7 @@ export class ProvidersService {
     const provider = await this.findProviderOrThrow(id);
 
     if (provider.owner.id !== userContext.id) {
-      throw new NotFoundException(`Provider with ID ${id} not found`);
+      throw new NotFoundError(`Provider with ID ${id} not found`);
     }
 
     return provider;
@@ -128,7 +129,7 @@ export class ProvidersService {
 
     // Check if user is owner of the provider
     if (provider.owner.id !== userContext.id) {
-      throw new NotFoundException(`Provider with ID ${id} not found`);
+      throw new NotFoundError(`Provider with ID ${id} not found`);
     }
 
     Object.assign(provider, updateProviderDto);
@@ -148,7 +149,7 @@ export class ProvidersService {
     const provider = await this.findProviderOrThrow(id);
     // Check if user is owner of the provider
     if (provider.owner.id !== userContext.id) {
-      throw new NotFoundException(`Provider with ID ${id} not found`);
+      throw new NotFoundError(`Provider with ID ${id} not found`);
     }
 
     // Soft delete the provider

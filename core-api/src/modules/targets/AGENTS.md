@@ -5,11 +5,12 @@ Scan roots of a workspace: a domain, IP, CIDR or Git organization. A target owns
 ## Layout
 
 - `targets.controller.ts`: HTTP routes on `targets`.
-- `targets.service.ts`: `TargetsService`: validation, bulk create (with assets), update, delete, scan schedule, CSV export, GIT_ORG repositories.
+- `targets.service.ts`: `TargetsService`: validation, bulk create (with assets), update, delete, `reScan`, scan schedule, CSV export, GIT_ORG repositories.
 - `target-overview.service.ts`: `TargetOverviewService`: overview, runs, changes, summary (raw SQL over assets, jobs, vulnerabilities, issues, projects). Exports `STALE_DAYS = 30`.
 - `entities/target.entity.ts`: `Target`, `TargetSource`, `GitOrgTargetSettings`. `TargetType` lives in `common/enums/enum.ts` and is re-exported here.
 - `cidr.ts` (parse/format/overlap), `target-logo.ts` (`resolveTargetLogo`), `target-source.dto.ts` (source enrichment).
 - `dto/targets.dto.ts`, `dto/target-overview.dto.ts`.
+- `processors/assets-discovery-schedule.processor.ts`: `AssetsDiscoveryScheduleConsumer`, the consumer of the scan-schedule queue.
 
 ## Public surface
 
@@ -19,13 +20,13 @@ Scan roots of a workspace: a domain, IP, CIDR or Git organization. A target owns
 | `GET targets`, `GET targets/export` (CSV), `GET targets/summary` | `target.read` |
 | `GET targets/:id`, `:id/overview`, `:id/runs`, `:id/changes`, `:id/repositories` | `target.read` |
 | `PATCH targets/:id` (scanSchedule, GIT_ORG settings) | `target.write` |
-| `POST targets/:id/re-scan` | `target.write`; delegates to `AssetsService.reScan` |
+| `POST targets/:id/re-scan` | `target.write`; `TargetsService.reScan` |
 | `DELETE targets/:id` | `target.write`, **and** workspace owner |
 
-- `@Global()`, exports `TargetsService`. It also provides `TriggerWorkflowService` (from `workflows/`), and this is the **only** module that provides it.
+- Exports `TargetsService`; imported by `IntegrationsModule`, `InternalNetworksModule`, `StatisticModule`, `SearchModule` and `AgentsModule`. It also provides `TriggerWorkflowService` (from `workflows/`), and this is the **only** module that provides it.
 - Event bridge: `@PublishEvent` sends `target.created` (bulk) and `target.updated` (PATCH). `target.deleted` is not on the stream: `deleteTarget` writes it only as an audit row via `AuditService.auditSafely`. After the create transaction, `createMultipleTargets` publishes `asset.discovered` once per target for its new assets.
-- In-process events (`EventEmitter2`): `target.<type>.create` for each created target (`target.domain.create`, `target.cidr.create`, `target.ip.create`, `target.git_org.create`), and `target.git_org.re-scan` when GIT_ORG settings change.
-- BullMQ: registers `ASSETS_DISCOVERY_SCHEDULE` and adds one repeatable job per scheduled target (job name = target id, data `{ id }`, `repeat.pattern` = the `CronSchedule` value). The consumer is `AssetsDiscoveryScheduleConsumer` in `jobs-registry/processors/scan-schedule.processor.ts`.
+- In-process events (`EventEmitter2`): `target.<type>.create` for each created target (`target.domain.create`, `target.cidr.create`, `target.ip.create`, `target.git_org.create`), and `target.git_org.re-scan` when GIT_ORG settings change. `reScan` emits `target.<type>.re-scan` (with `{ jobRunType }` as a third argument) after bumping `reScanCount` and `lastDiscoveredAt`, or `target.git_org.re-scan` for GIT_ORG targets; a host target without its primary asset (`AssetsService.hasPrimaryAsset`) gives 404.
+- BullMQ: registers `ASSETS_DISCOVERY_SCHEDULE` and adds one repeatable job per scheduled target (job name = target id, data `{ id }`, `repeat.pattern` = the `CronSchedule` value). The consumer, `AssetsDiscoveryScheduleConsumer` (`processors/assets-discovery-schedule.processor.ts`), lives here too and calls `TargetsService.reScan` with `JobRunType.SCHEDULED`.
 - MCP/agent tools: `retrieve_targets` (`getTargetsTool` in `agents/tools/workspace.tools.ts`, also on MCP) calls `getTargetsInWorkspace`. Agent-only `create_project` and `add_targets` go through `ensureTargets` in `agents/tools/project-build.tools.ts`, which looks existing values up with `findByWorkspaceAndValues` first and sends only new ones to `createMultipleTargets` (duplicates are rejected, see Gotchas).
 
 ## Data model
@@ -47,10 +48,12 @@ Scan roots of a workspace: a domain, IP, CIDR or Git organization. A target owns
 
 ## Coupling
 
-- `TargetsService` injects `AssetsService` (and exposes it as public `assetService`), `WorkspacesService`, `AuditService` and `EventBridgeService`. It writes `assets` rows directly inside its transaction.
-- `TriggerWorkflowService.onModuleInit` subscribes with `eventEmitter.onAny`, so **every** in-process event in the app is treated as a possible workflow trigger: `<a>.<b>` is matched against `workflow.content.on.<a>` containing `<b>`, and the payload is resolved to a workspace through `payload.id` as a target id. Project workflows (`project-%`, `group-%` file paths) are excluded.
+- Imports `AssetsModule` and `JobsRegistryModule` (`TriggerWorkflowService` uses `WorkflowRunnerService`). `TargetsService` injects `AssetsService` (and exposes it as public `assetService`), `WorkspacesService`, `AuditService` and `EventBridgeService`. It writes `assets` rows directly inside its transaction.
+- `TriggerWorkflowService.onModuleInit` subscribes with `eventEmitter.onAny`, so **every** in-process event in the app is treated as a possible workflow trigger: `<a>.<b>` is matched against `workflow.content.on.<a>` containing `<b>`, in the workspace of the payload's `workspaceId` (target events carry the `Target` row); a payload without one is skipped before any query. Project workflows (`project-%`, `group-%` file paths) are excluded.
 - Callers of `TargetsService`: integrations connectors (aws, cloudflare, vercel: `findByWorkspaceAndValues` then `createMultipleTargets`), `InternalNetworksService`, `SearchService`, agents tools. `StatisticModule` and `SearchModule` import `TargetsModule`.
-- Other code that touches `targets` directly: `AssetsService.reScan` updates `reScanCount` and `lastDiscoveredAt`. `WorkspacesService` bulk-deletes a workspace's targets and resolves `getWorkspaceIdByTargetId` (cached 60 s). `StatisticService` reads the table.
+- `RepositorySyncService` (integrations) reads and stamps GIT_ORG targets through `findInWorkspace` and `markDiscovered`.
+- Consumes `WORKSPACE_DELETING_EVENT` (`onWorkspaceDeleting`, awaited, `suppressErrors: false`): deletes every target of the workspace being deleted.
+- Other code that touches `targets` directly: `WorkspacesService` reads it (`getWorkspaceIdByTargetId`, cached 60 s). `StatisticService` reads the table.
 
 ## Gotchas
 
@@ -62,4 +65,4 @@ Scan roots of a workspace: a domain, IP, CIDR or Git organization. A target owns
 
 ## Testing
 
-Unit specs: `targets.service.spec.ts`, `targets.controller.spec.ts`, `target-overview.service.spec.ts`, `cidr.spec.ts`, `target-logo.spec.ts`, `target-source.dto.spec.ts`. E2E: `core-api/test/targets.e2e-spec.ts`.
+Unit specs: `targets.service.spec.ts`, `targets.controller.spec.ts`, `processors/assets-discovery-schedule.processor.spec.ts`, `target-overview.service.spec.ts`, `cidr.spec.ts`, `target-logo.spec.ts`, `target-source.dto.spec.ts`. E2E: `core-api/test/targets.e2e-spec.ts`.

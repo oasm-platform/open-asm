@@ -22,7 +22,7 @@ Workspace work items (`#no` per workspace), linked to findings, assets, targets,
 
 - There are no `issue.*` permission keys; issues use the `workspace.*` keys. Comment routes (`issues/:issueId/comments`) live in the `comments` module.
 - `IssueRulesController` is listed before `IssuesController` in `controllers` so `issues/rules` is not matched as `issues/:id`. Keep that order.
-- `@Global()`, exports `IssuesService` and the `ISSUE_VULNERABILITY_EVENTS` token (`useExisting: IssueAutomationService`).
+- Exports `IssuesService` and the `ISSUE_VULNERABILITY_EVENTS` token (`useExisting: IssueAutomationService`); imported by `EventBridgeModule` (the issues lane) and `AgentsModule`.
 - Events: every one is published from a service through `IssueEventsPublisher.publish` (no `@PublishEvent`). They are `issue.created|updated|assigned|opened|closed|resolved|deleted`, `issue.link.added|removed`, and subject `workspace:<id>/issue:<id>`. Automation publishes as actor `system`.
 - Consumed: the event bridge's `IssuesSink` (`event-bridge/sinks/issues/issues.sink.ts`, consumer group `issues`) passes `vulnerability.detected|resurfaced|fixed` to `IssueAutomationService.onVulnerabilityEvent`. `detected` → rule engine. `resurfaced` → handlers (reopen) and then rules. `fixed` → handlers (auto-resolve).
 - Agent/MCP tools: `enumerate_open_issues` (`getMany`), `inspect_issue` (`getById`) in `agents/tools/workspace.tools.ts`.
@@ -46,7 +46,7 @@ Workspace work items (`#no` per workspace), linked to findings, assets, targets,
 
 ## Coupling
 
-- Registers its own repositories plus `Comment`. Imports no domain modules: it reads `vulnerabilities`, `vulnerability_dismissals`, `assets`, `targets`, `projects`, `job_histories` and `workflows` with raw SQL.
+- Registers only its own repositories (`issue-activity.ts` writes system comments through the transaction's `EntityManager`). Imports no domain modules: it reads `vulnerabilities`, `vulnerability_dismissals`, `assets`, `targets`, `projects`, `job_histories` and `workflows` with raw SQL.
 - `VulnerabilitiesService.openIssues` and `TargetOverviewService` read `issues` / `issue_links` directly.
 - `asset_review` and `scan_failure` types have no automation yet (`ManualIssueHandler`). A new automated type needs an `IssueTypeHandler` registered in `IssueTypeHandlerRegistry`.
 

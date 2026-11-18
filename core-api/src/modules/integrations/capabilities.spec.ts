@@ -1,5 +1,5 @@
 import { IntegrationType } from '@/common/enums/enum';
-import { BadRequestException } from '@nestjs/common';
+
 import {
   getSupportedCapabilities,
   hasCapability,
@@ -15,6 +15,7 @@ import {
   restoreMaskedSecrets,
   validateIntegrationConfig,
 } from './validators/integration.validator';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 describe('integration capabilities', () => {
   describe('schema introspection', () => {
@@ -70,7 +71,7 @@ describe('integration capabilities', () => {
     it('rejects a legacy category that does not match the schema', () => {
       expect(() =>
         normalizeCapabilities({ appType: 'slack', category: 'TICKETING' }),
-      ).toThrow(BadRequestException);
+      ).toThrow(InvalidInputError);
     });
 
     it('dedupes and keeps a still-enabled primary category', () => {

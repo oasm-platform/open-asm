@@ -23,7 +23,8 @@ export const builtInTools: Tool[] = [
     command:
       '(echo {{value}} && subfinder -duc -d {{value}}) | dnsx -duc -a -aaaa -cname -mx -ns -soa -txt -resp',
     parser: (result: string) => {
-      const parsed = {};
+      // domain -> record type -> values
+      const parsed: Record<string, Record<string, string[]>> = {};
       result.split('\n').forEach((line) => {
         const cleaned = line.replace(/\x1B\[[0-9;]*m/g, '').trim();
         const match = cleaned.match(/^([^\[]+)\s+\[([A-Z]+)\]\s+\[(.+)\]$/);

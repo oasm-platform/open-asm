@@ -1,6 +1,6 @@
 # notifications module
 
-In-app notifications: the read side (list, unread count, read/unread, delete) plus `createNotification` for hand-picked recipient lists. `@Global()`, registered in `app.module.ts` (not `combine.module.ts`).
+In-app notifications: the read side (list, unread count, read/unread, delete) plus `createNotification` for hand-picked recipient lists. Registered in `app.module.ts` (not `combine.module.ts`) and imported by `WorkspacesModule`, `VulnerabilitiesModule` and `StatisticModule`.
 
 Workspace-addressed notifications are NOT written here: the event bridge `notifications` lane (`event-bridge/sinks/notifications/`) turns events into rows. The live push is `GET /events/stream` in the events module. The doc comment in `notifications.module.ts` still says "SSE stream"; this module has no stream route.
 

@@ -76,3 +76,25 @@ export enum AgentToolRuleAction {
   DENY = 'deny',
   ASK = 'ask',
 }
+
+export enum AgentMode {
+  ASK = 'ask',
+  AGENT = 'agent',
+}
+
+/**
+ * How commands run. Agent mode has every new plan approved by the user first,
+ * in either mode.
+ */
+export enum AgentApprovalMode {
+  /** Run every command without asking */
+  AUTO = 'auto',
+  /** Ask for every command that has not been approved before */
+  MANUAL = 'manual',
+}
+
+export enum AgentCommandApprovalStatus {
+  PENDING = 'pending',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
+}

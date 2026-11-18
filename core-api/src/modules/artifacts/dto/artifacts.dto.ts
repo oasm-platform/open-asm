@@ -1,10 +1,6 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
-import {
-  ArtifactListScope,
-  ArtifactShareType,
-  ArtifactSource,
-  ArtifactStatus,
-} from '@/common/enums/enum';
+import { ArtifactShareType, ArtifactSource, ArtifactStatus } from '@/common/enums/enum';
+import { ArtifactListScope } from '@/modules/artifacts/enums/artifact.enums';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {

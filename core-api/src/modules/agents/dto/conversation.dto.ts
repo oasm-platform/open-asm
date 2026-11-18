@@ -1,4 +1,4 @@
-import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
+import { AgentApprovalMode, AgentMode } from '@/modules/agents/enums/agent.enums';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {

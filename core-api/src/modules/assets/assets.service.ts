@@ -1,21 +1,15 @@
-import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
-import { JobRunType } from '@/common/enums/enum';
-import * as fs from 'fs';
 import * as path from 'path';
-import * as Mustache from 'mustache';
+import { PromptRegistry } from '@/common/utils/prompt-registry.util';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
-import { getManyResponse } from '@/utils/getManyResponse';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
 import { containsLikePattern } from '@/common/utils/like-pattern.util';
 import { generateText } from 'ai';
 import {
-  BadRequestException,
   Injectable,
   Logger,
-  NotFoundException,
 } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { DataSource, In, Repository } from 'typeorm';
@@ -26,7 +20,7 @@ import { LLMProvider } from '../agents/enums/agent.enums';
 import {
   getLLMProviderConfig,
 } from '../agents/llm-provider-supported';
-import { Target, TargetType } from '../targets/entities/target.entity';
+import { Target } from '../targets/entities/target.entity';
 
 import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
 import { StorageService } from '../storage/storage.service';
@@ -68,6 +62,7 @@ import {
   IpObservationSource,
 } from './entities/ip-observation.entity';
 import { TlsCertificate } from './entities/tls-certificate.entity';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 /** IP sources that belong to an asset (its DNS A/AAAA records). */
 const DNS_IP_SOURCES: IpObservationSource[] = ['dns_a', 'dns_aaaa'];
@@ -103,7 +98,10 @@ function toLegacyTls(cert: TlsCertificate): Record<string, unknown> {
 @Injectable()
 export class AssetsService {
   private readonly logger = new Logger(AssetsService.name);
-  private readonly prompts = new Map<string, string>();
+  // GENERATE_SERVICE_TAGS.md lives with the agent prompts
+  private readonly prompts = PromptRegistry.forDirectory(
+    path.join(__dirname, '../agents/prompts'),
+  );
 
   constructor(
     @InjectRepository(Asset)
@@ -126,47 +124,13 @@ export class AssetsService {
     private readonly llmConfigRepository: Repository<AgentLLMConfig>,
     @InjectRepository(AgentConfig)
     private readonly agentConfigRepository: Repository<AgentConfig>,
-    private eventEmitter: EventEmitter2,
     private technologyForwarderService: TechnologyForwarderService,
     private workspaceService: WorkspacesService,
     private workspaceEncryption: WorkspaceEncryptionService,
     private geoIpService: GeoIpService,
     private storageService: StorageService,
     private dataSource: DataSource,
-  ) {
-    this.loadPrompts();
-  }
-
-  private loadPrompts(): void {
-    const promptsDir = path.join(__dirname, '../agents/prompts');
-    try {
-      const entries = fs.readdirSync(promptsDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.name.endsWith('.md')) {
-          const key = entry.name.toLowerCase();
-          const content = fs.readFileSync(
-            path.join(promptsDir, entry.name),
-            'utf-8',
-          );
-          this.prompts.set(key, content);
-        }
-      }
-    } catch (error) {
-      this.logger.error('Failed to load prompts directory', error);
-    }
-  }
-
-  private getPrompt(fileName: string, data?: Record<string, unknown>): string {
-    const key = fileName.toLowerCase();
-    const template = this.prompts.get(key) ?? '';
-    if (!template) {
-      this.logger.warn(`Prompt not found: ${fileName}`);
-    }
-    if (data) {
-      return Mustache.render(template, data);
-    }
-    return template;
-  }
+  ) {}
 
   private async generateTagsWithAI(
     serviceData: string,
@@ -183,14 +147,14 @@ export class AssetsService {
     );
 
     if (!llmConfig) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'No LLM provider connected. Please connect a provider first.',
       );
     }
 
     const providerConfig = getLLMProviderConfig(llmConfig.provider);
     if (!providerConfig) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `Unsupported LLM provider: ${String(llmConfig.provider)}`,
       );
     }
@@ -204,7 +168,7 @@ export class AssetsService {
         : undefined;
     const model = providerConfig.handler(apiKey, llmConfig.model, baseURL);
 
-    const prompt = this.getPrompt('GENERATE_SERVICE_TAGS.md', {
+    const prompt = this.prompts.render('GENERATE_SERVICE_TAGS.md', {
       SERVICE_DATA: serviceData,
     });
 
@@ -572,70 +536,11 @@ export class AssetsService {
     });
   }
 
-  /**
-   * Triggers a rescan for a specific asset by creating new jobs for relevant workers.
-   *
-   * @param assetId - The ID of the asset to rescan.
-   * @param jobRunType - Recorded on the run: the target's scan schedule passes
-   *   SCHEDULED, a user re-scan keeps MANUAL.
-   * @throws Error if the asset is not found.
-   */
-  public async reScan(
-    targetId: string,
-    workspaceId: string,
-    jobRunType: JobRunType = JobRunType.MANUAL,
-  ): Promise<DefaultMessageResponseDto> {
-    // The rescan runs inside the target's own workspace — assert the caller is
-    // acting in that workspace before any worker jobs are dispatched.
-    const target = await this.targetRepo.findOne({
-      where: { id: targetId, workspaceId },
+  /** Whether the target still has its primary (own host) asset. */
+  public hasPrimaryAsset(targetId: string): Promise<boolean> {
+    return this.assetRepo.exists({
+      where: { target: { id: targetId }, isPrimary: true },
     });
-
-    if (!target) {
-      throw new NotFoundException('Target not found');
-    }
-
-    // A Git organization has no primary host asset: "re-scan" means re-sync
-    // its repositories, which RepositorySyncService does on this event (the
-    // scan schedule lands here too). Scanning follows on `git_org.synced`.
-    if (target.type === TargetType.GIT_ORG) {
-      await this.targetRepo.update(targetId, {
-        reScanCount: target.reScanCount + 1,
-      });
-      this.eventEmitter.emit('target.git_org.re-scan', target);
-      return { message: 'Repository sync started' };
-    }
-
-    const asset = await this.assetRepo.findOne({
-      where: {
-        target: { id: targetId },
-        isPrimary: true,
-      },
-    });
-
-    if (!asset) {
-      throw new NotFoundException('Asset not found');
-    }
-
-    const reScanCount = target.reScanCount + 1;
-    await this.targetRepo.update(targetId, {
-      reScanCount,
-      lastDiscoveredAt: new Date(),
-    });
-
-    // The trigger name carries the target type (`ip.re-scan`, `cidr.re-scan`)
-    // so the matching workflow runs — it used to be hard-coded to `domain`,
-    // which ran domain discovery on IP and CIDR targets. The run type rides
-    // along so TriggerWorkflowService records a scheduled run as scheduled.
-    this.eventEmitter.emit(
-      `target.${target.type.toLowerCase()}.re-scan`,
-      target,
-      { jobRunType },
-    );
-
-    return {
-      message: 'Scan started',
-    };
   }
 
   /**
@@ -1264,7 +1169,7 @@ export class AssetsService {
       .getOne();
 
     if (!assetService) {
-      throw new NotFoundException('Asset service not found');
+      throw new NotFoundError('Asset service not found');
     }
 
     // Update tags - tags belong to AssetService
@@ -1458,7 +1363,7 @@ export class AssetsService {
       .getOne();
 
     if (!assetService) {
-      throw new NotFoundException('Asset service not found');
+      throw new NotFoundError('Asset service not found');
     }
 
     const latestHttpResponse = assetService.httpResponses?.[0];
@@ -1499,7 +1404,7 @@ export class AssetsService {
     );
 
     if (tags.length === 0) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'AI model did not generate any tags. Ensure an LLM config is set up for your account.',
       );
     }
@@ -1517,7 +1422,7 @@ export class AssetsService {
     });
 
     if (!asset) {
-      throw new NotFoundException('Asset not found');
+      throw new NotFoundError('Asset not found');
     }
 
     // Update the asset's enabled status
@@ -2100,7 +2005,7 @@ export class AssetsService {
       where: { id: assetId, target: { workspaceId } },
     });
     if (!asset) {
-      throw new NotFoundException('Asset not found');
+      throw new NotFoundError('Asset not found');
     }
 
     // 2. Services of this asset (workspace scope already guaranteed by the

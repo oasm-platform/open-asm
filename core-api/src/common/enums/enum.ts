@@ -10,14 +10,6 @@ export enum Role {
   BOT = 'bot',
 }
 
-export enum InvitationStatus {
-  PENDING = 'pending',
-  ACCEPTED = 'accepted',
-  DECLINED = 'declined',
-  EXPIRED = 'expired',
-  CANCELLED = 'cancelled',
-}
-
 /**
  * Enum representing who performed an audit event.
  * v1 only writes `user` (authenticated-session actions); the other values are
@@ -89,16 +81,6 @@ export enum JobStatus {
   CANCELLED = 'cancelled',
   /** Skipped — tool was pending but a later tool in the pipeline has completed */
   SKIPPED = 'skipped',
-}
-
-/**
- * Enum representing scan statuses
- */
-export enum ScanStatus {
-  /** Running */
-  RUNNING = 'RUNNING',
-  /** Completed */
-  DONE = 'DONE',
 }
 
 /**
@@ -212,11 +194,6 @@ export enum NotificationType {
   NEW_URL_FOUND = 'NEW_URL_FOUND',
 }
 
-export enum Language {
-  EN = 'en',
-  VI = 'vi',
-}
-
 export enum IssueStatus {
   OPEN = 'open',
   IN_PROGRESS = 'in_progress',
@@ -239,14 +216,6 @@ export enum IssuePriority {
   P4 = 'p4',
 }
 
-export enum IssueResolution {
-  FIXED = 'fixed',
-  ACCEPTED = 'accepted',
-  DUPLICATE = 'duplicate',
-  WONT_FIX = 'wont_fix',
-  OTHER = 'other',
-}
-
 /** Kinds of resources an issue can link to (issue_links.resourceType). */
 export enum IssueLinkResourceType {
   VULNERABILITY = 'vulnerability',
@@ -254,14 +223,6 @@ export enum IssueLinkResourceType {
   TARGET = 'target',
   PROJECT = 'project',
   JOB_HISTORY = 'job_history',
-}
-
-/** How an issue rule groups matching resources into one open issue. */
-export enum IssueRuleGroupBy {
-  NONE = 'none',
-  VULNERABILITY_NAME = 'vulnerability_name',
-  ASSET = 'asset',
-  TARGET = 'target',
 }
 
 export enum IssueCommentType {
@@ -346,12 +307,6 @@ export enum ProjectScopeRuleType {
   ASSET = 'asset',
 }
 
-/** Why an asset belongs to a project. */
-export enum ProjectAssetSource {
-  MANUAL = 'manual',
-  RULE = 'rule',
-}
-
 /** When a project workflow runs on its own: on a schedule, or on an event. */
 export enum ProjectTriggerType {
   CRON = 'cron',
@@ -404,21 +359,6 @@ export enum VulnerabilityAnalyzeStatus {
   FAILED = 'failed',
 }
 
-/**
- * Enum representing target scope - internal or external networks
- */
-export enum TargetScopeType {
-  /** Targets belonging to internal networks */
-  INTERNAL = 'INTERNAL',
-  /** Targets belonging to external networks (public) */
-  EXTERNAL = 'EXTERNAL',
-}
-
-export enum AgentMode {
-  ASK = 'ask',
-  AGENT = 'agent',
-}
-
 export enum DefaultWorkflow {
   DOMAIN_DISCOVERY = 'domain_discovery.yaml',
   IP_ADDRESS_DISCOVERY = 'ip_address_discovery.yaml',
@@ -466,57 +406,6 @@ export enum IntegrationType {
   SOURCE_CODE = 'SOURCE_CODE',
 }
 
-/**
- * Event-bus consumer groups — one Redis consumer group per lane.
- *
- * An enum rather than four exported string constants: a group name is a Redis
- * key suffix that both the producer-side config and the consumer loop must
- * agree on, and a typo in a bare string only shows up as a lane that silently
- * never fires. Enum members make the compiler refuse it, and `Object.values`
- * gives an exhaustive list for the wiring tests without a second declaration
- * to keep in sync.
- *
- * An `email` member is deliberately absent: there is no mail transport behind
- * it, so the group would claim events it cannot deliver. Add it here and the
- * matching sink together, never one without the other.
- */
-export enum EventBusGroup {
-  /** Materializes the stream into `audit_events`; strictly ordered. */
-  Audit = 'audit',
-  /** Read models. */
-  Projection = 'projection',
-  /** In-app notification rows + SSE. */
-  Notifications = 'notifications',
-  /** Outbound webhooks, Slack, ticketing systems. */
-  Integrations = 'integrations',
-  /** Project scope rules and the "assets added" trigger. */
-  Projects = 'projects',
-  /** Issue rules and the automation of issue types (auto-resolve, reopen). */
-  Issues = 'issues',
-}
-
-export enum TelegramConnectStatus {
-  PENDING = 'PENDING',
-  CONNECTED = 'CONNECTED',
-}
-
-/**
- * How commands run. Agent mode has every new plan approved by the user first,
- * in either mode.
- */
-export enum AgentApprovalMode {
-  /** Run every command without asking */
-  AUTO = 'auto',
-  /** Ask for every command that has not been approved before */
-  MANUAL = 'manual',
-}
-
-export enum AgentCommandApprovalStatus {
-  PENDING = 'pending',
-  APPROVED = 'approved',
-  REJECTED = 'rejected',
-}
-
 export enum ArtifactSource {
   UPLOAD = 'upload',
   AGENT = 'agent',
@@ -533,10 +422,4 @@ export enum ArtifactStatus {
   PENDING = 'pending',
   READY = 'ready',
   DELETED = 'deleted',
-}
-
-export enum ArtifactListScope {
-  MINE = 'mine',
-  SHARED = 'shared',
-  ALL = 'all',
 }

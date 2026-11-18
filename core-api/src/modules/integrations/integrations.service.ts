@@ -9,16 +9,8 @@ import {
 
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { IntegrationType } from '@/common/enums/enum';
-import type { WrapperType } from '@/common/types/app.types';
-import { getManyResponse } from '@/utils/getManyResponse';
-import {
-  BadRequestException,
-  forwardRef,
-  Inject,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { Repository } from 'typeorm';
@@ -45,6 +37,7 @@ import type {
 import type { TestIntegrationDto } from './dto/test-integration.dto';
 import type { UpdateIntegrationDto } from './dto/update-integration.dto';
 import { Integration } from './entities/integration.entity';
+import { IntegrationConfigReader } from './integration-config.reader';
 import { IntegrationSyncService } from './integrations-sync.service';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import {
@@ -52,6 +45,8 @@ import {
   severityProperties,
   universalIntegrationSchema,
 } from './schemas';
+import { isInvalidInput } from '@/common/errors/error-checks';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 /**
  * Derives the Telegram webhook `secret_token` from the bot token.
@@ -93,8 +88,8 @@ export class IntegrationsService {
     @InjectRepository(Integration)
     private readonly integrationRepository: Repository<Integration>,
     private readonly workspaceEncryption: WorkspaceEncryptionService,
-    @Inject(forwardRef(() => IntegrationSyncService))
-    private readonly integrationSyncService: WrapperType<IntegrationSyncService>,
+    private readonly integrationSyncService: IntegrationSyncService,
+    private readonly configReader: IntegrationConfigReader,
   ) {}
 
   /**
@@ -160,7 +155,7 @@ export class IntegrationsService {
       typeof args.syncSchedule === 'string' &&
       args.syncSchedule !== 'disabled'
     ) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'AWS workloadIdentity integrations do not support scheduled syncs; the OIDC token is short-lived. Set syncSchedule to "disabled" and run manual syncs.',
       );
     }
@@ -201,7 +196,7 @@ export class IntegrationsService {
       args.syncSchedule !== 'disabled' &&
       !capabilities.includes(IntegrationType.CLOUD_PROVIDER)
     ) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'syncSchedule is only supported for CLOUD_PROVIDER integrations',
       );
     }
@@ -340,7 +335,7 @@ export class IntegrationsService {
     });
 
     if (!integration) {
-      throw new NotFoundException('Integration not found');
+      throw new NotFoundError('Integration not found');
     }
 
     const dek = await this.workspaceEncryption.getDEK(workspaceId);
@@ -352,21 +347,11 @@ export class IntegrationsService {
    * Throws NotFoundException if not found or not in this workspace.
    * Intended for internal service-to-service use where decrypted config is needed.
    */
-  async getIntegrationWithDecryptedConfig(
+  getIntegrationWithDecryptedConfig(
     id: string,
     workspaceId: string,
   ): Promise<{ integration: Integration; decryptedConfig: Record<string, unknown> }> {
-    const integration = await this.integrationRepository.findOne({
-      where: { id, workspaceId },
-    });
-    if (!integration) {
-      throw new NotFoundException('Integration not found');
-    }
-    const dek = await this.workspaceEncryption.getDEK(workspaceId);
-    return {
-      integration,
-      decryptedConfig: decryptSensitiveConfigFields(integration.config, dek),
-    };
+    return this.configReader.getIntegrationWithDecryptedConfig(id, workspaceId);
   }
 
   /**
@@ -381,7 +366,7 @@ export class IntegrationsService {
       where: { id },
     });
     if (!integration) {
-      throw new NotFoundException('Integration not found');
+      throw new NotFoundError('Integration not found');
     }
     const dek = await this.workspaceEncryption.getDEK(integration.workspaceId);
     return {
@@ -412,11 +397,11 @@ export class IntegrationsService {
     });
 
     if (!integration) {
-      throw new NotFoundException('Integration not found');
+      throw new NotFoundError('Integration not found');
     }
 
     if (dto?.capability && !hasCapability(integration, dto.capability)) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `Capability ${dto.capability} is not enabled on this integration`,
       );
     }
@@ -443,7 +428,7 @@ export class IntegrationsService {
           timestamp: new Date().toISOString(),
         };
       } catch (error) {
-        if (error instanceof BadRequestException) {
+        if (isInvalidInput(error)) {
           return {
             success: false,
             category: integration.category,
@@ -506,7 +491,7 @@ export class IntegrationsService {
       await this.getIntegrationWithDecryptedConfig(id, workspaceId);
 
     if (!hasCapability(integration, IntegrationType.SOURCE_CODE)) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'Organizations can only be listed for integrations with the SOURCE_CODE capability',
       );
     }
@@ -515,7 +500,7 @@ export class IntegrationsService {
     try {
       return await connector.listOrganizations(decryptedConfig);
     } catch (error) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         error instanceof Error ? error.message : 'Failed to list organizations',
       );
     }
@@ -535,7 +520,7 @@ export class IntegrationsService {
       await this.getIntegrationWithDecryptedConfig(id, workspaceId);
 
     if (!hasCapability(integration, IntegrationType.SOURCE_CODE)) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'Repositories can only be listed for integrations with the SOURCE_CODE capability',
       );
     }
@@ -550,7 +535,7 @@ export class IntegrationsService {
     } catch (error) {
       // Provider failures (bad token, missing scope) are the user's to fix —
       // a 400 with the provider message, not an opaque 500.
-      throw new BadRequestException(
+      throw new InvalidInputError(
         error instanceof Error ? error.message : 'Failed to list repositories',
       );
     }
@@ -569,7 +554,7 @@ export class IntegrationsService {
     });
 
     if (!integration) {
-      throw new NotFoundException('Integration not found');
+      throw new NotFoundError('Integration not found');
     }
 
     // Remove the periodic sync scheduler before deleting the row
@@ -598,7 +583,7 @@ export class IntegrationsService {
     });
 
     if (!integration) {
-      throw new NotFoundException('Integration not found');
+      throw new NotFoundError('Integration not found');
     }
 
     if (dto.name !== undefined) {
@@ -671,7 +656,7 @@ export class IntegrationsService {
         dto.syncSchedule !== 'disabled' &&
         !hasCapability(integration, IntegrationType.CLOUD_PROVIDER)
       ) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           'syncSchedule is only supported for CLOUD_PROVIDER integrations',
         );
       }
@@ -790,7 +775,7 @@ export class IntegrationsService {
   ): Promise<{ jobId: string }> {
     const integration = await this.getIntegrationById(id, workspaceId);
     if (!hasCapability(integration, IntegrationType.CLOUD_PROVIDER)) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'syncSchedule is only supported for CLOUD_PROVIDER integrations',
       );
     }

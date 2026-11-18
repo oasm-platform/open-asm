@@ -13,7 +13,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
-import { InvitationStatus } from '@/common/enums/enum';
+import { InvitationStatus } from '@/modules/workspaces/enums/workspace.enums';
 
 /** Wildcard, or lowercase domain.action keys, e.g. target.read */
 export const PERMISSION_KEY_REGEX = /^\*$|^[a-z]+\.[a-z]+$/;

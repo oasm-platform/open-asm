@@ -18,12 +18,14 @@ import { Test } from '@nestjs/testing';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
 import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
-import { IntegrationsService } from '../integrations/integrations.service';
+import { IntegrationConfigReader } from '../integrations/integration-config.reader';
 import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
 import type { WorkerInstance } from '../workers/entities/worker.entity';
 import { WorkersService } from '../workers/workers.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { JobsRegistryController } from './jobs-registry.controller';
+import { JobDispatchService } from './job-dispatch.service';
+import { JobHistoryQueryService } from './job-history-query.service';
 import { JobsRegistryService } from './jobs-registry.service';
 import { WorkflowRunnerService } from './workflow-runner.service';
 
@@ -90,7 +92,7 @@ describe('JobsRegistryController', () => {
     let mockJobsRegistryService: any;
     let mockConnectorRegistry: any;
     let mockToolConfigProfilesService: any;
-    let mockIntegrationsService: { getIntegrationWithDecryptedConfig: jest.Mock };
+    let mockIntegrationConfig: { getIntegrationWithDecryptedConfig: jest.Mock };
     let eventBridge: { publishSafely: jest.Mock };
 
     beforeEach(async () => {
@@ -110,7 +112,7 @@ describe('JobsRegistryController', () => {
       mockToolConfigProfilesService = {
         resolveConfigForJob: jest.fn(),
       };
-      mockIntegrationsService = {
+      mockIntegrationConfig = {
         getIntegrationWithDecryptedConfig: jest.fn(),
       };
 
@@ -118,9 +120,12 @@ describe('JobsRegistryController', () => {
         controllers: [JobsRegistryController],
         providers: [
           { provide: JobsRegistryService, useValue: mockJobsRegistryService },
+          { provide: JobHistoryQueryService, useValue: {} },
+          // One bag of mocks: getNextJob(s) on the dispatch side, the rest on the registry
+          { provide: JobDispatchService, useValue: mockJobsRegistryService },
           { provide: ConnectorRegistryService, useValue: mockConnectorRegistry },
           { provide: ToolConfigProfilesService, useValue: mockToolConfigProfilesService },
-          { provide: IntegrationsService, useValue: mockIntegrationsService },
+          { provide: IntegrationConfigReader, useValue: mockIntegrationConfig },
           { provide: WorkflowRunnerService, useValue: { retryRun: jest.fn() } },
           { provide: WorkspacesService, useValue: { getWorkspace: jest.fn() } },
           { provide: WorkersService, useValue: { validateWorkerToken: jest.fn() } },
@@ -274,7 +279,7 @@ describe('JobsRegistryController', () => {
         image: 'ghcr.io/oasm-platform/connector-gitleaks:8',
       });
       mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({});
-      mockIntegrationsService.getIntegrationWithDecryptedConfig.mockResolvedValue({
+      mockIntegrationConfig.getIntegrationWithDecryptedConfig.mockResolvedValue({
         integration: { appType: 'gitlab' },
         decryptedConfig: { apiToken: 'glpat-secret' },
       });
@@ -282,7 +287,7 @@ describe('JobsRegistryController', () => {
       const result = await controller.next({ id: 'worker-1' }, metadata);
 
       expect(
-        mockIntegrationsService.getIntegrationWithDecryptedConfig,
+        mockIntegrationConfig.getIntegrationWithDecryptedConfig,
       ).toHaveBeenCalledWith('int-1', 'ws-1');
       expect(result.inputs).toEqual({
         fields: {
@@ -312,7 +317,7 @@ describe('JobsRegistryController', () => {
         image: 'ghcr.io/oasm-platform/connector-gitleaks:8',
       });
       mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({});
-      mockIntegrationsService.getIntegrationWithDecryptedConfig.mockRejectedValue(
+      mockIntegrationConfig.getIntegrationWithDecryptedConfig.mockRejectedValue(
         new Error('not found'),
       );
 
@@ -431,7 +436,7 @@ describe('JobsRegistryController', () => {
         }),
       );
       mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({ apiKey: 'nessus-key' });
-      mockIntegrationsService.getIntegrationWithDecryptedConfig.mockResolvedValue({
+      mockIntegrationConfig.getIntegrationWithDecryptedConfig.mockResolvedValue({
         integration: { appType: 'github' },
         decryptedConfig: { apiToken: 'ghp-secret' },
       });
@@ -499,12 +504,15 @@ describe('JobsRegistryController', () => {
         controllers: [JobsRegistryController],
         providers: [
           { provide: JobsRegistryService, useValue: mockJobsRegistryService },
+          { provide: JobHistoryQueryService, useValue: {} },
+          // One bag of mocks: getNextJob(s) on the dispatch side, the rest on the registry
+          { provide: JobDispatchService, useValue: mockJobsRegistryService },
           {
             provide: ConnectorRegistryService,
             useValue: { getConnector: jest.fn(), getResourceDefaults: jest.fn() },
           },
           {
-            provide: IntegrationsService,
+            provide: IntegrationConfigReader,
             useValue: { getIntegrationWithDecryptedConfig: jest.fn() },
           },
           {
@@ -646,12 +654,15 @@ describe('JobsRegistryController', () => {
         controllers: [JobsRegistryController],
         providers: [
           { provide: JobsRegistryService, useValue: mockJobsRegistryService },
+          { provide: JobHistoryQueryService, useValue: {} },
+          // One bag of mocks: getNextJob(s) on the dispatch side, the rest on the registry
+          { provide: JobDispatchService, useValue: mockJobsRegistryService },
           {
             provide: ConnectorRegistryService,
             useValue: { getConnector: jest.fn(), getResourceDefaults: jest.fn() },
           },
           {
-            provide: IntegrationsService,
+            provide: IntegrationConfigReader,
             useValue: { getIntegrationWithDecryptedConfig: jest.fn() },
           },
           {

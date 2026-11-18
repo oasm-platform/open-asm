@@ -1,10 +1,8 @@
 import { JobRunType, WorkerType } from '@/common/enums/enum';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import {
-  BadRequestException,
   Injectable,
   Logger,
-  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
@@ -49,6 +47,7 @@ import {
   type PipelineStep,
 } from './pipeline';
 import { RUN_STATUS_SQL } from './provenance';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 export interface StartBindingRunOptions {
   jobRunType: JobRunType;
@@ -174,7 +173,7 @@ export class ProjectWorkflowsService {
       dto.copyFromProjectWorkflowId ? 'copy' : null,
     ].filter(Boolean);
     if (sources.length !== 1) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'Give exactly one of tools, template or copyFromProjectWorkflowId',
       );
     }
@@ -193,7 +192,7 @@ export class ProjectWorkflowsService {
         },
       });
       if (!template) {
-        throw new NotFoundException(`Template "${dto.template}" not found`);
+        throw new NotFoundError(`Template "${dto.template}" not found`);
       }
       jobs = template.content.jobs;
       defaultName = template.name;
@@ -206,7 +205,7 @@ export class ProjectWorkflowsService {
         relations: { workflow: true },
       });
       if (!source?.workflow) {
-        throw new NotFoundException(
+        throw new NotFoundError(
           `Project workflow "${dto.copyFromProjectWorkflowId}" not found`,
         );
       }
@@ -247,7 +246,7 @@ export class ProjectWorkflowsService {
     });
     const binding = await this.findBinding(projectId, bindingId);
     if (!isProjectOwnedWorkflow(binding.workflow.filePath, projectId)) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'This workflow is not owned by the project and cannot be edited here',
       );
     }
@@ -256,7 +255,7 @@ export class ProjectWorkflowsService {
     let content: WorkflowContent = { ...binding.workflow.content, name };
     if (dto.tools) {
       if (dto.tools.length === 0) {
-        throw new BadRequestException('A pipeline needs at least one tool');
+        throw new InvalidInputError('A pipeline needs at least one tool');
       }
       const jobs = await this.buildToolJobs(
         workspaceId,
@@ -340,7 +339,7 @@ export class ProjectWorkflowsService {
       relations: { workflow: { workspace: true }, project: true },
     });
     if (!binding?.workflow) {
-      throw new NotFoundException(`Project workflow "${bindingId}" not found`);
+      throw new NotFoundError(`Project workflow "${bindingId}" not found`);
     }
     return binding;
   }
@@ -362,7 +361,7 @@ export class ProjectWorkflowsService {
       ? opts.assetIds.filter((id) => inProject.has(id))
       : [...inProject];
     if (assetIds.length === 0) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         opts.assetIds
           ? 'None of the selected assets belong to the project'
           : 'The project has no assets to scan',
@@ -388,7 +387,7 @@ export class ProjectWorkflowsService {
       chainDepth: opts.chainDepth,
     });
     if (!jobHistory) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'The workflow has nothing to run on these assets',
       );
     }
@@ -412,7 +411,7 @@ export class ProjectWorkflowsService {
     const toolById = new Map(tools.map((tool) => [tool.id!, tool]));
     const missing = toolIds.filter((id) => !toolById.has(id));
     if (missing.length > 0) {
-      throw new NotFoundException(
+      throw new NotFoundError(
         `One or more tools with IDs "${missing.join(', ')}" not found`,
       );
     }
@@ -438,7 +437,7 @@ export class ProjectWorkflowsService {
           !input.configProfileId &&
           !profileToolIds.has(tool.id!)
         ) {
-          throw new BadRequestException(
+          throw new InvalidInputError(
             `Tool "${tool.name}" requires a configuration profile or inline config.`,
           );
         }
@@ -447,7 +446,7 @@ export class ProjectWorkflowsService {
         const capability = resolveToolCategory(tool, input.category);
         resolveStepInputs(tool.name, capability, input.input);
       } catch (error) {
-        throw new BadRequestException((error as Error).message);
+        throw new InvalidInputError((error as Error).message);
       }
 
       let config = input.config;
@@ -491,7 +490,7 @@ export class ProjectWorkflowsService {
       return normalizeWorkflowContent(content);
     } catch (error) {
       if (error instanceof WorkflowGraphError) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           `Invalid workflow content: ${error.errors.join('; ')}`,
         );
       }
@@ -528,7 +527,7 @@ export class ProjectWorkflowsService {
       this.logger.warn(
         `Project run refused: tool "${missing}" is not installed in workspace ${workflow.workspace?.id ?? 'unknown'}`,
       );
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `Tool "${missing}" is not installed in the workspace.`,
       );
     }

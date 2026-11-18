@@ -1,4 +1,4 @@
-import { EventBusGroup } from '@/common/enums/enum';
+import { EventBusGroup } from '@/modules/event-bridge/enums/event-bridge.enums';
 
 /**
  * Which domains each consumer group cares about — the SINGLE place a lane's

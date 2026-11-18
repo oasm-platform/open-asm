@@ -1,5 +1,3 @@
-import { JobRunType } from '@/common/enums/enum';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -29,7 +27,6 @@ describe('AssetsService', () => {
   let mockAssetRepository: Partial<Repository<Asset>>;
   let mockAssetServiceRepository: Partial<Repository<AssetService>>;
   let mockTargetRepository: Partial<Repository<Target>>;
-  let mockEventEmitter: Partial<EventEmitter2>;
   let mockTechnologyForwarderService: Partial<TechnologyForwarderService>;
   let mockWorkspacesService: Partial<WorkspacesService>;
   let mockGeoIpService: Partial<GeoIpService>;
@@ -76,10 +73,6 @@ describe('AssetsService', () => {
     mockTargetRepository = {
       findOne: jest.fn(),
       update: jest.fn(),
-    };
-
-    mockEventEmitter = {
-      emit: jest.fn(),
     };
 
     mockTechnologyForwarderService = {
@@ -192,10 +185,6 @@ describe('AssetsService', () => {
         {
           provide: getRepositoryToken(AgentConfig),
           useValue: { findOne: jest.fn() },
-        },
-        {
-          provide: EventEmitter2,
-          useValue: mockEventEmitter,
         },
         {
           provide: TechnologyForwarderService,
@@ -1141,112 +1130,14 @@ describe('AssetsService', () => {
     });
   });
 
-  describe('reScan', () => {
-    const targetId = 'target-uuid';
+  describe('hasPrimaryAsset', () => {
+    it('looks for the primary asset of the target', async () => {
+      mockAssetRepository.exists = jest.fn().mockResolvedValue(true);
 
-    beforeEach(() => {
-      jest.clearAllMocks();
-    });
-
-    it('should not throw BadRequestException when isAssetsDiscovery is false (gate removed)', async () => {
-      const mockAsset = { id: 'asset-uuid', isPrimary: true };
-      const mockTarget = {
-        id: targetId,
-        reScanCount: 0,
-        type: 'domain',
-        value: 'example.com',
-      };
-
-      mockAssetRepository.findOne = jest.fn().mockResolvedValue(mockAsset);
-      mockTargetRepository.findOne = jest.fn().mockResolvedValue(mockTarget);
-      mockTargetRepository.update = jest.fn().mockResolvedValue({});
-      mockWorkspacesService.getWorkspaceIdByTargetId = jest
-        .fn()
-        .mockResolvedValue('workspace-uuid');
-      mockEventEmitter.emit = jest.fn();
-
-      const result = await service.reScan(targetId);
-
-      // Should succeed (not throw), even though isAssetsDiscovery would be falsy if checked
-      expect(result).toEqual({ message: 'Scan started' });
-      expect(mockTargetRepository.update).toHaveBeenCalledWith(targetId, {
-        reScanCount: 1,
-        lastDiscoveredAt: expect.any(Date),
+      await expect(service.hasPrimaryAsset('target-uuid')).resolves.toBe(true);
+      expect(mockAssetRepository.exists).toHaveBeenCalledWith({
+        where: { target: { id: 'target-uuid' }, isPrimary: true },
       });
-      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
-        'target.domain.re-scan',
-        mockTarget,
-        { jobRunType: JobRunType.MANUAL },
-      );
-    });
-
-    it('emits the re-scan trigger of the target type (IP runs IP discovery, not domain discovery)', async () => {
-      const mockTarget = {
-        id: targetId,
-        reScanCount: 2,
-        type: 'IP',
-        value: '203.0.113.10',
-      };
-
-      mockAssetRepository.findOne = jest
-        .fn()
-        .mockResolvedValue({ id: 'asset-uuid', isPrimary: true });
-      mockTargetRepository.findOne = jest.fn().mockResolvedValue(mockTarget);
-      mockTargetRepository.update = jest.fn().mockResolvedValue({});
-      mockEventEmitter.emit = jest.fn();
-
-      await service.reScan(targetId);
-
-      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
-        'target.ip.re-scan',
-        mockTarget,
-        { jobRunType: JobRunType.MANUAL },
-      );
-    });
-
-    it('passes the scheduled run type on to the workflow trigger', async () => {
-      const mockTarget = {
-        id: targetId,
-        reScanCount: 0,
-        type: 'DOMAIN',
-        value: 'example.com',
-      };
-      mockAssetRepository.findOne = jest
-        .fn()
-        .mockResolvedValue({ id: 'asset-uuid', isPrimary: true });
-      mockTargetRepository.findOne = jest.fn().mockResolvedValue(mockTarget);
-      mockTargetRepository.update = jest.fn().mockResolvedValue({});
-      mockEventEmitter.emit = jest.fn();
-
-      await service.reScan(targetId, 'workspace-uuid', JobRunType.SCHEDULED);
-
-      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
-        'target.domain.re-scan',
-        mockTarget,
-        { jobRunType: JobRunType.SCHEDULED },
-      );
-    });
-
-    it('re-syncs a Git organization instead of requiring a primary host asset', async () => {
-      const mockTarget = {
-        id: targetId,
-        reScanCount: 0,
-        type: 'GIT_ORG',
-        value: 'github.com/acme',
-      };
-      mockAssetRepository.findOne = jest.fn().mockResolvedValue(null);
-      mockTargetRepository.findOne = jest.fn().mockResolvedValue(mockTarget);
-      mockTargetRepository.update = jest.fn().mockResolvedValue({});
-      mockEventEmitter.emit = jest.fn();
-
-      const result = await service.reScan(targetId);
-
-      expect(result).toEqual({ message: 'Repository sync started' });
-      expect(mockAssetRepository.findOne).not.toHaveBeenCalled();
-      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
-        'target.git_org.re-scan',
-        mockTarget,
-      );
     });
   });
 

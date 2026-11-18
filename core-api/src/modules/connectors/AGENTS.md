@@ -30,7 +30,7 @@ In-memory catalogue of scanner connectors (container images the worker runs), lo
 ## Coupling
 
 - Imported by `tools`, `jobs-registry`, `workers`, `projects` and `agents`. The main callers are `tools.service.ts` / `tool-config-profiles.service.ts` (schemas, config validation), `jobs-registry` (image and resource defaults at dispatch), `workers.service.ts` (`getAllConnectors`, logo URL `/connectors/<slug>.png`), `projects/project-workflows.service.ts`, and `agents/tools/connector.tools.ts` (`getAgentConnectors`, `getResourceDefaults`) and `agents/tools/workspace.tools.ts` (`getConnectorSchema`, for `display_available_tools`).
-- `StorageService` is injected without importing `StorageModule`, because that module is `@Global()`.
+- Imports `StorageModule` for `StorageService` (connector logos).
 - Logo files are written by `tools/tool-sync.service.ts` (`connectors/<slug>.png` in the `system` bucket), not by this module.
 - Imports `ManifestCapability` (type only) from `tools/tool-categories`.
 

@@ -4,7 +4,7 @@ The AI chat agent: LLM connections, conversations streamed over SSE, the tool se
 
 ## Layout
 
-- `agents.module.ts`: `@Global()`. Registers every entity below plus `Project`, and the tool classes (`AGENT_TOOL_CLASSES`). `onModuleInit` runs `validateAgentFunctions` over `AGENT_FUNCTION_HOSTS` (every class with `@AgentFunction` methods), so a broken declaration stops the boot.
+- `agents.module.ts`: not global; imported by `McpServerModule` (`src/mcp`). Registers every entity below plus `Project`, and the tool classes (`AGENT_TOOL_CLASSES`). `onModuleInit` runs `validateAgentFunctions` over `AGENT_FUNCTION_HOSTS` (every class with `@AgentFunction` methods), so a broken declaration stops the boot.
 - `agents.controller.ts`: all HTTP routes under `agents/`, including the SSE writer and the resume stream.
 - `agents.service.ts` (`AgentsService`): LLM config CRUD, conversation/message reads and deletes, workspace MCP config CRUD + ping, the `PROJECT_DELETING_EVENT` listener.
 - `agents.completions.ts` (`AgentsCompletionsService`, ~3000 lines): one chat turn (`streamMessage`), the continuation loop (`createContinuationStream`), system prompt assembly (`buildSystemContext`), compaction, title/goal generation, `vulAnalyze`, and the in-memory run registry (`activeRuns`).
@@ -19,7 +19,7 @@ The AI chat agent: LLM connections, conversations streamed over SSE, the tool se
 - `agents.config.ts`: per-user agent settings, default-model resolution (`findDefaultLLMConfig`, `withAgentConfig`), `withoutDisabledTools`, `createLanguageModel`.
 - `agents.mcp.ts`: lists tools from the workspace's external MCP servers. `agents.memories.ts`: STM (Redis) and LTM (DB). `agents.stream-buffer.ts`: Redis replay buffer for SSE. `agents.usage.ts`: raw-SQL usage report. `agents.models-catalog.ts` + `shared/models-dev.ts`: context window, cost and reasoning efforts from `resources/models-dev/catalog.json` (refresh with `task api:models:snapshot`).
 - `llm-provider-supported.ts`: provider list (`llmProviderSupported`), model handlers and model fetchers.
-- `prompts/*.md`: Mustache templates loaded at boot (`SYSTEM.md`, `ASK.md`/`AGENT.md` picked by `agentMode.toUpperCase()`, `PLAN.md`, title/goal/summary/vuln prompts).
+- `prompts/*.md`: Mustache templates loaded at boot through `PromptRegistry` (`common/utils/prompt-registry.util.ts`, one read per process, shared with `AssetsService`) (`SYSTEM.md`, `ASK.md`/`AGENT.md` picked by `agentMode.toUpperCase()`, `PLAN.md`, title/goal/summary/vuln prompts).
 - `shared/`: context budget, step limit, token counter, turn stats, `updateConversationMetadata`.
 
 ## Public surface
@@ -82,8 +82,8 @@ All routes: `@Controller('agents')`, `AuthGuard`, `@WorkspaceAccess('agent.read'
 
 ## Coupling
 
-- Imports `AssetsModule`, `ArtifactsModule`, `TargetsModule`, `TemplatesModule` (for `save_template`), `RemoteExecuteModule`, `WorkersModule`, `ConnectorsModule`, `ProjectsModule`, `HttpModule`, and `forwardRef` to `VulnerabilitiesModule` and `StatisticModule` (cycle Statistic → Vulnerabilities → Agents → Statistic). The tool classes inject `VulnerabilitiesService`, `VulnerabilityReviewService`, `IssuesService`, `ToolsService`, `WorkersService`, `JobsRegistryService` with `forwardRef`; issues/tools/jobs-registry/workspaces/event-bridge come from global modules. Importing `agents.tools.ts` before `AppModule` (e.g. at the top of an e2e spec) leaves `AgentTool` undefined in `AgentsCompletionsService`'s constructor metadata (import cycle through the services): import the app helpers first.
-- `VulnerabilitiesModule` imports this module with `forwardRef` and calls `AgentsCompletionsService.vulAnalyze`. `src/mcp/mcp.module.ts` imports it for `AgentTool.getMcpTools`.
+- Imports `AssetsModule`, `ArtifactsModule`, `TargetsModule`, `TemplatesModule` (for `save_template`), `RemoteExecuteModule`, `WorkersModule`, `ConnectorsModule`, `ProjectsModule`, `HttpModule`, `VulnerabilitiesModule`, `StatisticModule`, `IssuesModule`, `ToolsModule` and `JobsRegistryModule` (none of them imports this module). No `forwardRef`: the tool classes inject their services directly; workspaces and event-bridge come from global modules. Importing `agents.tools.ts` before `AppModule` (e.g. at the top of an e2e spec) leaves `AgentTool` undefined in `AgentsCompletionsService`'s constructor metadata (import cycle through the services): import the app helpers first.
+- `VulnerabilityAnalyzerAdapter` (`vulnerability-analyzer.adapter.ts`) registers itself in the vulnerabilities module's `VulnerabilityAnalyzerRegistry` on init and runs `AgentsCompletionsService.vulAnalyze` for it, so `VulnerabilitiesModule` does not import this module. `src/mcp/mcp.module.ts` imports it for `AgentTool.getMcpTools`.
 - Direct table access from outside: `workers/remote-execute-subscribe.service.ts` writes `agent_conversations.workerId` (sticky worker pin); `assets/assets.service.ts` registers `AgentLLMConfig`/`AgentConfig`, calls `findDefaultLLMConfig` and reads `prompts/GENERATE_SERVICE_TAGS.md` from this folder; `vulnerabilities/vulnerability-review.service.ts` runs raw SQL on `agent_message_tool_calls` and `agent_subagents` and reads the tool-output Redis keys; `vulnerability-source.entity.ts` has an FK to `AgentConversation` (`SET NULL`). Check these when changing those entities.
 
 ## Gotchas

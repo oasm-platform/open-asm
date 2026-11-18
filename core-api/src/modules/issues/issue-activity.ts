@@ -10,9 +10,10 @@ import { Comment } from '@/modules/comments/entities/comment.entity';
 import type { CatalogEvent } from '@/modules/event-bridge/contracts/event-catalog';
 import type { EventEnvelopeData } from '@/modules/event-bridge/contracts/event-envelope';
 import { EventBridgeService } from '@/modules/event-bridge/publishing/event-bridge.service';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { type EntityManager, QueryFailedError } from 'typeorm';
 import { IssueLink } from './entities/issue-link.entity';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 /** Statuses in which an issue is still being worked on. */
 export const ACTIVE_ISSUE_STATUSES: readonly IssueStatus[] = [
@@ -126,7 +127,7 @@ export async function assertWorkspaceMember(
     [workspaceId, userId],
   );
   if (rows.length === 0) {
-    throw new BadRequestException('The assignee is not a member of this workspace');
+    throw new InvalidInputError('The assignee is not a member of this workspace');
   }
 }
 

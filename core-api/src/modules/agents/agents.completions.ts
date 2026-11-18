@@ -1,8 +1,6 @@
 import {
-  BadRequestException,
   Injectable,
   Logger,
-  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type {
@@ -14,13 +12,12 @@ import type {
   UIMessageChunk,
 } from 'ai';
 import { streamText, toUIMessageStream } from 'ai';
-import * as fs from 'fs';
-import * as Mustache from 'mustache';
 import { EventEmitter } from 'node:events';
 import * as path from 'path';
 import { Repository } from 'typeorm';
 
-import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
+import { AgentApprovalMode, AgentMode } from '@/modules/agents/enums/agent.enums';
+import { PromptRegistry } from '@/common/utils/prompt-registry.util';
 import { RemoteExecuteSubscribeService } from '@/modules/workers/remote-execute-subscribe.service';
 import { WorkersService } from '@/modules/workers/workers.service';
 import { Project } from '@/modules/projects/entities/project.entity';
@@ -83,6 +80,7 @@ import {
   mergeStats,
   type StatsAccumulator,
 } from './shared/turn-stats';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 /**
  * Whether this run may plan. Agent mode keeps its own plan (`track`): every
@@ -428,8 +426,9 @@ export class AgentsCompletionsService {
   /** Compaction in progress by conversation id: a second trigger joins it */
   private readonly compactions = new Map<string, Promise<void>>();
 
-  private readonly prompts = new Map<string, string>();
-  private static readonly PROMPTS_DIR = 'prompts';
+  private readonly prompts = PromptRegistry.forDirectory(
+    path.join(__dirname, 'prompts'),
+  );
   private readonly toolCapableModelsCache = new Map<string, Set<string>>();
   private toolCapableCacheExpiry = 0;
   private static readonly TOOL_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
@@ -462,55 +461,10 @@ export class AgentsCompletionsService {
     private readonly agentsConfig: AgentsConfigService,
     private readonly modelsCatalog: AgentsModelsCatalogService,
     private readonly subagents: AgentsSubagentsService,
-  ) {
-    this.loadAllPrompts();
-  }
-
-  /**
-   * Loads all prompt files from the prompts directory at startup.
-   * Searches recursively to handle NestJS asset copy behavior where
-   * .md files may be placed in subdirectories (e.g., default/).
-   */
-  private loadAllPrompts(): void {
-    const promptsDir = path.join(
-      __dirname,
-      AgentsCompletionsService.PROMPTS_DIR,
-    );
-    try {
-      this.loadPromptsRecursive(promptsDir);
-    } catch (error) {
-      this.logger.error('Failed to load prompts directory', error);
-    }
-  }
-
-  /**
-   * Recursively walks a directory and loads all .md files found.
-   * Keys are stored in lowercase for case-insensitive lookup.
-   */
-  private loadPromptsRecursive(dir: string): void {
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        this.loadPromptsRecursive(fullPath);
-      } else if (entry.name.endsWith('.md')) {
-        try {
-          const key = entry.name.toLowerCase();
-          this.prompts.set(key, fs.readFileSync(fullPath, 'utf-8'));
-        } catch (error) {
-          this.logger.error(`Failed to load prompt: ${entry.name}`, error);
-        }
-      }
-    }
-  }
+  ) {}
 
   private getPrompt(fileName: string, data?: Record<string, unknown>): string {
-    const key = fileName.toLowerCase();
-    const template = this.prompts.get(key) ?? '';
-    if (data) {
-      return Mustache.render(template, data);
-    }
-    return template;
+    return this.prompts.render(fileName, data);
   }
 
   private async resolveLLMConfig(
@@ -538,7 +492,7 @@ export class AgentsCompletionsService {
       agentConfig,
     );
     if (!llmConfig) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'No LLM provider connected. Please connect a provider first.',
       );
     }
@@ -583,7 +537,7 @@ export class AgentsCompletionsService {
     }
 
     if (toolModels && !toolModels.has(config.model)) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `The selected model "${config.model}" does not support tool calling. ` +
           'Please switch to a model that supports tools (e.g. gpt-4o, claude-3-5-sonnet, gemini-2.0-flash).',
       );
@@ -919,7 +873,7 @@ export class AgentsCompletionsService {
           return existing; // Return existing conversation
         }
         // Conversation belongs to another member — never reuse or expose it
-        throw new NotFoundException('Conversation not found');
+        throw new NotFoundError('Conversation not found');
       }
     }
 
@@ -938,7 +892,7 @@ export class AgentsCompletionsService {
         workspaceId,
       ))
     ) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'Worker is not available to agents in this workspace',
       );
     }
@@ -947,7 +901,7 @@ export class AgentsCompletionsService {
       dto.workerId &&
       !this.remoteExecuteSubscribe.isAgentReady(dto.workerId, workspaceId)
     ) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'Worker is offline; choose an online worker or Auto',
       );
     }
@@ -1027,7 +981,7 @@ export class AgentsCompletionsService {
     });
 
     if (!llmConfig) {
-      throw new NotFoundException('LLM config not found');
+      throw new NotFoundError('LLM config not found');
     }
 
     // If user switched to a different provider, resolve the correct config
@@ -1170,7 +1124,7 @@ export class AgentsCompletionsService {
       return false;
     } catch (error) {
       this.logger.warn(
-        `[MidLoopCompaction] Error checking budget, skipping compaction: ${error}`,
+        `[MidLoopCompaction] Error checking budget, skipping compaction: ${String(error)}`,
       );
       return false;
     }

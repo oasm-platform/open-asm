@@ -18,6 +18,8 @@ import { IssuesSink } from './sinks/issues/issues.sink';
 import { NotificationsSink } from './sinks/notifications/notifications.sink';
 import { ProjectionSink } from './sinks/projection/projection.sink';
 import { ProjectsSink } from './sinks/projects/projects.sink';
+import { ProjectsModule } from '../projects/projects.module';
+import { IssuesModule } from '../issues/issues.module';
 
 /**
  * Every lane, one per `EventBusGroup`. Adding a lane = a sink class here plus
@@ -64,6 +66,8 @@ export const SINKS = [
       NotificationRecipient,
       User,
     ]),
+    ProjectsModule,
+    IssuesModule,
   ],
   providers: [
     // Publishing

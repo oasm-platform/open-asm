@@ -48,7 +48,7 @@ export class WorkerInstance extends BaseEntity {
   @Column({ type: 'uuid', nullable: true })
   workspaceId: string;
 
-  @ManyToOne(() => Workspace, (workspace) => workspace.workers, {
+  @ManyToOne(() => Workspace, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'workspaceId' })

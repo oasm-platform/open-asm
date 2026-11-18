@@ -4,9 +4,13 @@ Tenants: workspaces, their members, permission groups and invitations. It also o
 
 ## Layout
 
-- `workspaces.module.ts`: `@Global()`, exports `WorkspacesService`. Imports `ApiKeysModule`, `ArtifactsModule`, `forwardRef(() => WorkflowsModule)`.
+- `workspaces.module.ts`: `@Global()` on purpose: `WorkspacePermissionGuard` (behind `@WorkspaceAccess`, on controllers in some 20 modules) injects `WorkspacesService`, so this module is the tenancy kernel, like `AuthModule`. Exports `WorkspacesService`. Imports `ApiKeysModule`, `ArtifactsModule`, `NotificationsModule`.
 - `workspaces.controller.ts`: all `/workspaces` routes.
-- `workspaces.service.ts`: CRUD, members, permission groups, invitations, `getMembershipWithPermissions`.
+- `workspaces.service.ts`: CRUD, configs, api key, archive; `getMembershipWithPermissions` delegates to the membership service and stays here for the guard and other modules.
+- `workspace-invitations.service.ts` (`WorkspaceInvitationsService`): create, list, preview, accept, decline and cancel invitations, and the invitation notifications.
+- `workspace-members.service.ts` (`WorkspaceMembersService`): list members with their groups, replace a member's groups, remove a member (`assertMemberMutable`, audit rows in the same transaction, pseudonymization after commit).
+- `workspace-permission-groups.service.ts` (`WorkspacePermissionGroupsService`): the permission catalog, group CRUD, `seedOwnerPermissionGroup` (called inside the creation transaction), and the no-escalation checks members and invitations share (`assertCanGrantGroups`, `findValidPermissionGroups`). Exports `OWNER_PERMISSION_GROUP_NAME` and `WILDCARD_PERMISSION`.
+- `workspace-membership.service.ts` (`WorkspaceMembershipService`): the membership row plus the union of the member's permission keys (`getMembershipWithPermissions`), and `getCurrentPermission`.
 - `permission-catalog.json`: the list of valid `resource.action` keys. Read from disk at call time by `getPermissionCatalog()` (shipped to `dist/` through the `**/*.json` asset rule in `nest-cli.json`).
 - `entities/`: `Workspace`, `WorkspaceMembers`, `WorkspacePermission`, `WorkspaceMemberPermission`, `WorkspaceInvitation`.
 - `workspaces.doc.ts`: `GetManyWorkspaceDoc()` is unused and does not return its decorator.
@@ -44,9 +48,10 @@ Service methods other modules call: `getMembershipWithPermissions` (guard, event
 
 ## Data model
 
-- `workspaces`: `owner` FK with `ON DELETE CASCADE` from `users`, so deleting a user wipes their workspaces. That is why user deletion is disabled in `auth.ts`. Has a `deletedAt` column, but `deleteWorkspace` **hard-deletes** (`manager.delete`) after deleting the targets in a separate transaction. Artifact objects are removed in the background (`artifactsService.deleteWorkspaceObjects`).
+- `workspaces`: `owner` FK with `ON DELETE CASCADE` from `users`, so deleting a user wipes their workspaces. That is why user deletion is disabled in `auth.ts`. Has a `deletedAt` column, but `deleteWorkspace` **hard-deletes** (`manager.delete`, with the audit row in the same transaction) after awaiting `WORKSPACE_DELETING_EVENT`, on which the targets module deletes the workspace's targets in its own statement. Artifact objects are removed in the background (`artifactsService.deleteWorkspaceObjects`).
 - `dek` / `dekAt`: a wrapped per-workspace data key, generated at create with `WorkspaceEncryptionService.generateWrappedDEK()` (`src/services/workspace-encryption/`). That service caches unwrapped DEKs and backfills missing ones at boot. Never write `dek` yourself.
 - `settings` (jsonb, keyed by section) exists, but nothing in this module reads or writes it.
+- `Workspace` declares inverse relations only for its own tables (`workspaceMembers`, `permissions`). Workers, tools, statistics, workflows and internal networks point at it one-way.
 - `apiKey` is a one-to-one relation (`apiKeyId`) that is set on rotate. Lookups go through `ApiKeysService.getCurrentApiKey(WORKSPACE, workspaceId)`, not this column. `GET api-key` creates a key on first call.
 - `workspace_members`: the unique `(workspaceId, userId)` index `IDX_wm_workspace_user_unique` exists only in migration `1786002229271`, not on the entity. A generated migration may try to drop it.
 - `workspace_permissions`: unique `(workspace, name)`. The service also checks names case-insensitively. `permissions` is a `text[]`. `isSystem` marks the `Admin` group (`OWNER_PERMISSION_GROUP_NAME`, holds `['*']`).
@@ -65,11 +70,12 @@ Service methods other modules call: `getMembershipWithPermissions` (guard, event
 
 ## Coupling
 
-- Cycle with `WorkflowsModule` (`forwardRef` on both sides) for `WorkflowTemplateService.createDefaultWorkflows`.
-- Uses the global `NotificationsService`, `AuditService`, `WorkspaceEncryptionService` without importing their modules.
+- No dependency on the workflows module: `createWorkspace` emits `WORKSPACE_INITIALIZING_EVENT` (`workspace.events.ts`) with `emitAsync` after the transaction commits and awaits it. `WorkflowTemplateService` creates the default workflows on it; its failure fails the creation (`suppressErrors: false`).
+- Imports `NotificationsModule` for `NotificationsService` (used by `WorkspaceInvitationsService` only); uses the global `AuditService` and `WorkspaceEncryptionService`.
+- The controller calls each service directly. Only `WorkspacesService` is exported; other modules reach membership through its `getMembershipWithPermissions`.
 - These write the `workspaces` table directly: `admin/workspaces` (name, description, configs, `archivedAt`), `WorkspaceEncryptionService` (`dek`), plus reads in reports, statistic, artifact quota and workflow-template. `admin/users` and `artifacts` read `workspace_members`.
-- Writes `targets` directly (`deleteAllTargetsFromWorkspace`).
+- Writes no other module's table. `deleteWorkspace` emits `WORKSPACE_DELETING_EVENT` (`workspace.events.ts`) with `emitAsync` before the workspace row goes; `TargetsService.onWorkspaceDeleting` (`suppressErrors: false`) removes the targets, and a failure there keeps the workspace. It still reads `targets` (`getWorkspaceIdByTargetId`) and `jobs` (`getMemberOfWorkspaceByJobId`).
 
 ## Testing
 
-`workspaces.service.spec.ts` (large), `workspaces.controller.spec.ts` (permission metadata and audit wiring). The guard and decorators have specs in `src/common/guards/` and `src/common/decorators/`.
+`workspaces.service.spec.ts` (large), `workspace-invitations.service.spec.ts`, `workspace-membership.service.spec.ts`, `workspace-members.service.spec.ts`, `workspace-permission-groups.service.spec.ts`, `workspaces.controller.spec.ts` (permission metadata and audit wiring). The guard and decorators have specs in `src/common/guards/` and `src/common/decorators/`.

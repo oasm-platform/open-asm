@@ -36,7 +36,7 @@ Custom scan templates (nuclei YAML) stored as workspace artifacts, plus a route 
 
 - Imported by `AgentsModule` for `TemplatesService` (agent tool `save_template`).
 - Imports `ArtifactsModule` (`ArtifactsService`, `ArtifactFoldersService`) and `StorageModule` (already global). Registers `Artifact` and `ProjectAsset` repositories and queries `artifacts` and `project_assets` directly.
-- Uses `ToolsService` and `JobsRegistryService` from the global `ToolsModule` and `JobsRegistryModule` without importing them.
+- Imports `ToolsModule` and `JobsRegistryModule` for `ToolsService` and `JobsRegistryService`.
 - `jobs-registry/jobs-registry.service.ts` owns the `customTemplateIds` → `customTemplates` signing (`signCustomTemplates`, cache key `<id>-<updatedAt>`); changing how templates are stored means changing that code too.
 
 ## Testing

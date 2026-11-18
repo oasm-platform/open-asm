@@ -1,16 +1,13 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/require-await */
-import { BadRequestException } from '@nestjs/common';
-import {
-  AgentApprovalMode,
-  AgentMode,
-  WorkerScope,
-  WorkerType,
-} from '@/common/enums/enum';
+
+import { WorkerScope, WorkerType } from '@/common/enums/enum';
+import { AgentApprovalMode, AgentMode } from '@/modules/agents/enums/agent.enums';
 import { AgentsCompletionsService } from './agents.completions';
 import { AgentsService } from './agents.service';
 import { agentFunctionWith } from './agents.tools.testing';
 import { WorkspaceTools } from './tools/workspace.tools';
 import type { SendMessageDto } from './dto/message.dto';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 const dto = {
   question: 'hi',
@@ -57,7 +54,7 @@ describe('worker scope enforcement', () => {
 
       await expect(
         service.getOrCreateConversation(dto, 'ws-1', 'user-1'),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
       expect(
         service.workersService.isAgentWorkerForWorkspace,
       ).toHaveBeenCalledWith('worker-1', 'ws-1');

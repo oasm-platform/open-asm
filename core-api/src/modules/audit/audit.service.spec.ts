@@ -1,6 +1,6 @@
 import { AuditActorType, AuditOutcome } from '@/common/enums/enum';
 import type { RequestWithMetadata } from '@/common/interfaces/app.interface';
-import { BadRequestException, Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -26,6 +26,7 @@ import {
 import { AuditService, decodeCursor, encodeCursor } from './audit.service';
 import type { AuditEventInput } from './audit.service';
 import type { GetAuditEventsQueryDto } from './dto/audit.dto';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 const makeInput = (overrides: Partial<AuditEventInput> = {}): AuditEventInput => ({
   workspaceId: 'ws-1',
@@ -543,15 +544,15 @@ describe('AuditService', () => {
       // Node's Buffer.from(base64url) silently IGNORES invalid characters, so
       // this decodes identically to `valid` under lenient decoding — strict
       // validation must still reject it.
-      expect(() => decodeCursor(`!${valid}`)).toThrow(BadRequestException);
-      expect(() => decodeCursor(`${valid}?`)).toThrow(BadRequestException);
+      expect(() => decodeCursor(`!${valid}`)).toThrow(InvalidInputError);
+      expect(() => decodeCursor(`${valid}?`)).toThrow(InvalidInputError);
     });
 
     it('rejects padded/non-canonical base64url cursors', () => {
       const occurredAt = new Date('2026-08-10T10:00:00.000Z');
       const valid = encodeCursor({ occurredAt, id: randomUUID() });
       const padded = `${valid.slice(0, 4)}===${valid.slice(4)}`;
-      expect(() => decodeCursor(padded)).toThrow(BadRequestException);
+      expect(() => decodeCursor(padded)).toThrow(InvalidInputError);
     });
 
     it('rejects timestamps that are not strict ISO-8601 even when Date would parse them', () => {
@@ -567,7 +568,7 @@ describe('AuditService', () => {
       for (const iso of nonIso) {
         expect(() =>
           decodeCursor(Buffer.from(`${iso}|${id}`, 'utf8').toString('base64url')),
-        ).toThrow(BadRequestException);
+        ).toThrow(InvalidInputError);
       }
     });
   });
@@ -675,7 +676,7 @@ describe('AuditService', () => {
       for (const cursor of malformed) {
         await expect(
           service.queryEvents(testWorkspaceId, { ...baseQuery, cursor }),
-        ).rejects.toThrow(BadRequestException);
+        ).rejects.toThrow(InvalidInputError);
       }
     });
 
@@ -800,7 +801,7 @@ describe('AuditService', () => {
 
       await expect(
         service.exportEvents(testWorkspaceId, baseQuery),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
       expect(mockQueryBuilder.take).toHaveBeenCalledWith(10_001);
     });
 

@@ -1,4 +1,4 @@
-import { Global, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Comment } from '../comments/entities/comment.entity';
 import { ISSUE_VULNERABILITY_EVENTS } from '../event-bridge/sinks/issues/issues.sink';
@@ -17,14 +17,12 @@ import { IssuesService } from './issues.service';
 import { IssueRuleEngine } from './rules/issue-rule-engine.service';
 import { IssueRulesService } from './rules/issue-rules.service';
 
-@Global()
 @Module({
   imports: [TypeOrmModule.forFeature([
       Issue,
       IssueLink,
       IssueRule,
       IssueCounter,
-      Comment,
     ])],
   // Rules first: `/issues/rules` must not be matched as `/issues/:id`.
   controllers: [IssueRulesController, IssuesController],

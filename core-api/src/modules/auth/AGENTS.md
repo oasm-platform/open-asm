@@ -12,7 +12,6 @@ Wires the better-auth instance into Nest: it mounts the handler on `/api/auth/*`
 - `user-presence.service.ts`: last-request time per user in Redis (`presence:<userId>`, 30-day TTL).
 - `auth-env.ts`: `resolveAuthSecret()`. `auth-logger.ts`: routes better-auth logs into Nest's logger.
 - `entities/`: `User`, `Session`, `Account`, `Verification` (tables `users`, `sessions`, `accounts`, `verifications`).
-- `symbols.ts` is empty.
 
 ## Request authentication (`AuthGuard`)
 
@@ -44,7 +43,7 @@ Wires the better-auth instance into Nest: it mounts the handler on `/api/auth/*`
 
 ## Data model
 
-- `users`: `email` unique, `role` varchar (default `user`), ban columns from the admin plugin, `language`. Many modules point at `User` with `onDelete: CASCADE`.
+- `users`: `email` unique, `role` varchar (default `user`), ban columns from the admin plugin, `language`. Many modules point at `User` with `onDelete: CASCADE`, one-way: `User` declares only the inverse relations something reads (`sessions`, `accounts`, and `workspaceMembers`, which the notifications lane joins). Add one only with a reader, or the entity imports half the modules again.
 - `sessions` and `accounts` cascade on user delete. `sessions.impersonatedBy` is a second FK to `users`.
 - `UsersService.onModuleInit` (users module) seeds the bot user `BOT_ID`.
 - `accounts.password` holds better-auth's hash. Never write it through TypeORM.

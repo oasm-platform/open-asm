@@ -16,7 +16,7 @@ import { Role, WorkerScope } from '@/common/enums/enum';
 import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
 import { GrpcWorkerTokenGuard } from '@/common/guards/grpc-worker-token.guard';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
-import { GetManyResponseDto } from '@/utils/getManyResponse';
+import { GetManyResponseDto } from '@/common/utils/get-many-response.util';
 import { Metadata } from '@grpc/grpc-js';
 import {
   Body,
@@ -276,7 +276,9 @@ export class WorkersController {
       const stream = createReadStream(filePath, { highWaterMark: 1024 * 1024 }); // 1MB chunks
       let offset = 0;
 
-      stream.on('data', (chunk: Buffer) => {
+      stream.on('data', (data: string | Buffer) => {
+        // No encoding is set, so this is always a Buffer
+        const chunk = typeof data === 'string' ? Buffer.from(data) : data;
         subscriber.next({ chunk, offset, eof: false });
         offset += chunk.length;
       });

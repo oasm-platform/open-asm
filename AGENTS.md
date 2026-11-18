@@ -59,7 +59,7 @@ Same rules as this file: write facts that are true of the code today and that an
 
 pnpm workspace (`pnpm-workspace.yaml`, `packageManager: pnpm@10.33.2`) with 2 Node packages + 1 Go service:
 
-- `core-api/` — NestJS 11 (TypeScript). REST API, TypeORM DB layer, better-auth, gRPC server (`:16276`), BullMQ, AI/LLM (AI SDK v6, LangGraph), MCP HTTP endpoint, storage (RustFS/S3), PDF reports, integrations (AWS, Cloudflare, Vercel), notifications (Telegram), i18n. Modules in `src/modules/*` (30+ domains: `assets`, `asset-group`, `jobs-registry`, `workers`, `vulnerabilities`, `audit`, `workspaces`, `connectors`, `tools`, `workflows`, `storage`, `remote-execute`, `integrations`, `mcp` lives in `src/mcp`).
+- `core-api/` — NestJS 12 on `@nestjs/platform-node` (TypeScript). REST API, TypeORM DB layer, better-auth, gRPC server (`:16276`), BullMQ, AI/LLM (AI SDK `ai` v7), MCP HTTP endpoint, storage (RustFS/S3), PDF reports, integrations (AWS, Cloudflare, Vercel), notifications (Telegram), i18n. Modules in `src/modules/*` (34 domains: `assets`, `projects`, `jobs-registry`, `workers`, `vulnerabilities`, `audit`, `workspaces`, `connectors`, `tools`, `workflows`, `storage`, `remote-execute`, `integrations`, `mcp` lives in `src/mcp`).
 - `console/` — React 19 + Vite 8 + Tailwind v4. TanStack **Router** (file-based, `src/routes/` → generated `routeTree.gen.ts`) + TanStack Query, orval API client, shadcn/radix-ui/base-ui, recharts/echarts, xyflow, leaflet, Playwright e2e in `console/e2e/`.
 - `worker/` — Go 1.26 scanning worker (cobra + viper). Two entry points: `cmd/cli` (interactive TUI / headless) and `cmd/app` (env-driven, used by the Docker image). Talks to core-api over gRPC (`worker/internal/grpcclient/`, stubs in `worker/internal/gen/`), **spawns connector containers through the Docker Engine API** (`worker/internal/runtime/docker.go`), serves the connector callback gRPC on `:26276` (`worker/internal/connector/`), go-rod browser automation.
 
@@ -124,7 +124,11 @@ task release -- patch --dry-run          # preview: prints every change and comm
 task release -- v0.13.0                  # stamp package.json files, commit, tag, push main + tag
 ```
 
-Missing entries: `console:test:coverage`, `console:e2e`, `api:test:watch`, `api:test:cov` exist as package scripts but have **no** task entry — add one instead of calling the script.
+Missing entries: `console:test:coverage`, `console:e2e`, `api:test:watch` exist as package scripts but have **no** task entry — add one instead of calling the script.
+
+`task api:test:cov` runs the unit suite with coverage under the same limits as `api:test`, and fails below `jest.coverageThreshold` in `core-api/package.json` (the measured baseline; raise it when coverage goes up, never lower it). `api:test` itself collects no coverage, so CI does not enforce the threshold yet.
+
+`core-api/src/architecture.spec.ts` pins module coupling: the `@Global()` modules, `forwardRef` per file, entities registered outside their module, and cross-module imports. Adding or removing any of them fails the spec until its list is updated in the same change.
 
 ## Database Migrations — HARD RULE
 
@@ -142,7 +146,7 @@ Missing entries: `console:test:coverage`, `console:e2e`, `api:test:watch`, `api:
 6. **Apply only to a local database.** Before `task migration:run` / `task migration:revert`, confirm `core-api/.env` points at the local Postgres and say which DB you are about to mutate. Never run these against a shared/staging/production database.
 7. **Why this is non-negotiable:** `dataSourceOptions` in `core-api/src/database/database-config.ts` sets `synchronize: false` — the schema *only* ever changes through migrations. A missing or bogus migration is a real runtime bug, and `migrationsRun: NODE_ENV === 'development'` means a dev boot silently applies whatever is in the folder, so a hand-written file gets executed without anyone reviewing it.
 
-Migration location: `core-api/src/database/migrations/` (58 files, newest last). Docker path: the `migration` compose service runs `typeorm migration:run -d dist/database/database-config.js` from the built image and gates `core-api` startup on it.
+Migration location: `core-api/src/database/migrations/` (88 files, newest last). Docker path: the `migration` compose service runs `typeorm migration:run -d dist/database/database-config.js` from the built image and gates `core-api` startup on it.
 
 ## Local Dev Setup
 
@@ -155,7 +159,7 @@ Migration location: `core-api/src/database/migrations/` (58 files, newest last).
 
 ### core-api
 - `eslint.config.mjs` — type-checked rules that actually fail the build: `no-console: error`, `@typescript-eslint/no-floating-promises: error`, `@typescript-eslint/no-misused-promises: error`, `consistent-type-imports: error`, `no-explicit-any: warn` (relaxed in tests).
-- `tsconfig.json` — `@/` → `src/`; Jest `moduleNameMapper` mirrors it.
+- `tsconfig.json` — `@/` → `src/`; Jest `moduleNameMapper` mirrors it. `strict` is on except `strictPropertyInitialization` (entities and DTOs declare fields without initializers). `task api:typecheck` checks `src` without specs; Jest (SWC) never type-checks. Packages without types are declared in `src/common/types/untyped-modules.d.ts`.
 - `package.json` → `jest.transform` = `@swc/jest` (decorators + `decoratorMetadata`, target es5). **Do not** switch to `ts-jest` and **do not** drop `--maxWorkers` / `--workerIdleMemoryLimit` — both thrash RAM on this machine.
 - Lint: `task api:lint` → `eslint "{src,apps,libs,test}/**/*.ts" --fix` (note: `--fix` mutates files).
 
@@ -176,16 +180,21 @@ Migration location: `core-api/src/database/migrations/` (58 files, newest last).
 | `console/.env` (from `example.env`) | `VITE_API_URL` (dev `http://localhost:6276`) |
 | `worker/.env` (from `.example.env`) | `WORKER_API_KEY`, `WORKER_MAX_CONCURRENCY`, `WORKER_GRPC_HOST/PORT`, plus `WORKER_MODE`, `WORKER_TOOL_PATH`, `WORKER_TOKEN_FILE`, `WORKER_CONNECTOR_ADDR`, `WORKER_CONNECTOR_ADDR_ALLOW_AUTODETECT`, `WORKER_NETWORK`, `WORKER_DNS_RESOLVERS` (resolvers pinned onto built-in naabu via `-r`; empty = `/etc/resolv.conf`, `off` = naabu's public resolvers) |
 
+`validateEnv` (`core-api/src/common/config/env.schema.ts`, run by `ConfigModule`) refuses to boot on a malformed `PORT`/`GRPC_PORT`/`POSTGRES_PORT`, `POSTGRES_SSL`/`AUTH_RATE_LIMIT_DISABLED` other than `true`/`false`, a `REDIS_URL` or `BASE_URL` that is not a URL of the right scheme, or a `TRUSTED_PROXIES` entry that is not an IP/CIDR. It makes nothing required and leaves the values as strings; add a variable there when a bad value would otherwise be misread silently.
+
 `ENCRYPTION_KEYS` semantics matter: the last key encrypts *and* decrypts, earlier keys are decrypt-only, and the built-in default stays decrypt-only too. New ciphertext is AES-256-GCM tagged with its key id (`v2:<keyId>:…`, workspace data `v2:dek:…`), so keys can move; the older AES-CBC formats stay readable, and `EncryptionUpgradeService` re-wraps DEKs and rewrites older ciphertext with the active key at boot. Outside development/test the API refuses to boot unless the last key is random and 32+ characters (`assertEncryptionKeys` in `main.ts`).
 
 ## Architecture Patterns
 
 ### core-api
 - **Controller → Service → Repository/Entity**. Controllers do validation + mapping only.
+- **Module wiring**: only cross-cutting infrastructure is `@Global()`: `DatabaseModule`, `ServicesModule`, `AuthModule`, `AuditModule`, `EventBridgeModule`, and `WorkspacesModule` (its service backs `WorkspacePermissionGuard`, which every workspace-scoped controller uses). Every other module imports the modules whose providers it injects, including the ones its guards need (`WorkerTokenGuard` needs `WorkersModule`). No `forwardRef`: break a cycle with a port, an in-process event, or by moving the provider to the module that owns its data. `core-api/src/architecture.spec.ts` pins the global list and the `forwardRef` count (0).
+- **Table ownership**: write another module's table through that module's service. Registering its entity (`TypeOrmModule.forFeature`) is for reads and read models (reports, statistic, search); the few direct writes left are listed with their reason in `FOREIGN_ENTITIES` (`architecture.spec.ts`), and a new one needs the same kind of reason.
+- **Errors**: services throw domain errors (`common/errors/domain.errors.ts`: `InvalidInputError`, `UnauthenticatedError`, `ForbiddenError`, `NotFoundError`, `ConflictError`), never Nest HTTP exceptions, because the same services run under gRPC, BullMQ and agent tools. `DomainExceptionFilter` (registered in `configureApp`) answers them on HTTP with the exact status and body of the matching Nest exception, plus 409 for an uncaught Postgres unique violation and 400 for `22P02`. Controllers, guards and pipes keep Nest exceptions. To act on a caught error use `isNotFound` / `isInvalidInput` / `isUnauthenticated` (`common/errors/error-checks.ts`), not `instanceof`. A response that needs a custom body (e.g. `ArtifactQuotaService`'s `{ code: STORAGE_QUOTA_EXCEEDED }`) stays a Nest exception.
 - DTOs for every request/response (`class-validator` + `class-transformer`); Swagger decorators are required or orval generates unusable types.
-- Entities in module folders or `src/common/entity/`; `dataSourceOptions.entities` globs `**/*.entity{.ts,.js}`.
+- Entities in module folders (`BaseEntity` in `src/common/entities/`); `dataSourceOptions.entities` globs `**/*.entity{.ts,.js}`.
 - **User data responses expose only `id`, `name`, `image`** — enforce in services, not controllers.
-- `@getWorkspaceId: true` on controllers that need tenant context; workspace scoping is not optional.
+- `@WorkspaceAccess('<resource>.<action>', ...)` (`common/decorators/workspace-access.decorator.ts`) on every workspace-scoped handler, and `@WorkspaceId()` to read the id; workspace scoping is not optional.
 - **Admin-only endpoints live in `src/modules/admin/`** and are served under `/admin/*` with class-level `@Admin()` (`modules/admin/admin.decorator.ts`: ADMIN role + `AdminGuard`, which enforces the admin IP allow-list) (system configs + logo upload, tool creation, public `POST /admin/init`). Put new platform-admin endpoints there, not in the domain module.
 - gRPC server `:16276`, protos in `src/proto/`, Go stubs generated into `worker/internal/gen/` (there is **no** `grpc-client/` directory anymore — older docs are stale).
 - BullMQ for async jobs; queue payloads are slim and tenant-scoped.
@@ -259,7 +268,7 @@ Gotchas:
 
 `task docker-compose` = `docker compose --env-file ./core-api/.env up -d --build --force-recreate`.
 
-Services: `console` (`:3000`), `core-api` (`:6276` + `:16276`, healthcheck `/api/health`), `oasm-worker` (socket-mounted, connector callback `:26276` on the `oasm-connectors` network, not published), `postgres` (pg17+pgvector), `redis`, `geo-ip` (`:4360`), `rustfs` (`:9000`/`:9001`), and a one-shot `migration` service that gates `core-api` startup (`service_completed_successfully`).
+Services: `console` (`:3000`), `core-api` (`:6276` + `:16276`, healthcheck `/api/health`), `oasm-worker` (socket-mounted, connector callback `:26276` on the `oasm-connectors` network, not published), `postgres` (pg18+pgvector), `redis`, `geo-ip` (`:4360`), `rustfs` (`:9000`/`:9001`), and a one-shot `migration` service that gates `core-api` startup (`service_completed_successfully`).
 
 The compose service key is `oasm-worker`, **not** `worker`. It scales (`task docker-compose workers=3`): connector containers join the `oasm-connectors` network and dial each replica on its own IP, so nothing is published on the host. `oasm-connectors` is `internal: true`: connectors reach the internet only through the worker egress proxy (`:26277`, `worker/internal/egress`); connectors whose manifest says `egress: direct` (nmap, rustscan; core-api sends it as `Job.direct_egress` / `ToolRun.direct_egress`) are also attached to the default `bridge` and go direct. An existing non-internal `oasm-connectors` network must be removed (`docker network rm oasm-connectors`) before compose recreates it. Replicas share `worker-state` but each locks its own token slot (`.worker-token`, `.worker-token.1`, …) — two workers resuming the same token would share an identity and reap each other's connectors.
 

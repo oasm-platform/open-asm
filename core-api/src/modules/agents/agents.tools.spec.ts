@@ -1,4 +1,5 @@
-import { AgentApprovalMode, AgentMode, WorkerType } from '@/common/enums/enum';
+import { WorkerType } from '@/common/enums/enum';
+import { AgentApprovalMode, AgentMode } from '@/modules/agents/enums/agent.enums';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { EventEmitter } from 'node:events';
 import { withoutDisabledTools } from './agents.config';

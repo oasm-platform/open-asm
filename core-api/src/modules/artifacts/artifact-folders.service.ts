@@ -1,5 +1,5 @@
 import { ArtifactStatus } from '@/common/enums/enum';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, IsNull, Repository } from 'typeorm';
 import { ArtifactsService, TEMPLATES_FOLDER_NAME } from './artifacts.service';
@@ -11,11 +11,12 @@ import type {
 } from './dto/artifacts.dto';
 import { ArtifactFolder } from './entities/artifact-folder.entity';
 import { Artifact } from './entities/artifact.entity';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 /** A user root folder with this name would be mistaken for the templates folder once its owner is deleted. */
 function assertNotReservedRoot(name: string, parentFolderId: string | null | undefined): void {
   if (!parentFolderId && name === TEMPLATES_FOLDER_NAME) {
-    throw new BadRequestException(`"${TEMPLATES_FOLDER_NAME}" is reserved at the root`);
+    throw new InvalidInputError(`"${TEMPLATES_FOLDER_NAME}" is reserved at the root`);
   }
 }
 
@@ -152,7 +153,7 @@ export class ArtifactFoldersService {
         `artifact-folders:${workspaceId}:${userId}`,
       ]);
       if ((await this.subtreeIds(id, manager)).includes(target)) {
-        throw new BadRequestException('Cannot move a folder into itself');
+        throw new InvalidInputError('Cannot move a folder into itself');
       }
       return manager.save(folder);
     });

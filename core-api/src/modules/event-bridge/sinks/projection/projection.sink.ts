@@ -1,4 +1,4 @@
-import { EventBusGroup } from '@/common/enums/enum';
+import { EventBusGroup } from '@/modules/event-bridge/enums/event-bridge.enums';
 import { Injectable } from '@nestjs/common';
 import type { EventSink } from '../../consuming/event-sink';
 import { SUBSCRIPTIONS } from '../../routing/subscriptions';

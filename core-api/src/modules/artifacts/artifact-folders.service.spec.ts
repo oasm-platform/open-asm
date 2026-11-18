@@ -1,9 +1,10 @@
 import { ArtifactStatus } from '@/common/enums/enum';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+
 import { IsNull, type DataSource, type Repository } from 'typeorm';
 import { ArtifactFoldersService } from './artifact-folders.service';
 import type { ArtifactsService } from './artifacts.service';
 import type { ArtifactFolder } from './entities/artifact-folder.entity';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 const WS = 'ws-1';
 const OWNER = 'owner-id';
@@ -69,9 +70,8 @@ describe('ArtifactFoldersService', () => {
       }),
     );
 
-    artifacts.findReadableFolder.mockRejectedValue(new NotFoundException());
-    await expect(service.getMany(WS, 'someone-else', 'f-1')).rejects.toThrow(
-      NotFoundException,
+    artifacts.findReadableFolder.mockRejectedValue(new NotFoundError());
+    await expect(service.getMany(WS, 'someone-else', 'f-1')).rejects.toThrow(NotFoundError,
     );
   });
 
@@ -181,10 +181,10 @@ describe('ArtifactFoldersService', () => {
 
     await expect(
       service.update(WS, OWNER, 'f-1', { parentFolderId: 'f-child' }),
-    ).rejects.toThrow(BadRequestException);
+    ).rejects.toThrow(InvalidInputError);
     await expect(
       service.update(WS, OWNER, 'f-1', { parentFolderId: 'f-1' }),
-    ).rejects.toThrow(BadRequestException);
+    ).rejects.toThrow(InvalidInputError);
     expect(folderRepo.save).not.toHaveBeenCalled();
     expect(manager.save).not.toHaveBeenCalled();
   });
@@ -212,10 +212,10 @@ describe('ArtifactFoldersService', () => {
   it('refuses a user root folder named like the templates folder', async () => {
     await expect(
       service.create(WS, OWNER, { name: 'custom-templates' }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    ).rejects.toBeInstanceOf(InvalidInputError);
     await expect(
       service.update(WS, OWNER, 'f-1', { name: 'custom-templates', parentFolderId: null }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    ).rejects.toBeInstanceOf(InvalidInputError);
     await expect(
       service.create(WS, OWNER, { name: 'custom-templates', parentFolderId: 'f-1' }),
     ).resolves.toBeDefined();

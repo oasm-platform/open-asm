@@ -1,9 +1,8 @@
-import { Inject, Injectable, forwardRef } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
 
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { WorkerScope, WorkerType } from '@/common/enums/enum';
-import type { WrapperType } from '@/common/types/app.types';
 import {
   detailAssetSchema,
   detailIssueSchema,
@@ -100,20 +99,15 @@ export function describeConfigFields(
 export class WorkspaceTools {
   constructor(
     readonly assetsService: AssetsService,
-    @Inject(forwardRef(() => VulnerabilitiesService))
-    readonly vulnerabilitiesService: WrapperType<VulnerabilitiesService>,
+    readonly vulnerabilitiesService: VulnerabilitiesService,
     readonly projectResultsService: ProjectResultsService,
     readonly targetsService: TargetsService,
     readonly statisticService: StatisticService,
-    @Inject(forwardRef(() => IssuesService))
-    readonly issuesService: WrapperType<IssuesService>,
-    @Inject(forwardRef(() => ToolsService))
-    readonly toolsService: WrapperType<ToolsService>,
+    readonly issuesService: IssuesService,
+    readonly toolsService: ToolsService,
     readonly connectorRegistry: ConnectorRegistryService,
-    @Inject(forwardRef(() => WorkersService))
-    readonly workersService: WrapperType<WorkersService>,
-    @Inject(forwardRef(() => JobsRegistryService))
-    readonly jobsRegistryService: WrapperType<JobsRegistryService>,
+    readonly workersService: WorkersService,
+    readonly jobsRegistryService: JobsRegistryService,
   ) {}
 
   @AgentFunction({

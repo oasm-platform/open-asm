@@ -7,18 +7,16 @@ import {
   GetManyBaseResponseDto,
 } from '@/common/dtos/get-many-base.dto';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
-import { AgentCommandApprovalStatus } from '@/common/enums/enum';
+import { AgentCommandApprovalStatus } from '@/modules/agents/enums/agent.enums';
 import { AuthGuard } from '@/common/guards/auth.guard';
-import { GetManyResponseDto } from '@/utils/getManyResponse';
+import { GetManyResponseDto } from '@/common/utils/get-many-response.util';
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
   HttpCode,
   HttpStatus,
-  NotFoundException,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -92,6 +90,7 @@ import {
   CreateAgentDefinitionDto,
   UpdateAgentDefinitionDto,
 } from './dto/agent-definition.dto';
+import { isInvalidInput, isNotFound } from '@/common/errors/error-checks';
 
 /** Longest a stopped run is still reported as running while it saves */
 const STOP_SETTLE_TIMEOUT_MS = 30_000;
@@ -764,7 +763,7 @@ export class AgentsController {
       }
     } catch (error) {
       if (clientGone) return;
-      if (error instanceof BadRequestException) {
+      if (isInvalidInput(error)) {
         res.status(400).json({
           message: error.message,
           error: 'Bad Request',
@@ -856,7 +855,7 @@ export class AgentsController {
     try {
       await this.agentsService.getConversation(id, workspaceId, userId);
     } catch (error) {
-      if (!(error instanceof NotFoundException)) throw error;
+      if (!isNotFound(error)) throw error;
       res.status(HttpStatus.NO_CONTENT).end();
       return;
     }

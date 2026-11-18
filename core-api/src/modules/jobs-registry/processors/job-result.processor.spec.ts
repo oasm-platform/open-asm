@@ -10,7 +10,8 @@ import { Job } from '@/modules/jobs-registry/entities/job.entity';
 import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
 import { JobResultProcessor } from '@/modules/jobs-registry/processors/job-result.processor';
 import { WorkflowRunnerService } from '@/modules/jobs-registry/workflow-runner.service';
-import { VulnerabilityLifecycleService } from '@/modules/vulnerabilities/vulnerability-lifecycle.service';
+import { JOB_RESULT_SYNCED_EVENT } from '@/modules/jobs-registry/job.events';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 describe('JobResultProcessor', () => {
   let processor: JobResultProcessor;
@@ -42,8 +43,8 @@ describe('JobResultProcessor', () => {
     update: jest.fn(),
   };
 
-  const mockLifecycle = {
-    onScanJobCompleted: jest.fn(),
+  const mockEvents = {
+    emitAsync: jest.fn(),
   };
 
   const baseBullJob = {
@@ -72,6 +73,7 @@ describe('JobResultProcessor', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     mockJobRepository.update.mockResolvedValue({ affected: 1 });
+    mockEvents.emitAsync.mockResolvedValue([]);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -101,8 +103,8 @@ describe('JobResultProcessor', () => {
           useValue: mockJobRepository,
         },
         {
-          provide: VulnerabilityLifecycleService,
-          useValue: mockLifecycle,
+          provide: EventEmitter2,
+          useValue: mockEvents,
         },
       ],
     }).compile();
@@ -474,7 +476,7 @@ describe('JobResultProcessor', () => {
     });
   });
 
-  describe('auto-close after a vulnerability scan', () => {
+  describe('announcing a synced result', () => {
     const vulnJob = (overrides: Partial<Job> = {}) =>
       ({
         ...baseJob,
@@ -487,7 +489,7 @@ describe('JobResultProcessor', () => {
         ...overrides,
       }) as unknown as Job;
 
-    it('closes what the scan no longer reports once it completed, even with no findings', async () => {
+    it('announces the result once the job completed, even with no findings', async () => {
       const job = vulnJob();
       mockJobsRegistryService.findJobForUpdate.mockResolvedValue(job);
       mockStorageService.readJsonFile.mockResolvedValue({ error: false, raw: null, payload: [] });
@@ -496,34 +498,42 @@ describe('JobResultProcessor', () => {
       await processor.process(baseBullJob);
 
       expect(mockDataAdapterService.syncData).toHaveBeenCalledWith({ data: [], job });
-      expect(mockLifecycle.onScanJobCompleted).toHaveBeenCalledTimes(1);
-      const [calledJob, syncStartedAt] = mockLifecycle.onScanJobCompleted.mock.calls[0] as [Job, Date];
-      expect(calledJob).toBe(job);
-      expect(syncStartedAt.getTime()).toBeGreaterThanOrEqual(before);
-      expect(mockLifecycle.onScanJobCompleted.mock.invocationCallOrder[0]).toBeGreaterThan(
+      expect(mockEvents.emitAsync).toHaveBeenCalledTimes(1);
+      const [event, payload] = mockEvents.emitAsync.mock.calls[0] as [
+        string,
+        { job: Job; syncStartedAt: Date },
+      ];
+      expect(event).toBe(JOB_RESULT_SYNCED_EVENT);
+      expect(payload.job).toBe(job);
+      expect(payload.syncStartedAt.getTime()).toBeGreaterThanOrEqual(before);
+      // After the job is marked completed, before the engine moves the run on
+      expect(mockEvents.emitAsync.mock.invocationCallOrder[0]).toBeGreaterThan(
         mockJobRepository.update.mock.invocationCallOrder[0],
+      );
+      expect(mockEvents.emitAsync.mock.invocationCallOrder[0]).toBeLessThan(
+        mockWorkflowRunnerService.onJobTerminal.mock.invocationCallOrder[0],
       );
     });
 
-    it('does not close anything when no result was synced', async () => {
+    it('announces nothing when no result was synced', async () => {
       mockJobsRegistryService.findJobForUpdate.mockResolvedValue(vulnJob());
       mockStorageService.readJsonFile.mockResolvedValue({ error: false, raw: null, payload: null });
 
       await processor.process(baseBullJob);
 
-      expect(mockLifecycle.onScanJobCompleted).not.toHaveBeenCalled();
+      expect(mockEvents.emitAsync).not.toHaveBeenCalled();
     });
 
-    it('does not close anything when the job does not save data', async () => {
+    it('announces nothing when the job does not save data', async () => {
       mockJobsRegistryService.findJobForUpdate.mockResolvedValue(vulnJob({ isSaveData: false }));
       mockStorageService.readJsonFile.mockResolvedValue({ error: false, raw: null, payload: [] });
 
       await processor.process(baseBullJob);
 
-      expect(mockLifecycle.onScanJobCompleted).not.toHaveBeenCalled();
+      expect(mockEvents.emitAsync).not.toHaveBeenCalled();
     });
 
-    it('does not close anything when the scan failed', async () => {
+    it('announces nothing when the scan failed', async () => {
       mockJobsRegistryService.findJobForUpdate.mockResolvedValue(vulnJob());
       mockStorageService.readJsonFile.mockResolvedValue({ error: true, raw: 'nuclei crashed', payload: [] });
       const lastAttemptBullJob = {
@@ -533,23 +543,24 @@ describe('JobResultProcessor', () => {
 
       await expect(processor.process(lastAttemptBullJob)).rejects.toThrow('nuclei crashed');
 
-      expect(mockLifecycle.onScanJobCompleted).not.toHaveBeenCalled();
+      expect(mockEvents.emitAsync).not.toHaveBeenCalled();
     });
 
-    it('does not close anything when the job was cancelled mid-flight', async () => {
+    it('announces nothing when the job was cancelled mid-flight', async () => {
       mockJobsRegistryService.findJobForUpdate.mockResolvedValue(vulnJob());
       mockStorageService.readJsonFile.mockResolvedValue({ error: false, raw: null, payload: [] });
       mockJobRepository.update.mockResolvedValue({ affected: 0 });
 
       await processor.process(baseBullJob);
 
-      expect(mockLifecycle.onScanJobCompleted).not.toHaveBeenCalled();
+      expect(mockEvents.emitAsync).not.toHaveBeenCalled();
     });
 
-    it('does not run for other categories or a benign "nothing to scan"', async () => {
+    it('announces any category, but never a benign "nothing to scan"', async () => {
       mockJobsRegistryService.findJobForUpdate.mockResolvedValue(baseJob);
       mockStorageService.readJsonFile.mockResolvedValue({ error: false, raw: null, payload: [] });
       await processor.process(baseBullJob);
+      expect(mockEvents.emitAsync).toHaveBeenCalledTimes(1);
 
       mockJobsRegistryService.findJobForUpdate.mockResolvedValue({
         ...baseJob,
@@ -562,13 +573,13 @@ describe('JobResultProcessor', () => {
       });
       await processor.process(baseBullJob);
 
-      expect(mockLifecycle.onScanJobCompleted).not.toHaveBeenCalled();
+      expect(mockEvents.emitAsync).toHaveBeenCalledTimes(1);
     });
 
-    it('logs an auto-close failure instead of failing the job', async () => {
+    it('logs a failing listener instead of failing the job', async () => {
       mockJobsRegistryService.findJobForUpdate.mockResolvedValue(vulnJob());
       mockStorageService.readJsonFile.mockResolvedValue({ error: false, raw: null, payload: [] });
-      mockLifecycle.onScanJobCompleted.mockRejectedValueOnce(new Error('db down'));
+      mockEvents.emitAsync.mockRejectedValueOnce(new Error('db down'));
 
       await expect(processor.process(baseBullJob)).resolves.toBeUndefined();
 

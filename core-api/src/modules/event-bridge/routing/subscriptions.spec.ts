@@ -1,4 +1,4 @@
-import { EventBusGroup } from '@/common/enums/enum';
+import { EventBusGroup } from '@/modules/event-bridge/enums/event-bridge.enums';
 import { EVENT_NAMES, type EventName } from '../contracts/event-catalog';
 import { SUBSCRIPTIONS } from './subscriptions';
 

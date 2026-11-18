@@ -1,11 +1,6 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { ApiKey } from '@/modules/apikeys/entities/apikey.entity';
 import { User } from '@/modules/auth/entities/user.entity';
-import { Statistic } from '@/modules/statistic/entities/statistic.entity';
-import { WorkspaceTool } from '@/modules/tools/entities/workspace_tools.entity';
-import { WorkerInstance } from '@/modules/workers/entities/worker.entity';
-import { Workflow } from '@/modules/workflows/entities/workflow.entity';
-import { InternalNetwork } from '@/modules/internal-networks/entities/internal-network.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsBoolean, IsDateString, IsOptional, IsString } from 'class-validator';
 import {
@@ -44,7 +39,7 @@ export class Workspace extends BaseEntity {
   @Column('text', { nullable: true })
   description?: string;
 
-  @ManyToOne(() => User, (user) => user.workspaces, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
   owner: Relation<User>;
 
   @OneToMany(
@@ -59,14 +54,8 @@ export class Workspace extends BaseEntity {
   )
   permissions: Relation<WorkspacePermission[]>;
 
-  @OneToMany(() => WorkspaceTool, (workspaceTool) => workspaceTool.workspace)
-  workspaceTools: Relation<WorkspaceTool[]>;
-
   @DeleteDateColumn()
   deletedAt?: Date;
-
-  @OneToMany(() => WorkerInstance, (workerInstance) => workerInstance.workspace)
-  workers: Relation<WorkerInstance[]>;
 
   @ApiProperty({ type: String, format: 'date-time', required: false, nullable: true })
   @IsOptional()
@@ -77,18 +66,6 @@ export class Workspace extends BaseEntity {
   @OneToOne(() => ApiKey)
   @JoinColumn({ name: 'apiKeyId', referencedColumnName: 'id' })
   apiKey: Relation<ApiKey>;
-
-  @OneToMany(() => Statistic, (statistic) => statistic.workspace)
-  statistics: Relation<Statistic[]>;
-
-  @OneToMany(() => Workflow, (workflow) => workflow.workspace)
-  workflows: Relation<Workflow[]>;
-
-  @OneToMany(
-    () => InternalNetwork,
-    (internalNetwork) => internalNetwork.workspace,
-  )
-  internalNetworks: Relation<InternalNetwork[]>;
 
   @ApiProperty({
     example: true,

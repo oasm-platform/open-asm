@@ -14,7 +14,7 @@ import {
 import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
 import { GrpcWorkerTokenGuard } from '@/common/guards/grpc-worker-token.guard';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
-import { GetManyResponseDto } from '@/utils/getManyResponse';
+import { GetManyResponseDto } from '@/common/utils/get-many-response.util';
 import {
   Body,
   Controller,
@@ -37,7 +37,7 @@ import { DiscoveredUrl } from '../assets/entities/discovered-url.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
-import { IntegrationsService } from '../integrations/integrations.service';
+import { IntegrationConfigReader } from '../integrations/integration-config.reader';
 import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
 import { getSensitiveFields } from '../tools/validators/tool-config-profiles.crypto';
 import { WorkerInstance } from '../workers/entities/worker.entity';
@@ -49,8 +49,8 @@ import {
   isRepositoryAsset,
   repositoryUsername,
 } from './connector-inputs';
-import { GetManyJobHistoriesRequestDto } from './dto/get-many-job-histories-dto';
-import { GetManyJobsRequestDto } from './dto/get-many-jobs-dto';
+import { GetManyJobHistoriesRequestDto } from './dto/get-many-job-histories.dto';
+import { GetManyJobsRequestDto } from './dto/get-many-jobs.dto';
 import { JobListItemDto } from './dto/job-list-item.dto';
 import { RetryRunResponseDto } from './dto/retry-run-response.dto';
 import { JobHistoryDetailResponseDto } from './dto/job-history-detail.dto';
@@ -69,6 +69,8 @@ import {
   VulnerabilitiesResultDto,
   WorkerIdParams,
 } from './dto/jobs-registry.dto';
+import { JobDispatchService } from './job-dispatch.service';
+import { JobHistoryQueryService } from './job-history-query.service';
 import { JobsRegistryService } from './jobs-registry.service';
 
 /**
@@ -128,10 +130,12 @@ export class JobsRegistryController {
     private readonly jobsRegistryService: JobsRegistryService,
     private readonly connectorRegistry: ConnectorRegistryService,
     private readonly toolConfigProfilesService: ToolConfigProfilesService,
-    private readonly integrationsService: IntegrationsService,
+    private readonly integrationConfig: IntegrationConfigReader,
     private readonly workflowRunnerService: WorkflowRunnerService,
     private readonly grpcWorkerContext: GrpcWorkerContext,
     private readonly eventBridge: EventBridgeService,
+    private readonly jobHistoryQuery: JobHistoryQueryService,
+    private readonly jobDispatch: JobDispatchService,
   ) {}
 
   @WorkspaceAccess('job.read')
@@ -167,7 +171,7 @@ export class JobsRegistryController {
   })
   @Get('/timeline')
   getJobsTimeline(@WorkspaceId() workspaceId: string) {
-    return this.jobsRegistryService.getJobsTimeline(workspaceId);
+    return this.jobHistoryQuery.getJobsTimeline(workspaceId);
   }
 
   @Doc({
@@ -184,7 +188,7 @@ export class JobsRegistryController {
     @Param() { workerId }: WorkerIdParams,
     @CurrentWorker() worker: WorkerInstance,
   ) {
-    const job = await this.jobsRegistryService.getNextJob(
+    const job = await this.jobDispatch.getNextJob(
       this.authenticatedWorkerId(worker, workerId),
     );
     return job;
@@ -341,7 +345,7 @@ export class JobsRegistryController {
     @WorkspaceId() workspaceId: string,
     @Query() query: GetManyJobHistoriesRequestDto,
   ): Promise<GetManyBaseResponseDto<JobHistoryResponseDto>> {
-    return this.jobsRegistryService.getManyJobHistories(workspaceId, query);
+    return this.jobHistoryQuery.getManyJobHistories(workspaceId, query);
   }
 
   @WorkspaceAccess('job.read')
@@ -361,7 +365,7 @@ export class JobsRegistryController {
     @WorkspaceId() workspaceId: string,
     @Param('id') id: string,
   ): Promise<JobHistoryDetailResponseDto> {
-    return this.jobsRegistryService.getJobHistoryDetail(workspaceId, id);
+    return this.jobHistoryQuery.getJobHistoryDetail(workspaceId, id);
   }
 
   @WorkspaceAccess('job.read')
@@ -381,7 +385,7 @@ export class JobsRegistryController {
     @WorkspaceId() workspaceId: string,
     @Param('id') id: string,
   ): Promise<JobHistoryWorkflowResponseDto> {
-    return this.jobsRegistryService.getJobHistoryWorkflow(workspaceId, id);
+    return this.jobHistoryQuery.getJobHistoryWorkflow(workspaceId, id);
   }
 
   @WorkspaceAccess('job.write')
@@ -491,7 +495,7 @@ export class JobsRegistryController {
     metadata: Metadata,
   ): Promise<Record<string, unknown>> {
     const worker = this.grpcWorkerContext.requireWorker(metadata);
-    const job = await this.jobsRegistryService.getNextJob(
+    const job = await this.jobDispatch.getNextJob(
       this.authenticatedWorkerId(worker, request.id),
     );
     const mapped = job ? await this.mapJobToGrpcJob(job, worker) : null;
@@ -515,7 +519,7 @@ export class JobsRegistryController {
     metadata: Metadata,
   ): Promise<{ values: Record<string, unknown>[] }> {
     const worker = this.grpcWorkerContext.requireWorker(metadata);
-    const jobs = await this.jobsRegistryService.getNextJobs(
+    const jobs = await this.jobDispatch.getNextJobs(
       this.authenticatedWorkerId(worker, request.id),
       Number(request.limit) || 1,
     );
@@ -599,7 +603,7 @@ export class JobsRegistryController {
     }
     try {
       const { integration, decryptedConfig } =
-        await this.integrationsService.getIntegrationWithDecryptedConfig(
+        await this.integrationConfig.getIntegrationWithDecryptedConfig(
           integrationId,
           job.workspaceId,
         );

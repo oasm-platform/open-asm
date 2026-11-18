@@ -1,5 +1,5 @@
 import { BaseEntity } from '@/common/entities/base.entity';
-import { AgentCommandApprovalStatus } from '@/common/enums/enum';
+import { AgentCommandApprovalStatus } from '@/modules/agents/enums/agent.enums';
 import { ApiProperty } from '@nestjs/swagger';
 import { Column, Entity, Index } from 'typeorm';
 

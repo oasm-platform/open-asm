@@ -1,11 +1,12 @@
 # assets module
 
-Read side of the attack surface: hosts (`assets`), their open ports (`asset_services`), and the HTTP, TLS, tech, IP and DNS facts scans recorded about them. Also manual tags, AI tag suggestions, enable/disable, re-scan and URL discovery.
+Read side of the attack surface: hosts (`assets`), their open ports (`asset_services`), and the HTTP, TLS, tech, IP and DNS facts scans recorded about them. Also manual tags, AI tag suggestions, enable/disable and URL discovery.
 
 ## Layout
 
 - `assets.controller.ts`: HTTP routes on `assets`, including the CSV export built in the controller.
-- `assets.service.ts`: `AssetsService` (~2.2k lines): list/facet queries, graph, TLS, tags, toggle, `reScan`, `createPrimaryAsset`, AI tags.
+- `assets.service.ts`: `AssetsService` (~2.2k lines): list/facet queries, graph, TLS, tags, toggle, `hasPrimaryAsset`, `createPrimaryAsset`, AI tags.
+- `repository-assets.service.ts`: `RepositoryAssetsService`: lists a GIT_ORG target's repository assets and applies a repository sync's changes (`RepositoryAssetChanges`) in one transaction, ordered renames → updates → inserts → disables for the `(value, targetId)` unique constraint.
 - `url-discovery.service.ts`: `UrlDiscoveryService`: starts the `url_discovery` workflow and publishes `asset.url.discovered` when a run ends.
 - `asset-filter.ts`: filter-tree schema for the list (`compileAssetFilter`, `legacyParamsToFilter`, fields `host|port|ip|tech|url|statusCode|tlsHost|tag|project|isNew`).
 - `fresh-runs.ts`: the single definition of "new" rows (`findFreshRuns`, `freshRunSql`, `isFresh`).
@@ -21,8 +22,8 @@ Read side of the attack surface: hosts (`assets`), their open ports (`asset_serv
 | `GET assets/services/export` (CSV) | `asset.read` |
 | `PATCH assets/:id` (tags only), `POST assets/toggle`, `POST assets/service/tag/generate`, `POST assets/url/discover` | `asset.write` |
 
-- `@Global()`, exports `AssetsService` only (`UrlDiscoveryService` is internal).
-- No `@PublishEvent` on any route. `UrlDiscoveryService.handleRunEnd` (`@OnEvent(EventTriggerType.WORKFLOW_END)`) publishes `asset.url.discovered` for `url_discovery` runs. `reScan` emits in-process `target.<type>.re-scan` (with `{ jobRunType }` as a third argument), or `target.git_org.re-scan` for GIT_ORG targets.
+- Exports `AssetsService` and `RepositoryAssetsService` (`UrlDiscoveryService` is internal).
+- No `@PublishEvent` on any route. `UrlDiscoveryService.handleRunEnd` (`@OnEvent(EventTriggerType.WORKFLOW_END)`) publishes `asset.url.discovered` for `url_discovery` runs.
 - MCP/agent tools in `agents/tools/workspace.tools.ts`: `enumerate_assets`, `inspect_asset`, `examine_target_assets`, `list_network_ports`, `fingerprint_technologies`, `verify_tls_settings`. They call `getManyAsssetServices` (note the triple "s"), `getAssetById`, `getPortAssets`, `getTechnologyAssets`, `getManyTls`.
 
 ## Data model
@@ -45,20 +46,20 @@ Read side of the attack surface: hosts (`assets`), their open ports (`asset_serv
 
 ## Coupling
 
-- Imports `TechnologyModule` (tech enrichment) and `WorkspacesModule`. Uses global `StorageService`, `GeoIpService`, `WorkspaceEncryptionService`, `WorkflowsService`, `WorkflowRunnerService` and `EventBridgeService`. Registers the `Job`, `Target`, `AgentLLMConfig` and `AgentConfig` repositories itself.
-- Users of `AssetsService`: `TargetsService` (and `POST targets/:id/re-scan`), `AssetsDiscoveryScheduleConsumer` (`reScan`), `projects` (`ProjectAssetsService`, `ProjectsController`), `SearchService`, agents tools.
-- Writers of these tables outside the module: `DataAdapterService` (`data-adapter/`) ingests every scan result into `assets`, `asset_services`, `http_responses` and the child tables. `TargetsService.createMultipleTargets` inserts the primary/CIDR assets. `RepositorySyncService` creates GIT_ORG repository assets. `step-scope.loader.ts`, `StatisticService` and the reports read them directly.
+- Imports `TechnologyModule` (tech enrichment), `WorkspacesModule`, `StorageModule`, and `WorkflowsModule` + `JobsRegistryModule` (`UrlDiscoveryService`). Uses the global `GeoIpService`, `WorkspaceEncryptionService` and `EventBridgeService`. Imported by `TargetsModule`, `IntegrationsModule` (`RepositoryAssetsService`), `StatisticModule`, `SearchModule` and `AgentsModule`. Registers the `Target` (read only: `reScan` and its target writes live in `TargetsService`), `AgentLLMConfig` and `AgentConfig` repositories itself.
+- Users of `AssetsService`: `TargetsService` (including `hasPrimaryAsset` for `reScan`), `projects` (`ProjectAssetsService`, `ProjectsController`), `SearchService`, agents tools.
+- Writers of these tables outside the module: `DataAdapterService` (`data-adapter/`) ingests every scan result into `assets`, `asset_services`, `http_responses` and the child tables. `TargetsService.createMultipleTargets` inserts the primary/CIDR assets. GIT_ORG repository assets are written here, by `RepositoryAssetsService`, for the integrations module's `RepositorySyncService`. `step-scope.loader.ts`, `StatisticService` and the reports read them directly.
 - `project_assets` (projects module) cascades from `assets`.
 
 ## Gotchas
 
 - `getManyAsssetServices` matches `value` with `ILIKE` and an escaped pattern (`containsLikePattern`), so `%` and `_` in user input are literal. With no trigram index on `asset_services.value` every miss is a sequential scan.
 
-- `generateServiceTags` only **returns** suggestions and stores nothing, although its Swagger text says it replaces tags. It uses the workspace/user default LLM config (`findDefaultLLMConfig`), `generateText`, and the prompt `agents/prompts/GENERATE_SERVICE_TAGS.md`, which the constructor loads from disk.
+- `generateServiceTags` only **returns** suggestions and stores nothing, although its Swagger text says it replaces tags. It uses the workspace/user default LLM config (`findDefaultLLMConfig`), `generateText`, and the prompt `agents/prompts/GENERATE_SERVICE_TAGS.md`, read through `PromptRegistry` (`common/utils/prompt-registry.util.ts`), which shares one copy of that folder with the agents module.
 - Catalog events `asset.updated` and `asset.enabled_changed` have no publisher. The audit mapping `asset.deleted` → `AssetsController.deleteAsset` points at a method that does not exist.
 - Tech strings on list rows are `name:version`. See `technology/AGENTS.md` for why those miss the enrichment cache.
 - `POST assets/url/discover` accepts DOMAIN targets only, and returns a message (not an error) when no live HTTP service has been found yet.
 
 ## Testing
 
-Unit specs: `assets.service.spec.ts`, `assets.controller.spec.ts`, `url-discovery.service.spec.ts`, `asset-filter.spec.ts`, `fresh-runs.spec.ts`, `dto/assets-filter.dto.spec.ts`, `entities/discovered-url.entity.spec.ts`. E2E (live DB): `core-api/test/assets-facets.e2e-spec.ts`, `assets-filter.e2e-spec.ts`, `assets-url.e2e-spec.ts`.
+Unit specs: `assets.service.spec.ts`, `assets.controller.spec.ts`, `repository-assets.service.spec.ts`, `url-discovery.service.spec.ts`, `asset-filter.spec.ts`, `fresh-runs.spec.ts`, `dto/assets-filter.dto.spec.ts`, `entities/discovered-url.entity.spec.ts`. E2E (live DB): `core-api/test/assets-facets.e2e-spec.ts`, `assets-filter.e2e-spec.ts`, `assets-url.e2e-spec.ts`.

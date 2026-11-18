@@ -4,13 +4,12 @@ import { AuthService } from '@/modules/auth/auth.service';
 import { User } from '@/modules/auth/entities/user.entity';
 import { Lock } from '@/services/redis/lock.decorator';
 import {
-  ConflictException,
-  ForbiddenException,
   Injectable,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateFirstAdminDto } from './dto/admin.dto';
+import { ConflictError, ForbiddenError } from '@/common/errors/domain.errors';
 
 const FIRST_ADMIN_LOCK_KEY = 'admin-init';
 // Only bounds how long a crashed holder blocks retries; @Lock releases
@@ -60,11 +59,11 @@ export class AdminService {
   @Lock(FIRST_ADMIN_LOCK_KEY, {
     ttl: FIRST_ADMIN_LOCK_TTL,
     onLocked: () =>
-      new ConflictException('Admin initialization already in progress'),
+      new ConflictError('Admin initialization already in progress'),
   })
   private async bootstrapAdmin(email: string, password: string): Promise<void> {
     if (await this.usersRepository.exists({ where: { role: Role.ADMIN } })) {
-      throw new ForbiddenException();
+      throw new ForbiddenError();
     }
 
     const result = await this.authService.api.signUpEmail({

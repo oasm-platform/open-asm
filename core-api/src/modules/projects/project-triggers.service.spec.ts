@@ -5,7 +5,7 @@ import {
   RunOutcome,
   Severity,
 } from '@/common/enums/enum';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+
 import type { ProjectTriggerFact } from '../event-bridge/sinks/projects/projects.sink';
 import { Project } from './entities/project.entity';
 import { Workflow } from '../workflows/entities/workflow.entity';
@@ -17,6 +17,7 @@ import {
   ProjectTriggersService,
   runOutcomeOf,
 } from './project-triggers.service';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 const PROJECT_ID = 'p-1';
 const BINDING_ID = 'b-1';
@@ -532,7 +533,7 @@ describe('ProjectTriggersService', () => {
       ctx.triggerRepo.findOne.mockResolvedValue(null);
       await expect(
         ctx.service.fireCron({ triggerId: 'gone' }, 'project-trigger:gone'),
-      ).rejects.toBeInstanceOf(NotFoundException);
+      ).rejects.toBeInstanceOf(NotFoundError);
     });
   });
 
@@ -700,7 +701,7 @@ describe('ProjectTriggersService', () => {
           type: ProjectTriggerType.CRON,
           cron: 'disabled',
         }),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
     });
 
     it('does not register a schedule while the project is archived', async () => {
@@ -713,7 +714,7 @@ describe('ProjectTriggersService', () => {
           type: ProjectTriggerType.CRON,
           cron: '0 2 * * 1',
         }),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
       expect(ctx.scheduleQueue.upsertJobScheduler).not.toHaveBeenCalled();
     });
 

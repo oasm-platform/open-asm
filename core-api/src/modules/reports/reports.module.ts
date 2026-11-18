@@ -11,11 +11,13 @@ import { AssetService } from '@/modules/assets/entities/asset-services.entity';
 import { AssetTag } from '@/modules/assets/entities/asset-tags.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { StatisticModule } from '@/modules/statistic/statistic.module';
+import { StorageModule } from '../storage/storage.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Report, Vulnerability, Target, AssetService, AssetTag, Workspace]),
     StatisticModule,
+    StorageModule,
   ],
   controllers: [ReportsController],
   providers: [ReportsService, VulnerabilityReportService, SummaryReportService],

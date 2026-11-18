@@ -1,4 +1,4 @@
-import { Logger, BadRequestException } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { QueryFailedError } from 'typeorm';
 import { IntegrationType } from '@/common/enums/enum';
 import type { UserContextPayload } from '@/common/interfaces/app.interface';
@@ -10,6 +10,7 @@ import {
   type ConnectorConfig,
   type ConnectorSyncResult,
 } from './connector.abstract';
+import { isInvalidInput } from '@/common/errors/error-checks';
 
 /**
  * Cloudflare API v4 — pagination safety caps.
@@ -297,7 +298,7 @@ export class CloudflareConnector extends CloudProviderConnector {
    * BadRequestException or a Postgres unique-constraint violation). */
   private isDuplicateTargetError(error: unknown): boolean {
     if (
-      error instanceof BadRequestException &&
+      isInvalidInput(error) &&
       error.message.startsWith('Target already exists')
     ) {
       return true;

@@ -1,7 +1,7 @@
 import type { UserContextPayload } from '@/common/interfaces/app.interface';
 import { ProjectScopeRuleMode, ProjectScopeRuleType } from '@/common/enums/enum';
 import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import type { CreateToolRuleDto, UpdateToolRuleDto } from './dto/tool-rule.dto';
@@ -17,6 +17,7 @@ import {
 } from './guard/target-scope';
 import { matchToolRule } from './guard/tool-rules';
 import { stableStringify } from './tools/helpers';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 /** Why the guard decided a call; stored in the tool call's result. */
 export interface ToolPolicy {
@@ -278,7 +279,7 @@ export class AgentsGuardService {
 
   private async findRule(workspaceId: string, id: string): Promise<AgentToolRule> {
     const rule = await this.ruleRepo.findOne({ where: { id, workspaceId } });
-    if (!rule) throw new NotFoundException('Tool rule not found');
+    if (!rule) throw new NotFoundError('Tool rule not found');
     return rule;
   }
 

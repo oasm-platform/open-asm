@@ -25,7 +25,7 @@ import { createAuthMiddleware } from 'better-auth/api';
 import { toNodeHandler } from 'better-auth/node';
 import type { NodeRequest, NodeResponse } from '@nestjs/platform-node';
 import { APIErrorExceptionFilter } from '../../common/filters/api-error-exception-filter';
-import { SkipBodyParsingMiddleware } from '../../common/middlewares/skip-body-parsing.middlewares';
+import { SkipBodyParsingMiddleware } from '../../common/middleware/skip-body-parsing.middleware';
 import { auth } from './auth';
 import { AuthService } from './auth.service';
 import { UserPresenceService } from './user-presence.service';

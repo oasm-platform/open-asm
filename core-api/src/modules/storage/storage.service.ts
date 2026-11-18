@@ -15,12 +15,9 @@ import {
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
-  BadRequestException,
-  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   Logger,
-  NotFoundException,
   OnModuleInit,
   StreamableFile,
 } from '@nestjs/common';
@@ -35,6 +32,8 @@ import {
   parseStorageConfig,
   StorageConfig,
 } from './storage.config';
+import { isInvalidInput, isNotFound } from '@/common/errors/error-checks';
+import { ForbiddenError, InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 type BucketAccess =
   'public' | 'authenticated' | 'tenant' | 'private' | 'blocked';
@@ -290,10 +289,10 @@ export class StorageService implements OnModuleInit {
 
   public assertBucketAllowed(bucket: string): void {
     if (!bucket || bucket.trim() === '') {
-      throw new BadRequestException('bucket is required');
+      throw new InvalidInputError('bucket is required');
     }
     if (!this.buckets.includes(bucket)) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `Invalid bucket: ${bucket}. Allowed buckets: ${this.buckets.join(', ')}`,
       );
     }
@@ -301,7 +300,7 @@ export class StorageService implements OnModuleInit {
 
   public assertBucketNotPrivate(bucket: string): void {
     if (this.getBucketAccess(bucket) === 'private') {
-      throw new ForbiddenException(`Bucket '${bucket}' is private`);
+      throw new ForbiddenError(`Bucket '${bucket}' is private`);
     }
   }
 
@@ -340,16 +339,16 @@ export class StorageService implements OnModuleInit {
         : '';
 
     if (!ext) {
-      throw new BadRequestException('File must have an extension');
+      throw new InvalidInputError('File must have an extension');
     }
     if (this.restrictedExtensions.includes(ext)) {
-      throw new BadRequestException(`File extension '.${ext}' is restricted`);
+      throw new InvalidInputError(`File extension '.${ext}' is restricted`);
     }
     if (
       opts?.allowedExtensions &&
       !opts.allowedExtensions.map((e) => e.toLowerCase()).includes(ext)
     ) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `File extension '.${ext}' is not allowed. Allowed extensions: ${opts.allowedExtensions.join(', ')}`,
       );
     }
@@ -480,7 +479,7 @@ export class StorageService implements OnModuleInit {
 
   private assertValidLocation(bucket: string, key: string): void {
     if (!bucket || bucket.trim() === '') {
-      throw new BadRequestException('bucket is required');
+      throw new InvalidInputError('bucket is required');
     }
     if (
       !key ||
@@ -490,7 +489,7 @@ export class StorageService implements OnModuleInit {
       key.startsWith(' ') ||
       key.includes('..')
     ) {
-      throw new BadRequestException('Invalid key');
+      throw new InvalidInputError('Invalid key');
     }
   }
 
@@ -619,7 +618,7 @@ export class StorageService implements OnModuleInit {
   ): Promise<{ url: string; expiresIn: number | null }> {
     const slashIndex = path.indexOf('/');
     if (slashIndex <= 0 || slashIndex === path.length - 1) {
-      throw new BadRequestException('Invalid path');
+      throw new InvalidInputError('Invalid path');
     }
     const bucket = path.slice(0, slashIndex);
     const key = path.slice(slashIndex + 1);
@@ -627,7 +626,7 @@ export class StorageService implements OnModuleInit {
     this.assertBucketAllowed(bucket);
     const access = this.getBucketAccess(bucket);
     if (access === 'private' || access === 'blocked') {
-      throw new BadRequestException(`Bucket '${bucket}' is private`);
+      throw new InvalidInputError(`Bucket '${bucket}' is private`);
     }
 
     if (
@@ -765,7 +764,7 @@ export class StorageService implements OnModuleInit {
     const cleanPath = filePath.replace(/^[./\s]+/, '');
 
     if (!cleanPath || cleanPath.includes('..')) {
-      throw new NotFoundException('File not found');
+      throw new NotFoundError('File not found');
     }
 
     try {
@@ -777,7 +776,7 @@ export class StorageService implements OnModuleInit {
       );
 
       if (!response.Body) {
-        throw new NotFoundException('File not found');
+        throw new NotFoundError('File not found');
       }
 
       const body = response.Body as Readable;
@@ -791,7 +790,7 @@ export class StorageService implements OnModuleInit {
         error instanceof S3ServiceException &&
         (error.name === 'NoSuchKey' || error.$metadata.httpStatusCode === 404)
       ) {
-        throw new NotFoundException('File not found');
+        throw new NotFoundError('File not found');
       }
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error occurred';
@@ -824,7 +823,7 @@ export class StorageService implements OnModuleInit {
           error.name === 'NotFound' ||
           error.$metadata.httpStatusCode === 404)
       ) {
-        throw new NotFoundException('File not found');
+        throw new NotFoundError('File not found');
       }
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error occurred';
@@ -871,7 +870,7 @@ export class StorageService implements OnModuleInit {
         (error.name === 'NoSuchBucket' ||
           error.$metadata.httpStatusCode === 404)
       ) {
-        throw new NotFoundException('Bucket not found');
+        throw new NotFoundError('Bucket not found');
       }
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error occurred';
@@ -894,7 +893,7 @@ export class StorageService implements OnModuleInit {
   ): Promise<{ deleted: number; failed: number }> {
     // An empty prefix would match the whole bucket.
     if (!prefix.trim()) {
-      throw new BadRequestException('prefix is required');
+      throw new InvalidInputError('prefix is required');
     }
     const client = this.rustFsClient.getClient();
     let deleted = 0;
@@ -934,7 +933,7 @@ export class StorageService implements OnModuleInit {
     const cleanPath = filePath.replace(/^[./\s]+/, '');
 
     if (!cleanPath || cleanPath.includes('..')) {
-      throw new NotFoundException('File not found');
+      throw new NotFoundError('File not found');
     }
 
     try {
@@ -949,7 +948,7 @@ export class StorageService implements OnModuleInit {
         error instanceof S3ServiceException &&
         (error.name === 'NoSuchKey' || error.$metadata.httpStatusCode === 404)
       ) {
-        throw new NotFoundException('File not found');
+        throw new NotFoundError('File not found');
       }
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error occurred';
@@ -966,19 +965,19 @@ export class StorageService implements OnModuleInit {
       new URL(url);
     } catch (err) {
       Logger.error(err);
-      throw new BadRequestException('Invalid URL format');
+      throw new InvalidInputError('Invalid URL format');
     }
 
     try {
       const response = await fetch(url);
 
       if (!response.ok) {
-        throw new NotFoundException('Image not found at the provided URL');
+        throw new NotFoundError('Image not found at the provided URL');
       }
 
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.startsWith('image/')) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           'The provided URL does not point to an image',
         );
       }
@@ -989,13 +988,13 @@ export class StorageService implements OnModuleInit {
       return { buffer, contentType };
     } catch (error) {
       if (
-        error instanceof BadRequestException ||
-        error instanceof NotFoundException
+        isInvalidInput(error) ||
+        isNotFound(error)
       ) {
         throw error;
       }
 
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'Failed to fetch image from the provided URL',
       );
     }
@@ -1008,7 +1007,7 @@ export class StorageService implements OnModuleInit {
     const cleanPath = filePath.replace(/^[./\s]+/, '');
 
     if (!cleanPath || cleanPath.includes('..')) {
-      throw new NotFoundException('File not found');
+      throw new NotFoundError('File not found');
     }
 
     try {
@@ -1020,7 +1019,7 @@ export class StorageService implements OnModuleInit {
       );
 
       if (!response.Body) {
-        throw new NotFoundException('File not found');
+        throw new NotFoundError('File not found');
       }
 
       const body = response.Body as Readable;
@@ -1035,7 +1034,7 @@ export class StorageService implements OnModuleInit {
         error instanceof S3ServiceException &&
         (error.name === 'NoSuchKey' || error.$metadata.httpStatusCode === 404)
       ) {
-        throw new NotFoundException('File not found');
+        throw new NotFoundError('File not found');
       }
       if (error instanceof SyntaxError) {
         throw new InternalServerErrorException(

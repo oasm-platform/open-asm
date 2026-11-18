@@ -27,7 +27,7 @@ Scan worker nodes: join/identity, liveness, listing, the gRPC channels a worker 
 - Events (`EventBridgeService.publishSafely`): `worker.joined` (with `metadata.joinKeyId`), `worker.rejoined`, `worker.disconnected`, `worker.timed_out`. Only workers with a `workspaceId` are announced; cloud workers are skipped.
 - Redis keys: `workers:api:<apiKey>` + `workers:api-id:<id>` (join key, TTL 300 s); `oasm:worker:telemetry:v1:<workerId>` (TTL 90 s, `stale` after 30 s); `agent:conv:worker:<conversationId>` (TTL 1 day).
 - Redis channels: publishes `remote-execute:results:<sessionId>`; `worker:stream:cancel` and `worker:stream:jobs` (`WORKER_STREAM_CANCEL_CHANNEL` / `WORKER_STREAM_JOBS_CHANNEL`).
-- Exports `WorkersService`, `RemoteExecuteSubscribeService`, `GrpcWorkerContext`, `AliveStreamManager`, `WorkerTelemetryService`, `WorkerStreamRegistry`. The module is `@Global()`.
+- Exports `WorkersService`, `RemoteExecuteSubscribeService`, `GrpcWorkerContext`, `AliveStreamManager`, `WorkerTelemetryService`, `WorkerStreamRegistry`. Not global: imported by `JobsRegistryModule` (`WorkerStreamRegistry`, `GrpcWorkerContext`, and `WorkersService` for `WorkerTokenGuard` / `GrpcWorkerTokenGuard`), `RemoteExecuteModule` and `AgentsModule`.
 
 ## Data model
 
@@ -54,9 +54,9 @@ Scan worker nodes: join/identity, liveness, listing, the gRPC channels a worker 
 
 ## Coupling
 
-- `forwardRef(() => ToolsModule)` (the two modules import each other) and `ConnectorsModule`. Uses the global `GeoIpService` (`src/services/geo-ip`) for the detail location. `WorkersService` injects `JobsRegistryService` and `ToolsService` with `forwardRef`. This is part of the tools ↔ workers ↔ jobs-registry cycle noted in `combine.module.ts`.
-- Writes other modules' tables: `jobs` (through `jobsRegistryService.repo` and raw SQL), `network_interfaces` (`connectInternalNetwork`), and `agent_conversations.workerId` (conversation pin).
-- Consumers: `remote-execute`, which wraps `RemoteExecuteSubscribeService`. `agents`, which uses `getWorkers(..., { agentWorkspaceId })`, `isAgentWorkerForWorkspace`, `isAgentReady`, and pick/pin. `jobs-registry`, which uses `WorkerStreamRegistry.publishCancel` / `publishJobsAvailable` and `WorkerInstance`. `src/common/guards/` (`GrpcWorkerTokenGuard`, `WorkerTokenGuard`), which uses `validateWorkerToken`. `ToolsService`, which counts workers through `workersService.repo`.
+- Imports `ToolsModule` (plain: tools no longer imports this module) and `ConnectorsModule`. Uses the global `GeoIpService` (`src/services/geo-ip`) for the detail location. `WorkersService` injects `ToolsService` (`getBuiltInTools`) and the `Job` repository directly; it no longer injects `JobsRegistryService`. No `forwardRef` anywhere in the module.
+- Writes other modules' tables: `jobs` (its own `Job` repository and raw SQL), `network_interfaces` (`connectInternalNetwork`), and `agent_conversations.workerId` (conversation pin).
+- Consumers: `remote-execute`, which wraps `RemoteExecuteSubscribeService`. `agents`, which uses `getWorkers(..., { agentWorkspaceId })`, `isAgentWorkerForWorkspace`, `isAgentReady`, and pick/pin. `jobs-registry`, which uses `WorkerStreamRegistry.publishCancel` / `publishJobsAvailable` and `WorkerInstance`. `src/common/guards/` (`GrpcWorkerTokenGuard`, `WorkerTokenGuard`), which uses `validateWorkerToken`. `ToolsService`, which counts workers through its own `WorkerInstance` repository (read model).
 
 ## Gotchas
 

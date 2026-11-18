@@ -3,7 +3,7 @@ import {
   EVENT_BUS_STREAM,
   eventBusDlqKey,
 } from '@/common/constants/app.constants';
-import { EventBusGroup } from '@/common/enums/enum';
+import { EventBusGroup } from '@/modules/event-bridge/enums/event-bridge.enums';
 import type { RedisService, StreamEntry } from '@/services/redis/redis.service';
 import type { EventSink } from './event-sink';
 import { StreamConsumer } from './stream-consumer';

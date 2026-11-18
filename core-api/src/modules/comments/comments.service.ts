@@ -15,12 +15,9 @@ import type { EventEnvelopeData } from '@/modules/event-bridge/contracts/event-e
 import { EventBridgeService } from '@/modules/event-bridge/publishing/event-bridge.service';
 import { Issue } from '@/modules/issues/entities/issue.entity';
 import { Vulnerability } from '@/modules/vulnerabilities/entities/vulnerability.entity';
-import { getManyResponse } from '@/utils/getManyResponse';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
 import {
-  BadRequestException,
-  ForbiddenException,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, type SelectQueryBuilder } from 'typeorm';
@@ -31,6 +28,7 @@ import type {
   UpdateCommentDto,
 } from './dto/comment.dto';
 import { Comment } from './entities/comment.entity';
+import { ForbiddenError, InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 /** What a comment is about: exactly one subject, as the table enforces. */
 export type CommentSubject =
@@ -123,7 +121,7 @@ export class CommentsService {
         where: { id: dto.repCommentId },
       });
       if (!replied || !sameSubject(replied, subject)) {
-        throw new BadRequestException(
+        throw new InvalidInputError(
           'The replied-to comment does not belong to this thread',
         );
       }
@@ -210,7 +208,7 @@ export class CommentsService {
         select: { id: true },
       });
       if (!issue) {
-        throw new NotFoundException(`Issue with ID ${subject.id} not found`);
+        throw new NotFoundError(`Issue with ID ${subject.id} not found`);
       }
       return;
     }
@@ -223,7 +221,7 @@ export class CommentsService {
       .andWhere('target.workspaceId = :workspaceId', { workspaceId })
       .getOne();
     if (!vulnerability) {
-      throw new NotFoundException(
+      throw new NotFoundError(
         `Vulnerability with ID ${subject.id} not found`,
       );
     }
@@ -238,21 +236,21 @@ export class CommentsService {
     const comment = await this.commentsRepository.findOne({ where: { id } });
     const subject = comment ? subjectOf(comment) : null;
     if (!comment || !subject) {
-      throw new NotFoundException(`Comment with ID ${id} not found`);
+      throw new NotFoundError(`Comment with ID ${id} not found`);
     }
     try {
       await this.assertSubjectInWorkspace(subject, workspaceId);
     } catch {
       // Same answer as a missing comment: the id must not reveal that it
       // exists in another workspace.
-      throw new NotFoundException(`Comment with ID ${id} not found`);
+      throw new NotFoundError(`Comment with ID ${id} not found`);
     }
     const allowed = action === 'edit' ? comment.isCanEdit : comment.isCanDelete;
     if (!allowed) {
-      throw new ForbiddenException(`This comment cannot be ${action}ed`);
+      throw new ForbiddenError(`This comment cannot be ${action}ed`);
     }
     if (comment.createdById !== userId) {
-      throw new ForbiddenException(
+      throw new ForbiddenError(
         `Only the author of the comment can ${action} it`,
       );
     }
@@ -288,7 +286,7 @@ export class CommentsService {
       .andWhere('comment.id = :id', { id })
       .getOne();
     if (!comment) {
-      throw new NotFoundException(`Comment with ID ${id} not found`);
+      throw new NotFoundError(`Comment with ID ${id} not found`);
     }
     return this.toDto(comment);
   }

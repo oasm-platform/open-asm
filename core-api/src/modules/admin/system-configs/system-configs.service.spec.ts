@@ -1,6 +1,6 @@
 import { decrypt } from '@/common/utils/encryption.util';
 import { RedisService } from '@/services/redis/redis.service';
-import { BadRequestException } from '@nestjs/common';
+
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -10,6 +10,7 @@ import type { SystemSettingsDto } from './dto/system-configs.dto';
 import type { SystemSettings } from './entities/system-config.entity';
 import { SystemConfig } from './entities/system-config.entity';
 import { SystemConfigsService } from './system-configs.service';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 describe('SystemConfigsService', () => {
   let service: SystemConfigsService;
@@ -393,7 +394,7 @@ describe('SystemConfigsService', () => {
           service.updateSettings({
             mailServer: { enabled: true, host: 'smtp.test' },
           }),
-        ).rejects.toBeInstanceOf(BadRequestException);
+        ).rejects.toBeInstanceOf(InvalidInputError);
         expect(queryBuilder.execute).not.toHaveBeenCalled();
       });
 
@@ -447,7 +448,7 @@ describe('SystemConfigsService', () => {
             { adminAccess: { allowedIps: ['10.0.0.0/8'] } },
             '203.0.113.7',
           ),
-        ).rejects.toBeInstanceOf(BadRequestException);
+        ).rejects.toBeInstanceOf(InvalidInputError);
         expect(queryBuilder.execute).not.toHaveBeenCalled();
       });
 

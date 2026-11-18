@@ -1,22 +1,12 @@
-import {
-  ArtifactListScope,
-  ArtifactShareType,
-  ArtifactSource,
-  ArtifactStatus,
-  AuditActorType,
-  AuditOutcome,
-} from '@/common/enums/enum';
-import { getManyResponse } from '@/utils/getManyResponse';
+import { ArtifactShareType, ArtifactSource, ArtifactStatus, AuditActorType, AuditOutcome } from '@/common/enums/enum';
+import { ArtifactListScope } from '@/modules/artifacts/enums/artifact.enums';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
 import type { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import { StorageService } from '@/modules/storage/storage.service';
 import { WorkspaceMembers } from '@/modules/workspaces/entities/workspace-members.entity';
 import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
   Injectable,
   Logger,
-  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
@@ -38,6 +28,8 @@ import type {
 import { ArtifactFolder } from './entities/artifact-folder.entity';
 import { ArtifactShare } from './entities/artifact-share.entity';
 import { Artifact } from './entities/artifact.entity';
+import { isNotFound } from '@/common/errors/error-checks';
+import { ConflictError, ForbiddenError, InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 export const TEMPLATES_FOLDER_NAME = 'custom-templates';
 export const TEMPLATE_NAME_RE = /\.ya?ml$/i;
@@ -145,7 +137,7 @@ export class ArtifactsService {
         lock: { mode: 'pessimistic_write' },
       });
       if (!artifact || artifact.status === ArtifactStatus.DELETED) {
-        throw new NotFoundException('File not found');
+        throw new NotFoundError('File not found');
       }
       if (artifact.status === ArtifactStatus.READY) {
         return { artifact };
@@ -158,8 +150,8 @@ export class ArtifactsService {
           artifact.objectKey,
         ));
       } catch (error) {
-        if (error instanceof NotFoundException) {
-          throw new BadRequestException('File has not been uploaded yet');
+        if (isNotFound(error)) {
+          throw new InvalidInputError('File has not been uploaded yet');
         }
         throw error;
       }
@@ -175,7 +167,7 @@ export class ArtifactsService {
     });
 
     if ('mismatch' in outcome) {
-      throw new ConflictException('Uploaded size does not match the declared size');
+      throw new ConflictError('Uploaded size does not match the declared size');
     }
     return this.getById(workspaceId, userId, outcome.artifact.id, []);
   }
@@ -229,10 +221,10 @@ export class ArtifactsService {
         lock: { mode: 'pessimistic_write' },
       });
       if (!artifact) {
-        throw new NotFoundException('File not found');
+        throw new NotFoundError('File not found');
       }
       if (artifact.createdByUserId !== userId) {
-        throw new ForbiddenException('Only the owner can change this file');
+        throw new ForbiddenError('Only the owner can change this file');
       }
       this.quota.assertFileSize(buffer.length);
       // Release first so a full workspace can shrink. Every quota change runs
@@ -273,7 +265,7 @@ export class ArtifactsService {
 
     if (scope === ArtifactListScope.ALL) {
       if (!canManage(permissions)) {
-        throw new ForbiddenException('Requires artifact.manage');
+        throw new ForbiddenError('Requires artifact.manage');
       }
     } else if (scope === ArtifactListScope.SHARED) {
       qb.andWhere('artifact.shareType IN (:...shareTypes)', {
@@ -340,7 +332,7 @@ export class ArtifactsService {
       shareType: ArtifactShareType.PUBLIC,
     });
     if (!artifact) {
-      throw new NotFoundException('File not found');
+      throw new NotFoundError('File not found');
     }
     return this.presignDownload(artifact);
   }
@@ -357,7 +349,7 @@ export class ArtifactsService {
       dto.name !== undefined &&
       (!dto.name || dto.name.length > 200 || !TEMPLATE_NAME_RE.test(dto.name))
     ) {
-      throw new BadRequestException(TEMPLATE_NAME_ERROR);
+      throw new InvalidInputError(TEMPLATE_NAME_ERROR);
     }
     if (dto.parentFolderId) {
       await this.findOwnedFolder(workspaceId, userId, dto.parentFolderId);
@@ -390,7 +382,7 @@ export class ArtifactsService {
       !canManage(permissions) &&
       !(isOwner && hasPermission(permissions, ARTIFACT_WRITE_PERMISSION))
     ) {
-      throw new ForbiddenException(
+      throw new ForbiddenError(
         isOwner
           ? 'Requires artifact.write'
           : 'Only the owner can delete this file',
@@ -490,7 +482,7 @@ export class ArtifactsService {
       createdByUserId: userId,
     });
     if (!folder) {
-      throw new NotFoundException('Folder not found');
+      throw new NotFoundError('Folder not found');
     }
     return folder;
   }
@@ -511,7 +503,7 @@ export class ArtifactsService {
         name: TEMPLATES_FOLDER_NAME,
       }));
     if (!folder) {
-      throw new NotFoundException('Folder not found');
+      throw new NotFoundError('Folder not found');
     }
     return folder;
   }
@@ -602,7 +594,7 @@ export class ArtifactsService {
       await this.storageService.deleteFile(artifact.objectKey, artifact.bucket);
     } catch (error) {
       // Already gone is fine; anything else keeps the row so the sweep retries.
-      if (!(error instanceof NotFoundException)) {
+      if (!isNotFound(error)) {
         throw error;
       }
     }
@@ -658,7 +650,7 @@ export class ArtifactsService {
       { status: ArtifactStatus.READY },
     );
     if (!affected) {
-      throw new NotFoundException('File was removed during upload');
+      throw new NotFoundError('File was removed during upload');
     }
     await this.quota.commit(manager, artifact.workspaceId, artifact.sizeBytes);
     artifact.status = ArtifactStatus.READY;
@@ -713,7 +705,7 @@ export class ArtifactsService {
       !artifact ||
       !((await this.canRead(artifact, userId)) || canManage(permissions))
     ) {
-      throw new NotFoundException('File not found');
+      throw new NotFoundError('File not found');
     }
     return artifact;
   }
@@ -721,7 +713,7 @@ export class ArtifactsService {
   private async findOwned(workspaceId: string, userId: string, id: string) {
     const artifact = await this.findVisible(workspaceId, userId, id, []);
     if (artifact.createdByUserId !== userId) {
-      throw new ForbiddenException('Only the owner can change this file');
+      throw new ForbiddenError('Only the owner can change this file');
     }
     return artifact;
   }

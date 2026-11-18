@@ -4,7 +4,7 @@ import { DataKind, TargetType, ToolCategory, WorkerType } from '@/common/enums/e
 import { RedisLockService } from '@/services/redis/distributed-lock.service';
 import type { StorageService } from '../storage/storage.service';
 import type { Tool } from './entities/tools.entity';
-import type { WorkspaceTool } from './entities/workspace_tools.entity';
+import type { WorkspaceTool } from './entities/workspace-tools.entity';
 import { ToolSyncService } from './tool-sync.service';
 
 // NOTE: module-level `jest.mock('fs/promises')` is unreliable here — the SWC

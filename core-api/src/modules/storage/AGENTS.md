@@ -17,7 +17,7 @@ S3-compatible object storage (RustFS locally, any S3 in the cloud): bucket setup
 | `POST storage/presign/upload` | `@Roles(Role.ADMIN)`; bucket must exist and not be `private` |
 | `GET storage/presign/download?bucket&path&fileName` | authenticated session (global guard); then `authorizeRead` by bucket class |
 
-- `@Global()` module, registered in `app.module.ts` (not in `combine.module.ts`). Exports `StorageService` only.
+- Registered in `app.module.ts` (not in `combine.module.ts`) and imported by every module that injects `StorageService` (artifacts, assets, connectors, data-adapter, jobs-registry, projects, reports, root, admin system-configs, technology, templates, tools). Exports `StorageService` only. `StorageController` uses `WorkspacesService` from the global `WorkspacesModule`.
 - Main methods: `uploadFile(fileName, buffer, bucket, contentType?)`, `getFile(key, bucket)`, `headObject(bucket, key)`, `deleteFile(key, bucket)`, `deleteByPrefix(bucket, prefix)`, `listFiles(bucket)`, `readJsonFile(key, bucket)`, `getPresignedUploadUrl`, `getPresignedDownloadUrl`, `getPresignedPost`, `getClientUrlForPath`, `signStoragePath(s)`, `forwardImage(url)`, `generateObjectKey`.
 
 ## Buckets

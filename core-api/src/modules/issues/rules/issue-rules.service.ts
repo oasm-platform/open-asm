@@ -1,10 +1,6 @@
-import {
-  IssueLinkResourceType,
-  IssueRuleGroupBy,
-  IssueType,
-  Severity,
-} from '@/common/enums/enum';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { IssueLinkResourceType, IssueType, Severity } from '@/common/enums/enum';
+import { IssueRuleGroupBy } from '@/modules/issues/enums/issue.enums';
+import { Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import type {
@@ -15,6 +11,7 @@ import type {
 import { IssueRule } from '../entities/issue-rule.entity';
 import { assertWorkspaceMember } from '../issue-activity';
 import { IssueLinksService } from '../issue-links.service';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 /** The rule `POST /issues/rules/defaults` installs. */
 export const DEFAULT_ISSUE_RULE = {
@@ -127,7 +124,7 @@ export class IssueRulesService {
     const rule = await this.rulesRepository.findOne({
       where: { id, workspaceId },
     });
-    if (!rule) throw new NotFoundException(`Issue rule with ID ${id} not found`);
+    if (!rule) throw new NotFoundError(`Issue rule with ID ${id} not found`);
     return rule;
   }
 

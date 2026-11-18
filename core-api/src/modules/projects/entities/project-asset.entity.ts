@@ -1,5 +1,5 @@
 import { BaseEntity } from '@/common/entities/base.entity';
-import { ProjectAssetSource } from '@/common/enums/enum';
+import { ProjectAssetSource } from '@/modules/projects/enums/project.enums';
 import { Asset } from '@/modules/assets/entities/assets.entity';
 import {
   Column,

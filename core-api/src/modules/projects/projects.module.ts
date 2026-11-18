@@ -1,6 +1,6 @@
 import { BullMQName } from '@/common/enums/enum';
 import { BullModule } from '@nestjs/bullmq';
-import { Global, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ArtifactsModule } from '../artifacts/artifacts.module';
 import { Asset } from '../assets/entities/assets.entity';
@@ -10,7 +10,6 @@ import {
   PROJECT_TRIGGER_EVENTS,
 } from '../event-bridge/sinks/projects/projects.sink';
 import { Workflow } from '../workflows/entities/workflow.entity';
-import { Workspace } from '../workspaces/entities/workspace.entity';
 import { Project } from './entities/project.entity';
 import { ProjectArtifact } from './entities/project-artifact.entity';
 import { ProjectAsset } from './entities/project-asset.entity';
@@ -31,8 +30,11 @@ import { ProjectTriggersService } from './project-triggers.service';
 import { ProjectWorkflowsService } from './project-workflows.service';
 import { ProjectsController } from './projects.controller';
 import { ProjectsService } from './projects.service';
+import { StorageModule } from '../storage/storage.module';
+import { ToolsModule } from '../tools/tools.module';
+import { JobsRegistryModule } from '../jobs-registry/jobs-registry.module';
+import { WorkflowsModule } from '../workflows/workflows.module';
 
-@Global()
 @Module({
   imports: [
     BullModule.registerQueue(
@@ -49,10 +51,13 @@ import { ProjectsService } from './projects.service';
       ProjectWorkflow,
       ProjectWorkflowTrigger,
       Workflow,
-      Workspace,
     ]),
     ConnectorsModule,
     ArtifactsModule,
+    StorageModule,
+    ToolsModule,
+    JobsRegistryModule,
+    WorkflowsModule,
   ],
   controllers: [ProjectsController],
   providers: [

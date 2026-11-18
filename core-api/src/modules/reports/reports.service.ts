@@ -1,10 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { generateToken } from '@/utils/genToken';
-import { getManyResponse } from '@/utils/getManyResponse';
+import { generateToken } from '@/common/utils/gen-token.util';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
 import { StorageService } from '@/modules/storage/storage.service';
 import { GetManyReportsQueryDto } from './dto/reports.dto';
 import { Report } from './entities/report.entity';
@@ -13,6 +13,7 @@ import type { VulnerabilityReportData } from './types/vulnerability-report-data.
 import { VulnerabilityReportService } from './services/vulnerability-report.service';
 import { SummaryReportService } from './services/summary-report.service';
 import { renderReportPdf } from './renderer/pdf-renderer';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 @Injectable()
 export class ReportsService {
@@ -35,7 +36,7 @@ export class ReportsService {
       where: { id, workspace: { id: workspaceId } },
     });
     if (!report) {
-      throw new NotFoundException('Report not found');
+      throw new NotFoundError('Report not found');
     }
     return report;
   }

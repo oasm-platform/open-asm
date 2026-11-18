@@ -2,11 +2,8 @@ import {
   EVENT_BUS_AUDIT_LOCK_KEY,
   EVENT_BUS_AUDIT_LOCK_TTL_MS,
 } from '@/common/constants/app.constants';
-import {
-  AuditActorType,
-  AuditOutcome,
-  EventBusGroup,
-} from '@/common/enums/enum';
+import { AuditActorType, AuditOutcome } from '@/common/enums/enum';
+import { EventBusGroup } from '@/modules/event-bridge/enums/event-bridge.enums';
 import { AuditEvent } from '@/modules/audit/entities/audit-event.entity';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';

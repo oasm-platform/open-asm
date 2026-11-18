@@ -1,4 +1,3 @@
-// Trigger rebuild to update OpenAPI spec
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -11,7 +10,8 @@ import {
   QueryResolver,
 } from 'nestjs-i18n';
 import * as path from 'path';
-import { icuFormatter } from './utils/icu-formatter';
+import { validateEnv } from './common/config/env.schema';
+import { icuFormatter } from './common/utils/icu-formatter.util';
 import { DatabaseModule } from './database/database.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { CombineModule } from './modules/combine.module';
@@ -26,6 +26,7 @@ import { EventBridgeModule } from './modules/event-bridge/event-bridge.module';
     ConfigModule.forRoot({
       envFilePath: '.env',
       isGlobal: true,
+      validate: validateEnv,
     }),
     EventEmitterModule.forRoot({ wildcard: true }),
     ScheduleModule.forRoot(),
