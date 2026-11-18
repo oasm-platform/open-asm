@@ -12,7 +12,6 @@ Wires the better-auth instance into Nest: it mounts the handler on `/api/auth/*`
 - `user-presence.service.ts`: last-request time per user in Redis (`presence:<userId>`, 30-day TTL).
 - `auth-env.ts`: `resolveAuthSecret()`. `auth-logger.ts`: routes better-auth logs into Nest's logger.
 - `entities/`: `User`, `Session`, `Account`, `Verification` (tables `users`, `sessions`, `accounts`, `verifications`).
-- `symbols.ts` is empty.
 
 ## Request authentication (`AuthGuard`)
 

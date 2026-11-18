@@ -7,7 +7,6 @@ Ingest layer for scan results: turns a finished job's tool output into rows in t
 - `data-adapter.service.ts`: `DataAdapterService` plus exported pure helpers (`mergeDnsRecords`, `toDnsFacetRows`, `vulnerabilityFingerprint`, `rescanConflictClause`, `splitTechString`, `toTlsCertificateRow`, `VULNERABILITY_INSERT_CHUNK_SIZE`).
 - `url-owner.ts`: `serviceForUrl`, picks the `asset_services` row a discovered URL belongs to when the job ran on a whole host.
 - `data-adapter.interface.ts`: `DataAdapterInput<T>` (`{ data, job }`).
-- `data-adapter.controller.ts`: `@Controller('data-adapter')` with no routes.
 - Specs: `data-adapter.service.spec.ts`, `url-owner.spec.ts`, `vulnerability-fingerprint.spec.ts`.
 
 ## Public surface

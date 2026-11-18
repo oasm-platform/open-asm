@@ -5,7 +5,6 @@ Read-only technology catalogue: turns a detected technology name into its descri
 ## Layout
 
 - `technology-forwarder.service.ts`: `TechnologyForwarderService`, all of the logic.
-- `technology.controller.ts`: `TechnologyController` on `technology`, with **no routes** (an empty Swagger tag).
 - `dto/technology-detail.dto.ts`: `TechnologyDetailDTO`, `CategoryInfoDTO`.
 - `technology-forwarder.service.spec.ts`: unit tests (Redis and `StorageService` mocked).
 
