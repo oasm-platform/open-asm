@@ -5,7 +5,8 @@ Read side of the attack surface: hosts (`assets`), their open ports (`asset_serv
 ## Layout
 
 - `assets.controller.ts`: HTTP routes on `assets`, including the CSV export built in the controller.
-- `assets.service.ts`: `AssetsService` (~2.2k lines): list/facet queries, graph, TLS, tags, toggle, `hasPrimaryAsset`, `createPrimaryAsset`, AI tags.
+- `assets.service.ts`: `AssetsService`: list/facet queries, TLS, tags, toggle, `hasPrimaryAsset`, `createPrimaryAsset`, AI tags.
+- `asset-graph.service.ts`: `AssetGraphService`: the topology graph (`getAssetGraph`) and the lazy expansion of one asset's services (`getAssetServiceGraph`). Controller only.
 - `repository-assets.service.ts`: `RepositoryAssetsService`: lists a GIT_ORG target's repository assets and applies a repository sync's changes (`RepositoryAssetChanges`) in one transaction, ordered renames → updates → inserts → disables for the `(value, targetId)` unique constraint.
 - `url-discovery.service.ts`: `UrlDiscoveryService`: starts the `url_discovery` workflow and publishes `asset.url.discovered` when a run ends.
 - `asset-filter.ts`: filter-tree schema for the list (`compileAssetFilter`, `legacyParamsToFilter`, fields `host|port|ip|tech|url|statusCode|tlsHost|tag|project|isNew`).
@@ -62,4 +63,4 @@ Read side of the attack surface: hosts (`assets`), their open ports (`asset_serv
 
 ## Testing
 
-Unit specs: `assets.service.spec.ts`, `assets.controller.spec.ts`, `repository-assets.service.spec.ts`, `url-discovery.service.spec.ts`, `asset-filter.spec.ts`, `fresh-runs.spec.ts`, `dto/assets-filter.dto.spec.ts`, `entities/discovered-url.entity.spec.ts`. E2E (live DB): `core-api/test/assets-facets.e2e-spec.ts`, `assets-filter.e2e-spec.ts`, `assets-url.e2e-spec.ts`.
+Unit specs: `assets.service.spec.ts`, `asset-graph.service.spec.ts`, `assets.controller.spec.ts`, `repository-assets.service.spec.ts`, `url-discovery.service.spec.ts`, `asset-filter.spec.ts`, `fresh-runs.spec.ts`, `dto/assets-filter.dto.spec.ts`, `entities/discovered-url.entity.spec.ts`. E2E (live DB): `core-api/test/assets-facets.e2e-spec.ts`, `assets-filter.e2e-spec.ts`, `assets-url.e2e-spec.ts`.

@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { NodeResponse } from '@nestjs/platform-node';
+import { AssetGraphService } from './asset-graph.service';
 import { AssetsService } from './assets.service';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
 import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
@@ -44,6 +45,7 @@ export class AssetsController {
   constructor(
     private readonly assetsService: AssetsService,
     private readonly urlDiscoveryService: UrlDiscoveryService,
+    private readonly assetGraph: AssetGraphService,
   ) {}
 
   @Doc({
@@ -257,7 +259,7 @@ export class AssetsController {
     @Query() query: GetAssetGraphQueryDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetsService.getAssetGraph(query, workspaceId);
+    return this.assetGraph.getAssetGraph(query, workspaceId);
   }
 
   @Doc({
@@ -304,7 +306,7 @@ export class AssetsController {
     @Param('assetId') assetId: string,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetsService.getAssetServiceGraph(assetId, workspaceId);
+    return this.assetGraph.getAssetServiceGraph(assetId, workspaceId);
   }
 
   @Doc({
