@@ -2,7 +2,6 @@ import type { EventEmitter } from 'node:events';
 import type { Repository } from 'typeorm';
 
 import type { AgentMode } from '@/modules/agents/enums/agent.enums';
-import type { WrapperType } from '@/common/types/app.types';
 import type { ArtifactsService } from '@/modules/artifacts/artifacts.service';
 import type { AssetsService } from '@/modules/assets/assets.service';
 import type { ConnectorRegistryService } from '@/modules/connectors/connector-registry.service';
@@ -98,13 +97,13 @@ export type ToolScope = Pick<
 export interface ToolServices {
   assetsService: AssetsService;
   targetsService: TargetsService;
-  vulnerabilitiesService: WrapperType<VulnerabilitiesService>;
-  vulnerabilityReviewService: WrapperType<VulnerabilityReviewService>;
+  vulnerabilitiesService: VulnerabilitiesService;
+  vulnerabilityReviewService: VulnerabilityReviewService;
   statisticService: StatisticService;
-  issuesService: WrapperType<IssuesService>;
-  toolsService: WrapperType<ToolsService>;
-  workersService: WrapperType<WorkersService>;
-  jobsRegistryService: WrapperType<JobsRegistryService>;
+  issuesService: IssuesService;
+  toolsService: ToolsService;
+  workersService: WorkersService;
+  jobsRegistryService: JobsRegistryService;
   remoteExecuteService: RemoteExecuteService;
   conversationRepository: Repository<AgentConversation>;
   todoRepository: Repository<AgentConversationTodo>;

@@ -9,7 +9,7 @@ import { Asset } from '../assets/entities/assets.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
 import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
-import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
+import { Job } from '../jobs-registry/entities/job.entity';
 import { InternalNetwork } from '../internal-networks/entities/internal-network.entity';
 import { NetworkInterface } from '../internal-networks/entities/network-interface.entity';
 import { WorkspaceTool } from '../tools/entities/workspace-tools.entity';
@@ -30,7 +30,7 @@ describe('WorkersService', () => {
   let mockWorkspaceToolRepository: Partial<Repository<any>>;
   let mockInternalNetworkRepository: Partial<Repository<any>>;
   let mockNetworkInterfaceRepository: Partial<Repository<any>>;
-  let mockJobsRegistryService: Partial<JobsRegistryService>;
+  let mockJobsRegistryService: { repo: Record<string, jest.Mock> };
   let mockJoinKeyService: { consume: jest.Mock };
   let mockConfigService: Partial<ConfigService>;
   let mockToolsService: Partial<ToolsService>;
@@ -88,7 +88,7 @@ describe('WorkersService', () => {
         andWhere: jest.fn().mockReturnThis(),
         execute: jest.fn(),
       },
-    } as any;
+    };
 
     mockJoinKeyService = { consume: jest.fn().mockResolvedValue(null) };
 
@@ -150,8 +150,8 @@ describe('WorkersService', () => {
           useValue: mockNetworkInterfaceRepository,
         },
         {
-          provide: JobsRegistryService,
-          useValue: mockJobsRegistryService,
+          provide: getRepositoryToken(Job),
+          useValue: mockJobsRegistryService.repo,
         },
         {
           provide: WorkerJoinKeyService,

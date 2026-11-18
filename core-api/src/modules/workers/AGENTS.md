@@ -54,9 +54,9 @@ Scan worker nodes: join/identity, liveness, listing, the gRPC channels a worker 
 
 ## Coupling
 
-- `forwardRef(() => ToolsModule)` (the two modules import each other) and `ConnectorsModule`. Uses the global `GeoIpService` (`src/services/geo-ip`) for the detail location. `WorkersService` injects `JobsRegistryService` and `ToolsService` with `forwardRef`. This is part of the tools ↔ workers ↔ jobs-registry cycle noted in `combine.module.ts`.
-- Writes other modules' tables: `jobs` (through `jobsRegistryService.repo` and raw SQL), `network_interfaces` (`connectInternalNetwork`), and `agent_conversations.workerId` (conversation pin).
-- Consumers: `remote-execute`, which wraps `RemoteExecuteSubscribeService`. `agents`, which uses `getWorkers(..., { agentWorkspaceId })`, `isAgentWorkerForWorkspace`, `isAgentReady`, and pick/pin. `jobs-registry`, which uses `WorkerStreamRegistry.publishCancel` / `publishJobsAvailable` and `WorkerInstance`. `src/common/guards/` (`GrpcWorkerTokenGuard`, `WorkerTokenGuard`), which uses `validateWorkerToken`. `ToolsService`, which counts workers through `workersService.repo`.
+- Imports `ToolsModule` (plain: tools no longer imports this module) and `ConnectorsModule`. Uses the global `GeoIpService` (`src/services/geo-ip`) for the detail location. `WorkersService` injects `ToolsService` (`getBuiltInTools`) and the `Job` repository directly; it no longer injects `JobsRegistryService`. No `forwardRef` anywhere in the module.
+- Writes other modules' tables: `jobs` (its own `Job` repository and raw SQL), `network_interfaces` (`connectInternalNetwork`), and `agent_conversations.workerId` (conversation pin).
+- Consumers: `remote-execute`, which wraps `RemoteExecuteSubscribeService`. `agents`, which uses `getWorkers(..., { agentWorkspaceId })`, `isAgentWorkerForWorkspace`, `isAgentReady`, and pick/pin. `jobs-registry`, which uses `WorkerStreamRegistry.publishCancel` / `publishJobsAvailable` and `WorkerInstance`. `src/common/guards/` (`GrpcWorkerTokenGuard`, `WorkerTokenGuard`), which uses `validateWorkerToken`. `ToolsService`, which counts workers through its own `WorkerInstance` repository (read model).
 
 ## Gotchas
 

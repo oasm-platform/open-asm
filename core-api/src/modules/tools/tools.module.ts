@@ -1,9 +1,9 @@
-import { forwardRef, Global, Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { ConnectorsModule } from '../connectors/connectors.module';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
-import { WorkersModule } from '../workers/workers.module';
+import { WorkerInstance } from '../workers/entities/worker.entity';
 import { ToolConfigProfile } from './entities/tool-config-profiles.entity';
 import { Tool } from './entities/tools.entity';
 import { WorkspaceTool } from './entities/workspace-tools.entity';
@@ -16,8 +16,7 @@ import { ToolsService } from './tools.service';
 @Global()
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Tool, WorkspaceTool, Asset, Vulnerability, ToolConfigProfile]),
-    forwardRef(() => WorkersModule),
+    TypeOrmModule.forFeature([Tool, WorkspaceTool, Asset, Vulnerability, ToolConfigProfile, WorkerInstance]),
     ConnectorsModule,
   ],
   controllers: [ToolsController, ToolConfigProfilesController],

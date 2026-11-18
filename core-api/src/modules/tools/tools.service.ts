@@ -1,12 +1,7 @@
-import type { WrapperType } from '@/common/types/app.types';
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { ToolCategory, WorkerScope, WorkerType } from '@/common/enums/enum';
 import { getManyResponse } from '@/common/utils/get-many-response.util';
-import {
-  forwardRef,
-  Inject,
-  Injectable,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type {
   FindOperator,
@@ -15,7 +10,7 @@ import type {
 import { And, ILike, In, Not, Raw, Repository } from 'typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
-import { WorkersService } from '../workers/workers.service';
+import { WorkerInstance } from '../workers/entities/worker.entity';
 import { CreateToolDto } from './dto/create-tool.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
 import {
@@ -80,8 +75,10 @@ export class ToolsService {
     @InjectRepository(Vulnerability)
     public readonly vulnerabilityRepo: Repository<Vulnerability>,
 
-    @Inject(forwardRef(() => WorkersService))
-    private readonly workersService: WrapperType<WorkersService>,
+    // Read model: worker availability per tool. A direct read keeps tools
+    // from depending on WorkersService, which depends on tools.
+    @InjectRepository(WorkerInstance)
+    private readonly workerRepository: Repository<WorkerInstance>,
 
     @InjectRepository(ToolConfigProfile)
     private readonly profilesRepo: Repository<ToolConfigProfile>,
@@ -97,7 +94,7 @@ export class ToolsService {
    * @returns The number of available BUILT_IN workers.
    */
   private async countBuiltInWorkers(workspaceId: string): Promise<number> {
-    return this.workersService.repo
+    return this.workerRepository
       .createQueryBuilder('w')
       .where('(w."workspaceId" = :workspaceId OR w."scope" = :cloudScope)', {
         workspaceId,
@@ -124,7 +121,7 @@ export class ToolsService {
     if (toolIds.length === 0) return counts;
 
     const rows: Array<{ toolId: string | null; count: string }> =
-      await this.workersService.repo
+      await this.workerRepository
         .createQueryBuilder('w')
         .select('w."toolId"', 'toolId')
         .addSelect('COUNT(*)', 'count')

@@ -76,7 +76,7 @@ describe('ToolsService — readiness flags', () => {
       workspaceToolRepo as unknown as Repository<WorkspaceTool>,
       {} as any, // assetRepo
       {} as any, // vulnerabilityRepo
-      workersService as any,
+      workersService.repo as any,
       profilesRepo,
       connectorRegistry as any,
     );
@@ -628,7 +628,7 @@ describe('ToolsService — readiness flags', () => {
         workspaceToolRepo as unknown as Repository<WorkspaceTool>,
         {} as any,
         {} as any,
-        workersService as any,
+        workersService.repo as any,
         profilesRepo,
         connectorRegistry as any,
       );
@@ -775,7 +775,7 @@ describe('uninstallTool — cascades config profile deletion', () => {
       workspaceToolRepo as unknown as Repository<WorkspaceTool>,
       {} as any, // assetRepo
       {} as any, // vulnerabilityRepo
-      mockWorkersService() as any,
+      mockWorkersService().repo as any,
       profilesRepo,
       {} as any, // connectorRegistry
     );

@@ -1,4 +1,4 @@
-import { Inject, Injectable, forwardRef } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { z } from 'zod';
@@ -7,7 +7,6 @@ import { AuditActorType, AuditOutcome, DataKind, ProjectChange, ProjectScopeRule
 import { AgentMode } from '@/modules/agents/enums/agent.enums';
 import type { UserContextPayload } from '@/common/interfaces/app.interface';
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
-import type { WrapperType } from '@/common/types/app.types';
 import { getManyBaseRequestSchema } from '@/mcp/mcp.schema';
 import { ConnectorRegistryService } from '@/modules/connectors/connector-registry.service';
 import { EVENT_CATALOG } from '@/modules/event-bridge/contracts/event-catalog';
@@ -536,8 +535,7 @@ export class ProjectBuildTools {
   constructor(
     readonly workspacesService: WorkspacesService,
     readonly targetsService: TargetsService,
-    @Inject(forwardRef(() => ToolsService))
-    readonly toolsService: WrapperType<ToolsService>,
+    readonly toolsService: ToolsService,
     readonly connectorRegistry: ConnectorRegistryService,
     readonly toolConfigProfiles: ToolConfigProfilesService,
     readonly projectsService: ProjectsService,

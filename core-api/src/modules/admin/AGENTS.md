@@ -56,7 +56,7 @@ Ban, unban, create-user and impersonation are better-auth admin-plugin routes un
 - `AdminGuard` injects `SystemConfigsService`, so every module with an `@Admin()` controller imports `SystemConfigsModule` (including `AdminWorkspacesModule`). Controller specs that compile a `TestingModule` must provide it.
 - The IP allow-list does not cover better-auth's `/api/auth/admin/*` routes (ban, set-role, impersonate, create-user): they are served by the better-auth handler, not Nest controllers.
 - `SystemConfigsModule` is imported by `AdminUsersModule`, `AdminWorkspacesModule` and `RootModule` (`GET /metadata` uses `getConfig` and `isSignUpAllowed`). It is not global.
-- `ToolsService` and `StorageService` come from global modules. `combine.module.ts` keeps `AdminModule` below `JobsRegistryModule` to avoid the tools ↔ workers ↔ jobs-registry import cycle. Don't reorder.
+- `ToolsService` and `StorageService` come from global modules. Module order in `combine.module.ts` does not matter (the old tools ↔ workers ↔ jobs-registry cycle is gone).
 - `AdminWorkspacesService` writes the `workspaces` table directly and does not go through `WorkspacesService`. `AdminUsersService` reads `workspace_members` with raw SQL and presence through `UserPresenceService`.
 - `MailService` injects `AUTH_INSTANCE_KEY` and sets `emailVerification.sendVerificationEmail` in `onModuleInit`.
 

@@ -1,10 +1,7 @@
 import { WorkerScope, WorkerType } from '@/common/enums/enum';
-import type { WrapperType } from '@/common/types/app.types';
 import { AgentConversation } from '@/modules/agents/entities/agent-conversation.entity';
 import { RedisService } from '@/services/redis/redis.service';
 import {
-  forwardRef,
-  Inject,
   Injectable,
   Logger,
   OnModuleDestroy,
@@ -130,8 +127,7 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
   private readonly workerScope = new Map<string, ConnectedWorker>();
 
   constructor(
-    @Inject(forwardRef(() => WorkersService))
-    private readonly workersService: WrapperType<WorkersService>,
+    private readonly workersService: WorkersService,
     @InjectRepository(AgentConversation)
     private readonly conversationRepo: Repository<AgentConversation>,
     private readonly redisService: RedisService,

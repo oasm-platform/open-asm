@@ -1,10 +1,9 @@
-import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 import { WorkerType } from '@/common/enums/enum';
 import { AgentMode } from '@/modules/agents/enums/agent.enums';
-import type { WrapperType } from '@/common/types/app.types';
 import { ConnectorRegistryService } from '@/modules/connectors/connector-registry.service';
 import { RemoteExecuteService } from '@/modules/remote-execute/remote-execute.service';
 import { validateTemplate } from '@/modules/templates/templates.service';
@@ -306,8 +305,7 @@ type RunConnectorParams = z.infer<ReturnType<typeof runConnectorInput>>;
 export class ConnectorTools {
   constructor(
     readonly connectorRegistry: ConnectorRegistryService,
-    @Inject(forwardRef(() => ToolsService))
-    readonly toolsService: WrapperType<ToolsService>,
+    readonly toolsService: ToolsService,
     readonly toolConfigProfiles: ToolConfigProfilesService,
     readonly remoteExecuteSubscribe: RemoteExecuteSubscribeService,
     readonly remoteExecuteService: RemoteExecuteService,

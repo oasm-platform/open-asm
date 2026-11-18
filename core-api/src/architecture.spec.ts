@@ -149,17 +149,7 @@ const GLOBAL_MODULES = [
 ];
 
 /** `forwardRef(` per file: each one is a dependency cycle being papered over. */
-const FORWARD_REFS = [
-  'modules/agents/tools/connector.tools.ts: 1',
-  'modules/agents/tools/project-build.tools.ts: 1',
-  'modules/agents/tools/workspace.tools.ts: 3',
-  'modules/jobs-registry/jobs-registry.service.ts: 1',
-  'modules/tools/tools.module.ts: 1',
-  'modules/tools/tools.service.ts: 1',
-  'modules/workers/remote-execute-subscribe.service.ts: 1',
-  'modules/workers/workers.module.ts: 1',
-  'modules/workers/workers.service.ts: 2',
-];
+const FORWARD_REFS: string[] = [];
 
 /** `<module> <- <Entity> (<owner>)`: a repository used outside its own module. */
 const FOREIGN_ENTITIES = [
@@ -199,6 +189,7 @@ const FOREIGN_ENTITIES = [
   'modules/templates <- ProjectAsset (modules/projects)',
   'modules/tools <- Asset (modules/assets)',
   'modules/tools <- Vulnerability (modules/vulnerabilities)',
+  'modules/tools <- WorkerInstance (modules/workers)',
   'modules/users <- User (modules/auth)',
   'modules/vulnerabilities <- Asset (modules/assets)',
   'modules/vulnerabilities <- Target (modules/targets)',

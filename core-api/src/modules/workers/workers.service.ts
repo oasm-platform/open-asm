@@ -1,4 +1,3 @@
-import type { WrapperType } from '@/common/types/app.types';
 import { WORKER_TIMEOUT } from '@/common/constants/app.constants';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import {
@@ -12,12 +11,7 @@ import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
 import { RedisService } from '@/services/redis/redis.service';
 import { generateToken } from '@/common/utils/gen-token.util';
 import { getManyResponse } from '@/common/utils/get-many-response.util';
-import {
-  forwardRef,
-  Inject,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RpcException } from '@nestjs/microservices';
 import { Interval } from '@nestjs/schedule';
@@ -35,7 +29,7 @@ import { EventBridgeService } from '../event-bridge/publishing/event-bridge.serv
 import { InternalNetwork } from '../internal-networks/entities/internal-network.entity';
 import { NetworkInterface } from '../internal-networks/entities/network-interface.entity';
 import { isValidEncryptionPublicKey } from '../jobs-registry/job-secret-sealer';
-import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
+import { Job } from '../jobs-registry/entities/job.entity';
 import { WorkspaceTool } from '../tools/entities/workspace-tools.entity';
 import { ToolsService } from '../tools/tools.service';
 import { Workspace } from '../workspaces/entities/workspace.entity';
@@ -94,15 +88,14 @@ export class WorkersService {
     @InjectRepository(NetworkInterface)
     private networkInterfaceRepo: Repository<NetworkInterface>,
 
-    @Inject(forwardRef(() => JobsRegistryService))
-    private jobsRegistryService: WrapperType<JobsRegistryService>,
+    @InjectRepository(Job)
+    private readonly jobRepository: Repository<Job>,
 
     private readonly workerJoinKeyService: WorkerJoinKeyService,
 
     private configService: ConfigService,
 
-    @Inject(forwardRef(() => ToolsService))
-    private toolsService: WrapperType<ToolsService>,
+    private toolsService: ToolsService,
 
     private redisService: RedisService,
 
@@ -235,7 +228,7 @@ export class WorkersService {
    * workers can pick up the freed jobs immediately.
    */
   public async releaseWorkerJobs(workerId: string) {
-    await this.jobsRegistryService.repo
+    await this.jobRepository
       .createQueryBuilder('jobs')
       .update()
       .set({ status: JobStatus.PENDING, workerId: undefined })
@@ -344,7 +337,7 @@ export class WorkersService {
 
     const workersWithJobCount = await Promise.all(
       workers.map(async (worker) => {
-        const count = await this.jobsRegistryService['repo'].count({
+        const count = await this.jobRepository.count({
           where: {
             workerId: worker.id,
             status: JobStatus.IN_PROGRESS,
@@ -407,7 +400,7 @@ export class WorkersService {
 
     const jobCounts = new Map<string, number>();
     if (workers.length > 0) {
-      const rows = await this.jobsRegistryService['repo']
+      const rows = await this.jobRepository
         .createQueryBuilder('j')
         .select('j.workerId', 'workerId')
         .addSelect('COUNT(*)', 'count')
@@ -695,7 +688,7 @@ export class WorkersService {
     jobsByTool: Map<string, WorkerToolJobDto[]>;
     currentJobsCount: number;
   }> {
-    const rows = await this.jobsRegistryService['repo']
+    const rows = await this.jobRepository
       .createQueryBuilder('job')
       .leftJoin('job.tool', 'tool')
       .leftJoin('job.asset', 'asset')
@@ -732,7 +725,7 @@ export class WorkersService {
       jobsByTool.set(row.tool, list);
     }
 
-    const currentJobsCount = await this.jobsRegistryService['repo'].count({
+    const currentJobsCount = await this.jobRepository.count({
       where: { workerId, status: JobStatus.IN_PROGRESS },
     });
 
@@ -1016,7 +1009,7 @@ export class WorkersService {
    * @param workerId - The ID of the worker whose jobs should be reset.
    */
   private async fallbackWorkerRejoin(workerId: string) {
-    await this.jobsRegistryService.repo
+    await this.jobRepository
       .createQueryBuilder()
       .update()
       .set({ status: JobStatus.PENDING })

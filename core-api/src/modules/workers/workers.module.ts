@@ -1,4 +1,4 @@
-import { forwardRef, Global, Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Asset } from '../assets/entities/assets.entity';
 import { ConnectorsModule } from '../connectors/connectors.module';
@@ -33,7 +33,7 @@ import { WorkerJoinKeyService } from './worker-join-key.service';
       InternalNetwork,
       AgentConversation,
     ]),
-    forwardRef(() => ToolsModule),
+    ToolsModule,
     ConnectorsModule,
   ],
   controllers: [WorkersController, WorkerStreamController],

@@ -56,8 +56,8 @@ Scan jobs and workflow runs: creates `jobs` rows, lets workers claim them, inges
 ## Coupling
 
 - Imports `ConnectorsModule`, `IntegrationsModule` and `WorkspacesModule`, and registers the `ToolConfigProfile` repository. The controller injects `GrpcWorkerContext` (workers) and `EventBridgeService` (event-bridge), both global. `ToolsService`, `ToolConfigProfilesService`, `WorkerStreamRegistry`, storage, data-adapter, vulnerability lifecycle and `AssetsService` come from `@Global()` modules.
-- **Import cycle** tools.service → workers.service → jobs-registry.service → tools.service. `JobsRegistryService` injects `ToolsService` with `@Optional() @Inject(forwardRef(...))`, and `WorkersService` injects `JobsRegistryService` with `forwardRef`. Keep the module order in `combine.module.ts`.
-- Other code writes `jobs` directly. `WorkersService` uses `jobsRegistryService.repo` and raw SQL in `resetStuckAndFailedJobs`. `ToolSyncService.dedupeExistingTools` rewrites `toolId`. `ToolConfigProfilesService.remove` reads `jobs`. `AssetsModule` registers the `Job` repository.
+- No import cycle any more: tools no longer depends on workers, and workers no longer depends on this module, so `JobsRegistryService` injects `ToolsService` plainly and `combine.module.ts` needs no special order.
+- Other code writes `jobs` directly. `WorkersService` uses its own `Job` repository and raw SQL in `resetStuckAndFailedJobs`. `ToolSyncService.dedupeExistingTools` rewrites `toolId`. `ToolConfigProfilesService.remove` reads `jobs`. `AssetsModule` registers the `Job` repository.
 - `startRun` callers: `workflows/trigger-workflow.service.ts`, `projects/project-workflows.service.ts`, `assets/url-discovery.service.ts`, `vulnerabilities.service.ts`. `createNewJob` callers: `templates.service.ts`, `vulnerabilities.service.ts`. Agents call `getManyJobs`.
 
 ## Gotchas
