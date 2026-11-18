@@ -59,7 +59,7 @@ Same rules as this file: write facts that are true of the code today and that an
 
 pnpm workspace (`pnpm-workspace.yaml`, `packageManager: pnpm@10.33.2`) with 2 Node packages + 1 Go service:
 
-- `core-api/` — NestJS 11 (TypeScript). REST API, TypeORM DB layer, better-auth, gRPC server (`:16276`), BullMQ, AI/LLM (AI SDK v6, LangGraph), MCP HTTP endpoint, storage (RustFS/S3), PDF reports, integrations (AWS, Cloudflare, Vercel), notifications (Telegram), i18n. Modules in `src/modules/*` (30+ domains: `assets`, `asset-group`, `jobs-registry`, `workers`, `vulnerabilities`, `audit`, `workspaces`, `connectors`, `tools`, `workflows`, `storage`, `remote-execute`, `integrations`, `mcp` lives in `src/mcp`).
+- `core-api/` — NestJS 12 on `@nestjs/platform-node` (TypeScript). REST API, TypeORM DB layer, better-auth, gRPC server (`:16276`), BullMQ, AI/LLM (AI SDK `ai` v7), MCP HTTP endpoint, storage (RustFS/S3), PDF reports, integrations (AWS, Cloudflare, Vercel), notifications (Telegram), i18n. Modules in `src/modules/*` (34 domains: `assets`, `projects`, `jobs-registry`, `workers`, `vulnerabilities`, `audit`, `workspaces`, `connectors`, `tools`, `workflows`, `storage`, `remote-execute`, `integrations`, `mcp` lives in `src/mcp`).
 - `console/` — React 19 + Vite 8 + Tailwind v4. TanStack **Router** (file-based, `src/routes/` → generated `routeTree.gen.ts`) + TanStack Query, orval API client, shadcn/radix-ui/base-ui, recharts/echarts, xyflow, leaflet, Playwright e2e in `console/e2e/`.
 - `worker/` — Go 1.26 scanning worker (cobra + viper). Two entry points: `cmd/cli` (interactive TUI / headless) and `cmd/app` (env-driven, used by the Docker image). Talks to core-api over gRPC (`worker/internal/grpcclient/`, stubs in `worker/internal/gen/`), **spawns connector containers through the Docker Engine API** (`worker/internal/runtime/docker.go`), serves the connector callback gRPC on `:26276` (`worker/internal/connector/`), go-rod browser automation.
 
@@ -146,7 +146,7 @@ Missing entries: `console:test:coverage`, `console:e2e`, `api:test:watch` exist 
 6. **Apply only to a local database.** Before `task migration:run` / `task migration:revert`, confirm `core-api/.env` points at the local Postgres and say which DB you are about to mutate. Never run these against a shared/staging/production database.
 7. **Why this is non-negotiable:** `dataSourceOptions` in `core-api/src/database/database-config.ts` sets `synchronize: false` — the schema *only* ever changes through migrations. A missing or bogus migration is a real runtime bug, and `migrationsRun: NODE_ENV === 'development'` means a dev boot silently applies whatever is in the folder, so a hand-written file gets executed without anyone reviewing it.
 
-Migration location: `core-api/src/database/migrations/` (58 files, newest last). Docker path: the `migration` compose service runs `typeorm migration:run -d dist/database/database-config.js` from the built image and gates `core-api` startup on it.
+Migration location: `core-api/src/database/migrations/` (88 files, newest last). Docker path: the `migration` compose service runs `typeorm migration:run -d dist/database/database-config.js` from the built image and gates `core-api` startup on it.
 
 ## Local Dev Setup
 
@@ -189,9 +189,9 @@ Migration location: `core-api/src/database/migrations/` (58 files, newest last).
 ### core-api
 - **Controller → Service → Repository/Entity**. Controllers do validation + mapping only.
 - DTOs for every request/response (`class-validator` + `class-transformer`); Swagger decorators are required or orval generates unusable types.
-- Entities in module folders or `src/common/entity/`; `dataSourceOptions.entities` globs `**/*.entity{.ts,.js}`.
+- Entities in module folders (`BaseEntity` in `src/common/entities/`); `dataSourceOptions.entities` globs `**/*.entity{.ts,.js}`.
 - **User data responses expose only `id`, `name`, `image`** — enforce in services, not controllers.
-- `@getWorkspaceId: true` on controllers that need tenant context; workspace scoping is not optional.
+- `@WorkspaceAccess('<resource>.<action>', ...)` (`common/decorators/workspace-access.decorator.ts`) on every workspace-scoped handler, and `@WorkspaceId()` to read the id; workspace scoping is not optional.
 - **Admin-only endpoints live in `src/modules/admin/`** and are served under `/admin/*` with class-level `@Admin()` (`modules/admin/admin.decorator.ts`: ADMIN role + `AdminGuard`, which enforces the admin IP allow-list) (system configs + logo upload, tool creation, public `POST /admin/init`). Put new platform-admin endpoints there, not in the domain module.
 - gRPC server `:16276`, protos in `src/proto/`, Go stubs generated into `worker/internal/gen/` (there is **no** `grpc-client/` directory anymore — older docs are stale).
 - BullMQ for async jobs; queue payloads are slim and tenant-scoped.
@@ -265,7 +265,7 @@ Gotchas:
 
 `task docker-compose` = `docker compose --env-file ./core-api/.env up -d --build --force-recreate`.
 
-Services: `console` (`:3000`), `core-api` (`:6276` + `:16276`, healthcheck `/api/health`), `oasm-worker` (socket-mounted, connector callback `:26276` on the `oasm-connectors` network, not published), `postgres` (pg17+pgvector), `redis`, `geo-ip` (`:4360`), `rustfs` (`:9000`/`:9001`), and a one-shot `migration` service that gates `core-api` startup (`service_completed_successfully`).
+Services: `console` (`:3000`), `core-api` (`:6276` + `:16276`, healthcheck `/api/health`), `oasm-worker` (socket-mounted, connector callback `:26276` on the `oasm-connectors` network, not published), `postgres` (pg18+pgvector), `redis`, `geo-ip` (`:4360`), `rustfs` (`:9000`/`:9001`), and a one-shot `migration` service that gates `core-api` startup (`service_completed_successfully`).
 
 The compose service key is `oasm-worker`, **not** `worker`. It scales (`task docker-compose workers=3`): connector containers join the `oasm-connectors` network and dial each replica on its own IP, so nothing is published on the host. `oasm-connectors` is `internal: true`: connectors reach the internet only through the worker egress proxy (`:26277`, `worker/internal/egress`); connectors whose manifest says `egress: direct` (nmap, rustscan; core-api sends it as `Job.direct_egress` / `ToolRun.direct_egress`) are also attached to the default `bridge` and go direct. An existing non-internal `oasm-connectors` network must be removed (`docker network rm oasm-connectors`) before compose recreates it. Replicas share `worker-state` but each locks its own token slot (`.worker-token`, `.worker-token.1`, …) — two workers resuming the same token would share an identity and reap each other's connectors.
 
