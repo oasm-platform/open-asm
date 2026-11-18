@@ -4,7 +4,6 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConnectorsModule } from '../connectors/connectors.module';
 import { IntegrationConfigModule } from '../integrations/integration-config.module';
-import { ToolConfigProfile } from '../tools/entities/tool-config-profiles.entity';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
 import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
@@ -28,7 +27,6 @@ import { DataAdapterModule } from '../data-adapter/data-adapter.module';
       Job,
       JobHistory,
       JobErrorLog,
-      ToolConfigProfile,
     ]),
     ConnectorsModule,
     IntegrationConfigModule,

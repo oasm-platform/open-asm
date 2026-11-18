@@ -5,14 +5,12 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
-import { Asset } from '../assets/entities/assets.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
 import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
 import { Job } from '../jobs-registry/entities/job.entity';
 import { InternalNetwork } from '../internal-networks/entities/internal-network.entity';
 import { NetworkInterface } from '../internal-networks/entities/network-interface.entity';
-import { WorkspaceTool } from '../tools/entities/workspace-tools.entity';
 import { ToolsService } from '../tools/tools.service';
 import { RedisService } from '@/services/redis/redis.service';
 import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
@@ -26,8 +24,6 @@ import { NotFoundError } from '@/common/errors/domain.errors';
 describe('WorkersService', () => {
   let service: WorkersService;
   let mockWorkerInstanceRepository: Partial<Repository<WorkerInstance>>;
-  let mockAssetRepository: Partial<Repository<any>>;
-  let mockWorkspaceToolRepository: Partial<Repository<any>>;
   let mockInternalNetworkRepository: Partial<Repository<any>>;
   let mockNetworkInterfaceRepository: Partial<Repository<any>>;
   let mockJobsRegistryService: { repo: Record<string, jest.Mock> };
@@ -61,14 +57,6 @@ describe('WorkersService', () => {
       getRawMany: jest.fn(),
       getRawOne: jest.fn(),
       exists: jest.fn(),
-    } as any;
-
-    mockAssetRepository = {
-      findOne: jest.fn(),
-    } as any;
-
-    mockWorkspaceToolRepository = {
-      findOne: jest.fn(),
     } as any;
 
     mockInternalNetworkRepository = {
@@ -132,14 +120,6 @@ describe('WorkersService', () => {
         {
           provide: getRepositoryToken(WorkerInstance),
           useValue: mockWorkerInstanceRepository,
-        },
-        {
-          provide: getRepositoryToken(Asset),
-          useValue: mockAssetRepository,
-        },
-        {
-          provide: getRepositoryToken(WorkspaceTool),
-          useValue: mockWorkspaceToolRepository,
         },
         {
           provide: getRepositoryToken(InternalNetwork),

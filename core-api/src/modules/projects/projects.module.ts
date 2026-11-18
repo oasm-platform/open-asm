@@ -10,7 +10,6 @@ import {
   PROJECT_TRIGGER_EVENTS,
 } from '../event-bridge/sinks/projects/projects.sink';
 import { Workflow } from '../workflows/entities/workflow.entity';
-import { Workspace } from '../workspaces/entities/workspace.entity';
 import { Project } from './entities/project.entity';
 import { ProjectArtifact } from './entities/project-artifact.entity';
 import { ProjectAsset } from './entities/project-asset.entity';
@@ -52,7 +51,6 @@ import { WorkflowsModule } from '../workflows/workflows.module';
       ProjectWorkflow,
       ProjectWorkflowTrigger,
       Workflow,
-      Workspace,
     ]),
     ConnectorsModule,
     ArtifactsModule,

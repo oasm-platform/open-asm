@@ -1,8 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Asset } from '../assets/entities/assets.entity';
 import { ConnectorsModule } from '../connectors/connectors.module';
-import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkerInstance } from '../workers/entities/worker.entity';
 import { ToolConfigProfile } from './entities/tool-config-profiles.entity';
 import { Tool } from './entities/tools.entity';
@@ -16,7 +14,7 @@ import { StorageModule } from '../storage/storage.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Tool, WorkspaceTool, Asset, Vulnerability, ToolConfigProfile, WorkerInstance]),
+    TypeOrmModule.forFeature([Tool, WorkspaceTool, ToolConfigProfile, WorkerInstance]),
     ConnectorsModule,
     StorageModule,
   ],

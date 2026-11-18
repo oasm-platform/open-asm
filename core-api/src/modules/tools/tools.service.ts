@@ -8,8 +8,6 @@ import type {
   FindOptionsWhere,
 } from 'typeorm';
 import { And, ILike, In, Not, Raw, Repository } from 'typeorm';
-import { Asset } from '../assets/entities/assets.entity';
-import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { WorkerInstance } from '../workers/entities/worker.entity';
 import { CreateToolDto } from './dto/create-tool.dto';
 import { GetInstalledToolsDto } from './dto/get-installed-tools.dto';
@@ -69,11 +67,7 @@ export class ToolsService {
     @InjectRepository(WorkspaceTool)
     private readonly workspaceToolRepository: Repository<WorkspaceTool>,
 
-    @InjectRepository(Asset)
-    public readonly assetRepo: Repository<Asset>,
 
-    @InjectRepository(Vulnerability)
-    public readonly vulnerabilityRepo: Repository<Vulnerability>,
 
     // Read model: worker availability per tool. A direct read keeps tools
     // from depending on WorkersService, which depends on tools.

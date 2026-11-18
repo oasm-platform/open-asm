@@ -57,7 +57,7 @@ Findings on assets: list/detail/statistics, the lifecycle (new → active → fi
 ## Coupling
 
 - No import of `AgentsModule`: AI analysis runs through `VulnerabilityAnalyzerRegistry` (`vulnerability-analyzer.ts`, exported), in which the agents module's `VulnerabilityAnalyzerAdapter` registers itself on init (`get()` throws if nothing registered). Agents depends on this module: `VulnerabilityReviewService` (`propose_vulnerability`) and `VulnerabilitiesService`. `VulnerabilityReviewService` injects the global `RedisService` and reads the agents' tool-output keys (`toolOutputKey`).
-- Imports `NotificationsModule`, `JobsRegistryModule` (`JobsRegistryService`, `WorkflowRunnerService`), `ToolsModule` and `WorkflowsModule`. Uses the global `EventBridgeService`. Registers `Asset` and `Target` repositories itself.
+- Imports `NotificationsModule`, `JobsRegistryModule` (`JobsRegistryService`, `WorkflowRunnerService`), `ToolsModule` and `WorkflowsModule`. Uses the global `EventBridgeService`. Registers the `Target` repository itself.
 - `scan` runs the first job of `vulnerability_scan_basic.yaml` (nuclei) for host targets, and the whole `repository_scan.yaml` for GIT_ORG targets. Both workflows must exist in the workspace, or the call returns 404.
 - Writers outside: `DataAdapterService` inserts and upserts findings, `vulnerability_events` (`DETECTED`) and `vulnerability_sources`, and publishes `vulnerability.detected` / `vulnerability.resurfaced`.
 - The list reads `issue_links` / `issues` with raw SQL (`openIssues`). The issues lane consumes `vulnerability.detected|resurfaced|fixed`. Projects, reports, statistic, search, comments and target overview all query `vulnerabilities` directly.

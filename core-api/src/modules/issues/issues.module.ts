@@ -23,7 +23,6 @@ import { IssueRulesService } from './rules/issue-rules.service';
       IssueLink,
       IssueRule,
       IssueCounter,
-      Comment,
     ])],
   // Rules first: `/issues/rules` must not be matched as `/issues/:id`.
   controllers: [IssueRulesController, IssuesController],

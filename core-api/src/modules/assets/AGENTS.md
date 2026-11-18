@@ -45,7 +45,7 @@ Read side of the attack surface: hosts (`assets`), their open ports (`asset_serv
 
 ## Coupling
 
-- Imports `TechnologyModule` (tech enrichment), `WorkspacesModule`, `StorageModule`, and `WorkflowsModule` + `JobsRegistryModule` (`UrlDiscoveryService`). Uses the global `GeoIpService`, `WorkspaceEncryptionService` and `EventBridgeService`. Imported by `TargetsModule`, `StatisticModule`, `SearchModule` and `AgentsModule`. Registers the `Job`, `Target`, `AgentLLMConfig` and `AgentConfig` repositories itself.
+- Imports `TechnologyModule` (tech enrichment), `WorkspacesModule`, `StorageModule`, and `WorkflowsModule` + `JobsRegistryModule` (`UrlDiscoveryService`). Uses the global `GeoIpService`, `WorkspaceEncryptionService` and `EventBridgeService`. Imported by `TargetsModule`, `StatisticModule`, `SearchModule` and `AgentsModule`. Registers the `Target`, `AgentLLMConfig` and `AgentConfig` repositories itself.
 - Users of `AssetsService`: `TargetsService` (and `POST targets/:id/re-scan`), `AssetsDiscoveryScheduleConsumer` (`reScan`), `projects` (`ProjectAssetsService`, `ProjectsController`), `SearchService`, agents tools.
 - Writers of these tables outside the module: `DataAdapterService` (`data-adapter/`) ingests every scan result into `assets`, `asset_services`, `http_responses` and the child tables. `TargetsService.createMultipleTargets` inserts the primary/CIDR assets. `RepositorySyncService` creates GIT_ORG repository assets. `step-scope.loader.ts`, `StatisticService` and the reports read them directly.
 - `project_assets` (projects module) cascades from `assets`.

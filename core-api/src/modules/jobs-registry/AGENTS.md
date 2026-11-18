@@ -58,7 +58,7 @@ Scan jobs and workflow runs: creates `jobs` rows, lets workers claim them, inges
 
 - Imports `ConnectorsModule`, `IntegrationConfigModule` (only `IntegrationConfigReader`, for the repository token in connector inputs; not the whole `IntegrationsModule`) `WorkspacesModule`, `ToolsModule` (`ToolsService`, `ToolConfigProfilesService`), `StorageModule`, `WorkersModule` (`WorkerStreamRegistry`, `GrpcWorkerContext`, and `WorkersService` for the worker-token guards) and `DataAdapterModule`, and registers the `ToolConfigProfile` repository. `EventBridgeService` comes from the global event-bridge module.
 - No import cycle any more: tools no longer depends on workers, and workers no longer depends on this module, so `JobsRegistryService` injects `ToolsService` plainly and `combine.module.ts` needs no special order.
-- Other code writes `jobs` directly. `WorkersService` uses its own `Job` repository and raw SQL in `resetStuckAndFailedJobs`. `ToolSyncService.dedupeExistingTools` rewrites `toolId`. `ToolConfigProfilesService.remove` reads `jobs`. `AssetsModule` registers the `Job` repository.
+- Other code writes `jobs` directly. `WorkersService` uses its own `Job` repository and raw SQL in `resetStuckAndFailedJobs`. `ToolSyncService.dedupeExistingTools` rewrites `toolId`. `ToolConfigProfilesService.remove` reads `jobs`.
 - `startRun` callers: `workflows/trigger-workflow.service.ts`, `projects/project-workflows.service.ts`, `assets/url-discovery.service.ts`, `vulnerabilities.service.ts`. `createNewJob` callers: `templates.service.ts`, `vulnerabilities.service.ts`. Agents call `getManyJobs`.
 
 ## Gotchas

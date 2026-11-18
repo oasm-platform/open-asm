@@ -2,7 +2,6 @@ import { BullMQName } from '@/common/enums/enum';
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Asset } from '../assets/entities/assets.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { Target } from '../targets/entities/target.entity';
 import { VulnerabilityDismissal } from './entities/vulnerability-dismissal.entity';
@@ -24,7 +23,6 @@ import { WorkflowsModule } from '../workflows/workflows.module';
   imports: [
     TypeOrmModule.forFeature([
       Vulnerability,
-      Asset,
       VulnerabilityDismissal,
       VulnerabilityEvent,
       VulnerabilitySource,

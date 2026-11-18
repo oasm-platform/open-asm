@@ -46,7 +46,7 @@ Workspace work items (`#no` per workspace), linked to findings, assets, targets,
 
 ## Coupling
 
-- Registers its own repositories plus `Comment`. Imports no domain modules: it reads `vulnerabilities`, `vulnerability_dismissals`, `assets`, `targets`, `projects`, `job_histories` and `workflows` with raw SQL.
+- Registers only its own repositories (`issue-activity.ts` writes system comments through the transaction's `EntityManager`). Imports no domain modules: it reads `vulnerabilities`, `vulnerability_dismissals`, `assets`, `targets`, `projects`, `job_histories` and `workflows` with raw SQL.
 - `VulnerabilitiesService.openIssues` and `TargetOverviewService` read `issues` / `issue_links` directly.
 - `asset_review` and `scan_failure` types have no automation yet (`ManualIssueHandler`). A new automated type needs an `IssueTypeHandler` registered in `IssueTypeHandlerRegistry`.
 

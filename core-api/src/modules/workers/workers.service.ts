@@ -18,7 +18,6 @@ import { Interval } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { LessThan, Repository, SelectQueryBuilder } from 'typeorm';
-import { Asset } from '../assets/entities/assets.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import {
   type CatalogEvent,
@@ -30,7 +29,6 @@ import { InternalNetwork } from '../internal-networks/entities/internal-network.
 import { NetworkInterface } from '../internal-networks/entities/network-interface.entity';
 import { isValidEncryptionPublicKey } from '../jobs-registry/job-secret-sealer';
 import { Job } from '../jobs-registry/entities/job.entity';
-import { WorkspaceTool } from '../tools/entities/workspace-tools.entity';
 import { ToolsService } from '../tools/tools.service';
 import { Workspace } from '../workspaces/entities/workspace.entity';
 import {
@@ -76,11 +74,7 @@ export class WorkersService {
     @InjectRepository(WorkerInstance)
     public readonly repo: Repository<WorkerInstance>,
 
-    @InjectRepository(Asset)
-    public readonly assetRepo: Repository<Asset>,
 
-    @InjectRepository(WorkspaceTool)
-    public readonly workspaceToolRepo: Repository<WorkspaceTool>,
 
     @InjectRepository(InternalNetwork)
     private internalNetworkRepo: Repository<InternalNetwork>,

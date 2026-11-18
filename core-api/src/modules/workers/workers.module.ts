@@ -1,11 +1,9 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Asset } from '../assets/entities/assets.entity';
 import { ConnectorsModule } from '../connectors/connectors.module';
 import { InternalNetwork } from '../internal-networks/entities/internal-network.entity';
 import { NetworkInterface } from '../internal-networks/entities/network-interface.entity';
 import { Job } from '../jobs-registry/entities/job.entity';
-import { WorkspaceTool } from '../tools/entities/workspace-tools.entity';
 import { ToolsModule } from '../tools/tools.module';
 import { AgentConversation } from '@/modules/agents/entities/agent-conversation.entity';
 import { AliveStreamManager } from './alive-stream-manager.service';
@@ -26,8 +24,6 @@ import { WorkerJoinKeyService } from './worker-join-key.service';
     TypeOrmModule.forFeature([
       WorkerInstance,
       Job,
-      Asset,
-      WorkspaceTool,
       NetworkInterface,
       InternalNetwork,
       AgentConversation,
