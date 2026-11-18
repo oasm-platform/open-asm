@@ -1,9 +1,8 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import { JobRunType } from '@/common/enums/enum';
-import * as fs from 'fs';
 import * as path from 'path';
-import * as Mustache from 'mustache';
+import { PromptRegistry } from '@/common/utils/prompt-registry.util';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
 import { getManyResponse } from '@/common/utils/get-many-response.util';
@@ -103,7 +102,10 @@ function toLegacyTls(cert: TlsCertificate): Record<string, unknown> {
 @Injectable()
 export class AssetsService {
   private readonly logger = new Logger(AssetsService.name);
-  private readonly prompts = new Map<string, string>();
+  // GENERATE_SERVICE_TAGS.md lives with the agent prompts
+  private readonly prompts = PromptRegistry.forDirectory(
+    path.join(__dirname, '../agents/prompts'),
+  );
 
   constructor(
     @InjectRepository(Asset)
@@ -133,40 +135,7 @@ export class AssetsService {
     private geoIpService: GeoIpService,
     private storageService: StorageService,
     private dataSource: DataSource,
-  ) {
-    this.loadPrompts();
-  }
-
-  private loadPrompts(): void {
-    const promptsDir = path.join(__dirname, '../agents/prompts');
-    try {
-      const entries = fs.readdirSync(promptsDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.name.endsWith('.md')) {
-          const key = entry.name.toLowerCase();
-          const content = fs.readFileSync(
-            path.join(promptsDir, entry.name),
-            'utf-8',
-          );
-          this.prompts.set(key, content);
-        }
-      }
-    } catch (error) {
-      this.logger.error('Failed to load prompts directory', error);
-    }
-  }
-
-  private getPrompt(fileName: string, data?: Record<string, unknown>): string {
-    const key = fileName.toLowerCase();
-    const template = this.prompts.get(key) ?? '';
-    if (!template) {
-      this.logger.warn(`Prompt not found: ${fileName}`);
-    }
-    if (data) {
-      return Mustache.render(template, data);
-    }
-    return template;
-  }
+  ) {}
 
   private async generateTagsWithAI(
     serviceData: string,
@@ -204,7 +173,7 @@ export class AssetsService {
         : undefined;
     const model = providerConfig.handler(apiKey, llmConfig.model, baseURL);
 
-    const prompt = this.getPrompt('GENERATE_SERVICE_TAGS.md', {
+    const prompt = this.prompts.render('GENERATE_SERVICE_TAGS.md', {
       SERVICE_DATA: serviceData,
     });
 

@@ -54,7 +54,7 @@ Read side of the attack surface: hosts (`assets`), their open ports (`asset_serv
 
 - `getManyAsssetServices` matches `value` with `ILIKE` and an escaped pattern (`containsLikePattern`), so `%` and `_` in user input are literal. With no trigram index on `asset_services.value` every miss is a sequential scan.
 
-- `generateServiceTags` only **returns** suggestions and stores nothing, although its Swagger text says it replaces tags. It uses the workspace/user default LLM config (`findDefaultLLMConfig`), `generateText`, and the prompt `agents/prompts/GENERATE_SERVICE_TAGS.md`, which the constructor loads from disk.
+- `generateServiceTags` only **returns** suggestions and stores nothing, although its Swagger text says it replaces tags. It uses the workspace/user default LLM config (`findDefaultLLMConfig`), `generateText`, and the prompt `agents/prompts/GENERATE_SERVICE_TAGS.md`, read through `PromptRegistry` (`common/utils/prompt-registry.util.ts`), which shares one copy of that folder with the agents module.
 - Catalog events `asset.updated` and `asset.enabled_changed` have no publisher. The audit mapping `asset.deleted` → `AssetsController.deleteAsset` points at a method that does not exist.
 - Tech strings on list rows are `name:version`. See `technology/AGENTS.md` for why those miss the enrichment cache.
 - `POST assets/url/discover` accepts DOMAIN targets only, and returns a message (not an error) when no live HTTP service has been found yet.

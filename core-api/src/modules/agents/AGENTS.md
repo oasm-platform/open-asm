@@ -19,7 +19,7 @@ The AI chat agent: LLM connections, conversations streamed over SSE, the tool se
 - `agents.config.ts`: per-user agent settings, default-model resolution (`findDefaultLLMConfig`, `withAgentConfig`), `withoutDisabledTools`, `createLanguageModel`.
 - `agents.mcp.ts`: lists tools from the workspace's external MCP servers. `agents.memories.ts`: STM (Redis) and LTM (DB). `agents.stream-buffer.ts`: Redis replay buffer for SSE. `agents.usage.ts`: raw-SQL usage report. `agents.models-catalog.ts` + `shared/models-dev.ts`: context window, cost and reasoning efforts from `resources/models-dev/catalog.json` (refresh with `task api:models:snapshot`).
 - `llm-provider-supported.ts`: provider list (`llmProviderSupported`), model handlers and model fetchers.
-- `prompts/*.md`: Mustache templates loaded at boot (`SYSTEM.md`, `ASK.md`/`AGENT.md` picked by `agentMode.toUpperCase()`, `PLAN.md`, title/goal/summary/vuln prompts).
+- `prompts/*.md`: Mustache templates loaded at boot through `PromptRegistry` (`common/utils/prompt-registry.util.ts`, one read per process, shared with `AssetsService`) (`SYSTEM.md`, `ASK.md`/`AGENT.md` picked by `agentMode.toUpperCase()`, `PLAN.md`, title/goal/summary/vuln prompts).
 - `shared/`: context budget, step limit, token counter, turn stats, `updateConversationMetadata`.
 
 ## Public surface
