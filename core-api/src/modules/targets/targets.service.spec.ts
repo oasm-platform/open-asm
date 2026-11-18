@@ -1,5 +1,6 @@
 import type { UserContextPayload } from '@/common/interfaces/app.interface';
-import { AuditOutcome, IntegrationType } from '@/common/enums/enum';
+import { AuditOutcome, IntegrationType, JobRunType } from '@/common/enums/enum';
+import { NotFoundError } from '@/common/errors/domain.errors';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
@@ -121,6 +122,104 @@ describe('TargetsService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  describe('reScan', () => {
+    const targetId = 'target-uuid';
+    const target = (overrides: Partial<Target>) =>
+      ({
+        id: targetId,
+        workspaceId: 'workspace-uuid',
+        reScanCount: 0,
+        value: 'example.com',
+        ...overrides,
+      }) as Target;
+
+    beforeEach(() => {
+      mockAssetsService.hasPrimaryAsset = jest.fn().mockResolvedValue(true);
+      mockTargetRepository.update = jest.fn().mockResolvedValue({});
+    });
+
+    it('counts the re-scan and announces it with the type of the target', async () => {
+      const domain = target({ type: TargetType.DOMAIN });
+      mockTargetRepository.findOne = jest.fn().mockResolvedValue(domain);
+
+      const result = await service.reScan(targetId, 'workspace-uuid');
+
+      expect(result).toEqual({ message: 'Scan started' });
+      expect(mockTargetRepository.findOne).toHaveBeenCalledWith({
+        where: { id: targetId, workspaceId: 'workspace-uuid' },
+      });
+      expect(mockAssetsService.hasPrimaryAsset).toHaveBeenCalledWith(targetId);
+      expect(mockTargetRepository.update).toHaveBeenCalledWith(targetId, {
+        reScanCount: 1,
+        lastDiscoveredAt: expect.any(Date) as Date,
+      });
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        'target.domain.re-scan',
+        domain,
+        { jobRunType: JobRunType.MANUAL },
+      );
+    });
+
+    it('emits the re-scan trigger of the target type (IP runs IP discovery, not domain discovery)', async () => {
+      const ip = target({ type: TargetType.IP, value: '203.0.113.10', reScanCount: 2 });
+      mockTargetRepository.findOne = jest.fn().mockResolvedValue(ip);
+
+      await service.reScan(targetId, 'workspace-uuid');
+
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith('target.ip.re-scan', ip, {
+        jobRunType: JobRunType.MANUAL,
+      });
+    });
+
+    it('passes the scheduled run type on to the workflow trigger', async () => {
+      const domain = target({ type: TargetType.DOMAIN });
+      mockTargetRepository.findOne = jest.fn().mockResolvedValue(domain);
+
+      await service.reScan(targetId, 'workspace-uuid', JobRunType.SCHEDULED);
+
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        'target.domain.re-scan',
+        domain,
+        { jobRunType: JobRunType.SCHEDULED },
+      );
+    });
+
+    it('re-syncs a Git organization instead of requiring a primary host asset', async () => {
+      const org = target({ type: TargetType.GIT_ORG, value: 'github.com/acme' });
+      mockTargetRepository.findOne = jest.fn().mockResolvedValue(org);
+
+      const result = await service.reScan(targetId, 'workspace-uuid');
+
+      expect(result).toEqual({ message: 'Repository sync started' });
+      expect(mockAssetsService.hasPrimaryAsset).not.toHaveBeenCalled();
+      expect(mockTargetRepository.update).toHaveBeenCalledWith(targetId, {
+        reScanCount: 1,
+      });
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith('target.git_org.re-scan', org);
+    });
+
+    it('refuses a target of another workspace', async () => {
+      mockTargetRepository.findOne = jest.fn().mockResolvedValue(null);
+
+      await expect(service.reScan(targetId, 'other-workspace')).rejects.toThrow(
+        new NotFoundError('Target not found'),
+      );
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('refuses a host target whose primary asset is gone', async () => {
+      mockTargetRepository.findOne = jest
+        .fn()
+        .mockResolvedValue(target({ type: TargetType.DOMAIN }));
+      mockAssetsService.hasPrimaryAsset = jest.fn().mockResolvedValue(false);
+
+      await expect(service.reScan(targetId, 'workspace-uuid')).rejects.toThrow(
+        new NotFoundError('Asset not found'),
+      );
+      expect(mockTargetRepository.update).not.toHaveBeenCalled();
+    });
   });
 
   describe('createMultipleTargets', () => {

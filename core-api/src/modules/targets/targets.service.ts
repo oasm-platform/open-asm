@@ -1,5 +1,6 @@
+import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
-import { AuditOutcome, BullMQName, CronSchedule, IntegrationType, JobStatus, Severity } from '@/common/enums/enum';
+import { AuditOutcome, BullMQName, CronSchedule, IntegrationType, JobRunType, JobStatus, Severity } from '@/common/enums/enum';
 import { TargetScopeType } from '@/modules/targets/enums/target.enums';
 import { openVulnerabilityCondition } from '@/modules/vulnerabilities/open-vulnerability';
 import { UserContextPayload } from '@/common/interfaces/app.interface';
@@ -95,6 +96,67 @@ export class TargetsService implements OnModuleInit {
 
   async onModuleInit() {
     await this.handleUpdateScanSchedule();
+  }
+
+  /**
+   * Re-runs discovery on a target: counts the re-scan and emits
+   * `target.<type>.re-scan` for the matching workflow. A Git organization is
+   * re-synced instead (`target.git_org.re-scan`).
+   *
+   * @param jobRunType - Recorded on the run: the target's scan schedule passes
+   *   SCHEDULED, a user re-scan keeps MANUAL.
+   * @throws NotFoundError when the target is not in the workspace, or a host
+   *   target has lost its primary asset.
+   */
+  public async reScan(
+    targetId: string,
+    workspaceId: string,
+    jobRunType: JobRunType = JobRunType.MANUAL,
+  ): Promise<DefaultMessageResponseDto> {
+    // The rescan runs inside the target's own workspace — assert the caller is
+    // acting in that workspace before any worker jobs are dispatched.
+    const target = await this.repo.findOne({
+      where: { id: targetId, workspaceId },
+    });
+
+    if (!target) {
+      throw new NotFoundError('Target not found');
+    }
+
+    // A Git organization has no primary host asset: "re-scan" means re-sync
+    // its repositories, which RepositorySyncService does on this event (the
+    // scan schedule lands here too). Scanning follows on `git_org.synced`.
+    if (target.type === TargetType.GIT_ORG) {
+      await this.repo.update(targetId, {
+        reScanCount: target.reScanCount + 1,
+      });
+      this.eventEmitter.emit('target.git_org.re-scan', target);
+      return { message: 'Repository sync started' };
+    }
+
+    if (!(await this.assetService.hasPrimaryAsset(targetId))) {
+      throw new NotFoundError('Asset not found');
+    }
+
+    const reScanCount = target.reScanCount + 1;
+    await this.repo.update(targetId, {
+      reScanCount,
+      lastDiscoveredAt: new Date(),
+    });
+
+    // The trigger name carries the target type (`ip.re-scan`, `cidr.re-scan`)
+    // so the matching workflow runs — it used to be hard-coded to `domain`,
+    // which ran domain discovery on IP and CIDR targets. The run type rides
+    // along so TriggerWorkflowService records a scheduled run as scheduled.
+    this.eventEmitter.emit(
+      `target.${target.type.toLowerCase()}.re-scan`,
+      target,
+      { jobRunType },
+    );
+
+    return {
+      message: 'Scan started',
+    };
   }
 
   /**

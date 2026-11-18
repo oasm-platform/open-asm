@@ -322,7 +322,7 @@ export class TargetsController {
     @Param() { id }: IdQueryParamDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.targetsService.assetService.reScan(id, workspaceId);
+    return this.targetsService.reScan(id, workspaceId);
   }
 
   @Doc({

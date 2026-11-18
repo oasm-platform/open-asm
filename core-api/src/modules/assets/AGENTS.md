@@ -1,11 +1,11 @@
 # assets module
 
-Read side of the attack surface: hosts (`assets`), their open ports (`asset_services`), and the HTTP, TLS, tech, IP and DNS facts scans recorded about them. Also manual tags, AI tag suggestions, enable/disable, re-scan and URL discovery.
+Read side of the attack surface: hosts (`assets`), their open ports (`asset_services`), and the HTTP, TLS, tech, IP and DNS facts scans recorded about them. Also manual tags, AI tag suggestions, enable/disable and URL discovery.
 
 ## Layout
 
 - `assets.controller.ts`: HTTP routes on `assets`, including the CSV export built in the controller.
-- `assets.service.ts`: `AssetsService` (~2.2k lines): list/facet queries, graph, TLS, tags, toggle, `reScan`, `createPrimaryAsset`, AI tags.
+- `assets.service.ts`: `AssetsService` (~2.2k lines): list/facet queries, graph, TLS, tags, toggle, `hasPrimaryAsset`, `createPrimaryAsset`, AI tags.
 - `url-discovery.service.ts`: `UrlDiscoveryService`: starts the `url_discovery` workflow and publishes `asset.url.discovered` when a run ends.
 - `asset-filter.ts`: filter-tree schema for the list (`compileAssetFilter`, `legacyParamsToFilter`, fields `host|port|ip|tech|url|statusCode|tlsHost|tag|project|isNew`).
 - `fresh-runs.ts`: the single definition of "new" rows (`findFreshRuns`, `freshRunSql`, `isFresh`).
@@ -22,7 +22,7 @@ Read side of the attack surface: hosts (`assets`), their open ports (`asset_serv
 | `PATCH assets/:id` (tags only), `POST assets/toggle`, `POST assets/service/tag/generate`, `POST assets/url/discover` | `asset.write` |
 
 - Exports `AssetsService` only (`UrlDiscoveryService` is internal).
-- No `@PublishEvent` on any route. `UrlDiscoveryService.handleRunEnd` (`@OnEvent(EventTriggerType.WORKFLOW_END)`) publishes `asset.url.discovered` for `url_discovery` runs. `reScan` emits in-process `target.<type>.re-scan` (with `{ jobRunType }` as a third argument), or `target.git_org.re-scan` for GIT_ORG targets.
+- No `@PublishEvent` on any route. `UrlDiscoveryService.handleRunEnd` (`@OnEvent(EventTriggerType.WORKFLOW_END)`) publishes `asset.url.discovered` for `url_discovery` runs.
 - MCP/agent tools in `agents/tools/workspace.tools.ts`: `enumerate_assets`, `inspect_asset`, `examine_target_assets`, `list_network_ports`, `fingerprint_technologies`, `verify_tls_settings`. They call `getManyAsssetServices` (note the triple "s"), `getAssetById`, `getPortAssets`, `getTechnologyAssets`, `getManyTls`.
 
 ## Data model
@@ -45,8 +45,8 @@ Read side of the attack surface: hosts (`assets`), their open ports (`asset_serv
 
 ## Coupling
 
-- Imports `TechnologyModule` (tech enrichment), `WorkspacesModule`, `StorageModule`, and `WorkflowsModule` + `JobsRegistryModule` (`UrlDiscoveryService`). Uses the global `GeoIpService`, `WorkspaceEncryptionService` and `EventBridgeService`. Imported by `TargetsModule`, `StatisticModule`, `SearchModule` and `AgentsModule`. Registers the `Target`, `AgentLLMConfig` and `AgentConfig` repositories itself.
-- Users of `AssetsService`: `TargetsService` (and `POST targets/:id/re-scan`), `AssetsDiscoveryScheduleConsumer` (`reScan`), `projects` (`ProjectAssetsService`, `ProjectsController`), `SearchService`, agents tools.
+- Imports `TechnologyModule` (tech enrichment), `WorkspacesModule`, `StorageModule`, and `WorkflowsModule` + `JobsRegistryModule` (`UrlDiscoveryService`). Uses the global `GeoIpService`, `WorkspaceEncryptionService` and `EventBridgeService`. Imported by `TargetsModule`, `StatisticModule`, `SearchModule` and `AgentsModule`. Registers the `Target` (read only: `reScan` and its target writes live in `TargetsService`), `AgentLLMConfig` and `AgentConfig` repositories itself.
+- Users of `AssetsService`: `TargetsService` (including `hasPrimaryAsset` for `reScan`), `projects` (`ProjectAssetsService`, `ProjectsController`), `SearchService`, agents tools.
 - Writers of these tables outside the module: `DataAdapterService` (`data-adapter/`) ingests every scan result into `assets`, `asset_services`, `http_responses` and the child tables. `TargetsService.createMultipleTargets` inserts the primary/CIDR assets. `RepositorySyncService` creates GIT_ORG repository assets. `step-scope.loader.ts`, `StatisticService` and the reports read them directly.
 - `project_assets` (projects module) cascades from `assets`.
 

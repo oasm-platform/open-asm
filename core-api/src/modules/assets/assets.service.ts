@@ -1,6 +1,4 @@
-import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
-import { JobRunType } from '@/common/enums/enum';
 import * as path from 'path';
 import { PromptRegistry } from '@/common/utils/prompt-registry.util';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
@@ -12,7 +10,6 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { DataSource, In, Repository } from 'typeorm';
@@ -23,7 +20,7 @@ import { LLMProvider } from '../agents/enums/agent.enums';
 import {
   getLLMProviderConfig,
 } from '../agents/llm-provider-supported';
-import { Target, TargetType } from '../targets/entities/target.entity';
+import { Target } from '../targets/entities/target.entity';
 
 import { TechnologyForwarderService } from '../technology/technology-forwarder.service';
 import { StorageService } from '../storage/storage.service';
@@ -127,7 +124,6 @@ export class AssetsService {
     private readonly llmConfigRepository: Repository<AgentLLMConfig>,
     @InjectRepository(AgentConfig)
     private readonly agentConfigRepository: Repository<AgentConfig>,
-    private eventEmitter: EventEmitter2,
     private technologyForwarderService: TechnologyForwarderService,
     private workspaceService: WorkspacesService,
     private workspaceEncryption: WorkspaceEncryptionService,
@@ -540,70 +536,11 @@ export class AssetsService {
     });
   }
 
-  /**
-   * Triggers a rescan for a specific asset by creating new jobs for relevant workers.
-   *
-   * @param assetId - The ID of the asset to rescan.
-   * @param jobRunType - Recorded on the run: the target's scan schedule passes
-   *   SCHEDULED, a user re-scan keeps MANUAL.
-   * @throws Error if the asset is not found.
-   */
-  public async reScan(
-    targetId: string,
-    workspaceId: string,
-    jobRunType: JobRunType = JobRunType.MANUAL,
-  ): Promise<DefaultMessageResponseDto> {
-    // The rescan runs inside the target's own workspace — assert the caller is
-    // acting in that workspace before any worker jobs are dispatched.
-    const target = await this.targetRepo.findOne({
-      where: { id: targetId, workspaceId },
+  /** Whether the target still has its primary (own host) asset. */
+  public hasPrimaryAsset(targetId: string): Promise<boolean> {
+    return this.assetRepo.exists({
+      where: { target: { id: targetId }, isPrimary: true },
     });
-
-    if (!target) {
-      throw new NotFoundError('Target not found');
-    }
-
-    // A Git organization has no primary host asset: "re-scan" means re-sync
-    // its repositories, which RepositorySyncService does on this event (the
-    // scan schedule lands here too). Scanning follows on `git_org.synced`.
-    if (target.type === TargetType.GIT_ORG) {
-      await this.targetRepo.update(targetId, {
-        reScanCount: target.reScanCount + 1,
-      });
-      this.eventEmitter.emit('target.git_org.re-scan', target);
-      return { message: 'Repository sync started' };
-    }
-
-    const asset = await this.assetRepo.findOne({
-      where: {
-        target: { id: targetId },
-        isPrimary: true,
-      },
-    });
-
-    if (!asset) {
-      throw new NotFoundError('Asset not found');
-    }
-
-    const reScanCount = target.reScanCount + 1;
-    await this.targetRepo.update(targetId, {
-      reScanCount,
-      lastDiscoveredAt: new Date(),
-    });
-
-    // The trigger name carries the target type (`ip.re-scan`, `cidr.re-scan`)
-    // so the matching workflow runs — it used to be hard-coded to `domain`,
-    // which ran domain discovery on IP and CIDR targets. The run type rides
-    // along so TriggerWorkflowService records a scheduled run as scheduled.
-    this.eventEmitter.emit(
-      `target.${target.type.toLowerCase()}.re-scan`,
-      target,
-      { jobRunType },
-    );
-
-    return {
-      message: 'Scan started',
-    };
   }
 
   /**
