@@ -1,3 +1,4 @@
+import { ContextCompactionService } from './context-compaction.service';
 import { ConversationTitleService } from './conversation-title.service';
 import { LlmConfigResolver } from './llm-config.resolver';
 import { ActiveRunRegistry } from './active-run.registry';
@@ -101,6 +102,7 @@ export const AGENT_FUNCTION_HOSTS = [
     ActiveRunRegistry,
     LlmConfigResolver,
     ConversationTitleService,
+    ContextCompactionService,
     AgentTool,
     AgentsGuardService,
     AgentsMcpService,

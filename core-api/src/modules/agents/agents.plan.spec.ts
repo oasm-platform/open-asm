@@ -623,9 +623,12 @@ describe('AgentsCompletionsService plan execution', () => {
     service.conversationRepository = {
       findOne: jest.fn(() => Promise.resolve({ id: 'c1', summary: null })),
     };
-    service.checkAndCompactMidLoop = jest.fn(() => Promise.resolve(false));
+    service.compaction = {
+      checkAndCompactMidLoop: jest.fn(() => Promise.resolve(false)),
+      pruneContextByBudget: jest.fn(() => []),
+      handlePostStreamCompaction: jest.fn(() => Promise.resolve()),
+    };
     service.getConversationHistory = jest.fn(() => Promise.resolve([]));
-    service.pruneContextByBudget = jest.fn(() => []);
     service.mapHistoryToModelMessages = jest.fn(() => []);
     service.getModelContextWindow = jest.fn(() => 128_000);
     service.saveAssistantMessage = jest.fn(() =>
