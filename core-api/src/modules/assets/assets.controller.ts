@@ -17,6 +17,7 @@ import { ApiTags } from '@nestjs/swagger';
 import type { NodeResponse } from '@nestjs/platform-node';
 import { AssetGraphService } from './asset-graph.service';
 import { AssetQueryService } from './asset-query.service';
+import { AssetTaggingService } from './asset-tagging.service';
 import { AssetsService } from './assets.service';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
 import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
@@ -48,6 +49,7 @@ export class AssetsController {
     private readonly urlDiscoveryService: UrlDiscoveryService,
     private readonly assetGraph: AssetGraphService,
     private readonly assetQuery: AssetQueryService,
+    private readonly assetTagging: AssetTaggingService,
   ) {}
 
   @Doc({
@@ -282,7 +284,7 @@ export class AssetsController {
     @WorkspaceId() workspaceId: string,
     @UserId() userId: string,
   ) {
-    const tags = await this.assetsService.generateServiceTags(
+    const tags = await this.assetTagging.generateServiceTags(
       dto.assetServiceId,
       workspaceId,
       userId,

@@ -1,22 +1,8 @@
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
-import * as path from 'path';
-import { PromptRegistry } from '@/common/utils/prompt-registry.util';
-import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { getManyResponse } from '@/common/utils/get-many-response.util';
-import { generateText } from 'ai';
-import {
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { findDefaultLLMConfig } from '../agents/agents.config';
-import { AgentConfig } from '../agents/entities/agent-config.entity';
-import { AgentLLMConfig } from '../agents/entities/agent-llm-config.entity';
-import { LLMProvider } from '../agents/enums/agent.enums';
-import {
-  getLLMProviderConfig,
-} from '../agents/llm-provider-supported';
 
 import { AssetQueryService } from './asset-query.service';
 import { GetAssetsQueryDto } from './dto/assets.dto';
@@ -26,16 +12,10 @@ import { AssetService } from './entities/asset-services.entity';
 import { Asset } from './entities/assets.entity';
 import { HttpResponseTechnology } from './entities/http-response-technology.entity';
 import { TlsCertificate } from './entities/tls-certificate.entity';
-import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 @Injectable()
 export class AssetsService {
-  private readonly logger = new Logger(AssetsService.name);
-  // GENERATE_SERVICE_TAGS.md lives with the agent prompts
-  private readonly prompts = PromptRegistry.forDirectory(
-    path.join(__dirname, '../agents/prompts'),
-  );
-
   constructor(
     @InjectRepository(Asset)
     public readonly assetRepo: Repository<Asset>,
@@ -45,88 +25,9 @@ export class AssetsService {
     public readonly tlsCertificateRepo: Repository<TlsCertificate>,
     @InjectRepository(HttpResponseTechnology)
     public readonly httpResponseTechnologyRepo: Repository<HttpResponseTechnology>,
-    @InjectRepository(AgentLLMConfig)
-    private readonly llmConfigRepository: Repository<AgentLLMConfig>,
-    @InjectRepository(AgentConfig)
-    private readonly agentConfigRepository: Repository<AgentConfig>,
-    private workspaceEncryption: WorkspaceEncryptionService,
     private dataSource: DataSource,
     private readonly assetQuery: AssetQueryService,
   ) {}
-
-  private async generateTagsWithAI(
-    serviceData: string,
-    workspaceId: string,
-    userId: string,
-  ): Promise<string[]> {
-    const llmConfig = await findDefaultLLMConfig(
-      {
-        llmConfigs: this.llmConfigRepository,
-        agentConfigs: this.agentConfigRepository,
-      },
-      workspaceId,
-      userId,
-    );
-
-    if (!llmConfig) {
-      throw new InvalidInputError(
-        'No LLM provider connected. Please connect a provider first.',
-      );
-    }
-
-    const providerConfig = getLLMProviderConfig(llmConfig.provider);
-    if (!providerConfig) {
-      throw new InvalidInputError(
-        `Unsupported LLM provider: ${String(llmConfig.provider)}`,
-      );
-    }
-
-    const apiKey = llmConfig.apiKey
-      ? await this.workspaceEncryption.decrypt(workspaceId, llmConfig.apiKey)
-      : '';
-    const baseURL =
-      llmConfig.provider === LLMProvider.CUSTOM
-        ? llmConfig.apiUrl
-        : undefined;
-    const model = providerConfig.handler(apiKey, llmConfig.model, baseURL);
-
-    const prompt = this.prompts.render('GENERATE_SERVICE_TAGS.md', {
-      SERVICE_DATA: serviceData,
-    });
-
-    const result = await generateText({
-      model,
-      messages: [{ role: 'user', content: prompt }],
-    });
-
-    let textContent = '';
-    if (typeof result.content === 'string') {
-      textContent = result.content;
-    } else if (Array.isArray(result.content)) {
-      const textPart = result.content.find((part) => part.type === 'text');
-      textContent = textPart?.type === 'text' ? textPart.text : '';
-    }
-
-    this.logger.log(`AI response: ${textContent.slice(0, 500)}`);
-
-    const jsonMatch = textContent.match(/\[[\s\S]*?\]/);
-    if (!jsonMatch) {
-      this.logger.warn(
-        `Failed to parse tags from AI response: ${textContent.slice(0, 200)}`,
-      );
-      return [];
-    }
-
-    const parsed = JSON.parse(jsonMatch[0]) as unknown;
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed
-      .filter((item): item is string => typeof item === 'string')
-      .map((tag) => tag.trim().toLowerCase())
-      .filter((tag) => tag.length > 0 && tag.length <= 100);
-  }
 
   // Queries other modules (agents tools, search) still ask this service for
   getManyAsssetServices(
@@ -361,70 +262,6 @@ export class AssetsService {
     });
 
     return getManyResponse({ query, data, total });
-  }
-
-  public async generateServiceTags(
-    assetServiceId: string,
-    workspaceId: string,
-    userId: string,
-  ): Promise<string[]> {
-    const assetService = await this.assetServiceRepo
-      .createQueryBuilder('assetService')
-      .leftJoinAndSelect('assetService.asset', 'asset')
-      .leftJoinAndSelect('assetService.httpResponses', 'httpResponse')
-      .innerJoin('asset.target', 'target')
-      .where('assetService.id = :assetServiceId', { assetServiceId })
-      .andWhere('target.workspaceId = :workspaceId', { workspaceId })
-      .getOne();
-
-    if (!assetService) {
-      throw new NotFoundError('Asset service not found');
-    }
-
-    const latestHttpResponse = assetService.httpResponses?.[0];
-    const latestTechs = latestHttpResponse
-      ? await this.assetQuery.getTechStringsForHttpResponse(latestHttpResponse.id)
-      : [];
-    const latestTls = latestHttpResponse
-      ? await this.assetQuery.getTlsForHttpResponse(latestHttpResponse.id)
-      : null;
-
-    const serviceContext = {
-      service: {
-        value: assetService.value,
-        port: assetService.port,
-      },
-      host: assetService.asset?.value,
-      ...(latestHttpResponse && {
-        http: {
-          title: latestHttpResponse.title,
-          webserver: latestHttpResponse.webserver,
-          tech: latestTechs,
-          status_code: latestHttpResponse.status_code,
-          scheme: latestHttpResponse.scheme,
-          host: latestHttpResponse.host,
-          path: latestHttpResponse.path,
-          content_type: latestHttpResponse.content_type,
-          words: latestHttpResponse.words,
-          lines: latestHttpResponse.lines,
-          tls: latestTls,
-        },
-      }),
-    };
-
-    const tags = await this.generateTagsWithAI(
-      JSON.stringify(serviceContext, null, 2),
-      workspaceId,
-      userId,
-    );
-
-    if (tags.length === 0) {
-      throw new InvalidInputError(
-        'AI model did not generate any tags. Ensure an LLM config is set up for your account.',
-      );
-    }
-
-    return tags;
   }
 
   public async toggleAsset(

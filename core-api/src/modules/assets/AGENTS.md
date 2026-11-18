@@ -5,7 +5,8 @@ Read side of the attack surface: hosts (`assets`), their open ports (`asset_serv
 ## Layout
 
 - `assets.controller.ts`: HTTP routes on `assets`, including the CSV export built in the controller.
-- `assets.service.ts`: `AssetsService`: TLS, tags, toggle, `hasPrimaryAsset`, AI tags, CSV export. It keeps thin delegates (`getManyAsssetServices`, `getAssetById`, `getPortAssets`, `getTechnologyAssets`) for agents tools and search.
+- `assets.service.ts`: `AssetsService`: TLS list, tag replace (`updateAssetById`), toggle, `hasPrimaryAsset`, CSV export.
+- `asset-tagging.service.ts`: `AssetTaggingService`: AI tag suggestions (`generateServiceTags`). The only part of this module that uses the agents' LLM config and prompts. It keeps thin delegates (`getManyAsssetServices`, `getAssetById`, `getPortAssets`, `getTechnologyAssets`) for agents tools and search.
 - `asset-query.service.ts`: `AssetQueryService`: `buildBaseQuery` (tenant scope + filter tree, public: the TLS and export queries use it), the service list with its batch-loaded facets, `getAssetById`, the IP/host/tag/port/URL/technology/status-code tabs, and the per-response tech/TLS lookups.
 - `asset-graph.service.ts`: `AssetGraphService`: the topology graph (`getAssetGraph`) and the lazy expansion of one asset's services (`getAssetServiceGraph`). Controller only.
 - `repository-assets.service.ts`: `RepositoryAssetsService`: lists a GIT_ORG target's repository assets and applies a repository sync's changes (`RepositoryAssetChanges`) in one transaction, ordered renames → updates → inserts → disables for the `(value, targetId)` unique constraint.
@@ -57,11 +58,11 @@ Read side of the attack surface: hosts (`assets`), their open ports (`asset_serv
 
 - `getManyAsssetServices` matches `value` with `ILIKE` and an escaped pattern (`containsLikePattern`), so `%` and `_` in user input are literal. With no trigram index on `asset_services.value` every miss is a sequential scan.
 
-- `generateServiceTags` only **returns** suggestions and stores nothing, although its Swagger text says it replaces tags. It uses the workspace/user default LLM config (`findDefaultLLMConfig`), `generateText`, and the prompt `agents/prompts/GENERATE_SERVICE_TAGS.md`, read through `PromptRegistry` (`common/utils/prompt-registry.util.ts`), which shares one copy of that folder with the agents module.
+- `AssetTaggingService.generateServiceTags` only **returns** suggestions and stores nothing, although its Swagger text says it replaces tags. It uses the workspace/user default LLM config (`findDefaultLLMConfig`), `generateText`, and the prompt `agents/prompts/GENERATE_SERVICE_TAGS.md`, read through `PromptRegistry` (`common/utils/prompt-registry.util.ts`), which shares one copy of that folder with the agents module.
 - Catalog events `asset.updated` and `asset.enabled_changed` have no publisher. The audit mapping `asset.deleted` → `AssetsController.deleteAsset` points at a method that does not exist.
 - Tech strings on list rows are `name:version`. See `technology/AGENTS.md` for why those miss the enrichment cache.
 - `POST assets/url/discover` accepts DOMAIN targets only, and returns a message (not an error) when no live HTTP service has been found yet.
 
 ## Testing
 
-Unit specs: `assets.service.spec.ts`, `asset-query.service.spec.ts`, `asset-graph.service.spec.ts`, `assets.controller.spec.ts`, `repository-assets.service.spec.ts`, `url-discovery.service.spec.ts`, `asset-filter.spec.ts`, `fresh-runs.spec.ts`, `dto/assets-filter.dto.spec.ts`, `entities/discovered-url.entity.spec.ts`. E2E (live DB): `core-api/test/assets-facets.e2e-spec.ts`, `assets-filter.e2e-spec.ts`, `assets-url.e2e-spec.ts` (the facets and URL suites call `AssetQueryService` directly).
+Unit specs: `assets.service.spec.ts`, `asset-query.service.spec.ts`, `asset-graph.service.spec.ts`, `asset-tagging.service.spec.ts`, `assets.controller.spec.ts`, `repository-assets.service.spec.ts`, `url-discovery.service.spec.ts`, `asset-filter.spec.ts`, `fresh-runs.spec.ts`, `dto/assets-filter.dto.spec.ts`, `entities/discovered-url.entity.spec.ts`. E2E (live DB): `core-api/test/assets-facets.e2e-spec.ts`, `assets-filter.e2e-spec.ts`, `assets-url.e2e-spec.ts` (the facets and URL suites call `AssetQueryService` directly).
