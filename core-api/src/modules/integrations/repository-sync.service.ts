@@ -223,6 +223,7 @@ export class RepositorySyncService {
             isPrimary: false,
             metadata: asJson(planned.metadata),
             targetId: target.id,
+            workspaceId: target.workspaceId,
           })),
         );
       }

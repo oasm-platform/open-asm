@@ -5,6 +5,7 @@ import type { AgentMode } from '@/common/enums/enum';
 import type { WrapperType } from '@/common/types/app.types';
 import type { ArtifactsService } from '@/modules/artifacts/artifacts.service';
 import type { AssetsService } from '@/modules/assets/assets.service';
+import type { AttackSurfaceQueryService } from '@/modules/attack-surface-query/attack-surface-query.service';
 import type { ConnectorRegistryService } from '@/modules/connectors/connector-registry.service';
 import type { IssuesService } from '@/modules/issues/issues.service';
 import type { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
@@ -97,6 +98,7 @@ export type ToolScope = Pick<
  */
 export interface ToolServices {
   assetsService: AssetsService;
+  attackSurfaceQuery: AttackSurfaceQueryService;
   targetsService: TargetsService;
   vulnerabilitiesService: WrapperType<VulnerabilitiesService>;
   vulnerabilityReviewService: WrapperType<VulnerabilityReviewService>;

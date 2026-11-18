@@ -340,7 +340,7 @@ export function splitTechString(
  */
 export function toTlsCertificateRow(
   tls: Record<string, unknown> | null | undefined,
-  keys: { httpResponseId: string; assetServiceId?: string; jobHistoryId?: string },
+  keys: { httpResponseId: string; assetServiceId?: string; jobHistoryId?: string; workspaceId?: string },
 ): Record<string, unknown> | null {
   if (!tls || typeof tls !== 'object') return null;
   const str = (key: string): string | undefined => {
@@ -415,6 +415,8 @@ export class DataAdapterService {
   private async syncDnsFacets(
     manager: EntityManager,
     recordsByAssetId: Map<string, Record<string, string[]> | null>,
+    /** Workspace of the assets; the trigger fills it when unknown. */
+    workspaceId?: string,
   ): Promise<void> {
     const assetIds = [...recordsByAssetId.keys()];
     if (assetIds.length === 0) return;
@@ -435,12 +437,13 @@ export class DataAdapterService {
 
     const dnsRows: ReturnType<typeof toDnsFacetRows>['dnsRows'] = [];
     const ipRows: ReturnType<typeof toDnsFacetRows>['ipRows'] = [];
+    const scope = workspaceId ? { workspaceId } : {};
     for (const [assetId, records] of recordsByAssetId) {
       const facets = toDnsFacetRows(assetId, records);
-      dnsRows.push(...facets.dnsRows);
-      ipRows.push(...facets.ipRows);
+      dnsRows.push(...facets.dnsRows.map((row) => ({ ...row, ...scope })));
+      ipRows.push(...facets.ipRows.map((row) => ({ ...row, ...scope })));
     }
-    // 3 bind params per row; stay far below Postgres' 65535 cap.
+    // 4 bind params per row; stay far below Postgres' 65535 cap.
     const BATCH = 5000;
     for (let i = 0; i < dnsRows.length; i += BATCH) {
       await manager
@@ -619,6 +622,8 @@ export class DataAdapterService {
             value: asset.value,
             dnsRecords: asset.dnsRecords,
             target: { id: targetId },
+            // The target's workspace (the trigger fills it if unresolved).
+            ...(workspaceId ? { workspaceId } : {}),
             jobHistoryId: opts?.jobHistoryId ?? null,
             isEnabled:
               isEnabled ?? workspaceConfigs.isAutoEnableAssetAfterDiscovered,
@@ -628,6 +633,17 @@ export class DataAdapterService {
         ? insertQb.orUpdate(['dnsRecords'], ['value', 'targetId'])
         : insertQb.orIgnore()
       ).execute();
+
+      // Every host of the batch was just reported: new or already known.
+      if (batchValues.length > 0) {
+        await queryRunner.manager
+          .createQueryBuilder()
+          .update(Asset)
+          .set({ lastSeenAt: () => 'now()' })
+          .where('"targetId" = :targetId', { targetId })
+          .andWhere('value IN (:...batchValues)', { batchValues })
+          .execute();
+      }
 
       // Resolve ids by value: with orIgnore, RETURNING only yields the rows
       // actually inserted, so `identifiers[i]` does NOT line up with
@@ -659,7 +675,7 @@ export class DataAdapterService {
           dnsWrites.set(id, asset.dnsRecords);
         }
       }
-      await this.syncDnsFacets(queryRunner.manager, dnsWrites);
+      await this.syncDnsFacets(queryRunner.manager, dnsWrites, workspaceId ?? undefined);
 
       await queryRunner.commitTransaction();
 
@@ -707,6 +723,11 @@ export class DataAdapterService {
     try {
       const assetServiceId = job.assetService?.id;
       const jobHistoryId = job.jobHistory.id;
+      // Tenant scope of the service, when the job loaded it; otherwise the
+      // asq_fill_scope triggers copy it from the parent rows.
+      const scope = job.assetService?.workspaceId
+        ? { workspaceId: job.assetService.workspaceId }
+        : {};
 
       if (data.failed && job.assetServiceId) {
         await queryRunner.manager
@@ -725,16 +746,34 @@ export class DataAdapterService {
       for (const key of HTTP_RESPONSE_FACET_KEYS) delete rest[key];
       const saved = await queryRunner.manager.getRepository(HttpResponse).save({
         ...rest,
+        ...scope,
         assetServiceId,
         jobHistoryId,
       });
       const httpResponseId = saved.id;
 
+      // The service now points at its newest response (unless a probe that
+      // ran later already landed), and counts as seen.
+      if (assetServiceId) {
+        await queryRunner.manager
+          .createQueryBuilder()
+          .update(AssetService)
+          .set({ latestHttpResponseId: httpResponseId, lastSeenAt: () => 'now()' })
+          .where('id = :assetServiceId', { assetServiceId })
+          .andWhere(
+            `NOT EXISTS (SELECT 1 FROM http_responses cur, http_responses fresh
+                          WHERE cur.id = "latestHttpResponseId" AND fresh.id = :httpResponseId
+                            AND cur."createdAt" > fresh."createdAt")`,
+            { httpResponseId },
+          )
+          .execute();
+      }
+
       const tasks: Promise<unknown>[] = [];
 
       const tlsRow = toTlsCertificateRow(
         data.tls,
-        { httpResponseId, assetServiceId, jobHistoryId },
+        { httpResponseId, assetServiceId, jobHistoryId, ...scope },
       );
       if (tlsRow) {
         tasks.push(
@@ -768,6 +807,7 @@ export class DataAdapterService {
               version: t.version ?? undefined,
               httpResponseId,
               assetServiceId,
+              ...scope,
             }))
         : [];
       if (techRows.length > 0) {
@@ -788,6 +828,7 @@ export class DataAdapterService {
         httpResponseId: string;
         assetServiceId?: string;
         jobHistoryId: string;
+        workspaceId?: string;
       }> = [];
       for (const ip of Array.isArray(data.a) ? data.a : []) {
         if (typeof ip === 'string' && ip !== '' && isIP(ip) !== 0) {
@@ -797,6 +838,7 @@ export class DataAdapterService {
             httpResponseId,
             assetServiceId,
             jobHistoryId,
+            ...scope,
           });
         }
       }
@@ -808,6 +850,7 @@ export class DataAdapterService {
             httpResponseId,
             assetServiceId,
             jobHistoryId,
+            ...scope,
           });
         }
       }
@@ -829,6 +872,7 @@ export class DataAdapterService {
         chainIndex?: number;
         httpResponseId: string;
         assetServiceId?: string;
+        workspaceId?: string;
       }> = [];
       if (
         typeof data.status_code === 'number' &&
@@ -840,6 +884,7 @@ export class DataAdapterService {
           chainIndex: undefined,
           httpResponseId,
           assetServiceId,
+          ...scope,
         });
       }
       const chain = Array.isArray(data.chain_status_codes)
@@ -854,6 +899,7 @@ export class DataAdapterService {
             chainIndex: i,
             httpResponseId,
             assetServiceId,
+            ...scope,
           });
         }
       });
@@ -991,12 +1037,18 @@ export class DataAdapterService {
 
       // Insert asset services data
       if (uniquePorts && uniquePorts.length > 0) {
+        const seenAt = new Date();
         const assetServices = uniquePorts.map((port) => ({
           value: `${job.asset.value}:${port}`,
           port: port,
           assetId: job.asset.id,
-          // Kept on conflict: the upsert only overwrites `value`, so a
-          // service keeps the run that first found it.
+          // Tenant scope of the host; the asq_fill_scope trigger fills it
+          // when the job's asset was loaded without these columns.
+          ...(job.asset.workspaceId ? { workspaceId: job.asset.workspaceId } : {}),
+          ...(job.asset.targetId ? { targetId: job.asset.targetId } : {}),
+          lastSeenAt: seenAt,
+          // Kept on conflict: the upsert only overwrites `value` and
+          // `lastSeenAt`, so a service keeps the run that first found it.
           jobHistoryId: job.jobHistory.id,
         }));
 
@@ -1007,7 +1059,7 @@ export class DataAdapterService {
           .values(assetServices)
           .orUpdate({
             conflict_target: ['assetId', 'port'],
-            overwrite: ['value'],
+            overwrite: ['value', 'lastSeenAt'],
           })
           .execute();
       }
@@ -1080,6 +1132,9 @@ export class DataAdapterService {
           fingerprint,
           assetId: job.asset.id,
           toolId: job.tool.id,
+          // Tenant scope (the trigger fills it when unresolved); never
+          // overwritten on conflict (not in RESCAN_OVERWRITE_COLUMNS).
+          ...(workspaceId ? { workspaceId } : {}),
           asset: { id: job.asset.id },
           jobHistory: { id: job.jobHistory.id },
           tool: { id: job.tool.id },

@@ -30,7 +30,7 @@ Scan roots of a workspace: a domain, IP, CIDR or Git organization. A target owns
 
 ## Data model
 
-- `targets`: unique `(workspaceId, value)` in the DB (also on the entity). Hard delete, no soft delete.
+- `targets`: unique `(workspaceId, value)` in the DB (also on the entity), plus unique `(id, workspaceId)`: the target of the assets' composite FK `(targetId, workspaceId)` (see `assets/AGENTS.md`). `workspaceId` must never change once assets exist. Hard delete, no soft delete.
 - FKs: `workspaceId` → workspace CASCADE; `internalNetworkId` → internal network CASCADE (deleting a network deletes its targets); `integrationId` → integration SET NULL (a GIT_ORG target stays, syncing pauses).
 - Deleting a target cascades in the DB to `assets` and from there to services, jobs, vulnerabilities (and their comments). `issue_links` rows that point at it are not removed (they have no FK).
 - `jobId` holds the BullMQ `repeatJobKey`, not a job id. `status`, `totalAssets`, `totalAssetServices` and `logo` are computed, not columns.
@@ -47,7 +47,7 @@ Scan roots of a workspace: a domain, IP, CIDR or Git organization. A target owns
 
 ## Coupling
 
-- `TargetsService` injects `AssetsService` (and exposes it as public `assetService`), `WorkspacesService`, `AuditService` and `EventBridgeService`. It writes `assets` rows directly inside its transaction.
+- `TargetsService` injects `AssetsService` (and exposes it as public `assetService`), `WorkspacesService`, `AuditService` and `EventBridgeService`. It writes `assets` rows directly inside its transaction, with their `workspaceId`.
 - `TriggerWorkflowService.onModuleInit` subscribes with `eventEmitter.onAny`, so **every** in-process event in the app is treated as a possible workflow trigger: `<a>.<b>` is matched against `workflow.content.on.<a>` containing `<b>`, and the payload is resolved to a workspace through `payload.id` as a target id. Project workflows (`project-%`, `group-%` file paths) are excluded.
 - Callers of `TargetsService`: integrations connectors (aws, cloudflare, vercel: `findByWorkspaceAndValues` then `createMultipleTargets`), `InternalNetworksService`, `SearchService`, agents tools. `StatisticModule` and `SearchModule` import `TargetsModule`.
 - Other code that touches `targets` directly: `AssetsService.reScan` updates `reScanCount` and `lastDiscoveredAt`. `WorkspacesService` bulk-deletes a workspace's targets and resolves `getWorkspaceIdByTargetId` (cached 60 s). `StatisticService` reads the table.

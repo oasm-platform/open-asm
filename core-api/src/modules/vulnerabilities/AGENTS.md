@@ -34,7 +34,7 @@ Findings on assets: list/detail/statistics, the lifecycle (new → active → fi
 
 ## Data model
 
-- `vulnerabilities`: unique `fingerprint`. FK to asset CASCADE, so findings disappear with their asset or target. `jobHistoryId`, `lastSeenJobHistoryId`, `fixedByJobHistoryId` SET NULL. No soft delete.
+- `vulnerabilities`: unique `fingerprint`. FK to asset CASCADE, so findings disappear with their asset or target. `jobHistoryId`, `lastSeenJobHistoryId`, `fixedByJobHistoryId` SET NULL. No soft delete. `workspaceId` (NOT NULL, composite FK `(assetId, workspaceId)` → assets, trigger-filled when a writer omits it; see `assets/AGENTS.md`) is never in `RESCAN_OVERWRITE_COLUMNS`.
 - Lifecycle columns: `detectionStatus` (`new|active|resurfaced|fixed`), `timesDetected`, `resurfacedCount`, `missedScans`, `scanScopeKey`, `fixedAt`, `fixClaimedAt/ById`, `dueAt`. Review columns: `reviewStatus` (default `approved`), `reviewedBy/At`, `reviewNote`, `discoveredBy`.
 - `vulnerability_dismissals`: one per finding (unique `vulnerabilityId`, CASCADE). `expiresAt` is set only for `risk_accepted`.
 - `vulnerability_events`: the timeline, CASCADE. It carries its own `workspaceId`. Rows are written on transitions and user actions only, never on each re-detection.
@@ -59,7 +59,7 @@ Findings on assets: list/detail/statistics, the lifecycle (new → active → fi
 - Imports `NotificationsModule`. Uses global `JobsRegistryService`, `WorkflowRunnerService`, `WorkflowsService`, `ToolsService`, `EventBridgeService`. Registers `Asset` and `Target` repositories itself.
 - `scan` runs the first job of `vulnerability_scan_basic.yaml` (nuclei) for host targets, and the whole `repository_scan.yaml` for GIT_ORG targets. Both workflows must exist in the workspace, or the call returns 404.
 - Writers outside: `DataAdapterService` inserts and upserts findings, `vulnerability_events` (`DETECTED`) and `vulnerability_sources`, and publishes `vulnerability.detected` / `vulnerability.resurfaced`.
-- The list reads `issue_links` / `issues` with raw SQL (`openIssues`). The issues lane consumes `vulnerability.detected|resurfaced|fixed`. Projects, reports, statistic, search, comments and target overview all query `vulnerabilities` directly.
+- The list reads `issue_links` / `issues` with raw SQL (`openIssues`). The issues lane consumes `vulnerability.detected|resurfaced|fixed`. Projects, reports, statistic, search, comments, target overview and attack-surface-query (`vulnerabilities` resource, uses `approvedVulnerabilityCondition` / `openVulnerabilityCondition`) all query `vulnerabilities` directly.
 
 ## Gotchas
 

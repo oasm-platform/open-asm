@@ -8,7 +8,8 @@ Read side of the attack surface: hosts (`assets`), their open ports (`asset_serv
 - `assets.service.ts`: `AssetsService` (~2.2k lines): list/facet queries, graph, TLS, tags, toggle, `reScan`, `createPrimaryAsset`, AI tags.
 - `url-discovery.service.ts`: `UrlDiscoveryService`: starts the `url_discovery` workflow and publishes `asset.url.discovered` when a run ends.
 - `asset-filter.ts`: filter-tree schema for the list (`compileAssetFilter`, `legacyParamsToFilter`, fields `host|port|ip|tech|url|statusCode|tlsHost|tag|project|isNew`).
-- `fresh-runs.ts`: the single definition of "new" rows (`findFreshRuns`, `freshRunSql`, `isFresh`).
+- `fresh-runs.ts`: the single definition of "new" rows (`findFreshRuns`, `freshRunSql`, `isFresh`, and for set-based queries `latestCoveringRunsCte` + `freshRunInCteSql`, used by attack-surface-query).
+- `http-response-retention.cron.ts`: `HttpResponseRetentionCron`, optional pruning of old `http_responses` (`HTTP_RESPONSE_RETENTION_DAYS`, off by default; never the response a service points at).
 - `entities/`: one file per table (see Data model). `dto/`: query/response DTOs, `graph.dto.ts`, `tls.dto.ts`.
 
 ## Public surface
@@ -33,6 +34,10 @@ Read side of the attack surface: hosts (`assets`), their open ports (`asset_serv
 - `http_responses`: many per service; "latest" = newest `createdAt` (index `IDX_http_responses_assetServiceId_createdAt`). `tls`, `tech`, `a`, `resolvers`… on the entity are **not columns**. They are ingest-only fields that `DataAdapterService` splits into `tls_certificates` (unique per response), `http_response_technologies` (unique `(httpResponseId, name, version)`), `ip_observations` (inet, partial uniques per http/asset source), `http_status_codes` (primary + redirect chain).
 - `discovered_urls`: unique `(assetServiceId, url)`; `dns_records`: unique `(assetId, recordType, value)`; `ports` (array column; its asset relation is commented out, so there is no FK to assets).
 - Cascade asymmetry: deleting a `job_histories` row **deletes** its `http_responses`, `discovered_urls` and `ports`, but only nulls `assets.jobHistoryId` / `asset_services.jobHistoryId`.
+- **Tenant columns** (migrations `AddWorkspaceScopeColumns` + `AddWorkspaceScopeConstraints`): every attack surface table (`assets`, `asset_services`, `http_responses`, `http_response_technologies`, `tls_certificates`, `http_status_codes`, `ip_observations`, `dns_records`, `discovered_urls`, `asset_services_tags`, and `vulnerabilities`) has `workspaceId uuid NOT NULL`; `asset_services` and `discovered_urls` also `targetId`. Composite FKs `(parentId, workspaceId) → parent(id, workspaceId)` (and `(…, targetId)`) make them always equal the parent's, on top of the original single-column FKs; the parents carry `UNIQUE (id, workspaceId)`. BEFORE INSERT triggers `asq_fill_scope` copy them from the parent when a writer leaves them NULL. Query indexes `(workspaceId, createdAt DESC, id DESC)` etc. are written with DESC in the migration only.
+- `asset_services.latestHttpResponseId` (FK SET NULL) points at the service's newest response, kept by `DataAdapterService.httpResponses`; `assets.lastSeenAt` / `asset_services.lastSeenAt` are bumped whenever a scan reports the host/port.
+- Search indexes declared `synchronize: false` on the entities, created in the migration only: GIN `pg_trgm` on `assets.value`, `asset_services.value`, `http_responses.title`, `discovered_urls.url`; GiST `inet_ops` on `ip_observations.ip`.
+- RLS is enabled on these tables (policies `asq_tenant` for role `asq_reader`, `asq_others` keeps every other role unchanged; the owner bypasses RLS).
 - No soft delete anywhere. There is no delete route; assets go away only with their target.
 
 ## Invariants
@@ -40,7 +45,8 @@ Read side of the attack surface: hosts (`assets`), their open ports (`asset_serv
 - Tenant scope is `asset → target.workspaceId`, and `asset_service → asset → target.workspaceId` for services. `buildBaseQuery` applies it to every list and facet; single-row methods join `target` and filter on `workspaceId`. `getAllAssetsByTargetId` and `createPrimaryAsset` take no workspace and have no callers. Add a workspace check before you wire either to a route.
 - **Ids differ by route**: `GET/PATCH assets/:id` and `service/tag/generate` take an `asset_services.id`; `POST assets/toggle` and `GET assets/:assetId/services` take an `assets.id`. The list rows are services, not hosts.
 - `PATCH assets/:id` replaces all tags of the service (delete then insert), and returns the parent `Asset`.
-- `isNew` and the "new" badges both go through `freshRunSql`: a row is new while the completed run that found it is the latest completed run of that workflow on that target.
+- `isNew` and the "new" badges both go through `freshRunSql`: a row is new while the completed run that found it is the latest completed run of that workflow on that target. `freshRunInCteSql` must keep giving the same answer (attack-surface-query e2e compares them).
+- Any new writer of these tables should set `workspaceId` (and `targetId` where present) itself; the trigger is the fallback, the composite FK the guarantee.
 - List ordering always adds `asset_service.id` as a tie-breaker. Keep it, or offset pages repeat or skip rows.
 
 ## Coupling
@@ -49,6 +55,7 @@ Read side of the attack surface: hosts (`assets`), their open ports (`asset_serv
 - Users of `AssetsService`: `TargetsService` (and `POST targets/:id/re-scan`), `AssetsDiscoveryScheduleConsumer` (`reScan`), `projects` (`ProjectAssetsService`, `ProjectsController`), `SearchService`, agents tools.
 - Writers of these tables outside the module: `DataAdapterService` (`data-adapter/`) ingests every scan result into `assets`, `asset_services`, `http_responses` and the child tables. `TargetsService.createMultipleTargets` inserts the primary/CIDR assets. `RepositorySyncService` creates GIT_ORG repository assets. `step-scope.loader.ts`, `StatisticService` and the reports read them directly.
 - `project_assets` (projects module) cascades from `assets`.
+- `attack-surface-query` reads every table here directly (compiled SQL) and imports `fresh-runs.ts`.
 
 ## Gotchas
 

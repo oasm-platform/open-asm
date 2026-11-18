@@ -62,6 +62,9 @@ export interface GitOrgTargetSettings {
 @Index('IDX_targets_workspaceId', ['workspaceId'])
 @Index('IDX_targets_integrationId', ['integrationId'])
 @Unique(['workspaceId', 'value'])
+// Target of the assets' composite FK (targetId, workspaceId): keeps every
+// asset's denormalized workspaceId equal to its target's.
+@Unique('UQ_targets_id_workspaceId', ['id', 'workspaceId'])
 export class Target extends BaseEntity {
   @ApiProperty({
     example: 'example.com',

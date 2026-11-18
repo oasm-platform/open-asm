@@ -41,6 +41,9 @@ const LEGACY_WORKSPACE_TOOLS = [
   'list_workflow_templates',
   'list_pipeline_tools',
   'inspect_pipeline_tool',
+  // Added after the move (AttackSurfaceQueryTools).
+  'describe_attack_surface',
+  'query_attack_surface',
 ];
 const LEGACY_PROJECT_ACTION_TOOLS = [
   'create_project',
@@ -84,6 +87,8 @@ const LEGACY_MCP_TOOLS = [
   'read_project_file',
   'list_workflow_templates',
   'list_pipeline_tools',
+  'describe_attack_surface',
+  'query_attack_surface',
 ];
 const LEGACY_READ_ONLY_TOOLS = [
   ...LEGACY_MCP_TOOLS,
@@ -99,6 +104,9 @@ const LEGACY_TOOL_PERMISSIONS: Record<string, string[]> = {
   list_network_ports: ['asset.read'],
   fingerprint_technologies: ['asset.read'],
   verify_tls_settings: ['asset.read'],
+  // Per-resource keys (vulnerability.read, target.read) are checked by the query engine.
+  describe_attack_surface: ['asset.read'],
+  query_attack_surface: ['asset.read'],
   discover_vulnerabilities: ['vulnerability.read'],
   investigate_vulnerability: ['vulnerability.read'],
   retrieve_targets: ['target.read'],
@@ -201,6 +209,8 @@ describe('built-in tools declared with @AgentFunction', () => {
       'display_available_tools',
       'list_active_workers',
       'review_jobs',
+      'describe_attack_surface',
+      'query_attack_surface',
       'retrieve_web_page',
       'list_tool_config_profiles',
       'list_projects',
@@ -228,6 +238,8 @@ describe('built-in tools declared with @AgentFunction', () => {
       'display_available_tools',
       'list_active_workers',
       'review_jobs',
+      'describe_attack_surface',
+      'query_attack_surface',
       'retrieve_web_page',
       'list_tool_config_profiles',
       'run_tool_connector',

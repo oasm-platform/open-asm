@@ -27,6 +27,7 @@ Ingest layer for scan results: turns a finished job's tool output into rows in t
 - `discovered_urls` (unique `(assetServiceId, url)`, `.orIgnore()`, URLs over 2048 chars dropped).
 - `vulnerabilities`, `vulnerability_sources`, `vulnerability_events`, and `project_vulnerabilities` (raw SQL upsert when the run has a `projectId`).
 - `asset_services.screenshotPath` after uploading the PNG to the `screenshot` bucket.
+- Tenant columns (see `assets/AGENTS.md`): writes `workspaceId` itself where it has it (assets and DNS facets from `getWorkspaceIdByTargetId`, services from `job.asset`, HTTP facets from `job.assetService`, vulnerabilities from the resolved workspace); the `asq_fill_scope` triggers fill the rest. `portsScanner` overwrites `value` and `lastSeenAt` on conflict; `upsertAssetsByTargetId` bumps `assets.lastSeenAt` for the whole batch; `httpResponses` points `asset_services.latestHttpResponseId` at the new response unless a later probe already landed, and bumps `lastSeenAt`.
 
 ## Invariants
 

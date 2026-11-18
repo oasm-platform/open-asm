@@ -506,8 +506,12 @@ describe('DataAdapterService', () => {
       }
 
       // No apex value in the batch → primary dnsRecords must not be touched
-      expect(mockQueryRunner.manager.set).not.toHaveBeenCalled();
-      expect(mockQueryRunner.manager.update).not.toHaveBeenCalled();
+      // The only update is the batch's lastSeenAt.
+      expect(mockQueryRunner.manager.set).not.toHaveBeenCalledWith(
+        expect.objectContaining({ dnsRecords: expect.anything() }),
+      );
+      expect(mockQueryRunner.manager.set).toHaveBeenCalledWith({ lastSeenAt: expect.any(Function) });
+      expect(mockQueryRunner.manager.update).toHaveBeenCalledTimes(1);
 
       // Returned count = number of rows actually inserted
       expect(inserted).toBe(2);
@@ -593,9 +597,12 @@ describe('DataAdapterService', () => {
 
       await service.upsertAssetsByTargetId(targetId, withoutApex);
 
-      // No apex entry in the batch → primary update must not run (no NULL clobber)
-      expect(mockQueryRunner.manager.set).not.toHaveBeenCalled();
-      expect(mockQueryRunner.manager.update).not.toHaveBeenCalled();
+      // No apex entry in the batch → primary update must not run (no NULL
+      // clobber); the only update is the batch's lastSeenAt.
+      expect(mockQueryRunner.manager.set).not.toHaveBeenCalledWith(
+        expect.objectContaining({ dnsRecords: expect.anything() }),
+      );
+      expect(mockQueryRunner.manager.update).toHaveBeenCalledTimes(1);
     });
 
     it('should merge apex dnsRecords when the primary existing dnsRecords are NULL', async () => {
@@ -735,8 +742,10 @@ describe('DataAdapterService', () => {
         dnsRecords: { A: ['9.9.9.9'] },
         target: { id: targetId },
       });
-      // Primary refresh not touched (apex absent from batch)
-      expect(mockQueryRunner.manager.set).not.toHaveBeenCalled();
+      // Primary refresh not touched (apex absent from batch); lastSeenAt only.
+      expect(mockQueryRunner.manager.set).not.toHaveBeenCalledWith(
+        expect.objectContaining({ dnsRecords: expect.anything() }),
+      );
     });
 
     it('SC-ADAPTER-REPLACE-2: replaceDnsRecords — primary dnsRecords replaced wholesale (old types removed)', async () => {
@@ -863,17 +872,19 @@ describe('DataAdapterService', () => {
 
       // Only the inserted assets, each with its own records; the skipped
       // sub0 keeps its stored json, so its facets are untouched.
+      // Each facet row carries the target's workspace (tenant scope).
+      const ws = { workspaceId: 'workspace-id' };
       expect(valuesFor(DnsRecord)).toEqual([
-        { assetId: 'a1', recordType: 'A', value: '192.0.2.1' },
-        { assetId: 'a1', recordType: 'AAAA', value: '2001:db8::1' },
-        { assetId: 'a1', recordType: 'MX', value: '10 mx.example.com' },
-        { assetId: 'a2', recordType: 'A', value: '192.0.2.2' },
+        { assetId: 'a1', recordType: 'A', value: '192.0.2.1', ...ws },
+        { assetId: 'a1', recordType: 'AAAA', value: '2001:db8::1', ...ws },
+        { assetId: 'a1', recordType: 'MX', value: '10 mx.example.com', ...ws },
+        { assetId: 'a2', recordType: 'A', value: '192.0.2.2', ...ws },
       ]);
       // ip_observations only for A/AAAA rows that are real IPs.
       expect(valuesFor(IpObservation)).toEqual([
-        { assetId: 'a1', ip: '192.0.2.1', source: 'dns_a' },
-        { assetId: 'a1', ip: '2001:db8::1', source: 'dns_aaaa' },
-        { assetId: 'a2', ip: '192.0.2.2', source: 'dns_a' },
+        { assetId: 'a1', ip: '192.0.2.1', source: 'dns_a', ...ws },
+        { assetId: 'a1', ip: '2001:db8::1', source: 'dns_aaaa', ...ws },
+        { assetId: 'a2', ip: '192.0.2.2', source: 'dns_a', ...ws },
       ]);
       // Stale facet rows of the synced assets are cleared first.
       expect(builder.delete).toHaveBeenCalledTimes(2);
@@ -1487,9 +1498,10 @@ describe('DataAdapterService', () => {
         expect.objectContaining({ port: 80, jobHistoryId: 'history-id' }),
         expect.objectContaining({ port: 443, jobHistoryId: 'history-id' }),
       ]);
+      // A re-found port refreshes its value and lastSeenAt, never its run.
       expect(qb.orUpdate).toHaveBeenCalledWith({
         conflict_target: ['assetId', 'port'],
-        overwrite: ['value'],
+        overwrite: ['value', 'lastSeenAt'],
       });
     });
 

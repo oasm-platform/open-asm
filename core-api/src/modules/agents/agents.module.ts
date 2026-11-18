@@ -1,5 +1,6 @@
 import { ArtifactsModule } from '@/modules/artifacts/artifacts.module';
 import { AssetsModule } from '@/modules/assets/assets.module';
+import { AttackSurfaceQueryModule } from '@/modules/attack-surface-query/attack-surface-query.module';
 import { ConnectorsModule } from '@/modules/connectors/connectors.module';
 import { Project } from '@/modules/projects/entities/project.entity';
 import { ProjectsModule } from '@/modules/projects/projects.module';
@@ -74,6 +75,7 @@ export const AGENT_FUNCTION_HOSTS = [
       Project,
     ]),
     AssetsModule,
+    AttackSurfaceQueryModule,
     ArtifactsModule,
     TargetsModule,
     forwardRef(() => VulnerabilitiesModule),

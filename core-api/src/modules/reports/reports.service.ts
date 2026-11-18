@@ -13,6 +13,9 @@ import type { VulnerabilityReportData } from './types/vulnerability-report-data.
 import { VulnerabilityReportService } from './services/vulnerability-report.service';
 import { SummaryReportService } from './services/summary-report.service';
 import { renderReportPdf } from './renderer/pdf-renderer';
+import { AsqSavedQueriesService } from '@/modules/attack-surface-query/asq-saved-queries.service';
+import type { QueryBatchResult, QueryScope } from '@/modules/attack-surface-query/domain/query.types';
+import { toReportTables } from './services/query-report';
 
 @Injectable()
 export class ReportsService {
@@ -25,6 +28,7 @@ export class ReportsService {
     private readonly storageService: StorageService,
     private readonly vulnerabilityReportService: VulnerabilityReportService,
     private readonly summaryReportService: SummaryReportService,
+    private readonly savedQueries: AsqSavedQueriesService,
   ) {
     this.logoPath = path.join(process.cwd(), 'public', 'images', 'logo.png');
     this.loadLogo();
@@ -151,6 +155,43 @@ export class ReportsService {
       fileName,
     });
 
+    return { filePath: uploadPath, fileName };
+  }
+
+  /**
+   * Renders a saved attack surface query as a PDF report (one table per
+   * query) and stores it like the other reports. The query runs with the
+   * caller's permissions, in one consistent snapshot.
+   */
+  async generateQueryReport(
+    scope: QueryScope,
+    userId: string,
+    savedQueryId: string,
+  ): Promise<{ filePath: string; fileName: string }> {
+    const saved = await this.savedQueries.get(scope.workspaceId, savedQueryId);
+    const spec = saved.spec as { options?: Record<string, unknown> };
+    const result = (await this.savedQueries.runSpec(scope, {
+      ...spec,
+      options: { ...(spec.options ?? {}), consistent: true, mode: 'interactive' },
+    })) as QueryBatchResult;
+
+    const pdfBuffer = await renderReportPdf('QUERY', {
+      title: saved.name,
+      description: saved.description,
+      generatedAt: new Date().toISOString(),
+      tables: toReportTables(result),
+      logoBase64: this.logoBase64 ?? undefined,
+    });
+
+    const fileName = `report-query-${generateToken(24)}-${Date.now()}.pdf`;
+    const { path: uploadPath } = await this.storageService.uploadFile(fileName, pdfBuffer, 'reports');
+    await this.reportRepo.save({
+      workspace: { id: scope.workspaceId },
+      user: { id: userId },
+      type: 'QUERY',
+      path: uploadPath,
+      fileName,
+    });
     return { filePath: uploadPath, fileName };
   }
 

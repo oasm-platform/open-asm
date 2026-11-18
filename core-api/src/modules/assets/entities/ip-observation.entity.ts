@@ -3,6 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
   Entity,
+  ForeignKey,
   Index,
   JoinColumn,
   ManyToOne,
@@ -29,7 +30,25 @@ export type IpObservationSource =
 })
 @Index('IDX_ip_observations_ip', ['ip'])
 @Index('IDX_ip_observations_assetServiceId', ['assetServiceId'])
+// Tenant scope (attack-surface-query): workspaceId equals its parent's. A row
+// has an asset (DNS) or a response (HTTP); MATCH SIMPLE checks the one set.
+@ForeignKey(() => Asset, ['assetId', 'workspaceId'], ['id', 'workspaceId'], {
+  name: 'FK_ip_observations_asset_workspace',
+  onDelete: 'CASCADE',
+})
+@ForeignKey(() => HttpResponse, ['httpResponseId', 'workspaceId'], ['id', 'workspaceId'], {
+  name: 'FK_ip_observations_response_workspace',
+  onDelete: 'CASCADE',
+})
+@Index('IDX_ip_observations_workspace_ip', ['workspaceId', 'ip'])
+@Index('IDX_ip_observations_workspace_createdAt', ['workspaceId', 'createdAt', 'id'])
+// GiST inet_ops for subnet containment over many CIDRs (migration only).
+@Index('IDX_ip_observations_ip_gist', { synchronize: false })
 export class IpObservation extends BaseEntity {
+  /** The parent's workspace (denormalized, see Asset.workspaceId). */
+  @Column({ type: 'uuid' })
+  workspaceId: string;
+
   @ApiProperty({ required: false })
   @Column({ type: 'uuid', nullable: true })
   httpResponseId?: string;

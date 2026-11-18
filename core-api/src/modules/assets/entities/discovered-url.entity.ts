@@ -5,6 +5,7 @@ import { IsString } from 'class-validator';
 import {
   Column,
   Entity,
+  ForeignKey,
   Index,
   JoinColumn,
   ManyToOne,
@@ -16,7 +17,26 @@ import { AssetService } from './asset-services.entity';
 @Entity('discovered_urls')
 @Unique('UQ_discovered_urls_service_url', ['assetServiceId', 'url'])
 @Index('IDX_discovered_urls_service_createdAt', ['assetServiceId', 'createdAt'])
+// Tenant scope (attack-surface-query): workspaceId and targetId equal the service's.
+@ForeignKey(() => AssetService, ['assetServiceId', 'workspaceId'], ['id', 'workspaceId'], {
+  name: 'FK_discovered_urls_service_workspace',
+  onDelete: 'CASCADE',
+})
+@ForeignKey(() => AssetService, ['assetServiceId', 'targetId'], ['id', 'targetId'], {
+  name: 'FK_discovered_urls_service_target',
+  onDelete: 'CASCADE',
+})
+@Index('IDX_discovered_urls_workspace_createdAt', ['workspaceId', 'createdAt', 'id'])
+@Index('IDX_discovered_urls_url_trgm', { synchronize: false })
 export class DiscoveredUrl extends BaseEntity {
+  /** The service's workspace (denormalized, see Asset.workspaceId). */
+  @Column({ type: 'uuid' })
+  workspaceId: string;
+
+  /** The service's target (denormalized for "new" rows). */
+  @Column({ type: 'uuid' })
+  targetId: string;
+
   @ApiProperty()
   @IsString()
   @Column({ type: 'varchar' })

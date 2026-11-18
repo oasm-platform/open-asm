@@ -20,6 +20,7 @@ import {
   type AgentFunctionEntry,
 } from './tools/agent-function';
 import { ArtifactTools } from './tools/artifact.tools';
+import { AttackSurfaceQueryTools } from './tools/attack-surface-query.tools';
 import { ConnectorTools } from './tools/connector.tools';
 import { deniedMessage, stableStringify } from './tools/helpers';
 import { MemoryTools } from './tools/memory.tools';
@@ -42,6 +43,7 @@ import { WorkspaceTools } from './tools/workspace.tools';
  */
 export const BUILTIN_TOOL_CLASSES: readonly Type[] = [
   WorkspaceTools,
+  AttackSurfaceQueryTools,
   WebFetchTools,
   ConnectorTools,
   ProjectTools,

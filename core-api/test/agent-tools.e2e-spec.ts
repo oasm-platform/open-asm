@@ -70,7 +70,8 @@ describe('Agent tools in the running app', () => {
       agentTool.getTools(workspaceId, userId, AgentMode.AGENT, undefined, 'c1'),
     );
 
-    expect(ask).toHaveLength(25);
+    // 25 + describe_attack_surface, query_attack_surface.
+    expect(ask).toHaveLength(27);
     expect(agent).toEqual(
       expect.arrayContaining([
         ...ask,

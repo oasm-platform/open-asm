@@ -58,7 +58,7 @@ Third-party apps connected to a workspace (notification, ticketing, cloud-provid
 
 - `IntegrationsService` ↔ `IntegrationSyncService` form a cycle inside the module (`forwardRef` + `WrapperType` on both sides).
 - Uses global providers without importing their modules: `TargetsService` (`TargetsModule` is `@Global`), `DataAdapterService`, `WorkspacesService`, `WorkspaceEncryptionService`, `EventBridgeService`. Cloud connectors receive `targetsService` / `dataAdapterService` through `CloudProviderSyncConfig` (type-only imports, no DI).
-- Writes other modules' tables directly: `RepositorySyncService` writes `assets` and `targets.lastDiscoveredAt` through its own repositories (`Target` and `Asset` are registered in `forFeature`).
+- Writes other modules' tables directly: `RepositorySyncService` writes `assets` (with the target's `workspaceId`) and `targets.lastDiscoveredAt` through its own repositories (`Target` and `Asset` are registered in `forFeature`).
 - Imported by `event-bridge` (the integrations sink calls `getIntegrationEntitiesByCapability`, `runConnector` and `decryptSensitiveConfigFields` to push notifications and tickets) and by `jobs-registry` (`getIntegrationWithDecryptedConfig` to put the repository `apiToken` into connector inputs).
 - `targets.service.ts` imports `hasCapability`, `sourceCodeHost` and the `Integration` entity to validate GIT_ORG targets. `auth/entities/user.entity.ts` references `TelegramConnect`.
 - `projects/dto/cron-schedule.validator` provides `@IsCronSchedule` for the DTOs.

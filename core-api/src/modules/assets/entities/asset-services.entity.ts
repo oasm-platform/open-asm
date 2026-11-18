@@ -6,6 +6,7 @@ import { IsOptional } from 'class-validator';
 import {
   Column,
   Entity,
+  ForeignKey,
   Index,
   JoinColumn,
   ManyToOne,
@@ -22,10 +23,52 @@ import { HttpResponse } from './http-response.entity';
 @Unique(['assetId', 'port'])
 @Index(['createdAt'])
 @Index('IDX_asset_services_jobHistoryId', ['jobHistoryId'])
+// Tenant scope (attack-surface-query): workspaceId and targetId always equal
+// the host's (composite FKs); children reference (id, workspaceId).
+@Unique('UQ_asset_services_id_workspaceId', ['id', 'workspaceId'])
+@Unique('UQ_asset_services_id_targetId', ['id', 'targetId'])
+@ForeignKey(() => Asset, ['assetId', 'workspaceId'], ['id', 'workspaceId'], {
+  name: 'FK_asset_services_asset_workspace',
+  onDelete: 'CASCADE',
+})
+@ForeignKey(() => Asset, ['assetId', 'targetId'], ['id', 'targetId'], {
+  name: 'FK_asset_services_asset_target',
+  onDelete: 'CASCADE',
+})
+// DESC in the migration (TypeORM cannot express a column direction).
+@Index('IDX_asset_services_workspace_createdAt', ['workspaceId', 'createdAt', 'id'])
+@Index('IDX_asset_services_workspace_lastSeenAt', ['workspaceId', 'lastSeenAt', 'id'])
+@Index('IDX_asset_services_workspace_port', ['workspaceId', 'port', 'id'])
+@Index('IDX_asset_services_latestHttpResponseId', ['latestHttpResponseId'])
+@Index('IDX_asset_services_value_trgm', { synchronize: false })
 export class AssetService extends BaseEntity {
   @ApiProperty()
   @Column()
   value: string;
+
+  /** The host's workspace (denormalized, see Asset.workspaceId). */
+  @Column({ type: 'uuid' })
+  workspaceId: string;
+
+  /** The host's target (denormalized: "new" rows and target filters without a join). */
+  @Column({ type: 'uuid' })
+  targetId: string;
+
+  /**
+   * The newest HTTP response of the service, kept by DataAdapterService on
+   * every probe. Lets the current HTTP/TLS/tech state be joined by key
+   * instead of "latest per service" lookups.
+   */
+  @Column({ type: 'uuid', nullable: true })
+  latestHttpResponseId?: string | null;
+
+  @ManyToOne(() => HttpResponse, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'latestHttpResponseId' })
+  latestHttpResponse?: Relation<HttpResponse>;
+
+  /** When a port scan or probe last reported the port. */
+  @Column({ type: 'timestamptz', nullable: true })
+  lastSeenAt?: Date | null;
 
   @ApiProperty()
   @Index()

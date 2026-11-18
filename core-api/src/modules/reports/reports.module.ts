@@ -11,11 +11,13 @@ import { AssetService } from '@/modules/assets/entities/asset-services.entity';
 import { AssetTag } from '@/modules/assets/entities/asset-tags.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { StatisticModule } from '@/modules/statistic/statistic.module';
+import { AttackSurfaceQueryModule } from '@/modules/attack-surface-query/attack-surface-query.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Report, Vulnerability, Target, AssetService, AssetTag, Workspace]),
     StatisticModule,
+    AttackSurfaceQueryModule,
   ],
   controllers: [ReportsController],
   providers: [ReportsService, VulnerabilityReportService, SummaryReportService],

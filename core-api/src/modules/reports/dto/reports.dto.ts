@@ -1,6 +1,6 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsOptional, IsString, IsEnum } from 'class-validator';
+import { IsArray, IsOptional, IsString, IsEnum, IsUUID } from 'class-validator';
 
 const ReportType = {
   SUMMARY: 'SUMMARY',
@@ -66,6 +66,12 @@ export class GenerateSummaryReportBodyDto {
   @IsArray()
   @IsString({ each: true })
   targetIds?: string[];
+}
+
+export class GenerateQueryReportBodyDto {
+  @ApiProperty({ description: 'Saved attack surface query to render' })
+  @IsUUID()
+  savedQueryId: string;
 }
 
 export class GenerateVulReportBodyDto {

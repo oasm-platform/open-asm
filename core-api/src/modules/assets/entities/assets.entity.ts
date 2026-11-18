@@ -8,6 +8,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
   Entity,
+  ForeignKey,
   Index,
   JoinColumn,
   ManyToOne,
@@ -23,6 +24,18 @@ import { DnsRecord } from './dns-record.entity';
 @Index('IDX_assets_targetId', ['targetId'])
 @Index('IDX_assets_targetId_isEnabled', ['targetId', 'isEnabled'])
 @Index('IDX_assets_jobHistoryId', ['jobHistoryId'])
+// Tenant scope (attack-surface-query): workspaceId always equals the
+// target's, enforced by the composite FK; children reference (id, workspaceId).
+@Unique('UQ_assets_id_workspaceId', ['id', 'workspaceId'])
+@Unique('UQ_assets_id_targetId', ['id', 'targetId'])
+@ForeignKey(() => Target, ['targetId', 'workspaceId'], ['id', 'workspaceId'], {
+  name: 'FK_assets_target_workspace',
+  onDelete: 'CASCADE',
+})
+// DESC in the migration (TypeORM cannot express a column direction).
+@Index('IDX_assets_workspace_createdAt', ['workspaceId', 'createdAt', 'id'])
+@Index('IDX_assets_workspace_lastSeenAt', ['workspaceId', 'lastSeenAt', 'id'])
+@Index('IDX_assets_value_trgm', { synchronize: false })
 export class Asset extends BaseEntity {
   @ApiProperty()
   @Column()
@@ -31,6 +44,17 @@ export class Asset extends BaseEntity {
   @ApiProperty()
   @Column({ type: 'varchar', nullable: true })
   targetId: string;
+
+  /**
+   * The target's workspace, denormalized for tenant-scoped queries. Filled by
+   * the writers, or by the `asq_fill_scope` trigger when a writer omits it.
+   */
+  @Column({ type: 'uuid' })
+  workspaceId: string;
+
+  /** When a scan last reported the host (NULL: never since tracking began). */
+  @Column({ type: 'timestamptz', nullable: true })
+  lastSeenAt?: Date | null;
 
   // Relationships
   @ManyToOne(() => Target, (target) => target.assets, {
