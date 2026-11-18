@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AssetsModule } from '../assets/assets.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -14,7 +14,7 @@ import { StatisticService } from './statistic.service';
   imports: [
     TargetsModule,
     AssetsModule,
-    forwardRef(() => VulnerabilitiesModule),
+    VulnerabilitiesModule,
     TypeOrmModule.forFeature([Statistic, Workspace]),
     NotificationsModule,
   ],

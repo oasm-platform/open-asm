@@ -37,8 +37,8 @@ All routes are `GET`, `@WorkspaceAccess('workspace.read')`, workspace from the `
 ## Coupling
 
 - `StatisticService` injects `DataSource`, `GeoIpService`, `RedisService`, `WorkspacesService`, `EventBridgeService`, `TechnologyForwarderService` (global `TechnologyModule`). It queries `targets`, `assets`, `asset_services`, `asset_tags`, `vulnerabilities`, `tls_certificates` and more directly; it does not call those modules' services.
-- The module imports `TargetsModule`, `AssetsModule`, `forwardRef(() => VulnerabilitiesModule)` and `NotificationsModule`, although the service injects nothing from them. Cycle: `StatisticModule` → `VulnerabilitiesModule` → `forwardRef(AgentsModule)` → `forwardRef(StatisticModule)`. Keep the `forwardRef`s.
-- Imported by `reports` (report data and score), `search` (`getTotalAssets`, `getTotalTargets`) and `agents` (`forwardRef`).
+- The module imports `TargetsModule`, `AssetsModule`, `VulnerabilitiesModule` and `NotificationsModule`, although the service injects nothing from them. The old Statistic → Vulnerabilities → Agents → Statistic cycle is gone (vulnerabilities no longer imports agents), so there is no `forwardRef`.
+- Imported by `reports` (report data and score), `search` (`getTotalAssets`, `getTotalTargets`) and `agents`.
 - Notifications about discovery runs are produced downstream from `workflow.run.completed`, not here.
 
 ## Testing

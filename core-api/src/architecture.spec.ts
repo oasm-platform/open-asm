@@ -150,17 +150,12 @@ const GLOBAL_MODULES = [
 
 /** `forwardRef(` per file: each one is a dependency cycle being papered over. */
 const FORWARD_REFS = [
-  'modules/agents/agents.module.ts: 2',
   'modules/agents/tools/connector.tools.ts: 1',
   'modules/agents/tools/project-build.tools.ts: 1',
-  'modules/agents/tools/vulnerability-proposal.tool.ts: 1',
-  'modules/agents/tools/workspace.tools.ts: 5',
+  'modules/agents/tools/workspace.tools.ts: 3',
   'modules/jobs-registry/jobs-registry.service.ts: 1',
-  'modules/statistic/statistic.module.ts: 1',
   'modules/tools/tools.module.ts: 1',
   'modules/tools/tools.service.ts: 1',
-  'modules/vulnerabilities/vulnerabilities.module.ts: 1',
-  'modules/vulnerabilities/vulnerabilities.service.ts: 1',
   'modules/workers/remote-execute-subscribe.service.ts: 1',
   'modules/workers/workers.module.ts: 1',
   'modules/workers/workers.service.ts: 2',

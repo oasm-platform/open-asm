@@ -5,7 +5,7 @@ import * as yaml from 'js-yaml';
 import type { Queue } from 'bullmq';
 import type { DataSource, Repository } from 'typeorm';
 import { TargetType } from '@/common/enums/enum';
-import type { AgentsCompletionsService } from '../agents/agents.completions';
+import type { VulnerabilityAnalyzerRegistry } from './vulnerability-analyzer';
 import type { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import type { WorkflowRunnerService } from '../jobs-registry/workflow-runner.service';
 import type { NotificationsService } from '../notifications/notifications.service';
@@ -45,7 +45,7 @@ describe('VulnerabilitiesService', () => {
       mockJobRegistryService as unknown as JobsRegistryService,
       mockToolsService as unknown as ToolsService,
       { workflowRepository: mockWorkflowRepository } as unknown as WorkflowsService,
-      {} as AgentsCompletionsService,
+      {} as VulnerabilityAnalyzerRegistry,
       {} as NotificationsService,
       mockTargetRepository as unknown as Repository<Target>,
       mockWorkflowRunnerService as unknown as WorkflowRunnerService,

@@ -1,8 +1,7 @@
 import { BullMQName } from '@/common/enums/enum';
 import { BullModule } from '@nestjs/bullmq';
-import { Global, Module, forwardRef } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AgentsModule } from '../agents/agents.module';
 import { Asset } from '../assets/entities/assets.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { Target } from '../targets/entities/target.entity';
@@ -16,6 +15,7 @@ import { VulnerabilitiesService } from './vulnerabilities.service';
 import { VulnerabilityLifecycleService } from './vulnerability-lifecycle.service';
 import { VulnerabilityReviewService } from './vulnerability-review.service';
 import { VulnerabilityRiskExpiryCron } from './vulnerability-risk-expiry.cron';
+import { VulnerabilityAnalyzerRegistry } from './vulnerability-analyzer';
 
 @Global()
 @Module({
@@ -28,7 +28,6 @@ import { VulnerabilityRiskExpiryCron } from './vulnerability-risk-expiry.cron';
       VulnerabilitySource,
       Target,
     ]),
-    forwardRef(() => AgentsModule),
     NotificationsModule,
     BullModule.registerQueue({
       name: BullMQName.VULNERABILITY_ANALYSIS,
@@ -45,9 +44,11 @@ import { VulnerabilityRiskExpiryCron } from './vulnerability-risk-expiry.cron';
     VulnerabilityLifecycleService,
     VulnerabilityReviewService,
     VulnerabilityRiskExpiryCron,
+    VulnerabilityAnalyzerRegistry,
   ],
   exports: [
     VulnerabilitiesService,
+    VulnerabilityAnalyzerRegistry,
     VulnerabilityLifecycleService,
     VulnerabilityReviewService,
   ],

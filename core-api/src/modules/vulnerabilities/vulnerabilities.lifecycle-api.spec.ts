@@ -7,7 +7,7 @@ import {
   VulnerabilityAnalyzeStatus,
   VulnerabilityDiscoveredBy,
 } from '@/common/enums/enum';
-import type { AgentsCompletionsService } from '../agents/agents.completions';
+import type { VulnerabilityAnalyzerRegistry } from './vulnerability-analyzer';
 import type { User } from '../auth/entities/user.entity';
 import type { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import type { WorkflowRunnerService } from '../jobs-registry/workflow-runner.service';
@@ -76,7 +76,7 @@ function setup() {
     {} as JobsRegistryService,
     {} as ToolsService,
     {} as WorkflowsService,
-    {} as AgentsCompletionsService,
+    {} as VulnerabilityAnalyzerRegistry,
     {} as NotificationsService,
     {} as Repository<Target>,
     {} as WorkflowRunnerService,

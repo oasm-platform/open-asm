@@ -100,13 +100,11 @@ export function describeConfigFields(
 export class WorkspaceTools {
   constructor(
     readonly assetsService: AssetsService,
-    @Inject(forwardRef(() => VulnerabilitiesService))
-    readonly vulnerabilitiesService: WrapperType<VulnerabilitiesService>,
+    readonly vulnerabilitiesService: VulnerabilitiesService,
     readonly projectResultsService: ProjectResultsService,
     readonly targetsService: TargetsService,
     readonly statisticService: StatisticService,
-    @Inject(forwardRef(() => IssuesService))
-    readonly issuesService: WrapperType<IssuesService>,
+    readonly issuesService: IssuesService,
     @Inject(forwardRef(() => ToolsService))
     readonly toolsService: WrapperType<ToolsService>,
     readonly connectorRegistry: ConnectorRegistryService,

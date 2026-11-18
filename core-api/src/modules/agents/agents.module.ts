@@ -9,7 +9,7 @@ import { TemplatesModule } from '@/modules/templates/templates.module';
 import { VulnerabilitiesModule } from '@/modules/vulnerabilities/vulnerabilities.module';
 import { RemoteExecuteModule } from '@/modules/remote-execute/remote-execute.module';
 import { WorkersModule } from '@/modules/workers/workers.module';
-import { Global, Module, forwardRef, type OnModuleInit } from '@nestjs/common';
+import { Global, Module, type OnModuleInit } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentsCompletionsService } from './agents.completions';
 import { AgentsController } from './agents.controller';
@@ -43,6 +43,7 @@ import { AgentToolRule } from './entities/agent-tool-rule.entity';
 import { AgentsGuardService } from './agents.guard';
 import { AgentWorkflowNote } from './entities/agent-workflow-note.entity';
 import { HttpModule } from '@nestjs/axios';
+import { VulnerabilityAnalyzerAdapter } from './vulnerability-analyzer.adapter';
 
 /** Every class with @AgentFunction methods: their names must not collide. */
 export const AGENT_FUNCTION_HOSTS = [
@@ -76,9 +77,8 @@ export const AGENT_FUNCTION_HOSTS = [
     AssetsModule,
     ArtifactsModule,
     TargetsModule,
-    forwardRef(() => VulnerabilitiesModule),
-    // Statistic → Vulnerabilities → Agents → Statistic is an import cycle.
-    forwardRef(() => StatisticModule),
+    VulnerabilitiesModule,
+    StatisticModule,
     RemoteExecuteModule,
     HttpModule,
     WorkersModule,
@@ -103,6 +103,7 @@ export const AGENT_FUNCTION_HOSTS = [
     AgentsDefinitionsService,
     AgentsStreamBufferService,
     AgentsUsageService,
+    VulnerabilityAnalyzerAdapter,
     ...AGENT_TOOL_CLASSES,
   ],
   exports: [

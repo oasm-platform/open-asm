@@ -1,4 +1,3 @@
-import type { WrapperType } from '@/common/types/app.types';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import {
   type GetManyBaseResponseDto,
@@ -21,16 +20,10 @@ import {
 } from '@/common/enums/enum';
 import { getManyResponse } from '@/common/utils/get-many-response.util';
 import { InjectQueue } from '@nestjs/bullmq';
-import {
-  Inject,
-  forwardRef,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
 import { DataSource, In, Repository } from 'typeorm';
-import { AgentsCompletionsService } from '../agents/agents.completions';
 import { User } from '../auth/entities/user.entity';
 import { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import { WorkflowRunnerService } from '../jobs-registry/workflow-runner.service';
@@ -39,6 +32,7 @@ import { Target } from '../targets/entities/target.entity';
 import { ToolsService } from '../tools/tools.service';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { normalizeInput, orderedJobEntries } from '../workflows/workflow-graph';
+import { VulnerabilityAnalyzerRegistry } from './vulnerability-analyzer';
 import type {
   GetVulnerabilitiesStatisticsQueryDto,
   GetVulnerabilitiesStatisticsResponseDto,
@@ -137,9 +131,8 @@ export class VulnerabilitiesService {
     private jobRegistryService: JobsRegistryService,
     private toolsService: ToolsService,
     private workflowService: WorkflowsService,
-    // agents ↔ vulnerabilities import each other (tools ↔ analysis).
-    @Inject(forwardRef(() => AgentsCompletionsService))
-    private agentsCompletionsService: WrapperType<AgentsCompletionsService>,
+    // The agents module registers the analyzer (no import of agents here)
+    private analyzers: VulnerabilityAnalyzerRegistry,
     private notificationsService: NotificationsService,
     @InjectRepository(Target)
     private targetRepository: Repository<Target>,
@@ -1166,7 +1159,7 @@ export class VulnerabilitiesService {
         null,
         2,
       );
-      const analyzeResult = await this.agentsCompletionsService.vulAnalyze(
+      const analyzeResult = await this.analyzers.get().analyze(
         vulnerabilityJson,
         workspaceId,
         userId,

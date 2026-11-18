@@ -55,7 +55,7 @@ Findings on assets: list/detail/statistics, the lifecycle (new → active → fi
 
 ## Coupling
 
-- `forwardRef` cycle with `AgentsModule`: `VulnerabilitiesService` → `AgentsCompletionsService.vulAnalyze` (analysis); agents → `VulnerabilityReviewService` (`propose_vulnerability`). `VulnerabilityReviewService` injects the global `RedisService` and reads the agents' tool-output keys (`toolOutputKey`).
+- No import of `AgentsModule`: AI analysis runs through `VulnerabilityAnalyzerRegistry` (`vulnerability-analyzer.ts`, exported), in which the agents module's `VulnerabilityAnalyzerAdapter` registers itself on init (`get()` throws if nothing registered). Agents depends on this module: `VulnerabilityReviewService` (`propose_vulnerability`) and `VulnerabilitiesService`. `VulnerabilityReviewService` injects the global `RedisService` and reads the agents' tool-output keys (`toolOutputKey`).
 - Imports `NotificationsModule`. Uses global `JobsRegistryService`, `WorkflowRunnerService`, `WorkflowsService`, `ToolsService`, `EventBridgeService`. Registers `Asset` and `Target` repositories itself.
 - `scan` runs the first job of `vulnerability_scan_basic.yaml` (nuclei) for host targets, and the whole `repository_scan.yaml` for GIT_ORG targets. Both workflows must exist in the workspace, or the call returns 404.
 - Writers outside: `DataAdapterService` inserts and upserts findings, `vulnerability_events` (`DETECTED`) and `vulnerability_sources`, and publishes `vulnerability.detected` / `vulnerability.resurfaced`.
