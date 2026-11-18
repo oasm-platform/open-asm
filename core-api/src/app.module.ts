@@ -10,6 +10,7 @@ import {
   QueryResolver,
 } from 'nestjs-i18n';
 import * as path from 'path';
+import { validateEnv } from './common/config/env.schema';
 import { icuFormatter } from './common/utils/icu-formatter.util';
 import { DatabaseModule } from './database/database.module';
 import { AuditModule } from './modules/audit/audit.module';
@@ -25,6 +26,7 @@ import { EventBridgeModule } from './modules/event-bridge/event-bridge.module';
     ConfigModule.forRoot({
       envFilePath: '.env',
       isGlobal: true,
+      validate: validateEnv,
     }),
     EventEmitterModule.forRoot({ wildcard: true }),
     ScheduleModule.forRoot(),
