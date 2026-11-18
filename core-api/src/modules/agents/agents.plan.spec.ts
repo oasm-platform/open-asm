@@ -8,6 +8,7 @@ import {
   type PlanningState,
   withStepResults,
 } from './agents.completions';
+import { ConversationTitleService } from './conversation-title.service';
 import { SUBAGENT_MAX_ROUNDS_PER_TURN } from './agents.subagents';
 import { formatTodosToPrompt, type AgentTodoItem } from './agents.todo';
 import type { AgentTool } from './agents.tools';
@@ -1376,11 +1377,11 @@ describe('planning state', () => {
   });
 });
 
-describe('generateGoal', () => {
+describe('ConversationTitleService.generateGoal', () => {
   const makeService = (overrides: Record<string, unknown> = {}) => {
-    const service: any = Object.create(AgentsCompletionsService.prototype);
+    const service: any = Object.create(ConversationTitleService.prototype);
     service.goaling = new Set<string>();
-    service.getPrompt = jest.fn(() => 'prompt');
+    service.prompts = { render: jest.fn(() => 'prompt') };
     service.llmConfigs = { createLanguageModel: jest.fn(() => Promise.resolve({})) };
     service.completeText = jest.fn(() =>
       Promise.resolve(
@@ -1414,6 +1415,11 @@ describe('generateGoal', () => {
   };
 
   const llmConfig = { workspaceId: 'w1', provider: 'openai' } as never;
+  // What the completions service passes: stream the plan with the new goal
+  const emitTodos = (emitter: EventEmitter) => (goal: string) => {
+    emitter.emit('todos-updated', [], goal);
+    return Promise.resolve();
+  };
 
   it('streams a one-line goal and pins it on the conversation', async () => {
     const { service, meta } = makeService();
@@ -1421,7 +1427,7 @@ describe('generateGoal', () => {
     const emitted = jest.fn();
     emitter.on('todos-updated', emitted);
 
-    await service.generateGoal('c1', llmConfig, 'scan example.com', emitter);
+    await service.generateGoal('c1', llmConfig, 'scan example.com', emitTodos(emitter));
 
     // First line, surrounding quotes stripped
     expect(emitted).toHaveBeenCalledWith(
@@ -1444,7 +1450,7 @@ describe('generateGoal', () => {
     const emitted = jest.fn();
     emitter.on('todos-updated', emitted);
 
-    await service.generateGoal('c1', llmConfig, 'scan example.com', emitter);
+    await service.generateGoal('c1', llmConfig, 'scan example.com', emitTodos(emitter));
 
     expect(emitted).not.toHaveBeenCalled();
     expect(meta()).toBeNull();

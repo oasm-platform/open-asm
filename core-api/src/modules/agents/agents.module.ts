@@ -1,3 +1,4 @@
+import { ConversationTitleService } from './conversation-title.service';
 import { LlmConfigResolver } from './llm-config.resolver';
 import { ActiveRunRegistry } from './active-run.registry';
 import { ArtifactsModule } from '@/modules/artifacts/artifacts.module';
@@ -99,6 +100,7 @@ export const AGENT_FUNCTION_HOSTS = [
     AgentsCompletionsService,
     ActiveRunRegistry,
     LlmConfigResolver,
+    ConversationTitleService,
     AgentTool,
     AgentsGuardService,
     AgentsMcpService,

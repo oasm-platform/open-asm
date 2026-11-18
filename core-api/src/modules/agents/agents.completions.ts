@@ -1,5 +1,6 @@
 import { ActiveRunRegistry } from './active-run.registry';
 import { LlmConfigResolver } from './llm-config.resolver';
+import { ConversationTitleService } from './conversation-title.service';
 import {
   Injectable,
   Logger,
@@ -56,8 +57,7 @@ import { AgentConversation } from './entities/agent-conversation.entity';
 import { AgentConversationTodo } from './entities/agent-conversation-todo.entity';
 import { AgentMessage } from './entities/agent-message.entity';
 import { AgentMessageToolCall } from './entities/tool-call.entity';
-import { LLMProvider, MessageRole, MessageType } from './enums/agent.enums';
-import { getReasoningProviderOptions } from './llm-provider-supported';
+import { MessageRole, MessageType } from './enums/agent.enums';
 import { ContextBudgetManager } from './shared/context-budget-manager';
 import {
   type ConversationMetadata,
@@ -383,10 +383,6 @@ export class AgentsCompletionsService {
     return aborted || cancelled > 0;
   }
 
-  /** Conversations whose title is being generated */
-  private readonly titling = new Set<string>();
-  /** Conversations whose goal is being generated */
-  private readonly goaling = new Set<string>();
   /** Compaction in progress by conversation id: a second trigger joins it */
   private readonly compactions = new Map<string, Promise<void>>();
 
@@ -422,155 +418,11 @@ export class AgentsCompletionsService {
     private readonly subagents: AgentsSubagentsService,
     private readonly activeRuns: ActiveRunRegistry,
     private readonly llmConfigs: LlmConfigResolver,
+    private readonly titles: ConversationTitleService,
   ) {}
 
   private getPrompt(fileName: string, data?: Record<string, unknown>): string {
     return this.prompts.render(fileName, data);
-  }
-
-  /**
-   * One-shot text completion for background helpers (title, summary, vuln
-   * analysis). Uses streamText, not generateText: some OpenAI-compatible
-   * providers answer a non-streaming request with an SSE-framed body that
-   * generateText cannot parse (see the custom-provider note).
-   */
-  private async completeText(
-    model: LanguageModel,
-    prompt: string,
-    provider?: LLMProvider,
-  ): Promise<string> {
-    const options = provider
-      ? getReasoningProviderOptions(provider)
-      : undefined;
-    const result = streamText({
-      model,
-      messages: [{ role: 'user', content: prompt }],
-      maxRetries: 2,
-      ...(options ? { providerOptions: options } : {}),
-    });
-    return (await result.text).trim();
-  }
-
-  /**
-   * Titles the conversation once, while its title is still the placeholder
-   * (the first question) set at creation. A titled or renamed conversation
-   * keeps its title, so later turns and iterations cost no LLM call.
-   */
-  private async generateTitle(
-    conversationId: string,
-    llmConfig: ResolvedLLMConfig,
-  ): Promise<void> {
-    // Iterations of one run finish before the title is written
-    if (this.titling.has(conversationId)) return;
-    this.titling.add(conversationId);
-    try {
-      const [conversation, messages] = await Promise.all([
-        this.conversationRepository.findOne({
-          where: { id: conversationId },
-          select: ['id', 'title'],
-        }),
-        this.messageRepository.find({
-          where: { conversationId },
-          order: { createdAt: 'ASC' },
-          take: 2,
-          select: ['id', 'role', 'content'],
-        }),
-      ]);
-
-      if (messages.length < 2) {
-        return;
-      }
-      const question = messages.find((m) => m.role === MessageRole.USER);
-      if (!question || conversation?.title !== question.content.slice(0, 500)) {
-        return;
-      }
-
-      const conversationContent = messages
-        .map((msg) => `${msg.role}: ${msg.content}`)
-        .join('\n\n');
-
-      const prompt = this.getPrompt('TITLE_GENERATE.md', {
-        CONVERSATION_CONTENT: conversationContent,
-      });
-
-      const model = await this.llmConfigs.createLanguageModel(
-        llmConfig,
-        llmConfig.workspaceId,
-      );
-
-      const titleText = await this.completeText(
-        model,
-        prompt,
-        llmConfig.provider,
-      );
-
-      const title = titleText.trim().slice(0, 500);
-
-      if (title) {
-        await this.conversationRepository.update(
-          { id: conversationId },
-          { title },
-        );
-      }
-    } catch (error) {
-      this.logger.error('Failed to generate title', error);
-    } finally {
-      this.titling.delete(conversationId);
-    }
-  }
-
-  /**
-   * Generates the goal of an Agent-mode turn from the user's question and
-   * streams it to the client right away (like the title), so the pinned goal
-   * appears before the agent has built its plan. Writes it to the
-   * conversation metadata, where the pinned-goal prompt and later turns read
-   * it; the agent's `formulate_plan` can still refine it. Fire-and-forget:
-   * never blocks the run, and only one generation per conversation at a time.
-   */
-  private async generateGoal(
-    conversationId: string,
-    llmConfig: ResolvedLLMConfig,
-    question: string,
-    emitter: EventEmitter,
-  ): Promise<void> {
-    if (this.goaling.has(conversationId)) return;
-    this.goaling.add(conversationId);
-    try {
-      const prompt = this.getPrompt('GOAL_GENERATE.md', {
-        QUESTION: question.slice(0, 2000),
-      });
-      const model = await this.llmConfigs.createLanguageModel(
-        llmConfig,
-        llmConfig.workspaceId,
-      );
-      const text = await this.completeText(model, prompt, llmConfig.provider);
-      // One line, no stray quotes, bounded like the stored column
-      const goal = text
-        .split('\n')[0]
-        .trim()
-        .replace(/^["']|["']$/g, '')
-        .trim()
-        .slice(0, 500);
-      if (!goal) return;
-
-      // A plan the agent started meanwhile owns the goal: don't clobber it
-      const active = await this.todoRepository.exists({
-        where: { conversationId, status: 'in_progress' },
-      });
-      if (active) return;
-
-      await updateConversationMetadata(
-        this.conversationRepository.manager,
-        conversationId,
-        { goal },
-      );
-      const todos = await this.loadTodoItems(conversationId);
-      emitter.emit('todos-updated', todos, goal);
-    } catch (error) {
-      this.logger.error('Failed to generate goal', error);
-    } finally {
-      this.goaling.delete(conversationId);
-    }
   }
 
   private async handleStreamFinish(
@@ -596,7 +448,7 @@ export class AgentsCompletionsService {
       );
       // An answer just completed. Fire-and-forget: title generation should
       // not block stream closure, and it skips an already titled conversation
-      this.generateTitle(conversationId, llmConfig).catch((err) =>
+      this.titles.generateTitle(conversationId, llmConfig).catch((err) =>
         this.logger.error('Error generating title', err),
       );
     } catch (error) {
@@ -1365,7 +1217,7 @@ export class AgentsCompletionsService {
       );
 
       // Generate the summary
-      const cleanedSummary = await this.completeText(
+      const cleanedSummary = await this.titles.completeText(
         model,
         prompt,
         llmConfig.provider,
@@ -2680,11 +2532,14 @@ export class AgentsCompletionsService {
       (t) => t.status === 'pending' || t.status === 'in_progress',
     );
     if (agentMode === AgentMode.AGENT && !hasActivePlan) {
-      void this.generateGoal(
+      void this.titles.generateGoal(
         conversation.id,
         llmConfig,
         dto.question,
-        todosEmitter,
+        async (goal) => {
+          const todos = await this.loadTodoItems(conversation.id);
+          todosEmitter.emit('todos-updated', todos, goal);
+        },
       );
     }
 
