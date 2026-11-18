@@ -2,6 +2,7 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { Severity } from '@/common/enums/enum';
 import type { Statistic } from './entities/statistic.entity';
+import { ReportStatisticsService } from './report-statistics.service';
 import { StatisticService } from './statistic.service';
 import { DataSource } from 'typeorm';
 import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
@@ -10,6 +11,7 @@ import { TechnologyForwarderService } from '../technology/technology-forwarder.s
 
 describe('StatisticService', () => {
   let service: StatisticService;
+  let reports: ReportStatisticsService;
 
   const mockQueryBuilder = {
     select: jest.fn().mockReturnThis(),
@@ -61,6 +63,7 @@ describe('StatisticService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         StatisticService,
+        ReportStatisticsService,
         { provide: DataSource, useValue: mockDataSource },
         { provide: GeoIpService, useValue: mockGeoIpService },
         { provide: RedisService, useValue: mockRedisService },
@@ -72,6 +75,7 @@ describe('StatisticService', () => {
     }).compile();
 
     service = module.get<StatisticService>(StatisticService);
+    reports = module.get(ReportStatisticsService);
   });
 
   it('should be defined', () => {
@@ -253,7 +257,7 @@ describe('StatisticService', () => {
     });
   });
 
-  describe('getCountForWorkspace', () => {
+  describe('ReportStatisticsService.getCountForWorkspace', () => {
     it('sums open vulnerabilities across severities, leaving Info out', async () => {
       mockQueryBuilder.getRawMany.mockResolvedValueOnce([
         { workspaceId: 'workspace-1', severity: 'critical', count: '2' },
@@ -262,7 +266,7 @@ describe('StatisticService', () => {
       ]);
 
       await expect(
-        service.getCountForWorkspace('vulnerabilities', 'workspace-1'),
+        reports.getCountForWorkspace('vulnerabilities', 'workspace-1'),
       ).resolves.toBe(5);
     });
   });

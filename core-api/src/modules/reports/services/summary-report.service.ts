@@ -6,6 +6,7 @@ import { Target } from '@/modules/targets/entities/target.entity';
 import { AssetService } from '@/modules/assets/entities/asset-services.entity';
 import { AssetTag } from '@/modules/assets/entities/asset-tags.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
+import { ReportStatisticsService } from '@/modules/statistic/report-statistics.service';
 import { StatisticService } from '@/modules/statistic/statistic.service';
 import {
   approvedVulnerabilityCondition,
@@ -33,7 +34,7 @@ export class SummaryReportService {
     private readonly assetTagRepo: Repository<AssetTag>,
     @InjectRepository(Workspace)
     private readonly workspaceRepo: Repository<Workspace>,
-    private readonly statisticService: StatisticService,
+    private readonly reportStatistics: ReportStatisticsService,
   ) {}
 
   async getSummaryReportData(
@@ -92,26 +93,26 @@ export class SummaryReportService {
       newPorts,
       newTechnologies,
     ] = await Promise.all([
-      this.statisticService.getCountForWorkspace('targets', workspaceId, options),
-      this.statisticService.getCountForWorkspace('targets', workspaceId, { ...options, startDate: lastWeekStart, endDate: weekStart }),
-      this.statisticService.getCountForWorkspace('targets', workspaceId, { ...options, startDate: lastMonthStart, endDate: monthStart }),
-      this.statisticService.getCountForWorkspace('assets', workspaceId, options),
-      this.statisticService.getCountForWorkspace('assets', workspaceId, { ...options, startDate: lastWeekStart, endDate: weekStart }),
-      this.statisticService.getCountForWorkspace('assets', workspaceId, { ...options, startDate: lastMonthStart, endDate: monthStart }),
-      this.statisticService.getCountForWorkspace('services', workspaceId, options),
-      this.statisticService.getCountForWorkspace('services', workspaceId, { ...options, startDate: lastWeekStart, endDate: weekStart }),
-      this.statisticService.getCountForWorkspace('services', workspaceId, { ...options, startDate: lastMonthStart, endDate: monthStart }),
-      this.statisticService.getCountForWorkspace('vulnerabilities', workspaceId, options),
-      this.statisticService.getCountForWorkspace('vulnerabilities', workspaceId, { ...options, startDate: lastWeekStart, endDate: weekStart }),
-      this.statisticService.getCountForWorkspace('vulnerabilities', workspaceId, { ...options, startDate: lastMonthStart, endDate: monthStart }),
-      this.statisticService.getSeverityCounts(workspaceId, options),
-      this.statisticService.getSeverityCounts(workspaceId, { ...options, startDate: lastWeekStart, endDate: weekStart }),
-      this.statisticService.getSeverityCounts(workspaceId, { ...options, startDate: lastMonthStart, endDate: monthStart }),
+      this.reportStatistics.getCountForWorkspace('targets', workspaceId, options),
+      this.reportStatistics.getCountForWorkspace('targets', workspaceId, { ...options, startDate: lastWeekStart, endDate: weekStart }),
+      this.reportStatistics.getCountForWorkspace('targets', workspaceId, { ...options, startDate: lastMonthStart, endDate: monthStart }),
+      this.reportStatistics.getCountForWorkspace('assets', workspaceId, options),
+      this.reportStatistics.getCountForWorkspace('assets', workspaceId, { ...options, startDate: lastWeekStart, endDate: weekStart }),
+      this.reportStatistics.getCountForWorkspace('assets', workspaceId, { ...options, startDate: lastMonthStart, endDate: monthStart }),
+      this.reportStatistics.getCountForWorkspace('services', workspaceId, options),
+      this.reportStatistics.getCountForWorkspace('services', workspaceId, { ...options, startDate: lastWeekStart, endDate: weekStart }),
+      this.reportStatistics.getCountForWorkspace('services', workspaceId, { ...options, startDate: lastMonthStart, endDate: monthStart }),
+      this.reportStatistics.getCountForWorkspace('vulnerabilities', workspaceId, options),
+      this.reportStatistics.getCountForWorkspace('vulnerabilities', workspaceId, { ...options, startDate: lastWeekStart, endDate: weekStart }),
+      this.reportStatistics.getCountForWorkspace('vulnerabilities', workspaceId, { ...options, startDate: lastMonthStart, endDate: monthStart }),
+      this.reportStatistics.getSeverityCounts(workspaceId, options),
+      this.reportStatistics.getSeverityCounts(workspaceId, { ...options, startDate: lastWeekStart, endDate: weekStart }),
+      this.reportStatistics.getSeverityCounts(workspaceId, { ...options, startDate: lastMonthStart, endDate: monthStart }),
       this.getNewVulnerabilityCount(workspaceId, weekStart, now),
       this.getNewVulnerabilityCount(workspaceId, monthStart, now),
       this.getResolvedVulnerabilityCount(workspaceId, weekStart, now),
       this.getResolvedVulnerabilityCount(workspaceId, monthStart, now),
-      this.statisticService.getVulnerabilityTrends(workspaceId),
+      this.reportStatistics.getVulnerabilityTrends(workspaceId),
       this.getNewFindings(workspaceId, options),
       this.getResolvedFindings(workspaceId, options),
       this.getTargets(workspaceId, options),
