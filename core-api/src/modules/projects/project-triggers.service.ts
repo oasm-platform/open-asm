@@ -18,7 +18,7 @@ import { DataSource, EntityManager, Repository } from 'typeorm';
 import type {
   ProjectTriggerEvents,
   ProjectTriggerFact,
-} from '../event-bridge/sinks/projects/projects.sink';
+} from './event-lane/projects.sink';
 import { Workflow, type WorkflowContent } from '../workflows/entities/workflow.entity';
 import type { WorkflowRunScope } from '../workflows/workflow-graph';
 import type {

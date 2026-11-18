@@ -5,12 +5,13 @@ A project is a named set of workspace assets (picked by hand or selected by scop
 ## Layout
 
 - `projects.controller.ts`: every route under `projects`; the `PROJECT_UPDATED(ProjectChange.X)` helper decorator.
-- `projects.service.ts`: create (with compensating rollback), update, archive/unarchive, delete, `addDiscoveredAssets` (the `PROJECT_ASSET_DISCOVERY` implementation), `project.assets.added` publishing.
+- `projects.service.ts`: create (with compensating rollback), update, archive/unarchive, delete, `addDiscoveredAssets` (called by the `projects` lane), `project.assets.added` publishing.
 - `project-access.ts`: `findProjectOrFail` (404, and 400 on an archived project when `writable`).
 - `project-assets.service.ts`: hand-picked assets, asset list, candidates.
 - `project-scope.service.ts` + `scope-rules.ts`: include/exclude rules compiled to raw SQL (`scopeRulesSql`, `SqlParams`); sync, preview, discovery matching.
 - `project-workflows.service.ts` + `pipeline.ts`: project-owned workflows (from tools, a template or a copy), `startBindingRun`, `buildToolJobs` (encrypts inline connector secrets).
-- `project-triggers.service.ts` + `workflow-on.ts`: cron and event triggers, BullMQ schedulers, Redis batch windows, chain-depth guard (the `PROJECT_TRIGGER_EVENTS` implementation).
+- `project-triggers.service.ts` + `workflow-on.ts`: cron and event triggers, BullMQ schedulers, Redis batch windows, chain-depth guard (`onTriggerEvent`, called by the `projects` lane).
+- `event-lane/projects.sink.ts`: `ProjectsSink`, the `@EventLane()` of event-bus group `projects`, and the fact types it hands over.
 - `processors/project-schedule.processor.ts`: `ProjectScheduleConsumer` (cron fire) and `ProjectTriggerEventsConsumer` (batch window closed).
 - `project-run-events.listener.ts`: turns in-process `EventTriggerType.WORKFLOW_END` into `project.run.completed`.
 - `project-results.service.ts` + `provenance.ts`: overview, runs, vulnerabilities, timeline, activity (raw SQL).
@@ -28,9 +29,9 @@ All routes use `@WorkspaceAccess`:
 - `@PublishEvent`: `project.created`, `project.deleted`, `project.archived`, `project.unarchived`. `project.updated` goes through `PROJECT_UPDATED(ProjectChange.X)` on settings, assets add/remove, scope, workflow add/update/remove and trigger create/update/delete; `metadata.change` names the change for the activity feed. A new mutating route needs its own `PROJECT_UPDATED`. Manual run and file routes publish nothing.
 - Direct `publishSafely`: `project.assets.added` (payload `ProjectAssetsAddedPayload`, only when ids were actually added), `project.updated` with `change: assets.discovered` and a System actor (discovery has no request), and `project.run.completed` (from the listener; cancelled runs never finish this way).
 - In-process: `PROJECT_DELETING_EVENT` (`'project.deleting'`) is awaited with `emitAsync` before a delete, while cascading rows can still be read. `AgentsService` handles it.
-- Consumed: the bridge `projects` lane (`ProjectsSink`) calls `addDiscoveredAssets` on `asset.discovered` and `ProjectTriggersService.onTriggerEvent` on `project.assets.added`, `project.run.completed`, `vulnerability.detected`.
+- Consumed: the `projects` lane (`ProjectsSink`, registered here, discovered by the event bridge) calls `addDiscoveredAssets` on `asset.discovered` and `ProjectTriggersService.onTriggerEvent` on `project.assets.added`, `project.run.completed`, `vulnerability.detected`.
 - Queues: `BullMQName.PROJECT_WORKFLOW_SCHEDULE` (value `asset-groups-workflow-schedule`; one job scheduler per cron trigger, id `project-trigger:<triggerId>`) and `BullMQName.PROJECT_TRIGGER_EVENTS` (delayed `event-trigger` jobs, one per open batch).
-- Exports all seven services plus the tokens `PROJECT_ASSET_DISCOVERY` and `PROJECT_TRIGGER_EVENTS` (`useExisting`).
+- Exports all seven services.
 
 ## Data model
 
@@ -57,7 +58,7 @@ All routes use `@WorkspaceAccess`:
 ## Coupling
 
 - Imports `ConnectorsModule`, `ArtifactsModule`, `StorageModule` (project files), `ToolsModule`, `JobsRegistryModule` (`WorkflowRunnerService`) and `WorkflowsModule` (`WorkflowsService` saves project pipeline edits); uses the global `EventBridgeService` and `RedisService`.
-- `event-bridge/sinks/projects/projects.sink.ts` defines the two tokens and fact types this module implements.
+- `event-lane/projects.sink.ts` imports the bus contracts from `event-bridge` (`EventSink`, idempotency, `readPayload`, `SUBSCRIPTIONS`); the bridge does not import this module.
 - Agent tools (`agents/tools/project*.tools.ts`, `agents.tools.ts`, `agents.completions.ts`) call these services and `findProjectOrFail` directly, and publish `project.*` events themselves.
 - Other modules query project tables with raw SQL: `vulnerabilities.service.ts`, `targets/target-overview.service.ts`, `assets/asset-filter.ts`. `templates.service.ts` injects the `ProjectAsset` repository. `provenance.ts` exports (`RUN_STATUS_SQL`, `SEVERITY_RANK_SQL`, `VulnerabilityProvenance`) are used by vulnerabilities and targets.
 - `TriggerWorkflowService` (workflows) skips `project-%` / `group-%` workflows, so target events never run project workflows.

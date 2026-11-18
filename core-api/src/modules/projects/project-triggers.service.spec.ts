@@ -6,7 +6,7 @@ import {
   Severity,
 } from '@/common/enums/enum';
 
-import type { ProjectTriggerFact } from '../event-bridge/sinks/projects/projects.sink';
+import type { ProjectTriggerFact } from './event-lane/projects.sink';
 import { Project } from './entities/project.entity';
 import { Workflow } from '../workflows/entities/workflow.entity';
 import { ProjectWorkflow } from './entities/project-workflow.entity';

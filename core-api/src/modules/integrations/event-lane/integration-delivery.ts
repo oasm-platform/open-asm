@@ -1,9 +1,9 @@
 import { AuditOutcome, NotificationType, type Severity } from '@/common/enums/enum';
 import { severityProperties } from '@/modules/integrations/schemas/severity.schema';
-import type { EventName } from '../../contracts/event-catalog';
-import type { ConsumedEvent } from '../../contracts/event-envelope';
-import { hasUnfinishedSteps, readPayload } from '../../contracts/event-payloads';
-import { eventSeverity } from '../../routing/event-policy';
+import type { EventName } from '@/modules/event-bridge/contracts/event-catalog';
+import type { ConsumedEvent } from '@/modules/event-bridge/contracts/event-envelope';
+import { hasUnfinishedSteps, readPayload } from '@/modules/event-bridge/contracts/event-payloads';
+import { eventSeverity } from '@/modules/event-bridge/routing/event-policy';
 
 /**
  * Delivery policy for the `integrations` lane, in two steps:

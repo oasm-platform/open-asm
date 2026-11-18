@@ -41,5 +41,3 @@ export interface EventSink {
   handle(name: EventName, event: ConsumedEvent): Promise<void>;
 }
 
-/** DI token for the list of sinks the consumer runtime starts. */
-export const EVENT_SINKS = Symbol('EVENT_SINKS');

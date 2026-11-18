@@ -2,9 +2,7 @@ import type { DataSource } from 'typeorm';
 import type { GeoIpService } from '@/services/geo-ip/geo-ip.service';
 import type { RedisService } from '@/services/redis/redis.service';
 import { InsightLevel } from '../targets/dto/target-overview.dto';
-import type { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
 import type { TechnologyForwarderService } from '../technology/technology-forwarder.service';
-import type { WorkspacesService } from '../workspaces/workspaces.service';
 import { StatisticService } from './statistic.service';
 import {
   buildWorkspaceInsights,
@@ -64,8 +62,6 @@ describe('StatisticService.getAttention', () => {
       { query } as unknown as DataSource,
       {} as GeoIpService,
       {} as RedisService,
-      {} as WorkspacesService,
-      {} as EventBridgeService,
       {} as TechnologyForwarderService,
     );
     jest.spyOn(service, 'getTlsStatistics').mockResolvedValue({
