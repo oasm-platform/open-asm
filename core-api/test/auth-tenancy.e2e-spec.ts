@@ -31,7 +31,15 @@ import { createUser, createWorkspace, cleanupE2eData } from './helpers/workspace
  *     while closed, `/api/auth/sign-up/email` 403s and creates no account;
  *     once open, it creates an account that cannot sign in until an admin
  *     approves (unbans) it.
+ * 11. CORS headers go to trusted origins only (`resolveTrustedOrigins`; the
+ *     local dev servers are trusted under NODE_ENV=test).
+ * 12. better-auth refuses a cookie-carrying call from an untrusted origin, and
+ *     accepts a trusted one or a page the browser marks same-origin.
  */
+/** The Vite dev server: a trusted origin under NODE_ENV=test. */
+const CONSOLE_ORIGIN = 'http://localhost:5173';
+const FOREIGN_ORIGIN = 'https://evil.example';
+
 describe('Auth and tenancy matrix', () => {
   jest.setTimeout(60_000);
 
@@ -176,7 +184,8 @@ describe('Auth and tenancy matrix', () => {
   it('opens sign-up to accounts that confirm their email, then wait for approval', async () => {
     const email = `e2e-signup-open-${Date.now()}@example.com`;
     const password = 'Password123!';
-    const callbackURL = 'http://console.e2e.test/login?verified=1';
+    // The console's own page; better-auth refuses a callback off a trusted origin
+    const callbackURL = `${CONSOLE_ORIGIN}/login?verified=1`;
     const userIds: string[] = [];
     try {
       await withSignUp(true, async (sent) => {
@@ -210,6 +219,7 @@ describe('Auth and tenancy matrix', () => {
           request(server)
             .post('/api/auth/admin/unban-user')
             .set('Cookie', adminCookie)
+            .set('Origin', CONSOLE_ORIGIN)
             .send({ userId });
 
         // Unconfirmed: sign-in asks for it, and approval waits for it
@@ -250,6 +260,70 @@ describe('Auth and tenancy matrix', () => {
     } finally {
       await cleanupE2eData(dataSource, { userIds });
     }
+  });
+
+  it('sends CORS headers to trusted origins only', async () => {
+    const trusted = await request(server)
+      .get('/api/health')
+      .set('Origin', CONSOLE_ORIGIN)
+      .expect(200);
+    expect(trusted.headers['access-control-allow-origin']).toBe(CONSOLE_ORIGIN);
+    expect(trusted.headers['access-control-allow-credentials']).toBe('true');
+
+    const foreign = await request(server)
+      .get('/api/health')
+      .set('Origin', FOREIGN_ORIGIN)
+      .expect(200);
+    expect(foreign.headers['access-control-allow-origin']).toBeUndefined();
+
+    const preflight = await request(server)
+      .options('/api/targets')
+      .set('Origin', FOREIGN_ORIGIN)
+      .set('Access-Control-Request-Method', 'POST');
+    expect(preflight.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
+  it('refuses a signed-in auth call from an untrusted origin', async () => {
+    const cookie = await signIn(server, userA.email);
+    const signOut = (headers: Record<string, string>) =>
+      request(server)
+        .post('/api/auth/sign-out')
+        .set('Cookie', cookie)
+        .set(headers)
+        .send({});
+
+    const foreign = await signOut({ Origin: FOREIGN_ORIGIN }).expect(403);
+    expect(foreign.body).toMatchObject({ code: 'INVALID_ORIGIN' });
+    // A page cannot vouch for itself: only the browser sets Sec-Fetch-Site
+    await signOut({ Origin: FOREIGN_ORIGIN, 'Sec-Fetch-Site': 'cross-site' })
+      .expect(403);
+    await signOut({}).expect(403);
+
+    // Refused calls left the session alone
+    await request(server)
+      .get('/api/targets')
+      .set('Cookie', cookie)
+      .set('X-Workspace-Id', workspaceAId)
+      .expect(200);
+  });
+
+  it('accepts a signed-in auth call from a trusted or same-origin page', async () => {
+    await request(server)
+      .post('/api/auth/sign-out')
+      .set('Cookie', await signIn(server, userA.email))
+      .set('Origin', CONSOLE_ORIGIN)
+      .send({})
+      .expect(200);
+
+    // The console behind nginx: an origin no setting lists, same-origin per
+    // the browser
+    await request(server)
+      .post('/api/auth/sign-out')
+      .set('Cookie', await signIn(server, userA.email))
+      .set('Origin', 'http://console.e2e.test:3000')
+      .set('Sec-Fetch-Site', 'same-origin')
+      .send({})
+      .expect(200);
   });
 
   it('rejects a valid session without a workspace id', async () => {
