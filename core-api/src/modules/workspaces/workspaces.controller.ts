@@ -55,6 +55,7 @@ import { WorkspaceInvitation } from './entities/workspace-invitation.entity';
 import { WorkspaceMembers } from './entities/workspace-members.entity';
 import { WorkspacePermission } from './entities/workspace-permission.entity';
 import { Workspace } from './entities/workspace.entity';
+import { WorkspaceMembershipService } from './workspace-membership.service';
 import { WorkspacesService } from './workspaces.service';
 
 @ApiTags('Workspaces')
@@ -63,6 +64,7 @@ export class WorkspacesController {
   constructor(
     private readonly workspacesService: WorkspacesService,
     private readonly auditService: AuditService,
+    private readonly membership: WorkspaceMembershipService,
   ) {}
 
   @Doc({
@@ -195,7 +197,7 @@ export class WorkspacesController {
     @WorkspaceId() workspaceId: string,
     @UserContext() userContext: UserContextPayload,
   ) {
-    return this.workspacesService.getCurrentPermission(
+    return this.membership.getCurrentPermission(
       workspaceId,
       userContext.id,
     );

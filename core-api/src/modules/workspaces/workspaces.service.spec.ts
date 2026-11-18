@@ -24,6 +24,7 @@ import { WorkspaceMemberPermission } from './entities/workspace-member-permissio
 import { WorkspaceMembers } from './entities/workspace-members.entity';
 import { WorkspacePermission } from './entities/workspace-permission.entity';
 import { Workspace } from './entities/workspace.entity';
+import { WorkspaceMembershipService } from './workspace-membership.service';
 import { WorkspacesService } from './workspaces.service';
 import { ForbiddenError, InvalidInputError } from '@/common/errors/domain.errors';
 
@@ -295,6 +296,8 @@ describe('WorkspacesService', () => {
           provide: ArtifactsService,
           useValue: mockArtifactsService,
         },
+        // Real: the guard-facing lookup the grant checks go through
+        WorkspaceMembershipService,
       ],
     }).compile();
 
@@ -879,12 +882,9 @@ describe('WorkspacesService', () => {
       ...overrides,
     });
 
-    it('should aggregate permission keys across groups', async () => {
+    it('answers the guard through WorkspaceMembershipService', async () => {
       (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue({
-        memberPermissions: [
-          { permission: { permissions: ['project.read'] } },
-          { permission: { permissions: ['target.read', '*'] } },
-        ],
+        memberPermissions: [{ permission: { permissions: ['project.read'] } }],
       });
 
       const result = await service.getMembershipWithPermissions(
@@ -892,70 +892,7 @@ describe('WorkspacesService', () => {
         testUserId,
       );
 
-      expect(result.permissionKeys.sort()).toEqual([
-        '*',
-        'project.read',
-        'target.read',
-      ]);
-    });
-
-    it('should throw NotFound for a non-member', async () => {
-      (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue(
-        null,
-      );
-
-      await expect(
-        service.getMembershipWithPermissions(testWorkspaceId, testUserId),
-      ).rejects.toThrow('Workspace member not found');
-    });
-
-    describe('getCurrentPermission', () => {
-      it('should return the union of permission keys for the member', async () => {
-        (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue(
-          {
-            memberPermissions: [
-              { permission: { permissions: ['project.read'] } },
-              { permission: { permissions: ['target.read', '*'] } },
-            ],
-          },
-        );
-
-        const result = await service.getCurrentPermission(
-          testWorkspaceId,
-          testUserId,
-        );
-
-        expect(result.currentPermission.sort()).toEqual([
-          '*',
-          'project.read',
-          'target.read',
-        ]);
-      });
-
-      it('should return an empty list when membership has no permission groups', async () => {
-        (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue(
-          {
-            memberPermissions: [],
-          },
-        );
-
-        const result = await service.getCurrentPermission(
-          testWorkspaceId,
-          testUserId,
-        );
-
-        expect(result).toEqual({ currentPermission: [] });
-      });
-
-      it('should throw NotFound for a non-member', async () => {
-        (mockWorkspaceMembersRepository.findOne as jest.Mock).mockResolvedValue(
-          null,
-        );
-
-        await expect(
-          service.getCurrentPermission(testWorkspaceId, testUserId),
-        ).rejects.toThrow('Workspace member not found');
-      });
+      expect(result.permissionKeys).toEqual(['project.read']);
     });
 
     it('should update member permissions', async () => {

@@ -41,12 +41,12 @@ import {
 } from './dto/workspace-access.dto';
 import {
   CreateWorkspaceDto,
-  CurrentPermissionResponseDto,
   GetApiKeyResponseDto,
   GetManyWorkspacesDto,
   UpdateWorkspaceDto,
 } from './dto/workspaces.dto';
 import { WorkspaceMembers } from './entities/workspace-members.entity';
+import { WorkspaceMembershipService } from './workspace-membership.service';
 import { WorkspaceInvitation } from './entities/workspace-invitation.entity';
 import { WorkspaceMemberPermission } from './entities/workspace-member-permission.entity';
 import { WorkspacePermission } from './entities/workspace-permission.entity';
@@ -107,6 +107,7 @@ export class WorkspacesService implements OnModuleInit {
     private workspaceEncryptionService: WorkspaceEncryptionService,
     private auditService: AuditService,
     private artifactsService: ArtifactsService,
+    private readonly membership: WorkspaceMembershipService,
   ) {}
 
   async onModuleInit() {}
@@ -646,96 +647,16 @@ export class WorkspacesService implements OnModuleInit {
   }
 
   /**
-   * Retrieves a workspace member by workspace ID and user ID.
-   * @param workspaceId - The ID of the workspace to be retrieved.
-   * @param userId - The ID of the user to be retrieved.
-   * @returns The workspace member, if found.
-   * @throws NotFoundException if the workspace member does not exist.
+   * A member's membership row and the union of their permission keys
+   * (`WorkspaceMembershipService`). Kept here for `WorkspacePermissionGuard`
+   * and the other modules that ask the workspaces module.
+   * @throws NotFoundError if the user is not a member of the workspace.
    */
-  private async getWorkspaceMember(
-    workspaceId: string,
-    userId: string,
-  ): Promise<WorkspaceMembers> {
-    const workspaceMember = await this.workspaceMembersRepository.findOne({
-      where: {
-        workspace: { id: workspaceId },
-        user: { id: userId },
-      },
-      relations: ['workspace', 'user'],
-    });
-
-    if (!workspaceMember) {
-      throw new NotFoundError('Workspace member not found');
-    }
-
-    return workspaceMember;
-  }
-
-  /**
-   * Retrieves all members of a workspace.
-   * @param workspaceId - The ID of the workspace.
-   * @returns A promise that resolves to an array of workspace members with user details.
-   */
-  public async getMembersByWorkspaceId(
-    workspaceId: string,
-  ): Promise<WorkspaceMembers[]> {
-    return this.workspaceMembersRepository.find({
-      where: {
-        workspace: { id: workspaceId },
-      },
-      relations: ['user'],
-    });
-  }
-
-  /**
-   * Resolves a member's membership row and the union of permission keys from
-   * all their permission groups. Used by WorkspacePermissionGuard.
-   * @param workspaceId - The ID of the workspace.
-   * @param userId - The ID of the user.
-   * @returns The membership row and flattened permission keys.
-   * @throws NotFoundException if the user is not a member of the workspace.
-   */
-  public async getMembershipWithPermissions(
+  public getMembershipWithPermissions(
     workspaceId: string,
     userId: string,
   ): Promise<{ membership: WorkspaceMembers; permissionKeys: string[] }> {
-    const membership = await this.workspaceMembersRepository.findOne({
-      where: { workspace: { id: workspaceId }, user: { id: userId } },
-      relations: ['memberPermissions', 'memberPermissions.permission'],
-    });
-
-    if (!membership) {
-      throw new NotFoundError('Workspace member not found');
-    }
-
-    const keys = new Set<string>();
-    for (const memberPermission of membership.memberPermissions ?? []) {
-      for (const key of memberPermission.permission?.permissions ?? []) {
-        keys.add(key);
-      }
-    }
-
-    return { membership, permissionKeys: [...keys] };
-  }
-
-  /**
-   * Returns the union of permission keys of the current user in a workspace,
-   * computed from all their permission groups. Consumers that need the keys
-   * without the membership row (e.g. the current-permission endpoint) use this.
-   * @param workspaceId - The ID of the workspace.
-   * @param userId - The ID of the user.
-   * @returns The deduped permission keys of the user in the workspace.
-   * @throws NotFoundException if the user is not a member of the workspace.
-   */
-  public async getCurrentPermission(
-    workspaceId: string,
-    userId: string,
-  ): Promise<CurrentPermissionResponseDto> {
-    const { permissionKeys } = await this.getMembershipWithPermissions(
-      workspaceId,
-      userId,
-    );
-    return { currentPermission: permissionKeys };
+    return this.membership.getMembershipWithPermissions(workspaceId, userId);
   }
 
   /**
@@ -1064,7 +985,7 @@ export class WorkspacesService implements OnModuleInit {
     if (keys.length === 0) {
       return;
     }
-    const { permissionKeys } = await this.getMembershipWithPermissions(
+    const { permissionKeys } = await this.membership.getMembershipWithPermissions(
       workspaceId,
       userId,
     );
@@ -1164,7 +1085,7 @@ export class WorkspacesService implements OnModuleInit {
     }
 
     // Privilege escalation guard: assigner must hold every key being granted.
-    const { permissionKeys } = await this.getMembershipWithPermissions(
+    const { permissionKeys } = await this.membership.getMembershipWithPermissions(
       workspaceId,
       currentUserId,
     );
@@ -1342,7 +1263,7 @@ export class WorkspacesService implements OnModuleInit {
       dto.permissionIds,
     );
     const validPermissionIds = validGroups.map((group) => group.id);
-    const { permissionKeys } = await this.getMembershipWithPermissions(
+    const { permissionKeys } = await this.membership.getMembershipWithPermissions(
       workspaceId,
       invitedById,
     );
