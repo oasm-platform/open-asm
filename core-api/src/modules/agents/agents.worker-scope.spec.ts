@@ -3,6 +3,7 @@
 import { WorkerScope, WorkerType } from '@/common/enums/enum';
 import { AgentApprovalMode, AgentMode } from '@/modules/agents/enums/agent.enums';
 import { AgentsCompletionsService } from './agents.completions';
+import { LlmConfigResolver } from './llm-config.resolver';
 import { AgentsService } from './agents.service';
 import { agentFunctionWith } from './agents.tools.testing';
 import { WorkspaceTools } from './tools/workspace.tools';
@@ -28,9 +29,15 @@ function buildCompletions(
   const service = Object.assign(
     Object.create(AgentsCompletionsService.prototype),
     {
-      llmConfigRepository: {
-        findOne: jest.fn().mockResolvedValue({ id: 'llm-1' }),
-      },
+      llmConfigs: Object.assign(Object.create(LlmConfigResolver.prototype), {
+        llmConfigRepository: {
+          findOne: jest.fn().mockResolvedValue({ id: 'llm-1' }),
+        },
+        agentsConfig: {
+          find: jest.fn().mockResolvedValue(agentConfig),
+          getDefaultLLMConfig: jest.fn().mockResolvedValue({ id: 'llm-1' }),
+        },
+      }),
       agentsConfig: {
         find: jest.fn().mockResolvedValue(agentConfig),
         getDefaultLLMConfig: jest.fn().mockResolvedValue({ id: 'llm-1' }),

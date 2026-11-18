@@ -1381,7 +1381,7 @@ describe('generateGoal', () => {
     const service: any = Object.create(AgentsCompletionsService.prototype);
     service.goaling = new Set<string>();
     service.getPrompt = jest.fn(() => 'prompt');
-    service.createLanguageModel = jest.fn(() => Promise.resolve({}));
+    service.llmConfigs = { createLanguageModel: jest.fn(() => Promise.resolve({})) };
     service.completeText = jest.fn(() =>
       Promise.resolve(
         '"Find the open ports of example.com"\nignored second line',

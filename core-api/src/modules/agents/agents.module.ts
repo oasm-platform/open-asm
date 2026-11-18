@@ -1,3 +1,4 @@
+import { LlmConfigResolver } from './llm-config.resolver';
 import { ActiveRunRegistry } from './active-run.registry';
 import { ArtifactsModule } from '@/modules/artifacts/artifacts.module';
 import { AssetsModule } from '@/modules/assets/assets.module';
@@ -97,6 +98,7 @@ export const AGENT_FUNCTION_HOSTS = [
     AgentsService,
     AgentsCompletionsService,
     ActiveRunRegistry,
+    LlmConfigResolver,
     AgentTool,
     AgentsGuardService,
     AgentsMcpService,

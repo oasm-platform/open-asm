@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/require-await */
-import { AgentsCompletionsService } from './agents.completions';
+import { LlmConfigResolver } from './llm-config.resolver';
 import { AgentsService } from './agents.service';
 import type { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { LLMProvider } from './enums/agent.enums';
@@ -115,7 +115,7 @@ describe('AgentsService keeps the default model in agent config', () => {
   });
 });
 
-describe('AgentsCompletionsService model for a later message', () => {
+describe('LlmConfigResolver model for a later message', () => {
   const resolve = (
     dto: Partial<SendMessageDto>,
     defaultRef?: { llmConfigId: string; model: string; contextWindow?: number },
@@ -125,7 +125,7 @@ describe('AgentsCompletionsService model for a later message', () => {
       b: conn('b', 'claude', LLMProvider.ANTHROPIC),
     };
     const service = Object.assign(
-      Object.create(AgentsCompletionsService.prototype),
+      Object.create(LlmConfigResolver.prototype),
       {
         llmConfigRepository: {
           findOne: jest.fn(async ({ where }) =>
