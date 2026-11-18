@@ -158,7 +158,7 @@ export function buildAgentFunction(
         ...ctx,
         toolCallId: call?.toolCallId ?? '',
         abortSignal: call?.abortSignal,
-      }) as unknown,
+      }),
   };
   return tool(config as unknown as Parameters<typeof tool>[0]);
 }

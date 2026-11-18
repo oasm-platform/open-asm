@@ -232,7 +232,7 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
       return await this.redisService.get(`agent:conv:worker:${conversationId}`);
     } catch (err) {
       this.logger.warn(
-        `[RedisCache] Failed to read cached worker for ${conversationId}: ${err}`,
+        `[RedisCache] Failed to read cached worker for ${conversationId}: ${String(err)}`,
       );
       return null;
     }
@@ -254,7 +254,7 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
       );
     } catch (err) {
       this.logger.warn(
-        `[RedisCache] Failed to cache worker ${workerId} for conversation ${conversationId}: ${err}`,
+        `[RedisCache] Failed to cache worker ${workerId} for conversation ${conversationId}: ${String(err)}`,
       );
     }
   }
@@ -269,7 +269,7 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
       await this.redisService.del(`agent:conv:worker:${conversationId}`);
     } catch (err) {
       this.logger.warn(
-        `[RedisCache] Failed to delete cached worker for conversation ${conversationId}: ${err}`,
+        `[RedisCache] Failed to delete cached worker for conversation ${conversationId}: ${String(err)}`,
       );
     }
   }

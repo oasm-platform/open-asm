@@ -89,7 +89,8 @@ export class Tool {
   logoUrl?: string;
 
   // @ApiProperty()
-  parser?: (result: string | undefined) => JobDataResultType;
+  // Called only with non-empty output (job-result.processor.ts)
+  parser?: (result: string) => JobDataResultType;
 
   @ApiProperty()
   @Column({ type: 'boolean', default: false })

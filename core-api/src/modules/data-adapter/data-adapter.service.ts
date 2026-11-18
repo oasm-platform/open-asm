@@ -1340,42 +1340,41 @@ export class DataAdapterService {
     data,
   }: DataAdapterInput<JobDataResultType>): Promise<void> {
     try {
-      // Define type for sync function configuration
-      type SyncFunctionConfig<T = unknown> = {
-        handler: (data: DataAdapterInput<T>) => Promise<void | InsertResult>;
+      // The payload's shape is trusted from the job's category: each handler
+      // casts to what its tool produces (only SCREENSHOT is validated).
+      type SyncFunctionConfig = {
+        handler: (input: DataAdapterInput<unknown>) => Promise<void | InsertResult>;
         validationClass?: new () => object;
       };
 
       // Map of tool categories to their corresponding sync functions and validation classes
-      const syncFunctions: Partial<
-        Record<ToolCategory, SyncFunctionConfig<unknown>>
-      > = {
+      const syncFunctions: Partial<Record<ToolCategory, SyncFunctionConfig>> = {
         [ToolCategory.PORTS_SCANNER]: {
-          handler: (data: DataAdapterInput<number[]>) =>
-            this.portsScanner(data),
+          handler: (input) =>
+            this.portsScanner(input as DataAdapterInput<number[]>),
         },
         [ToolCategory.SUBDOMAINS]: {
-          handler: (data: DataAdapterInput<Asset[]>) => this.subdomains(data),
+          handler: (input) => this.subdomains(input as DataAdapterInput<Asset[]>),
           // validationClass: Asset,
         },
         [ToolCategory.HTTP_PROBE]: {
-          handler: (data: DataAdapterInput<HttpResponse>) =>
-            this.httpResponses(data),
+          handler: (input) =>
+            this.httpResponses(input as DataAdapterInput<HttpResponse>),
           // validationClass: HttpResponse, // no validate for now
         },
         [ToolCategory.VULNERABILITIES]: {
-          handler: (data: DataAdapterInput<Vulnerability[]>) =>
-            this.vulnerabilities(data),
+          handler: (input) =>
+            this.vulnerabilities(input as DataAdapterInput<Vulnerability[]>),
           // validationClass: Vulnerability,
         },
         [ToolCategory.SCREENSHOT]: {
-          handler: (data: DataAdapterInput<ScreenshotPayload>) =>
-            this.screenshot(data),
+          handler: (input) =>
+            this.screenshot(input as DataAdapterInput<ScreenshotPayload>),
           validationClass: ScreenshotPayload,
         },
         [ToolCategory.URL_DISCOVERY]: {
-          handler: (data: DataAdapterInput<DiscoveredUrl[]>) =>
-            this.urlDiscovery(data),
+          handler: (input) =>
+            this.urlDiscovery(input as DataAdapterInput<DiscoveredUrl[]>),
         },
       };
 

@@ -112,7 +112,9 @@ export function mergeBetterAuthSpec(
     for (const [pathKey, methods] of Object.entries(
       betterAuthDoc.paths,
     )) {
-      document.paths[pathKey] = document.paths[pathKey] ?? {};
+      // Keyed by HTTP method, as better-auth's own spec is
+      const pathItem = (document.paths[pathKey] ?? {}) as Record<string, unknown>;
+      document.paths[pathKey] = pathItem;
       for (const [method, operation] of Object.entries(methods)) {
         const currentTags: string[] = operation.tags ?? [];
 
@@ -126,7 +128,7 @@ export function mergeBetterAuthSpec(
           );
         }
 
-        document.paths[pathKey][method] = {
+        pathItem[method] = {
           ...operation,
           tags: newTags,
         };

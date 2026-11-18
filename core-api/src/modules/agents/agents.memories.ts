@@ -47,7 +47,7 @@ export class AgentsMemoriesService {
       );
     } catch (error) {
       this.logger.warn(
-        `STM set failed [conv=${conversationId}, key=${key}]: ${error}`,
+        `STM set failed [conv=${conversationId}, key=${key}]: ${String(error)}`,
       );
     }
   }
@@ -60,7 +60,7 @@ export class AgentsMemoriesService {
       return JSON.parse(raw) as STMEntry;
     } catch (error) {
       this.logger.warn(
-        `STM get failed [conv=${conversationId}, key=${key}]: ${error}`,
+        `STM get failed [conv=${conversationId}, key=${key}]: ${String(error)}`,
       );
       return null;
     }
@@ -72,7 +72,7 @@ export class AgentsMemoriesService {
       await this.redisService.cacheClient.hdel(redisKey, key);
     } catch (error) {
       this.logger.warn(
-        `STM delete failed [conv=${conversationId}, key=${key}]: ${error}`,
+        `STM delete failed [conv=${conversationId}, key=${key}]: ${String(error)}`,
       );
     }
   }
@@ -84,7 +84,7 @@ export class AgentsMemoriesService {
       if (!raw) return [];
       return Object.values(raw).map((v) => JSON.parse(v) as STMEntry);
     } catch (error) {
-      this.logger.warn(`STM getAll failed [conv=${conversationId}]: ${error}`);
+      this.logger.warn(`STM getAll failed [conv=${conversationId}]: ${String(error)}`);
       return [];
     }
   }
@@ -94,7 +94,7 @@ export class AgentsMemoriesService {
     try {
       await this.redisService.cacheClient.del(redisKey);
     } catch (error) {
-      this.logger.warn(`STM clear failed [conv=${conversationId}]: ${error}`);
+      this.logger.warn(`STM clear failed [conv=${conversationId}]: ${String(error)}`);
     }
   }
 

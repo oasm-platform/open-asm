@@ -372,7 +372,7 @@ export class JobResultProcessor extends WorkerHost {
         await this.jobsRegistryService.handleJobError(
           { jobId, data: { payload: partial } as DataPayloadResult },
           job,
-          e,
+          e instanceof Error ? e : new Error(String(e)),
         );
 
         // A permanently failed job is a terminal outcome for its step: let the

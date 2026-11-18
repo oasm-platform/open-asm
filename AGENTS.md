@@ -159,7 +159,7 @@ Migration location: `core-api/src/database/migrations/` (58 files, newest last).
 
 ### core-api
 - `eslint.config.mjs` — type-checked rules that actually fail the build: `no-console: error`, `@typescript-eslint/no-floating-promises: error`, `@typescript-eslint/no-misused-promises: error`, `consistent-type-imports: error`, `no-explicit-any: warn` (relaxed in tests).
-- `tsconfig.json` — `@/` → `src/`; Jest `moduleNameMapper` mirrors it.
+- `tsconfig.json` — `@/` → `src/`; Jest `moduleNameMapper` mirrors it. `strict` is on except `strictPropertyInitialization` (entities and DTOs declare fields without initializers). `task api:typecheck` checks `src` without specs; Jest (SWC) never type-checks. Packages without types are declared in `src/common/types/untyped-modules.d.ts`.
 - `package.json` → `jest.transform` = `@swc/jest` (decorators + `decoratorMetadata`, target es5). **Do not** switch to `ts-jest` and **do not** drop `--maxWorkers` / `--workerIdleMemoryLimit` — both thrash RAM on this machine.
 - Lint: `task api:lint` → `eslint "{src,apps,libs,test}/**/*.ts" --fix` (note: `--fix` mutates files).
 

@@ -1125,7 +1125,7 @@ export class AgentsCompletionsService {
       return false;
     } catch (error) {
       this.logger.warn(
-        `[MidLoopCompaction] Error checking budget, skipping compaction: ${error}`,
+        `[MidLoopCompaction] Error checking budget, skipping compaction: ${String(error)}`,
       );
       return false;
     }

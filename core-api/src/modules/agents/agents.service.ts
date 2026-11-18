@@ -468,7 +468,7 @@ export class AgentsService {
         return withEfforts(JSON.parse(cached) as FetchedModel[]);
       }
     } catch (error) {
-      this.logger.warn(`Failed to read from Redis cache: ${error}`);
+      this.logger.warn(`Failed to read from Redis cache: ${String(error)}`);
     }
 
     const provider = getLLMProviderConfig(config.provider);
@@ -486,7 +486,7 @@ export class AgentsService {
     try {
       await this.redisService.setex(cacheKey, 3600, JSON.stringify(models));
     } catch (error) {
-      this.logger.warn(`Failed to cache models in Redis: ${error}`);
+      this.logger.warn(`Failed to cache models in Redis: ${String(error)}`);
     }
 
     return withEfforts(models);

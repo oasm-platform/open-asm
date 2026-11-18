@@ -214,14 +214,14 @@ export class WorkflowTemplateService implements OnModuleInit {
 
   private normalizeOn(obj: Record<string, unknown>): Record<string, unknown> {
     if (!obj.on) return obj;
+    const on = obj.on as Record<string, unknown>;
 
-    for (const key of Object.keys(obj.on)) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const value = obj.on[key];
+    for (const key of Object.keys(on)) {
+      const value = on[key];
       if (Array.isArray(value)) {
-        obj.on[key] = value.map(String);
+        on[key] = value.map(String);
       } else if (typeof value === 'string') {
-        obj.on[key] = [value];
+        on[key] = [value];
       } else {
         throw new Error(
           `Invalid type for on.${key}, must be string or array of string`,

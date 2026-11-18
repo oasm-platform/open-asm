@@ -276,7 +276,9 @@ export class WorkersController {
       const stream = createReadStream(filePath, { highWaterMark: 1024 * 1024 }); // 1MB chunks
       let offset = 0;
 
-      stream.on('data', (chunk: Buffer) => {
+      stream.on('data', (data: string | Buffer) => {
+        // No encoding is set, so this is always a Buffer
+        const chunk = typeof data === 'string' ? Buffer.from(data) : data;
         subscriber.next({ chunk, offset, eof: false });
         offset += chunk.length;
       });
