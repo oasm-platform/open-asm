@@ -9,14 +9,8 @@ import {
 
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { IntegrationType } from '@/common/enums/enum';
-import type { WrapperType } from '@/common/types/app.types';
 import { getManyResponse } from '@/common/utils/get-many-response.util';
-import {
-  forwardRef,
-  Inject,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { Repository } from 'typeorm';
@@ -43,6 +37,7 @@ import type {
 import type { TestIntegrationDto } from './dto/test-integration.dto';
 import type { UpdateIntegrationDto } from './dto/update-integration.dto';
 import { Integration } from './entities/integration.entity';
+import { IntegrationConfigReader } from './integration-config.reader';
 import { IntegrationSyncService } from './integrations-sync.service';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import {
@@ -93,8 +88,8 @@ export class IntegrationsService {
     @InjectRepository(Integration)
     private readonly integrationRepository: Repository<Integration>,
     private readonly workspaceEncryption: WorkspaceEncryptionService,
-    @Inject(forwardRef(() => IntegrationSyncService))
-    private readonly integrationSyncService: WrapperType<IntegrationSyncService>,
+    private readonly integrationSyncService: IntegrationSyncService,
+    private readonly configReader: IntegrationConfigReader,
   ) {}
 
   /**
@@ -352,21 +347,11 @@ export class IntegrationsService {
    * Throws NotFoundException if not found or not in this workspace.
    * Intended for internal service-to-service use where decrypted config is needed.
    */
-  async getIntegrationWithDecryptedConfig(
+  getIntegrationWithDecryptedConfig(
     id: string,
     workspaceId: string,
   ): Promise<{ integration: Integration; decryptedConfig: Record<string, unknown> }> {
-    const integration = await this.integrationRepository.findOne({
-      where: { id, workspaceId },
-    });
-    if (!integration) {
-      throw new NotFoundError('Integration not found');
-    }
-    const dek = await this.workspaceEncryption.getDEK(workspaceId);
-    return {
-      integration,
-      decryptedConfig: decryptSensitiveConfigFields(integration.config, dek),
-    };
+    return this.configReader.getIntegrationWithDecryptedConfig(id, workspaceId);
   }
 
   /**

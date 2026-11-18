@@ -1,19 +1,12 @@
 import { BullMQName, IntegrationType } from '@/common/enums/enum';
 import type { UserContextPayload } from '@/common/interfaces/app.interface';
-import type { WrapperType } from '@/common/types/app.types';
 import { DataAdapterService } from '@/modules/data-adapter/data-adapter.service';
 import { TargetsService } from '@/modules/targets/targets.service';
 import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
 import { Lock } from '@/services/redis/lock.decorator';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { InjectQueue } from '@nestjs/bullmq';
-import {
-  forwardRef,
-  Inject,
-  Injectable,
-  Logger,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Queue } from 'bullmq';
 import { ArrayContains, IsNull, Not } from 'typeorm';
@@ -29,7 +22,7 @@ import {
   runConnector,
 } from './connectors/connector.factory';
 import { Integration } from './entities/integration.entity';
-import { IntegrationsService } from './integrations.service';
+import { IntegrationConfigReader } from './integration-config.reader';
 import {
   decryptSensitiveConfigFields,
   encryptSensitiveConfigFields,
@@ -58,8 +51,7 @@ export class IntegrationSyncService implements OnModuleInit {
     private readonly queue: Queue,
     @InjectRepository(Integration)
     private readonly integrationRepository: Repository<Integration>,
-    @Inject(forwardRef(() => IntegrationsService))
-    private readonly integrationsService: WrapperType<IntegrationsService>,
+    private readonly configReader: IntegrationConfigReader,
     private readonly targetsService: TargetsService,
     private readonly dataAdapterService: DataAdapterService,
     private readonly workspacesService: WorkspacesService,
@@ -216,7 +208,7 @@ export class IntegrationSyncService implements OnModuleInit {
     opts?: { dryRun?: boolean },
   ): Promise<ConnectorSyncResult> {
     const { integration, decryptedConfig } =
-      await this.integrationsService.getIntegrationWithDecryptedConfig(
+      await this.configReader.getIntegrationWithDecryptedConfig(
         integrationId,
         workspaceId,
       );

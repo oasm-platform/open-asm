@@ -12,6 +12,7 @@ import {
   IntegrationSyncService,
 } from './integrations-sync.service';
 import type { Integration } from './entities/integration.entity';
+import type { IntegrationConfigReader } from './integration-config.reader';
 import { IntegrationsService } from './integrations.service';
 import { VercelConnector } from './connectors/vercel.connector';
 import { getConnectorClass } from './connectors/connector.registry';
@@ -81,7 +82,7 @@ describe('Vercel integration — mocked end-to-end through IntegrationSyncServic
     save: jest.Mock;
     update: jest.Mock;
   };
-  let integrationsServiceMock: { getIntegrationWithDecryptedConfig: jest.Mock };
+  let configReaderMock: { getIntegrationWithDecryptedConfig: jest.Mock };
   let targetsServiceMock: {
     findByWorkspaceAndValues: jest.Mock;
     createMultipleTargets: jest.Mock;
@@ -118,7 +119,7 @@ describe('Vercel integration — mocked end-to-end through IntegrationSyncServic
       save: jest.fn().mockImplementation((entity: Integration) => entity),
       update: jest.fn().mockResolvedValue(undefined),
     };
-    integrationsServiceMock = {
+    configReaderMock = {
       getIntegrationWithDecryptedConfig: jest.fn().mockResolvedValue({
         integration: integration(),
         decryptedConfig: { apiToken: 'vercel-token' },
@@ -159,7 +160,7 @@ describe('Vercel integration — mocked end-to-end through IntegrationSyncServic
     service = new IntegrationSyncService(
       queueMock as unknown as Queue,
       repoMock as unknown as Repository<Integration>,
-      integrationsServiceMock as unknown as IntegrationsService,
+      configReaderMock as unknown as IntegrationConfigReader,
       targetsServiceMock as unknown as TargetsService,
       dataAdapterServiceMock as unknown as DataAdapterService,
       workspacesServiceMock as unknown as WorkspacesService,
@@ -264,6 +265,7 @@ describe('Vercel integration — mocked end-to-end through IntegrationSyncServic
         {} as unknown as Repository<Integration>,
         {} as unknown as WorkspaceEncryptionService,
         {} as unknown as IntegrationSyncService,
+        {} as unknown as IntegrationConfigReader,
       );
 
       const schema = catalogService.getSchemas() as {

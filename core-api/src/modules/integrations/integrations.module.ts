@@ -10,6 +10,7 @@ import { TelegramConnect } from './entities/telegram-connect.entity';
 import { IntegrationSyncProcessor } from './integration-sync.processor';
 import { IntegrationsController } from './integrations.controller';
 import { AwsSsoService } from './connectors/aws/aws-sso.service';
+import { IntegrationConfigReader } from './integration-config.reader';
 import { IntegrationSyncService } from './integrations-sync.service';
 import { IntegrationsService } from './integrations.service';
 import { RepositorySyncProcessor } from './repository-sync.processor';
@@ -37,6 +38,7 @@ import { TelegramBotService } from './telegram-bot.service';
   ],
   controllers: [IntegrationsController],
   providers: [
+    IntegrationConfigReader,
     IntegrationsService,
     IntegrationSyncService,
     IntegrationSyncProcessor,

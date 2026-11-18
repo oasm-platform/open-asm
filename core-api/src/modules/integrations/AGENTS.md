@@ -7,6 +7,7 @@ Third-party apps connected to a workspace (notification, ticketing, cloud-provid
 - `integrations.controller.ts`: all HTTP routes, prefix `integrations`.
 - `integrations.service.ts`: CRUD, test, list orgs/repos, enqueue sync; also exports `deriveTelegramWebhookSecret` / `verifyTelegramWebhookSecret`.
 - `integrations-sync.service.ts` (`IntegrationSyncService`) + `integration-sync.processor.ts`: cloud-provider asset sync and its BullMQ repeat schedulers.
+- `integration-config.reader.ts` (`IntegrationConfigReader`): loads an integration with its secrets decrypted; shared by the two services above.
 - `repository-sync.service.ts` + `repository-sync.processor.ts` + `repository-sync.plan.ts` (pure): GIT_ORG target → repository assets.
 - `capabilities.ts`: the capability model (`resolveCapabilities`, `hasCapability`, `normalizeCapabilities`, `isMultiCapabilityApp`).
 - `schemas/`: one JSON Schema per app, joined in `universal-integration.schema.ts` (`oneOf`). Each schema file also calls `registerConnector(appType, Class)`. `capability-fields.ts` holds the `x-capabilities` / `ui:capability` helpers.
@@ -56,7 +57,7 @@ Third-party apps connected to a workspace (notification, ticketing, cloud-provid
 
 ## Coupling
 
-- `IntegrationsService` ↔ `IntegrationSyncService` form a cycle inside the module (`forwardRef` + `WrapperType` on both sides).
+- `IntegrationConfigReader` (`integration-config.reader.ts`) loads an integration of a workspace with its config decrypted. `IntegrationsService.getIntegrationWithDecryptedConfig` and `IntegrationSyncService` both use it, so the two services no longer depend on each other (no `forwardRef`): `IntegrationsService` → `IntegrationSyncService` → `IntegrationConfigReader`.
 - Uses global providers without importing their modules: `TargetsService` (`TargetsModule` is `@Global`), `DataAdapterService`, `WorkspacesService`, `WorkspaceEncryptionService`, `EventBridgeService`. Cloud connectors receive `targetsService` / `dataAdapterService` through `CloudProviderSyncConfig` (type-only imports, no DI).
 - Writes other modules' tables directly: `RepositorySyncService` writes `assets` and `targets.lastDiscoveredAt` through its own repositories (`Target` and `Asset` are registered in `forFeature`).
 - Imported by `event-bridge` (the integrations sink calls `getIntegrationEntitiesByCapability`, `runConnector` and `decryptSensitiveConfigFields` to push notifications and tickets) and by `jobs-registry` (`getIntegrationWithDecryptedConfig` to put the repository `apiToken` into connector inputs).

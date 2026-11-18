@@ -155,8 +155,6 @@ const FORWARD_REFS = [
   'modules/agents/tools/project-build.tools.ts: 1',
   'modules/agents/tools/vulnerability-proposal.tool.ts: 1',
   'modules/agents/tools/workspace.tools.ts: 5',
-  'modules/integrations/integrations-sync.service.ts: 1',
-  'modules/integrations/integrations.service.ts: 1',
   'modules/jobs-registry/jobs-registry.service.ts: 1',
   'modules/statistic/statistic.module.ts: 1',
   'modules/tools/tools.module.ts: 1',

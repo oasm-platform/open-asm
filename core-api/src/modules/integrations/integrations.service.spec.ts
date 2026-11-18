@@ -3,6 +3,7 @@ import type { Repository } from 'typeorm';
 import type { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import { IntegrationType } from '@/common/enums/enum';
 import type { Integration } from './entities/integration.entity';
+import { IntegrationConfigReader } from './integration-config.reader';
 import { IntegrationsService } from './integrations.service';
 import type { IntegrationSyncService } from './integrations-sync.service';
 
@@ -95,6 +96,10 @@ describe('IntegrationsService', () => {
       repoMock as unknown as Repository<Integration>,
       workspaceEncryptionMock as unknown as WorkspaceEncryptionService,
       integrationSyncServiceMock as unknown as IntegrationSyncService,
+      new IntegrationConfigReader(
+        repoMock as unknown as Repository<Integration>,
+        workspaceEncryptionMock as unknown as WorkspaceEncryptionService,
+      ),
     );
   });
 
