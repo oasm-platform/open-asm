@@ -12,7 +12,7 @@ A project is a scope (targets and rules) plus workflows that scan it. A workflow
 Extract four things; ask only for what you cannot infer:
 
 - **Outcome**: what the user wants to end up with — a list of URLs, open ports, live web services, vulnerabilities of some severity or type, screenshots.
-- **Scope**: the targets (domain, IP, CIDR) and anything to exclude. Only what the user named or already owns in the workspace (`retrieve_targets`). Pass them as `targets`; existing ones are reused, new ones created. Do not also add a `target` scope rule for them.
+- **Scope**: the targets (domain, IP, CIDR) and anything to exclude. Only what the user named or already owns in the workspace (`query_attack_surface` on `targets`). Pass them as `targets`; existing ones are reused, new ones created. Do not also add a `target` scope rule for them.
 - **Narrowing**: the words that restrict the outcome — "login", "admin", "API docs", "critical", "WordPress", "port 22", "only staging". Each one becomes a config value or a scope rule, not a reason to scan everything.
 - **Cadence**: once (`runNow`), on a schedule (`schedule`, cron in UTC), or both.
 
@@ -64,7 +64,7 @@ A refusal starting with `Not executed:` names the step and the reason (category 
 
 ## 7. Verify and report
 
-`inspect_project` to check the workflow and its triggers. Start it when the user asked to (`runNow`, or `run_project_workflow`), then follow the run with `list_project_runs` and read results with `list_project_assets` / `discover_vulnerabilities`. Report what the project does, when it runs, and which part of the request depends on a profile the user still has to add.
+`inspect_project` to check the workflow and its triggers. Start it when the user asked to (`runNow`, or `run_project_workflow`), then follow the run with `list_project_runs` and read results with `list_project_assets` / `query_attack_surface` (with the project's `projectId`). Report what the project does, when it runs, and which part of the request depends on a profile the user still has to add.
 
 ## Patterns
 

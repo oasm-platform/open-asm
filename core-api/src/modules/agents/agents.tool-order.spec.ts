@@ -12,20 +12,13 @@ import {
 import { agentToolWith } from './agents.tools.testing';
 import { AgentsWorkflowService, SubmitResultTools } from './agents.workflow';
 import { agentFunctionsOf, validateAgentFunctions } from './tools/agent-function';
+import { currentToolName } from './tools/helpers';
 
 // The tool tables the @AgentFunction decorators replaced, copied from the
 // code before the move: the decorators must describe exactly the same tools.
 const LEGACY_WORKSPACE_TOOLS = [
-  'enumerate_assets',
-  'discover_vulnerabilities',
-  'retrieve_targets',
   'gather_statistics',
-  'inspect_asset',
-  'examine_target_assets',
   'investigate_vulnerability',
-  'list_network_ports',
-  'fingerprint_technologies',
-  'verify_tls_settings',
   'retrieve_web_page',
   'enumerate_open_issues',
   'inspect_issue',
@@ -41,7 +34,10 @@ const LEGACY_WORKSPACE_TOOLS = [
   'list_workflow_templates',
   'list_pipeline_tools',
   'inspect_pipeline_tool',
-  // Added after the move (AttackSurfaceQueryTools).
+  // Added after the move (AttackSurfaceQueryTools); they replaced the attack
+  // surface lookups (enumerate_assets, inspect_asset, examine_target_assets,
+  // list_network_ports, fingerprint_technologies, verify_tls_settings,
+  // discover_vulnerabilities, retrieve_targets), now aliases (RENAMED_TOOLS).
   'describe_attack_surface',
   'query_attack_surface',
 ];
@@ -66,16 +62,8 @@ const LEGACY_AGENT_ONLY = [
   'run_tool_connector',
 ];
 const LEGACY_MCP_TOOLS = [
-  'enumerate_assets',
-  'discover_vulnerabilities',
-  'retrieve_targets',
   'gather_statistics',
-  'inspect_asset',
-  'examine_target_assets',
   'investigate_vulnerability',
-  'list_network_ports',
-  'fingerprint_technologies',
-  'verify_tls_settings',
   'enumerate_open_issues',
   'inspect_issue',
   'list_active_workers',
@@ -98,18 +86,11 @@ const LEGACY_READ_ONLY_TOOLS = [
   'read_tool_output',
 ];
 const LEGACY_TOOL_PERMISSIONS: Record<string, string[]> = {
-  enumerate_assets: ['asset.read'],
-  inspect_asset: ['asset.read'],
-  examine_target_assets: ['asset.read'],
-  list_network_ports: ['asset.read'],
-  fingerprint_technologies: ['asset.read'],
-  verify_tls_settings: ['asset.read'],
-  // Per-resource keys (vulnerability.read, target.read) are checked by the query engine.
-  describe_attack_surface: ['asset.read'],
-  query_attack_surface: ['asset.read'],
-  discover_vulnerabilities: ['vulnerability.read'],
+  // Membership only: the query engine checks asset.read, vulnerability.read
+  // and target.read for each resource a query reads.
+  describe_attack_surface: [],
+  query_attack_surface: [],
   investigate_vulnerability: ['vulnerability.read'],
-  retrieve_targets: ['target.read'],
   gather_statistics: ['workspace.read'],
   enumerate_open_issues: ['workspace.read'],
   inspect_issue: ['workspace.read'],
@@ -194,16 +175,8 @@ describe('built-in tools declared with @AgentFunction', () => {
   // change here changes what the model sees: update this list on purpose.
   it('offers the tools in source order', () => {
     expect(offered(AgentMode.ASK)).toEqual([
-      'enumerate_assets',
-      'discover_vulnerabilities',
-      'retrieve_targets',
       'gather_statistics',
-      'inspect_asset',
-      'examine_target_assets',
       'investigate_vulnerability',
-      'list_network_ports',
-      'fingerprint_technologies',
-      'verify_tls_settings',
       'enumerate_open_issues',
       'inspect_issue',
       'display_available_tools',
@@ -223,16 +196,8 @@ describe('built-in tools declared with @AgentFunction', () => {
       'inspect_pipeline_tool',
     ]);
     expect(offered(AgentMode.AGENT)).toEqual([
-      'enumerate_assets',
-      'discover_vulnerabilities',
-      'retrieve_targets',
       'gather_statistics',
-      'inspect_asset',
-      'examine_target_assets',
       'investigate_vulnerability',
-      'list_network_ports',
-      'fingerprint_technologies',
-      'verify_tls_settings',
       'enumerate_open_issues',
       'inspect_issue',
       'display_available_tools',
@@ -267,6 +232,32 @@ describe('built-in tools declared with @AgentFunction', () => {
       'propose_vulnerability',
       'execute_remote_command',
     ]);
+  });
+});
+
+describe('replaced attack surface lookups', () => {
+  const REPLACED = [
+    'enumerate_assets',
+    'inspect_asset',
+    'examine_target_assets',
+    'list_network_ports',
+    'fingerprint_technologies',
+    'verify_tls_settings',
+    'discover_vulnerabilities',
+    'retrieve_targets',
+  ];
+
+  it('are gone from every mode and from MCP', () => {
+    const everywhere = [
+      ...offered(AgentMode.ASK),
+      ...offered(AgentMode.AGENT),
+      ...Object.keys(agentTool.getMcpTools('w1')),
+    ];
+    for (const name of REPLACED) expect(everywhere).not.toContain(name);
+  });
+
+  it('resolve to query_attack_surface in saved settings and agent definitions', () => {
+    for (const name of REPLACED) expect(currentToolName(name)).toBe('query_attack_surface');
   });
 });
 

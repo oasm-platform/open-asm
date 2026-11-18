@@ -13,8 +13,7 @@ type Runnable = { execute: (params: unknown, options: ToolCallOptions) => Promis
 
 function setup(permissionKeys: string[] | Error = ['*']) {
   const services = {
-    targetsService: { getTargetsInWorkspace: jest.fn().mockResolvedValue(page) },
-    assetsService: { getManyAsssetServices: jest.fn().mockResolvedValue(page) },
+    jobsRegistryService: { getManyJobs: jest.fn().mockResolvedValue(page) },
     connectorRegistry: { getAgentConnectors: jest.fn().mockReturnValue([]) },
     workspacesService: {
       getMembershipWithPermissions:
@@ -46,41 +45,41 @@ describe('AgentTool workspace permissions', () => {
   });
 
   it('runs a tool for a member holding its permission', async () => {
-    const { services, tools } = setup(['target.read']);
+    const { services, tools } = setup(['job.read']);
 
-    await tools().retrieve_targets.execute({}, call);
+    await tools().review_jobs.execute({}, call);
 
     expect(services.workspacesService.getMembershipWithPermissions).toHaveBeenCalledWith(
       'w1',
       'u1',
     );
-    expect(services.targetsService.getTargetsInWorkspace).toHaveBeenCalled();
+    expect(services.jobsRegistryService.getManyJobs).toHaveBeenCalled();
   });
 
   it('refuses a tool to a member the API would refuse', async () => {
     const { services, tools } = setup(['asset.read']);
 
-    const result = await tools().retrieve_targets.execute({}, call);
+    const result = await tools().review_jobs.execute({}, call);
 
-    expect(result).toEqual({ error: expect.stringContaining('target.read') });
-    expect(services.targetsService.getTargetsInWorkspace).not.toHaveBeenCalled();
+    expect(result).toEqual({ error: expect.stringContaining('job.read') });
+    expect(services.jobsRegistryService.getManyJobs).not.toHaveBeenCalled();
   });
 
   it('lets {domain}.write satisfy a read tool, like the API guard', async () => {
-    const { services, tools } = setup(['target.write']);
+    const { services, tools } = setup(['job.write']);
 
-    await tools().retrieve_targets.execute({}, call);
+    await tools().review_jobs.execute({}, call);
 
-    expect(services.targetsService.getTargetsInWorkspace).toHaveBeenCalled();
+    expect(services.jobsRegistryService.getManyJobs).toHaveBeenCalled();
   });
 
   it('refuses every tool to a user who is no longer a member', async () => {
     const { services, tools } = setup(new NotFoundException());
 
-    const result = await tools().enumerate_assets.execute({}, call);
+    const result = await tools().review_jobs.execute({}, call);
 
     expect(result).toEqual({ error: expect.stringContaining('not a member') });
-    expect(services.assetsService.getManyAsssetServices).not.toHaveBeenCalled();
+    expect(services.jobsRegistryService.getManyJobs).not.toHaveBeenCalled();
   });
 
   it('checks the permission before the guard and the approval prompt', async () => {
@@ -89,7 +88,7 @@ describe('AgentTool workspace permissions', () => {
     await tools(AgentMode.AGENT, {
       userId: 'u1',
       mode: AgentApprovalMode.MANUAL,
-    }).retrieve_targets.execute({}, call);
+    }).review_jobs.execute({}, call);
 
     expect(services.guard.evaluate).not.toHaveBeenCalled();
     expect(services.approvals.authorize).not.toHaveBeenCalled();
@@ -98,21 +97,21 @@ describe('AgentTool workspace permissions', () => {
   it('checks the permission when the tools run without approval (read-only subagents)', async () => {
     const { services, tools } = setup([]);
 
-    await tools(AgentMode.AGENT).retrieve_targets.execute({}, call);
+    await tools(AgentMode.AGENT).review_jobs.execute({}, call);
 
-    expect(services.targetsService.getTargetsInWorkspace).not.toHaveBeenCalled();
+    expect(services.jobsRegistryService.getManyJobs).not.toHaveBeenCalled();
   });
 
   it('reads the permissions at call time, so a revoked key stops the next call', async () => {
-    const { services, tools } = setup(['target.read']);
-    const retrieve = tools().retrieve_targets;
+    const { services, tools } = setup(['job.read']);
+    const reviewJobs = tools().review_jobs;
 
-    await retrieve.execute({}, call);
+    await reviewJobs.execute({}, call);
     services.workspacesService.getMembershipWithPermissions.mockResolvedValue({
       permissionKeys: [],
     });
-    await retrieve.execute({}, call);
+    await reviewJobs.execute({}, call);
 
-    expect(services.targetsService.getTargetsInWorkspace).toHaveBeenCalledTimes(1);
+    expect(services.jobsRegistryService.getManyJobs).toHaveBeenCalledTimes(1);
   });
 });

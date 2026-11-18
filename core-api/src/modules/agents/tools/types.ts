@@ -3,7 +3,6 @@ import type { Repository } from 'typeorm';
 
 import type { AgentMode } from '@/modules/agents/enums/agent.enums';
 import type { ArtifactsService } from '@/modules/artifacts/artifacts.service';
-import type { AssetsService } from '@/modules/assets/assets.service';
 import type { AttackSurfaceQueryService } from '@/modules/attack-surface-query/attack-surface-query.service';
 import type { ConnectorRegistryService } from '@/modules/connectors/connector-registry.service';
 import type { IssuesService } from '@/modules/issues/issues.service';
@@ -96,7 +95,6 @@ export type ToolScope = Pick<
  * uses for it; the shared helpers take the slice they need (`Deps<...>`).
  */
 export interface ToolServices {
-  assetsService: AssetsService;
   attackSurfaceQuery: AttackSurfaceQueryService;
   targetsService: TargetsService;
   vulnerabilitiesService: VulnerabilitiesService;

@@ -31,7 +31,7 @@ Findings on assets: list/detail/statistics, the lifecycle (new → active → fi
 - BullMQ `VULNERABILITY_ANALYSIS` (`vulnerability-analysis`): job name = vulnerability id, data = the analysis payload plus `workspaceId` and `userId`, removed on complete and on fail.
 - Consumes the in-process `JOB_RESULT_SYNCED_EVENT` (`@OnEvent`, `promisify: true`) in `VulnerabilityLifecycleService.onJobResultSynced`.
 - Cron `VulnerabilityRiskExpiryCron`: `5 * * * *`, `@Lock('cron:vulnerability-risk-expiry')`.
-- Agent/MCP tools: `discover_vulnerabilities`, `investigate_vulnerability` (read, also on MCP). `propose_vulnerability` (agent mode only) calls `VulnerabilityReviewService.propose`.
+- Agent/MCP tools: `investigate_vulnerability` (read, also on MCP); listing findings goes through `query_attack_surface` (`vulnerabilities` resource, attack-surface-query module), which replaced `discover_vulnerabilities`. `propose_vulnerability` (agent mode only) calls `VulnerabilityReviewService.propose`.
 
 ## Data model
 

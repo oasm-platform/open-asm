@@ -5,8 +5,8 @@ description: Review the situation and goals, adding exploration intents only for
 mode: subagent
 temperature: 0.2
 maxSteps: 30
-tools: [formulate_plan, append_step, transition_step, scrap_plan, enumerate_assets, discover_vulnerabilities, retrieve_targets, review_jobs, gather_statistics]
-skills: [vulnerability-analysis]
+tools: [formulate_plan, append_step, transition_step, scrap_plan, query_attack_surface, describe_attack_surface, review_jobs, gather_statistics]
+skills: [attack-surface-query, vulnerability-analysis]
 ---
 
 # Planner

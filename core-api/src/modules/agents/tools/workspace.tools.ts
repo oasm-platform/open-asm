@@ -4,52 +4,32 @@ import { z } from 'zod';
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { WorkerScope, WorkerType } from '@/common/enums/enum';
 import {
-  detailAssetSchema,
   detailIssueSchema,
   detailVulnSchema,
-  getAssetsSchema,
-  getPortsSchema,
-  getTargetsSchema,
-  getTechnologiesSchema,
-  getTlsSchema,
-  getVulnerabilitiesSchema,
-  listAssetsInTargetSchema,
   listIssuesSchema,
   listJobsSchema,
   listToolsSchema,
   listWorkersSchema,
 } from '@/mcp/mcp.schema';
-import { AssetsService } from '@/modules/assets/assets.service';
 import { ConnectorRegistryService } from '@/modules/connectors/connector-registry.service';
 import { IssuesService } from '@/modules/issues/issues.service';
 import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
 import { ProjectResultsService } from '@/modules/projects/project-results.service';
 import { StatisticService } from '@/modules/statistic/statistic.service';
-import { TargetsService } from '@/modules/targets/targets.service';
 import { ToolsService } from '@/modules/tools/tools.service';
 import { getSensitiveFields } from '@/modules/tools/validators/tool-config-profiles.crypto';
 import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilities.service';
 import { WorkersService } from '@/modules/workers/workers.service';
 
 import { AgentFunction } from './agent-function';
-import {
-  NEWEST_FIRST,
-  assetsInProject,
-  pageOf,
-  projectFor,
-  projectIdInput,
-} from './helpers';
+import { NEWEST_FIRST, pageOf, projectFor, projectIdInput } from './helpers';
 import type { AgentFunctionContext } from './types';
 
 // Tools over the workspace's OASM data, offered in every agent mode. The
 // project-aware ones take a projectId, or are locked to the conversation's.
+// Listing and filtering hosts, services, technologies, TLS, findings and
+// targets goes through query_attack_surface (AttackSurfaceQueryTools).
 
-const getAssetsInput = getAssetsSchema.extend(projectIdInput);
-const getVulnerabilitiesInput = getVulnerabilitiesSchema.extend(projectIdInput);
-const listAssetsInTargetInput = listAssetsInTargetSchema.extend(projectIdInput);
-const getPortsInput = getPortsSchema.extend(projectIdInput);
-const getTechnologiesInput = getTechnologiesSchema.extend(projectIdInput);
-const getTlsInput = getTlsSchema.extend(projectIdInput);
 const statisticsInput = z.object(projectIdInput);
 
 export interface ConfigFieldInfo {
@@ -98,10 +78,8 @@ export function describeConfigFields(
 @Injectable()
 export class WorkspaceTools {
   constructor(
-    readonly assetsService: AssetsService,
     readonly vulnerabilitiesService: VulnerabilitiesService,
     readonly projectResultsService: ProjectResultsService,
-    readonly targetsService: TargetsService,
     readonly statisticService: StatisticService,
     readonly issuesService: IssuesService,
     readonly toolsService: ToolsService,
@@ -109,147 +87,6 @@ export class WorkspaceTools {
     readonly workersService: WorkersService,
     readonly jobsRegistryService: JobsRegistryService,
   ) {}
-
-  @AgentFunction({
-    name: 'enumerate_assets',
-    description:
-      'List discovered assets (domains, IPs, URLs) in the workspace. Params: page, limit, value (filter text), projectId.',
-    inputSchema: getAssetsInput,
-    permissions: ['asset.read'],
-    readOnly: true,
-    mcp: true,
-  })
-  async enumerateAssets(
-    params: z.infer<typeof getAssetsInput>,
-    ctx: AgentFunctionContext,
-  ) {
-    const response = await this.assetsService.getManyAsssetServices(
-      {
-        ...pageOf(params),
-        ...NEWEST_FIRST,
-        value: params.value,
-        ...assetsInProject(projectFor(ctx, params)),
-      },
-      ctx.workspaceId,
-    );
-    return {
-      ...response,
-      data: response.data.map((i) => ({ id: i.id, value: i.value })),
-    };
-  }
-
-  @AgentFunction({
-    name: 'discover_vulnerabilities',
-    description: [
-      'List security vulnerabilities, most severe first. Only open findings unless status says otherwise (AI proposals show only under pending_review/rejected).',
-      'Params: page, limit, q (search e.g. "XSS", "CVE-2024"), status, severity, overdue, discoveredBy, tags, targetIds, createdFrom/createdTo (first detected), projectId.',
-      'With a project: the ones its runs reported (q, status and severity apply).',
-      'Each item: id, name, severity, asset, detectionStatus (new/active/fixed/resurfaced), reviewStatus, discoveredBy, dueAt (SLA), timesDetected, firstDetectedDate, lastSeenDate, cveId, cvssScore, dismissal ({reason, expiresAt} or null), openIssue ({id, no, status} or null).',
-    ],
-    inputSchema: getVulnerabilitiesInput,
-    permissions: ['vulnerability.read'],
-    readOnly: true,
-    mcp: true,
-  })
-  async discoverVulnerabilities(
-    params: z.infer<typeof getVulnerabilitiesInput>,
-    ctx: AgentFunctionContext,
-  ) {
-    const { workspaceId } = ctx;
-    const projectId = projectFor(ctx, params);
-    if (projectId) {
-      const found = await this.projectResultsService.vulnerabilities(
-        projectId,
-        workspaceId,
-        {
-          ...pageOf(params),
-          ...NEWEST_FIRST,
-          search: params.q ?? '',
-          status: params.status,
-          severity: params.severity,
-        },
-      );
-      return {
-        total: found.total,
-        page: found.page,
-        limit: found.limit,
-        pageCount: found.pageCount,
-        hasNextPage: found.hasNextPage,
-        data: found.data.map((i) => ({
-          id: i.id,
-          name: i.name,
-          severity: i.severity,
-          asset: i.assetValue,
-          status: i.status,
-          provenance: i.provenance,
-          cveId: i.cveId,
-          tool: i.toolName,
-        })),
-      };
-    }
-    const response = await this.vulnerabilitiesService.getVulnerabilities(
-      {
-        ...pageOf(params),
-        sortBy: 'severity',
-        sortOrder: SortOrder.DESC,
-        q: params.q,
-        status: params.status,
-        severity: params.severity,
-        overdue: params.overdue,
-        discoveredBy: params.discoveredBy,
-        tags: params.tags,
-        targetIds: params.targetIds,
-        createdFrom: params.createdFrom,
-        createdTo: params.createdTo,
-      },
-      workspaceId,
-    );
-    return {
-      ...response,
-      data: response.data.map((i) => ({
-        id: i.id,
-        name: i.name,
-        severity: i.severity,
-        asset: i.asset?.value ?? null,
-        detectionStatus: i.detectionStatus,
-        reviewStatus: i.reviewStatus,
-        discoveredBy: i.discoveredBy,
-        dueAt: i.dueAt ?? null,
-        timesDetected: i.timesDetected,
-        firstDetectedDate: i.firstDetectedDate ?? null,
-        lastSeenDate: i.lastSeenDate ?? null,
-        cveId: i.cveId ?? null,
-        cvssScore: i.cvssScore ?? null,
-        dismissal: i.dismissal
-          ? { reason: i.dismissal.reason, expiresAt: i.dismissal.expiresAt ?? null }
-          : null,
-        openIssue: i.openIssue,
-      })),
-    };
-  }
-
-  @AgentFunction({
-    name: 'retrieve_targets',
-    description:
-      'Show scanning scope (root domains, IP ranges added by user). Params: page, limit, value (filter text).',
-    inputSchema: getTargetsSchema,
-    permissions: ['target.read'],
-    readOnly: true,
-    mcp: true,
-  })
-  async retrieveTargets(
-    params: z.infer<typeof getTargetsSchema>,
-    ctx: AgentFunctionContext,
-  ) {
-    const response = await this.targetsService.getTargetsInWorkspace(
-      { ...pageOf(params), ...NEWEST_FIRST, value: params.value },
-      ctx.workspaceId,
-    );
-    return {
-      ...response,
-      data: response.data.map((i) => ({ id: i.id, value: i.value })),
-    };
-  }
 
   @AgentFunction({
     name: 'gather_statistics',
@@ -271,46 +108,6 @@ export class WorkspaceTools {
   }
 
   @AgentFunction({
-    name: 'inspect_asset',
-    description: 'Get full technical details of a single asset by assetId.',
-    inputSchema: detailAssetSchema,
-    permissions: ['asset.read'],
-    readOnly: true,
-    mcp: true,
-  })
-  inspectAsset(
-    params: z.infer<typeof detailAssetSchema>,
-    ctx: AgentFunctionContext,
-  ) {
-    return this.assetsService.getAssetById(params.assetId, ctx.workspaceId);
-  }
-
-  @AgentFunction({
-    name: 'examine_target_assets',
-    description:
-      'List assets discovered from a specific target by targetId. Params: targetId, page, limit, value (filter), projectId.',
-    inputSchema: listAssetsInTargetInput,
-    permissions: ['asset.read'],
-    readOnly: true,
-    mcp: true,
-  })
-  examineTargetAssets(
-    params: z.infer<typeof listAssetsInTargetInput>,
-    ctx: AgentFunctionContext,
-  ) {
-    return this.assetsService.getManyAsssetServices(
-      {
-        ...pageOf(params),
-        ...NEWEST_FIRST,
-        targetIds: [params.targetId],
-        value: params.value,
-        ...assetsInProject(projectFor(ctx, params)),
-      },
-      ctx.workspaceId,
-    );
-  }
-
-  @AgentFunction({
     name: 'investigate_vulnerability',
     description:
       'Get full vulnerability report: CVSS/EPSS, PoC, remediation, code location, lifecycle (detectionStatus, timesDetected, resurfacedCount, fixedAt, fixClaimedAt, dueAt), review (reviewStatus, reviewNote), discoveredBy, every source (tool run or AI agent, with evidence), dismissal and the open remediation issue. Params: vulnId.',
@@ -325,79 +122,6 @@ export class WorkspaceTools {
   ) {
     return this.vulnerabilitiesService.getVulnerability(
       params.vulnId ?? params.id,
-      ctx.workspaceId,
-    );
-  }
-
-  @AgentFunction({
-    name: 'list_network_ports',
-    description:
-      'List open network ports with asset counts. Params: page, limit, value (port number filter), projectId.',
-    inputSchema: getPortsInput,
-    permissions: ['asset.read'],
-    readOnly: true,
-    mcp: true,
-  })
-  listNetworkPorts(
-    params: z.infer<typeof getPortsInput>,
-    ctx: AgentFunctionContext,
-  ) {
-    return this.assetsService.getPortAssets(
-      {
-        ...pageOf(params),
-        ...NEWEST_FIRST,
-        value: params.value,
-        ...assetsInProject(projectFor(ctx, params)),
-      },
-      ctx.workspaceId,
-    );
-  }
-
-  @AgentFunction({
-    name: 'fingerprint_technologies',
-    description:
-      'List detected technologies (software, frameworks, servers). Params: page, limit, value (filter by name), projectId.',
-    inputSchema: getTechnologiesInput,
-    permissions: ['asset.read'],
-    readOnly: true,
-    mcp: true,
-  })
-  fingerprintTechnologies(
-    params: z.infer<typeof getTechnologiesInput>,
-    ctx: AgentFunctionContext,
-  ) {
-    return this.assetsService.getTechnologyAssets(
-      {
-        ...pageOf(params),
-        ...NEWEST_FIRST,
-        value: params.value,
-        ...assetsInProject(projectFor(ctx, params)),
-      },
-      ctx.workspaceId,
-    );
-  }
-
-  @AgentFunction({
-    name: 'verify_tls_settings',
-    description:
-      'List TLS/SSL certificates with issuer, subject, expiry. Params: page, limit, search (host name filter), projectId.',
-    inputSchema: getTlsInput,
-    permissions: ['asset.read'],
-    readOnly: true,
-    mcp: true,
-  })
-  verifyTlsSettings(
-    params: z.infer<typeof getTlsInput>,
-    ctx: AgentFunctionContext,
-  ) {
-    return this.assetsService.getManyTls(
-      {
-        ...pageOf(params),
-        sortBy: 'not_after',
-        sortOrder: SortOrder.ASC,
-        search: params.search,
-        ...assetsInProject(projectFor(ctx, params)),
-      },
       ctx.workspaceId,
     );
   }

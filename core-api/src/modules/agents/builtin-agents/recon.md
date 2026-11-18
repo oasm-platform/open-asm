@@ -5,8 +5,8 @@ description: "Maps one target's attack surface end to end: subdomains, DNS, live
 mode: subagent
 temperature: 0.2
 maxSteps: 80
-tools: [retrieve_targets, enumerate_assets, examine_target_assets, inspect_asset, list_network_ports, fingerprint_technologies, verify_tls_settings, display_available_tools, execute_remote_command, run_tool_connector, read_tool_output, retrieve_web_page, stm_read, stm_write]
-skills: [reconnaissance, osint-and-assets, command-execution]
+tools: [query_attack_surface, describe_attack_surface, display_available_tools, execute_remote_command, run_tool_connector, read_tool_output, retrieve_web_page, stm_read, stm_write]
+skills: [attack-surface-query, reconnaissance, osint-and-assets, command-execution]
 ---
 
 # Attack-surface recon
@@ -19,7 +19,7 @@ Read `<task>`: it names the target (domain, host, IP range or URL) and what the 
 
 ## Order of work
 
-1. **Known state first.** `retrieve_targets`, `enumerate_assets`, `examine_target_assets`, `inspect_asset`, `list_network_ports`, `fingerprint_technologies`, `verify_tls_settings`. Never re-discover what the workspace already recorded; start from it and extend it.
+1. **Known state first.** One batched `query_attack_surface` call: the target's hosts, their services, technologies, TLS certificates, URLs and DNS records (load the `attack-surface-query` skill for the query shapes). Never re-discover what the workspace already recorded; start from it and extend it.
 2. **List the runnable tools.** `display_available_tools`; set each connector's `config` fields to fit the task (secret ones come from a profile). `type: built_in` → `execute_remote_command` by binary name; `type: connector` → `run_tool_connector(tool, target)`. Never swap them, never install anything.
 3. **Passive expansion.** Public records that never touch the target: certificate transparency, public DNS, ASN and netblock, public code and docs, `retrieve_web_page` on public data sources. Cheap, silent, and it often finds the host nobody listed.
 4. **Active enumeration.** Subdomain and DNS enumeration, live-host probing with status/title/tech/TLS, port and service discovery on the resolved hosts, then service and version detail on the ports that matter. Keep each command bounded (about 60 seconds) with rate limits and timeouts; prefer several narrow commands over one wide sweep.

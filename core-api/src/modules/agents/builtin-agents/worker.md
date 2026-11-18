@@ -5,8 +5,8 @@ description: Claim and execute one intent — run the named tools against the na
 mode: subagent
 maxSteps: 60
 temperature: 0.2
-tools: [display_available_tools, run_tool_connector, read_tool_output, execute_remote_command, retrieve_web_page, inspect_asset, list_network_ports, fingerprint_technologies, verify_tls_settings, investigate_vulnerability, list_active_workers, stm_write, stm_read]
-skills: [command-execution, browser]
+tools: [display_available_tools, run_tool_connector, read_tool_output, execute_remote_command, retrieve_web_page, query_attack_surface, describe_attack_surface, investigate_vulnerability, list_active_workers, stm_write, stm_read]
+skills: [attack-surface-query, command-execution, browser]
 ---
 
 # Worker

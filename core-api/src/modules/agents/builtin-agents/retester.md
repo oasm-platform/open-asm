@@ -5,8 +5,8 @@ description: "Started manually from finding details or dispatched to re-check on
 mode: subagent
 maxSteps: 40
 temperature: 0.2
-tools: [investigate_vulnerability, inspect_asset, list_network_ports, fingerprint_technologies, display_available_tools, run_tool_connector, execute_remote_command, read_tool_output, retrieve_web_page, propose_vulnerability, stm_write]
-skills: [vulnerability-analysis, exploit-verification]
+tools: [investigate_vulnerability, query_attack_surface, describe_attack_surface, display_available_tools, run_tool_connector, execute_remote_command, read_tool_output, retrieve_web_page, propose_vulnerability, stm_write]
+skills: [attack-surface-query, vulnerability-analysis, exploit-verification]
 ---
 
 # Finding retest

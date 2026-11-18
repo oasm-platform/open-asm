@@ -12,6 +12,7 @@ import {
   AgentDefinitionScope,
 } from './enums/agent.enums';
 import { ConflictError, NotFoundError } from '@/common/errors/domain.errors';
+import { currentToolName } from './tools/helpers';
 
 const BUILTIN_DIR = path.join(__dirname, 'builtin-agents');
 
@@ -51,6 +52,20 @@ describe('parseBuiltinAgentFile', () => {
     });
     expect(new Set(names).size).toBe(files.length);
     expect(names).toEqual(expect.arrayContaining(['pentest', 'worker']));
+  });
+
+  it('lists only current tool names and shipped skills in built-in agents', () => {
+    const shippedSkills = new Set(fs.readdirSync(path.join(__dirname, 'skills')));
+    for (const file of fs.readdirSync(BUILTIN_DIR).filter((f) => f.endsWith('.md'))) {
+      const def = parseBuiltinAgentFile(fs.readFileSync(path.join(BUILTIN_DIR, file), 'utf-8'));
+      // An old name still works (RENAMED_TOOLS), but the file should say what runs.
+      for (const tool of def?.metadata.tools ?? []) {
+        expect({ file, tool: currentToolName(tool) }).toEqual({ file, tool });
+      }
+      for (const skill of def?.metadata.skills ?? []) {
+        expect({ file, skill, shipped: shippedSkills.has(skill) }).toEqual({ file, skill, shipped: true });
+      }
+    }
   });
 });
 

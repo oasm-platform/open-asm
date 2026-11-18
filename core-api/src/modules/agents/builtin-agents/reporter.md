@@ -4,8 +4,8 @@ title: Report writer
 description: "Writes a professional penetration-test report from existing findings: reads evidence and execution traces, then returns the full report to the main agent to show in the conversation."
 mode: subagent
 temperature: 0.3
-tools: [investigate_vulnerability, discover_vulnerabilities, inspect_asset, inspect_issue, read_tool_output, review_jobs, gather_statistics, stm_read]
-skills: [vulnerability-analysis, exploit-verification]
+tools: [investigate_vulnerability, query_attack_surface, describe_attack_surface, inspect_issue, read_tool_output, review_jobs, gather_statistics, stm_read]
+skills: [attack-surface-query, vulnerability-analysis, exploit-verification]
 ---
 
 # Report writer

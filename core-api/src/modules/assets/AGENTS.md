@@ -28,7 +28,7 @@ Read side of the attack surface: hosts (`assets`), their open ports (`asset_serv
 
 - Exports `AssetsService` and `RepositoryAssetsService` (`UrlDiscoveryService` is internal).
 - No `@PublishEvent` on any route. `UrlDiscoveryService.handleRunEnd` (`@OnEvent(EventTriggerType.WORKFLOW_END)`) publishes `asset.url.discovered` for `url_discovery` runs.
-- MCP/agent tools in `agents/tools/workspace.tools.ts`: `enumerate_assets`, `inspect_asset`, `examine_target_assets`, `list_network_ports`, `fingerprint_technologies`, `verify_tls_settings`. They call `getManyAsssetServices` (note the triple "s"), `getAssetById`, `getPortAssets`, `getTechnologyAssets`, `getManyTls`.
+- No agent/MCP tool calls this module any more: the agent reads these tables through `query_attack_surface` (attack-surface-query module), which replaced `enumerate_assets`, `inspect_asset`, `examine_target_assets`, `list_network_ports`, `fingerprint_technologies` and `verify_tls_settings`.
 
 ## Data model
 
