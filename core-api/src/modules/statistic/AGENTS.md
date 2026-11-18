@@ -4,8 +4,9 @@ Dashboard numbers for a workspace (live counts, timelines, top-N lists, TLS and 
 
 ## Layout
 
-- `statistic.service.ts`: `StatisticService`, all queries (raw SQL / query builders over other modules' tables), Redis caching, workflow start/end handlers.
-- `statistic-cron.service.ts`: `@Cron('0 0 * * *')` + `@Lock('cron:statistic-daily', { ttl: 600_000 })` → `calculateAndStoreStatistics()`.
+- `statistic.service.ts`: `StatisticService`, the dashboard and report queries (raw SQL / query builders over other modules' tables), Redis caching, `calculateStatistics` (the live numbers, also what the cron stores) and `calculateSecurityScore`.
+- `statistic-snapshot.service.ts`: `StatisticSnapshotService`: the daily snapshot (`calculateAndStoreStatistics`, `filterChangedStatistics`) and the workflow start/end handlers. It reads the counts through `StatisticService`.
+- `statistic-cron.service.ts`: `@Cron('0 0 * * *')` + `@Lock('cron:statistic-daily', { ttl: 600_000 })` → `StatisticSnapshotService.calculateAndStoreStatistics()`.
 - `statistic.controller.ts`: read-only routes under `statistic`.
 - `entities/statistic.entity.ts`: `Statistic` (`workspace_statistics`).
 - `dto/`: one DTO file per endpoint.
@@ -19,7 +20,7 @@ All routes are `GET`, `@WorkspaceAccess('workspace.read')`, workspace from the `
 
 - Registered in `combine.module.ts`. Exports `StatisticService`.
 - Agent tool use: `agents/tools/workspace.tools.ts` calls `getStatistics`.
-- Consumes in-process `EventEmitter2` events `EventTriggerType.WORKFLOW_START` and `WORKFLOW_END` (`@OnEvent`, emitted by `jobs-registry.service.ts` and `workflow-runner.service.ts`).
+- Consumes in-process `EventEmitter2` events `EventTriggerType.WORKFLOW_START` and `WORKFLOW_END` (`@OnEvent` on `StatisticSnapshotService`, emitted by `jobs-registry.service.ts` and `workflow-runner.service.ts`).
 - Publishes `workflow.run.completed` (`WorkflowRunCompletedPayload`) through `EventBridgeService.publishSafely`, only for runs of `DefaultWorkflow.DOMAIN_DISCOVERY` / `IP_ADDRESS_DISCOVERY`.
 
 ## Data model
@@ -36,11 +37,11 @@ All routes are `GET`, `@WorkspaceAccess('workspace.read')`, workspace from the `
 
 ## Coupling
 
-- `StatisticService` injects `DataSource`, `GeoIpService`, `RedisService`, `WorkspacesService`, `EventBridgeService`, `TechnologyForwarderService` (imports `TechnologyModule`). It queries `targets`, `assets`, `asset_services`, `asset_tags`, `vulnerabilities`, `tls_certificates` and more directly; it does not call those modules' services.
+- `StatisticService` injects `DataSource`, `GeoIpService`, `RedisService`, `TechnologyForwarderService` (imports `TechnologyModule`); `StatisticSnapshotService` injects `DataSource`, `RedisService`, `WorkspacesService`, `EventBridgeService` and `StatisticService`. It queries `targets`, `assets`, `asset_services`, `asset_tags`, `vulnerabilities`, `tls_certificates` and more directly; it does not call those modules' services.
 - The module imports `TechnologyModule` (for `TechnologyForwarderService`), plus `TargetsModule`, `AssetsModule`, `VulnerabilitiesModule` and `NotificationsModule`, although the service injects nothing from those four. The old Statistic → Vulnerabilities → Agents → Statistic cycle is gone (vulnerabilities no longer imports agents), so there is no `forwardRef`.
 - Imported by `reports` (report data and score), `search` (`getTotalAssets`, `getTotalTargets`) and `agents`.
 - Notifications about discovery runs are produced downstream from `workflow.run.completed`, not here.
 
 ## Testing
 
-`statistic.service.spec.ts`, `statistic.controller.spec.ts` (including a check that every route has the workspace permission guard), `statistic-cron.service.spec.ts`, `workspace-insights.spec.ts` (rules and `getAttention`).
+`statistic.service.spec.ts`, `statistic-snapshot.service.spec.ts` (workflow end handler), `statistic.controller.spec.ts` (including a check that every route has the workspace permission guard), `statistic-cron.service.spec.ts`, `workspace-insights.spec.ts` (rules and `getAttention`).

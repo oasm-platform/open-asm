@@ -7,6 +7,7 @@ import { VulnerabilitiesModule } from '../vulnerabilities/vulnerabilities.module
 import { Statistic } from './entities/statistic.entity';
 import { StatisticCronService } from './statistic-cron.service';
 import { StatisticController } from './statistic.controller';
+import { StatisticSnapshotService } from './statistic-snapshot.service';
 import { StatisticService } from './statistic.service';
 import { TechnologyModule } from '../technology/technology.module';
 
@@ -20,7 +21,7 @@ import { TechnologyModule } from '../technology/technology.module';
     TechnologyModule,
   ],
   controllers: [StatisticController],
-  providers: [StatisticService, StatisticCronService],
+  providers: [StatisticService, StatisticSnapshotService, StatisticCronService],
   exports: [StatisticService],
 })
 export class StatisticModule {}

@@ -1,12 +1,12 @@
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { StatisticCronService } from './statistic-cron.service';
-import { StatisticService } from './statistic.service';
+import { StatisticSnapshotService } from './statistic-snapshot.service';
 import { RedisLockService } from '@/services/redis/distributed-lock.service';
 
 describe('StatisticCronService', () => {
   let service: StatisticCronService;
-  let statisticService: StatisticService;
+  let statisticService: StatisticSnapshotService;
 
   const mockStatisticService = {
     calculateAndStoreStatistics: jest.fn(),
@@ -35,14 +35,14 @@ describe('StatisticCronService', () => {
       providers: [
         StatisticCronService,
         {
-          provide: StatisticService,
+          provide: StatisticSnapshotService,
           useValue: mockStatisticService,
         },
       ],
     }).compile();
 
     service = module.get<StatisticCronService>(StatisticCronService);
-    statisticService = module.get<StatisticService>(StatisticService);
+    statisticService = module.get<StatisticSnapshotService>(StatisticSnapshotService);
   });
 
   it('should be defined', () => {
