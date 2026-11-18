@@ -5,7 +5,8 @@ Read side of the attack surface: hosts (`assets`), their open ports (`asset_serv
 ## Layout
 
 - `assets.controller.ts`: HTTP routes on `assets`, including the CSV export built in the controller.
-- `assets.service.ts`: `AssetsService`: list/facet queries, TLS, tags, toggle, `hasPrimaryAsset`, `createPrimaryAsset`, AI tags.
+- `assets.service.ts`: `AssetsService`: TLS, tags, toggle, `hasPrimaryAsset`, AI tags, CSV export. It keeps thin delegates (`getManyAsssetServices`, `getAssetById`, `getPortAssets`, `getTechnologyAssets`) for agents tools and search.
+- `asset-query.service.ts`: `AssetQueryService`: `buildBaseQuery` (tenant scope + filter tree, public: the TLS and export queries use it), the service list with its batch-loaded facets, `getAssetById`, the IP/host/tag/port/URL/technology/status-code tabs, and the per-response tech/TLS lookups.
 - `asset-graph.service.ts`: `AssetGraphService`: the topology graph (`getAssetGraph`) and the lazy expansion of one asset's services (`getAssetServiceGraph`). Controller only.
 - `repository-assets.service.ts`: `RepositoryAssetsService`: lists a GIT_ORG target's repository assets and applies a repository sync's changes (`RepositoryAssetChanges`) in one transaction, ordered renames → updates → inserts → disables for the `(value, targetId)` unique constraint.
 - `url-discovery.service.ts`: `UrlDiscoveryService`: starts the `url_discovery` workflow and publishes `asset.url.discovered` when a run ends.
@@ -39,7 +40,7 @@ Read side of the attack surface: hosts (`assets`), their open ports (`asset_serv
 
 ## Invariants
 
-- Tenant scope is `asset → target.workspaceId`, and `asset_service → asset → target.workspaceId` for services. `buildBaseQuery` applies it to every list and facet; single-row methods join `target` and filter on `workspaceId`. `getAllAssetsByTargetId` and `createPrimaryAsset` take no workspace and have no callers. Add a workspace check before you wire either to a route.
+- Tenant scope is `asset → target.workspaceId`, and `asset_service → asset → target.workspaceId` for services. `buildBaseQuery` applies it to every list and facet; single-row methods join `target` and filter on `workspaceId`.
 - **Ids differ by route**: `GET/PATCH assets/:id` and `service/tag/generate` take an `asset_services.id`; `POST assets/toggle` and `GET assets/:assetId/services` take an `assets.id`. The list rows are services, not hosts.
 - `PATCH assets/:id` replaces all tags of the service (delete then insert), and returns the parent `Asset`.
 - `isNew` and the "new" badges both go through `freshRunSql`: a row is new while the completed run that found it is the latest completed run of that workflow on that target.
@@ -63,4 +64,4 @@ Read side of the attack surface: hosts (`assets`), their open ports (`asset_serv
 
 ## Testing
 
-Unit specs: `assets.service.spec.ts`, `asset-graph.service.spec.ts`, `assets.controller.spec.ts`, `repository-assets.service.spec.ts`, `url-discovery.service.spec.ts`, `asset-filter.spec.ts`, `fresh-runs.spec.ts`, `dto/assets-filter.dto.spec.ts`, `entities/discovered-url.entity.spec.ts`. E2E (live DB): `core-api/test/assets-facets.e2e-spec.ts`, `assets-filter.e2e-spec.ts`, `assets-url.e2e-spec.ts`.
+Unit specs: `assets.service.spec.ts`, `asset-query.service.spec.ts`, `asset-graph.service.spec.ts`, `assets.controller.spec.ts`, `repository-assets.service.spec.ts`, `url-discovery.service.spec.ts`, `asset-filter.spec.ts`, `fresh-runs.spec.ts`, `dto/assets-filter.dto.spec.ts`, `entities/discovered-url.entity.spec.ts`. E2E (live DB): `core-api/test/assets-facets.e2e-spec.ts`, `assets-filter.e2e-spec.ts`, `assets-url.e2e-spec.ts` (the facets and URL suites call `AssetQueryService` directly).

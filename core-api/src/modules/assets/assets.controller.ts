@@ -16,6 +16,7 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import type { NodeResponse } from '@nestjs/platform-node';
 import { AssetGraphService } from './asset-graph.service';
+import { AssetQueryService } from './asset-query.service';
 import { AssetsService } from './assets.service';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
 import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
@@ -46,6 +47,7 @@ export class AssetsController {
     private readonly assetsService: AssetsService,
     private readonly urlDiscoveryService: UrlDiscoveryService,
     private readonly assetGraph: AssetGraphService,
+    private readonly assetQuery: AssetQueryService,
   ) {}
 
   @Doc({
@@ -64,7 +66,7 @@ export class AssetsController {
     @Query() query: GetAssetsQueryDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetsService.getManyAsssetServices(query, workspaceId);
+    return this.assetQuery.getManyAsssetServices(query, workspaceId);
   }
 
   @Doc({
@@ -83,7 +85,7 @@ export class AssetsController {
     @Query() query: GetAssetsQueryDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetsService.getIpAssets(query, workspaceId);
+    return this.assetQuery.getIpAssets(query, workspaceId);
   }
 
   @Doc({
@@ -102,7 +104,7 @@ export class AssetsController {
     @Query() query: GetAssetsQueryDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetsService.getHostAssets(query, workspaceId);
+    return this.assetQuery.getHostAssets(query, workspaceId);
   }
 
   @Doc({
@@ -121,7 +123,7 @@ export class AssetsController {
     @Query() query: GetAssetsQueryDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetsService.getPortAssets(query, workspaceId);
+    return this.assetQuery.getPortAssets(query, workspaceId);
   }
 
   @Doc({
@@ -141,7 +143,7 @@ export class AssetsController {
     @Query() query: GetAssetsQueryDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetsService.getUrlAssets(query, workspaceId);
+    return this.assetQuery.getUrlAssets(query, workspaceId);
   }
 
   @Doc({
@@ -180,7 +182,7 @@ export class AssetsController {
     @Query() query: GetAssetsQueryDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetsService.getTechnologyAssets(query, workspaceId);
+    return this.assetQuery.getTechnologyAssets(query, workspaceId);
   }
 
   @Doc({
@@ -199,7 +201,7 @@ export class AssetsController {
     @Query() query: GetAssetsQueryDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetsService.getStatusCodeAssets(query, workspaceId);
+    return this.assetQuery.getStatusCodeAssets(query, workspaceId);
   }
 
   @Doc({
@@ -239,7 +241,7 @@ export class AssetsController {
     @Query() query: GetAssetsQueryDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetsService.getTagAssets(query, workspaceId);
+    return this.assetQuery.getTagAssets(query, workspaceId);
   }
 
   @Doc({
@@ -322,7 +324,7 @@ export class AssetsController {
   @WorkspaceAccess('asset.read')
   @Get(':id')
   getAssetById(@Param('id') id: string, @WorkspaceId() workspaceId: string) {
-    return this.assetsService.getAssetById(id, workspaceId);
+    return this.assetQuery.getAssetById(id, workspaceId);
   }
 
   @Doc({

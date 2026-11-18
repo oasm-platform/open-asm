@@ -7,6 +7,7 @@ import { TechnologyModule } from '../technology/technology.module';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
 import { AssetsController } from './assets.controller';
 import { AssetGraphService } from './asset-graph.service';
+import { AssetQueryService } from './asset-query.service';
 import { AssetsService } from './assets.service';
 import { RepositoryAssetsService } from './repository-assets.service';
 import { AssetService } from './entities/asset-services.entity';
@@ -49,6 +50,7 @@ import { JobsRegistryModule } from '../jobs-registry/jobs-registry.module';
   providers: [
     AssetsService,
     AssetGraphService,
+    AssetQueryService,
     UrlDiscoveryService,
     RepositoryAssetsService,
   ],
