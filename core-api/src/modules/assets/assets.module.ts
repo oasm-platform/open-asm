@@ -20,6 +20,7 @@ import { HttpResponseTechnology } from './entities/http-response-technology.enti
 import { HttpStatusCode } from './entities/http-status-code.entity';
 import { IpObservation } from './entities/ip-observation.entity';
 import { TlsCertificate } from './entities/tls-certificate.entity';
+import { HttpResponseRetentionCron } from './http-response-retention.cron';
 import { UrlDiscoveryService } from './url-discovery.service';
 import { StorageModule } from '../storage/storage.module';
 import { WorkflowsModule } from '../workflows/workflows.module';
@@ -55,6 +56,7 @@ import { JobsRegistryModule } from '../jobs-registry/jobs-registry.module';
     AssetTaggingService,
     UrlDiscoveryService,
     RepositoryAssetsService,
+    HttpResponseRetentionCron,
   ],
   exports: [AssetsService, RepositoryAssetsService],
 })

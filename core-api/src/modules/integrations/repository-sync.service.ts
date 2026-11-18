@@ -178,7 +178,7 @@ export class RepositorySyncService {
     });
 
     // One transaction, ordered for the (value, targetId) unique constraint
-    await this.repositoryAssets.apply(target.id, plan);
+    await this.repositoryAssets.apply(target.id, target.workspaceId, plan);
 
     return {
       status: 'synced',

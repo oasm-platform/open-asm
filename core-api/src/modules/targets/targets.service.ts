@@ -693,7 +693,12 @@ export class TargetsService implements OnModuleInit {
             .createQueryBuilder()
             .insert()
             .into(Asset)
-            .values(assetValues.slice(i, i + ASSET_INSERT_CHUNK))
+            // workspaceId: the tenant scope of every asset (see Asset.workspaceId).
+            .values(
+              assetValues
+                .slice(i, i + ASSET_INSERT_CHUNK)
+                .map((asset) => ({ ...asset, workspaceId })),
+            )
             .orIgnore()
             .execute();
         }

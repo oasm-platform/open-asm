@@ -4,11 +4,13 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
   Entity,
+  ForeignKey,
   Index,
   JoinColumn,
   ManyToOne,
   OneToMany,
   Relation,
+  Unique,
 } from 'typeorm';
 import { AssetService } from './asset-services.entity';
 import { HttpResponseTechnology } from './http-response-technology.entity';
@@ -37,7 +39,18 @@ class KnowledgebaseInfo {
   'assetServiceId',
   'createdAt',
 ])
+// Tenant scope (attack-surface-query): workspaceId equals the service's.
+@Unique('UQ_http_responses_id_workspaceId', ['id', 'workspaceId'])
+@ForeignKey(() => AssetService, ['assetServiceId', 'workspaceId'], ['id', 'workspaceId'], {
+  name: 'FK_http_responses_service_workspace',
+  onDelete: 'CASCADE',
+})
+@Index('IDX_http_responses_title_trgm', { synchronize: false })
 export class HttpResponse extends BaseEntity {
+  /** The service's workspace (denormalized, see Asset.workspaceId). */
+  @Column({ type: 'uuid' })
+  workspaceId: string;
+
   @ApiProperty()
   @Column({ type: 'timestamp with time zone', nullable: true })
   timestamp?: Date;

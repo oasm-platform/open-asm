@@ -9,13 +9,13 @@ You are assessing what is listening on a host, whether it should be, and whether
 
 ## Inventory first
 
-1. What the workspace already knows: `list_network_ports`, `inspect_asset`, `fingerprint_technologies`.
+1. What the workspace already knows: `query_attack_surface` on `services` (port, host, latest HTTP response) with their `technologies` (see the `attack-surface-query` skill).
 2. What actually answers now: a port scan on the ports that matter, then a service and version scan on the open ones. Narrow and rate-limited beats a wide sweep that gets you blocked.
 3. Banner and version per service. A version is a CVE lookup; a service with no version is a question, not a finding.
 
 ## Assess by service
 
-- **TLS/SSL**: protocol versions (SSLv2/3, TLS 1.0/1.1 still enabled), cipher strength and order, certificate validity, expiry, hostname match, chain completeness, known-vulnerable libraries. `verify_tls_settings` for the recorded state, an active handshake check to confirm it now.
+- **TLS/SSL**: protocol versions (SSLv2/3, TLS 1.0/1.1 still enabled), cipher strength and order, certificate validity, expiry, hostname match, chain completeness, known-vulnerable libraries. `query_attack_surface` on `tls` for the recorded state, an active handshake check to confirm it now.
 - **SSH**: protocol and software version, offered key-exchange, ciphers and MACs, whether password auth or root login is allowed, weak or deprecated algorithms. Report exposure and weak config; never guess credentials.
 - **Mail (SMTP/IMAP/POP3)**: open-relay *indicators* (not a relay test that sends mail), missing STARTTLS, cleartext auth offered, banner and software version disclosure, permissive auth mechanisms.
 - **Databases and caches** (MySQL, PostgreSQL, MSSQL, MongoDB, Redis, Memcached, Elasticsearch, Cassandra): the finding is reachability plus missing authentication. Confirm whether auth is required; never dump data. An unauthenticated Redis or an open Elasticsearch is a data-exposure finding on its own.

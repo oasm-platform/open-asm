@@ -40,6 +40,45 @@ export function freshRunSql(runColumn: string, targetColumn: string): string {
   )`;
 }
 
+/** Name of the CTE {@link latestCoveringRunsCte} defines. */
+export const LATEST_RUNS_CTE = 'asq_latest';
+
+/**
+ * CTE body: for each (workflow, target) of one workspace, the newest completed
+ * run that recorded the target in its scope. With it, {@link freshRunInCteSql}
+ * gives the same answer as {@link freshRunSql} while reading `job_histories`
+ * once per query instead of once per row.
+ *
+ * @param workspaceParam - Bound parameter holding the workspace id.
+ */
+export function latestCoveringRunsCte(workspaceParam: string): string {
+  return `SELECT later."workflowId", t.id AS "targetId", max(later."createdAt") AS "latestAt"
+      FROM job_histories later
+      JOIN targets t
+        ON t."workspaceId" = ${workspaceParam}
+       AND later.scope -> 'targetIds' @> jsonb_build_array(t.id::text)
+     WHERE later."isCompleted" = true
+     GROUP BY later."workflowId", t.id`;
+}
+
+/**
+ * Boolean SQL, never NULL: the run in `runColumn` is fresh for the target in
+ * `targetColumn`, read from the {@link LATEST_RUNS_CTE} CTE. Same rule as
+ * {@link freshRunSql}: completed, and no later completed run of the same
+ * workflow on that target.
+ */
+export function freshRunInCteSql(runColumn: string, targetColumn: string): string {
+  return `COALESCE((
+    SELECT run."isCompleted" AND NOT EXISTS (
+             SELECT 1 FROM ${LATEST_RUNS_CTE} latest
+              WHERE latest."workflowId" = run."workflowId"
+                AND latest."targetId" = ${targetColumn}
+                AND latest."latestAt" > run."createdAt")
+      FROM job_histories run
+     WHERE run.id = ${runColumn}
+  ), false)`;
+}
+
 /**
  * The (run, target) pairs whose rows still count as new: the run has finished,
  * and no later run of the same workflow has finished on that target since.

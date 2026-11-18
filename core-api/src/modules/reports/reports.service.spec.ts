@@ -6,6 +6,7 @@ import { Report } from './entities/report.entity';
 import { ReportsService } from './reports.service';
 import { VulnerabilityReportService } from './services/vulnerability-report.service';
 import { SummaryReportService } from './services/summary-report.service';
+import { AsqSavedQueriesService } from '@/modules/attack-surface-query/asq-saved-queries.service';
 
 jest.mock('./renderer/pdf-renderer', () => ({
   renderReportPdf: jest.fn().mockResolvedValue(Buffer.from('mock-pdf')),
@@ -67,6 +68,10 @@ describe('ReportsService', () => {
             getSummaryReportData: jest.fn(),
           },
         },
+        {
+          provide: AsqSavedQueriesService,
+          useValue: savedQueries,
+        },
       ],
     }).compile();
 
@@ -77,8 +82,34 @@ describe('ReportsService', () => {
     storageService = module.get<StorageService>(StorageService);
   });
 
+  const savedQueries = {
+    get: jest.fn(),
+    runSpec: jest.fn(),
+  };
+
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  describe('generateQueryReport', () => {
+    it('runs the saved query consistently as the caller and stores a QUERY report', async () => {
+      const scope = { workspaceId: 'workspace-1', permissions: ['asset.read'], caller: 'http' as const };
+      savedQueries.get.mockResolvedValue({ id: 'q1', name: 'Exposed ports', description: null, spec: { queries: { p: { from: 'services' } } } });
+      savedQueries.runSpec.mockResolvedValue({
+        data: { p: { rows: [{ id: 's1', port: 443 }], nextCursor: null, truncated: false } },
+        meta: { now: '', tookMs: 1, queries: {} },
+      });
+      jest.spyOn(storageService, 'uploadFile').mockResolvedValue({ path: 'reports/x.pdf' });
+
+      await service.generateQueryReport(scope, 'user-1', 'q1');
+
+      expect(savedQueries.get).toHaveBeenCalledWith('workspace-1', 'q1');
+      expect(savedQueries.runSpec).toHaveBeenCalledWith(scope, {
+        queries: { p: { from: 'services' } },
+        options: { consistent: true, mode: 'interactive' },
+      });
+      expect(reportRepository.save).toHaveBeenCalledWith(expect.objectContaining({ type: 'QUERY', path: 'reports/x.pdf' }));
+    });
   });
 
   describe('findById', () => {

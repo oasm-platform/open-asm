@@ -59,7 +59,11 @@ export class RepositoryAssetsService {
    * `(value, targetId)` unique constraint satisfied: move stale rows aside,
    * then rename/refresh matched rows, then insert new ones, then disable.
    */
-  async apply(targetId: string, changes: RepositoryAssetChanges): Promise<void> {
+  async apply(
+    targetId: string,
+    workspaceId: string,
+    changes: RepositoryAssetChanges,
+  ): Promise<void> {
     await this.assetRepo.manager.transaction(async (manager) => {
       const assets = manager.getRepository(Asset);
       for (const { id, value } of changes.renames) {
@@ -80,6 +84,7 @@ export class RepositoryAssetsService {
             isPrimary: false,
             metadata: asJson(planned.metadata),
             targetId,
+            workspaceId,
           })),
         );
       }

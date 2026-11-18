@@ -1,5 +1,5 @@
 import { isLocalEnv } from '@/common/config/runtime-env';
-import { resolveAuthSecret } from './auth-env';
+import { resolveAuthSecret, resolveSigningSecret } from './auth-env';
 
 const strongSecret = 'f3Jq9vX2mR7tL0pK8sW4nB6yH1cD5eZaU+oQ=';
 
@@ -53,5 +53,19 @@ describe('resolveAuthSecret', () => {
         resolveAuthSecret({ NODE_ENV: 'test', BETTER_AUTH_SECRET: 'short' }),
       ).toBe('short');
     });
+  });
+});
+
+describe('resolveSigningSecret', () => {
+  it('is the configured secret', () => {
+    expect(resolveSigningSecret({ BETTER_AUTH_SECRET: strongSecret })).toBe(strongSecret);
+  });
+
+  it("is better-auth's own fallback locally when unset, like the sessions", () => {
+    expect(resolveSigningSecret({ NODE_ENV: 'test' })).toBe('better-auth-secret-12345678901234567890');
+  });
+
+  it('refuses a missing secret when deployed', () => {
+    expect(() => resolveSigningSecret({})).toThrow(/BETTER_AUTH_SECRET/);
   });
 });

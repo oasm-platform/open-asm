@@ -152,7 +152,7 @@ const FOREIGN_ENTITIES = [
   'modules/admin <- Workspace (modules/workspaces)',
   // read: the conversation's project, for the prompt context
   'modules/agents <- Project (modules/projects)',
-  // read: the user's default LLM for tag suggestions (agents imports assets)
+  // read: the user's default LLM for tag suggestions
   'modules/assets <- AgentConfig (modules/agents)',
   'modules/assets <- AgentLLMConfig (modules/agents)',
   // read: tenant scope of asset queries
@@ -224,7 +224,6 @@ const CROSS_MODULE_IMPORTS = [
   'common -> modules/workspaces',
   'mcp -> modules/agents',
   'mcp -> modules/apikeys',
-  'mcp -> modules/vulnerabilities',
   'modules/admin -> modules/artifacts',
   'modules/admin -> modules/auth',
   'modules/admin -> modules/event-bridge',
@@ -232,7 +231,7 @@ const CROSS_MODULE_IMPORTS = [
   'modules/admin -> modules/tools',
   'modules/admin -> modules/workspaces',
   'modules/agents -> modules/artifacts',
-  'modules/agents -> modules/assets',
+  'modules/agents -> modules/attack-surface-query',
   'modules/agents -> modules/auth',
   'modules/agents -> modules/connectors',
   'modules/agents -> modules/event-bridge',
@@ -262,6 +261,10 @@ const CROSS_MODULE_IMPORTS = [
   'modules/assets -> modules/vulnerabilities',
   'modules/assets -> modules/workflows',
   'modules/assets -> modules/workspaces',
+  'modules/attack-surface-query -> modules/assets',
+  'modules/attack-surface-query -> modules/auth',
+  'modules/attack-surface-query -> modules/vulnerabilities',
+  'modules/attack-surface-query -> modules/workspaces',
   'modules/audit -> modules/event-bridge',
   'modules/auth -> modules/workspaces',
   'modules/comments -> modules/auth',
@@ -329,6 +332,7 @@ const CROSS_MODULE_IMPORTS = [
   'modules/providers -> modules/tools',
   'modules/remote-execute -> modules/workers',
   'modules/reports -> modules/assets',
+  'modules/reports -> modules/attack-surface-query',
   'modules/reports -> modules/auth',
   'modules/reports -> modules/event-bridge',
   'modules/reports -> modules/statistic',

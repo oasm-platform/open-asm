@@ -11,7 +11,7 @@ Recon is the phase that decides how much of the target you will ever be able to 
 
 Layer by layer; each layer narrows the next. Stop a layer only when it stops yielding new surface.
 
-1. **Known state.** `enumerate_assets`, `list_network_ports`, `fingerprint_technologies`, `verify_tls_settings`. Never re-discover what the workspace already recorded — extend it.
+1. **Known state.** `query_attack_surface`: hosts, services, technologies, TLS, URLs and DNS records already recorded (see the `attack-surface-query` skill). Never re-discover what the workspace already recorded — extend it.
 2. **Passive first.** Sources that never touch the target: certificate transparency, public DNS, ASN and netblock, public code and paste and docs, archived pages, `retrieve_web_page` on public data. Passive recon is free, silent, and routinely finds the host nobody listed.
 3. **Subdomains and DNS.** A subdomain enumerator piped through a resolver for A/AAAA/CNAME/MX/NS/TXT. Then pivot on what you get: a CNAME to a cloud service is a takeover candidate, a TXT record is a vendor and sometimes a key, an MX is a second target.
 4. **Live-host probing.** Probe the resolved names for status code, title, web server, detected tech, TLS and CDN. A name that resolves but serves nothing is still useful: compare the vhost response against the default.

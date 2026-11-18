@@ -3,6 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
   Entity,
+  ForeignKey,
   Index,
   JoinColumn,
   ManyToOne,
@@ -16,7 +17,18 @@ import { HttpResponse } from './http-response.entity';
 @Unique(['httpResponseId'])
 @Index('IDX_tls_certificates_assetServiceId', ['assetServiceId'])
 @Index('IDX_tls_certificates_host', ['host'])
+// Tenant scope (attack-surface-query): workspaceId equals the response's.
+@ForeignKey(() => HttpResponse, ['httpResponseId', 'workspaceId'], ['id', 'workspaceId'], {
+  name: 'FK_tls_certificates_response_workspace',
+  onDelete: 'CASCADE',
+})
+@Index('IDX_tls_certificates_workspace_notAfter', ['workspaceId', 'notAfter', 'id'])
+@Index('IDX_tls_certificates_workspace_createdAt', ['workspaceId', 'createdAt', 'id'])
 export class TlsCertificate extends BaseEntity {
+  /** The response's workspace (denormalized, see Asset.workspaceId). */
+  @Column({ type: 'uuid' })
+  workspaceId: string;
+
   @ApiProperty()
   @Column({ type: 'uuid' })
   httpResponseId: string;

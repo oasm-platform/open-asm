@@ -20,6 +20,7 @@ PDF reports for a workspace: a summary (attack surface) report and a vulnerabili
 | `GET reports/preview/vulnerability` | `report.read` | none |
 | `POST reports/generate/summary` | `report.write` | `report.generated` (metadata `reportType: summary`) |
 | `POST reports/generate/vulnerability` | `report.write` | none |
+| `POST reports/generate/query` (`{ savedQueryId }`) | `report.write`, plus the read permission of every resource the saved query reads | `report.generated` (metadata `reportType: query`) |
 | `DELETE reports/:id` | `report.write` | `report.deleted` |
 
 - Registered in `combine.module.ts`. Exports nothing.
@@ -28,7 +29,8 @@ PDF reports for a workspace: a summary (attack surface) report and a vulnerabili
 
 ## Data model
 
-- `reports` (`Report`, extends `BaseEntity`): `workspaceId` (ManyToOne, CASCADE, no explicit column property), `userId` (CASCADE), `type` varchar `'SUMMARY' | 'VULNERABILITY'` (default `SUMMARY`), `path` = `reports/<fileName>`, `fileName` = `report-<type>-<token>-<ms>.pdf`. Hard delete.
+- `reports` (`Report`, extends `BaseEntity`): `workspaceId` (ManyToOne, CASCADE, no explicit column property), `userId` (CASCADE), `type` varchar `'SUMMARY' | 'VULNERABILITY' | 'QUERY'` (default `SUMMARY`), `path` = `reports/<fileName>`, `fileName` = `report-<type>-<token>-<ms>.pdf`. Hard delete.
+- `QUERY` reports render a saved attack surface query (`services/query-report.ts` flattens each query to a table, at most `QUERY_REPORT_MAX_ROWS` rows; `renderer/query/QueryReportDocument.tsx`), run as the caller in one consistent snapshot.
 
 ## Invariants
 
@@ -42,6 +44,7 @@ PDF reports for a workspace: a summary (attack surface) report and a vulnerabili
 ## Coupling
 
 - Imports `StatisticModule` (`ReportStatisticsService`: `getCountForWorkspace`, `getSeverityCounts`, `getVulnerabilityTrends`, `getTopAssetsWithVulnerabilities`, `getTargetVulnerabilityStats`) and registers repositories for `Vulnerability`, `Target`, `AssetService`, `AssetTag`, `Workspace` to query those tables directly.
+- Imports `AttackSurfaceQueryModule` (`AsqSavedQueriesService`) for query reports; the route uses `AsqErrorInterceptor` so query errors keep their status.
 - Imports `StorageModule` for `StorageService`. Audit actions for these routes are listed in `audit/constants/audit-events.ts`.
 
 ## Gotchas

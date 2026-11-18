@@ -31,11 +31,11 @@ Findings on assets: list/detail/statistics, the lifecycle (new → active → fi
 - BullMQ `VULNERABILITY_ANALYSIS` (`vulnerability-analysis`): job name = vulnerability id, data = the analysis payload plus `workspaceId` and `userId`, removed on complete and on fail.
 - Consumes the in-process `JOB_RESULT_SYNCED_EVENT` (`@OnEvent`, `promisify: true`) in `VulnerabilityLifecycleService.onJobResultSynced`.
 - Cron `VulnerabilityRiskExpiryCron`: `5 * * * *`, `@Lock('cron:vulnerability-risk-expiry')`.
-- Agent/MCP tools: `discover_vulnerabilities`, `investigate_vulnerability` (read, also on MCP). `propose_vulnerability` (agent mode only) calls `VulnerabilityReviewService.propose`.
+- Agent/MCP tools: `investigate_vulnerability` (read, also on MCP); listing findings goes through `query_attack_surface` (`vulnerabilities` resource, attack-surface-query module), which replaced `discover_vulnerabilities`. `propose_vulnerability` (agent mode only) calls `VulnerabilityReviewService.propose`.
 
 ## Data model
 
-- `vulnerabilities`: unique `fingerprint`. FK to asset CASCADE, so findings disappear with their asset or target. `jobHistoryId`, `lastSeenJobHistoryId`, `fixedByJobHistoryId` SET NULL. No soft delete.
+- `vulnerabilities`: unique `fingerprint`. FK to asset CASCADE, so findings disappear with their asset or target. `jobHistoryId`, `lastSeenJobHistoryId`, `fixedByJobHistoryId` SET NULL. No soft delete. `workspaceId` (NOT NULL, composite FK `(assetId, workspaceId)` → assets, trigger-filled when a writer omits it; see `assets/AGENTS.md`) is never in `RESCAN_OVERWRITE_COLUMNS`.
 - Lifecycle columns: `detectionStatus` (`new|active|resurfaced|fixed`), `timesDetected`, `resurfacedCount`, `missedScans`, `scanScopeKey`, `fixedAt`, `fixClaimedAt/ById`, `dueAt`. Review columns: `reviewStatus` (default `approved`), `reviewedBy/At`, `reviewNote`, `discoveredBy`.
 - `vulnerability_dismissals`: one per finding (unique `vulnerabilityId`, CASCADE). `expiresAt` is set only for `risk_accepted`.
 - `vulnerability_events`: the timeline, CASCADE. It carries its own `workspaceId`. Rows are written on transitions and user actions only, never on each re-detection.
@@ -60,7 +60,7 @@ Findings on assets: list/detail/statistics, the lifecycle (new → active → fi
 - Imports `NotificationsModule`, `JobsRegistryModule` (`JobsRegistryService`, `WorkflowRunnerService`), `ToolsModule` and `WorkflowsModule`. Uses the global `EventBridgeService`. Registers the `Target` repository itself.
 - `scan` runs the first job of `vulnerability_scan_basic.yaml` (nuclei) for host targets, and the whole `repository_scan.yaml` for GIT_ORG targets. Both workflows must exist in the workspace, or the call returns 404.
 - Writers outside: `DataAdapterService` inserts and upserts findings, `vulnerability_events` (`DETECTED`) and `vulnerability_sources`, and publishes `vulnerability.detected` / `vulnerability.resurfaced`.
-- The list reads `issue_links` / `issues` with raw SQL (`openIssues`). The issues lane consumes `vulnerability.detected|resurfaced|fixed`. Projects, reports, statistic, search, comments and target overview all query `vulnerabilities` directly.
+- The list reads `issue_links` / `issues` with raw SQL (`openIssues`). The issues lane consumes `vulnerability.detected|resurfaced|fixed`. Projects, reports, statistic, search, comments, target overview and attack-surface-query (`vulnerabilities` resource, uses `approvedVulnerabilityCondition` / `openVulnerabilityCondition`) all query `vulnerabilities` directly.
 
 ## Gotchas
 

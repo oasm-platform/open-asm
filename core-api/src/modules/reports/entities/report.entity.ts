@@ -19,7 +19,8 @@ export class Report extends BaseEntity {
     type: 'varchar',
     default: 'SUMMARY',
   })
-  type: 'SUMMARY' | 'VULNERABILITY';
+  /** QUERY: a saved attack surface query rendered as tables. */
+  type: 'SUMMARY' | 'VULNERABILITY' | 'QUERY';
 
   @Column('text')
   path: string;

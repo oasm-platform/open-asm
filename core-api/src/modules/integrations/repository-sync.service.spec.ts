@@ -124,6 +124,7 @@ describe('RepositorySyncService', () => {
     expect(repositoryAssets.list).toHaveBeenCalledWith('target-1');
     expect(repositoryAssets.apply).toHaveBeenCalledWith(
       'target-1',
+      workspaceId,
       expect.objectContaining({
         inserts: [
           expect.objectContaining({ value: 'github.com/acme/web', isEnabled: true }),

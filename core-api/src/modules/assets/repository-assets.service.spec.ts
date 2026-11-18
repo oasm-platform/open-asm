@@ -34,7 +34,7 @@ describe('RepositoryAssetsService', () => {
   });
 
   it('applies renames, then updates, then inserts, then disables, in one transaction', async () => {
-    await service.apply('target-1', {
+    await service.apply('target-1', 'ws-1', {
       renames: [{ id: 'a-old', value: 'github.com/acme/web~1' }],
       updates: [
         { id: 'a-1', value: 'github.com/acme/web', isEnabled: true, metadata: metadata('1') },
@@ -56,6 +56,7 @@ describe('RepositoryAssetsService', () => {
         isPrimary: false,
         metadata: metadata('2'),
         targetId: 'target-1',
+        workspaceId: 'ws-1',
       },
     ]);
     // The disable runs after the insert
@@ -71,7 +72,7 @@ describe('RepositoryAssetsService', () => {
       metadata: metadata(String(i)),
     }));
 
-    await service.apply('target-1', { renames: [], updates: [], inserts, disableIds: [] });
+    await service.apply('target-1', 'ws-1', { renames: [], updates: [], inserts, disableIds: [] });
 
     expect(writes.insert.mock.calls.map(([rows]) => (rows as unknown[]).length)).toEqual([
       200, 200, 50,

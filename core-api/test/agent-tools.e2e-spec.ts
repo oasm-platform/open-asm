@@ -70,7 +70,9 @@ describe('Agent tools in the running app', () => {
       agentTool.getTools(workspaceId, userId, AgentMode.AGENT, undefined, 'c1'),
     );
 
-    expect(ask).toHaveLength(25);
+    // The attack surface lookups are one tool now (query_attack_surface).
+    expect(ask).toHaveLength(19);
+    expect(ask).toEqual(expect.arrayContaining(['query_attack_surface', 'describe_attack_surface']));
     expect(agent).toEqual(
       expect.arrayContaining([
         ...ask,
@@ -106,16 +108,21 @@ describe('Agent tools in the running app', () => {
   it("runs a lookup through the real services for the workspace's owner", async () => {
     const tools = agentTool.getTools(workspaceId, userId, AgentMode.ASK) as Tools;
 
-    const result = await tools.retrieve_targets.execute({}, call);
+    const result = await tools.query_attack_surface.execute(
+      { queries: { targets: { from: 'targets', select: ['value'], window: null } } },
+      call,
+    );
 
     expect(result).not.toHaveProperty('error');
-    expect(result).toMatchObject({ data: expect.any(Array) });
+    expect(result).toMatchObject({ data: { targets: { rows: expect.any(Array) } } });
   });
 
   it('refuses the same lookup to a user who is not a member', async () => {
     const tools = agentTool.getTools(workspaceId, outsiderId, AgentMode.ASK) as Tools;
 
-    await expect(tools.retrieve_targets.execute({}, call)).resolves.toEqual({
+    await expect(
+      tools.query_attack_surface.execute({ queries: { targets: { from: 'targets' } } }, call),
+    ).resolves.toEqual({
       error: expect.stringContaining('not a member'),
     });
   });

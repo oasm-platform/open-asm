@@ -26,11 +26,13 @@ describe('DiscoveredUrl entity metadata', () => {
     });
 
     it('declares index (assetServiceId, createdAt)', () => {
+      // Looked up by name: the entity also declares the tenant/search indexes.
       const index = storage.indices.find(
-        (i) => i.target === DiscoveredUrl,
+        (i) =>
+          i.target === DiscoveredUrl &&
+          i.name === 'IDX_discovered_urls_service_createdAt',
       );
       expect(index).toBeDefined();
-      expect(index?.name).toBe('IDX_discovered_urls_service_createdAt');
       expect(index?.columns).toEqual(['assetServiceId', 'createdAt']);
     });
   });

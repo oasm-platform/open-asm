@@ -521,7 +521,7 @@ describe('AgentTool plan tools', () => {
         settings(AgentApprovalMode.AUTO),
       ) as unknown as Record<string, { execute: ToolLike['execute'] }>;
 
-      const result = (await tools.enumerate_assets.execute(
+      const result = (await tools.review_jobs.execute(
         {},
         { toolCallId: 'tc1' },
       )) as unknown as { error: string };
@@ -549,7 +549,7 @@ describe('AgentTool plan tools', () => {
 
       // the gated call is rejected so the underlying service is never hit
       approvals.authorize.mockResolvedValue({ allowed: false });
-      await tools.enumerate_assets.execute({}, { toolCallId: 'tc2' });
+      await tools.review_jobs.execute({}, { toolCallId: 'tc2' });
 
       expect(approvals.authorize).toHaveBeenCalledWith(
         expect.any(String),

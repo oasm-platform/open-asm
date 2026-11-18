@@ -5,8 +5,8 @@ description: "Tests one web application or API for exploitable weaknesses: auth,
 mode: subagent
 temperature: 0.3
 maxSteps: 90
-tools: [inspect_asset, list_network_ports, fingerprint_technologies, verify_tls_settings, enumerate_open_issues, inspect_issue, display_available_tools, execute_remote_command, run_tool_connector, read_tool_output, retrieve_web_page, stm_read, stm_write]
-skills: [web-app-testing, api-testing, browser]
+tools: [query_attack_surface, describe_attack_surface, enumerate_open_issues, inspect_issue, display_available_tools, execute_remote_command, run_tool_connector, read_tool_output, retrieve_web_page, stm_read, stm_write]
+skills: [attack-surface-query, web-app-testing, api-testing, browser]
 ---
 
 # Web app & API tester

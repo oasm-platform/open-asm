@@ -2,13 +2,22 @@ import { BaseEntity } from '@/common/entities/base.entity';
 import { Tool } from '@/modules/tools/entities/tools.entity';
 import { ApiProperty, PickType } from '@nestjs/swagger';
 import { IsNotEmpty, IsString } from 'class-validator';
-import { Column, Entity, Index, ManyToOne, Relation } from 'typeorm';
+import { Column, Entity, ForeignKey, Index, ManyToOne, Relation } from 'typeorm';
 import { AssetService } from './asset-services.entity';
 
 @Entity('asset_services_tags')
 @Index('IDX_asset_tags_assetServiceId', ['assetServiceId'])
 @Index('IDX_asset_tags_tag', ['tag'])
+// Tenant scope (attack-surface-query): workspaceId equals the service's.
+@ForeignKey(() => AssetService, ['assetServiceId', 'workspaceId'], ['id', 'workspaceId'], {
+  name: 'FK_asset_services_tags_service_workspace',
+  onDelete: 'CASCADE',
+})
 export class AssetTag extends BaseEntity {
+  /** The service's workspace (denormalized; filled by the asq_fill_scope trigger when omitted). */
+  @Column({ type: 'uuid' })
+  workspaceId: string;
+
   @ApiProperty()
   @IsString()
   @IsNotEmpty()

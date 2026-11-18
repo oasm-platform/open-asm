@@ -12,8 +12,7 @@ const page = { data: [], total: 0, page: 1, limit: 100, pageCount: 0, hasNextPag
 
 function setup() {
   const services = {
-    assetsService: { getManyAsssetServices: jest.fn().mockResolvedValue(page) },
-    vulnerabilitiesService: { getVulnerabilities: jest.fn().mockResolvedValue(page) },
+    attackSurfaceQuery: { run: jest.fn().mockResolvedValue({ data: {}, meta: {} }) },
     projectResultsService: {
       vulnerabilities: jest.fn().mockResolvedValue(page),
       overview: jest.fn().mockResolvedValue({ totalAssets: 3 }),
@@ -42,31 +41,29 @@ function setup() {
   return { services, tools };
 }
 
-const projectFilter = (projectId: string) => ({
-  logic: 'and',
-  items: [{ field: 'project', op: 'eq', value: projectId }],
-});
+const batch = { queries: { hosts: { from: 'hosts' } } };
 
 describe('project-aware tools', () => {
   it('reads the whole workspace when no project is given', async () => {
     const { services, tools } = setup();
 
-    await tools(AgentMode.ASK).enumerate_assets.execute({}, call);
+    await tools(AgentMode.ASK).query_attack_surface.execute(batch, call);
 
-    expect(services.assetsService.getManyAsssetServices).toHaveBeenCalledWith(
-      expect.not.objectContaining({ filter: expect.anything() }),
-      'w1',
+    expect(services.attackSurfaceQuery.run).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceId: 'w1', projectId: undefined }),
+      batch,
     );
   });
 
-  it('filters assets by the projectId the model passes', async () => {
+  it('restricts attack surface queries to the projectId the model passes', async () => {
     const { services, tools } = setup();
 
-    await tools(AgentMode.ASK).enumerate_assets.execute({ projectId: P2 }, call);
+    await tools(AgentMode.ASK).query_attack_surface.execute({ ...batch, projectId: P2 }, call);
 
-    expect(services.assetsService.getManyAsssetServices).toHaveBeenCalledWith(
-      expect.objectContaining({ filter: projectFilter(P2) }),
-      'w1',
+    // The project goes to the scope; the batch reaches the engine without it.
+    expect(services.attackSurfaceQuery.run).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: P2 }),
+      batch,
     );
   });
 
@@ -74,20 +71,13 @@ describe('project-aware tools', () => {
     const { services, tools } = setup();
     const locked = tools(AgentMode.ASK, P1);
 
-    await locked.enumerate_assets.execute({ projectId: P2 }, call);
-    await locked.discover_vulnerabilities.execute({ projectId: P2, q: 'xss' }, call);
+    await locked.query_attack_surface.execute({ ...batch, projectId: P2 }, call);
     await locked.gather_statistics.execute({}, call);
 
-    expect(services.assetsService.getManyAsssetServices).toHaveBeenCalledWith(
-      expect.objectContaining({ filter: projectFilter(P1) }),
-      'w1',
+    expect(services.attackSurfaceQuery.run).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: P1 }),
+      batch,
     );
-    expect(services.projectResultsService.vulnerabilities).toHaveBeenCalledWith(
-      P1,
-      'w1',
-      expect.objectContaining({ search: 'xss' }),
-    );
-    expect(services.vulnerabilitiesService.getVulnerabilities).not.toHaveBeenCalled();
     expect(services.projectResultsService.overview).toHaveBeenCalledWith(P1, 'w1');
     expect(services.statisticService.getStatistics).not.toHaveBeenCalled();
   });

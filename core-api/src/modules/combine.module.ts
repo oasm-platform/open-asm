@@ -29,6 +29,7 @@ import { AgentsModule } from './agents/agents.module';
 import { RemoteExecuteModule } from './remote-execute/remote-execute.module';
 import { ReportsModule } from './reports/reports.module';
 import { ArtifactsModule } from './artifacts/artifacts.module';
+import { AttackSurfaceQueryModule } from './attack-surface-query/attack-surface-query.module';
 
 @Module({
   imports: [
@@ -67,6 +68,7 @@ import { ArtifactsModule } from './artifacts/artifacts.module';
     IntegrationsModule,
     ConnectorsModule,
     EventsModule,
+    AttackSurfaceQueryModule,
   ],
 })
 export class CombineModule {}

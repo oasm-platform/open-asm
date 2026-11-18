@@ -167,6 +167,8 @@ export enum BullMQName {
   INTEGRATION_SYNC_SCHEDULE = 'integration-sync-schedule',
   REPOSITORY_SYNC = 'repository-sync',
   AUDIT_RETENTION = 'audit-retention',
+  /** Report-mode attack surface queries (attack-surface-query module). */
+  ASQ_REPORT = 'asq-report',
 }
 
 export enum NotificationStatus {
