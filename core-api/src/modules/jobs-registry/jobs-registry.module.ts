@@ -3,7 +3,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConnectorsModule } from '../connectors/connectors.module';
-import { IntegrationsModule } from '../integrations/integrations.module';
+import { IntegrationConfigModule } from '../integrations/integration-config.module';
 import { ToolConfigProfile } from '../tools/entities/tool-config-profiles.entity';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
 import { JobErrorLog } from './entities/job-error-log.entity';
@@ -28,7 +28,7 @@ import { WorkflowRunnerService } from './workflow-runner.service';
       ToolConfigProfile,
     ]),
     ConnectorsModule,
-    IntegrationsModule,
+    IntegrationConfigModule,
     WorkspacesModule,
     BullModule.registerQueue({
       name: BullMQName.JOB_RESULT,

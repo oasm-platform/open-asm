@@ -37,7 +37,7 @@ import { DiscoveredUrl } from '../assets/entities/discovered-url.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
 import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
-import { IntegrationsService } from '../integrations/integrations.service';
+import { IntegrationConfigReader } from '../integrations/integration-config.reader';
 import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
 import { getSensitiveFields } from '../tools/validators/tool-config-profiles.crypto';
 import { WorkerInstance } from '../workers/entities/worker.entity';
@@ -128,7 +128,7 @@ export class JobsRegistryController {
     private readonly jobsRegistryService: JobsRegistryService,
     private readonly connectorRegistry: ConnectorRegistryService,
     private readonly toolConfigProfilesService: ToolConfigProfilesService,
-    private readonly integrationsService: IntegrationsService,
+    private readonly integrationConfig: IntegrationConfigReader,
     private readonly workflowRunnerService: WorkflowRunnerService,
     private readonly grpcWorkerContext: GrpcWorkerContext,
     private readonly eventBridge: EventBridgeService,
@@ -599,7 +599,7 @@ export class JobsRegistryController {
     }
     try {
       const { integration, decryptedConfig } =
-        await this.integrationsService.getIntegrationWithDecryptedConfig(
+        await this.integrationConfig.getIntegrationWithDecryptedConfig(
           integrationId,
           job.workspaceId,
         );
