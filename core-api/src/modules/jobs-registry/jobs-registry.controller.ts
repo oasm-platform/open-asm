@@ -69,6 +69,7 @@ import {
   VulnerabilitiesResultDto,
   WorkerIdParams,
 } from './dto/jobs-registry.dto';
+import { JobHistoryQueryService } from './job-history-query.service';
 import { JobsRegistryService } from './jobs-registry.service';
 
 /**
@@ -132,6 +133,7 @@ export class JobsRegistryController {
     private readonly workflowRunnerService: WorkflowRunnerService,
     private readonly grpcWorkerContext: GrpcWorkerContext,
     private readonly eventBridge: EventBridgeService,
+    private readonly jobHistoryQuery: JobHistoryQueryService,
   ) {}
 
   @WorkspaceAccess('job.read')
@@ -167,7 +169,7 @@ export class JobsRegistryController {
   })
   @Get('/timeline')
   getJobsTimeline(@WorkspaceId() workspaceId: string) {
-    return this.jobsRegistryService.getJobsTimeline(workspaceId);
+    return this.jobHistoryQuery.getJobsTimeline(workspaceId);
   }
 
   @Doc({
@@ -341,7 +343,7 @@ export class JobsRegistryController {
     @WorkspaceId() workspaceId: string,
     @Query() query: GetManyJobHistoriesRequestDto,
   ): Promise<GetManyBaseResponseDto<JobHistoryResponseDto>> {
-    return this.jobsRegistryService.getManyJobHistories(workspaceId, query);
+    return this.jobHistoryQuery.getManyJobHistories(workspaceId, query);
   }
 
   @WorkspaceAccess('job.read')
@@ -361,7 +363,7 @@ export class JobsRegistryController {
     @WorkspaceId() workspaceId: string,
     @Param('id') id: string,
   ): Promise<JobHistoryDetailResponseDto> {
-    return this.jobsRegistryService.getJobHistoryDetail(workspaceId, id);
+    return this.jobHistoryQuery.getJobHistoryDetail(workspaceId, id);
   }
 
   @WorkspaceAccess('job.read')
@@ -381,7 +383,7 @@ export class JobsRegistryController {
     @WorkspaceId() workspaceId: string,
     @Param('id') id: string,
   ): Promise<JobHistoryWorkflowResponseDto> {
-    return this.jobsRegistryService.getJobHistoryWorkflow(workspaceId, id);
+    return this.jobHistoryQuery.getJobHistoryWorkflow(workspaceId, id);
   }
 
   @WorkspaceAccess('job.write')

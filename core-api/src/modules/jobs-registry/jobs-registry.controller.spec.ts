@@ -24,6 +24,7 @@ import type { WorkerInstance } from '../workers/entities/worker.entity';
 import { WorkersService } from '../workers/workers.service';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import { JobsRegistryController } from './jobs-registry.controller';
+import { JobHistoryQueryService } from './job-history-query.service';
 import { JobsRegistryService } from './jobs-registry.service';
 import { WorkflowRunnerService } from './workflow-runner.service';
 
@@ -118,6 +119,7 @@ describe('JobsRegistryController', () => {
         controllers: [JobsRegistryController],
         providers: [
           { provide: JobsRegistryService, useValue: mockJobsRegistryService },
+          { provide: JobHistoryQueryService, useValue: {} },
           { provide: ConnectorRegistryService, useValue: mockConnectorRegistry },
           { provide: ToolConfigProfilesService, useValue: mockToolConfigProfilesService },
           { provide: IntegrationConfigReader, useValue: mockIntegrationConfig },
@@ -499,6 +501,7 @@ describe('JobsRegistryController', () => {
         controllers: [JobsRegistryController],
         providers: [
           { provide: JobsRegistryService, useValue: mockJobsRegistryService },
+          { provide: JobHistoryQueryService, useValue: {} },
           {
             provide: ConnectorRegistryService,
             useValue: { getConnector: jest.fn(), getResourceDefaults: jest.fn() },
@@ -646,6 +649,7 @@ describe('JobsRegistryController', () => {
         controllers: [JobsRegistryController],
         providers: [
           { provide: JobsRegistryService, useValue: mockJobsRegistryService },
+          { provide: JobHistoryQueryService, useValue: {} },
           {
             provide: ConnectorRegistryService,
             useValue: { getConnector: jest.fn(), getResourceDefaults: jest.fn() },

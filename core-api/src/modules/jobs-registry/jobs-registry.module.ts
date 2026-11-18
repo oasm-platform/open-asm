@@ -9,6 +9,7 @@ import { JobErrorLog } from './entities/job-error-log.entity';
 import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
 import { JobsRegistryController } from './jobs-registry.controller';
+import { JobHistoryQueryService } from './job-history-query.service';
 import { JobsRegistryService } from './jobs-registry.service';
 import { JobResultCleanupService } from './job-result-cleanup.service';
 import { JobConfigSealService } from './job-config-seal.service';
@@ -42,6 +43,7 @@ import { DataAdapterModule } from '../data-adapter/data-adapter.module';
   controllers: [JobsRegistryController],
   providers: [
     JobsRegistryService,
+    JobHistoryQueryService,
     WorkflowRunnerService,
     WorkflowRunReconcilerService,
     JobResultProcessor,
