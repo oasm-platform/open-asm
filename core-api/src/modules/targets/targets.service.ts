@@ -11,7 +11,7 @@ import {
   Injectable,
   OnModuleInit,
 } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Job, Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
@@ -26,6 +26,10 @@ import { AuditService } from '../audit/audit.service';
 import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
 import type { AssetDiscoveredPayload } from '../event-bridge/contracts/event-payloads';
 import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
+import {
+  WORKSPACE_DELETING_EVENT,
+  type WorkspaceDeletingEvent,
+} from '../workspaces/workspace.events';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import {
   BulkTargetResultDto,
@@ -96,6 +100,15 @@ export class TargetsService implements OnModuleInit {
 
   async onModuleInit() {
     await this.handleUpdateScanSchedule();
+  }
+
+  /**
+   * A workspace is being deleted: its targets go first, each with its
+   * assets, jobs and findings (database cascade), in one statement.
+   */
+  @OnEvent(WORKSPACE_DELETING_EVENT, { promisify: true, suppressErrors: false })
+  async onWorkspaceDeleting({ workspaceId }: WorkspaceDeletingEvent): Promise<void> {
+    await this.repo.delete({ workspaceId });
   }
 
   /** The target, or null when it is not in this workspace. */

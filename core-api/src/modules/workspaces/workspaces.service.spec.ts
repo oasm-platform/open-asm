@@ -15,7 +15,10 @@ import { ArtifactsService } from '../artifacts/artifacts.service';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { WORKSPACE_INITIALIZING_EVENT } from './workspace.events';
+import {
+  WORKSPACE_DELETING_EVENT,
+  WORKSPACE_INITIALIZING_EVENT,
+} from './workspace.events';
 import { WorkspaceInvitation } from './entities/workspace-invitation.entity';
 import { WorkspaceMemberPermission } from './entities/workspace-member-permission.entity';
 import { WorkspaceMembers } from './entities/workspace-members.entity';
@@ -1173,17 +1176,6 @@ describe('WorkspacesService', () => {
         id: testWorkspaceId,
         name: 'Doomed',
       });
-      // deleteAllTargetsFromWorkspace runs first (its own tx); stub its
-      // createQueryBuilder delete chain so only the workspace delete matters.
-      mockManager.getRepository.mockReturnValue({
-        createQueryBuilder: jest.fn().mockReturnValue({
-          delete: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          returning: jest.fn().mockReturnThis(),
-          execute: jest.fn().mockResolvedValue({ raw: [] }),
-        }),
-      });
-
       const result = await service.deleteWorkspace(
         testWorkspaceId,
         testUserContext,
@@ -1191,6 +1183,14 @@ describe('WorkspacesService', () => {
       );
 
       expect(result).toEqual({ message: 'Workspace deleted successfully' });
+      // Other modules remove their rows first (targets: its own tx)
+      expect(mockEvents.emitAsync).toHaveBeenCalledWith(
+        WORKSPACE_DELETING_EVENT,
+        { workspaceId: testWorkspaceId },
+      );
+      expect(mockEvents.emitAsync.mock.invocationCallOrder[0]).toBeLessThan(
+        mockDataSource.transaction.mock.invocationCallOrder[0],
+      );
       expect(mockManager.delete).toHaveBeenCalledWith(Workspace, {
         id: testWorkspaceId,
       });
@@ -1212,18 +1212,25 @@ describe('WorkspacesService', () => {
       );
     });
 
-    it('deleteWorkspace rolls back when the audit write fails mid-transaction (no success response, no committed state)', async () => {
+    it('deleteWorkspace keeps the workspace when a module fails to remove its rows', async () => {
       (mockWorkspaceRepository.findOne as jest.Mock).mockResolvedValue({
         id: testWorkspaceId,
         name: 'Doomed',
       });
-      mockManager.getRepository.mockReturnValue({
-        createQueryBuilder: jest.fn().mockReturnValue({
-          delete: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          returning: jest.fn().mockReturnThis(),
-          execute: jest.fn().mockResolvedValue({ raw: [] }),
-        }),
+      mockEvents.emitAsync.mockRejectedValueOnce(new Error('targets delete failed'));
+
+      await expect(
+        service.deleteWorkspace(testWorkspaceId, testUserContext, auditContext),
+      ).rejects.toThrow('targets delete failed');
+
+      expect(mockManager.delete).not.toHaveBeenCalled();
+      expect(mockAuditService.recordInTx).not.toHaveBeenCalled();
+    });
+
+    it('deleteWorkspace rolls back when the audit write fails mid-transaction (no success response, no committed state)', async () => {
+      (mockWorkspaceRepository.findOne as jest.Mock).mockResolvedValue({
+        id: testWorkspaceId,
+        name: 'Doomed',
       });
       (mockAuditService.recordInTx).mockRejectedValueOnce(
         new Error('audit write failed'),
@@ -1247,14 +1254,6 @@ describe('WorkspacesService', () => {
       (mockWorkspaceRepository.findOne as jest.Mock).mockResolvedValue({
         id: testWorkspaceId,
         name: 'Doomed',
-      });
-      mockManager.getRepository.mockReturnValue({
-        createQueryBuilder: jest.fn().mockReturnValue({
-          delete: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          returning: jest.fn().mockReturnThis(),
-          execute: jest.fn().mockResolvedValue({ raw: [] }),
-        }),
       });
       (mockManager.delete as jest.Mock).mockRejectedValueOnce(
         new Error('workspace delete failed'),

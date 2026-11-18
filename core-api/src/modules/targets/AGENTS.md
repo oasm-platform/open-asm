@@ -52,7 +52,8 @@ Scan roots of a workspace: a domain, IP, CIDR or Git organization. A target owns
 - `TriggerWorkflowService.onModuleInit` subscribes with `eventEmitter.onAny`, so **every** in-process event in the app is treated as a possible workflow trigger: `<a>.<b>` is matched against `workflow.content.on.<a>` containing `<b>`, in the workspace of the payload's `workspaceId` (target events carry the `Target` row); a payload without one is skipped before any query. Project workflows (`project-%`, `group-%` file paths) are excluded.
 - Callers of `TargetsService`: integrations connectors (aws, cloudflare, vercel: `findByWorkspaceAndValues` then `createMultipleTargets`), `InternalNetworksService`, `SearchService`, agents tools. `StatisticModule` and `SearchModule` import `TargetsModule`.
 - `RepositorySyncService` (integrations) reads and stamps GIT_ORG targets through `findInWorkspace` and `markDiscovered`.
-- Other code that touches `targets` directly: `WorkspacesService` bulk-deletes a workspace's targets and resolves `getWorkspaceIdByTargetId` (cached 60 s). `StatisticService` reads the table.
+- Consumes `WORKSPACE_DELETING_EVENT` (`onWorkspaceDeleting`, awaited, `suppressErrors: false`): deletes every target of the workspace being deleted.
+- Other code that touches `targets` directly: `WorkspacesService` reads it (`getWorkspaceIdByTargetId`, cached 60 s). `StatisticService` reads the table.
 
 ## Gotchas
 

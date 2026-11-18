@@ -1,7 +1,7 @@
 import type { UserContextPayload } from '@/common/interfaces/app.interface';
 import { AuditOutcome, IntegrationType, JobRunType } from '@/common/enums/enum';
 import { NotFoundError } from '@/common/errors/domain.errors';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EVENT_LISTENER_METADATA, EventEmitter2 } from '@nestjs/event-emitter';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -14,6 +14,7 @@ import type { AuditContext } from '../audit/audit.service';
 import { AuditService } from '../audit/audit.service';
 import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
 import { Integration } from '../integrations/entities/integration.entity';
+import { WORKSPACE_DELETING_EVENT } from '../workspaces/workspace.events';
 import { WorkspacesService } from '../workspaces/workspaces.service';
 import {
   Target,
@@ -219,6 +220,30 @@ describe('TargetsService', () => {
         new NotFoundError('Asset not found'),
       );
       expect(mockTargetRepository.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('a workspace being deleted', () => {
+    it('removes the targets of that workspace', async () => {
+      mockTargetRepository.delete = jest.fn().mockResolvedValue({ affected: 3 });
+
+      await service.onWorkspaceDeleting({ workspaceId: 'ws-1' });
+
+      expect(mockTargetRepository.delete).toHaveBeenCalledWith({ workspaceId: 'ws-1' });
+    });
+
+    it('is awaited by the deletion, which fails when it does', () => {
+      expect(
+        Reflect.getMetadata(
+          EVENT_LISTENER_METADATA,
+          TargetsService.prototype.onWorkspaceDeleting,
+        ),
+      ).toEqual([
+        {
+          event: WORKSPACE_DELETING_EVENT,
+          options: { promisify: true, suppressErrors: false },
+        },
+      ]);
     });
   });
 

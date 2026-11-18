@@ -52,7 +52,9 @@ import { WorkspaceMemberPermission } from './entities/workspace-member-permissio
 import { WorkspacePermission } from './entities/workspace-permission.entity';
 import { Workspace } from './entities/workspace.entity';
 import {
+  WORKSPACE_DELETING_EVENT,
   WORKSPACE_INITIALIZING_EVENT,
+  type WorkspaceDeletingEvent,
   type WorkspaceInitializingEvent,
 } from './workspace.events';
 import { readFileSync } from 'fs';
@@ -316,36 +318,6 @@ export class WorkspacesService implements OnModuleInit {
   }
 
   /**
-   * Deletes all targets associated with a specific workspace.
-   * Uses transaction and createQueryBuilder for atomic operation.
-   *
-   * @param workspaceId - The ID of the workspace whose targets will be deleted.
-   * @returns An object containing the list of deleted target IDs.
-   */
-  public async deleteAllTargetsFromWorkspace(
-    workspaceId: string,
-  ): Promise<{ deletedTargetIds: string[] }> {
-    const result = await this.repo.manager.transaction(
-      async (transactionalEntityManager) => {
-        const result = await transactionalEntityManager
-          .getRepository(Target)
-          .createQueryBuilder()
-          .delete()
-          .where('"workspaceId" = :workspaceId', { workspaceId })
-          .returning('id')
-          .execute();
-
-        const raw = result.raw as { id: string }[] | undefined;
-        const targetIds = (raw ?? []).map((r) => r.id);
-
-        return { deletedTargetIds: targetIds };
-      },
-    );
-
-    return result;
-  }
-
-  /**
    * Deletes a workspace by its ID, but only if the requesting user is the owner.
    * The workspace is soft deleted, meaning it is not actually removed from the
    * database, but its `deletedAt` field is set to the current timestamp.
@@ -365,9 +337,11 @@ export class WorkspacesService implements OnModuleInit {
       throw new NotFoundError('Workspace not found');
     }
 
-    // Delete all targets associated with the workspace first (own tx — the
+    // Other modules remove their rows first, each in its own transaction (the
     // audit row must stay atomic with the workspace-row delete below).
-    await this.deleteAllTargetsFromWorkspace(id);
+    await this.events.emitAsync(WORKSPACE_DELETING_EVENT, {
+      workspaceId: id,
+    } satisfies WorkspaceDeletingEvent);
 
     await this.dataSource.transaction(async (manager) => {
       await manager.delete(Workspace, { id });

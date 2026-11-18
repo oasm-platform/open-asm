@@ -44,7 +44,7 @@ Service methods other modules call: `getMembershipWithPermissions` (guard, event
 
 ## Data model
 
-- `workspaces`: `owner` FK with `ON DELETE CASCADE` from `users`, so deleting a user wipes their workspaces. That is why user deletion is disabled in `auth.ts`. Has a `deletedAt` column, but `deleteWorkspace` **hard-deletes** (`manager.delete`) after deleting the targets in a separate transaction. Artifact objects are removed in the background (`artifactsService.deleteWorkspaceObjects`).
+- `workspaces`: `owner` FK with `ON DELETE CASCADE` from `users`, so deleting a user wipes their workspaces. That is why user deletion is disabled in `auth.ts`. Has a `deletedAt` column, but `deleteWorkspace` **hard-deletes** (`manager.delete`, with the audit row in the same transaction) after awaiting `WORKSPACE_DELETING_EVENT`, on which the targets module deletes the workspace's targets in its own statement. Artifact objects are removed in the background (`artifactsService.deleteWorkspaceObjects`).
 - `dek` / `dekAt`: a wrapped per-workspace data key, generated at create with `WorkspaceEncryptionService.generateWrappedDEK()` (`src/services/workspace-encryption/`). That service caches unwrapped DEKs and backfills missing ones at boot. Never write `dek` yourself.
 - `settings` (jsonb, keyed by section) exists, but nothing in this module reads or writes it.
 - `Workspace` declares inverse relations only for its own tables (`workspaceMembers`, `permissions`). Workers, tools, statistics, workflows and internal networks point at it one-way.
@@ -69,7 +69,7 @@ Service methods other modules call: `getMembershipWithPermissions` (guard, event
 - No dependency on the workflows module: `createWorkspace` emits `WORKSPACE_INITIALIZING_EVENT` (`workspace.events.ts`) with `emitAsync` after the transaction commits and awaits it. `WorkflowTemplateService` creates the default workflows on it; its failure fails the creation (`suppressErrors: false`).
 - Imports `NotificationsModule` for `NotificationsService`; uses the global `AuditService` and `WorkspaceEncryptionService`.
 - These write the `workspaces` table directly: `admin/workspaces` (name, description, configs, `archivedAt`), `WorkspaceEncryptionService` (`dek`), plus reads in reports, statistic, artifact quota and workflow-template. `admin/users` and `artifacts` read `workspace_members`.
-- Writes `targets` directly (`deleteAllTargetsFromWorkspace`).
+- Writes no other module's table. `deleteWorkspace` emits `WORKSPACE_DELETING_EVENT` (`workspace.events.ts`) with `emitAsync` before the workspace row goes; `TargetsService.onWorkspaceDeleting` (`suppressErrors: false`) removes the targets, and a failure there keeps the workspace. It still reads `targets` (`getWorkspaceIdByTargetId`) and `jobs` (`getMemberOfWorkspaceByJobId`).
 
 ## Testing
 
