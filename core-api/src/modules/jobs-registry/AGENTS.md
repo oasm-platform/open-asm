@@ -8,7 +8,7 @@ Scan jobs and workflow runs: creates `jobs` rows, lets workers claim them, inges
 - `jobs-registry.service.ts`: `createNewJob`, the claim (`getNextJobs`), result enqueue, job/run listings and run detail, re-run, cancel, delete.
 - `workflow-runner.service.ts`: the workflow engine (`startRun`, `retryRun`, `onJobTerminal`, `advanceRun`).
 - `workflow-run-reconciler.service.ts`, `job-result-cleanup.service.ts`, `job-retention.service.ts`: crons.
-- `processors/job-result.processor.ts`: `JobResultProcessor`. `processors/scan-schedule.processor.ts`: `AssetsDiscoveryScheduleConsumer`.
+- `processors/job-result.processor.ts`: `JobResultProcessor`.
 - `job-secret-release.policy.ts`: `secretReleaseDenial`, which worker may receive a connector job's secrets. `job-config-seal.service.ts`: `JobConfigSealService`, encrypts plaintext `jobs.config` left by older versions, at boot.
 - `step-inputs.ts` (pure planner: which jobs a step creates), `step-scope.loader.ts` (`StepScopeLoader`, loads the scope rows; `URL_INPUTS_PER_HOST = 50`), `connector-inputs.ts` (connector `inputs` map, repository clone URL + credentials).
 - `entities/`: `Job`, `JobHistory`, `JobErrorLog`. `dto/`: request/response DTOs.
@@ -26,7 +26,7 @@ Scan jobs and workflow runs: creates `jobs` rows, lets workers claim them, inges
 - gRPC `JobsRegistryService` (`src/proto/jobs_registry.proto`): `Next`, `NextBatch`, `Result` (deprecated), `ResultSubdomains`, `ResultHttpProbe`, `ResultPorts`, `ResultVulnerabilities`, `ResultScreenshot`, `ResultUrlDiscovery`. All use `GrpcWorkerTokenGuard`.
 - `Next` / `NextBatch` publish `job.secrets.released` (persisted, audit action wired to `nextBatch`) for each dispatched connector job that carries a secret: `metadata.fields` lists the field names (`inputs.token` for a repository token), never values.
 - Exports `JobsRegistryService` and `WorkflowRunnerService`. The module is `@Global()`.
-- Queues: registers and consumes `BullMQName.JOB_RESULT` (concurrency 10; enqueued with 3 attempts, exponential backoff, removed on complete/fail). Consumes `ASSETS_DISCOVERY_SCHEDULE`, which `targets` registers and fills; it calls `AssetsService.reScan` with `JobRunType.SCHEDULED`.
+- Queues: registers and consumes `BullMQName.JOB_RESULT` (concurrency 10; enqueued with 3 attempts, exponential backoff, removed on complete/fail).
 - In-process events (EventEmitter2): `EventTriggerType.WORKFLOW_START` (from `startRun`, and from `createNewJob` when it creates its own history), `WORKFLOW_END` (after the commit that completes a run). Listeners: `statistic.service.ts`, `projects/project-run-events.listener.ts`, `assets/url-discovery.service.ts`.
 - Redis: `jobs:<jobId>` is published when `job.isPublishEvent` (no subscriber in core-api). Cancels and "jobs available" hints go through `WorkerStreamRegistry` (workers module).
 - Crons (each behind a Redis `@Lock`): reconcile stalled runs `*/2 * * * *`; delete `job-results` bucket files older than 30 days `0 3 * * *`; prune terminal jobs older than `JOB_RETENTION_DAYS` (180) in batches of 10,000 `30 3 * * *`.
@@ -55,7 +55,7 @@ Scan jobs and workflow runs: creates `jobs` rows, lets workers claim them, inges
 
 ## Coupling
 
-- Imports `ConnectorsModule`, `IntegrationsModule` and `WorkspacesModule`, and registers the `ToolConfigProfile` repository. The controller injects `GrpcWorkerContext` (workers) and `EventBridgeService` (event-bridge), both global. `ToolsService`, `ToolConfigProfilesService`, `WorkerStreamRegistry`, storage, data-adapter, vulnerability lifecycle and `AssetsService` come from `@Global()` modules.
+- Imports `ConnectorsModule`, `IntegrationsModule` and `WorkspacesModule`, and registers the `ToolConfigProfile` repository. The controller injects `GrpcWorkerContext` (workers) and `EventBridgeService` (event-bridge), both global. `ToolsService`, `ToolConfigProfilesService`, `WorkerStreamRegistry`, storage, data-adapter and vulnerability lifecycle come from `@Global()` modules.
 - No import cycle any more: tools no longer depends on workers, and workers no longer depends on this module, so `JobsRegistryService` injects `ToolsService` plainly and `combine.module.ts` needs no special order.
 - Other code writes `jobs` directly. `WorkersService` uses its own `Job` repository and raw SQL in `resetStuckAndFailedJobs`. `ToolSyncService.dedupeExistingTools` rewrites `toolId`. `ToolConfigProfilesService.remove` reads `jobs`. `AssetsModule` registers the `Job` repository.
 - `startRun` callers: `workflows/trigger-workflow.service.ts`, `projects/project-workflows.service.ts`, `assets/url-discovery.service.ts`, `vulnerabilities.service.ts`. `createNewJob` callers: `templates.service.ts`, `vulnerabilities.service.ts`. Agents call `getManyJobs`.
@@ -70,4 +70,4 @@ Scan jobs and workflow runs: creates `jobs` rows, lets workers claim them, inges
 
 ## Testing
 
-Specs are colocated: service, controller, `job-secret-release.policy`, `job-config-seal.service`, `workflow-runner`, `workflow-run-reconciler`, `job-result-cleanup`, `processors/*`, `step-inputs`, `step-scope.loader`, `connector-inputs`, `dto/jobs-registry.dto.spec.ts`, plus `jobs-registry.audit-wiring.spec.ts`, which checks which handlers publish `job.cancelled`.
+Specs are colocated: service, controller, `job-secret-release.policy`, `job-config-seal.service`, `workflow-runner`, `workflow-run-reconciler`, `job-result-cleanup`, `processors/job-result.processor`, `step-inputs`, `step-scope.loader`, `connector-inputs`, `dto/jobs-registry.dto.spec.ts`, plus `jobs-registry.audit-wiring.spec.ts`, which checks which handlers publish `job.cancelled`.

@@ -7,6 +7,7 @@ import { Integration } from '../integrations/entities/integration.entity';
 import { TriggerWorkflowService } from '../workflows/trigger-workflow.service';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
 import { Target } from './entities/target.entity';
+import { AssetsDiscoveryScheduleConsumer } from './processors/assets-discovery-schedule.processor';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { TargetsController } from './targets.controller';
 import { TargetOverviewService } from './target-overview.service';
@@ -22,7 +23,12 @@ import { TargetsService } from './targets.service';
     }),
   ],
   controllers: [TargetsController],
-  providers: [TargetsService, TargetOverviewService, TriggerWorkflowService],
+  providers: [
+    TargetsService,
+    TargetOverviewService,
+    TriggerWorkflowService,
+    AssetsDiscoveryScheduleConsumer,
+  ],
   exports: [TargetsService],
 })
 export class TargetsModule {}

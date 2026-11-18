@@ -10,6 +10,7 @@ Scan roots of a workspace: a domain, IP, CIDR or Git organization. A target owns
 - `entities/target.entity.ts`: `Target`, `TargetSource`, `GitOrgTargetSettings`. `TargetType` lives in `common/enums/enum.ts` and is re-exported here.
 - `cidr.ts` (parse/format/overlap), `target-logo.ts` (`resolveTargetLogo`), `target-source.dto.ts` (source enrichment).
 - `dto/targets.dto.ts`, `dto/target-overview.dto.ts`.
+- `processors/assets-discovery-schedule.processor.ts`: `AssetsDiscoveryScheduleConsumer`, the consumer of the scan-schedule queue.
 
 ## Public surface
 
@@ -25,7 +26,7 @@ Scan roots of a workspace: a domain, IP, CIDR or Git organization. A target owns
 - `@Global()`, exports `TargetsService`. It also provides `TriggerWorkflowService` (from `workflows/`), and this is the **only** module that provides it.
 - Event bridge: `@PublishEvent` sends `target.created` (bulk) and `target.updated` (PATCH). `target.deleted` is not on the stream: `deleteTarget` writes it only as an audit row via `AuditService.auditSafely`. After the create transaction, `createMultipleTargets` publishes `asset.discovered` once per target for its new assets.
 - In-process events (`EventEmitter2`): `target.<type>.create` for each created target (`target.domain.create`, `target.cidr.create`, `target.ip.create`, `target.git_org.create`), and `target.git_org.re-scan` when GIT_ORG settings change.
-- BullMQ: registers `ASSETS_DISCOVERY_SCHEDULE` and adds one repeatable job per scheduled target (job name = target id, data `{ id }`, `repeat.pattern` = the `CronSchedule` value). The consumer is `AssetsDiscoveryScheduleConsumer` in `jobs-registry/processors/scan-schedule.processor.ts`.
+- BullMQ: registers `ASSETS_DISCOVERY_SCHEDULE` and adds one repeatable job per scheduled target (job name = target id, data `{ id }`, `repeat.pattern` = the `CronSchedule` value). The consumer, `AssetsDiscoveryScheduleConsumer` (`processors/assets-discovery-schedule.processor.ts`), lives here too and calls `AssetsService.reScan` with `JobRunType.SCHEDULED`.
 - MCP/agent tools: `retrieve_targets` (`getTargetsTool` in `agents/tools/workspace.tools.ts`, also on MCP) calls `getTargetsInWorkspace`. Agent-only `create_project` and `add_targets` go through `ensureTargets` in `agents/tools/project-build.tools.ts`, which looks existing values up with `findByWorkspaceAndValues` first and sends only new ones to `createMultipleTargets` (duplicates are rejected, see Gotchas).
 
 ## Data model
@@ -62,4 +63,4 @@ Scan roots of a workspace: a domain, IP, CIDR or Git organization. A target owns
 
 ## Testing
 
-Unit specs: `targets.service.spec.ts`, `targets.controller.spec.ts`, `target-overview.service.spec.ts`, `cidr.spec.ts`, `target-logo.spec.ts`, `target-source.dto.spec.ts`. E2E: `core-api/test/targets.e2e-spec.ts`.
+Unit specs: `targets.service.spec.ts`, `targets.controller.spec.ts`, `processors/assets-discovery-schedule.processor.spec.ts`, `target-overview.service.spec.ts`, `cidr.spec.ts`, `target-logo.spec.ts`, `target-source.dto.spec.ts`. E2E: `core-api/test/targets.e2e-spec.ts`.

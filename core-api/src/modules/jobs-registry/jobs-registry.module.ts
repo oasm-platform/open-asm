@@ -15,7 +15,6 @@ import { JobResultCleanupService } from './job-result-cleanup.service';
 import { JobConfigSealService } from './job-config-seal.service';
 import { JobRetentionService } from './job-retention.service';
 import { JobResultProcessor } from './processors/job-result.processor';
-import { AssetsDiscoveryScheduleConsumer } from './processors/scan-schedule.processor';
 import { WorkflowRunReconcilerService } from './workflow-run-reconciler.service';
 import { WorkflowRunnerService } from './workflow-runner.service';
 
@@ -40,7 +39,6 @@ import { WorkflowRunnerService } from './workflow-runner.service';
     JobsRegistryService,
     WorkflowRunnerService,
     WorkflowRunReconcilerService,
-    AssetsDiscoveryScheduleConsumer,
     JobResultProcessor,
     JobResultCleanupService,
     JobRetentionService,

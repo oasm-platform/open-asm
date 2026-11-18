@@ -2,7 +2,7 @@ import { JobRunType } from '@/common/enums/enum';
 import type { AssetsService } from '@/modules/assets/assets.service';
 import type { Target } from '@/modules/targets/entities/target.entity';
 import type { Job } from 'bullmq';
-import { AssetsDiscoveryScheduleConsumer } from './scan-schedule.processor';
+import { AssetsDiscoveryScheduleConsumer } from './assets-discovery-schedule.processor';
 
 describe('AssetsDiscoveryScheduleConsumer', () => {
   it('re-scans the target as a scheduled run in its own workspace', async () => {
