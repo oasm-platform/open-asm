@@ -1,3 +1,8 @@
+import { AgentApprovalsController } from './agent-approvals.controller';
+import { AgentCustomizationController } from './agent-customization.controller';
+import { AgentMcpConfigsController } from './agent-mcp-configs.controller';
+import { AgentModelsController } from './agent-models.controller';
+import { AgentSettingsController } from './agent-settings.controller';
 import { ContextCompactionService } from './context-compaction.service';
 import { ConversationTitleService } from './conversation-title.service';
 import { LlmConfigResolver } from './llm-config.resolver';
@@ -95,7 +100,14 @@ export const AGENT_FUNCTION_HOSTS = [
     ToolsModule,
     JobsRegistryModule,
   ],
-  controllers: [AgentsController],
+  controllers: [
+    AgentsController,
+    AgentApprovalsController,
+    AgentModelsController,
+    AgentMcpConfigsController,
+    AgentSettingsController,
+    AgentCustomizationController,
+  ],
   providers: [
     AgentsService,
     AgentsCompletionsService,

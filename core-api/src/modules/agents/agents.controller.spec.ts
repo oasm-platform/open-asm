@@ -1,13 +1,40 @@
 import { WorkspacePermissions } from '@/common/decorators/workspace-permissions.decorator';
 import { HttpStatus, NotFoundException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { AgentApprovalsController } from './agent-approvals.controller';
+import { AgentCustomizationController } from './agent-customization.controller';
+import { AgentMcpConfigsController } from './agent-mcp-configs.controller';
+import { AgentModelsController } from './agent-models.controller';
+import { AgentSettingsController } from './agent-settings.controller';
 import { AgentsController } from './agents.controller';
 
 jest.mock('better-auth/node', () => ({
   fromNodeHeaders: jest.fn(),
 }));
 
-describe('AgentsController workspace permission guards', () => {
+/** The agents routes, split by resource over these controllers. */
+const AGENT_CONTROLLERS = [
+  AgentsController,
+  AgentApprovalsController,
+  AgentModelsController,
+  AgentMcpConfigsController,
+  AgentSettingsController,
+  AgentCustomizationController,
+];
+
+/** The handler and the controller that declares it. */
+const handlerOf = (method: string): [() => unknown, object] => {
+  const owner = AGENT_CONTROLLERS.find((c) =>
+    Object.prototype.hasOwnProperty.call(c.prototype, method),
+  );
+  if (!owner) throw new Error(`no agents controller declares ${method}`);
+  return [
+    (owner.prototype as unknown as Record<string, () => unknown>)[method],
+    owner,
+  ];
+};
+
+describe('Agents controllers workspace permission guards', () => {
   const reflector = new Reflector();
 
   const read: Array<[string, string]> = [
@@ -61,24 +88,12 @@ describe('AgentsController workspace permission guards', () => {
   ];
 
   it.each(read)('%s (%s) requires agent.read', (method, _route) => {
-    const handler = (AgentsController.prototype as unknown as Record<string, () => unknown>)[
-      method
-    ];
-    const required = reflector.getAllAndOverride(WorkspacePermissions, [
-      handler,
-      AgentsController,
-    ]);
+    const required = reflector.getAllAndOverride(WorkspacePermissions, handlerOf(method));
     expect(required).toEqual(['agent.read']);
   });
 
   it.each(write)('%s (%s) requires agent.write', (method, _route) => {
-    const handler = (AgentsController.prototype as unknown as Record<string, () => unknown>)[
-      method
-    ];
-    const required = reflector.getAllAndOverride(WorkspacePermissions, [
-      handler,
-      AgentsController,
-    ]);
+    const required = reflector.getAllAndOverride(WorkspacePermissions, handlerOf(method));
     expect(required).toEqual(['agent.write']);
   });
 
@@ -87,13 +102,7 @@ describe('AgentsController workspace permission guards', () => {
   ];
 
   it.each(execute)('%s (%s) requires agent.read', (method, _route) => {
-    const handler = (AgentsController.prototype as unknown as Record<string, () => unknown>)[
-      method
-    ];
-    const required = reflector.getAllAndOverride(WorkspacePermissions, [
-      handler,
-      AgentsController,
-    ]);
+    const required = reflector.getAllAndOverride(WorkspacePermissions, handlerOf(method));
     expect(required).toEqual(['agent.read']);
   });
 });

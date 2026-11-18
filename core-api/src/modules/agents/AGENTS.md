@@ -5,7 +5,8 @@ The AI chat agent: LLM connections, conversations streamed over SSE, the tool se
 ## Layout
 
 - `agents.module.ts`: not global; imported by `McpServerModule` (`src/mcp`). Registers every entity below plus `Project`, and the tool classes (`AGENT_TOOL_CLASSES`). `onModuleInit` runs `validateAgentFunctions` over `AGENT_FUNCTION_HOSTS` (every class with `@AgentFunction` methods), so a broken declaration stops the boot.
-- `agents.controller.ts`: all HTTP routes under `agents/`, including the SSE writer and the resume stream.
+- `agents.controller.ts`: the conversation routes under `agents/` (conversations, messages, subagents, workflow), including the SSE writer, stop and the resume stream.
+- The other `agents/` routes, one controller per resource: `agent-models.controller.ts` (modes, providers, llm-configs, usage), `agent-approvals.controller.ts` (command/plan approvals), `agent-mcp-configs.controller.ts`, `agent-settings.controller.ts` (config, workspace-memory), `agent-customization.controller.ts` (definitions, skills, tool-rules). Their handlers keep `operationId: 'AgentsController_<method>'` in `@Doc`, so the OpenAPI operation ids and the console's generated hooks did not change when they moved; keep that prefix on new handlers of these controllers only if you want the old naming, otherwise Nest names them after their class.
 - `agents.service.ts` (`AgentsService`): LLM config CRUD, conversation/message reads and deletes, workspace MCP config CRUD + ping, the `PROJECT_DELETING_EVENT` listener.
 - `agents.completions.ts` (`AgentsCompletionsService`, ~3000 lines): one chat turn (`streamMessage`), the continuation loop (`createContinuationStream`), system prompt assembly (`buildSystemContext`), `vulAnalyze`, and `stopRun`.
 - `context-compaction.service.ts` (`ContextCompactionService`): token-budget pruning of the history a turn sends (`pruneContextByBudget`) and compaction into `agent_conversations.summary`, mid-loop (`checkAndCompactMidLoop`) or after the stream (`handlePostStreamCompaction`, past 60% of the window). A running compaction is joined.
@@ -28,7 +29,7 @@ The AI chat agent: LLM connections, conversations streamed over SSE, the tool se
 
 ## Public surface
 
-All routes: `@Controller('agents')`, `AuthGuard`, `@WorkspaceAccess('agent.read' | 'agent.write')`.
+All routes (every agents controller): `@Controller('agents')`, `AuthGuard`, `@WorkspaceAccess('agent.read' | 'agent.write')`. `agents.controller.spec.ts` checks the permission of each route on whichever controller declares it.
 
 | Route | Permission |
 |---|---|
