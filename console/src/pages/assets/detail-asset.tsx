@@ -24,7 +24,7 @@ import {
   Lock,
   Tag,
 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useParams } from '@tanstack/react-router';
 import ScreenshotCell from './components/screenshot-cell';
 import HTTPXStatusCode from './components/status-code';
@@ -73,15 +73,6 @@ export default function DetailAsset() {
   );
 
   const [faviconError, setFaviconError] = useState(false);
-
-  useEffect(() => {
-    const pageTitle = data?.httpResponses?.title || data?.value;
-    if (!pageTitle) return;
-    document.title = `${pageTitle} | OASM`;
-    return () => {
-      document.title = 'OASM';
-    };
-  }, [data?.httpResponses?.title, data?.value]);
 
   if (!id) return null;
 
@@ -187,6 +178,7 @@ export default function DetailAsset() {
   return (
     <Page
       title={assetTitle}
+      documentTitle={httpResponses?.title || value}
       header={assetHeader}
      
       permission="asset.read"

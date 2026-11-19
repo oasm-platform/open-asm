@@ -12,10 +12,6 @@ import ReactDOM from 'react-dom/client';
 import { ThemeProvider } from './components/ui/theme-provider';
 import { TooltipProvider } from './components/ui/tooltip';
 import { router } from './router';
-import {
-  getRootControllerGetMetadataQueryKey,
-  useRootControllerGetMetadata,
-} from './services/apis/gen/queries';
 import './styles/index.css';
 import { AxiosError } from 'axios';
 import { toast } from 'sonner';
@@ -111,20 +107,6 @@ persistQueryClient({
       PERSISTED_QUERY_ROOTS.has(String(query.queryKey[0])),
   },
 });
-
-function useMetadataTitle() {
-  const { data: metadata } = useRootControllerGetMetadata({
-    query: { queryKey: getRootControllerGetMetadataQueryKey() },
-  });
-  useEffect(() => {
-    if (metadata?.name) document.title = metadata.name;
-  }, [metadata]);
-}
-
-function MetadataProvider({ children }: { children: React.ReactNode }) {
-  useMetadataTitle();
-  return <>{children}</>;
-}
 
 function AppRouter() {
   const { data: session, isPending } = useSession();
@@ -245,14 +227,13 @@ function App() {
   return (
     <StrictMode>
       <QueryClientProvider client={queryClient}>
-        <MetadataProvider>
-          <ThemeProvider defaultTheme="system" storageKey="theme">
-            <TooltipProvider>
-              <AppRouter />
-              <Toaster position="bottom-center" />
-            </TooltipProvider>
-          </ThemeProvider>
-        </MetadataProvider>
+        {/* The document title follows the route: DocumentTitle in __root */}
+        <ThemeProvider defaultTheme="system" storageKey="theme">
+          <TooltipProvider>
+            <AppRouter />
+            <Toaster position="bottom-center" />
+          </TooltipProvider>
+        </ThemeProvider>
       </QueryClientProvider>
     </StrictMode>
   );

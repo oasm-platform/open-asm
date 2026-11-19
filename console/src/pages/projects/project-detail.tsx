@@ -130,6 +130,7 @@ export default function ProjectDetail() {
     <Page
      
       permission="project.read"
+      documentTitle={project.name}
       title={
         <span className="flex min-w-0 items-center gap-2.5">
           <h1 className="truncate">{project.name}</h1>

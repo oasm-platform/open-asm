@@ -276,6 +276,7 @@ export default function IssueDetail({ issueId }: { issueId?: string } = {}) {
 
   return (
     <Page
+      documentTitle={`${formatIssueNo(issue.no)} ${issue.title}`}
       title={
         <EditableTitle issue={issue} onSave={(title) => update({ title })} />
       }
