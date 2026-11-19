@@ -44,6 +44,12 @@ const Page = ({
       <div
         className={cn(
           'flex flex-wrap items-end justify-between gap-3',
+          // The title's capitals start ~7.5px below its line box (32px line
+          // on 24px Geist), so the gap above them looks ~6px wider than the
+          // page's side padding: pull the row up to match it. Dark mode has
+          // no line under the header, so the title sits right up close.
+          // Only with a title: an empty row must not ride up into the header.
+          (title || description) && '-mt-1.5 dark:-mt-4',
           headerClassName,
         )}
       >

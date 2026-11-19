@@ -124,7 +124,7 @@ const ListWorkers = () => {
       {[...Array(4)].map((_, i) => (
         <div
           key={i}
-          className="flex flex-col items-start gap-2 rounded-lg border p-5 animate-pulse"
+          className="flex flex-col items-start gap-2 rounded-lg border p-5 animate-pulse dark:bg-card-surface"
         >
           <div className="flex w-full items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -193,7 +193,8 @@ const ListWorkers = () => {
         // the internal-network badge can sit beside it instead of nested inside
         <div
           key={worker.id}
-          className={`relative flex h-full flex-col items-start gap-2 rounded-lg border p-5 text-left transition-colors hover:bg-accent/70 ${isWorkerOnline(worker) ? '' : 'opacity-50'}`}
+          // Dark mode: the card fill, as outlines are off there (index.css)
+          className={`relative flex h-full flex-col items-start gap-2 rounded-lg border p-5 text-left transition-colors hover:bg-accent/70 dark:bg-card-surface dark:hover:bg-accent/70 ${isWorkerOnline(worker) ? '' : 'opacity-50'}`}
         >
           <button
             type="button"

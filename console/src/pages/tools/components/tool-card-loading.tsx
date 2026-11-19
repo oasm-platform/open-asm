@@ -6,7 +6,7 @@ const ToolCardSkeleton = ({ count = 8 }: ToolCardSkeletonProps) => {
   const skeletonCards = Array.from({ length: count }, (_, index) => (
     <div
       key={index}
-      className="flex flex-col items-start gap-2 rounded-lg border p-5 animate-pulse"
+      className="flex flex-col items-start gap-2 rounded-lg border p-5 animate-pulse dark:bg-card-surface"
     >
       <div className="flex items-center gap-2">
         <div className="size-6 rounded bg-muted" />

@@ -33,6 +33,27 @@ interface StatsStripProps {
   onSelect?: (view: StatsView) => void;
   /** Shows AI proposals to review instead of open findings (the dashboard counts those already). */
   showPendingReview?: boolean;
+  /**
+   * False leaves the per-severity counts out of the Open card, for a page
+   * that shows them elsewhere: they make every card in the row taller.
+   */
+  showSeverityBreakdown?: boolean;
+}
+
+/** Open findings per severity, zeros included. */
+export function openSeverityCounts(
+  stats: GetVulnerabilitiesStatisticsResponseDto,
+): SeverityCountsDto {
+  const bySeverity = Object.fromEntries(
+    (stats.data ?? []).map((s) => [s.severity, s.count]),
+  ) as Partial<SeverityCountsDto>;
+  return {
+    critical: bySeverity.critical ?? 0,
+    high: bySeverity.high ?? 0,
+    medium: bySeverity.medium ?? 0,
+    low: bySeverity.low ?? 0,
+    info: bySeverity.info ?? 0,
+  };
 }
 
 /** One row of compact cards on wide screens, like the dashboard totals. */
@@ -47,6 +68,7 @@ export function VulnerabilityStatsStrip({
   isLoading,
   onSelect,
   showPendingReview,
+  showSeverityBreakdown = true,
 }: StatsStripProps) {
   const { data: settings } = useVulnerabilitiesControllerGetSettings();
 
@@ -68,16 +90,6 @@ export function VulnerabilityStatsStrip({
     );
   }
 
-  const bySeverity = Object.fromEntries(
-    (stats.data ?? []).map((s) => [s.severity, s.count]),
-  ) as Partial<SeverityCountsDto>;
-  const counts: SeverityCountsDto = {
-    critical: bySeverity.critical ?? 0,
-    high: bySeverity.high ?? 0,
-    medium: bySeverity.medium ?? 0,
-    low: bySeverity.low ?? 0,
-    info: bySeverity.info ?? 0,
-  };
   const open = (stats.data ?? []).reduce((sum, s) => sum + s.count, 0);
   const mttrHigh = stats.mttr?.find((m) => m.severity === 'high');
   const slaHigh = settings?.slaDays.high;
@@ -108,7 +120,9 @@ export function VulnerabilityStatsStrip({
           value={open}
           onClick={select('open')}
         >
-          <SeverityBreakdown counts={counts} />
+          {showSeverityBreakdown && (
+            <SeverityBreakdown counts={openSeverityCounts(stats)} />
+          )}
         </StatCard>
       )}
       <StatCard

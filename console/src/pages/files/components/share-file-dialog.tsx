@@ -166,7 +166,7 @@ export function ShareFileDialog({
         <div className="space-y-1">
           <p className="text-sm font-medium">People with access</p>
           {shares.data?.length ? (
-            <ul className="divide-y rounded-md border">
+            <ul className="divide-y rounded-md border dark:bg-card-surface">
               {shares.data.map((user) => (
                 <li
                   key={user.id}

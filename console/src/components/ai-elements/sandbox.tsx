@@ -102,6 +102,8 @@ export const SandboxTabsList = ({
   ...props
 }: SandboxTabsListProps) => (
   <TabsList
+    // The triggers draw their own bottom border
+    indicator={false}
     className={cn("h-auto rounded-none border-0 bg-transparent p-0", className)}
     {...props}
   />

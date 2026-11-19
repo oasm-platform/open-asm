@@ -15,7 +15,9 @@ export function AiChatPanelToggle() {
       label="Ask AI"
       // Small screens keep only the icon, beside the search icon
       labelClassName="hidden md:inline"
-      className="shrink-0"
+      // Dark mode: borderless and unfilled, so it does not read as a second
+      // search box, and the icon takes the label's color, not the accent
+      className="shrink-0 dark:border-transparent dark:aria-pressed:border-transparent dark:bg-transparent dark:shadow-none dark:[&_svg]:text-current"
       aria-label={isOpen ? 'Close AI chat' : 'Open AI chat'}
       aria-pressed={isOpen}
       title={isOpen ? 'Close AI chat' : 'Ask AI'}

@@ -52,6 +52,7 @@ export function CodeBlock({
 
   return (
     <div
+      data-slot="code-block"
       className={cn(
         'w-full overflow-hidden rounded-lg border bg-background shadow-sm',
         className,

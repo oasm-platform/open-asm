@@ -78,7 +78,8 @@ export default function Statistic() {
   ];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4 h-full">
+    // Sized by the dashboard's main column (`dashboard-main` container)
+    <div className="grid grid-cols-1 @md/dashboard-main:grid-cols-2 @3xl/dashboard-main:grid-cols-4 gap-4 h-full">
       {statsCards.map((card, index) => (
         <Card
           key={index}

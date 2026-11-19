@@ -297,7 +297,7 @@ function TemplateChecklist({ selected, onSelectedChange }: PickerProps) {
   return (
     <div className="space-y-2">
       <Label>Templates</Label>
-      <ScrollArea className="h-36 rounded-md border">
+      <ScrollArea className="h-36 rounded-md border dark:bg-card-surface">
         <div className="p-2">
           {rows.map((row) => (
             <label

@@ -190,7 +190,7 @@ export default function IpLocationsCard({
 
   return (
     <div
-      className={`rounded-xl border h-full relative ${isDark ? 'bg-card' : 'bg-white'}`}
+      className={`rounded-xl border h-full relative ${isDark ? 'bg-card-surface' : 'bg-white'}`}
     >
       <div className="absolute top-4 left-4 z-10">
         <h3 className="font-semibold text-base">Locations</h3>
@@ -198,8 +198,9 @@ export default function IpLocationsCard({
           Distribution of asset IPs by location
         </p>
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-4 p-4 pt-0 gap-4">
-        <div className="lg:col-span-3 relative overflow-hidden rounded-xl">
+      {/* Sized by the dashboard's main column (`dashboard-main` container) */}
+      <div className="grid grid-cols-1 @3xl/dashboard-main:grid-cols-4 p-4 pt-0 gap-4">
+        <div className="@3xl/dashboard-main:col-span-3 relative overflow-hidden rounded-xl">
           <ReactEChartsCore
             ref={chartRef}
             echarts={echarts}
@@ -212,7 +213,8 @@ export default function IpLocationsCard({
         </div>
         {data.length > 0 && (
           <div
-            className={`lg:col-span-1 rounded-xl p-2 self-center ${isDark ? 'bg-card' : 'bg-white'}`}
+            // Dark mode: no fill of its own, it sits on the see-through card
+            className={`@3xl/dashboard-main:col-span-1 rounded-xl p-2 self-center ${isDark ? '' : 'bg-white'}`}
           >
             <IpLocationsTable
               data={data}

@@ -16,7 +16,8 @@ export const badgeVariants = cva(
         warning:
           'border-transparent bg-warning/12 text-[color:var(--warning)] [a&]:hover:bg-warning/20',
         outline:
-          'text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
+          // Its line is the whole chip: in dark mode a plain border draws none
+          'border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
         soft: 'border-transparent bg-accent text-accent-foreground [a&]:hover:bg-accent/80',
       },
     },

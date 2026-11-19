@@ -60,18 +60,20 @@ export function ThemeProvider({
     root.classList.add(activeTheme);
     setResolvedTheme(activeTheme);
 
-    const themeColor = activeTheme === 'dark' ? '#0a1024' : '#fbfbfd';
-    let metaThemeColor = document.querySelector(
-      'meta[name="theme-color"]:not([media])',
-    );
-
-    if (!metaThemeColor) {
-      metaThemeColor = document.createElement('meta');
-      metaThemeColor.setAttribute('name', 'theme-color');
-      document.head.appendChild(metaThemeColor);
+    // Dark: the top of the page, the navy under the header's blue glow
+    // (index.css .app-glow, averaged across a 390px-wide screen), so the
+    // mobile browser bar runs on into the header
+    const themeColor = activeTheme === 'dark' ? '#152a4f' : '#fbfbfd';
+    // Every theme-color meta: index.html's follow the OS scheme and come
+    // first, so the browser would take them over the app's own theme
+    const metas = document.querySelectorAll('meta[name="theme-color"]');
+    if (metas.length === 0) {
+      const meta = document.createElement('meta');
+      meta.setAttribute('name', 'theme-color');
+      meta.setAttribute('content', themeColor);
+      document.head.appendChild(meta);
     }
-
-    metaThemeColor.setAttribute('content', themeColor);
+    metas.forEach((meta) => meta.setAttribute('content', themeColor));
   }, [theme]);
 
   useEffect(() => {

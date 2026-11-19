@@ -8,7 +8,8 @@ export default function Templates() {
   return (
     // Rendered as a workspace settings tab: fill the viewport below the
     // settings main padding and the tab's title block (plus the mobile header).
-    <div className="flex h-[calc(100svh-10rem)] flex-col overflow-hidden rounded-md border md:h-[calc(100svh-7.5rem)]">
+    // Dark mode: the card fill, as plain outlines are off there.
+    <div className="flex h-[calc(100svh-10rem)] flex-col overflow-hidden rounded-md border dark:bg-card-surface md:h-[calc(100svh-7.5rem)]">
       <SidebarProvider
         className="flex flex-col flex-1 min-h-0"
         style={{ '--sidebar-width': '15rem' } as React.CSSProperties}

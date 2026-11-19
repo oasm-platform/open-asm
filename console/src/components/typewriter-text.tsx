@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useTypewriter } from '@/hooks/use-typewriter';
 
 interface TypewriterTextProps {
   texts: string[];
@@ -15,54 +15,11 @@ export default function TypewriterText({
   pauseDuration = 2000,
   className = '',
 }: TypewriterTextProps) {
-  const [displayText, setDisplayText] = useState('');
-  const [charIndex, setCharIndex] = useState(0);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(() =>
-    Math.floor(Math.random() * texts.length),
-  );
-  // A new list (e.g. ask/agent switch) can be shorter than the old index:
-  // start over on a text from the new list.
-  const [prevTexts, setPrevTexts] = useState(texts);
-  if (texts !== prevTexts) {
-    setPrevTexts(texts);
-    setDisplayText('');
-    setCharIndex(0);
-    setIsDeleting(false);
-    setCurrentIndex(Math.floor(Math.random() * texts.length));
-  }
-
-  useEffect(() => {
-    const currentText = texts[currentIndex];
-    let timeout: ReturnType<typeof setTimeout>;
-
-    if (!isDeleting && charIndex < currentText.length) {
-      // Typing forward
-      timeout = setTimeout(() => {
-        setDisplayText(currentText.slice(0, charIndex + 1));
-        setCharIndex(charIndex + 1);
-      }, typingSpeed);
-    } else if (!isDeleting && charIndex === currentText.length) {
-      // Pause before deleting
-      timeout = setTimeout(() => {
-        setIsDeleting(true);
-      }, pauseDuration);
-    } else if (isDeleting && charIndex > 0) {
-      // Deleting backward
-      timeout = setTimeout(() => {
-        setDisplayText(currentText.slice(0, charIndex - 1));
-        setCharIndex(charIndex - 1);
-      }, deletingSpeed);
-    } else if (isDeleting && charIndex === 0) {
-      // Move to next text
-      timeout = setTimeout(() => {
-        setIsDeleting(false);
-        setCurrentIndex((prev) => (prev + 1) % texts.length);
-      }, 500);
-    }
-
-    return () => clearTimeout(timeout);
-  }, [charIndex, isDeleting, currentIndex, texts, typingSpeed, deletingSpeed, pauseDuration]);
+  const displayText = useTypewriter(texts, {
+    typingSpeed,
+    deletingSpeed,
+    pauseDuration,
+  });
 
   return (
     <p className={className}>

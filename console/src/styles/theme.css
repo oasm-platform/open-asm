@@ -6,6 +6,8 @@
 
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.1805 0.0233 264.05);
+  /* The Card fill: solid here, see-through in dark mode */
+  --card-surface: var(--card);
 
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.1805 0.0233 264.05);
@@ -64,6 +66,8 @@
 
   --card: oklch(0.1938 0.0213 264.05);
   --card-foreground: oklch(0.9674 0.0061 247.86);
+  /* Slightly see-through: cards near the top take a little of the page glow */
+  --card-surface: color-mix(in oklab, var(--card) 80%, transparent);
 
   --popover: oklch(0.1938 0.0213 264.05);
   --popover-foreground: oklch(0.9674 0.0061 247.86);
@@ -89,7 +93,10 @@
   --warning: oklch(0.8041 0.1475 70.08);
   --warning-foreground: oklch(0.1452 0.018 264.05);
 
-  --border: oklch(0.2924 0.018 264.05);
+  /* A soft line for dividers, tracks and scrollbars: element outlines are off
+     in dark mode (index.css), so this no longer frames every surface.
+     --input keeps the stronger line so fields still read as fields. */
+  --border: oklch(0.2496 0.018 264.05);
   --input: oklch(0.2924 0.018 264.05);
   --ring: oklch(0.64 0.2333 264.05);
 
@@ -105,7 +112,7 @@
   --sidebar-primary-foreground: oklch(0.9911 0.0035 247.86);
   --sidebar-accent: oklch(0.2426 0.0213 264.05);
   --sidebar-accent-foreground: oklch(0.9674 0.0061 247.86);
-  --sidebar-border: oklch(0.2924 0.018 264.05);
+  --sidebar-border: oklch(0.2496 0.018 264.05);
   --sidebar-ring: oklch(0.64 0.2333 264.05);
 
   --graph-canvas: oklch(0.16 0.02 264);
@@ -136,6 +143,7 @@
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
+  --color-card-surface: var(--card-surface);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);

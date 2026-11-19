@@ -1,4 +1,3 @@
-import { RouteProgress } from '@/components/common/route-progress';
 import { Toaster } from '@/components/ui/sonner';
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
 import {
@@ -236,7 +235,6 @@ function App() {
             <TooltipProvider>
               <AppRouter />
               <Toaster position="bottom-center" />
-              <RouteProgress />
             </TooltipProvider>
           </ThemeProvider>
         </MetadataProvider>
