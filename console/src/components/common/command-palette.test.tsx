@@ -1,10 +1,17 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ASK_PROMPT_GROUPS } from '@/pages/agents/components/landing-constants';
 import { CommandPalette } from './command-palette';
 
 const askPrompts = ASK_PROMPT_GROUPS.flatMap((group) => group.prompts);
+
+/**
+ * Queries inside the open palette. The trigger button shows a random search
+ * hint, one of which reads "Ask AI …", so page-wide /Ask AI/ queries would
+ * catch it.
+ */
+const inPalette = () => within(screen.getByRole('dialog'));
 
 /** The AI starter questions on screen, in order */
 function shownSuggestions() {
@@ -114,7 +121,7 @@ describe('CommandPalette Ask AI', () => {
   it('hides Ask AI while the search is loading', async () => {
     searchState.current = { data: undefined, isFetching: true };
     await openAndType('zero-day');
-    expect(screen.queryByText(/Ask AI/)).not.toBeInTheDocument();
+    expect(inPalette().queryByText(/Ask AI/)).not.toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Searching…');
   });
 
@@ -132,19 +139,19 @@ describe('CommandPalette Ask AI', () => {
     };
     await openAndType('zero-day');
     expect(screen.getByText('zero-day.example.com')).toBeInTheDocument();
-    expect(screen.queryByText(/Ask AI/)).not.toBeInTheDocument();
+    expect(inPalette().queryByText(/Ask AI/)).not.toBeInTheDocument();
   });
 
   it('hides Ask AI when a page matches', async () => {
     await openAndType('assets');
     expect(screen.getByRole('option', { name: /Assets/ })).toBeInTheDocument();
-    expect(screen.queryByText(/Ask AI/)).not.toBeInTheDocument();
+    expect(inPalette().queryByText(/Ask AI/)).not.toBeInTheDocument();
   });
 
   it('offers three starter questions beside the pages for an empty input', async () => {
     await openAndType('   ');
-    expect(screen.queryByText(/Ask AI about/)).not.toBeInTheDocument();
-    expect(screen.getByText('Ask AI')).toBeInTheDocument();
+    expect(inPalette().queryByText(/Ask AI about/)).not.toBeInTheDocument();
+    expect(inPalette().getByText('Ask AI')).toBeInTheDocument();
     expect(new Set(shownSuggestions()).size).toBe(3);
     expect(screen.getByRole('option', { name: /Assets/ })).toBeInTheDocument();
   });
