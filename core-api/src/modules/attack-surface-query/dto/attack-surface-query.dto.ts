@@ -143,7 +143,8 @@ export class CreateSavedQueryDto {
   @ApiProperty({
     type: 'object',
     additionalProperties: true,
-    description: 'A query batch, same shape as the body of POST attack-surface/query',
+    description:
+      'A query batch, same shape as the body of POST attack-surface/query, plus optional "params": { <name>: { type: "string" | "number" | "list", default, description? } } used as { "$param": "<name>" } in a filter value, a limit or a window bound.',
     example: QUERY_EXAMPLE,
   })
   @IsObject()
@@ -151,6 +152,18 @@ export class CreateSavedQueryDto {
 }
 
 export class UpdateSavedQueryDto extends PartialType(CreateSavedQueryDto) {}
+
+export class RunSavedQueryDto {
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: true,
+    description: 'Values of the params the saved query declares ({ <name>: string | number | string[] }); missing ones take their default.',
+    example: { target: 'example.com', ports: ['22', '3389'] },
+  })
+  @IsOptional()
+  @IsObject()
+  params?: Record<string, unknown>;
+}
 
 export class SavedQueryDto {
   @ApiProperty() id: string;
