@@ -1,10 +1,11 @@
 import type { IntegrationType } from '@/common/enums/enum';
-import { BadRequestException } from '@nestjs/common';
+
 import {
   CAPABILITIES_KEYWORD,
   type CapabilityMeta,
 } from './schemas/capability-fields';
 import { universalIntegrationSchema } from './schemas/universal-integration.schema';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 /**
  * Capability model
@@ -103,7 +104,7 @@ export function normalizeCapabilities(args: {
 }): { category: string; capabilities: string[] } {
   const supported = getSupportedCapabilities(args.appType);
   if (supported.length === 0) {
-    throw new BadRequestException(
+    throw new InvalidInputError(
       `Unknown integration app "${args.appType}"`,
     );
   }
@@ -115,7 +116,7 @@ export function normalizeCapabilities(args: {
   ];
   const unsupported = requested.filter((cap) => !supported.includes(cap));
   if (unsupported.length > 0) {
-    throw new BadRequestException(
+    throw new InvalidInputError(
       `Integration app "${args.appType}" does not support: ${unsupported.join(', ')}. Supported: ${supported.join(', ')}`,
     );
   }
@@ -123,7 +124,7 @@ export function normalizeCapabilities(args: {
   if (!isMultiCapabilityApp(args.appType)) {
     // Legacy: the only valid set is the single category itself.
     if (requested.length !== 1 || requested[0] !== args.category) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `Integration app "${args.appType}" only supports ${supported[0]}`,
       );
     }

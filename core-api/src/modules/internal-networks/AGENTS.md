@@ -7,7 +7,7 @@ Named private networks inside a workspace. Workers attach to one and report thei
 - `internal-networks.controller.ts`: `/internal-networks` routes.
 - `internal-networks.service.ts`: CRUD, interface listing, `createTargetsFromInterfaces`.
 - `entities/internal-network.entity.ts`, `entities/network-interface.entity.ts`.
-- `dtos/`: request/response DTOs. The list queries extend `GetManyBaseQueryParams`, whose `sortBy` must match `SAFE_SORT_IDENTIFIER` (the service interpolates it into `ORDER BY`).
+- `dto/`: request/response DTOs. The list queries extend `GetManyBaseQueryParams`, whose `sortBy` must match `SAFE_SORT_IDENTIFIER` (the service interpolates it into `ORDER BY`).
 
 ## Public surface
 
@@ -36,7 +36,7 @@ Workers attach over gRPC with `WorkersService/ConnectInternalNetwork`, which is 
 
 ## Coupling
 
-- Imports `WorkspacesModule` (it is also global). `TargetsService` comes from the global `TargetsModule`.
+- Imports `WorkspacesModule` (it is also global) and `TargetsModule` (`TargetsService`).
 - `WorkersModule` registers `InternalNetwork` and `NetworkInterface` and writes both tables directly (`connectInternalNetwork`). `Target` and `WorkerInstance` carry FKs to `internal_networks`. A schema change here touches those entities too.
 
 ## Testing

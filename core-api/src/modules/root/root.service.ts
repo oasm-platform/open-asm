@@ -6,12 +6,13 @@ import {
 import { Role } from '@/common/enums/enum';
 import { ReleaseVersion } from '@/common/interfaces/app.interface';
 import { RedisService } from '@/services/redis/redis.service';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SystemConfigsService } from '../admin/system-configs/system-configs.service';
 import { StorageService } from '../storage/storage.service';
 import { UsersService } from '../users/users.service';
 import { GetMetadataDto, GetVersionDto } from './dto/root.dto';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 @Injectable()
 export class RootService {
@@ -84,7 +85,7 @@ export class RootService {
     const data = await this.redisService.get(VERSION_KEY);
 
     if (!data) {
-      throw new NotFoundException('Version data not found');
+      throw new NotFoundError('Version data not found');
     }
 
     const parsed = JSON.parse(data) as ReleaseVersion;

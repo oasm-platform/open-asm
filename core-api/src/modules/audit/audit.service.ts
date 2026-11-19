@@ -2,7 +2,7 @@ import { AuditActorType, AuditOutcome } from '@/common/enums/enum';
 import { requestClientIp } from '@/common/config/trusted-proxies';
 import { MCP_API_KEY_HEADER } from '@/common/constants/app.constants';
 import type { RequestWithMetadata } from '@/common/interfaces/app.interface';
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { DataSource } from 'typeorm';
@@ -11,6 +11,7 @@ import type { AuditAction } from './constants/audit-events';
 import type { GetAuditEventsQueryDto } from './dto/audit.dto';
 import { AuditEvent } from './entities/audit-event.entity';
 import { redactSecrets } from '../event-bridge/publishing/redact-secrets';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 /** Separator between the occurredAt ISO and the id inside a keyset cursor. */
 const CURSOR_SEPARATOR = '|';
@@ -53,25 +54,25 @@ export function decodeCursor(
   // '!<valid>' decodes fine) and accepts '=' padding — encodeCursor emits
   // unpadded canonical base64url, so both are malformed.
   if (!BASE64URL_RE.test(cursor)) {
-    throw new BadRequestException('Invalid cursor');
+    throw new InvalidInputError('Invalid cursor');
   }
   const raw = Buffer.from(cursor, 'base64url').toString('utf8');
   const parts = raw.split(CURSOR_SEPARATOR);
   if (parts.length !== 2) {
-    throw new BadRequestException('Invalid cursor');
+    throw new InvalidInputError('Invalid cursor');
   }
   const [iso, id] = parts;
   // Strict ISO-8601 in the exact toISOString() shape; the round-trip check
   // additionally rejects out-of-range dates that would otherwise normalize.
   if (!CURSOR_ISO_RE.test(iso) || !CURSOR_UUID_RE.test(id)) {
-    throw new BadRequestException('Invalid cursor');
+    throw new InvalidInputError('Invalid cursor');
   }
   const occurredAt = new Date(iso);
   if (
     Number.isNaN(occurredAt.getTime()) ||
     occurredAt.toISOString() !== iso
   ) {
-    throw new BadRequestException('Invalid cursor');
+    throw new InvalidInputError('Invalid cursor');
   }
   return { occurredAt, id };
 }
@@ -369,7 +370,7 @@ export class AuditService {
       .take(EXPORT_MAX_ROWS + 1)
       .getMany();
     if (rows.length > EXPORT_MAX_ROWS) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `Export is capped at ${EXPORT_MAX_ROWS.toLocaleString()} rows; narrow the filters and retry`,
       );
     }

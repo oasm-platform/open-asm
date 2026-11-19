@@ -1,15 +1,14 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/require-await */
-import { BadRequestException } from '@nestjs/common';
-import {
-  AgentApprovalMode,
-  AgentMode,
-  WorkerScope,
-  WorkerType,
-} from '@/common/enums/enum';
+
+import { WorkerScope, WorkerType } from '@/common/enums/enum';
+import { AgentApprovalMode, AgentMode } from '@/modules/agents/enums/agent.enums';
 import { AgentsCompletionsService } from './agents.completions';
+import { LlmConfigResolver } from './llm-config.resolver';
 import { AgentsService } from './agents.service';
-import { listWorkersTool } from './tools/workspace.tools';
+import { agentFunctionWith } from './agents.tools.testing';
+import { WorkspaceTools } from './tools/workspace.tools';
 import type { SendMessageDto } from './dto/message.dto';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 const dto = {
   question: 'hi',
@@ -30,9 +29,15 @@ function buildCompletions(
   const service = Object.assign(
     Object.create(AgentsCompletionsService.prototype),
     {
-      llmConfigRepository: {
-        findOne: jest.fn().mockResolvedValue({ id: 'llm-1' }),
-      },
+      llmConfigs: Object.assign(Object.create(LlmConfigResolver.prototype), {
+        llmConfigRepository: {
+          findOne: jest.fn().mockResolvedValue({ id: 'llm-1' }),
+        },
+        agentsConfig: {
+          find: jest.fn().mockResolvedValue(agentConfig),
+          getDefaultLLMConfig: jest.fn().mockResolvedValue({ id: 'llm-1' }),
+        },
+      }),
       agentsConfig: {
         find: jest.fn().mockResolvedValue(agentConfig),
         getDefaultLLMConfig: jest.fn().mockResolvedValue({ id: 'llm-1' }),
@@ -56,7 +61,7 @@ describe('worker scope enforcement', () => {
 
       await expect(
         service.getOrCreateConversation(dto, 'ws-1', 'user-1'),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
       expect(
         service.workersService.isAgentWorkerForWorkspace,
       ).toHaveBeenCalledWith('worker-1', 'ws-1');
@@ -165,9 +170,11 @@ describe('worker scope enforcement', () => {
           },
         ],
       });
-      const tool = listWorkersTool(
-        { workersService: { getWorkers } } as never,
-        'ws-1',
+      const tool = agentFunctionWith(
+        WorkspaceTools,
+        'list_active_workers',
+        { workersService: { getWorkers } },
+        { workspaceId: 'ws-1' },
       ) as unknown as {
         execute: (params: unknown, options: unknown) => Promise<unknown>;
       };

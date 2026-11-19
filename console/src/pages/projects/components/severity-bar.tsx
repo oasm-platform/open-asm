@@ -78,9 +78,12 @@ export const SeverityCounts = memo(function SeverityCounts({
 export const SeverityBreakdown = memo(function SeverityBreakdown({
   counts,
   className,
+  showLabels = false,
 }: {
   counts?: SeverityCountsDto | null;
   className?: string;
+  /** Names each severity beside its count, for use away from a number card */
+  showLabels?: boolean;
 }) {
   return (
     <ul
@@ -100,7 +103,13 @@ export const SeverityBreakdown = memo(function SeverityBreakdown({
             >
               {count}
             </span>
-            <span className="sr-only">{s.label}</span>
+            <span
+              className={
+                showLabels ? 'text-xs text-muted-foreground' : 'sr-only'
+              }
+            >
+              {s.label}
+            </span>
           </li>
         );
       })}

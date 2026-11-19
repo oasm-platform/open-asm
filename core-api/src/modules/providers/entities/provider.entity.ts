@@ -78,7 +78,7 @@ export class ToolProvider extends BaseEntity {
   @Column({ default: true })
   isActive: boolean;
 
-  @ManyToOne(() => User, (user) => user.toolProviders)
+  @ManyToOne(() => User)
   owner: Relation<User>;
 
   @OneToMany(() => Tool, (tool) => tool.provider)

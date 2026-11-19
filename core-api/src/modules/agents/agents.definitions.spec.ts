@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+
 import * as fs from 'fs';
 import * as path from 'path';
 import type { Repository } from 'typeorm';
@@ -11,6 +11,8 @@ import {
   AgentDefinitionMode,
   AgentDefinitionScope,
 } from './enums/agent.enums';
+import { ConflictError, NotFoundError } from '@/common/errors/domain.errors';
+import { currentToolName } from './tools/helpers';
 
 const BUILTIN_DIR = path.join(__dirname, 'builtin-agents');
 
@@ -51,6 +53,20 @@ describe('parseBuiltinAgentFile', () => {
     expect(new Set(names).size).toBe(files.length);
     expect(names).toEqual(expect.arrayContaining(['pentest', 'worker']));
   });
+
+  it('lists only current tool names and shipped skills in built-in agents', () => {
+    const shippedSkills = new Set(fs.readdirSync(path.join(__dirname, 'skills')));
+    for (const file of fs.readdirSync(BUILTIN_DIR).filter((f) => f.endsWith('.md'))) {
+      const def = parseBuiltinAgentFile(fs.readFileSync(path.join(BUILTIN_DIR, file), 'utf-8'));
+      // An old name still works (RENAMED_TOOLS), but the file should say what runs.
+      for (const tool of def?.metadata.tools ?? []) {
+        expect({ file, tool: currentToolName(tool) }).toEqual({ file, tool });
+      }
+      for (const skill of def?.metadata.skills ?? []) {
+        expect({ file, skill, shipped: shippedSkills.has(skill) }).toEqual({ file, skill, shipped: true });
+      }
+    }
+  });
 });
 
 describe('AgentsDefinitionsService', () => {
@@ -78,7 +94,7 @@ describe('AgentsDefinitionsService', () => {
   it('reserves built-in names', async () => {
     await expect(
       service.create('ws', 'u1', { ...dto, name: 'pentest' }),
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).rejects.toBeInstanceOf(ConflictError);
     expect(repo.exists).not.toHaveBeenCalled();
   });
 
@@ -105,7 +121,7 @@ describe('AgentsDefinitionsService', () => {
     repo.exists.mockResolvedValue(true);
     await expect(
       service.create('ws', 'u1', { ...dto, scope: AgentDefinitionScope.WORKSPACE }),
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).rejects.toBeInstanceOf(ConflictError);
     const { where } = repo.exists.mock.calls[0][0] as { where: object[] };
     expect(where).toEqual([{ workspaceId: 'ws', name: 'my-agent' }]);
   });
@@ -121,14 +137,13 @@ describe('AgentsDefinitionsService', () => {
 
   it('only lets the creator delete a custom agent', async () => {
     repo.findOne.mockResolvedValue(null);
-    await expect(service.delete('ws', 'u2', 'c1')).rejects.toBeInstanceOf(
-      NotFoundException,
+    await expect(service.delete('ws', 'u2', 'c1')).rejects.toBeInstanceOf(NotFoundError,
     );
     expect(repo.findOne).toHaveBeenCalledWith({
       where: { id: 'c1', workspaceId: 'ws', createdBy: 'u2' },
     });
     await expect(
       service.delete('ws', 'u1', 'builtin-pentest'),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 });

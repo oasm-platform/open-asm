@@ -13,7 +13,8 @@ export function StorageUsage({ usage }: { usage?: ArtifactUsageDto }) {
     : 100;
 
   return (
-    <div className="rounded-lg border p-4 space-y-2">
+    // Dark mode: the card fill, as plain outlines are off there
+    <div className="rounded-lg border p-4 space-y-2 dark:bg-card-surface">
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
         <span className="font-medium">Workspace storage</span>
         <span className="text-muted-foreground">

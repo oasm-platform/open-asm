@@ -13,7 +13,7 @@ import { IntegrationSyncService } from './integrations-sync.service';
  * processor only ever reads job.data, so both shapes are handled identically.
  *
  * Orphan guard: if the integration row is gone (deleted without cleaning up
- * the schedule — same race as scan-schedule.processor.ts), the job is dropped
+ * the schedule — same race as targets/processors/assets-discovery-schedule.processor.ts), the job is dropped
  * instead of failing forever on every repeat. The guard covers QUEUED jobs;
  * an in-flight job may still finish its writes after DELETE — accepted,
  * workspace-scoped and benign (see IntegrationSyncService.runSync).

@@ -1,7 +1,7 @@
 import type { App } from 'supertest/types';
 import type { DataSource } from 'typeorm';
 import * as request from 'supertest';
-import { AssetsService } from '../src/modules/assets/assets.service';
+import { AssetQueryService } from '../src/modules/assets/asset-query.service';
 import { DataAdapterService } from '../src/modules/data-adapter/data-adapter.service';
 import { closeTestApp, createTestApp, type TestApp } from './helpers/app';
 import { cleanupE2eData, createUserWithWorkspace } from './helpers/workspace';
@@ -28,7 +28,7 @@ describe('Asset facets (e2e)', () => {
   let app: TestApp;
   let server: App;
   let dataSource: DataSource;
-  let assets: AssetsService;
+  let assets: AssetQueryService;
   let adapter: DataAdapterService;
   let headers: Record<string, string>;
   let workspaceId: string;
@@ -80,7 +80,7 @@ describe('Asset facets (e2e)', () => {
     app = await createTestApp();
     server = app.server;
     dataSource = app.dataSource;
-    assets = app.app.get(AssetsService);
+    assets = app.app.get(AssetQueryService);
     adapter = app.app.get(DataAdapterService);
 
     const ctx = await createUserWithWorkspace(app.server, 'facets');

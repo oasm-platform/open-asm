@@ -49,6 +49,14 @@ tasks:
         msg: SPEC must identify one test file
     cmds:
       - pnpm run test -- --runTestsByPath {{.SPEC}}
+  # Unit tests with coverage, under the same worker and memory limits as
+  # `task api:test`. Report in core-api/coverage/; jest.coverageThreshold in
+  # package.json fails the run when coverage drops below the baseline.
+  test:cov:
+    cmds:
+      # pnpm hands everything after the script name to jest; a `--` would be
+      # forwarded too and turn the flag into a test path pattern.
+      - pnpm run test --coverage --coverageReporters=text-summary --coverageReporters=json-summary
   # Run e2e tests (boots full AppModule; needs postgres+redis running)
   test:e2e:
     cmds:
@@ -96,6 +104,26 @@ tasks:
   migration:revert:
     cmds:
       - pnpm exec ts-node --project tsconfig.json -r tsconfig-paths/register -- node_modules/typeorm/cli.js migration:revert -d src/database/database-config.ts
+  # Batched backfill of the attack surface tenant columns (workspaceId/targetId)
+  # for large databases: run between the AddWorkspaceScopeColumns and
+  # AddWorkspaceScopeConstraints migrations. Usage:
+  #   task api:asq:backfill BATCH=10000 PAUSE_MS=100
+  asq:backfill:
+    env:
+      BATCH: '{{.BATCH | default "10000"}}'
+      PAUSE_MS: '{{.PAUSE_MS | default "100"}}'
+    cmds:
+      - pnpm exec ts-node --project tsconfig.json -r tsconfig-paths/register -- scripts/asq-backfill.ts
+  # Attack surface query benchmark on a LOCAL database (seeds a throwaway
+  # workspace, prints p50/p95 per sample query, deletes it unless KEEP=1). Usage:
+  #   task api:asq:bench SCALE=100000 RUNS=20
+  asq:bench:
+    env:
+      SCALE: '{{.SCALE | default "100000"}}'
+      RUNS: '{{.RUNS | default "20"}}'
+      KEEP: '{{.KEEP | default "0"}}'
+    cmds:
+      - pnpm exec ts-node --project tsconfig.json -r tsconfig-paths/register -- scripts/asq-benchmark.ts
   # Refresh the bundled models.dev snapshot (resources/models-dev/catalog.json)
   # Fallback for context-window limits when models.dev is unreachable at runtime.
   models:snapshot:

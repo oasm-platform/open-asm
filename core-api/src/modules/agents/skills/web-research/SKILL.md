@@ -77,8 +77,8 @@ Pick the right source for the query:
 
 After gathering external intel, map findings back to the workspace:
 
-- Use `enumerate_assets` or `fingerprint_technologies` to check if affected software is in use
-- Use `discover_vulnerabilities` to see if the CVE is already tracked
+- Use `query_attack_surface` on `technologies` to check if affected software is in use
+- Use `query_attack_surface` on `vulnerabilities` (`cve` eq the id) to see if the CVE is already tracked
 - Use `enumerate_open_issues` to check if someone is already investigating
 
 ### 5. Save Important Findings

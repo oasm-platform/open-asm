@@ -1,10 +1,9 @@
-import { Global, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TechnologyForwarderService } from './technology-forwarder.service';
-import { TechnologyController } from './technology.controller';
+import { StorageModule } from '../storage/storage.module';
 
-@Global()
 @Module({
-  controllers: [TechnologyController],
+  imports: [StorageModule],
   providers: [TechnologyForwarderService],
   exports: [TechnologyForwarderService],
 })

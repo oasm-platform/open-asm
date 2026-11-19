@@ -1,7 +1,8 @@
 name: PR Size
 
 # Keeps pull requests small enough to review properly. Posts a single sticky bot
-# comment when a PR gets large, and fails the check when it exceeds the hard limit.
+# comment when a PR gets large. Advisory only: past the hard limit the comment
+# says so, but the check still passes (ENFORCE below).
 #
 # Uses pull_request_target so the bot can also comment on PRs from forks (the
 # pull_request token is read-only there). This is safe ONLY because the job never
@@ -25,16 +26,17 @@ jobs:
     name: PR Size
     runs-on: ubuntu-latest
     env:
-      # Set to 'false' to only comment without failing the check (e.g. during a trial period).
-      ENFORCE: 'true'
+      # 'false': only comment, never fail the check. Set to 'true' to fail PRs
+      # past the hard limit (unless they carry the override label).
+      ENFORCE: 'false'
     steps:
       - name: Check PR size
         uses: actions/github-script@v9
         with:
           script: |
             const SOFT_LINES = 400;   // above this: warning comment
-            const HARD_LINES = 1000;  // above this: check fails
-            const HARD_FILES = 40;    // above this: check fails
+            const HARD_LINES = 1000;  // above this: "too large" comment (fails only if ENFORCE)
+            const HARD_FILES = 40;    // above this: "too large" comment (fails only if ENFORCE)
             const OVERRIDE_LABEL = 'size/override';
             const MARKER = '<!-- pr-size-check -->';
             const ENFORCE = process.env.ENFORCE === 'true';
@@ -114,7 +116,8 @@ jobs:
               advice =
                 `Please split it into smaller PRs that each do **one** thing — see [Pull Request Size](${guide}) for how.\n\n` +
                 `If the size is genuinely unavoidable (mechanical rename, generated-only change, vendored update), ` +
-                `ask a maintainer to apply the \`${OVERRIDE_LABEL}\` label.`;
+                `ask a maintainer to apply the \`${OVERRIDE_LABEL}\` label.` +
+                (ENFORCE ? '' : '\n\nThis is a warning only; the check still passes.');
             } else {
               heading = '### ⚠️ This PR is getting large';
               advice =

@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+
 import type { Queue } from 'bullmq';
 import type { Repository } from 'typeorm';
 import { IntegrationType } from '@/common/enums/enum';
@@ -12,10 +12,12 @@ import {
   IntegrationSyncService,
 } from './integrations-sync.service';
 import type { Integration } from './entities/integration.entity';
+import type { IntegrationConfigReader } from './integration-config.reader';
 import { IntegrationsService } from './integrations.service';
 import { VercelConnector } from './connectors/vercel.connector';
 import { getConnectorClass } from './connectors/connector.registry';
 import type { AwsSsoService } from './connectors/aws/aws-sso.service';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 /**
  * F3 — Vercel mocked end-to-end QA.
@@ -80,7 +82,7 @@ describe('Vercel integration — mocked end-to-end through IntegrationSyncServic
     save: jest.Mock;
     update: jest.Mock;
   };
-  let integrationsServiceMock: { getIntegrationWithDecryptedConfig: jest.Mock };
+  let configReaderMock: { getIntegrationWithDecryptedConfig: jest.Mock };
   let targetsServiceMock: {
     findByWorkspaceAndValues: jest.Mock;
     createMultipleTargets: jest.Mock;
@@ -117,7 +119,7 @@ describe('Vercel integration — mocked end-to-end through IntegrationSyncServic
       save: jest.fn().mockImplementation((entity: Integration) => entity),
       update: jest.fn().mockResolvedValue(undefined),
     };
-    integrationsServiceMock = {
+    configReaderMock = {
       getIntegrationWithDecryptedConfig: jest.fn().mockResolvedValue({
         integration: integration(),
         decryptedConfig: { apiToken: 'vercel-token' },
@@ -158,7 +160,7 @@ describe('Vercel integration — mocked end-to-end through IntegrationSyncServic
     service = new IntegrationSyncService(
       queueMock as unknown as Queue,
       repoMock as unknown as Repository<Integration>,
-      integrationsServiceMock as unknown as IntegrationsService,
+      configReaderMock as unknown as IntegrationConfigReader,
       targetsServiceMock as unknown as TargetsService,
       dataAdapterServiceMock as unknown as DataAdapterService,
       workspacesServiceMock as unknown as WorkspacesService,
@@ -232,7 +234,7 @@ describe('Vercel integration — mocked end-to-end through IntegrationSyncServic
         .runSync('integration-1', 'ws-1', { dryRun: true })
         .catch((e: unknown) => e);
 
-      expect(error).toBeInstanceOf(BadRequestException);
+      expect(error).toBeInstanceOf(InvalidInputError);
       expect((error as Error).message).toContain('Vercel API error 401');
       expect((error as Error).message).toContain('invalid access token');
       expect(fetchSpy).toHaveBeenCalledTimes(1); // no retry on 401
@@ -250,7 +252,7 @@ describe('Vercel integration — mocked end-to-end through IntegrationSyncServic
         .runSync('integration-1', 'ws-1', { dryRun: true })
         .catch((e: unknown) => e);
 
-      expect(error).toBeInstanceOf(BadRequestException);
+      expect(error).toBeInstanceOf(InvalidInputError);
       expect((error as Error).message).toContain('Vercel API error 403');
       expect((error as Error).message).toContain('forbidden');
       expect(fetchSpy).toHaveBeenCalledTimes(1);
@@ -263,6 +265,7 @@ describe('Vercel integration — mocked end-to-end through IntegrationSyncServic
         {} as unknown as Repository<Integration>,
         {} as unknown as WorkspaceEncryptionService,
         {} as unknown as IntegrationSyncService,
+        {} as unknown as IntegrationConfigReader,
       );
 
       const schema = catalogService.getSchemas() as {

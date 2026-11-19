@@ -1,5 +1,5 @@
 import { CronSchedule, JobStatus } from '@/common/enums/enum';
-import { NotFoundException } from '@nestjs/common';
+
 import type { Queue } from 'bullmq';
 import type { DataSource, Repository } from 'typeorm';
 import {
@@ -14,6 +14,7 @@ import {
   TargetOverviewService,
   toSeverityCounts,
 } from './target-overview.service';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 const DAY = 86_400_000;
 const NOW = Date.UTC(2026, 10, 7);
@@ -111,8 +112,7 @@ describe('TargetOverviewService', () => {
 
   it('rejects a target of another workspace', async () => {
     repo.findOneBy.mockResolvedValue(null);
-    await expect(service.overview('t1', 'ws-2')).rejects.toBeInstanceOf(
-      NotFoundException,
+    await expect(service.overview('t1', 'ws-2')).rejects.toBeInstanceOf(NotFoundError,
     );
     expect(repo.findOneBy).toHaveBeenCalledWith({ id: 't1', workspaceId: 'ws-2' });
     expect(query).not.toHaveBeenCalled();

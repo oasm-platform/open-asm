@@ -23,7 +23,7 @@ The tool catalogue (built-in CLIs, manifest connectors, provider tools), per-wor
 | `PATCH/DELETE tools/:toolId/config-profiles/:id`, `POST :id/set-default` | `workspace.write` |
 
 - `POST /admin/tools` (admin module) calls `ToolsService.createTool`, which creates a `PROVIDER` tool.
-- Exports `ToolsService` and `ToolConfigProfilesService`. The module is `@Global()`.
+- Exports `ToolsService` and `ToolConfigProfilesService`. Not global: imported by `WorkersModule`, `JobsRegistryModule`, `AdminModule`, `AgentsModule`, `ProjectsModule`, `TemplatesModule` and `VulnerabilitiesModule`.
 
 ## Data model
 
@@ -52,8 +52,7 @@ The tool catalogue (built-in CLIs, manifest connectors, provider tools), per-wor
 
 ## Coupling
 
-- Imports `forwardRef(() => WorkersModule)` and `ConnectorsModule`. `ToolsService` injects `WorkersService` with `forwardRef` and counts workers through `workersService.repo`. This is part of the tools ↔ workers ↔ jobs-registry cycle; see the comment in `combine.module.ts`, where `AdminModule` must load after `JobsRegistryModule`.
-- Registers the `Asset` and `Vulnerability` repositories (exposed as public `assetRepo` / `vulnerabilityRepo`).
+- Imports `ConnectorsModule` and `StorageModule` (`ToolSyncService`); no dependency on `WorkersModule` (workers depends on tools). Worker availability per tool is a read model: `ToolsService` reads the `workers` table through its own `WorkerInstance` repository (`countBuiltInWorkers`, `countAvailableWorkersBatch`) and never writes it.
 - Used by: jobs-registry (`resolveConfigForJob`, `assertProfileOwnership`, `getToolByNames`, the helpers, `builtInTools`, `maskProfile`), `workflows.service.ts`, `projects/project-workflows.service.ts`, agents (`getManyTools`, `installTool`, `getInstalledTools`, `getAgentTools`, `getToolById`, `ToolConfigProfilesService.list` for `list_tool_config_profiles`), `admin.controller.ts`, `templates.service.ts`, `vulnerabilities.service.ts`. `connectors/connector-registry.service.ts` imports the `ManifestCapability` type from `tool-categories.ts`.
 
 ## Gotchas

@@ -1,21 +1,22 @@
 import { Button } from '@/components/ui/button';
-import { useNavigate } from '@tanstack/react-router';
+import { useAiChat } from '@/hooks/useAiChat';
 import { Sparkles } from 'lucide-react';
 import { useCallback, type ComponentProps } from 'react';
 
 /**
- * Opens AI Studio in Ask mode and sends `query` straight away, so a search
- * with no results still ends in an answer instead of a dead end.
+ * Opens the AI chat sidebar on a new Ask-mode chat and sends `query` straight
+ * away, so a search with no results still ends in an answer instead of a dead
+ * end, without leaving the page.
  */
 export function useAskAi() {
-  const navigate = useNavigate();
+  const { openChat } = useAiChat();
   return useCallback(
     (query: string) => {
       const text = query.trim();
       if (!text) return;
-      void navigate({ to: '/aistudio', search: { text, mode: 'ask' } });
+      openChat({ text, agentMode: 'ask' });
     },
-    [navigate],
+    [openChat],
   );
 }
 

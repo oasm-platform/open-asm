@@ -1,6 +1,6 @@
 import { decryptWithDEK } from '@/common/utils/workspace-encryption.util';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { LanguageModel } from 'ai';
 import { In, Repository } from 'typeorm';
@@ -19,6 +19,7 @@ import { AgentLLMConfig } from './entities/agent-llm-config.entity';
 import { LLMProvider, SearchProvider } from './enums/agent.enums';
 import { getLLMProviderConfig } from './llm-provider-supported';
 import { currentToolName } from './tools/helpers';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 export function maskApiKey(apiKey: string): string {
   if (apiKey.length <= 4) return '****';
@@ -174,7 +175,7 @@ export class AgentsConfigService {
     const providerConfig = getLLMProviderConfig(config.provider);
 
     if (!providerConfig) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `Unsupported LLM provider: ${String(config.provider)}`,
       );
     }
@@ -360,7 +361,7 @@ export class AgentsConfigService {
       where: { id: In(ids), workspaceId, userId },
     });
     if (found !== ids.length) {
-      throw new BadRequestException('LLM config not found');
+      throw new InvalidInputError('LLM config not found');
     }
   }
 
@@ -375,10 +376,10 @@ export class AgentsConfigService {
   ): Promise<AgentSearchProviderConfig[]> {
     const providers = input.map((p) => p.provider);
     if (new Set(providers).size !== providers.length) {
-      throw new BadRequestException('Each search provider can be added once');
+      throw new InvalidInputError('Each search provider can be added once');
     }
     if (input.filter((p) => p.isDefault).length > 1) {
-      throw new BadRequestException('Only one search provider can be default');
+      throw new InvalidInputError('Only one search provider can be default');
     }
     const hasDefault = input.some((p) => p.isDefault);
 
@@ -392,7 +393,7 @@ export class AgentsConfigService {
           );
         }
         if (!apiKey) {
-          throw new BadRequestException(`API key required for ${p.provider}`);
+          throw new InvalidInputError(`API key required for ${p.provider}`);
         }
         return {
           provider: p.provider,

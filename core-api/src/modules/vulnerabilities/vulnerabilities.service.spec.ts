@@ -1,11 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
-import { NotFoundException } from '@nestjs/common';
+
 import type { Queue } from 'bullmq';
 import type { DataSource, Repository } from 'typeorm';
 import { TargetType } from '@/common/enums/enum';
-import type { AgentsCompletionsService } from '../agents/agents.completions';
+import type { VulnerabilityAnalyzerRegistry } from './vulnerability-analyzer';
 import type { JobsRegistryService } from '../jobs-registry/jobs-registry.service';
 import type { WorkflowRunnerService } from '../jobs-registry/workflow-runner.service';
 import type { NotificationsService } from '../notifications/notifications.service';
@@ -15,6 +15,7 @@ import type { WorkflowsService } from '../workflows/workflows.service';
 import type { VulnerabilityDismissal } from './entities/vulnerability-dismissal.entity';
 import type { Vulnerability } from './entities/vulnerability.entity';
 import { VulnerabilitiesService } from './vulnerabilities.service';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 describe('VulnerabilitiesService', () => {
   let service: VulnerabilitiesService;
@@ -44,7 +45,7 @@ describe('VulnerabilitiesService', () => {
       mockJobRegistryService as unknown as JobsRegistryService,
       mockToolsService as unknown as ToolsService,
       { workflowRepository: mockWorkflowRepository } as unknown as WorkflowsService,
-      {} as AgentsCompletionsService,
+      {} as VulnerabilityAnalyzerRegistry,
       {} as NotificationsService,
       mockTargetRepository as unknown as Repository<Target>,
       mockWorkflowRunnerService as unknown as WorkflowRunnerService,
@@ -218,8 +219,7 @@ describe('VulnerabilitiesService', () => {
           : { id: 'workflow-host', content: { jobs: {} } },
     );
 
-    await expect(service.scan(['domain-1', 'org-1'], 'ws-1')).rejects.toThrow(
-      NotFoundException,
+    await expect(service.scan(['domain-1', 'org-1'], 'ws-1')).rejects.toThrow(NotFoundError,
     );
     expect(mockJobRegistryService.createNewJob).not.toHaveBeenCalled();
     expect(mockWorkflowRunnerService.startRun).not.toHaveBeenCalled();
@@ -228,8 +228,7 @@ describe('VulnerabilitiesService', () => {
   it('scan rejects when none of the targets belong to the workspace', async () => {
     mockTargetRepository.find.mockResolvedValue([]);
 
-    await expect(service.scan(['other-ws-target'], 'ws-1')).rejects.toThrow(
-      NotFoundException,
+    await expect(service.scan(['other-ws-target'], 'ws-1')).rejects.toThrow(NotFoundError,
     );
     expect(mockWorkflowRepository.findOne).not.toHaveBeenCalled();
   });

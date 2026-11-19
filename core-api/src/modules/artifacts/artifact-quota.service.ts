@@ -7,13 +7,13 @@ import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import {
   ConflictException,
   Injectable,
-  NotFoundException,
   PayloadTooLargeException,
 } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import type { ArtifactUsageDto, WorkspaceStorageQuotaDto } from './dto/artifacts.dto';
 import { Artifact } from './entities/artifact.entity';
 import { WorkspaceStorageUsage } from './entities/workspace-storage-usage.entity';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 export const STORAGE_QUOTA_EXCEEDED = 'STORAGE_QUOTA_EXCEEDED';
 
@@ -155,7 +155,7 @@ export class ArtifactQuotaService {
       .getRepository(Workspace)
       .existsBy({ id: workspaceId });
     if (!exists) {
-      throw new NotFoundException('Workspace not found');
+      throw new NotFoundError('Workspace not found');
     }
 
     await this.dataSource

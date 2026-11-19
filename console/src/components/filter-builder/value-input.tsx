@@ -106,7 +106,9 @@ export function ValueInput({ field, condition, onChange, error }: {
         // scroll lock swallows it) and fights the on-screen keyboard for position.
         <>
           {input}
-          {open && options.length > 0 && <div className="rounded-md border">{list}</div>}
+          {open && options.length > 0 && (
+            <div className="rounded-md border dark:bg-card-surface">{list}</div>
+          )}
         </>
       ) : (
         <Popover open={open && options.length > 0} onOpenChange={setOpen}>

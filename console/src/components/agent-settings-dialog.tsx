@@ -102,7 +102,7 @@ const tabs: TabConfig[] = [
 const GROUP_LABEL = 'Agent settings';
 
 const triggerClassName =
-  'data-[state=active]:bg-sidebar-accent data-[state=active]:text-sidebar-accent-foreground data-[state=active]:after:hidden text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 h-10 w-full flex-none justify-start gap-3 rounded-lg px-3 text-sm font-medium border-0 shadow-none';
+  'data-[state=active]:bg-sidebar-accent data-[state=active]:text-sidebar-accent-foreground text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 h-10 w-full flex-none justify-start gap-3 rounded-lg px-3 text-sm font-medium border-0 shadow-none';
 
 export function AgentSettingsDialog() {
   const {
@@ -132,7 +132,11 @@ export function AgentSettingsDialog() {
             <p className="px-3 pb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
               {GROUP_LABEL}
             </p>
-            <TabsList className="p-0 h-auto w-full flex-col items-stretch justify-start gap-0.5 rounded-none bg-transparent">
+            <TabsList
+              // The selected item is a filled row, not an underline
+              indicator={false}
+              className="p-0 h-auto w-full flex-col items-stretch justify-start gap-0.5 rounded-none bg-transparent"
+            >
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 return (

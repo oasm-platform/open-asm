@@ -1,17 +1,18 @@
 import { APP_INTERCEPTOR } from '@nestjs/core';
-import { BullMQName, EventBusGroup } from '@/common/enums/enum';
+import { BullMQName } from '@/common/enums/enum';
+import { EventBusGroup } from '@/modules/event-bridge/enums/event-bridge.enums';
 import { EventConsumersService } from './consuming/event-consumers.service';
-import { EVENT_SINKS } from './consuming/event-sink';
+import { EVENT_LANE_METADATA } from './consuming/event-lane.decorator';
 import { EventBridgeModule, SINKS } from './event-bridge.module';
 import { EventBridgeService } from './publishing/event-bridge.service';
 import { EventPublishInterceptor } from './publishing/event-publish.interceptor';
 import { SUBSCRIPTIONS } from './routing/subscriptions';
 import { AuditSink } from './sinks/audit/audit.sink';
-import { IntegrationsSink } from './sinks/integrations/integrations.sink';
-import { IssuesSink } from './sinks/issues/issues.sink';
+import { IntegrationsSink } from '../integrations/event-lane/integrations.sink';
+import { IssuesSink } from '../issues/event-lane/issues.sink';
 import { NotificationsSink } from './sinks/notifications/notifications.sink';
 import { ProjectionSink } from './sinks/projection/projection.sink';
-import { ProjectsSink } from './sinks/projects/projects.sink';
+import { ProjectsSink } from '../projects/event-lane/projects.sink';
 
 /**
  * Guards the one wiring mistake that is invisible everywhere else: a lane
@@ -33,14 +34,6 @@ describe('EventBridgeModule wiring', () => {
   const exports = (): unknown[] =>
     (Reflect.getMetadata('exports', EventBridgeModule) ?? []) as unknown[];
 
-  const providerFor = (token: unknown) =>
-    providers().find(
-      (provider): provider is Record<string, unknown> =>
-        typeof provider === 'object' &&
-        provider !== null &&
-        (provider as { provide?: unknown }).provide === token,
-    );
-
   const allSinks = [
     AuditSink,
     ProjectionSink,
@@ -50,19 +43,26 @@ describe('EventBridgeModule wiring', () => {
     IssuesSink,
   ];
 
-  it('registers every sink as a provider', () => {
-    for (const sink of allSinks) {
+  it('registers its own lanes and the consumer runtime', () => {
+    for (const sink of SINKS) {
       expect(providers()).toContain(sink);
     }
+    expect(providers()).toContain(EventConsumersService);
   });
 
-  it('hands every sink to the consumer runtime', () => {
-    // A sink registered as a provider but missing from EVENT_SINKS would boot
-    // cleanly and never consume.
-    const sinksProvider = providerFor(EVENT_SINKS);
-    expect(sinksProvider?.inject).toEqual(expect.arrayContaining(allSinks));
-    expect(SINKS).toHaveLength(allSinks.length);
-    expect(providers()).toContain(EventConsumersService);
+  it('imports no domain module: the domain lanes register themselves', () => {
+    const imported = ((Reflect.getMetadata('imports', EventBridgeModule) ?? []) as Array<{ name?: string }>)
+      .map((m) => m?.name ?? '');
+    expect(imported).not.toEqual(
+      expect.arrayContaining([expect.stringMatching(/^(Integrations|Projects|Issues)Module$/)]),
+    );
+  });
+
+  it('marks every lane for discovery', () => {
+    // An unmarked sink would never be found, and boot would fail on its group
+    for (const sink of allSinks) {
+      expect(Reflect.getMetadata(EVENT_LANE_METADATA, sink)).toBe(true);
+    }
   });
 
   it('runs exactly one sink per declared lane', () => {

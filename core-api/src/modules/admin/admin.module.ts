@@ -6,6 +6,7 @@ import { AdminService } from './admin.service';
 import { SystemConfigsModule } from './system-configs/system-configs.module';
 import { AdminUsersModule } from './users/admin-users.module';
 import { AdminWorkspacesModule } from './workspaces/admin-workspaces.module';
+import { ToolsModule } from '../tools/tools.module';
 
 /**
  * System administration: everything served under /admin/*.
@@ -16,6 +17,7 @@ import { AdminWorkspacesModule } from './workspaces/admin-workspaces.module';
     SystemConfigsModule,
     AdminUsersModule,
     AdminWorkspacesModule,
+    ToolsModule,
   ],
   controllers: [AdminController],
   providers: [AdminService],

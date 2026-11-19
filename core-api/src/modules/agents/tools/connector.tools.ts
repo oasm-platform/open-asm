@@ -1,21 +1,26 @@
-import type { Tool } from 'ai';
-import { Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 import { WorkerType } from '@/common/enums/enum';
-import type { ConnectorRegistryService } from '@/modules/connectors/connector-registry.service';
-import type { RemoteExecuteService } from '@/modules/remote-execute/remote-execute.service';
+import { AgentMode } from '@/modules/agents/enums/agent.enums';
+import { ConnectorRegistryService } from '@/modules/connectors/connector-registry.service';
+import { RemoteExecuteService } from '@/modules/remote-execute/remote-execute.service';
 import { validateTemplate } from '@/modules/templates/templates.service';
+import { ToolConfigProfilesService } from '@/modules/tools/tool-config-profiles.service';
+import { ToolsService } from '@/modules/tools/tools.service';
 import { getSensitiveFields } from '@/modules/tools/validators/tool-config-profiles.crypto';
 import { validatePartialConfigOrThrow } from '@/modules/tools/validators/tool-config-profiles.validator';
+import { RemoteExecuteSubscribeService } from '@/modules/workers/remote-execute-subscribe.service';
+import { RedisService } from '@/services/redis/redis.service';
 
-import { defineTool, errorMessage } from './helpers';
+import { AgentFunction } from './agent-function';
+import { errorMessage } from './helpers';
 import {
   AGENT_TOOL_OUTPUT_TTL_SECONDS,
   toolOutputKey,
 } from './tool-output-store';
-import type { Deps, ToolCallOptions } from './types';
+import type { AgentFunctionContext, Deps } from './types';
 
 const logger = new Logger('AgentTool');
 
@@ -163,47 +168,6 @@ const listToolConfigProfilesSchema = z.object({
 });
 
 /**
- * list_tool_config_profiles: the config profiles of one installed connector,
- * so the model can pick a configProfileId for run_tool_connector. Field
- * names only: a profile's values (secrets included) never reach the model.
- */
-export function listToolConfigProfilesTool(
-  deps: Deps<'toolsService' | 'toolConfigProfiles' | 'connectorRegistry'>,
-  workspaceId: string,
-): Tool {
-  return defineTool({
-    description: [
-      'List the config profiles of one connector installed in this workspace, to choose configProfileId for run_tool_connector.',
-      'Each profile: id, name, isDefault, configuredFields (fields it sets), missingRequired (required fields it leaves empty; such a profile cannot run).',
-      'run_tool_connector uses the default profile when configProfileId is omitted. Field meanings are in the config of display_available_tools. Values are never returned.',
-      'Params: tool (connector slug).',
-    ].join('\n'),
-    inputSchema: listToolConfigProfilesSchema,
-    execute: async (params: z.infer<typeof listToolConfigProfilesSchema>) => {
-      const slug = params.tool;
-      // Same install check as run_tool_connector: Tool.name is the slug.
-      const [toolRow] = await deps.toolsService.getToolByNames({
-        names: [slug],
-      });
-      const installed = toolRow?.id
-        ? await deps.toolsService.getToolById(toolRow.id, workspaceId)
-        : null;
-      if (!installed?.isInstalled || installed.type !== WorkerType.CONNECTOR) {
-        return {
-          error: `Tool ${slug} is not a connector installed in this workspace.`,
-        };
-      }
-      const schema = deps.connectorRegistry.getConnectorSchema(slug);
-      const profiles = await deps.toolConfigProfiles.list(
-        workspaceId,
-        installed.id!,
-      );
-      return { tool: slug, profiles: summarizeProfiles(schema, profiles) };
-    },
-  });
-}
-
-/**
  * A JSON line (an object, or an array of objects as nuclei prints) cut down
  * to `fields`; any other line is returned as is.
  */
@@ -275,231 +239,6 @@ export function pageToolOutput(
   };
 }
 
-/**
- * run_tool_connector: runs one connector flagged `agentTool: true` against one target
- * on the conversation's worker and returns the worker's raw output. Not a
- * job: nothing goes through the job registry or the database. Agent-only,
- * off the MCP surface, and approval-gated like any mutating tool (the
- * target is free text).
- */
-export function runConnectorTool(
-  deps: Deps<
-    | 'connectorRegistry'
-    | 'toolsService'
-    | 'remoteExecuteSubscribe'
-    | 'toolConfigProfiles'
-    | 'remoteExecuteService'
-    | 'redisService'
-  >,
-  workspaceId: string,
-  conversationId: string,
-): Tool | null {
-  // Runs on the conversation's pinned worker, so none without a conversation.
-  if (!conversationId) return null;
-  const connectors = deps.connectorRegistry.getAgentConnectors();
-  if (connectors.length === 0) return null;
-
-  const inputSchema = z.object({
-    tool: z
-      .enum(connectors.map((entry) => entry.slug) as [string, ...string[]])
-      .describe('Connector slug to run'),
-    target: z
-      .string()
-      .min(1)
-      .describe('Target passed to the tool: domain, IP, host:port or URL'),
-    configProfileId: z
-      .string()
-      .uuid()
-      .optional()
-      .describe(
-        'Config profile id from list_tool_config_profiles; omit to use the default profile',
-      ),
-    config: z
-      .record(z.string(), z.unknown())
-      .optional()
-      .describe(
-        'Settings for this run, merged over the profile: field names and meanings from the config of display_available_tools. Never secret fields.',
-      ),
-    templates: z
-      .array(z.string().min(1))
-      .max(20)
-      .optional()
-      .describe(
-        `nuclei only: Nuclei template YAML documents to run instead of the built-in templates (each needs an "id"; ${AGENT_TEMPLATES_MAX_BYTES / 1024}KB total). Not saved.`,
-      ),
-  });
-  const catalog = connectors
-    .map(
-      (entry) =>
-        `- ${entry.slug}: ${entry.shortDescription ?? entry.description ?? ''}`,
-    )
-    .join('\n');
-
-  return defineTool({
-    description: [
-      "Run one security tool against one target on this conversation's worker and get its raw output.",
-      'Nothing is saved: results are not stored as assets or vulnerabilities.',
-      `Waits up to ${AGENT_TOOL_RUN_TIMEOUT_MS / 60_000} minutes. Output: stdout (first ${AGENT_TOOL_OUTPUT_PAGE / 1024}KB), exitCode, error, timedOut, truncated, totalLines.`,
-      'The full output is kept for 1 hour under runId: when truncated is true read it with read_tool_output(runId), filtering with pattern instead of paging through everything. Cite runId in propose_vulnerability evidence.',
-      'Shape the run with config (fields from display_available_tools: e.g. a match regex, ports, severity); secret fields only come from a profile. A refusal names the required fields still missing.',
-      'Params: tool (slug), target, optional config, optional configProfileId (from list_tool_config_profiles; default profile when omitted), optional templates (nuclei only: your own template YAML, run instead of the built-in set).',
-      'Tools:',
-      catalog,
-    ].join('\n'),
-    inputSchema,
-    execute: async (
-      params: z.infer<typeof inputSchema>,
-      options: ToolCallOptions,
-    ) => {
-      const {
-        tool: slug,
-        target,
-        configProfileId,
-        templates,
-        config: inlineConfig,
-      } = params;
-      if (templates?.length) {
-        if (slug !== 'nuclei') {
-          return { error: 'templates only apply to the nuclei tool.' };
-        }
-        const bytes = templates.reduce((n, t) => n + Buffer.byteLength(t, 'utf8'), 0);
-        if (bytes > AGENT_TEMPLATES_MAX_BYTES) {
-          return {
-            error: `templates total ${bytes} bytes; the limit is ${AGENT_TEMPLATES_MAX_BYTES}.`,
-          };
-        }
-        for (const [i, content] of templates.entries()) {
-          try {
-            validateTemplate(undefined, content);
-          } catch (error) {
-            return { error: `templates[${i}]: ${errorMessage(error)}` };
-          }
-        }
-      }
-      const entry = deps.connectorRegistry.getConnector(slug);
-      // Tool.name IS the connector slug; getToolById sets isInstalled from
-      // an enabled workspace_tools row, so a connector of another workspace
-      // (or one disabled here) cannot run.
-      const [toolRow] = await deps.toolsService.getToolByNames({
-        names: [slug],
-      });
-      const installed = toolRow?.id
-        ? await deps.toolsService.getToolById(toolRow.id, workspaceId)
-        : null;
-      if (!entry?.image || !installed?.isInstalled) {
-        return { error: `Tool ${slug} is not installed in this workspace.` };
-      }
-      const badConfig = inlineConfig
-        ? checkInlineConfig(deps.connectorRegistry, slug, inlineConfig)
-        : null;
-      if (badConfig) return { error: badConfig };
-
-      const pick = await deps.remoteExecuteSubscribe.pickConversationWorker(
-        conversationId,
-        workspaceId,
-      );
-      if (!pick) {
-        return {
-          error:
-            'No worker available for this workspace. Select a workspace worker for this conversation.',
-        };
-      }
-
-      let config: Record<string, unknown> | undefined;
-      try {
-        config = await deps.toolConfigProfiles.resolveConfigForJob(
-          workspaceId,
-          installed.id!,
-          {
-            configProfileId,
-            ...(inlineConfig && Object.keys(inlineConfig).length > 0
-              ? { config: inlineConfig }
-              : {}),
-          },
-        );
-      } catch (error) {
-        return { error: errorMessage(error) };
-      }
-      if (templates?.length) {
-        config = {
-          ...config,
-          customTemplates: templates.map((content) => ({ content })),
-        };
-      }
-      const missing = missingRequiredConfig(entry.configSchema, config);
-      if (missing.length > 0) {
-        return {
-          error: `Tool ${slug} needs configuration (${missing.join(', ')}). Set the non-secret ones in config; secret ones come only from a config profile the user adds in this workspace.`,
-        };
-      }
-
-      const limits = deps.connectorRegistry.getResourceDefaults(slug);
-      // The worker kills the run when core stops waiting, so the manifest
-      // timeout only ever shortens the budget.
-      const budgetSeconds = AGENT_TOOL_RUN_TIMEOUT_MS / 1000;
-      const timeoutSeconds = Math.min(
-        limits.timeoutSeconds || budgetSeconds,
-        budgetSeconds,
-      );
-      const runId = randomUUID();
-      let result: Awaited<ReturnType<RemoteExecuteService['waitForToolRun']>>;
-      try {
-        // No live stream: the chat renders no terminal for run_tool_connector, so
-        // per-chunk events only cost re-renders.
-        result = await deps.remoteExecuteService.waitForToolRun(
-          pick.workerId,
-          {
-            tool: slug,
-            image: entry.image,
-            target,
-            configJson:
-              config && Object.keys(config).length > 0
-                ? JSON.stringify(config)
-                : '',
-            cpu: limits.cpu,
-            memory: limits.memory,
-            timeoutSeconds,
-            directEgress: entry.egress === 'direct',
-          },
-          runId,
-          timeoutSeconds * 1000 + AGENT_TOOL_RESULT_GRACE_MS,
-          {
-            abortSignal: options.abortSignal,
-            maxOutputChars: AGENT_TOOL_OUTPUT_STORE_MAX,
-            onPushed: pick.pin
-              ? () =>
-                  deps.remoteExecuteSubscribe.pinConversationWorker(
-                    conversationId,
-                    pick.workerId,
-                  )
-              : undefined,
-          },
-        );
-      } catch (error) {
-        // The worker stream closed between resolving and pushing.
-        return { error: errorMessage(error) };
-      }
-      // stdout is already capped at AGENT_TOOL_OUTPUT_STORE_MAX, so
-      // totalLines matches what read_tool_output pages over.
-      const page = await pageForModel(deps, conversationId, runId, result.stdout);
-      return {
-        tool: slug,
-        target,
-        stdout: page.stdout,
-        exitCode: result.exitCode,
-        error: result.error,
-        timedOut: result.timedOut,
-        truncated: page.truncated,
-        totalLines: page.totalLines,
-        ...(page.runId ? { runId: page.runId } : {}),
-        ...(result.stdoutTruncated
-          ? { note: 'Output over 10MB: only the first 10MB is kept.' }
-          : {}),
-      };
-    },
-  });
-}
-
 const readToolOutputSchema = z.object({
   runId: z
     .string()
@@ -528,39 +267,320 @@ const readToolOutputSchema = z.object({
     ),
 });
 
-/** Pages through a tool output kept in Redis for this conversation. */
-export function readToolOutputTool(
-  deps: Deps<'redisService'>,
-  conversationId: string,
-): Tool {
-  return defineTool({
+/** The input of run_tool_connector: `tool` is one of the agent connectors. */
+const runConnectorInput = (slugs: string[]) =>
+  z.object({
+    tool: z
+      .enum(slugs as [string, ...string[]])
+      .describe('Connector slug to run'),
+    target: z
+      .string()
+      .min(1)
+      .describe('Target passed to the tool: domain, IP, host:port or URL'),
+    configProfileId: z
+      .string()
+      .uuid()
+      .optional()
+      .describe(
+        'Config profile id from list_tool_config_profiles; omit to use the default profile',
+      ),
+    config: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe(
+        'Settings for this run, merged over the profile: field names and meanings from the config of display_available_tools. Never secret fields.',
+      ),
+    templates: z
+      .array(z.string().min(1))
+      .max(20)
+      .optional()
+      .describe(
+        `nuclei only: Nuclei template YAML documents to run instead of the built-in templates (each needs an "id"; ${AGENT_TEMPLATES_MAX_BYTES / 1024}KB total). Not saved.`,
+      ),
+  });
+
+type RunConnectorParams = z.infer<ReturnType<typeof runConnectorInput>>;
+
+@Injectable()
+export class ConnectorTools {
+  constructor(
+    readonly connectorRegistry: ConnectorRegistryService,
+    readonly toolsService: ToolsService,
+    readonly toolConfigProfiles: ToolConfigProfilesService,
+    readonly remoteExecuteSubscribe: RemoteExecuteSubscribeService,
+    readonly remoteExecuteService: RemoteExecuteService,
+    readonly redisService: RedisService,
+  ) {}
+
+  /**
+   * The config profiles of one installed connector, so the model can pick a
+   * configProfileId for run_tool_connector. Field names only: a profile's
+   * values (secrets included) never reach the model.
+   */
+  @AgentFunction({
+    name: 'list_tool_config_profiles',
+    description: [
+      'List the config profiles of one connector installed in this workspace, to choose configProfileId for run_tool_connector.',
+      'Each profile: id, name, isDefault, configuredFields (fields it sets), missingRequired (required fields it leaves empty; such a profile cannot run).',
+      'run_tool_connector uses the default profile when configProfileId is omitted. Field meanings are in the config of display_available_tools. Values are never returned.',
+      'Params: tool (connector slug).',
+    ],
+    inputSchema: listToolConfigProfilesSchema,
+    permissions: ['workspace.read'],
+    readOnly: true,
+  })
+  async listToolConfigProfiles(
+    params: z.infer<typeof listToolConfigProfilesSchema>,
+    ctx: AgentFunctionContext,
+  ) {
+    const { workspaceId } = ctx;
+    const slug = params.tool;
+    // Same install check as run_tool_connector: Tool.name is the slug.
+    const [toolRow] = await this.toolsService.getToolByNames({
+      names: [slug],
+    });
+    const installed = toolRow?.id
+      ? await this.toolsService.getToolById(toolRow.id, workspaceId)
+      : null;
+    if (!installed?.isInstalled || installed.type !== WorkerType.CONNECTOR) {
+      return {
+        error: `Tool ${slug} is not a connector installed in this workspace.`,
+      };
+    }
+    const schema = this.connectorRegistry.getConnectorSchema(slug);
+    const profiles = await this.toolConfigProfiles.list(
+      workspaceId,
+      installed.id!,
+    );
+    return { tool: slug, profiles: summarizeProfiles(schema, profiles) };
+  }
+
+  /**
+   * Runs one connector flagged `agentTool: true` against one target on the
+   * conversation's worker and returns the worker's raw output. Not a job:
+   * nothing goes through the job registry or the database. Agent-only, off
+   * the MCP surface, and approval-gated like any mutating tool (the target
+   * is free text).
+   */
+  @AgentFunction({
+    name: 'run_tool_connector',
+    description: (_ctx, self: ConnectorTools) => [
+      "Run one security tool against one target on this conversation's worker and get its raw output.",
+      'Nothing is saved: results are not stored as assets or vulnerabilities.',
+      `Waits up to ${AGENT_TOOL_RUN_TIMEOUT_MS / 60_000} minutes. Output: stdout (first ${AGENT_TOOL_OUTPUT_PAGE / 1024}KB), exitCode, error, timedOut, truncated, totalLines.`,
+      'The full output is kept for 1 hour under runId: when truncated is true read it with read_tool_output(runId), filtering with pattern instead of paging through everything. Cite runId in propose_vulnerability evidence.',
+      'Shape the run with config (fields from display_available_tools: e.g. a match regex, ports, severity); secret fields only come from a profile. A refusal names the required fields still missing.',
+      'Params: tool (slug), target, optional config, optional configProfileId (from list_tool_config_profiles; default profile when omitted), optional templates (nuclei only: your own template YAML, run instead of the built-in set).',
+      'Tools:',
+      self.connectorRegistry
+        .getAgentConnectors()
+        .map(
+          (entry) =>
+            `- ${entry.slug}: ${entry.shortDescription ?? entry.description ?? ''}`,
+        )
+        .join('\n'),
+    ],
+    // The enum lists the agent connectors of this run
+    inputSchema: (_ctx, self: ConnectorTools) =>
+      runConnectorInput(
+        self.connectorRegistry.getAgentConnectors().map((entry) => entry.slug),
+      ),
+    // Starts a scan job on a worker
+    permissions: ['job.write'],
+    modes: [AgentMode.AGENT],
+    // Runs on the conversation's pinned worker, so none without a conversation
+    available: (ctx, self: ConnectorTools) =>
+      !!ctx.conversationId &&
+      self.connectorRegistry.getAgentConnectors().length > 0,
+  })
+  async runToolConnector(params: RunConnectorParams, ctx: AgentFunctionContext) {
+    const { workspaceId } = ctx;
+    const conversationId = ctx.conversationId ?? '';
+    const {
+      tool: slug,
+      target,
+      configProfileId,
+      templates,
+      config: inlineConfig,
+    } = params;
+    if (templates?.length) {
+      if (slug !== 'nuclei') {
+        return { error: 'templates only apply to the nuclei tool.' };
+      }
+      const bytes = templates.reduce((n, t) => n + Buffer.byteLength(t, 'utf8'), 0);
+      if (bytes > AGENT_TEMPLATES_MAX_BYTES) {
+        return {
+          error: `templates total ${bytes} bytes; the limit is ${AGENT_TEMPLATES_MAX_BYTES}.`,
+        };
+      }
+      for (const [i, content] of templates.entries()) {
+        try {
+          validateTemplate(undefined, content);
+        } catch (error) {
+          return { error: `templates[${i}]: ${errorMessage(error)}` };
+        }
+      }
+    }
+    const entry = this.connectorRegistry.getConnector(slug);
+    // Tool.name IS the connector slug; getToolById sets isInstalled from
+    // an enabled workspace_tools row, so a connector of another workspace
+    // (or one disabled here) cannot run.
+    const [toolRow] = await this.toolsService.getToolByNames({
+      names: [slug],
+    });
+    const installed = toolRow?.id
+      ? await this.toolsService.getToolById(toolRow.id, workspaceId)
+      : null;
+    if (!entry?.image || !installed?.isInstalled) {
+      return { error: `Tool ${slug} is not installed in this workspace.` };
+    }
+    const badConfig = inlineConfig
+      ? checkInlineConfig(this.connectorRegistry, slug, inlineConfig)
+      : null;
+    if (badConfig) return { error: badConfig };
+
+    const pick = await this.remoteExecuteSubscribe.pickConversationWorker(
+      conversationId,
+      workspaceId,
+    );
+    if (!pick) {
+      return {
+        error:
+          'No worker available for this workspace. Select a workspace worker for this conversation.',
+      };
+    }
+
+    let config: Record<string, unknown> | undefined;
+    try {
+      config = await this.toolConfigProfiles.resolveConfigForJob(
+        workspaceId,
+        installed.id!,
+        {
+          configProfileId,
+          ...(inlineConfig && Object.keys(inlineConfig).length > 0
+            ? { config: inlineConfig }
+            : {}),
+        },
+      );
+    } catch (error) {
+      return { error: errorMessage(error) };
+    }
+    if (templates?.length) {
+      config = {
+        ...config,
+        customTemplates: templates.map((content) => ({ content })),
+      };
+    }
+    const missing = missingRequiredConfig(entry.configSchema, config);
+    if (missing.length > 0) {
+      return {
+        error: `Tool ${slug} needs configuration (${missing.join(', ')}). Set the non-secret ones in config; secret ones come only from a config profile the user adds in this workspace.`,
+      };
+    }
+
+    const limits = this.connectorRegistry.getResourceDefaults(slug);
+    // The worker kills the run when core stops waiting, so the manifest
+    // timeout only ever shortens the budget.
+    const budgetSeconds = AGENT_TOOL_RUN_TIMEOUT_MS / 1000;
+    const timeoutSeconds = Math.min(
+      limits.timeoutSeconds || budgetSeconds,
+      budgetSeconds,
+    );
+    const runId = randomUUID();
+    let result: Awaited<ReturnType<RemoteExecuteService['waitForToolRun']>>;
+    try {
+      // No live stream: the chat renders no terminal for run_tool_connector, so
+      // per-chunk events only cost re-renders.
+      result = await this.remoteExecuteService.waitForToolRun(
+        pick.workerId,
+        {
+          tool: slug,
+          image: entry.image,
+          target,
+          configJson:
+            config && Object.keys(config).length > 0
+              ? JSON.stringify(config)
+              : '',
+          cpu: limits.cpu,
+          memory: limits.memory,
+          timeoutSeconds,
+          directEgress: entry.egress === 'direct',
+        },
+        runId,
+        timeoutSeconds * 1000 + AGENT_TOOL_RESULT_GRACE_MS,
+        {
+          abortSignal: ctx.abortSignal,
+          maxOutputChars: AGENT_TOOL_OUTPUT_STORE_MAX,
+          onPushed: pick.pin
+            ? () =>
+                this.remoteExecuteSubscribe.pinConversationWorker(
+                  conversationId,
+                  pick.workerId,
+                )
+            : undefined,
+        },
+      );
+    } catch (error) {
+      // The worker stream closed between resolving and pushing.
+      return { error: errorMessage(error) };
+    }
+    // stdout is already capped at AGENT_TOOL_OUTPUT_STORE_MAX, so
+    // totalLines matches what read_tool_output pages over.
+    const page = await pageForModel(this, conversationId, runId, result.stdout);
+    return {
+      tool: slug,
+      target,
+      stdout: page.stdout,
+      exitCode: result.exitCode,
+      error: result.error,
+      timedOut: result.timedOut,
+      truncated: page.truncated,
+      totalLines: page.totalLines,
+      ...(page.runId ? { runId: page.runId } : {}),
+      ...(result.stdoutTruncated
+        ? { note: 'Output over 10MB: only the first 10MB is kept.' }
+        : {}),
+    };
+  }
+
+  /** Pages through a tool output kept in Redis for this conversation. */
+  @AgentFunction({
+    name: 'read_tool_output',
     description: [
       'Read the full output of a run_tool_connector or execute_remote_command call that came back truncated.',
       `Returns at most ${AGENT_TOOL_OUTPUT_PAGE / 1024}KB per call, lines numbered as in the full output; continue from nextOffset.`,
       'Prefer pattern (e.g. "200", "admin") to pull only the relevant lines.',
       'When each line is a JSON record (e.g. nuclei findings), pass fields to keep only the keys you need: far fewer calls than paging whole records.',
       'Params: runId, optional offset (default 0), limit (default 200), pattern, fields.',
-    ].join('\n'),
+    ],
     inputSchema: readToolOutputSchema,
-    execute: async (params: z.infer<typeof readToolOutputSchema>) => {
-      const raw = await deps.redisService.get(
-        toolOutputKey(conversationId, params.runId),
-      );
-      if (raw === null) {
-        return {
-          error:
-            'No stored output for this runId (expired after 1 hour or unknown). Run the tool again.',
-        };
-      }
+    // The chat's own tool output: no workspace data
+    permissions: [],
+    readOnly: true,
+    // Pages the long outputs of execute_remote_command and run_tool_connector
+    modes: [AgentMode.AGENT],
+  })
+  async readToolOutput(
+    params: z.infer<typeof readToolOutputSchema>,
+    ctx: AgentFunctionContext,
+  ) {
+    const raw = await this.redisService.get(
+      toolOutputKey(ctx.conversationId ?? '', params.runId),
+    );
+    if (raw === null) {
       return {
-        runId: params.runId,
-        ...pageToolOutput(raw, {
-          offset: params.offset ?? 0,
-          limit: params.limit ?? 200,
-          pattern: params.pattern,
-          fields: params.fields,
-        }),
+        error:
+          'No stored output for this runId (expired after 1 hour or unknown). Run the tool again.',
       };
-    },
-  });
+    }
+    return {
+      runId: params.runId,
+      ...pageToolOutput(raw, {
+        offset: params.offset ?? 0,
+        limit: params.limit ?? 200,
+        pattern: params.pattern,
+        fields: params.fields,
+      }),
+    };
+  }
 }

@@ -3,8 +3,8 @@ name: mainagent
 title: Main agent
 description: "Human interface: observe progress and turn user intent into hints or high-priority intents."
 mode: primary
-tools: [formulate_plan, append_step, transition_step, enumerate_assets, discover_vulnerabilities, retrieve_targets, review_jobs, gather_statistics, inspect_asset, investigate_vulnerability, enumerate_open_issues, inspect_issue, read_tool_output, ltm_read, ltm_write, stm_read, stm_write]
-skills: [vulnerability-analysis, web-research, command-execution]
+tools: [formulate_plan, append_step, transition_step, query_attack_surface, describe_attack_surface, review_jobs, gather_statistics, investigate_vulnerability, enumerate_open_issues, inspect_issue, read_tool_output, ltm_read, ltm_write, stm_read, stm_write]
+skills: [attack-surface-query, vulnerability-analysis, web-research, command-execution]
 ---
 
 # Main agent

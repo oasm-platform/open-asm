@@ -1,6 +1,8 @@
+import { EVENT_LISTENER_METADATA } from '@nestjs/event-emitter';
 import type { Repository } from 'typeorm';
 import type { Workflow } from './entities/workflow.entity';
 import type { Workspace } from '../workspaces/entities/workspace.entity';
+import { WORKSPACE_INITIALIZING_EVENT } from '../workspaces/workspace.events';
 import { WorkflowTemplateService } from './workflow-template.service';
 
 /**
@@ -64,6 +66,32 @@ describe('WorkflowTemplateService', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  describe('a new workspace', () => {
+    it('gets the default workflows when it is initializing', async () => {
+      const create = jest
+        .spyOn(service, 'createDefaultWorkflows')
+        .mockResolvedValue(undefined);
+
+      await service.onWorkspaceInitializing({ workspaceId: WORKSPACE_ID });
+
+      expect(create).toHaveBeenCalledWith(WORKSPACE_ID);
+    });
+
+    it('is awaited by the emitter, which also sees a failure', () => {
+      const listeners = Reflect.getMetadata(
+        EVENT_LISTENER_METADATA,
+        WorkflowTemplateService.prototype.onWorkspaceInitializing,
+      ) as unknown[];
+
+      expect(listeners).toEqual([
+        {
+          event: WORKSPACE_INITIALIZING_EVENT,
+          options: { promisify: true, suppressErrors: false },
+        },
+      ]);
+    });
   });
 
   it('stores the jobs map in dependency order', async () => {

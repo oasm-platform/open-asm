@@ -1,4 +1,4 @@
-import type { EventBusGroup } from '@/common/enums/enum';
+import type { EventBusGroup } from '@/modules/event-bridge/enums/event-bridge.enums';
 import type { EventName } from '../contracts/event-catalog';
 import type { ConsumedEvent } from '../contracts/event-envelope';
 import type { DomainSubscription } from '../routing/subscriptions';
@@ -41,5 +41,3 @@ export interface EventSink {
   handle(name: EventName, event: ConsumedEvent): Promise<void>;
 }
 
-/** DI token for the list of sinks the consumer runtime starts. */
-export const EVENT_SINKS = Symbol('EVENT_SINKS');

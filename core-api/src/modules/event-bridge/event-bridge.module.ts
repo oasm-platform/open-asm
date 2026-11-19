@@ -1,63 +1,51 @@
 import { ServicesModule } from '@/services/services.module';
 import { Global, Module } from '@nestjs/common';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_INTERCEPTOR, DiscoveryModule } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '../auth/entities/user.entity';
 import { AuditEvent } from '../audit/entities/audit-event.entity';
-import { IntegrationsModule } from '../integrations/integrations.module';
 import { NotificationRecipient } from '../notifications/entities/notification-recipient.entity';
 import { Notification } from '../notifications/entities/notification.entity';
 import { EventConsumersService } from './consuming/event-consumers.service';
-import { EVENT_SINKS, type EventSink } from './consuming/event-sink';
 import { EVENT_CATALOG, EVENT_CATALOG_TOKEN } from './contracts/event-catalog';
 import { EventBridgeService } from './publishing/event-bridge.service';
 import { EventPublishInterceptor } from './publishing/event-publish.interceptor';
 import { AuditSink } from './sinks/audit/audit.sink';
-import { IntegrationsSink } from './sinks/integrations/integrations.sink';
-import { IssuesSink } from './sinks/issues/issues.sink';
 import { NotificationsSink } from './sinks/notifications/notifications.sink';
 import { ProjectionSink } from './sinks/projection/projection.sink';
-import { ProjectsSink } from './sinks/projects/projects.sink';
 
 /**
- * Every lane, one per `EventBusGroup`. Adding a lane = a sink class here plus
- * its `SUBSCRIPTIONS` entry; the consumer runtime picks it up from
- * `EVENT_SINKS`.
+ * The lanes this module owns. The integrations, projects and issues lanes
+ * are `@EventLane()` providers of their own modules; `EventConsumersService`
+ * discovers all of them at boot and refuses to start unless every
+ * `EventBusGroup` has exactly one.
  */
-export const SINKS = [
-  AuditSink,
-  ProjectionSink,
-  NotificationsSink,
-  IntegrationsSink,
-  ProjectsSink,
-  IssuesSink,
-] as const;
+export const SINKS = [AuditSink, ProjectionSink, NotificationsSink] as const;
 
 /**
  * The event bus: publish domain events onto a Redis Stream and consume them
  * back through one consumer group per lane.
  *
- *   publishing/   producer side — `EventBridgeService`, `@PublishEvent` + its
+ *   publishing/   producer side: `EventBridgeService`, `@PublishEvent` + its
  *                 interceptor, secret redaction
- *   contracts/    the wire contract — catalog, envelope, payload shapes
+ *   contracts/    the wire contract: catalog, envelope, payload shapes
  *   routing/      per-event policy and per-lane domain subscriptions
  *   transport/    stream entry encode/decode
- *   consuming/    the consumer-group runtime — loop, retry, DLQ, idempotency
- *   sinks/        what each lane does with an event
+ *   consuming/    the consumer-group runtime: lane discovery, loop, retry,
+ *                 DLQ, idempotency
+ *   sinks/        the lanes that belong to the bus itself (audit, projection,
+ *                 notifications)
  *
  * `@Global()` because the bridge is published FROM a dozen modules and
  * imported INTO none of them: every emit site stays a one-line DI of
- * `EventBridgeService`.
- *
- * `IntegrationsModule` is imported for the outbound lane (decrypting a
- * workspace's integration config); the entities are registered for the audit
- * and notifications lanes that materialize them.
+ * `EventBridgeService`. It imports no domain module; the entities are
+ * registered for the audit and notifications lanes that materialize them.
  */
 @Global()
 @Module({
   imports: [
     ServicesModule,
-    IntegrationsModule,
+    DiscoveryModule,
     TypeOrmModule.forFeature([
       AuditEvent,
       Notification,
@@ -73,11 +61,6 @@ export const SINKS = [
 
     // Consuming
     ...SINKS,
-    {
-      provide: EVENT_SINKS,
-      useFactory: (...sinks: EventSink[]) => sinks,
-      inject: [...SINKS],
-    },
     EventConsumersService,
   ],
   exports: [EventBridgeService, EVENT_CATALOG_TOKEN, NotificationsSink],

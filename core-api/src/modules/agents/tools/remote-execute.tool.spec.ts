@@ -1,6 +1,7 @@
-import { AgentApprovalMode } from '@/common/enums/enum';
+import { AgentApprovalMode } from '@/modules/agents/enums/agent.enums';
 import { EventEmitter } from 'node:events';
-import { browserSessionOf, remoteExecuteTool } from './remote-execute.tool';
+import { agentFunctionWith } from '../agents.tools.testing';
+import { RemoteExecuteTools, browserSessionOf } from './remote-execute.tool';
 
 const SESSION = `b-${'0123456789abcdef'.repeat(2)}`;
 
@@ -36,7 +37,9 @@ describe('remoteExecuteTool browser screenshots', () => {
     const emitter = new EventEmitter();
     const shots: unknown[] = [];
     emitter.on('browser-screenshot', (shot) => shots.push(shot));
-    const tool = remoteExecuteTool(
+    const tool = agentFunctionWith(
+      RemoteExecuteTools,
+      'execute_remote_command',
       {
         approvals: { authorize: jest.fn().mockResolvedValue({ allowed: true }) },
         guard: { evaluate: jest.fn().mockResolvedValue({ action: 'default' }) },
@@ -50,11 +53,13 @@ describe('remoteExecuteTool browser screenshots', () => {
           }),
         },
         redisService: { setex: jest.fn() },
-      } as never,
-      'w1',
-      'c1',
-      emitter,
-      { userId: 'u1', mode: AgentApprovalMode.AUTO },
+      },
+      {
+        workspaceId: 'w1',
+        conversationId: 'c1',
+        emitter,
+        approval: { userId: 'u1', mode: AgentApprovalMode.AUTO },
+      },
     );
     const result = await (
       tool.execute as (input: unknown, options: unknown) => Promise<unknown>

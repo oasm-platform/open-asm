@@ -1,6 +1,7 @@
-import { NotFoundException } from '@nestjs/common';
-import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
+
+import { AgentApprovalMode, AgentMode } from '@/modules/agents/enums/agent.enums';
 import { AgentsService } from './agents.service';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 const conversation = {
   id: 'conv-1',
@@ -46,7 +47,7 @@ describe('AgentsService.getConversationSubagent', () => {
 
     await expect(
       service.getConversationSubagent('conv-1', 'sa-1', 'ws-1', 'user-1'),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    ).rejects.toBeInstanceOf(NotFoundError);
     expect(getDetail(service)).not.toHaveBeenCalled();
   });
 
@@ -55,7 +56,7 @@ describe('AgentsService.getConversationSubagent', () => {
 
     await expect(
       service.getConversationSubagent('conv-1', 'sa-x', 'ws-1', 'user-1'),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 });
 
@@ -73,7 +74,7 @@ describe('AgentsService.getConversation', () => {
 
     await expect(
       service.getConversation('conv-1', 'ws-1', 'user-1'),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    ).rejects.toBeInstanceOf(NotFoundError);
     expect(
       (service as unknown as { subagents: { listForConversation: jest.Mock } })
         .subagents.listForConversation,

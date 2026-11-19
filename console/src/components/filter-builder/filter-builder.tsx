@@ -47,7 +47,8 @@ export function FilterBuilder({ fields, value, onApply, onCancel, flat = false, 
     // From md up the inner wrapper is display:contents and order-1 moves the actions after the value,
     // giving the single desktop row field / operator / value / actions.
     return (
-      <div className="flex flex-col gap-2 rounded-md border p-2 md:flex-row md:items-start md:rounded-none md:border-0 md:p-0">
+      // Dark mode: the mobile card takes the card fill, as plain outlines are off there
+      <div className="flex flex-col gap-2 rounded-md border p-2 dark:bg-card-surface md:flex-row md:items-start md:rounded-none md:border-0 md:p-0 md:dark:bg-transparent">
         <div className="flex min-w-0 items-start gap-2 md:contents">
           <Select value={c.field} onValueChange={(v) => update({ field: v })}>
             <SelectTrigger aria-label="Field" className="h-9 w-full min-w-0 flex-1 md:w-36 md:flex-none"><SelectValue /></SelectTrigger>

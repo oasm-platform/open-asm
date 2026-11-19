@@ -647,7 +647,8 @@ export default function AuditLogSettings() {
         </Button>
       </div>
 
-      <div ref={listRef} className="scroll-mt-4 overflow-hidden rounded-md border">
+      {/* Dark mode: the card fill, as plain outlines are off there */}
+      <div ref={listRef} className="scroll-mt-4 overflow-hidden rounded-md border dark:bg-card-surface">
         <div className="border-b bg-muted/40 px-4 py-3 text-sm font-semibold">
           Recent events
         </div>

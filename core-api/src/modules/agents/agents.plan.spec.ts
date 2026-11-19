@@ -1,4 +1,4 @@
-import { AgentApprovalMode, AgentMode } from '@/common/enums/enum';
+import { AgentApprovalMode, AgentMode } from '@/modules/agents/enums/agent.enums';
 import type { ApprovalSettings } from './agents.approvals';
 import { Logger } from '@nestjs/common';
 import { EventEmitter } from 'node:events';
@@ -8,9 +8,11 @@ import {
   type PlanningState,
   withStepResults,
 } from './agents.completions';
+import { ConversationTitleService } from './conversation-title.service';
 import { SUBAGENT_MAX_ROUNDS_PER_TURN } from './agents.subagents';
 import { formatTodosToPrompt, type AgentTodoItem } from './agents.todo';
-import { AgentTool } from './agents.tools';
+import type { AgentTool } from './agents.tools';
+import { agentToolWith } from './agents.tools.testing';
 import type { TodoStatus } from './entities/agent-conversation-todo.entity';
 import { stepLimit } from './shared/step-limit';
 import { emptyStats } from './shared/turn-stats';
@@ -207,17 +209,12 @@ describe('AgentTool plan tools', () => {
       authorize: jest.fn(() => Promise.resolve({ allowed: true })),
     };
     emitter = new EventEmitter();
-    agentTool = new (
-      AgentTool as unknown as new (...args: unknown[]) => AgentTool
-    )(
-      ...(Array(9).fill(null) as unknown[]),
-      conversations,
-      repo,
-      null,
+    agentTool = agentToolWith({
+      conversationRepository: conversations,
+      todoRepository: repo,
+      agentsMemories: null,
       approvals,
-      { getAgentConnectors: () => [], getConnector: () => null },
-    );
-    Object.assign(agentTool, {
+      connectorRegistry: { getAgentConnectors: () => [], getConnector: () => null },
       guard: { evaluate: jest.fn().mockResolvedValue({ action: 'default' }) },
       workspacesService: {
         getMembershipWithPermissions: jest
@@ -524,7 +521,7 @@ describe('AgentTool plan tools', () => {
         settings(AgentApprovalMode.AUTO),
       ) as unknown as Record<string, { execute: ToolLike['execute'] }>;
 
-      const result = (await tools.enumerate_assets.execute(
+      const result = (await tools.review_jobs.execute(
         {},
         { toolCallId: 'tc1' },
       )) as unknown as { error: string };
@@ -552,7 +549,7 @@ describe('AgentTool plan tools', () => {
 
       // the gated call is rejected so the underlying service is never hit
       approvals.authorize.mockResolvedValue({ allowed: false });
-      await tools.enumerate_assets.execute({}, { toolCallId: 'tc2' });
+      await tools.review_jobs.execute({}, { toolCallId: 'tc2' });
 
       expect(approvals.authorize).toHaveBeenCalledWith(
         expect.any(String),
@@ -626,9 +623,12 @@ describe('AgentsCompletionsService plan execution', () => {
     service.conversationRepository = {
       findOne: jest.fn(() => Promise.resolve({ id: 'c1', summary: null })),
     };
-    service.checkAndCompactMidLoop = jest.fn(() => Promise.resolve(false));
+    service.compaction = {
+      checkAndCompactMidLoop: jest.fn(() => Promise.resolve(false)),
+      pruneContextByBudget: jest.fn(() => []),
+      handlePostStreamCompaction: jest.fn(() => Promise.resolve()),
+    };
     service.getConversationHistory = jest.fn(() => Promise.resolve([]));
-    service.pruneContextByBudget = jest.fn(() => []);
     service.mapHistoryToModelMessages = jest.fn(() => []);
     service.getModelContextWindow = jest.fn(() => 128_000);
     service.saveAssistantMessage = jest.fn(() =>
@@ -1380,12 +1380,12 @@ describe('planning state', () => {
   });
 });
 
-describe('generateGoal', () => {
+describe('ConversationTitleService.generateGoal', () => {
   const makeService = (overrides: Record<string, unknown> = {}) => {
-    const service: any = Object.create(AgentsCompletionsService.prototype);
+    const service: any = Object.create(ConversationTitleService.prototype);
     service.goaling = new Set<string>();
-    service.getPrompt = jest.fn(() => 'prompt');
-    service.createLanguageModel = jest.fn(() => Promise.resolve({}));
+    service.prompts = { render: jest.fn(() => 'prompt') };
+    service.llmConfigs = { createLanguageModel: jest.fn(() => Promise.resolve({})) };
     service.completeText = jest.fn(() =>
       Promise.resolve(
         '"Find the open ports of example.com"\nignored second line',
@@ -1418,6 +1418,11 @@ describe('generateGoal', () => {
   };
 
   const llmConfig = { workspaceId: 'w1', provider: 'openai' } as never;
+  // What the completions service passes: stream the plan with the new goal
+  const emitTodos = (emitter: EventEmitter) => (goal: string) => {
+    emitter.emit('todos-updated', [], goal);
+    return Promise.resolve();
+  };
 
   it('streams a one-line goal and pins it on the conversation', async () => {
     const { service, meta } = makeService();
@@ -1425,7 +1430,7 @@ describe('generateGoal', () => {
     const emitted = jest.fn();
     emitter.on('todos-updated', emitted);
 
-    await service.generateGoal('c1', llmConfig, 'scan example.com', emitter);
+    await service.generateGoal('c1', llmConfig, 'scan example.com', emitTodos(emitter));
 
     // First line, surrounding quotes stripped
     expect(emitted).toHaveBeenCalledWith(
@@ -1448,7 +1453,7 @@ describe('generateGoal', () => {
     const emitted = jest.fn();
     emitter.on('todos-updated', emitted);
 
-    await service.generateGoal('c1', llmConfig, 'scan example.com', emitter);
+    await service.generateGoal('c1', llmConfig, 'scan example.com', emitTodos(emitter));
 
     expect(emitted).not.toHaveBeenCalled();
     expect(meta()).toBeNull();

@@ -3,12 +3,13 @@ import {
   decryptWithDEK,
   encryptWithDEK,
 } from '@/common/utils/workspace-encryption.util';
-import { BadRequestException } from '@nestjs/common';
+
 import Ajv from 'ajv/dist/2020';
 import addFormats from 'ajv-formats';
 
 import { isMultiCapabilityApp } from '../capabilities';
 import { universalIntegrationSchema } from '../schemas';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 /**
  * Dynamically extracts sensitive field names from the integration JSON schemas.
@@ -215,7 +216,7 @@ export function validateConfigOrThrow(args: {
 }): void {
   const result = validateIntegrationConfig(args);
   if (!result.valid) {
-    throw new BadRequestException(
+    throw new InvalidInputError(
       `Invalid integration configuration: ${result.errors.join('; ')}`,
     );
   }

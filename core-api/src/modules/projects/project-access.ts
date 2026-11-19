@@ -1,6 +1,7 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+
 import type { Repository } from 'typeorm';
 import type { Project } from './entities/project.entity';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 /**
  * Loads a project of the workspace or throws 404. With `writable`, an
@@ -17,10 +18,10 @@ export async function findProjectOrFail(
     where: { id, workspace: { id: workspaceId } },
   });
   if (!project) {
-    throw new NotFoundException(`Project "${id}" not found`);
+    throw new NotFoundError(`Project "${id}" not found`);
   }
   if (opts.writable && project.archivedAt) {
-    throw new BadRequestException(
+    throw new InvalidInputError(
       'The project is archived; reopen it to make changes',
     );
   }

@@ -1,8 +1,5 @@
 import {
-  BadRequestException,
-  ForbiddenException,
   InternalServerErrorException,
-  NotFoundException,
   StreamableFile,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -26,6 +23,7 @@ import type * as S3Module from '@aws-sdk/client-s3';
 import { DataSource } from 'typeorm';
 import { RustFsClient } from './rustfs.client';
 import { attachmentDisposition, StorageService } from './storage.service';
+import { ForbiddenError, InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 jest.mock('@aws-sdk/s3-presigned-post', () => ({
   createPresignedPost: jest.fn().mockResolvedValue({
@@ -144,8 +142,7 @@ describe('StorageService', () => {
     });
 
     it('should refuse an empty prefix, which would match the whole bucket', async () => {
-      await expect(service.deleteByPrefix('artifacts', ' ')).rejects.toThrow(
-        BadRequestException,
+      await expect(service.deleteByPrefix('artifacts', ' ')).rejects.toThrow(InvalidInputError,
       );
       expect(sendMock).not.toHaveBeenCalled();
     });
@@ -215,8 +212,7 @@ describe('StorageService', () => {
         }),
       );
 
-      await expect(service.listFiles('missing-bucket')).rejects.toThrow(
-        NotFoundException,
+      await expect(service.listFiles('missing-bucket')).rejects.toThrow(NotFoundError,
       );
     });
   });
@@ -499,14 +495,14 @@ describe('StorageService', () => {
       async (key) => {
         await expect(
           service.getPresignedUploadUrl({ bucket: 'default', key }),
-        ).rejects.toThrow(BadRequestException);
+        ).rejects.toThrow(InvalidInputError);
       },
     );
 
     it('should reject an empty bucket', async () => {
       await expect(
         service.getPresignedUploadUrl({ bucket: '', key: 'b/k' }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
   });
 
@@ -546,7 +542,7 @@ describe('StorageService', () => {
     it('should reject an invalid key', async () => {
       await expect(
         service.getPresignedDownloadUrl({ bucket: 'default', key: '../a' }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
   });
 
@@ -583,7 +579,7 @@ describe('StorageService', () => {
           contentType: 'text/plain',
           sizeBytes: 1,
         }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
   });
 
@@ -811,8 +807,7 @@ describe('StorageService', () => {
     it.each(['reports/x', 'job-results/x'])(
       'should reject private path %p',
       async (path) => {
-        await expect(service.getClientUrlForPath(path)).rejects.toThrow(
-          BadRequestException,
+        await expect(service.getClientUrlForPath(path)).rejects.toThrow(InvalidInputError,
         );
         expect(mockGetSignedUrl).not.toHaveBeenCalled();
       },
@@ -821,8 +816,7 @@ describe('StorageService', () => {
     it.each(['default/x'])(
       'should reject blocked path %p (F-2)',
       async (path) => {
-        await expect(service.getClientUrlForPath(path)).rejects.toThrow(
-          BadRequestException,
+        await expect(service.getClientUrlForPath(path)).rejects.toThrow(InvalidInputError,
         );
         expect(mockGetSignedUrl).not.toHaveBeenCalled();
       },
@@ -831,8 +825,7 @@ describe('StorageService', () => {
     it.each(['noslash', 'bogus/x'])(
       'should reject malformed path %p',
       async (path) => {
-        await expect(service.getClientUrlForPath(path)).rejects.toThrow(
-          BadRequestException,
+        await expect(service.getClientUrlForPath(path)).rejects.toThrow(InvalidInputError,
         );
         expect(mockGetSignedUrl).not.toHaveBeenCalled();
       },
@@ -898,13 +891,13 @@ describe('StorageService', () => {
     it('should reject private/malformed items with 400', async () => {
       await expect(
         service.signStoragePaths([{ bucket: 'reports', path: 'reports/x' }]),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
 
     it('should reject blocked-bucket items with 400 (F-2)', async () => {
       await expect(
         service.signStoragePaths([{ bucket: 'default', path: 'default/x' }]),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(InvalidInputError);
     });
 
     it('should resolve null for malformed stored rows instead of throwing (F-5)', async () => {
@@ -1072,21 +1065,83 @@ describe('StorageService', () => {
     });
   });
 
+  describe('applyBucketCors', () => {
+    const initWith = async (values: Record<string, string>) => {
+      // Every key the trusted-origin list reads is set, since the mock config
+      // answers 'test-secret' for an unknown key
+      configValues = {
+        STORAGE_URL_BASE: '',
+        BASE_URL: '',
+        NODE_ENV: '',
+        TRUSTED_ORIGINS: '',
+        CORS_ALLOWED_ORIGINS: '',
+        ...values,
+      };
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          StorageService,
+          { provide: RustFsClient, useValue: mockRustFsClient },
+          { provide: ConfigService, useValue: mockConfigService },
+          { provide: DataSource, useValue: { query: dataSourceQuery } },
+        ],
+      }).compile();
+      sendMock.mockResolvedValue({});
+      await module.get<StorageService>(StorageService).onModuleInit();
+      return sendMock.mock.calls
+        .map(([cmd]: [object]) => cmd)
+        .filter(
+          (cmd): cmd is PutBucketCorsCommand =>
+            cmd instanceof PutBucketCorsCommand,
+        );
+    };
+
+    it('should apply the trusted origins as CORS on every bucket', async () => {
+      const commands = await initWith({
+        TRUSTED_ORIGINS: 'http://100.64.0.1:5173',
+        BASE_URL: 'https://app.example.com',
+      });
+
+      expect(commands.map((cmd) => cmd.input.Bucket).sort()).toEqual(
+        [
+          'artifacts',
+          'cached-static',
+          'default',
+          'job-results',
+          'reports',
+          'screenshot',
+          'system',
+        ].sort(),
+      );
+      for (const cmd of commands) {
+        expect(cmd.input.CORSConfiguration?.CORSRules?.[0]?.AllowedOrigins).toEqual(
+          ['http://100.64.0.1:5173', 'https://app.example.com'],
+        );
+      }
+    });
+
+    it('should skip bucket CORS when no origin is trusted, even with CORS_ALLOWED_ORIGINS set', async () => {
+      const commands = await initWith({
+        CORS_ALLOWED_ORIGINS: 'http://legacy.example.com',
+      });
+
+      expect(commands).toHaveLength(0);
+    });
+  });
+
   describe('generateObjectKey', () => {
     it('should generate a key preserving the extension', () => {
       expect(service.generateObjectKey('a.png')).toMatch(/\.png$/);
     });
 
     it('should reject a restricted extension', () => {
-      expect(() => service.generateObjectKey('a.exe')).toThrow(
-        BadRequestException,
+      expect(() => service.generateObjectKey('a.exe')).toThrow(InvalidInputError,
       );
     });
 
     it('should reject an extension outside allowedExtensions', () => {
       expect(() =>
         service.generateObjectKey('a.webp', { allowedExtensions: ['png'] }),
-      ).toThrow(BadRequestException);
+      ).toThrow(InvalidInputError);
     });
 
     it('should apply the prefix', () => {
@@ -1098,14 +1153,12 @@ describe('StorageService', () => {
 
   describe('bucket guards', () => {
     it('should forbid the reports bucket', () => {
-      expect(() => service.assertBucketNotPrivate('reports')).toThrow(
-        ForbiddenException,
+      expect(() => service.assertBucketNotPrivate('reports')).toThrow(ForbiddenError,
       );
     });
 
     it('should forbid the job-results bucket', () => {
-      expect(() => service.assertBucketNotPrivate('job-results')).toThrow(
-        ForbiddenException,
+      expect(() => service.assertBucketNotPrivate('job-results')).toThrow(ForbiddenError,
       );
     });
 
@@ -1114,8 +1167,7 @@ describe('StorageService', () => {
     });
 
     it('should reject a bucket outside the allow-list', () => {
-      expect(() => service.assertBucketAllowed('nope')).toThrow(
-        BadRequestException,
+      expect(() => service.assertBucketAllowed('nope')).toThrow(InvalidInputError,
       );
     });
   });
@@ -1295,8 +1347,7 @@ describe('StorageService', () => {
         }),
       );
 
-      await expect(service.getFile('missing.png', 'system')).rejects.toThrow(
-        NotFoundException,
+      await expect(service.getFile('missing.png', 'system')).rejects.toThrow(NotFoundError,
       );
     });
 

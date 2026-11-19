@@ -8,7 +8,7 @@ import { Lock } from '@/services/redis/lock.decorator';
 import { WorkerType } from '@/common/enums/enum';
 import { JobPriority } from '@/common/enums/enum';
 import { Tool } from './entities/tools.entity';
-import { WorkspaceTool } from './entities/workspace_tools.entity';
+import { WorkspaceTool } from './entities/workspace-tools.entity';
 import { StorageService } from '../storage/storage.service';
 import { DataSource } from 'typeorm';
 import { parseManifestCategories, sameCategories } from './tool-categories';

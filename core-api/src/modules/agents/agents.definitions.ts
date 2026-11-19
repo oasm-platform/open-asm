@@ -1,8 +1,6 @@
 import {
-  ConflictException,
   Injectable,
   Logger,
-  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as fs from 'fs';
@@ -25,6 +23,7 @@ import {
   AgentDefinitionMode,
   AgentDefinitionScope,
 } from './enums/agent.enums';
+import { ConflictError, NotFoundError } from '@/common/errors/domain.errors';
 
 const BUILTIN_DIR = 'builtin-agents';
 const MODES = new Set<string>(Object.values(AgentDefinitionMode));
@@ -189,7 +188,7 @@ export class AgentsDefinitionsService {
     excludeId?: string,
   ): Promise<void> {
     if (this.builtins.has(name)) {
-      throw new ConflictException(`"@${name}" is a built-in agent`);
+      throw new ConflictError(`"@${name}" is a built-in agent`);
     }
     const base: FindOptionsWhere<AgentDefinition> = {
       workspaceId,
@@ -204,7 +203,7 @@ export class AgentsDefinitionsService {
             { ...base, createdBy: userId },
           ];
     if (await this.repo.exists({ where })) {
-      throw new ConflictException(`Agent "@${name}" already exists`);
+      throw new ConflictError(`Agent "@${name}" already exists`);
     }
   }
 
@@ -214,7 +213,7 @@ export class AgentsDefinitionsService {
       return await this.repo.save(row);
     } catch (error) {
       if (isUniqueViolation(error)) {
-        throw new ConflictException(`Agent "@${row.name}" already exists`);
+        throw new ConflictError(`Agent "@${row.name}" already exists`);
       }
       throw error;
     }
@@ -229,7 +228,7 @@ export class AgentsDefinitionsService {
     const row = id.startsWith('builtin-')
       ? null
       : await this.repo.findOne({ where: { id, workspaceId, createdBy: userId } });
-    if (!row) throw new NotFoundException('Agent not found');
+    if (!row) throw new NotFoundError('Agent not found');
     return row;
   }
 

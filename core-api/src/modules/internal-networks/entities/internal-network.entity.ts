@@ -22,7 +22,7 @@ export class InternalNetwork extends BaseEntity {
   @Column({ type: 'uuid' })
   workspaceId: string;
 
-  @ManyToOne(() => Workspace, (workspace) => workspace.internalNetworks, {
+  @ManyToOne(() => Workspace, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'workspaceId' })
@@ -31,7 +31,7 @@ export class InternalNetwork extends BaseEntity {
   @Column({ type: 'uuid' })
   createdBy: string;
 
-  @ManyToOne(() => User, (user) => user.createdInternalNetworks, {
+  @ManyToOne(() => User, {
     nullable: true,
   })
   @JoinColumn({ name: 'createdBy' })

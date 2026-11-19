@@ -1,10 +1,10 @@
-import type { Tool } from 'ai';
+import { Injectable } from '@nestjs/common';
 import * as dns from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { z } from 'zod';
 
-import { defineTool } from './helpers';
-import type { ToolCallOptions } from './types';
+import { AgentFunction } from './agent-function';
+import type { AgentFunctionContext } from './types';
 
 const webFetchSchema = z.object({
   url: z.string().url().describe('Target URL'),
@@ -72,69 +72,72 @@ async function readCapped(response: Response): Promise<string> {
   return Buffer.concat(chunks).subarray(0, WEB_FETCH_MAX_BYTES).toString('utf8');
 }
 
-/** retrieve_web_page */
-export function webFetchTool(): Tool {
-  return defineTool({
+@Injectable()
+export class WebFetchTools {
+  @AgentFunction({
+    name: 'retrieve_web_page',
     description: `HTTP GET to any public URL. Returns statusCode + body (first ${WEB_FETCH_MAX_BODY_CHARS / 1024}KB, truncated: true when cut). Params: url.`,
     inputSchema: webFetchSchema,
-    execute: async (
-      { url: rawUrl }: z.infer<typeof webFetchSchema>,
-      options?: ToolCallOptions,
-    ) => {
-      try {
-        // Stopping the run cancels the request; a slow server can't hold it
-        const signal = AbortSignal.any([
-          AbortSignal.timeout(WEB_FETCH_TIMEOUT_MS),
-          ...(options?.abortSignal ? [options.abortSignal] : []),
-        ]);
+    // Fetches a public URL: no workspace data. Not read-only: a URL it
+    // fetches can carry data out.
+    permissions: [],
+  })
+  async retrieveWebPage(
+    { url: rawUrl }: z.infer<typeof webFetchSchema>,
+    ctx: AgentFunctionContext,
+  ) {
+    try {
+      // Stopping the run cancels the request; a slow server can't hold it
+      const signal = AbortSignal.any([
+        AbortSignal.timeout(WEB_FETCH_TIMEOUT_MS),
+        ...(ctx.abortSignal ? [ctx.abortSignal] : []),
+      ]);
 
-        let url = new URL(rawUrl);
-        for (let hop = 0; ; hop++) {
-          if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-            return {
-              error: 'Only http and https protocols are allowed',
-              url: rawUrl,
-            };
-          }
-          // Every hop is checked: a public URL may redirect to a private one
-          if (await isBlockedHost(url.hostname)) {
-            return {
-              error:
-                'Request blocked: target address is not publicly accessible',
-              url: rawUrl,
-            };
-          }
-          const response = await fetch(url, {
-            method: 'GET',
-            headers: { 'User-Agent': 'OASM-Security-Agent/1.0' },
-            redirect: 'manual',
-            signal,
-          });
-          const location = response.headers.get('location');
-          if (response.status >= 300 && response.status < 400 && location) {
-            await response.body?.cancel().catch(() => undefined);
-            if (hop >= WEB_FETCH_MAX_REDIRECTS) {
-              return { error: 'Too many redirects', url: rawUrl };
-            }
-            url = new URL(location, url);
-            continue;
-          }
-
-          const body = await readCapped(response);
-          const truncated = body.length > WEB_FETCH_MAX_BODY_CHARS;
+      let url = new URL(rawUrl);
+      for (let hop = 0; ; hop++) {
+        if (url.protocol !== 'http:' && url.protocol !== 'https:') {
           return {
-            statusCode: response.status,
-            ...(url.href !== new URL(rawUrl).href ? { finalUrl: url.href } : {}),
-            body: body.slice(0, WEB_FETCH_MAX_BODY_CHARS),
-            ...(truncated ? { truncated: true } : {}),
+            error: 'Only http and https protocols are allowed',
+            url: rawUrl,
           };
         }
-      } catch (error) {
+        // Every hop is checked: a public URL may redirect to a private one
+        if (await isBlockedHost(url.hostname)) {
+          return {
+            error: 'Request blocked: target address is not publicly accessible',
+            url: rawUrl,
+          };
+        }
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: { 'User-Agent': 'OASM-Security-Agent/1.0' },
+          redirect: 'manual',
+          signal,
+        });
+        const location = response.headers.get('location');
+        if (response.status >= 300 && response.status < 400 && location) {
+          await response.body?.cancel().catch(() => undefined);
+          if (hop >= WEB_FETCH_MAX_REDIRECTS) {
+            return { error: 'Too many redirects', url: rawUrl };
+          }
+          url = new URL(location, url);
+          continue;
+        }
+
+        const body = await readCapped(response);
+        const truncated = body.length > WEB_FETCH_MAX_BODY_CHARS;
         return {
-          error: error instanceof Error ? error.message : 'Unknown error',
-          url: rawUrl,
+          statusCode: response.status,
+          ...(url.href !== new URL(rawUrl).href ? { finalUrl: url.href } : {}),
+          body: body.slice(0, WEB_FETCH_MAX_BODY_CHARS),
+          ...(truncated ? { truncated: true } : {}),
         };
       }
-    },
-  });
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        url: rawUrl,
+      };
+    }
+  }
 }

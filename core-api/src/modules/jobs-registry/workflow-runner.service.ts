@@ -1,9 +1,7 @@
 import { EventTriggerType, JobRunType, JobStatus } from '@/common/enums/enum';
 import {
-  BadRequestException,
   Injectable,
   Logger,
-  NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource, type QueryRunner } from 'typeorm';
@@ -28,6 +26,7 @@ import { WorkspacesService } from '../workspaces/workspaces.service';
 import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
 import { JobsRegistryService } from './jobs-registry.service';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 export interface StartRunInput {
   workflow: Workflow;
@@ -160,7 +159,7 @@ export class WorkflowRunnerService {
       .getOne();
 
     if (!history) {
-      throw new NotFoundException('Job history not found in workspace');
+      throw new NotFoundError('Job history not found in workspace');
     }
 
     const result = await this.startRun({
@@ -173,7 +172,7 @@ export class WorkflowRunnerService {
     });
 
     if (!result.jobHistory) {
-      throw new BadRequestException('This workflow has no runnable steps');
+      throw new InvalidInputError('This workflow has no runnable steps');
     }
 
     return {

@@ -26,15 +26,16 @@ Findings on assets: list/detail/statistics, the lifecycle (new → active → fi
 
 - `GET activity` (`getActivity`, dashboard feed) pages `vulnerability_events` of the whole workspace, newest first, optional `types[]` filter. It filters on both `e."workspaceId"` (index `IDX_vulnerability_events_workspaceId_occurredAt`) and the target join. Static routes like `activity` must stay above `:id`.
 - Comment routes for findings live in the `comments` module.
-- `@Global()`, exports `VulnerabilitiesService`, `VulnerabilityLifecycleService`, `VulnerabilityReviewService`.
+- Exports `VulnerabilitiesService`, `VulnerabilityLifecycleService`, `VulnerabilityReviewService` and `VulnerabilityAnalyzerRegistry`; imported by `AgentsModule` and `StatisticModule`.
 - Events through `@PublishEvent`: `vulnerability.status.updated` (`dismiss` and `claim-fix`), `vulnerability.bulk_updated` (`reopen`), `vulnerability.settings.updated`, `vulnerability.review.approved|rejected|merged` (the bulk routes publish one event with `{ action: 'bulk', count, ids }` of the decided ids). Published from services: `vulnerability.proposed` (propose), `vulnerability.detected` (approve, so issue rules run on approved AI findings), `vulnerability.fixed` (auto-close), `vulnerability.analysis.completed` (processor, addressed to the requesting user). `vulnerability.dismissed`, `vulnerability.reopened`, `analysis.started` and `analysis.failed` are in the catalog, but nothing publishes them.
 - BullMQ `VULNERABILITY_ANALYSIS` (`vulnerability-analysis`): job name = vulnerability id, data = the analysis payload plus `workspaceId` and `userId`, removed on complete and on fail.
+- Consumes the in-process `JOB_RESULT_SYNCED_EVENT` (`@OnEvent`, `promisify: true`) in `VulnerabilityLifecycleService.onJobResultSynced`.
 - Cron `VulnerabilityRiskExpiryCron`: `5 * * * *`, `@Lock('cron:vulnerability-risk-expiry')`.
-- Agent/MCP tools: `discover_vulnerabilities`, `investigate_vulnerability` (read, also on MCP). `propose_vulnerability` (agent mode only) calls `VulnerabilityReviewService.propose`.
+- Agent/MCP tools: `investigate_vulnerability` (read, also on MCP); listing findings goes through `query_attack_surface` (`vulnerabilities` resource, attack-surface-query module), which replaced `discover_vulnerabilities`. `propose_vulnerability` (agent mode only) calls `VulnerabilityReviewService.propose`.
 
 ## Data model
 
-- `vulnerabilities`: unique `fingerprint`. FK to asset CASCADE, so findings disappear with their asset or target. `jobHistoryId`, `lastSeenJobHistoryId`, `fixedByJobHistoryId` SET NULL. No soft delete.
+- `vulnerabilities`: unique `fingerprint`. FK to asset CASCADE, so findings disappear with their asset or target. `jobHistoryId`, `lastSeenJobHistoryId`, `fixedByJobHistoryId` SET NULL. No soft delete. `workspaceId` (NOT NULL, composite FK `(assetId, workspaceId)` → assets, trigger-filled when a writer omits it; see `assets/AGENTS.md`) is never in `RESCAN_OVERWRITE_COLUMNS`.
 - Lifecycle columns: `detectionStatus` (`new|active|resurfaced|fixed`), `timesDetected`, `resurfacedCount`, `missedScans`, `scanScopeKey`, `fixedAt`, `fixClaimedAt/ById`, `dueAt`. Review columns: `reviewStatus` (default `approved`), `reviewedBy/At`, `reviewNote`, `discoveredBy`.
 - `vulnerability_dismissals`: one per finding (unique `vulnerabilityId`, CASCADE). `expiresAt` is set only for `risk_accepted`.
 - `vulnerability_events`: the timeline, CASCADE. It carries its own `workspaceId`. Rows are written on transitions and user actions only, never on each re-detection.
@@ -46,7 +47,7 @@ Findings on assets: list/detail/statistics, the lifecycle (new → active → fi
 - **Tenant path is `vulnerability → asset → target.workspaceId`.** Every query joins it (`assertInWorkspace`, `findInWorkspace`, `findPending`). Another tenant's id gives 404.
 - "Open" means approved, `detectionStatus IN (new, active, resurfaced)` and no **unexpired** dismissal. Every count (dashboard, reports, projects, targets, this list) must use `openVulnerabilityCondition`, so the numbers match across screens. An expired risk acceptance counts as open even before the cron deletes its row.
 - AI proposals (`pending_review`, `rejected`) never count as findings. They show only under `status=pending_review|rejected`. Their fingerprints start with `ai-`, so they can never collide with a scanner fingerprint.
-- Auto-close: only a later scan with the **same** `scanScopeKey` (asset + tool + service + inputs + config + profile) can count a miss. Findings with a null key (AI, manual, older rows) are never auto-closed, and a fix claim on them is recorded as `not_verifiable_by_scan`. `onScanJobCompleted` is called from `jobs-registry/processors/job-result.processor.ts`.
+- Auto-close: only a later scan with the **same** `scanScopeKey` (asset + tool + service + inputs + config + profile) can count a miss. Findings with a null key (AI, manual, older rows) are never auto-closed, and a fix claim on them is recorded as `not_verifiable_by_scan`. `onScanJobCompleted` runs from `onJobResultSynced`, the listener of `JOB_RESULT_SYNCED_EVENT` (`jobs-registry/job.events.ts`) that `JobResultProcessor` emits and awaits; it ignores non-vulnerability jobs and logs its own failure. This module does not inject anything from the processor side.
 - Re-detection is the ingest's `ON CONFLICT ("fingerprint")` clause (`rescanConflictClause` in `data-adapter.service.ts`). It moves fixed → resurfaced and clears the fix and fix-claim columns. It never touches rows under review.
 - Bulk review runs the single-id `approve`/`reject` per id, each in its own transaction. Ids missing from the workspace or no longer pending come back under `skipped`; any other error stops the batch and keeps what was already decided. Bulk approve keeps each proposed severity.
 - The `PROPOSED` and `VERIFIED_BY_AI` events carry `data.proposalToolCallId`, the id of the `propose_vulnerability` call itself, and `data.evidenceVerdict`; the cited calls stay in `vulnerability_sources.toolCallIds`.
@@ -55,11 +56,11 @@ Findings on assets: list/detail/statistics, the lifecycle (new → active → fi
 
 ## Coupling
 
-- `forwardRef` cycle with `AgentsModule`: `VulnerabilitiesService` → `AgentsCompletionsService.vulAnalyze` (analysis); agents → `VulnerabilityReviewService` (`propose_vulnerability`). `VulnerabilityReviewService` injects the global `RedisService` and reads the agents' tool-output keys (`toolOutputKey`).
-- Imports `NotificationsModule`. Uses global `JobsRegistryService`, `WorkflowRunnerService`, `WorkflowsService`, `ToolsService`, `EventBridgeService`. Registers `Asset` and `Target` repositories itself.
+- No import of `AgentsModule`: AI analysis runs through `VulnerabilityAnalyzerRegistry` (`vulnerability-analyzer.ts`, exported), in which the agents module's `VulnerabilityAnalyzerAdapter` registers itself on init (`get()` throws if nothing registered). Agents depends on this module: `VulnerabilityReviewService` (`propose_vulnerability`) and `VulnerabilitiesService`. `VulnerabilityReviewService` injects the global `RedisService` and reads the agents' tool-output keys (`toolOutputKey`).
+- Imports `NotificationsModule`, `JobsRegistryModule` (`JobsRegistryService`, `WorkflowRunnerService`), `ToolsModule` and `WorkflowsModule`. Uses the global `EventBridgeService`. Registers the `Target` repository itself.
 - `scan` runs the first job of `vulnerability_scan_basic.yaml` (nuclei) for host targets, and the whole `repository_scan.yaml` for GIT_ORG targets. Both workflows must exist in the workspace, or the call returns 404.
 - Writers outside: `DataAdapterService` inserts and upserts findings, `vulnerability_events` (`DETECTED`) and `vulnerability_sources`, and publishes `vulnerability.detected` / `vulnerability.resurfaced`.
-- The list reads `issue_links` / `issues` with raw SQL (`openIssues`). The issues lane consumes `vulnerability.detected|resurfaced|fixed`. Projects, reports, statistic, search, comments and target overview all query `vulnerabilities` directly.
+- The list reads `issue_links` / `issues` with raw SQL (`openIssues`). The issues lane consumes `vulnerability.detected|resurfaced|fixed`. Projects, reports, statistic, search, comments, target overview and attack-surface-query (`vulnerabilities` resource, uses `approvedVulnerabilityCondition` / `openVulnerabilityCondition`) all query `vulnerabilities` directly.
 
 ## Gotchas
 

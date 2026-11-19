@@ -1,29 +1,24 @@
 import { BullMQName, IntegrationType, TargetType } from '@/common/enums/enum';
-import {
-  Asset,
-  type RepositoryAssetMetadata,
-} from '@/modules/assets/entities/assets.entity';
-import { Target } from '@/modules/targets/entities/target.entity';
+import { RepositoryAssetsService } from '@/modules/assets/repository-assets.service';
+import type { Target } from '@/modules/targets/entities/target.entity';
+import { TargetsService } from '@/modules/targets/targets.service';
 import { Lock } from '@/services/redis/lock.decorator';
 import { InjectQueue } from '@nestjs/bullmq';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
 import type { Queue } from 'bullmq';
-import { In, Repository } from 'typeorm';
-import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { hasCapability } from './capabilities';
 import type { SourceRepository } from './connectors/connector.abstract';
 import { resolveSourceCodeConnector } from './connectors/connector.factory';
 import { IntegrationsService } from './integrations.service';
 import { gitOrgOwner, planRepositorySync } from './repository-sync.plan';
+import { isNotFound } from '@/common/errors/error-checks';
 
 /** Upper bound on one sync; the listing stops paging past it. */
 const MAX_SYNC_DURATION_MS = 10 * 60 * 1000;
 /** 100 pages × 100 = 10 000 repositories per organization. */
 const MAX_PAGES = 100;
 const PAGE_SIZE = 100;
-const ASSET_WRITE_CHUNK = 200;
 
 export interface RepositorySyncJob {
   targetId: string;
@@ -40,16 +35,6 @@ export interface RepositorySyncResult {
   /** True when paging stopped early (cap or deadline): nothing was disabled. */
   truncated: boolean;
 }
-
-/**
- * Repository metadata as the jsonb column value. TypeORM's deep-partial
- * typing rejects `null` members of a `Record<string, unknown>` column even
- * though jsonb stores them fine.
- */
-const asJson = (
-  metadata: RepositoryAssetMetadata,
-): QueryDeepPartialEntity<Asset>['metadata'] =>
-  ({ ...metadata }) as unknown as QueryDeepPartialEntity<Asset>['metadata'];
 
 const skipped = (reason: string): RepositorySyncResult => ({
   status: 'skipped',
@@ -78,10 +63,8 @@ export class RepositorySyncService {
   private readonly logger = new Logger(RepositorySyncService.name);
 
   constructor(
-    @InjectRepository(Target)
-    private readonly targetRepository: Repository<Target>,
-    @InjectRepository(Asset)
-    private readonly assetRepository: Repository<Asset>,
+    private readonly targetsService: TargetsService,
+    private readonly repositoryAssets: RepositoryAssetsService,
     private readonly integrationsService: IntegrationsService,
     private readonly eventEmitter: EventEmitter2,
     @InjectQueue(BullMQName.REPOSITORY_SYNC)
@@ -121,9 +104,7 @@ export class RepositorySyncService {
     targetId: string,
     workspaceId: string,
   ): Promise<RepositorySyncResult> {
-    const target = await this.targetRepository.findOne({
-      where: { id: targetId, workspaceId },
-    });
+    const target = await this.targetsService.findInWorkspace(targetId, workspaceId);
     if (!target || target.type !== TargetType.GIT_ORG) {
       return skipped('target not found or not a Git organization');
     }
@@ -145,7 +126,7 @@ export class RepositorySyncService {
         workspaceId,
       );
     } catch (error) {
-      if (error instanceof NotFoundException) {
+      if (isNotFound(error)) {
         return skipped('integration not found');
       }
       throw error;
@@ -163,9 +144,7 @@ export class RepositorySyncService {
       return skipped('sync already in progress');
     }
 
-    await this.targetRepository.update(target.id, {
-      lastDiscoveredAt: new Date(),
-    });
+    await this.targetsService.markDiscovered(target.id);
     this.eventEmitter.emit('target.git_org.synced', target);
     this.logger.log(
       `Repository sync for ${target.value}: ${JSON.stringify(result)}`,
@@ -188,10 +167,7 @@ export class RepositorySyncService {
       gitOrgOwner(target.value),
     );
 
-    const existing = await this.assetRepository.find({
-      where: { targetId: target.id },
-      select: { id: true, value: true, isEnabled: true, metadata: true },
-    });
+    const existing = await this.repositoryAssets.list(target.id);
 
     const plan = planRepositorySync({
       existing,
@@ -201,35 +177,8 @@ export class RepositorySyncService {
       complete,
     });
 
-    await this.assetRepository.manager.transaction(async (manager) => {
-      const assets = manager.getRepository(Asset);
-      // Order matters for the (value, targetId) unique constraint: move stale
-      // rows aside, then rename/refresh matched rows, then insert new ones.
-      for (const { id, value } of plan.renames) {
-        await assets.update(id, { value });
-      }
-      for (const update of plan.updates) {
-        await assets.update(update.id, {
-          value: update.value,
-          isEnabled: update.isEnabled,
-          metadata: asJson(update.metadata),
-        });
-      }
-      for (let i = 0; i < plan.inserts.length; i += ASSET_WRITE_CHUNK) {
-        await assets.insert(
-          plan.inserts.slice(i, i + ASSET_WRITE_CHUNK).map((planned) => ({
-            value: planned.value,
-            isEnabled: planned.isEnabled,
-            isPrimary: false,
-            metadata: asJson(planned.metadata),
-            targetId: target.id,
-          })),
-        );
-      }
-      if (plan.disableIds.length > 0) {
-        await assets.update({ id: In(plan.disableIds) }, { isEnabled: false });
-      }
-    });
+    // One transaction, ordered for the (value, targetId) unique constraint
+    await this.repositoryAssets.apply(target.id, target.workspaceId, plan);
 
     return {
       status: 'synced',

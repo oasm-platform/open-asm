@@ -8,12 +8,13 @@ import { NotificationRecipient } from './entities/notification-recipient.entity'
 import { Notification } from './entities/notification.entity';
 import { NotificationsService } from './notifications.service';
 import { NotificationsSink } from '../event-bridge/sinks/notifications/notifications.sink';
-import { BadRequestException } from '@nestjs/common';
+
 import {
   CURSOR_TS_SQL,
   decodeNotificationCursor,
   encodeNotificationCursor,
 } from './notification-cursor';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 const RECIPIENT_ID = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -193,7 +194,7 @@ describe('NotificationsService', () => {
 
       await expect(
         service.getNotifications('user-1', 'ws-1', { ...query, cursor: 'nope!' }, 'en'),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
       expect(qb.getRawAndEntities).not.toHaveBeenCalled();
     });
   });

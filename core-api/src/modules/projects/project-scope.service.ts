@@ -1,9 +1,6 @@
-import {
-  ProjectAssetSource,
-  ProjectScopeRuleMode,
-  ProjectScopeRuleType,
-} from '@/common/enums/enum';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { ProjectScopeRuleMode, ProjectScopeRuleType } from '@/common/enums/enum';
+import { ProjectAssetSource } from '@/modules/projects/enums/project.enums';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import type {
@@ -22,6 +19,7 @@ import {
   scopeRulesSql,
   SqlParams,
 } from './scope-rules';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 /** Assets of the workspace (alias `a`), the workspace id in parameter `ws`. */
 const workspaceAssets = (ws: string) =>
@@ -66,7 +64,7 @@ export class ProjectScopeService {
           value: normalizeScopeRuleValue(rule.type, rule.value),
         };
       } catch (error) {
-        throw new BadRequestException((error as Error).message);
+        throw new InvalidInputError((error as Error).message);
       }
     });
 
@@ -81,7 +79,7 @@ export class ProjectScopeService {
       );
       const missing = targetIds.filter((id) => !found.some((f) => f.id === id));
       if (missing.length > 0) {
-        throw new BadRequestException(`Target "${missing[0]}" not found`);
+        throw new InvalidInputError(`Target "${missing[0]}" not found`);
       }
     }
     const assetIds = idsOf(ProjectScopeRuleType.ASSET);
@@ -92,7 +90,7 @@ export class ProjectScopeService {
       );
       const missing = assetIds.filter((id) => !found.some((f) => f.id === id));
       if (missing.length > 0) {
-        throw new BadRequestException(`Asset "${missing[0]}" not found`);
+        throw new InvalidInputError(`Asset "${missing[0]}" not found`);
       }
     }
 

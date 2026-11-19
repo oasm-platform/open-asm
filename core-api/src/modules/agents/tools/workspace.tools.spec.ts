@@ -1,18 +1,9 @@
-import {
-  IssueLinkResourceType,
-  IssuePriority,
-  Severity,
-  VulnerabilityDiscoveredBy,
-} from '@/common/enums/enum';
-import { getVulnerabilitiesSchema, listIssuesSchema } from '@/mcp/mcp.schema';
-import { VulnerabilityStatus } from '@/modules/vulnerabilities/vulnerability-status';
+import { IssueLinkResourceType, IssuePriority } from '@/common/enums/enum';
+import { listIssuesSchema } from '@/mcp/mcp.schema';
 
+import { agentFunctionWith } from '../agents.tools.testing';
 import type { ToolCallOptions } from './types';
-import {
-  getVulnerabilitiesTool,
-  listAssetsInTargetTool,
-  listIssuesTool,
-} from './workspace.tools';
+import { WorkspaceTools } from './workspace.tools';
 
 const W = 'w1';
 const V1 = '11111111-1111-4111-8111-111111111111';
@@ -30,160 +21,17 @@ type Executable = {
   execute: (params: unknown, options: ToolCallOptions) => Promise<unknown>;
 };
 
-describe('discover_vulnerabilities', () => {
-  const vulnerability = {
-    id: V1,
-    name: 'SQL injection',
-    severity: Severity.HIGH,
-    description: 'long text the list leaves out',
-    asset: { id: 'a1', value: 'app.example.com' },
-    detectionStatus: 'resurfaced',
-    reviewStatus: 'approved',
-    discoveredBy: VulnerabilityDiscoveredBy.AI_TOOL,
-    dueAt: new Date('2026-11-01'),
-    timesDetected: 3,
-    firstDetectedDate: new Date('2026-10-01'),
-    lastSeenDate: new Date('2026-11-05'),
-    cveId: ['CVE-2026-1'],
-    cvssScore: 8.1,
-    dismissal: null,
-    openIssue: { id: 'i1', no: 4, status: 'open' },
-  };
-
-  function setup() {
-    const deps = {
-      vulnerabilitiesService: {
-        getVulnerabilities: jest.fn().mockResolvedValue(page([vulnerability])),
-      },
-      projectResultsService: {
-        vulnerabilities: jest.fn().mockResolvedValue(page([])),
-      },
-    };
-    const tool = getVulnerabilitiesTool(
-      deps as never,
-      W,
-    ) as unknown as Executable;
-    return { deps, tool };
-  }
-
-  it('accepts every lifecycle status', () => {
-    for (const status of Object.values(VulnerabilityStatus)) {
-      expect(getVulnerabilitiesSchema.safeParse({ status }).success).toBe(true);
-    }
-    expect(
-      getVulnerabilitiesSchema.safeParse({ status: 'closed' }).success,
-    ).toBe(false);
-  });
-
-  it('passes the lifecycle filters to the list, most severe first', async () => {
-    const { deps, tool } = setup();
-
-    await tool.execute(
-      {
-        q: 'sql',
-        status: VulnerabilityStatus.RESURFACED,
-        severity: [Severity.HIGH],
-        overdue: true,
-        discoveredBy: [VulnerabilityDiscoveredBy.AI],
-        tags: ['sqli'],
-        createdFrom: '2026-10-01',
-      },
-      call,
-    );
-
-    expect(deps.vulnerabilitiesService.getVulnerabilities).toHaveBeenCalledWith(
-      expect.objectContaining({
-        sortBy: 'severity',
-        q: 'sql',
-        status: VulnerabilityStatus.RESURFACED,
-        severity: [Severity.HIGH],
-        overdue: true,
-        discoveredBy: [VulnerabilityDiscoveredBy.AI],
-        tags: ['sqli'],
-        createdFrom: '2026-10-01',
-      }),
-      W,
-    );
-  });
-
-  it('returns the lifecycle fields of each finding, not the full record', async () => {
-    const { tool } = setup();
-
-    const result = (await tool.execute({}, call)) as {
-      data: Record<string, unknown>[];
-    };
-
-    expect(result.data[0]).toEqual(
-      expect.objectContaining({
-        id: V1,
-        asset: 'app.example.com',
-        detectionStatus: 'resurfaced',
-        discoveredBy: VulnerabilityDiscoveredBy.AI_TOOL,
-        timesDetected: 3,
-        dismissal: null,
-        openIssue: { id: 'i1', no: 4, status: 'open' },
-      }),
-    );
-    expect(result.data[0]).not.toHaveProperty('description');
-  });
-});
-
-describe('examine_target_assets', () => {
-  const asset = {
-    id: 'a1',
-    value: 'models.example.com:443',
-    port: 443,
-    isNew: false,
-    targetId: 't1',
-    ipAddresses: ['104.18.10.66'],
-    dnsRecords: { A: ['104.18.10.66'] },
-    // Raw response bodies can be megabytes per asset
-    httpResponses: { body: 'x'.repeat(2_000_000) },
-    screenshotPath: '/s.png',
-  };
-
-  function setup() {
-    const deps = {
-      assetsService: {
-        getManyAsssetServices: jest.fn().mockResolvedValue(page([asset])),
-      },
-    };
-    const tool = listAssetsInTargetTool(deps as never, W) as unknown as Executable;
-    return { deps, tool };
-  }
-
-  it('lists the target assets with summary fields, not the full record', async () => {
-    const { deps, tool } = setup();
-
-    const result = (await tool.execute({ targetId: 't1' }, call)) as {
-      data: Record<string, unknown>[];
-      total: number;
-    };
-
-    expect(deps.assetsService.getManyAsssetServices).toHaveBeenCalledWith(
-      expect.objectContaining({ targetIds: ['t1'] }),
-      W,
-    );
-    expect(result.total).toBe(1);
-    expect(result.data).toEqual([
-      {
-        id: 'a1',
-        value: 'models.example.com:443',
-        port: 443,
-        ipAddresses: ['104.18.10.66'],
-      },
-    ]);
-  });
-});
-
 describe('enumerate_open_issues', () => {
   function setup(userId?: string) {
     const deps = {
       issuesService: { getMany: jest.fn().mockResolvedValue(page([])) },
     };
-    const tool = listIssuesTool(deps as never, W, {
-      userId,
-    }) as unknown as Executable;
+    const tool = agentFunctionWith(
+      WorkspaceTools,
+      'enumerate_open_issues',
+      deps,
+      { workspaceId: W, userId },
+    ) as unknown as Executable;
     return { deps, tool };
   }
 

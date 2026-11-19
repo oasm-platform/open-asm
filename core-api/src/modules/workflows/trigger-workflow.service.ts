@@ -4,7 +4,6 @@ import { Target } from '@/modules/targets/entities/target.entity';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
-import { WorkspacesService } from '../workspaces/workspaces.service';
 import { Workflow } from './entities/workflow.entity';
 import { jobEntries } from './workflow-graph';
 
@@ -23,7 +22,6 @@ export interface TriggerOptions {
 export class TriggerWorkflowService implements OnModuleInit {
   private readonly logger = new Logger(TriggerWorkflowService.name);
   constructor(
-    private workspaceService: WorkspacesService,
     private workflowRunnerService: WorkflowRunnerService,
     private dataSource: DataSource,
     private eventEmitter: EventEmitter2,
@@ -34,14 +32,16 @@ export class TriggerWorkflowService implements OnModuleInit {
     // captures its result ({ success, error }) and warn-logs failures, so
     // the handler itself only guards against unexpected rejections.
     this.eventEmitter.onAny(
-      (event: string, payload: Target, options?: TriggerOptions) => {
+      (event: string | string[], payload: Target, options?: TriggerOptions) => {
+        // Emitted as a dotted string; an emitter may also pass the segments
+        const name = Array.isArray(event) ? event.join('.') : event;
         // Every event lands here, so the third argument is not trusted to be
         // a TriggerOptions: anything but SCHEDULED is a manual run.
         const jobRunType =
           options?.jobRunType === JobRunType.SCHEDULED
             ? JobRunType.SCHEDULED
             : JobRunType.MANUAL;
-        void this.trigger(event, payload, jobRunType).catch((error) => {
+        void this.trigger(name, payload, jobRunType).catch((error) => {
           Logger.error('Error in onModuleInit:', error);
         });
       },
@@ -115,12 +115,13 @@ export class TriggerWorkflowService implements OnModuleInit {
    * @returns Workflow object
    */
   private async getWorkflowByEvent(event: string, payload: Target) {
+    // Every in-process event lands here; only target events carry the Target
+    // row (loaded from the database, so with its workspaceId).
+    const workspaceId = (payload as Partial<Target> | undefined)?.workspaceId;
+    if (!workspaceId) return null;
     const dotIndex = event.indexOf('.');
     const target = event.substring(0, dotIndex);
     const action = event.substring(dotIndex + 1);
-    const workspaceId = await this.workspaceService.getWorkspaceIdByTargetId(
-      payload.id,
-    );
     return this.dataSource
       .getRepository(Workflow)
       .createQueryBuilder('workflow')

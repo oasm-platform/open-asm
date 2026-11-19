@@ -32,6 +32,7 @@ export function VulnerabilitiesView({
   projectId,
   onOpenSighting,
   actions,
+  showSeverityBreakdown,
 }: {
   targetId?: string;
   projectId?: string;
@@ -39,6 +40,8 @@ export function VulnerabilitiesView({
   onOpenSighting?: (vulnerabilityId: string) => void;
   /** Toolbar actions of the list. */
   actions?: ReactNode;
+  /** False: the page shows the Open counts per severity elsewhere */
+  showSeverityBreakdown?: boolean;
 }) {
   const navigate = useNavigate();
   const search = useSearch({ strict: false }) as Record<string, unknown>;
@@ -55,6 +58,7 @@ export function VulnerabilitiesView({
       <VulnerabilityStatsStrip
         stats={stats}
         isLoading={isLoading}
+        showSeverityBreakdown={showSeverityBreakdown}
         onSelect={(view) =>
           navigate({
             search: ((prev: Record<string, unknown>) => ({

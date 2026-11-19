@@ -3,7 +3,7 @@ import { Doc } from '@/common/doc/doc.decorator';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
-import { GetManyResponseDto } from '@/utils/getManyResponse';
+import { GetManyResponseDto } from '@/common/utils/get-many-response.util';
 import {
   Body,
   Controller,
@@ -12,13 +12,16 @@ import {
   Param,
   Post,
   Query,
+  Req,
   Res,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
 import { PublishEvent } from '../event-bridge/publishing/publish-event.decorator';
 import type { NodeResponse } from '@nestjs/platform-node';
 import {
+  GenerateQueryReportBodyDto,
   GenerateSummaryReportBodyDto,
   GenerateVulReportBodyDto,
   GetManyReportsQueryDto,
@@ -27,6 +30,8 @@ import {
   ReportResponseDto,
 } from './dto/reports.dto';
 import { ReportsService } from './reports.service';
+import { AsqErrorInterceptor } from '@/modules/attack-surface-query/asq-error.interceptor';
+import type { RequestWithMetadata } from '@/common/interfaces/app.interface';
 
 @ApiTags('Reports')
 @Controller('reports')
@@ -160,6 +165,35 @@ export class ReportsController {
     );
 
     return { message: 'Vulnerability report generated successfully' };
+  }
+
+  @Doc({
+    summary: 'Generate query PDF report',
+    description:
+      'Renders a saved attack surface query (one table per query) as a PDF report, run with your current permissions.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @PublishEvent(EVENT_CATALOG.report.generated, { metadata: () => ({ reportType: 'query' }) })
+  @WorkspaceAccess('report.write')
+  @UseInterceptors(AsqErrorInterceptor)
+  @Post('generate/query')
+  async generateQueryReport(
+    @Body() body: GenerateQueryReportBodyDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+    @Req() req: RequestWithMetadata,
+  ): Promise<DefaultMessageResponseDto> {
+    await this.reportsService.generateQueryReport(
+      { workspaceId, permissions: req.permissions ?? [], caller: 'http' },
+      userId,
+      body.savedQueryId,
+    );
+    return { message: 'Query report generated successfully' };
   }
 
   @Doc({

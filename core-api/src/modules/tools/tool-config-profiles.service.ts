@@ -1,9 +1,6 @@
 import {
-  BadRequestException,
-  ConflictException,
   Injectable,
   Logger,
-  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -22,6 +19,7 @@ import {
   maskProfile,
 } from './validators/tool-config-profiles.crypto';
 import { validateProfileOrThrow } from './validators/tool-config-profiles.validator';
+import { ConflictError, InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 interface JobRef { id: string; }
 interface WfRef { name: string; wf_id: string; }
@@ -48,11 +46,11 @@ export class ToolConfigProfilesService {
   private async resolveConnectorSchema(toolId: string) {
     const tool = await this.toolsRepo.findOne({ where: { id: toolId } });
     if (!tool) {
-      throw new BadRequestException(`Tool ${toolId} not found`);
+      throw new InvalidInputError(`Tool ${toolId} not found`);
     }
     const entry = this.connectorRegistry.getConnector(tool.name);
     if (!entry) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `Unknown tool "${tool.name}" -- cannot validate config`,
       );
     }
@@ -142,7 +140,7 @@ export class ToolConfigProfilesService {
       },
     });
     if (existing) {
-      throw new ConflictException(
+      throw new ConflictError(
         `Profile name "${dto.name}" already exists for this tool`,
       );
     }
@@ -211,7 +209,7 @@ export class ToolConfigProfilesService {
         },
       });
       if (dup) {
-        throw new ConflictException(
+        throw new ConflictError(
           `Profile name "${dto.name}" already exists for this tool`,
         );
       }
@@ -306,7 +304,7 @@ export class ToolConfigProfilesService {
       [profileId, workspaceId],
     )) as unknown as JobRef[];
     if (jobRefs && jobRefs.length > 0) {
-      throw new ConflictException(
+      throw new ConflictError(
         `Cannot delete profile ${profileId}: referenced by Job #${jobRefs[0].id}`,
       );
     }
@@ -320,7 +318,7 @@ export class ToolConfigProfilesService {
       [workspaceId, JSON.stringify([{ configProfileId: profileId }])],
     )) as unknown as WfRef[];
     if (wfRefs && wfRefs.length > 0) {
-      throw new ConflictException(
+      throw new ConflictError(
         `Cannot delete profile ${profileId}: referenced by Workflow ${wfRefs[0].name} (#${wfRefs[0].wf_id})`,
       );
     }
@@ -382,7 +380,7 @@ export class ToolConfigProfilesService {
     const profile = await this.findOwned(workspaceId, profileId);
     const profileToolId = (profile.tool as unknown as { id: string }).id;
     if (profileToolId !== toolId) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         `Profile ${profileId} does not belong to tool ${toolId}`,
       );
     }
@@ -407,13 +405,13 @@ export class ToolConfigProfilesService {
         relations: ['workspace', 'tool'],
       });
       if (!profile) {
-        throw new NotFoundException(`ToolConfigProfile ${profileId} not found`);
+        throw new NotFoundError(`ToolConfigProfile ${profileId} not found`);
       }
 
       const profileWsId = (profile.workspace as unknown as { id: string }).id;
       const profileToolId = (profile.tool as unknown as { id: string }).id;
       if (profileWsId !== workspaceId || profileToolId !== toolId) {
-        throw new NotFoundException(`ToolConfigProfile ${profileId} not found`);
+        throw new NotFoundError(`ToolConfigProfile ${profileId} not found`);
       }
     } else {
       // Default profile for this workspace + tool
@@ -517,11 +515,11 @@ export class ToolConfigProfilesService {
       relations: ['workspace', 'tool'],
     });
     if (!profile) {
-      throw new NotFoundException(`Profile ${profileId} not found`);
+      throw new NotFoundError(`Profile ${profileId} not found`);
     }
     const profileWsId = (profile.workspace as unknown as { id: string }).id;
     if (profileWsId !== workspaceId) {
-      throw new NotFoundException(`Profile ${profileId} not found`);
+      throw new NotFoundError(`Profile ${profileId} not found`);
     }
     return profile;
   }

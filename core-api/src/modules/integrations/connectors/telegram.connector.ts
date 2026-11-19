@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import type { Repository } from 'typeorm';
-import { TelegramConnectStatus } from '@/common/enums/enum';
+import { TelegramConnectStatus } from '@/modules/integrations/enums/integration.enums';
 import type { TelegramConnect } from '@/modules/integrations/entities/telegram-connect.entity';
 import type { ConnectorConfig } from './connector.abstract';
 import { NotificationConnector } from './connector.abstract';

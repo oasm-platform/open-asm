@@ -6,10 +6,8 @@ import {
   TargetType,
 } from '@/common/enums/enum';
 import {
-  BadRequestException,
   Injectable,
   Logger,
-  NotFoundException,
 } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -22,6 +20,7 @@ import { WorkflowRunnerService } from '../jobs-registry/workflow-runner.service'
 import { Target } from '../targets/entities/target.entity';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { DiscoveredUrl } from './entities/discovered-url.entity';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 /** How many of a run's new URLs one notification previews. */
 const URL_PREVIEW = 10;
@@ -57,14 +56,14 @@ export class UrlDiscoveryService {
       select: { id: true, type: true, value: true },
     });
     if (targets.length === 0) {
-      throw new NotFoundException('No targets found in the workspace.');
+      throw new NotFoundError('No targets found in the workspace.');
     }
 
     // The URL discovery connectors only accept domain targets: an IP or CIDR
     // target would start a run in which every step is skipped.
     const domains = targets.filter((t) => t.type === TargetType.DOMAIN);
     if (domains.length === 0) {
-      throw new BadRequestException(
+      throw new InvalidInputError(
         'URL discovery supports domain targets only.',
       );
     }
@@ -76,7 +75,7 @@ export class UrlDiscoveryService {
       },
     });
     if (!workflow) {
-      throw new NotFoundException(
+      throw new NotFoundError(
         `Workflow ${DefaultWorkflow.URL_DISCOVERY} not found in the workspace.`,
       );
     }

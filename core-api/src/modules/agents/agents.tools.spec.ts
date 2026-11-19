@@ -1,17 +1,16 @@
-import { AgentApprovalMode, AgentMode, WorkerType } from '@/common/enums/enum';
+import { WorkerType } from '@/common/enums/enum';
+import { AgentApprovalMode, AgentMode } from '@/modules/agents/enums/agent.enums';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { EventEmitter } from 'node:events';
 import { withoutDisabledTools } from './agents.config';
 import { AgentsMcpService, getMcpToolMetadata } from './agents.mcp';
 import type { AgentsService } from './agents.service';
 import { AgentTool, MCP_TOOLS, READ_ONLY_TOOLS } from './agents.tools';
-import {
-  listToolConfigProfilesTool,
-  pageToolOutput,
-} from './tools/connector.tools';
+import { agentFunctionWith, agentToolWith } from './agents.tools.testing';
+import { ConnectorTools, pageToolOutput } from './tools/connector.tools';
 import { _resetValidatorCache } from '@/modules/tools/validators/tool-config-profiles.validator';
 import { stableStringify } from './tools/helpers';
-import { listConnectorsTool } from './tools/workspace.tools';
+import { WorkspaceTools } from './tools/workspace.tools';
 
 describe('MCP tool metadata', () => {
   afterEach(() => {
@@ -252,7 +251,7 @@ describe('AgentTool run_tool_connector', () => {
   };
 
   const createAgentTool = (overrides: Record<string, unknown> = {}) =>
-    Object.assign(Object.create(AgentTool.prototype), {
+    agentToolWith({
       connectorRegistry: {
         getAgentConnectors: jest.fn(() => [connector]),
         getConnector: jest.fn(() => connector),
@@ -296,7 +295,7 @@ describe('AgentTool run_tool_connector', () => {
           .mockResolvedValue({ permissionKeys: ['*'] }),
       },
       ...overrides,
-    }) as AgentTool;
+    });
 
   const runnable = (agentTool: AgentTool) =>
     agentTool.getTools('w1', 'u1', AgentMode.AGENT, undefined, 'c1')
@@ -659,13 +658,10 @@ describe('AgentTool display_available_tools', () => {
     slug === 'acunetix' ? acunetixSchema : null,
   );
   const listTools = (getAgentTools: jest.Mock) =>
-    listConnectorsTool(
-      {
-        toolsService: { getAgentTools },
-        connectorRegistry: { getConnectorSchema },
-      } as any,
-      'w1',
-    ) as unknown as Listing;
+    agentFunctionWith(WorkspaceTools, 'display_available_tools', {
+      toolsService: { getAgentTools },
+      connectorRegistry: { getConnectorSchema },
+    }) as unknown as Listing;
 
   it("lists the workspace's agent tools with their config fields, not a readiness flag", async () => {
     const getAgentTools = jest.fn().mockResolvedValue([
@@ -810,9 +806,10 @@ describe('AgentTool list_tool_config_profiles', () => {
       },
       connectorRegistry: { getConnectorSchema: jest.fn(() => schema) },
     };
-    const tool = listToolConfigProfilesTool(
-      deps as any,
-      'w1',
+    const tool = agentFunctionWith(
+      ConnectorTools,
+      'list_tool_config_profiles',
+      deps,
     ) as unknown as Listing;
     return { deps, tool };
   }
@@ -894,7 +891,7 @@ describe('pageToolOutput', () => {
 });
 
 describe('AgentTool MCP surface', () => {
-  const agentTool = Object.create(AgentTool.prototype) as AgentTool;
+  const agentTool = agentToolWith();
 
   it('offers only the read-only workspace data tools', () => {
     const names = Object.keys(agentTool.getMcpTools('w1'));

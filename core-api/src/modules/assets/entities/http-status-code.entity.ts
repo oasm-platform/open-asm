@@ -3,6 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
   Entity,
+  ForeignKey,
   Index,
   JoinColumn,
   ManyToOne,
@@ -22,7 +23,16 @@ import { HttpResponse } from './http-response.entity';
 })
 @Index('IDX_http_status_codes_assetServiceId', ['assetServiceId', 'statusCode'])
 @Index('IDX_http_status_codes_httpResponseId', ['httpResponseId'])
+// Tenant scope (attack-surface-query): workspaceId equals the response's.
+@ForeignKey(() => HttpResponse, ['httpResponseId', 'workspaceId'], ['id', 'workspaceId'], {
+  name: 'FK_http_status_codes_response_workspace',
+  onDelete: 'CASCADE',
+})
 export class HttpStatusCode extends BaseEntity {
+  /** The response's workspace (denormalized, see Asset.workspaceId). */
+  @Column({ type: 'uuid' })
+  workspaceId: string;
+
   @ApiProperty()
   @Column({ type: 'uuid' })
   httpResponseId: string;

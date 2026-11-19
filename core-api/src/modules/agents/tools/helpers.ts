@@ -1,23 +1,9 @@
-import { tool, type Tool } from 'ai';
 import { z } from 'zod';
 
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 
 import type { ApprovalDecision } from '../agents.approvals';
-import type { ToolCallOptions, ToolScope } from './types';
-
-export interface ToolConfig {
-  description: string;
-  inputSchema: z.ZodTypeAny;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  execute: (params: any, options: ToolCallOptions) => unknown;
-}
-
-/** An AI SDK tool from a plain config, without tool()'s schema generics. */
-export function defineTool(config: ToolConfig): Tool {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return tool(config as any);
-}
+import type { ToolScope } from './types';
 
 export const errorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
@@ -64,17 +50,6 @@ export const projectFor = (
   scope: ToolScope,
   params: { projectId?: string },
 ): string | undefined => scope.projectId ?? params.projectId ?? undefined;
-
-/** Asset-service queries restricted to the assets of `projectId`, if any. */
-export const assetsInProject = (projectId: string | undefined) =>
-  projectId
-    ? {
-        filter: {
-          logic: 'and' as const,
-          items: [{ field: 'project' as const, op: 'eq' as const, value: projectId }],
-        },
-      }
-    : {};
 
 export function rejectionMessage(what: string, feedback?: string): string {
   const base = `${what} was not approved by the user and was not executed.`;
@@ -127,7 +102,20 @@ const RENAMED_TOOLS: Readonly<Record<string, string>> = {
   run_tool: 'run_tool_connector',
   // ltm_write saves a new record each call, which is what append was for
   ltm_append: 'ltm_write',
+  // Attack surface lookups replaced by the attack surface query language.
+  enumerate_assets: 'query_attack_surface',
+  inspect_asset: 'query_attack_surface',
+  examine_target_assets: 'query_attack_surface',
+  list_network_ports: 'query_attack_surface',
+  fingerprint_technologies: 'query_attack_surface',
+  verify_tls_settings: 'query_attack_surface',
+  discover_vulnerabilities: 'query_attack_surface',
+  retrieve_targets: 'query_attack_surface',
 };
 
 export const currentToolName = (name: string): string =>
   RENAMED_TOOLS[name] ?? name;
+
+/** An old name a live tool must not take back. */
+export const isRenamedToolName = (name: string): boolean =>
+  Object.hasOwn(RENAMED_TOOLS, name);

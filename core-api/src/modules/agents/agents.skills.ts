@@ -1,7 +1,6 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Tool } from 'ai';
-import { tool } from 'ai';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Repository } from 'typeorm';
@@ -12,6 +11,9 @@ import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
 import type { SkillResponseDto } from './dto/skill.dto';
 import { CreateSkillDto, UpdateSkillDto } from './dto/skill.dto';
 import { AgentSkill } from './entities/agent-skill.entity';
+import { AgentFunction, buildAgentFunctions } from './tools/agent-function';
+import type { AgentFunctionContext } from './tools/types';
+import { ConflictError, NotFoundError } from '@/common/errors/domain.errors';
 
 interface BuiltinSkill {
   name: string;
@@ -215,31 +217,34 @@ export class AgentsSkillsService {
    *   skills); all of the workspace's skills when omitted.
    */
   createLoadSkillTool(workspaceId: string, only?: string[]): Tool {
-    const allowed = only ? new Set(only) : undefined;
-    const toolConfig = {
-      description:
-        "Load a skill to get specialized instructions. Call this when the user's request matches a skill description and you need detailed guidance.",
-      inputSchema: z.object({
-        name: z.string().describe('The skill name to load'),
-      }),
-      execute: async ({ name }: { name: string }) => {
-        if (allowed && !allowed.has(name)) {
-          return {
-            error: `Skill '${name}' is not available here; available: ${[...allowed].join(', ')}`,
-          };
-        }
-        const skill = await this.getSkillByName(workspaceId, name);
-        if (!skill) {
-          return { error: `Skill '${name}' not found or is disabled` };
-        }
-        return {
-          name: skill.name,
-          description: skill.description,
-          content: skill.content,
-        };
-      },
+    return buildAgentFunctions(this, { workspaceId, skills: only }).load_skill;
+  }
+
+  @AgentFunction({
+    name: 'load_skill',
+    description:
+      "Load a skill to get specialized instructions. Call this when the user's request matches a skill description and you need detailed guidance.",
+    inputSchema: z.object({
+      name: z.string().describe('The skill name to load'),
+    }),
+    permissions: 'ungated',
+    gate: 'none',
+  })
+  async loadSkill({ name }: { name: string }, ctx: AgentFunctionContext) {
+    if (ctx.skills && !ctx.skills.includes(name)) {
+      return {
+        error: `Skill '${name}' is not available here; available: ${[...new Set(ctx.skills)].join(', ')}`,
+      };
+    }
+    const skill = await this.getSkillByName(ctx.workspaceId, name);
+    if (!skill) {
+      return { error: `Skill '${name}' not found or is disabled` };
+    }
+    return {
+      name: skill.name,
+      description: skill.description,
+      content: skill.content,
     };
-    return tool(toolConfig as unknown as Parameters<typeof tool>[0]);
   }
 
   async buildSkillsPrompt(workspaceId: string): Promise<string> {
@@ -293,7 +298,7 @@ export class AgentsSkillsService {
     });
 
     if (existing) {
-      throw new ConflictException(
+      throw new ConflictError(
         `Skill with name "${dto.name}" already exists in this workspace`,
       );
     }
@@ -338,7 +343,7 @@ export class AgentsSkillsService {
     });
 
     if (!skill) {
-      throw new NotFoundException('Skill not found');
+      throw new NotFoundError('Skill not found');
     }
 
     if (dto.name !== undefined && dto.name !== skill.name) {
@@ -346,7 +351,7 @@ export class AgentsSkillsService {
         where: { workspaceId, name: dto.name },
       });
       if (existing) {
-        throw new ConflictException(
+        throw new ConflictError(
           `Skill with name "${dto.name}" already exists in this workspace`,
         );
       }
@@ -385,7 +390,7 @@ export class AgentsSkillsService {
     });
 
     if (!skill) {
-      throw new NotFoundException('Skill not found');
+      throw new NotFoundError('Skill not found');
     }
 
     await this.skillRepository.remove(skill);
@@ -407,7 +412,7 @@ export class AgentsSkillsService {
     });
 
     if (!skill) {
-      throw new NotFoundException('Skill not found');
+      throw new NotFoundError('Skill not found');
     }
 
     skill.isEnabled = isEnabled;

@@ -1,4 +1,4 @@
-import { AssetsService } from './../src/modules/assets/assets.service';
+import { AssetQueryService } from './../src/modules/assets/asset-query.service';
 import type { DataSource } from 'typeorm';
 import { closeTestApp, createTestApp } from './helpers/app';
 import { signUp } from './helpers/auth';
@@ -27,7 +27,7 @@ import type { INestApplication } from '@nestjs/common';
 describe('GET /api/assets/url (e2e)', () => {
   let app: INestApplication<App>;
   let dataSource: DataSource;
-  let assetsService: AssetsService;
+  let assetsService: AssetQueryService;
   let workspaceId: string;
   let userId: string;
 
@@ -49,7 +49,7 @@ describe('GET /api/assets/url (e2e)', () => {
     app = created.app as INestApplication<App>;
     server = created.server;
     dataSource = created.dataSource;
-    assetsService = app.get(AssetsService);
+    assetsService = app.get(AssetQueryService);
 
     // ── Sign up over real HTTP, capture the session cookie ──────────────
     const signedUp = await signUp(created.server, { email, password, name: 'E2E URL' });

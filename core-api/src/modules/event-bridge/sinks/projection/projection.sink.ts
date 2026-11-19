@@ -1,4 +1,5 @@
-import { EventBusGroup } from '@/common/enums/enum';
+import { EventLane } from '../../consuming/event-lane.decorator';
+import { EventBusGroup } from '@/modules/event-bridge/enums/event-bridge.enums';
 import { Injectable } from '@nestjs/common';
 import type { EventSink } from '../../consuming/event-sink';
 import { SUBSCRIPTIONS } from '../../routing/subscriptions';
@@ -24,6 +25,7 @@ import { SUBSCRIPTIONS } from '../../routing/subscriptions';
  * declared but absent fails at the first event: XREADGROUP on a group that
  * does not exist is an error, not an empty read.
  */
+@EventLane()
 @Injectable()
 export class ProjectionSink implements EventSink {
   readonly group = EventBusGroup.Projection;

@@ -1,5 +1,6 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
-import { CronSchedule, JobStatus, ScanStatus, TargetScopeType } from '@/common/enums/enum';
+import { CronSchedule, JobStatus } from '@/common/enums/enum';
+import { ScanStatus, TargetScopeType } from '@/modules/targets/enums/target.enums';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {

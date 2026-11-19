@@ -1,7 +1,7 @@
 import { Admin } from '../admin.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { IdQueryParamDto } from '@/common/dtos/id-query-param.dto';
-import { GetManyResponseDto } from '@/utils/getManyResponse';
+import { GetManyResponseDto } from '@/common/utils/get-many-response.util';
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { AdminUsersService } from './admin-users.service';

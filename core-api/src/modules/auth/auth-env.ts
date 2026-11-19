@@ -26,3 +26,14 @@ export function resolveAuthSecret(
   }
   return secret;
 }
+
+/**
+ * The secret that actually signs, for other server-side signatures derived
+ * from it (e.g. attack surface query cursors): `resolveAuthSecret`, or
+ * better-auth's own fallback where that one allows none (local and tests).
+ */
+export function resolveSigningSecret(
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  return resolveAuthSecret(env) ?? PUBLIC_DEFAULT_SECRET;
+}

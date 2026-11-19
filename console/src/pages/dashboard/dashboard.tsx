@@ -42,9 +42,12 @@ export default function Dashboard() {
 
   return (
     <Page title="Dashboard" description="Workspace security overview">
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
-          <div className="col-span-1 xl:col-span-3 order-2 xl:order-0 flex flex-col gap-4">
+      {/* Columns follow the dashboard's own width, not the viewport's: the
+          app sidebar and the AI chat panel take their share first. */}
+      <div className="@container/dashboard space-y-4">
+        <div className="grid grid-cols-1 @6xl/dashboard:grid-cols-4 gap-4">
+          {/* `dashboard-main`: the stat cards and the map size by this column */}
+          <div className="@container/dashboard-main col-span-1 @6xl/dashboard:col-span-3 order-2 @6xl/dashboard:order-0 flex flex-col gap-4">
             <div className="flex-1">
               <Statistic />
             </div>
@@ -58,42 +61,43 @@ export default function Dashboard() {
               />
             </div>
           </div>
-          <div className="col-span-1 order-1 xl:order-0 flex flex-col gap-4">
-            <div className="flex-1">
+          {/* Stacked above the main column, the two cards share a row */}
+          <div className="col-span-1 order-1 @6xl/dashboard:order-0 flex flex-col @2xl/dashboard:flex-row @6xl/dashboard:flex-col gap-4">
+            <div className="flex-1 min-w-0">
               <VulnerabilityStatistic />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <TlsStatistics />
             </div>
           </div>
         </div>
         <VulnerabilityLifecycle />
-        <div className="grid grid-cols-1 xl:grid-cols-6 gap-4">
-          <div className="xl:col-span-2">
+        <div className="grid grid-cols-1 @6xl/dashboard:grid-cols-6 gap-4">
+          <div className="@6xl/dashboard:col-span-2">
             <NeedsAttention />
           </div>
-          <div className="xl:col-span-4">
+          <div className="@6xl/dashboard:col-span-4">
             <VulnerabilityActivity />
           </div>
         </div>
         <div className="space-y-4">
-          <div className="grid grid-cols-1 xl:grid-cols-6 gap-4">
-            <div className="xl:col-span-4">
+          <div className="grid grid-cols-1 @6xl/dashboard:grid-cols-6 gap-4">
+            <div className="@6xl/dashboard:col-span-4">
               <AssetTrends />
             </div>
-            <div className="xl:col-span-2">
+            <div className="@6xl/dashboard:col-span-2">
               <RecentAssets />
             </div>
           </div>
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 @5xl/dashboard:grid-cols-2 gap-4">
             <TopPorts />
             <TopTechnologies />
           </div>
-          <div className="grid grid-cols-1 xl:grid-cols-6 gap-4">
-            <div className="xl:col-span-4">
+          <div className="grid grid-cols-1 @6xl/dashboard:grid-cols-6 gap-4">
+            <div className="@6xl/dashboard:col-span-4">
               <IssuesTimeline />
             </div>
-            <div className="xl:col-span-2">
+            <div className="@6xl/dashboard:col-span-2">
               <TopAssetsVulnerabilitiesChart />
             </div>
           </div>

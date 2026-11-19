@@ -1,4 +1,5 @@
-import { BadRequestException } from '@nestjs/common';
+
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 /**
  * Keyset cursor of the notification list = base64url(`createdAt` + '|' + `id`),
@@ -37,15 +38,15 @@ export function encodeNotificationCursor(cursor: NotificationCursor): string {
 /** Inverse of {@link encodeNotificationCursor}; 400 on anything malformed. */
 export function decodeNotificationCursor(cursor: string): NotificationCursor {
   if (!BASE64URL_RE.test(cursor)) {
-    throw new BadRequestException('Invalid cursor');
+    throw new InvalidInputError('Invalid cursor');
   }
   const parts = Buffer.from(cursor, 'base64url').toString('utf8').split(SEPARATOR);
   if (parts.length !== 2) {
-    throw new BadRequestException('Invalid cursor');
+    throw new InvalidInputError('Invalid cursor');
   }
   const [createdAt, id] = parts;
   if (!TS_RE.test(createdAt) || !UUID_RE.test(id)) {
-    throw new BadRequestException('Invalid cursor');
+    throw new InvalidInputError('Invalid cursor');
   }
   // Shape alone lets '2026-13-45T…' through, which Postgres would reject with
   // a 500; a date that does not survive a round trip is not a real one.
@@ -54,7 +55,7 @@ export function decodeNotificationCursor(cursor: string): NotificationCursor {
     Number.isNaN(date.getTime()) ||
     date.toISOString().slice(0, 19) !== createdAt.slice(0, 19)
   ) {
-    throw new BadRequestException('Invalid cursor');
+    throw new InvalidInputError('Invalid cursor');
   }
   return { createdAt, id };
 }

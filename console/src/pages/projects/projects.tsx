@@ -142,7 +142,8 @@ const ProjectCard = memo(function ProjectCard({
     // full-card overlay
     <div
       className={cn(
-        'relative flex h-full flex-col gap-3 rounded-lg border p-5 text-left transition-colors hover:bg-accent/70',
+        // Dark mode: the card fill, as outlines are off there (index.css)
+        'relative flex h-full flex-col gap-3 rounded-lg border p-5 text-left transition-colors hover:bg-accent/70 dark:bg-card-surface dark:hover:bg-accent/70',
         project.archivedAt && 'opacity-70',
       )}
     >
@@ -239,7 +240,7 @@ export function Projects() {
       {[...Array(4)].map((_, i) => (
         <div
           key={i}
-          className="flex flex-col gap-3 rounded-lg border p-5 animate-pulse"
+          className="flex flex-col gap-3 rounded-lg border p-5 animate-pulse dark:bg-card-surface"
         >
           <div className="flex items-center gap-2">
             <div className="size-6 rounded-md bg-muted" />

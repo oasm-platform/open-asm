@@ -150,7 +150,7 @@ function ToolCallDetail({ call }: { call: SubagentToolCallDto }) {
  * tab, whose own tab bar already uses those.
  */
 const SEGMENT =
-  'h-6 rounded-md px-2.5 text-xs data-[state=active]:bg-background data-[state=active]:shadow-xs data-[state=active]:after:hidden';
+  'h-6 rounded-md px-2.5 text-xs data-[state=active]:bg-background data-[state=active]:shadow-xs';
 
 interface SubagentTranscriptProps {
   subagent: SubagentResponseDto;
@@ -207,7 +207,8 @@ export function SubagentTranscript({
   return (
     <Tabs value={tab} onValueChange={setTab} className="gap-3">
       <div className="flex items-center gap-3">
-        <TabsList className="h-7 gap-0.5 rounded-lg bg-muted p-0.5">
+        {/* A segmented control: the selected tab is a raised pill */}
+        <TabsList indicator={false} className="h-7 gap-0.5 rounded-lg bg-muted p-0.5">
           <TabsTrigger value="conversation" className={SEGMENT}>
             Conversation
           </TabsTrigger>

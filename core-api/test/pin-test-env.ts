@@ -45,7 +45,7 @@ export function pinTestEnv(): string {
   process.env.POSTGRES_DB = requested;
 
   /**
-   * better-auth's limiter is hardcoded to 100 requests / 60s in-memory
+   * better-auth's limiter is hardcoded to 100 requests / 60s
    * (`src/modules/auth/auth.ts`). A suite that signs up users and fires guard
    * matrices trips it and starts failing on rate limit instead of on real
    * bugs. `auth.ts` reads this flag; production never sets it.

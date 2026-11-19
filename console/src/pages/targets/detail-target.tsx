@@ -1,7 +1,6 @@
 import Page from '@/components/common/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import JobStatusBadge from '@/components/ui/job-status';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   JobStatus,
@@ -149,16 +148,8 @@ export function DetailTarget() {
         />
       }
       header={
+        // No scan status badge: the overview's "Running now" shows the runs
         <div className="flex flex-wrap items-center gap-3">
-          <JobStatusBadge
-            status={target.status}
-            onClick={() =>
-              navigate({
-                search: { ...search, animation: scanning ? 'true' : undefined },
-                replace: true,
-              })
-            }
-          />
           <Badge
             variant="outline"
             className="cursor-pointer gap-1.5 font-normal"

@@ -1,6 +1,7 @@
 import { ProjectScopeRuleMode, ProjectScopeRuleType } from '@/common/enums/enum';
-import { BadRequestException } from '@nestjs/common';
+
 import { ProjectScopeService } from './project-scope.service';
+import { InvalidInputError } from '@/common/errors/domain.errors';
 
 const WORKSPACE_ID = 'ws-1';
 const TARGET_ID = '3f1c2a8e-6c1b-4d5e-9f00-0a1b2c3d4e5f';
@@ -31,7 +32,7 @@ describe('ProjectScopeService', () => {
         ctx.service.normalizeRules(WORKSPACE_ID, [
           include(ProjectScopeRuleType.CIDR, '10.0.0.0/40'),
         ]),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
     });
 
     it('refuses a target of another workspace', async () => {

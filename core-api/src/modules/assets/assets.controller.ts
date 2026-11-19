@@ -2,7 +2,7 @@ import { UserId, WorkspaceId } from '@/common/decorators/app.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
 import { WorkspaceAccess } from '@/common/decorators/workspace-access.decorator';
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
-import { GetManyResponseDto } from '@/utils/getManyResponse';
+import { GetManyResponseDto } from '@/common/utils/get-many-response.util';
 import {
   Body,
   Controller,
@@ -15,6 +15,9 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { NodeResponse } from '@nestjs/platform-node';
+import { AssetGraphService } from './asset-graph.service';
+import { AssetQueryService } from './asset-query.service';
+import { AssetTaggingService } from './asset-tagging.service';
 import { AssetsService } from './assets.service';
 import { GetAssetsQueryDto, GetAssetsResponseDto } from './dto/assets.dto';
 import { GetIpAssetsDTO } from './dto/get-ip-assets.dto';
@@ -44,6 +47,9 @@ export class AssetsController {
   constructor(
     private readonly assetsService: AssetsService,
     private readonly urlDiscoveryService: UrlDiscoveryService,
+    private readonly assetGraph: AssetGraphService,
+    private readonly assetQuery: AssetQueryService,
+    private readonly assetTagging: AssetTaggingService,
   ) {}
 
   @Doc({
@@ -62,7 +68,7 @@ export class AssetsController {
     @Query() query: GetAssetsQueryDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetsService.getManyAsssetServices(query, workspaceId);
+    return this.assetQuery.getManyAsssetServices(query, workspaceId);
   }
 
   @Doc({
@@ -81,7 +87,7 @@ export class AssetsController {
     @Query() query: GetAssetsQueryDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetsService.getIpAssets(query, workspaceId);
+    return this.assetQuery.getIpAssets(query, workspaceId);
   }
 
   @Doc({
@@ -100,7 +106,7 @@ export class AssetsController {
     @Query() query: GetAssetsQueryDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetsService.getHostAssets(query, workspaceId);
+    return this.assetQuery.getHostAssets(query, workspaceId);
   }
 
   @Doc({
@@ -119,7 +125,7 @@ export class AssetsController {
     @Query() query: GetAssetsQueryDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetsService.getPortAssets(query, workspaceId);
+    return this.assetQuery.getPortAssets(query, workspaceId);
   }
 
   @Doc({
@@ -139,7 +145,7 @@ export class AssetsController {
     @Query() query: GetAssetsQueryDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetsService.getUrlAssets(query, workspaceId);
+    return this.assetQuery.getUrlAssets(query, workspaceId);
   }
 
   @Doc({
@@ -178,7 +184,7 @@ export class AssetsController {
     @Query() query: GetAssetsQueryDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetsService.getTechnologyAssets(query, workspaceId);
+    return this.assetQuery.getTechnologyAssets(query, workspaceId);
   }
 
   @Doc({
@@ -197,7 +203,7 @@ export class AssetsController {
     @Query() query: GetAssetsQueryDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetsService.getStatusCodeAssets(query, workspaceId);
+    return this.assetQuery.getStatusCodeAssets(query, workspaceId);
   }
 
   @Doc({
@@ -237,7 +243,7 @@ export class AssetsController {
     @Query() query: GetAssetsQueryDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetsService.getTagAssets(query, workspaceId);
+    return this.assetQuery.getTagAssets(query, workspaceId);
   }
 
   @Doc({
@@ -257,7 +263,7 @@ export class AssetsController {
     @Query() query: GetAssetGraphQueryDto,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetsService.getAssetGraph(query, workspaceId);
+    return this.assetGraph.getAssetGraph(query, workspaceId);
   }
 
   @Doc({
@@ -278,7 +284,7 @@ export class AssetsController {
     @WorkspaceId() workspaceId: string,
     @UserId() userId: string,
   ) {
-    const tags = await this.assetsService.generateServiceTags(
+    const tags = await this.assetTagging.generateServiceTags(
       dto.assetServiceId,
       workspaceId,
       userId,
@@ -304,7 +310,7 @@ export class AssetsController {
     @Param('assetId') assetId: string,
     @WorkspaceId() workspaceId: string,
   ) {
-    return this.assetsService.getAssetServiceGraph(assetId, workspaceId);
+    return this.assetGraph.getAssetServiceGraph(assetId, workspaceId);
   }
 
   @Doc({
@@ -320,7 +326,7 @@ export class AssetsController {
   @WorkspaceAccess('asset.read')
   @Get(':id')
   getAssetById(@Param('id') id: string, @WorkspaceId() workspaceId: string) {
-    return this.assetsService.getAssetById(id, workspaceId);
+    return this.assetQuery.getAssetById(id, workspaceId);
   }
 
   @Doc({

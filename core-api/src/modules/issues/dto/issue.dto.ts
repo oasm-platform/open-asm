@@ -1,9 +1,5 @@
-import {
-  IssuePriority,
-  IssueResolution,
-  IssueStatus,
-  IssueType,
-} from '@/common/enums/enum';
+import { IssuePriority, IssueStatus, IssueType } from '@/common/enums/enum';
+import { IssueResolution } from '@/modules/issues/enums/issue.enums';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {

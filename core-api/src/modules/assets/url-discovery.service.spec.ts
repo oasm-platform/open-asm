@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+
 import type { Repository } from 'typeorm';
 import { JobRunType, TargetType } from '@/common/enums/enum';
 import type { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
@@ -11,6 +11,7 @@ import type { Target } from '../targets/entities/target.entity';
 import type { WorkflowsService } from '../workflows/workflows.service';
 import type { DiscoveredUrl } from './entities/discovered-url.entity';
 import { UrlDiscoveryService } from './url-discovery.service';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 describe('UrlDiscoveryService', () => {
   let service: UrlDiscoveryService;
@@ -192,8 +193,7 @@ describe('UrlDiscoveryService', () => {
       { id: 'ip-1', type: TargetType.IP, value: '203.0.113.1' },
     ]);
 
-    await expect(service.discover(['ip-1'], 'ws-1')).rejects.toBeInstanceOf(
-      BadRequestException,
+    await expect(service.discover(['ip-1'], 'ws-1')).rejects.toBeInstanceOf(InvalidInputError,
     );
     expect(mockWorkflowRunnerService.startRun).not.toHaveBeenCalled();
   });
@@ -201,8 +201,7 @@ describe('UrlDiscoveryService', () => {
   it('rejects when none of the targets belong to the workspace', async () => {
     mockTargetRepository.find.mockResolvedValue([]);
 
-    await expect(service.discover(['domain-1'], 'ws-1')).rejects.toBeInstanceOf(
-      NotFoundException,
+    await expect(service.discover(['domain-1'], 'ws-1')).rejects.toBeInstanceOf(NotFoundError,
     );
     expect(mockWorkflowRunnerService.startRun).not.toHaveBeenCalled();
   });
@@ -210,8 +209,7 @@ describe('UrlDiscoveryService', () => {
   it('rejects when the workflow is missing from the workspace', async () => {
     mockWorkflowRepository.findOne.mockResolvedValue(null);
 
-    await expect(service.discover(['domain-1'], 'ws-1')).rejects.toBeInstanceOf(
-      NotFoundException,
+    await expect(service.discover(['domain-1'], 'ws-1')).rejects.toBeInstanceOf(NotFoundError,
     );
     expect(mockWorkflowRunnerService.startRun).not.toHaveBeenCalled();
   });

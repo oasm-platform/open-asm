@@ -2,7 +2,6 @@ import { ROLE_METADATA_KEY } from '@/common/constants/app.constants';
 import { Role } from '@/common/enums/enum';
 import type { ConfigService } from '@nestjs/config';
 import {
-  BadRequestException,
   ForbiddenException,
   NotFoundException,
   RequestMethod,
@@ -18,6 +17,7 @@ import { WorkspacesService } from '../workspaces/workspaces.service';
 import type { RustFsClient } from './rustfs.client';
 import { StorageController } from './storage.controller';
 import { StorageService } from './storage.service';
+import { ForbiddenError, InvalidInputError } from '@/common/errors/domain.errors';
 
 const reflector = new Reflector();
 
@@ -164,7 +164,7 @@ describe('StorageController', () => {
     it('rejects an unknown bucket before generating a key', async () => {
       await expect(
         controller.presignUpload({ fileName: 'report.pdf', bucket: 'nope' }),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
 
       expect(generateObjectKey).not.toHaveBeenCalled();
       expect(storageService.getPresignedUploadUrl).not.toHaveBeenCalled();
@@ -173,7 +173,7 @@ describe('StorageController', () => {
     it('rejects a private bucket before generating a key', async () => {
       await expect(
         controller.presignUpload({ fileName: 'report.pdf', bucket: 'reports' }),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      ).rejects.toBeInstanceOf(ForbiddenError);
 
       expect(generateObjectKey).not.toHaveBeenCalled();
       expect(storageService.getPresignedUploadUrl).not.toHaveBeenCalled();
@@ -184,7 +184,7 @@ describe('StorageController', () => {
 
       await expect(
         controller.presignUpload({ fileName: 'README' }),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
 
       expect(storageService.getPresignedUploadUrl).not.toHaveBeenCalled();
     });
@@ -261,7 +261,7 @@ describe('StorageController', () => {
     it('rejects an empty bucket before signing', async () => {
       await expect(
         controller.presignDownload({ bucket: '  ', path: 'a/b.pdf' }, user),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
 
       expect(storageService.getPresignedDownloadUrl).not.toHaveBeenCalled();
     });
@@ -272,7 +272,7 @@ describe('StorageController', () => {
           { bucket: 'job-results', path: 'a/b.pdf' },
           user,
         ),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      ).rejects.toBeInstanceOf(ForbiddenError);
 
       expect(storageService.getPresignedDownloadUrl).not.toHaveBeenCalled();
     });
@@ -372,7 +372,7 @@ describe('StorageController', () => {
     it('rejects an unknown bucket with 400 before authorizing', async () => {
       await expect(
         controller.presignDownload({ bucket: 'nope', path: 'a/b.pdf' }, user),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(InvalidInputError);
 
       expect(storageService.getPresignedDownloadUrl).not.toHaveBeenCalled();
     });

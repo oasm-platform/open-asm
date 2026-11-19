@@ -1,8 +1,9 @@
+import type { EventEmitter } from 'node:events';
 import type { Repository } from 'typeorm';
 
-import type { WrapperType } from '@/common/types/app.types';
+import type { AgentMode } from '@/modules/agents/enums/agent.enums';
 import type { ArtifactsService } from '@/modules/artifacts/artifacts.service';
-import type { AssetsService } from '@/modules/assets/assets.service';
+import type { AttackSurfaceQueryService } from '@/modules/attack-surface-query/attack-surface-query.service';
 import type { ConnectorRegistryService } from '@/modules/connectors/connector-registry.service';
 import type { IssuesService } from '@/modules/issues/issues.service';
 import type { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
@@ -27,31 +28,82 @@ import type { WorkersService } from '@/modules/workers/workers.service';
 import type { WorkspacesService } from '@/modules/workspaces/workspaces.service';
 import type { RedisService } from '@/services/redis/redis.service';
 
-import type { AgentsApprovalsService } from '../agents.approvals';
+import type { AgentsApprovalsService, ApprovalSettings } from '../agents.approvals';
 import type { AgentsGuardService } from '../agents.guard';
 import type { AgentsMemoriesService } from '../agents.memories';
+import type { SubagentOutput } from '../shared/conversation-metadata';
 import type { AgentConversationTodo } from '../entities/agent-conversation-todo.entity';
 import type { AgentConversation } from '../entities/agent-conversation.entity';
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type ToolType = any;
 
 export interface ToolCallOptions {
   toolCallId: string;
   abortSignal?: AbortSignal;
 }
 
-/** Everything AgentTool injects; each tool file takes the slice it uses. */
-export interface AgentToolDeps {
-  assetsService: AssetsService;
+/** Plan tool settings of a run, see PlanTools. */
+export interface PlanSettings {
+  workspaceId: string;
+  approval: ApprovalSettings;
+  selfManaged?: boolean;
+}
+
+/** What a run knows when it builds its tool set. */
+export interface AgentFunctionBuildContext {
+  workspaceId: string;
+  /** The member the run acts for; unset on the OASM MCP server (no user). */
+  userId?: string;
+  /** The agent mode; unset = the functions limited to some modes are left out. */
+  mode?: AgentMode;
+  /** The chat the tools run in; '' or unset when the run has none (vulAnalyze). */
+  conversationId?: string;
+  /** The conversation's project: locks every project-aware tool to it. */
+  projectId?: string | null;
+  /** Agent definition running the tools (a subagent's name); unset = main. */
+  agentName?: string;
+  /** Present => every gated tool goes through the guard and the approval flow. */
+  approval?: ApprovalSettings;
+  emitter?: EventEmitter;
+  /** Plan tools: the run's settings; unset = plans are set without review. */
+  plan?: PlanSettings;
+  /** Subagent tools: lets the running iteration release a result it read. */
+  onResultRead?: (id: string) => void;
+  /** load_skill: the skills a subagent may load; unset = every enabled one. */
+  skills?: readonly string[];
+  /** submit_result: the subagent run's hand-back, one callback per run. */
+  onSubmitResult?: (output: SubagentOutput) => void;
+}
+
+/** Second argument of every agent function: the run plus the model's call. */
+export interface AgentFunctionContext extends AgentFunctionBuildContext {
+  /** '' when the caller passed no call options. */
+  toolCallId: string;
+  abortSignal?: AbortSignal;
+}
+
+/**
+ * What a project-aware tool reads of the run. A conversation about a project
+ * locks every project-aware tool to it; elsewhere the model picks one with
+ * `projectId`.
+ */
+export type ToolScope = Pick<
+  AgentFunctionBuildContext,
+  'projectId' | 'userId' | 'conversationId' | 'agentName'
+>;
+
+/**
+ * The services the tool classes inject, by the property name every class
+ * uses for it; the shared helpers take the slice they need (`Deps<...>`).
+ */
+export interface ToolServices {
+  attackSurfaceQuery: AttackSurfaceQueryService;
   targetsService: TargetsService;
-  vulnerabilitiesService: WrapperType<VulnerabilitiesService>;
-  vulnerabilityReviewService: WrapperType<VulnerabilityReviewService>;
+  vulnerabilitiesService: VulnerabilitiesService;
+  vulnerabilityReviewService: VulnerabilityReviewService;
   statisticService: StatisticService;
-  issuesService: WrapperType<IssuesService>;
-  toolsService: WrapperType<ToolsService>;
-  workersService: WrapperType<WorkersService>;
-  jobsRegistryService: WrapperType<JobsRegistryService>;
+  issuesService: IssuesService;
+  toolsService: ToolsService;
+  workersService: WorkersService;
+  jobsRegistryService: JobsRegistryService;
   remoteExecuteService: RemoteExecuteService;
   conversationRepository: Repository<AgentConversation>;
   todoRepository: Repository<AgentConversationTodo>;
@@ -75,18 +127,4 @@ export interface AgentToolDeps {
   templatesService: TemplatesService;
 }
 
-export type Deps<K extends keyof AgentToolDeps> = Pick<AgentToolDeps, K>;
-
-/**
- * What a tool set is built for. A conversation about a project locks every
- * project-aware tool to it; elsewhere the model picks one with `projectId`.
- */
-export interface ToolScope {
-  projectId?: string | null;
-  /** Whose run it is: write tools check this member's workspace permissions. */
-  userId?: string;
-  /** The chat a new project gets linked to. */
-  conversationId?: string;
-  /** Agent definition running the tools (a subagent's name); unset = main. */
-  agentName?: string;
-}
+export type Deps<K extends keyof ToolServices> = Pick<ToolServices, K>;

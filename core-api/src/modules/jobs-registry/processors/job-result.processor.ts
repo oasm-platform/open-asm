@@ -1,22 +1,22 @@
 import {
   BullMQName,
   JobStatus,
-  ToolCategory,
   WorkerType,
 } from '@/common/enums/enum';
 import { JobDataResultType } from '@/common/types/app.types';
 import { DataAdapterService } from '@/modules/data-adapter/data-adapter.service';
 import { StorageService } from '@/modules/storage/storage.service';
 import { builtInTools } from '@/modules/tools/tools-provider/built-in-tools';
-import { VulnerabilityLifecycleService } from '@/modules/vulnerabilities/vulnerability-lifecycle.service';
 import { RedisService } from '@/services/redis/redis.service';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Job as BullJob, UnrecoverableError } from 'bullmq';
 import { Repository } from 'typeorm';
 import { DataPayloadResult } from '../dto/jobs-registry.dto';
 import { Job } from '../entities/job.entity';
+import { JOB_RESULT_SYNCED_EVENT, type JobResultSyncedEvent } from '../job.events';
 import { JobsRegistryService } from '../jobs-registry.service';
 import { WorkflowRunnerService } from '../workflow-runner.service';
 
@@ -138,7 +138,7 @@ export class JobResultProcessor extends WorkerHost {
     private readonly storageService: StorageService,
     @InjectRepository(Job)
     private readonly jobRepo: Repository<Job>,
-    private readonly vulnerabilityLifecycle: VulnerabilityLifecycleService,
+    private readonly events: EventEmitter2,
   ) {
     super();
   }
@@ -316,22 +316,19 @@ export class JobResultProcessor extends WorkerHost {
 
       const completedJob = { ...job, status: JobStatus.COMPLETED, completedAt };
 
-      // A vulnerability scan that really ran (its result was synced, even an
-      // empty one) closes the findings of the same scope it no longer
-      // reports. A "nothing to scan" outcome proves nothing, so it does not.
-      if (
-        synced &&
-        !benignReason &&
-        (job.category as string) === (ToolCategory.VULNERABILITIES as string)
-      ) {
+      // A scan that really ran (its result was synced, even an empty one) is
+      // announced; the vulnerabilities module closes the findings of the same
+      // scope it no longer reports. A "nothing to scan" outcome proves
+      // nothing, so it is not.
+      if (synced && !benignReason) {
         try {
-          await this.vulnerabilityLifecycle.onScanJobCompleted(
+          await this.events.emitAsync(JOB_RESULT_SYNCED_EVENT, {
             job,
             syncStartedAt,
-          );
+          } satisfies JobResultSyncedEvent);
         } catch (error) {
           this.logger.error(
-            `Auto-close after job ${job.id} failed: ${error instanceof Error ? error.message : String(error)}`,
+            `Listeners of ${JOB_RESULT_SYNCED_EVENT} failed for job ${job.id}: ${error instanceof Error ? error.message : String(error)}`,
           );
         }
       }
@@ -372,7 +369,7 @@ export class JobResultProcessor extends WorkerHost {
         await this.jobsRegistryService.handleJobError(
           { jobId, data: { payload: partial } as DataPayloadResult },
           job,
-          e,
+          e instanceof Error ? e : new Error(String(e)),
         );
 
         // A permanently failed job is a terminal outcome for its step: let the

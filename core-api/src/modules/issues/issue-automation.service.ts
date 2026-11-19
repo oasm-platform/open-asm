@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type {
   IssueVulnerabilityEvents,
   IssueVulnerabilityFact,
-} from '../event-bridge/sinks/issues/issues.sink';
+} from './event-lane/issues.sink';
 import { IssueTypeHandlerRegistry } from './handlers/issue-type-handler.registry';
 import { IssueRuleEngine } from './rules/issue-rule-engine.service';
 

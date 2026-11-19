@@ -1,230 +1,99 @@
-import type { WrapperType } from '@/common/types/app.types';
 import { firstMissingPermission } from '@/common/utils/permission-keys.util';
-import {
-  Inject,
-  Injectable,
-  NotFoundException,
-  forwardRef,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { Injectable, type Type } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import type { Tool } from 'ai';
 import type { EventEmitter } from 'node:events';
-import { Repository } from 'typeorm';
 
-import { ArtifactsService } from '@/modules/artifacts/artifacts.service';
-import { AssetsService } from '@/modules/assets/assets.service';
-import { ConnectorRegistryService } from '@/modules/connectors/connector-registry.service';
-import { IssuesService } from '@/modules/issues/issues.service';
-import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
-import { ProjectAssetsService } from '@/modules/projects/project-assets.service';
-import { ProjectFilesService } from '@/modules/projects/project-files.service';
-import { ProjectResultsService } from '@/modules/projects/project-results.service';
-import { ProjectScopeService } from '@/modules/projects/project-scope.service';
-import { ProjectTriggersService } from '@/modules/projects/project-triggers.service';
-import { ProjectWorkflowsService } from '@/modules/projects/project-workflows.service';
-import { EventBridgeService } from '@/modules/event-bridge/publishing/event-bridge.service';
-import { ProjectsService } from '@/modules/projects/projects.service';
-import { RemoteExecuteService } from '@/modules/remote-execute/remote-execute.service';
-import { StatisticService } from '@/modules/statistic/statistic.service';
-import { TargetsService } from '@/modules/targets/targets.service';
-import { TemplatesService } from '@/modules/templates/templates.service';
-import { ToolConfigProfilesService } from '@/modules/tools/tool-config-profiles.service';
-import { ToolsService } from '@/modules/tools/tools.service';
-import { VulnerabilitiesService } from '@/modules/vulnerabilities/vulnerabilities.service';
-import { VulnerabilityReviewService } from '@/modules/vulnerabilities/vulnerability-review.service';
-import { RemoteExecuteSubscribeService } from '@/modules/workers/remote-execute-subscribe.service';
-import { WorkersService } from '@/modules/workers/workers.service';
+import { AgentMode } from '@/modules/agents/enums/agent.enums';
 import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
-import { RedisService } from '@/services/redis/redis.service';
 
-import { AgentMode } from '@/common/enums/enum';
 import {
   AgentsApprovalsService,
   type ApprovalContext,
   type ApprovalSettings,
 } from './agents.approvals';
 import { AgentsGuardService, guardApprovalMeta } from './agents.guard';
-import { TOOL_PERMISSIONS } from './agents.tool-permissions';
-import { AgentsMemoriesService } from './agents.memories';
-import { AgentConversationTodo } from './entities/agent-conversation-todo.entity';
-import { AgentConversation } from './entities/agent-conversation.entity';
-import { artifactTools } from './tools/artifact.tools';
 import {
-  listToolConfigProfilesTool,
-  readToolOutputTool,
-  runConnectorTool,
-} from './tools/connector.tools';
+  agentFunctionsOf,
+  buildAgentFunction,
+  isOffered,
+  type AgentFunctionEntry,
+} from './tools/agent-function';
+import { ArtifactTools } from './tools/artifact.tools';
+import { AttackSurfaceQueryTools } from './tools/attack-surface-query.tools';
+import { ConnectorTools } from './tools/connector.tools';
 import { deniedMessage, stableStringify } from './tools/helpers';
-import { memoryTools } from './tools/memory.tools';
-import { planTools } from './tools/plan.tools';
-import {
-  addProjectTriggerTool,
-  addProjectWorkflowTool,
-  addTargetsTool,
-  createProjectTool,
-  installToolTool,
-  listPipelineToolsTool,
-  inspectPipelineToolTool,
-  listWorkflowTemplatesTool,
-  removeProjectTriggerTool,
-  removeProjectWorkflowTool,
-  updateProjectInstructionTool,
-  updateProjectScopeTool,
-} from './tools/project-build.tools';
-import {
-  addAssetsToProjectTool,
-  inspectProjectTool,
-  listProjectAssetsTool,
-  listProjectRunsTool,
-  listProjectsTool,
-  readProjectFileTool,
-  removeAssetsFromProjectTool,
-  runProjectWorkflowTool,
-} from './tools/project.tools';
-import { remoteExecuteTool } from './tools/remote-execute.tool';
+import { MemoryTools } from './tools/memory.tools';
+import { PlanTools } from './tools/plan.tools';
+import { ProjectBuildTools } from './tools/project-build.tools';
+import { ProjectTools } from './tools/project.tools';
+import { RemoteExecuteTools } from './tools/remote-execute.tool';
 import type {
-  AgentToolDeps,
+  AgentFunctionBuildContext,
+  PlanSettings,
   ToolCallOptions,
-  ToolScope,
-  ToolType,
 } from './tools/types';
-import { proposeVulnerabilityTool } from './tools/vulnerability-proposal.tool';
-import { webFetchTool } from './tools/web-fetch.tool';
-import {
-  detailAssetTool,
-  detailIssueTool,
-  detailVulnTool,
-  getAssetsTool,
-  getPortsTool,
-  getStatisticsTool,
-  getTargetsTool,
-  getTechnologiesTool,
-  getTlsTool,
-  getVulnerabilitiesTool,
-  listAssetsInTargetTool,
-  listConnectorsTool,
-  listIssuesTool,
-  listJobsTool,
-  listWorkersTool,
-} from './tools/workspace.tools';
-
-type ToolBuilder = (
-  deps: AgentToolDeps,
-  workspaceId: string,
-  scope: ToolScope,
-) => Tool;
-
-/** Tools offered in both agent modes, in the order the model sees them. */
-const WORKSPACE_TOOLS: Record<string, ToolBuilder> = {
-  enumerate_assets: getAssetsTool,
-  discover_vulnerabilities: getVulnerabilitiesTool,
-  retrieve_targets: getTargetsTool,
-  gather_statistics: getStatisticsTool,
-  inspect_asset: detailAssetTool,
-  examine_target_assets: listAssetsInTargetTool,
-  investigate_vulnerability: detailVulnTool,
-  list_network_ports: getPortsTool,
-  fingerprint_technologies: getTechnologiesTool,
-  verify_tls_settings: getTlsTool,
-  retrieve_web_page: webFetchTool,
-  enumerate_open_issues: listIssuesTool,
-  inspect_issue: detailIssueTool,
-  display_available_tools: listConnectorsTool,
-  list_tool_config_profiles: listToolConfigProfilesTool,
-  list_active_workers: listWorkersTool,
-  review_jobs: listJobsTool,
-  list_projects: listProjectsTool,
-  inspect_project: inspectProjectTool,
-  list_project_assets: listProjectAssetsTool,
-  list_project_runs: listProjectRunsTool,
-  read_project_file: readProjectFileTool,
-  list_workflow_templates: listWorkflowTemplatesTool,
-  list_pipeline_tools: listPipelineToolsTool,
-  inspect_pipeline_tool: inspectPipelineToolTool,
-};
-
-/** Agent mode only: they build or change projects, or start their scans. */
-const PROJECT_ACTION_TOOLS: Record<string, ToolBuilder> = {
-  create_project: createProjectTool,
-  add_targets: addTargetsTool,
-  update_project_scope: updateProjectScopeTool,
-  add_project_workflow: addProjectWorkflowTool,
-  remove_project_workflow: removeProjectWorkflowTool,
-  add_project_trigger: addProjectTriggerTool,
-  remove_project_trigger: removeProjectTriggerTool,
-  install_tool: installToolTool,
-  update_project_instruction: updateProjectInstructionTool,
-  add_assets_to_project: addAssetsToProjectTool,
-  remove_assets_from_project: removeAssetsFromProjectTool,
-  run_project_workflow: runProjectWorkflowTool,
-  // Records a proven finding for human review; nothing counts until approved
-  propose_vulnerability: proposeVulnerabilityTool,
-};
+import { VulnerabilityProposalTools } from './tools/vulnerability-proposal.tool';
+import { WebFetchTools } from './tools/web-fetch.tool';
+import { WorkspaceTools } from './tools/workspace.tools';
+import { isNotFound } from '@/common/errors/error-checks';
 
 /**
- * The only tools on the OASM MCP server: workspace data lookups. MCP calls
- * skip the approval flow, so nothing that runs commands or connectors,
- * fetches URLs or writes may ever be listed here (getMcpTools also drops
- * anything that is not in READ_ONLY_TOOLS).
+ * The built-in tool classes, in the order the model sees their functions
+ * (inside a class: the order the methods are written in).
  */
-export const MCP_TOOLS: ReadonlySet<string> = new Set([
-  'enumerate_assets',
-  'discover_vulnerabilities',
-  'retrieve_targets',
-  'gather_statistics',
-  'inspect_asset',
-  'examine_target_assets',
-  'investigate_vulnerability',
-  'list_network_ports',
-  'fingerprint_technologies',
-  'verify_tls_settings',
-  'enumerate_open_issues',
-  'inspect_issue',
-  'list_active_workers',
-  'review_jobs',
-  'list_projects',
-  'inspect_project',
-  'list_project_assets',
-  'list_project_runs',
-  'read_project_file',
-  'list_workflow_templates',
-  'list_pipeline_tools',
-]);
+export const BUILTIN_TOOL_CLASSES: readonly Type[] = [
+  WorkspaceTools,
+  AttackSurfaceQueryTools,
+  WebFetchTools,
+  ConnectorTools,
+  ProjectTools,
+  ProjectBuildTools,
+  VulnerabilityProposalTools,
+  RemoteExecuteTools,
+];
 
-/** Tools that gate themselves (on the raw command) instead of via withApproval. */
-const SELF_GATED_TOOLS = new Set(['execute_remote_command']);
+/** The tool classes of AgentTool: the built-ins and the per-run families. */
+export const AGENT_TOOL_CLASSES: readonly Type[] = [
+  ...BUILTIN_TOOL_CLASSES,
+  PlanTools,
+  MemoryTools,
+  ArtifactTools,
+];
+
+const BUILTIN_FUNCTIONS = BUILTIN_TOOL_CLASSES.flatMap(agentFunctionsOf).map(
+  ({ options }) => options,
+);
 
 /**
- * Built-in tools that only read OASM data, so MANUAL runs them without
- * asking. Not retrieve_web_page: a URL it fetches can carry data out.
+ * Built-in tools that only read OASM data (`readOnly: true`), so MANUAL runs
+ * them without asking. Not retrieve_web_page: a URL it fetches can carry data
+ * out.
  */
-export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
-  'enumerate_assets',
-  'discover_vulnerabilities',
-  'retrieve_targets',
-  'gather_statistics',
-  'inspect_asset',
-  'examine_target_assets',
-  'investigate_vulnerability',
-  'list_network_ports',
-  'fingerprint_technologies',
-  'verify_tls_settings',
-  'enumerate_open_issues',
-  'inspect_issue',
-  'display_available_tools',
-  'list_tool_config_profiles',
-  'list_active_workers',
-  'review_jobs',
-  'list_projects',
-  'inspect_project',
-  'list_project_assets',
-  'list_project_runs',
-  'read_project_file',
-  'list_workflow_templates',
-  'list_pipeline_tools',
-  'inspect_pipeline_tool',
-  'read_tool_output',
-]);
+export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set(
+  BUILTIN_FUNCTIONS.filter((o) => o.readOnly).map((o) => o.name),
+);
+
+/**
+ * The only tools on the OASM MCP server (`mcp: true`): workspace data
+ * lookups. MCP calls skip the approval flow, so the boot check refuses any
+ * that is not read-only.
+ */
+export const MCP_TOOLS: ReadonlySet<string> = new Set(
+  BUILTIN_FUNCTIONS.filter((o) => o.mcp && o.readOnly).map((o) => o.name),
+);
+
+/**
+ * The workspace permission keys each built-in tool needs: the key of the
+ * HTTP route that reads or changes the same data, so the chat can never
+ * reach what the API refuses the same member.
+ */
+export const TOOL_PERMISSIONS: Readonly<Record<string, readonly string[]>> =
+  Object.fromEntries(
+    BUILTIN_FUNCTIONS.flatMap((o) =>
+      o.permissions === 'ungated' ? [] : [[o.name, o.permissions]],
+    ),
+  );
 
 /** What the approval gate reads off a tool. */
 interface GateableTool {
@@ -232,6 +101,12 @@ interface GateableTool {
   metadata?: unknown;
   execute: (params: unknown, options: ToolCallOptions) => Promise<unknown>;
 }
+
+/**
+ * The parts of a tool the gates read. Through `unknown`: comparing the AI
+ * SDK's Tool type with another type is too deep for the type checker.
+ */
+const gateable = (toolDef: Tool) => toolDef as unknown as GateableTool;
 
 /**
  * An MCP tool counts as read-only when its server says so and does not say
@@ -246,102 +121,39 @@ function isReadOnlyMcpTool(metadata: unknown): boolean {
 }
 
 /**
- * Builds the agent's tool set (the tools themselves live in ./tools) and
- * puts each tool behind the approval flow.
+ * Builds a run's tool set from the @AgentFunction methods of the tool
+ * classes (./tools) and puts each tool behind its gates: the member's
+ * workspace permission, then the guard and the approval flow.
  */
 @Injectable()
 export class AgentTool {
   constructor(
-    private readonly assetsService: AssetsService,
-    private readonly targetsService: TargetsService,
-    @Inject(forwardRef(() => VulnerabilitiesService))
-    private readonly vulnerabilitiesService: WrapperType<VulnerabilitiesService>,
-    private readonly statisticService: StatisticService,
-    @Inject(forwardRef(() => IssuesService))
-    private readonly issuesService: WrapperType<IssuesService>,
-    @Inject(forwardRef(() => ToolsService))
-    private readonly toolsService: WrapperType<ToolsService>,
-    @Inject(forwardRef(() => WorkersService))
-    private readonly workersService: WrapperType<WorkersService>,
-    @Inject(forwardRef(() => JobsRegistryService))
-    private readonly jobsRegistryService: WrapperType<JobsRegistryService>,
-    private readonly remoteExecuteService: RemoteExecuteService,
-    @InjectRepository(AgentConversation)
-    private readonly conversationRepository: Repository<AgentConversation>,
-    @InjectRepository(AgentConversationTodo)
-    private readonly todoRepository: Repository<AgentConversationTodo>,
-    private readonly agentsMemories: AgentsMemoriesService,
-    private readonly approvals: AgentsApprovalsService,
-    private readonly connectorRegistry: ConnectorRegistryService,
-    private readonly toolConfigProfiles: ToolConfigProfilesService,
-    private readonly remoteExecuteSubscribe: RemoteExecuteSubscribeService,
-    private readonly redisService: RedisService,
-    private readonly artifactsService: ArtifactsService,
+    private readonly moduleRef: ModuleRef,
     private readonly workspacesService: WorkspacesService,
-    private readonly projectsService: ProjectsService,
-    private readonly projectAssetsService: ProjectAssetsService,
-    private readonly projectFilesService: ProjectFilesService,
-    private readonly projectResultsService: ProjectResultsService,
-    private readonly projectScopeService: ProjectScopeService,
-    private readonly projectTriggersService: ProjectTriggersService,
-    private readonly projectWorkflowsService: ProjectWorkflowsService,
-    private readonly eventBridge: EventBridgeService,
-    private readonly templatesService: TemplatesService,
-    @Inject(forwardRef(() => VulnerabilityReviewService))
-    private readonly vulnerabilityReviewService: WrapperType<VulnerabilityReviewService>,
+    private readonly approvals: AgentsApprovalsService,
     private readonly guard: AgentsGuardService,
   ) {}
-
-  private get deps(): AgentToolDeps {
-    return {
-      assetsService: this.assetsService,
-      targetsService: this.targetsService,
-      vulnerabilitiesService: this.vulnerabilitiesService,
-      vulnerabilityReviewService: this.vulnerabilityReviewService,
-      statisticService: this.statisticService,
-      issuesService: this.issuesService,
-      toolsService: this.toolsService,
-      workersService: this.workersService,
-      jobsRegistryService: this.jobsRegistryService,
-      remoteExecuteService: this.remoteExecuteService,
-      conversationRepository: this.conversationRepository,
-      todoRepository: this.todoRepository,
-      agentsMemories: this.agentsMemories,
-      approvals: this.approvals,
-      guard: this.guard,
-      connectorRegistry: this.connectorRegistry,
-      toolConfigProfiles: this.toolConfigProfiles,
-      remoteExecuteSubscribe: this.remoteExecuteSubscribe,
-      redisService: this.redisService,
-      artifactsService: this.artifactsService,
-      workspacesService: this.workspacesService,
-      projectsService: this.projectsService,
-      projectAssetsService: this.projectAssetsService,
-      projectFilesService: this.projectFilesService,
-      projectResultsService: this.projectResultsService,
-      projectScopeService: this.projectScopeService,
-      projectTriggersService: this.projectTriggersService,
-      projectWorkflowsService: this.projectWorkflowsService,
-      eventBridge: this.eventBridge,
-      templatesService: this.templatesService,
-    };
-  }
 
   /** Plan tools (formulate_plan, transition_step, append_step, scrap_plan). */
   getTodoTools(
     conversationId: string,
     emitter?: EventEmitter,
-    plan?: Parameters<typeof planTools>[3],
-  ): Record<string, ToolType> {
-    return planTools(this.deps, conversationId, emitter, plan);
+    plan?: PlanSettings,
+  ): Record<string, Tool> {
+    return this.build([PlanTools], {
+      workspaceId: plan?.workspaceId ?? '',
+      conversationId,
+      emitter,
+      plan,
+    });
   }
 
   getMemoryTools(
     workspaceId: string,
     userId: string,
     conversationId: string,
-  ): Record<string, ToolType> {
-    return memoryTools(this.deps, workspaceId, userId, conversationId);
+  ): Record<string, Tool> {
+    return this.build([MemoryTools], { workspaceId, userId, conversationId });
   }
 
   /** save_file (the user's private Files) and save_template (workspace templates). */
@@ -349,30 +161,38 @@ export class AgentTool {
     workspaceId: string,
     userId: string,
     conversationId: string,
-  ): Record<string, ToolType> {
-    return artifactTools(this.deps, workspaceId, userId, conversationId);
+  ): Record<string, Tool> {
+    return this.build([ArtifactTools], {
+      workspaceId,
+      userId,
+      conversationId,
+    });
   }
 
   /**
-   * The OASM MCP server's tools: MCP_TOOLS only, and never one that is not
-   * read-only, whatever MCP_TOOLS says. Ungated: MCP has no approval flow.
+   * The OASM MCP server's tools: the `mcp: true` ones, never one that is not
+   * read-only. Ungated: MCP has no approval flow and no user.
    */
-  getMcpTools(workspaceId: string): Record<string, ToolType> {
-    const deps = this.deps;
-    return Object.fromEntries(
-      Object.entries(WORKSPACE_TOOLS)
-        .filter(([name]) => MCP_TOOLS.has(name) && READ_ONLY_TOOLS.has(name))
-        .map(([name, build]) => [name, build(deps, workspaceId, {})]),
-    );
+  getMcpTools(workspaceId: string): Record<string, Tool> {
+    const ctx: AgentFunctionBuildContext = { workspaceId };
+    const tools: Record<string, Tool> = {};
+    for (const cls of BUILTIN_TOOL_CLASSES) {
+      const instance = this.moduleRef.get<object>(cls);
+      for (const entry of agentFunctionsOf(cls)) {
+        if (!entry.options.mcp || !entry.options.readOnly) continue;
+        tools[entry.options.name] = buildAgentFunction(instance, entry, ctx);
+      }
+    }
+    return tools;
   }
 
   /**
    * The built-in tools for `agentMode`, run on behalf of `userId`: every call
-   * first needs that member's workspace permission (TOOL_PERMISSIONS), then
-   * goes through the approval flow when given. With `projectId` (the
-   * conversation's project) the project-aware tools are locked to it.
-   * `agentName` names the agent definition running them (a subagent); tools
-   * that record provenance (propose_vulnerability) use it.
+   * first needs that member's workspace permission (the function's
+   * `permissions`), then goes through the approval flow when given. With
+   * `projectId` (the conversation's project) the project-aware tools are
+   * locked to it. `agentName` names the agent definition running them (a
+   * subagent); tools that record provenance (propose_vulnerability) use it.
    */
   getTools(
     workspaceId: string,
@@ -383,96 +203,85 @@ export class AgentTool {
     approval?: ApprovalSettings,
     projectId?: string | null,
     agentName?: string,
-  ): Record<string, ToolType> {
-    return this.withPermissions(
-      this.getApprovalGatedTools(
-        workspaceId,
-        userId,
-        agentMode,
-        emitter,
-        conversationId,
-        approval,
-        projectId,
-        agentName,
-      ),
+  ): Record<string, Tool> {
+    return this.build(BUILTIN_TOOL_CLASSES, {
       workspaceId,
       userId,
-    );
+      mode: agentMode,
+      emitter,
+      conversationId,
+      approval,
+      projectId,
+      agentName,
+    });
   }
 
-  private getApprovalGatedTools(
-    workspaceId: string,
-    userId: string,
-    agentMode: AgentMode,
-    emitter?: EventEmitter,
-    conversationId?: string,
-    approval?: ApprovalSettings,
-    projectId?: string | null,
-    agentName?: string,
-  ): Record<string, ToolType> {
-    const deps = this.deps;
-    const conversation = conversationId ?? '';
-    const scope: ToolScope = {
-      projectId,
-      userId,
-      conversationId,
-      agentName,
-    };
-    const tools: Record<string, ToolType> = {};
-
-    for (const [name, build] of Object.entries(WORKSPACE_TOOLS)) {
-      tools[name] = build(deps, workspaceId, scope);
-    }
-    // AGENT-only tools act on workers and projects
-    if (agentMode === AgentMode.AGENT) {
-      for (const [name, build] of Object.entries(PROJECT_ACTION_TOOLS)) {
-        tools[name] = build(deps, workspaceId, scope);
+  /** The functions of `classes` the run offers, each behind its gates. */
+  private build(
+    classes: readonly Type[],
+    ctx: AgentFunctionBuildContext,
+  ): Record<string, Tool> {
+    const tools: Record<string, Tool> = {};
+    for (const cls of classes) {
+      const instance = this.moduleRef.get<object>(cls);
+      for (const entry of agentFunctionsOf(cls)) {
+        if (!isOffered(entry.options, ctx, instance)) continue;
+        tools[entry.options.name] = this.gate(
+          buildAgentFunction(instance, entry, ctx),
+          entry,
+          ctx,
+        );
       }
-      tools.execute_remote_command = remoteExecuteTool(
-        deps,
-        workspaceId,
-        conversation,
-        emitter,
-        approval,
+    }
+    return tools;
+  }
+
+  /**
+   * The permission check first, so nobody is asked to approve what the
+   * member may not do; then the guard and the approval flow.
+   */
+  private gate(
+    toolDef: Tool,
+    { options }: AgentFunctionEntry,
+    ctx: AgentFunctionBuildContext,
+  ): Tool {
+    const { approval } = ctx;
+    let gated = toolDef;
+    // Wrapped inside out: the approval wrapper goes on first so the
+    // permission wrapper, added last, runs first. Keep this order.
+    if (approval && (options.gate ?? 'approval') === 'approval') {
+      gated = this.withApproval(
+        options.name,
+        gated,
+        // Read at call time: approving a plan switches the mode mid-run
+        () => ({
+          ...approval,
+          workspaceId: ctx.workspaceId,
+          conversationId: ctx.conversationId ?? '',
+        }),
+        ctx.emitter,
+        options.readOnly === true,
       );
-      // Pages the long outputs of execute_remote_command and run_tool_connector
-      tools.read_tool_output = readToolOutputTool(deps, conversation);
-      const runTool = runConnectorTool(deps, workspaceId, conversation);
-      if (runTool) {
-        tools.run_tool_connector = runTool;
-      }
     }
-
-    if (!approval) return tools;
-    return Object.fromEntries(
-      Object.entries(tools).map(([name, toolDef]) => [
-        name,
-        SELF_GATED_TOOLS.has(name)
-          ? toolDef
-          : this.withApproval(
-              name,
-              toolDef,
-              // Read at call time: approving a plan switches the mode mid-run
-              () => ({
-                ...approval,
-                workspaceId,
-                conversationId: conversation,
-              }),
-              emitter,
-              READ_ONLY_TOOLS.has(name),
-            ),
-      ]),
-    ) as Record<string, ToolType>;
+    if (options.permissions !== 'ungated') {
+      gated = this.withPermission(
+        options.permissions,
+        gated,
+        ctx.workspaceId,
+        ctx.userId ?? '',
+      );
+    }
+    return gated;
   }
 
   /** Applies the same approval gate to dynamically discovered MCP tools. */
   wrapExternalToolsWithApproval(
-    tools: Record<string, ToolType>,
+    tools: Record<string, Tool>,
     workspaceId: string,
     conversationId: string,
     approval: ApprovalSettings,
     emitter?: EventEmitter,
-  ): Record<string, ToolType> {
+  ): Record<string, Tool> {
     return Object.fromEntries(
       Object.entries(tools).map(([name, toolDef]) => [
         name,
@@ -481,11 +290,11 @@ export class AgentTool {
           toolDef,
           () => ({ ...approval, workspaceId, conversationId }),
           emitter,
-          isReadOnlyMcpTool((toolDef as GateableTool).metadata),
+          isReadOnlyMcpTool(gateable(toolDef).metadata),
           true,
         ),
       ]),
-    ) as Record<string, ToolType>;
+    );
   }
 
   /**
@@ -493,13 +302,13 @@ export class AgentTool {
    * subagent tools), so Agent mode still blocks them until a plan is approved.
    */
   gateTools(
-    tools: Record<string, ToolType>,
+    tools: Record<string, Tool>,
     workspaceId: string,
     conversationId: string,
     approval: ApprovalSettings,
     emitter: EventEmitter | undefined,
     readOnly: boolean,
-  ): Record<string, ToolType> {
+  ): Record<string, Tool> {
     return Object.fromEntries(
       Object.entries(tools).map(([name, toolDef]) => [
         name,
@@ -511,52 +320,41 @@ export class AgentTool {
           readOnly,
         ),
       ]),
-    ) as Record<string, ToolType>;
+    );
   }
 
   /**
-   * Wraps each tool so a call runs only when `userId` holds the tool's
-   * TOOL_PERMISSIONS keys, read at call time (a revoked key stops the next
-   * call), with the API guard's rule. Runs before the guard and the approval
-   * prompt, so nobody is asked to approve what the member may not do.
+   * Wraps a tool so a call runs only when `userId` holds the `required`
+   * keys, read at call time (a revoked key stops the next call), with the
+   * API guard's rule.
    */
-  private withPermissions(
-    tools: Record<string, ToolType>,
+  private withPermission(
+    required: readonly string[],
+    toolDef: Tool,
     workspaceId: string,
     userId: string,
-  ): Record<string, ToolType> {
-    return Object.fromEntries(
-      Object.entries(tools).map(([name, toolDef]) => {
-        const { execute: original } = toolDef as GateableTool;
-        return [
-          name,
-          {
-            ...(toolDef as GateableTool),
-            execute: async (params: unknown, options: ToolCallOptions) => {
-              const refused = await this.permissionRefusal(
-                name,
-                workspaceId,
-                userId,
-              );
-              if (refused) return { error: refused };
-              return original(params, options);
-            },
-          },
-        ];
-      }),
-    ) as Record<string, ToolType>;
+  ): Tool {
+    const { execute: original } = gateable(toolDef);
+    return {
+      ...gateable(toolDef),
+      execute: async (params: unknown, options: ToolCallOptions) => {
+        const refused = await this.permissionRefusal(
+          required,
+          workspaceId,
+          userId,
+        );
+        if (refused) return { error: refused };
+        return original(params, options);
+      },
+    } satisfies GateableTool as unknown as Tool;
   }
 
-  /** Why `userId` may not run tool `name` here, or null when they may. */
+  /** Why `userId` may not run a tool needing `required` here, or null when they may. */
   private async permissionRefusal(
-    name: string,
+    required: readonly string[],
     workspaceId: string,
     userId: string,
   ): Promise<string | null> {
-    const required = TOOL_PERMISSIONS[name];
-    if (!required) {
-      return `Not executed: "${name}" has no workspace permission mapping.`;
-    }
     let permissionKeys: string[];
     try {
       ({ permissionKeys } =
@@ -565,7 +363,7 @@ export class AgentTool {
           userId,
         ));
     } catch (error) {
-      if (error instanceof NotFoundException) {
+      if (isNotFound(error)) {
         return 'Not executed: the user is not a member of this workspace.';
       }
       throw error;
@@ -579,23 +377,23 @@ export class AgentTool {
   /**
    * Wraps a tool so each call goes through the guard (workspace rules, scope;
    * the built-in deny list for `external` MCP tools) and then the approval
-   * flow, in any agent mode. (SELF_GATED_TOOLS gate themselves.)
+   * flow, in any agent mode. (Self-gated functions gate themselves.)
    */
   private withApproval(
     name: string,
-    toolDef: ToolType,
+    toolDef: Tool,
     ctx: () => ApprovalContext,
     emitter?: EventEmitter,
     readOnly = false,
     external = false,
-  ): ToolType {
+  ): Tool {
     const {
       execute: original,
       description,
       metadata,
-    } = toolDef as GateableTool;
+    } = gateable(toolDef);
     return {
-      ...(toolDef as GateableTool),
+      ...gateable(toolDef),
       execute: async (params: unknown, options: ToolCallOptions) => {
         const context = ctx();
         const verdict = await this.guard.evaluate({
@@ -633,6 +431,6 @@ export class AgentTool {
         }
         return original(params, options);
       },
-    };
+    } satisfies GateableTool as unknown as Tool;
   }
 }

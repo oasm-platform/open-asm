@@ -1,11 +1,8 @@
-import {
-  IssueLinkResourceType,
-  IssueRuleGroupBy,
-  IssueType,
-  Severity,
-} from '@/common/enums/enum';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { IssueLinkResourceType, IssueType, Severity } from '@/common/enums/enum';
+import { IssueRuleGroupBy } from '@/modules/issues/enums/issue.enums';
+
 import { DEFAULT_ISSUE_RULE, IssueRulesService } from './issue-rules.service';
+import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 const WS = 'ws-1';
 
@@ -72,17 +69,16 @@ describe('IssueRulesService', () => {
     dataSource.query.mockResolvedValue([]);
     await expect(
       service.create({ ...input, defaultAssigneeId: 'stranger' }, WS, 'u-1'),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    ).rejects.toBeInstanceOf(InvalidInputError);
     expect(rulesRepo.save).toHaveBeenCalledTimes(1);
   });
 
   it('updates and deletes only rules of the workspace', async () => {
     const { service, rulesRepo } = setup();
     rulesRepo.findOne.mockResolvedValue(null);
-    await expect(service.update('r-x', { enabled: false }, WS)).rejects.toBeInstanceOf(
-      NotFoundException,
+    await expect(service.update('r-x', { enabled: false }, WS)).rejects.toBeInstanceOf(NotFoundError,
     );
-    await expect(service.delete('r-x', WS)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.delete('r-x', WS)).rejects.toBeInstanceOf(NotFoundError);
     expect(rulesRepo.findOne).toHaveBeenCalledWith({
       where: { id: 'r-x', workspaceId: WS },
     });

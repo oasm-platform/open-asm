@@ -23,9 +23,10 @@ export function AppCard({ appSchema, onClick, formatCategory }: AppCardProps) {
       type="button"
       disabled={!available}
       onClick={onClick}
-      className={`flex flex-col items-start gap-2 rounded-lg border p-5 text-left transition-colors ${
+      // Dark mode: the card fill, as outlines are off there (index.css)
+      className={`flex flex-col items-start gap-2 rounded-lg border p-5 text-left transition-colors dark:bg-card-surface ${
         available
-          ? 'hover:bg-accent/70 cursor-pointer'
+          ? 'hover:bg-accent/70 dark:hover:bg-accent/70 cursor-pointer'
           : 'opacity-50 cursor-not-allowed'
       }`}
     >

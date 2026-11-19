@@ -3,11 +3,12 @@ import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { Role } from '@/common/enums/enum';
 import { User } from '@/modules/auth/entities/user.entity';
 import { UserPresenceService } from '@/modules/auth/user-presence.service';
-import { getManyResponse } from '@/utils/getManyResponse';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AdminUserDto, GetManyAdminUsersDto } from './dto/admin-users.dto';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 // Injection-safe sort column lookup: sortBy becomes a bare identifier.
 const SORT_COLUMNS: Record<string, string> = {
@@ -101,7 +102,7 @@ export class AdminUsersService {
   public async getUser(id: string): Promise<AdminUserDto> {
     const user = await this.usersRepository.findOneBy({ id });
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundError('User not found');
     }
     const lastActive = await this.presence.lastActiveAt([id]);
     return toAdminUserDto(user, lastActive.get(id) ?? null);

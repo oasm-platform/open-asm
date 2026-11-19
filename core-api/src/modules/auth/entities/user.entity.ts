@@ -1,13 +1,6 @@
 import { BaseEntity } from '@/common/entities/base.entity';
 import { Role } from '@/common/enums/enum';
-import { InternalNetwork } from '@/modules/internal-networks/entities/internal-network.entity';
-import { TelegramConnect } from '@/modules/integrations/entities/telegram-connect.entity';
-import { ToolProvider } from '@/modules/providers/entities/provider.entity';
-import { SearchHistory } from '@/modules/search/entities/search-history.entity';
-import { VulnerabilityDismissal } from '@/modules/vulnerabilities/entities/vulnerability-dismissal.entity';
-import { Workflow } from '@/modules/workflows/entities/workflow.entity';
 import { WorkspaceMembers } from '@/modules/workspaces/entities/workspace-members.entity';
-import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { Column, Entity, OneToMany, Relation } from 'typeorm';
 import { Account } from './account.entity';
@@ -47,9 +40,6 @@ export class User extends BaseEntity {
   )
   workspaceMembers: Relation<WorkspaceMembers[]>;
 
-  @OneToMany(() => Workspace, (workspace) => workspace.owner)
-  workspaces: Relation<Workspace[]>;
-
   @Column('date', { nullable: true })
   banExpires: Date;
 
@@ -58,31 +48,4 @@ export class User extends BaseEntity {
 
   @Column('text', { nullable: true })
   banReason?: string;
-
-  @OneToMany(() => SearchHistory, (searchHistory) => searchHistory.user)
-  searchHistory: Relation<SearchHistory[]>;
-
-  @OneToMany(() => ToolProvider, (toolProvider) => toolProvider.owner)
-  toolProviders: Relation<ToolProvider[]>;
-
-  @OneToMany(() => Workflow, (workflow) => workflow.createdBy)
-  createdWorkflows: Relation<Workflow[]>;
-
-  @OneToMany(
-    () => InternalNetwork,
-    (internalNetwork) => internalNetwork.creator,
-  )
-  createdInternalNetworks: Relation<InternalNetwork[]>;
-
-  @OneToMany(
-    () => VulnerabilityDismissal,
-    (vulnerabilityDismissal) => vulnerabilityDismissal.user,
-  )
-  vulnerabilityDismissals: Relation<VulnerabilityDismissal[]>;
-
-  @OneToMany(
-    () => TelegramConnect,
-    (telegramConnect) => telegramConnect.user,
-  )
-  telegramConnects: Relation<TelegramConnect[]>;
 }

@@ -11,6 +11,7 @@ import { ArtifactShare } from './entities/artifact-share.entity';
 import { Artifact } from './entities/artifact.entity';
 import { WorkspaceStorageUsage } from './entities/workspace-storage-usage.entity';
 import { PublicArtifactsController } from './public-artifacts.controller';
+import { StorageModule } from '../storage/storage.module';
 
 /** Workspace files ("artifacts"): uploads, sharing and the storage quota. */
 @Module({
@@ -21,6 +22,7 @@ import { PublicArtifactsController } from './public-artifacts.controller';
       ArtifactFolder,
       WorkspaceStorageUsage,
     ]),
+    StorageModule,
   ],
   controllers: [
     ArtifactsController,

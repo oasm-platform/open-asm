@@ -1,10 +1,11 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException } from '@nestjs/common';
 import {
   ARTIFACT_MAX_FILE_BYTES,
   ARTIFACT_WORKSPACE_QUOTA_BYTES,
 } from '@/common/constants/app.constants';
 import type { DataSource, EntityManager } from 'typeorm';
 import { ArtifactQuotaService, STORAGE_QUOTA_EXCEEDED } from './artifact-quota.service';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 /** A chainable query-builder stub whose `execute` resolves to `result`. */
 const queryBuilder = (result: unknown) => {
@@ -109,7 +110,7 @@ describe('ArtifactQuotaService', () => {
     };
     await expect(
       build(dataSource as unknown as DataSource).setQuota('ws-1', 10),
-    ).rejects.toThrow(NotFoundException);
+    ).rejects.toThrow(NotFoundError);
   });
 
   it('setQuota upserts the override', async () => {

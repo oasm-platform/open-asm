@@ -1,8 +1,8 @@
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import type { User } from '@/modules/auth/entities/user.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
-import { getManyResponse } from '@/utils/getManyResponse';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { getManyResponse } from '@/common/utils/get-many-response.util';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -11,6 +11,7 @@ import {
   GetManyAdminWorkspacesDto,
   UpdateAdminWorkspaceDto,
 } from './dto/admin-workspaces.dto';
+import { NotFoundError } from '@/common/errors/domain.errors';
 
 // Injection-safe sort column lookup: sortBy becomes a bare identifier.
 const SORT_COLUMNS: Record<string, string> = {
@@ -120,7 +121,7 @@ export class AdminWorkspacesService {
       relations: { owner: true },
     });
     if (!workspace) {
-      throw new NotFoundException('Workspace not found');
+      throw new NotFoundError('Workspace not found');
     }
 
     const counts = await this.getCounts([workspace.id]);
@@ -177,7 +178,7 @@ export class AdminWorkspacesService {
   private async findWorkspaceOrFail(id: string): Promise<Workspace> {
     const workspace = await this.workspacesRepository.findOneBy({ id });
     if (!workspace) {
-      throw new NotFoundException('Workspace not found');
+      throw new NotFoundError('Workspace not found');
     }
     return workspace;
   }

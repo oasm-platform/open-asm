@@ -143,26 +143,49 @@ describe('parseStorageConfig', () => {
   });
 
   describe('corsAllowedOrigins', () => {
-    it('uses the canonical list exactly', () => {
+    it('uses the trusted origins: TRUSTED_ORIGINS and the BASE_URL origin', () => {
       const config = parseStorageConfig(
         configFrom({
-          CORS_ALLOWED_ORIGINS: 'http://a, , http://b',
+          TRUSTED_ORIGINS: 'http://100.64.0.1:5173, , https://ops.example.com',
+          BASE_URL: 'https://app.example.com/console/',
         }),
       );
 
-      expect(config.corsAllowedOrigins).toEqual(['http://a', 'http://b']);
+      expect(config.corsAllowedOrigins).toEqual([
+        'http://100.64.0.1:5173',
+        'https://ops.example.com',
+        'https://app.example.com',
+      ]);
       expect(warnSpy).not.toHaveBeenCalled();
     });
 
-    it('ignores the never-released S3_CORS_ALLOWED_ORIGINS name', () => {
+    it('adds the local dev servers in development', () => {
       expect(
-        parseStorageConfig(
-          configFrom({ S3_CORS_ALLOWED_ORIGINS: 'http://legacy.example.com' }),
-        ).corsAllowedOrigins,
-      ).toEqual([]);
+        parseStorageConfig(configFrom({ NODE_ENV: 'development' }))
+          .corsAllowedOrigins,
+      ).toEqual(['http://localhost:5173', 'http://localhost:3000']);
     });
 
-    it('defaults to an empty array when unset', () => {
+    it('no longer reads CORS_ALLOWED_ORIGINS, and warns that it is ignored', () => {
+      const config = parseStorageConfig(
+        configFrom({ CORS_ALLOWED_ORIGINS: 'http://legacy.example.com' }),
+      );
+
+      expect(config.corsAllowedOrigins).toEqual([]);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('TRUSTED_ORIGINS'),
+      );
+    });
+
+    it('falls back to no origins and warns on an invalid TRUSTED_ORIGINS', () => {
+      expect(
+        parseStorageConfig(configFrom({ TRUSTED_ORIGINS: '*' }))
+          .corsAllowedOrigins,
+      ).toEqual([]);
+      expect(warnSpy).toHaveBeenCalled();
+    });
+
+    it('defaults to an empty array when nothing is trusted', () => {
       expect(
         parseStorageConfig(configFrom({})).corsAllowedOrigins,
       ).toEqual([]);

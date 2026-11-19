@@ -3105,185 +3105,6 @@ export type DeleteResponseDto = {
   success: boolean;
 };
 
-export type StatisticResponseDto = {
-  /** Number of assets */
-  assets: number;
-  /** Number of targets */
-  targets: number;
-  /** Number of vulnerabilities */
-  vuls: number;
-  /** Number of critical vulnerabilities */
-  criticalVuls: number;
-  /** Number of high severity vulnerabilities */
-  highVuls: number;
-  /** Number of medium severity vulnerabilities */
-  mediumVuls: number;
-  /** Number of low severity vulnerabilities */
-  lowVuls: number;
-  /** Number of info severity vulnerabilities */
-  infoVuls: number;
-  /** Number of technologies detected */
-  techs: number;
-  /** Number of ports */
-  ports: number;
-  /** Security score */
-  score: number;
-  /** Number of services */
-  services: number;
-};
-
-export type Statistic = {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  /** Number of assets */
-  assets: number;
-  /** Number of targets */
-  targets: number;
-  /** Number of vulnerabilities */
-  vuls: number;
-  /** Number of critical vulnerabilities */
-  criticalVuls: number;
-  /** Number of high severity vulnerabilities */
-  highVuls: number;
-  /** Number of medium severity vulnerabilities */
-  mediumVuls: number;
-  /** Number of low severity vulnerabilities */
-  lowVuls: number;
-  /** Number of info severity vulnerabilities */
-  infoVuls: number;
-  /** Number of technologies detected */
-  techs: number;
-  /** Number of ports */
-  ports: number;
-  /** Number of services */
-  services: number;
-  /** Security score */
-  score: number;
-};
-
-export type TimelineResponseDto = {
-  /** List of statistics over time */
-  data: Statistic[];
-  /** Total count of timeline records */
-  total: number;
-};
-
-export type IssuesTimelineItem = {
-  /** Number of vulnerabilities */
-  vuls: number;
-  /** Creation timestamp */
-  createdAt: string;
-};
-
-export type IssuesTimelineResponseDto = {
-  /** List of issues over time */
-  data: IssuesTimelineItem[];
-  /** Total count of issues timeline records */
-  total: number;
-};
-
-export type TopTagAsset = {
-  /** The name of the tag */
-  tag: string;
-  /** The number of assets associated with the tag */
-  count: number;
-};
-
-export type AssetLocationDto = {
-  /** ISO 3166-1 alpha-2 country code */
-  countryCode: string;
-  /** Full country name */
-  country: string;
-  /** Number of IP addresses in this country */
-  count: number;
-};
-
-export type TlsStatisticResponseDto = {
-  alreadyExpired: number;
-  expireInAMonth: number;
-  expireIn3Months: number;
-  wontExpireAnytimeSoon: number;
-  newCertificatesDiscovered: number;
-};
-
-export type WorkspaceInsightKind =
-  (typeof WorkspaceInsightKind)[keyof typeof WorkspaceInsightKind];
-
-export const WorkspaceInsightKind = {
-  critical_open: 'critical_open',
-  sla_overdue: 'sla_overdue',
-  failed_runs: 'failed_runs',
-  tls_expiring: 'tls_expiring',
-  stale_targets: 'stale_targets',
-  pending_review: 'pending_review',
-  unscheduled_targets: 'unscheduled_targets',
-} as const;
-
-export type WorkspaceInsightDto = {
-  kind: WorkspaceInsightKind;
-  level: InsightLevel;
-  count: number;
-  /** Window of the count, in days */
-  days?: number;
-};
-
-export type WorkspaceAttentionResponseDto = {
-  /** Worst first; empty when all is well */
-  insights: WorkspaceInsightDto[];
-};
-
-export type TopAssetVulnerabilities = {
-  /** The number of critical vulnerabilities */
-  critical: number;
-  /** The number of high severity vulnerabilities */
-  high: number;
-  /** The number of medium severity vulnerabilities */
-  medium: number;
-  /** The number of low severity vulnerabilities */
-  low: number;
-  /** The number of info severity vulnerabilities */
-  info: number;
-  /** The total number of vulnerabilities */
-  total: number;
-  /** The ID of the asset */
-  id: string;
-  /** The value of the asset */
-  value: string;
-};
-
-export type PortCountDto = {
-  /** The port number */
-  port: number;
-  /** Number of services exposing this port */
-  count: number;
-  /** Whether the port is IANA-assigned (well-known or registered, < 49152) */
-  isStandard: boolean;
-};
-
-export type TopPortsResponseDto = {
-  /** Total distinct ports exposed by the workspace */
-  totalPorts: number;
-  /** Distinct non-standard (IANA dynamic/private, >= 49152) ports exposed */
-  nonstandardPorts: number;
-  /** Top 10 ports by number of exposed services */
-  ports: PortCountDto[];
-};
-
-export type TechnologyCountDto = {
-  /** Technology name */
-  name: string;
-  /** Number of services running this technology */
-  count: number;
-  /** Icon URL for the technology, when available */
-  iconUrl?: string;
-};
-
-export type TopTechnologiesResponseDto = {
-  /** Top 10 technologies by number of services */
-  technologies: TechnologyCountDto[];
-};
-
 export type ScanDto = {
   /** IDs of the targets to scan */
   targetIds: string[];
@@ -5953,6 +5774,152 @@ export type UpdateToolRuleDto = {
   description?: UpdateToolRuleDtoDescription;
 };
 
+export type SchemaFieldDto = {
+  name: string;
+  type: string;
+  description: string;
+  ops: string[];
+  enumValues?: string[];
+  sortable?: string;
+  groupable?: boolean;
+  heavy?: boolean;
+};
+
+export type SchemaRelationDto = {
+  name: string;
+  resource: string;
+  description: string;
+};
+
+export type SchemaResourceDto = {
+  name: string;
+  description: string;
+  root: boolean;
+  fields: SchemaFieldDto[];
+  one: SchemaRelationDto[];
+  many: SchemaRelationDto[];
+  defaultSelect: string[];
+  defaultTimeField?: string;
+};
+
+export type SchemaResponseDto = {
+  resources: SchemaResourceDto[];
+};
+
+export type QueryResultMetaDtoQueries = { [key: string]: unknown };
+
+export type QueryResultMetaDto = {
+  now: string;
+  tookMs: number;
+  queries: QueryResultMetaDtoQueries;
+};
+
+/**
+ * { <name>: { rows, nextCursor?, total?, totalCapped?, truncated } | { error: { code, message } } }
+ */
+export type QueryBatchResultDtoData = { [key: string]: unknown };
+
+export type QueryBatchResultDto = {
+  /** { <name>: { rows, nextCursor?, total?, totalCapped?, truncated } | { error: { code, message } } } */
+  data: QueryBatchResultDtoData;
+  meta: QueryResultMetaDto;
+};
+
+/**
+ * Named queries: { <name>: { from, select?, include?, where?, window?, windowField?, groupBy?, aggregate?, orderBy?, limit?, cursor?, withTotal? } }. See GET attack-surface/schema.
+ */
+export type QueryBatchDtoQueries = { [key: string]: unknown };
+
+/**
+ * Default time window of every query: { since: "now-5d", until?: "now" }
+ */
+export type QueryBatchDtoWindow = { [key: string]: unknown };
+
+/**
+ * { consistent?: boolean, timezone?: "UTC", mode?: "interactive" | "report" }
+ */
+export type QueryBatchDtoOptions = { [key: string]: unknown };
+
+export type QueryBatchDto = {
+  /** Named queries: { <name>: { from, select?, include?, where?, window?, windowField?, groupBy?, aggregate?, orderBy?, limit?, cursor?, withTotal? } }. See GET attack-surface/schema. */
+  queries: QueryBatchDtoQueries;
+  /** Default time window of every query: { since: "now-5d", until?: "now" } */
+  window?: QueryBatchDtoWindow;
+  /** { consistent?: boolean, timezone?: "UTC", mode?: "interactive" | "report" } */
+  options?: QueryBatchDtoOptions;
+};
+
+/**
+ * { <name>: { cost, budget, hints, resources, planner: { totalCost, sortRows }, sqlTemplate? } }
+ */
+export type ExplainResultDtoQueries = { [key: string]: unknown };
+
+export type ExplainResultDto = {
+  /** { <name>: { cost, budget, hints, resources, planner: { totalCost, sortRows }, sqlTemplate? } } */
+  queries: ExplainResultDtoQueries;
+};
+
+export type ReportJobDtoStatus =
+  (typeof ReportJobDtoStatus)[keyof typeof ReportJobDtoStatus];
+
+export const ReportJobDtoStatus = {
+  queued: 'queued',
+  running: 'running',
+  completed: 'completed',
+  failed: 'failed',
+} as const;
+
+export type ReportJobDtoError = { [key: string]: unknown };
+
+export type ReportJobDto = {
+  jobId: string;
+  status: ReportJobDtoStatus;
+  result?: QueryBatchResultDto;
+  error?: ReportJobDtoError;
+};
+
+export type SavedQueryDtoSpec = { [key: string]: unknown };
+
+export type SavedQueryDto = {
+  id: string;
+  name: string;
+  /** @nullable */
+  description?: string | null;
+  spec: SavedQueryDtoSpec;
+  /** @nullable */
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/**
+ * A query batch, same shape as the body of POST attack-surface/query
+ */
+export type CreateSavedQueryDtoSpec = { [key: string]: unknown };
+
+export type CreateSavedQueryDto = {
+  /** @maxLength 120 */
+  name: string;
+  /** @maxLength 2000 */
+  description?: string;
+  /** A query batch, same shape as the body of POST attack-surface/query */
+  spec: CreateSavedQueryDtoSpec;
+};
+
+/**
+ * A query batch, same shape as the body of POST attack-surface/query
+ */
+export type UpdateSavedQueryDtoSpec = { [key: string]: unknown };
+
+export type UpdateSavedQueryDto = {
+  /** @maxLength 120 */
+  name?: string;
+  /** @maxLength 2000 */
+  description?: string;
+  /** A query batch, same shape as the body of POST attack-surface/query */
+  spec?: UpdateSavedQueryDtoSpec;
+};
+
 export type NotificationResponseDtoStatus =
   (typeof NotificationResponseDtoStatus)[keyof typeof NotificationResponseDtoStatus];
 
@@ -5977,6 +5944,185 @@ export type NotificationListResponseDto = {
   data: NotificationResponseDto[];
   /** @nullable */
   nextCursor?: string | null;
+};
+
+export type StatisticResponseDto = {
+  /** Number of assets */
+  assets: number;
+  /** Number of targets */
+  targets: number;
+  /** Number of vulnerabilities */
+  vuls: number;
+  /** Number of critical vulnerabilities */
+  criticalVuls: number;
+  /** Number of high severity vulnerabilities */
+  highVuls: number;
+  /** Number of medium severity vulnerabilities */
+  mediumVuls: number;
+  /** Number of low severity vulnerabilities */
+  lowVuls: number;
+  /** Number of info severity vulnerabilities */
+  infoVuls: number;
+  /** Number of technologies detected */
+  techs: number;
+  /** Number of ports */
+  ports: number;
+  /** Security score */
+  score: number;
+  /** Number of services */
+  services: number;
+};
+
+export type Statistic = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  /** Number of assets */
+  assets: number;
+  /** Number of targets */
+  targets: number;
+  /** Number of vulnerabilities */
+  vuls: number;
+  /** Number of critical vulnerabilities */
+  criticalVuls: number;
+  /** Number of high severity vulnerabilities */
+  highVuls: number;
+  /** Number of medium severity vulnerabilities */
+  mediumVuls: number;
+  /** Number of low severity vulnerabilities */
+  lowVuls: number;
+  /** Number of info severity vulnerabilities */
+  infoVuls: number;
+  /** Number of technologies detected */
+  techs: number;
+  /** Number of ports */
+  ports: number;
+  /** Number of services */
+  services: number;
+  /** Security score */
+  score: number;
+};
+
+export type TimelineResponseDto = {
+  /** List of statistics over time */
+  data: Statistic[];
+  /** Total count of timeline records */
+  total: number;
+};
+
+export type IssuesTimelineItem = {
+  /** Number of vulnerabilities */
+  vuls: number;
+  /** Creation timestamp */
+  createdAt: string;
+};
+
+export type IssuesTimelineResponseDto = {
+  /** List of issues over time */
+  data: IssuesTimelineItem[];
+  /** Total count of issues timeline records */
+  total: number;
+};
+
+export type TopTagAsset = {
+  /** The name of the tag */
+  tag: string;
+  /** The number of assets associated with the tag */
+  count: number;
+};
+
+export type AssetLocationDto = {
+  /** ISO 3166-1 alpha-2 country code */
+  countryCode: string;
+  /** Full country name */
+  country: string;
+  /** Number of IP addresses in this country */
+  count: number;
+};
+
+export type TlsStatisticResponseDto = {
+  alreadyExpired: number;
+  expireInAMonth: number;
+  expireIn3Months: number;
+  wontExpireAnytimeSoon: number;
+  newCertificatesDiscovered: number;
+};
+
+export type WorkspaceInsightKind =
+  (typeof WorkspaceInsightKind)[keyof typeof WorkspaceInsightKind];
+
+export const WorkspaceInsightKind = {
+  critical_open: 'critical_open',
+  sla_overdue: 'sla_overdue',
+  failed_runs: 'failed_runs',
+  tls_expiring: 'tls_expiring',
+  stale_targets: 'stale_targets',
+  pending_review: 'pending_review',
+  unscheduled_targets: 'unscheduled_targets',
+} as const;
+
+export type WorkspaceInsightDto = {
+  kind: WorkspaceInsightKind;
+  level: InsightLevel;
+  count: number;
+  /** Window of the count, in days */
+  days?: number;
+};
+
+export type WorkspaceAttentionResponseDto = {
+  /** Worst first; empty when all is well */
+  insights: WorkspaceInsightDto[];
+};
+
+export type TopAssetVulnerabilities = {
+  /** The number of critical vulnerabilities */
+  critical: number;
+  /** The number of high severity vulnerabilities */
+  high: number;
+  /** The number of medium severity vulnerabilities */
+  medium: number;
+  /** The number of low severity vulnerabilities */
+  low: number;
+  /** The number of info severity vulnerabilities */
+  info: number;
+  /** The total number of vulnerabilities */
+  total: number;
+  /** The ID of the asset */
+  id: string;
+  /** The value of the asset */
+  value: string;
+};
+
+export type PortCountDto = {
+  /** The port number */
+  port: number;
+  /** Number of services exposing this port */
+  count: number;
+  /** Whether the port is IANA-assigned (well-known or registered, < 49152) */
+  isStandard: boolean;
+};
+
+export type TopPortsResponseDto = {
+  /** Total distinct ports exposed by the workspace */
+  totalPorts: number;
+  /** Distinct non-standard (IANA dynamic/private, >= 49152) ports exposed */
+  nonstandardPorts: number;
+  /** Top 10 ports by number of exposed services */
+  ports: PortCountDto[];
+};
+
+export type TechnologyCountDto = {
+  /** Technology name */
+  name: string;
+  /** Number of services running this technology */
+  count: number;
+  /** Icon URL for the technology, when available */
+  iconUrl?: string;
+};
+
+export type TopTechnologiesResponseDto = {
+  /** Top 10 technologies by number of services */
+  technologies: TechnologyCountDto[];
 };
 
 export type ProjectTriggerType =
@@ -7660,6 +7806,11 @@ export type GenerateVulReportBodyDto = {
   vulnIds?: string[];
   /** Minimum severity level (CRITICAL, HIGH, MEDIUM, LOW, INFO) */
   minSeverity?: GenerateVulReportBodyDtoMinSeverity;
+};
+
+export type GenerateQueryReportBodyDto = {
+  /** Saved attack surface query to render */
+  savedQueryId: string;
 };
 
 export type Session = {
@@ -34920,1628 +35071,6 @@ export const useSearchControllerDeleteSearchHistory = <
 };
 
 /**
- * Retrieves statistics for a workspace including total targets, assets, vulnerabilities, and unique technologies.
- * @summary Get workspace statistics
- */
-export const statisticControllerGetStatistics = (
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<StatisticResponseDto>(
-    { url: `/api/statistic`, method: 'GET', signal },
-    options,
-  );
-};
-
-export const getStatisticControllerGetStatisticsQueryKey = () => {
-  return [`/api/statistic`] as const;
-};
-
-export const getStatisticControllerGetStatisticsQueryOptions = <
-  TData = Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getStatisticControllerGetStatisticsQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof statisticControllerGetStatistics>>
-  > = ({ signal }) => statisticControllerGetStatistics(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type StatisticControllerGetStatisticsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof statisticControllerGetStatistics>>
->;
-export type StatisticControllerGetStatisticsQueryError = unknown;
-
-export function useStatisticControllerGetStatistics<
-  TData = Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-          TError,
-          Awaited<ReturnType<typeof statisticControllerGetStatistics>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStatisticControllerGetStatistics<
-  TData = Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-          TError,
-          Awaited<ReturnType<typeof statisticControllerGetStatistics>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStatisticControllerGetStatistics<
-  TData = Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get workspace statistics
- */
-
-export function useStatisticControllerGetStatistics<
-  TData = Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getStatisticControllerGetStatisticsQueryOptions(options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-/**
- * Retrieves statistics for a workspace over the last 3 months, showing trends and changes over time.
- * @summary Get timeline statistics for a workspace
- */
-export const statisticControllerGetTimelineStatistics = (
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<TimelineResponseDto>(
-    { url: `/api/statistic/timeline`, method: 'GET', signal },
-    options,
-  );
-};
-
-export const getStatisticControllerGetTimelineStatisticsQueryKey = () => {
-  return [`/api/statistic/timeline`] as const;
-};
-
-export const getStatisticControllerGetTimelineStatisticsQueryOptions = <
-  TData = Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getStatisticControllerGetTimelineStatisticsQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>
-  > = ({ signal }) =>
-    statisticControllerGetTimelineStatistics(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type StatisticControllerGetTimelineStatisticsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>
->;
-export type StatisticControllerGetTimelineStatisticsQueryError = unknown;
-
-export function useStatisticControllerGetTimelineStatistics<
-  TData = Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
-          TError,
-          Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStatisticControllerGetTimelineStatistics<
-  TData = Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
-          TError,
-          Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStatisticControllerGetTimelineStatistics<
-  TData = Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get timeline statistics for a workspace
- */
-
-export function useStatisticControllerGetTimelineStatistics<
-  TData = Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getStatisticControllerGetTimelineStatisticsQueryOptions(options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-/**
- * Retrieves issues timeline statistics for a workspace, showing the number of vulnerabilities over time.
- * @summary Get issues timeline statistics for a workspace
- */
-export const statisticControllerGetIssuesTimeline = (
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<IssuesTimelineResponseDto>(
-    { url: `/api/statistic/issues-timeline`, method: 'GET', signal },
-    options,
-  );
-};
-
-export const getStatisticControllerGetIssuesTimelineQueryKey = () => {
-  return [`/api/statistic/issues-timeline`] as const;
-};
-
-export const getStatisticControllerGetIssuesTimelineQueryOptions = <
-  TData = Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getStatisticControllerGetIssuesTimelineQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>
-  > = ({ signal }) =>
-    statisticControllerGetIssuesTimeline(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type StatisticControllerGetIssuesTimelineQueryResult = NonNullable<
-  Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>
->;
-export type StatisticControllerGetIssuesTimelineQueryError = unknown;
-
-export function useStatisticControllerGetIssuesTimeline<
-  TData = Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
-          TError,
-          Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStatisticControllerGetIssuesTimeline<
-  TData = Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
-          TError,
-          Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStatisticControllerGetIssuesTimeline<
-  TData = Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get issues timeline statistics for a workspace
- */
-
-export function useStatisticControllerGetIssuesTimeline<
-  TData = Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getStatisticControllerGetIssuesTimelineQueryOptions(options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-/**
- * Retrieves the top 10 tags with the most assets in a workspace.
- * @summary Get top 10 tags with the most assets in a workspace
- */
-export const statisticControllerGetTopTagsAssets = (
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<TopTagAsset[]>(
-    { url: `/api/statistic/top-tags-assets`, method: 'GET', signal },
-    options,
-  );
-};
-
-export const getStatisticControllerGetTopTagsAssetsQueryKey = () => {
-  return [`/api/statistic/top-tags-assets`] as const;
-};
-
-export const getStatisticControllerGetTopTagsAssetsQueryOptions = <
-  TData = Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getStatisticControllerGetTopTagsAssetsQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>
-  > = ({ signal }) =>
-    statisticControllerGetTopTagsAssets(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type StatisticControllerGetTopTagsAssetsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>
->;
-export type StatisticControllerGetTopTagsAssetsQueryError = unknown;
-
-export function useStatisticControllerGetTopTagsAssets<
-  TData = Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
-          TError,
-          Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStatisticControllerGetTopTagsAssets<
-  TData = Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
-          TError,
-          Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStatisticControllerGetTopTagsAssets<
-  TData = Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get top 10 tags with the most assets in a workspace
- */
-
-export function useStatisticControllerGetTopTagsAssets<
-  TData = Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getStatisticControllerGetTopTagsAssetsQueryOptions(options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-/**
- * Retrieves the top 10 countries by IP count for a workspace. Batches IP lookups to the geo IP service and aggregates results by country.
- * @summary Get asset locations
- */
-export const statisticControllerGetAssetLocations = (
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<AssetLocationDto[]>(
-    { url: `/api/statistic/asset-locations`, method: 'GET', signal },
-    options,
-  );
-};
-
-export const getStatisticControllerGetAssetLocationsQueryKey = () => {
-  return [`/api/statistic/asset-locations`] as const;
-};
-
-export const getStatisticControllerGetAssetLocationsQueryOptions = <
-  TData = Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getStatisticControllerGetAssetLocationsQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>
-  > = ({ signal }) =>
-    statisticControllerGetAssetLocations(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type StatisticControllerGetAssetLocationsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>
->;
-export type StatisticControllerGetAssetLocationsQueryError = unknown;
-
-export function useStatisticControllerGetAssetLocations<
-  TData = Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
-          TError,
-          Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStatisticControllerGetAssetLocations<
-  TData = Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
-          TError,
-          Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStatisticControllerGetAssetLocations<
-  TData = Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get asset locations
- */
-
-export function useStatisticControllerGetAssetLocations<
-  TData = Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getStatisticControllerGetAssetLocationsQueryOptions(options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-/**
- * Retrieves TLS certificate statistics grouped by expiration status using not_after field, and counts newly discovered certificates within the last 30 days.
- * @summary Get TLS certificate statistics for a workspace
- */
-export const statisticControllerGetTlsStatistics = (
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<TlsStatisticResponseDto>(
-    { url: `/api/statistic/tls`, method: 'GET', signal },
-    options,
-  );
-};
-
-export const getStatisticControllerGetTlsStatisticsQueryKey = () => {
-  return [`/api/statistic/tls`] as const;
-};
-
-export const getStatisticControllerGetTlsStatisticsQueryOptions = <
-  TData = Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getStatisticControllerGetTlsStatisticsQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>
-  > = ({ signal }) =>
-    statisticControllerGetTlsStatistics(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type StatisticControllerGetTlsStatisticsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>
->;
-export type StatisticControllerGetTlsStatisticsQueryError = unknown;
-
-export function useStatisticControllerGetTlsStatistics<
-  TData = Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
-          TError,
-          Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStatisticControllerGetTlsStatistics<
-  TData = Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
-          TError,
-          Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStatisticControllerGetTlsStatistics<
-  TData = Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get TLS certificate statistics for a workspace
- */
-
-export function useStatisticControllerGetTlsStatistics<
-  TData = Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getStatisticControllerGetTlsStatisticsQueryOptions(options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-/**
- * Open critical and SLA-overdue findings, runs with a failed job in 7 days, TLS certificates expired or expiring within 30 days, targets not discovered for 30 days or without a scan schedule, and AI proposals waiting for review. Worst first; kinds with a zero count are left out.
- * @summary Get what needs attention in a workspace
- */
-export const statisticControllerGetAttention = (
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<WorkspaceAttentionResponseDto>(
-    { url: `/api/statistic/attention`, method: 'GET', signal },
-    options,
-  );
-};
-
-export const getStatisticControllerGetAttentionQueryKey = () => {
-  return [`/api/statistic/attention`] as const;
-};
-
-export const getStatisticControllerGetAttentionQueryOptions = <
-  TData = Awaited<ReturnType<typeof statisticControllerGetAttention>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof statisticControllerGetAttention>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getStatisticControllerGetAttentionQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof statisticControllerGetAttention>>
-  > = ({ signal }) => statisticControllerGetAttention(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof statisticControllerGetAttention>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type StatisticControllerGetAttentionQueryResult = NonNullable<
-  Awaited<ReturnType<typeof statisticControllerGetAttention>>
->;
-export type StatisticControllerGetAttentionQueryError = unknown;
-
-export function useStatisticControllerGetAttention<
-  TData = Awaited<ReturnType<typeof statisticControllerGetAttention>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetAttention>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof statisticControllerGetAttention>>,
-          TError,
-          Awaited<ReturnType<typeof statisticControllerGetAttention>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStatisticControllerGetAttention<
-  TData = Awaited<ReturnType<typeof statisticControllerGetAttention>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetAttention>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof statisticControllerGetAttention>>,
-          TError,
-          Awaited<ReturnType<typeof statisticControllerGetAttention>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStatisticControllerGetAttention<
-  TData = Awaited<ReturnType<typeof statisticControllerGetAttention>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetAttention>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get what needs attention in a workspace
- */
-
-export function useStatisticControllerGetAttention<
-  TData = Awaited<ReturnType<typeof statisticControllerGetAttention>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetAttention>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getStatisticControllerGetAttentionQueryOptions(options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-/**
- * Retrieves the top 10 assets with the most vulnerabilities in a workspace.
- * @summary Get top 10 assets with the most vulnerabilities in a workspace
- */
-export const statisticControllerGetTopAssetsWithMostVulnerabilities = (
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<TopAssetVulnerabilities[]>(
-    { url: `/api/statistic/top-assets-vulnerabilities`, method: 'GET', signal },
-    options,
-  );
-};
-
-export const getStatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryKey =
-  () => {
-    return [`/api/statistic/top-assets-vulnerabilities`] as const;
-  };
-
-export const getStatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryOptions =
-  <
-    TData = Awaited<
-      ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
-    >,
-    TError = unknown,
-  >(options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<
-            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
-          >
-        >,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  }) => {
-    const { query: queryOptions, request: requestOptions } = options ?? {};
-
-    const queryKey =
-      queryOptions?.queryKey ??
-      getStatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryKey();
-
-    const queryFn: QueryFunction<
-      Awaited<
-        ReturnType<
-          typeof statisticControllerGetTopAssetsWithMostVulnerabilities
-        >
-      >
-    > = ({ signal }) =>
-      statisticControllerGetTopAssetsWithMostVulnerabilities(
-        requestOptions,
-        signal,
-      );
-
-    return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-      Awaited<
-        ReturnType<
-          typeof statisticControllerGetTopAssetsWithMostVulnerabilities
-        >
-      >,
-      TError,
-      TData
-    > & { queryKey: DataTag<QueryKey, TData, TError> };
-  };
-
-export type StatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryResult =
-  NonNullable<
-    Awaited<
-      ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
-    >
-  >;
-export type StatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryError =
-  unknown;
-
-export function useStatisticControllerGetTopAssetsWithMostVulnerabilities<
-  TData = Awaited<
-    ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
-  >,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<
-            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
-          >
-        >,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<
-            ReturnType<
-              typeof statisticControllerGetTopAssetsWithMostVulnerabilities
-            >
-          >,
-          TError,
-          Awaited<
-            ReturnType<
-              typeof statisticControllerGetTopAssetsWithMostVulnerabilities
-            >
-          >
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStatisticControllerGetTopAssetsWithMostVulnerabilities<
-  TData = Awaited<
-    ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
-  >,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<
-            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
-          >
-        >,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<
-            ReturnType<
-              typeof statisticControllerGetTopAssetsWithMostVulnerabilities
-            >
-          >,
-          TError,
-          Awaited<
-            ReturnType<
-              typeof statisticControllerGetTopAssetsWithMostVulnerabilities
-            >
-          >
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStatisticControllerGetTopAssetsWithMostVulnerabilities<
-  TData = Awaited<
-    ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
-  >,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<
-            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
-          >
-        >,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get top 10 assets with the most vulnerabilities in a workspace
- */
-
-export function useStatisticControllerGetTopAssetsWithMostVulnerabilities<
-  TData = Awaited<
-    ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
-  >,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<
-            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
-          >
-        >,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getStatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryOptions(
-      options,
-    );
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-/**
- * Retrieves the top 10 ports by number of exposed services, classified as standard (IANA) or non-standard, plus distinct port totals.
- * @summary Get top exposed ports for a workspace
- */
-export const statisticControllerGetTopPorts = (
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<TopPortsResponseDto>(
-    { url: `/api/statistic/top-ports`, method: 'GET', signal },
-    options,
-  );
-};
-
-export const getStatisticControllerGetTopPortsQueryKey = () => {
-  return [`/api/statistic/top-ports`] as const;
-};
-
-export const getStatisticControllerGetTopPortsQueryOptions = <
-  TData = Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getStatisticControllerGetTopPortsQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof statisticControllerGetTopPorts>>
-  > = ({ signal }) => statisticControllerGetTopPorts(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type StatisticControllerGetTopPortsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof statisticControllerGetTopPorts>>
->;
-export type StatisticControllerGetTopPortsQueryError = unknown;
-
-export function useStatisticControllerGetTopPorts<
-  TData = Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
-          TError,
-          Awaited<ReturnType<typeof statisticControllerGetTopPorts>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStatisticControllerGetTopPorts<
-  TData = Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
-          TError,
-          Awaited<ReturnType<typeof statisticControllerGetTopPorts>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStatisticControllerGetTopPorts<
-  TData = Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get top exposed ports for a workspace
- */
-
-export function useStatisticControllerGetTopPorts<
-  TData = Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions = getStatisticControllerGetTopPortsQueryOptions(options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-/**
- * Retrieves the top 10 technologies detected on the latest HTTP response of each service, ranked by number of services.
- * @summary Get top technologies for a workspace
- */
-export const statisticControllerGetTopTechnologies = (
-  options?: SecondParameter<typeof orvalClient>,
-  signal?: AbortSignal,
-) => {
-  return orvalClient<TopTechnologiesResponseDto>(
-    { url: `/api/statistic/top-technologies`, method: 'GET', signal },
-    options,
-  );
-};
-
-export const getStatisticControllerGetTopTechnologiesQueryKey = () => {
-  return [`/api/statistic/top-technologies`] as const;
-};
-
-export const getStatisticControllerGetTopTechnologiesQueryOptions = <
-  TData = Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof orvalClient>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getStatisticControllerGetTopTechnologiesQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>
-  > = ({ signal }) =>
-    statisticControllerGetTopTechnologies(requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type StatisticControllerGetTopTechnologiesQueryResult = NonNullable<
-  Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>
->;
-export type StatisticControllerGetTopTechnologiesQueryError = unknown;
-
-export function useStatisticControllerGetTopTechnologies<
-  TData = Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
-          TError,
-          Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStatisticControllerGetTopTechnologies<
-  TData = Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
-          TError,
-          Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>
-        >,
-        'initialData'
-      >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-export function useStatisticControllerGetTopTechnologies<
-  TData = Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-};
-/**
- * @summary Get top technologies for a workspace
- */
-
-export function useStatisticControllerGetTopTechnologies<
-  TData = Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof orvalClient>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData, TError>;
-} {
-  const queryOptions =
-    getStatisticControllerGetTopTechnologiesQueryOptions(options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-/**
  * Initiates a vulnerability scan for one or more targets. Domain, CIDR and IP targets run the vulnerability_scan_basic workflow (nuclei); Git organization targets run the repository_scan workflow.
  * @summary Scan targets
  */
@@ -46307,6 +44836,1221 @@ export const useAgentsControllerDeleteToolRule = <
 };
 
 /**
+ * Resources, fields, operators and relations the caller may query.
+ * @summary Attack surface query schema
+ */
+export const attackSurfaceQueryControllerSchema = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SchemaResponseDto>(
+    { url: `/api/attack-surface/schema`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAttackSurfaceQueryControllerSchemaQueryKey = () => {
+  return [`/api/attack-surface/schema`] as const;
+};
+
+export const getAttackSurfaceQueryControllerSchemaQueryOptions = <
+  TData = Awaited<ReturnType<typeof attackSurfaceQueryControllerSchema>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof attackSurfaceQueryControllerSchema>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAttackSurfaceQueryControllerSchemaQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof attackSurfaceQueryControllerSchema>>
+  > = ({ signal }) =>
+    attackSurfaceQueryControllerSchema(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof attackSurfaceQueryControllerSchema>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AttackSurfaceQueryControllerSchemaQueryResult = NonNullable<
+  Awaited<ReturnType<typeof attackSurfaceQueryControllerSchema>>
+>;
+export type AttackSurfaceQueryControllerSchemaQueryError = unknown;
+
+export function useAttackSurfaceQueryControllerSchema<
+  TData = Awaited<ReturnType<typeof attackSurfaceQueryControllerSchema>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof attackSurfaceQueryControllerSchema>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof attackSurfaceQueryControllerSchema>>,
+          TError,
+          Awaited<ReturnType<typeof attackSurfaceQueryControllerSchema>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAttackSurfaceQueryControllerSchema<
+  TData = Awaited<ReturnType<typeof attackSurfaceQueryControllerSchema>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof attackSurfaceQueryControllerSchema>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof attackSurfaceQueryControllerSchema>>,
+          TError,
+          Awaited<ReturnType<typeof attackSurfaceQueryControllerSchema>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAttackSurfaceQueryControllerSchema<
+  TData = Awaited<ReturnType<typeof attackSurfaceQueryControllerSchema>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof attackSurfaceQueryControllerSchema>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Attack surface query schema
+ */
+
+export function useAttackSurfaceQueryControllerSchema<
+  TData = Awaited<ReturnType<typeof attackSurfaceQueryControllerSchema>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof attackSurfaceQueryControllerSchema>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAttackSurfaceQueryControllerSchemaQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Runs a batch of named queries. With options.mode = "report" the batch is queued and the response is a job to poll (GET attack-surface/jobs/:jobId).
+ * @summary Run attack surface queries
+ */
+export const attackSurfaceQueryControllerQuery = (
+  queryBatchDto: QueryBatchDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<QueryBatchResultDto>(
+    {
+      url: `/api/attack-surface/query`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: queryBatchDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAttackSurfaceQueryControllerQueryMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof attackSurfaceQueryControllerQuery>>,
+    TError,
+    { data: QueryBatchDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof attackSurfaceQueryControllerQuery>>,
+  TError,
+  { data: QueryBatchDto },
+  TContext
+> => {
+  const mutationKey = ['attackSurfaceQueryControllerQuery'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof attackSurfaceQueryControllerQuery>>,
+    { data: QueryBatchDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return attackSurfaceQueryControllerQuery(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AttackSurfaceQueryControllerQueryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof attackSurfaceQueryControllerQuery>>
+>;
+export type AttackSurfaceQueryControllerQueryMutationBody = QueryBatchDto;
+export type AttackSurfaceQueryControllerQueryMutationError = unknown;
+
+/**
+ * @summary Run attack surface queries
+ */
+export const useAttackSurfaceQueryControllerQuery = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof attackSurfaceQueryControllerQuery>>,
+      TError,
+      { data: QueryBatchDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof attackSurfaceQueryControllerQuery>>,
+  TError,
+  { data: QueryBatchDto },
+  TContext
+> => {
+  return useMutation(
+    getAttackSurfaceQueryControllerQueryMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Validates a batch and returns its cost and planner estimates without running it.
+ * @summary Explain attack surface queries
+ */
+export const attackSurfaceQueryControllerExplain = (
+  queryBatchDto: QueryBatchDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ExplainResultDto>(
+    {
+      url: `/api/attack-surface/explain`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: queryBatchDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAttackSurfaceQueryControllerExplainMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof attackSurfaceQueryControllerExplain>>,
+    TError,
+    { data: QueryBatchDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof attackSurfaceQueryControllerExplain>>,
+  TError,
+  { data: QueryBatchDto },
+  TContext
+> => {
+  const mutationKey = ['attackSurfaceQueryControllerExplain'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof attackSurfaceQueryControllerExplain>>,
+    { data: QueryBatchDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return attackSurfaceQueryControllerExplain(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AttackSurfaceQueryControllerExplainMutationResult = NonNullable<
+  Awaited<ReturnType<typeof attackSurfaceQueryControllerExplain>>
+>;
+export type AttackSurfaceQueryControllerExplainMutationBody = QueryBatchDto;
+export type AttackSurfaceQueryControllerExplainMutationError = unknown;
+
+/**
+ * @summary Explain attack surface queries
+ */
+export const useAttackSurfaceQueryControllerExplain = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof attackSurfaceQueryControllerExplain>>,
+      TError,
+      { data: QueryBatchDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof attackSurfaceQueryControllerExplain>>,
+  TError,
+  { data: QueryBatchDto },
+  TContext
+> => {
+  return useMutation(
+    getAttackSurfaceQueryControllerExplainMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * State and, once completed, result of a report-mode query batch (kept one hour).
+ * @summary Report job state
+ */
+export const attackSurfaceQueryControllerJob = (
+  jobId: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ReportJobDto>(
+    { url: `/api/attack-surface/jobs/${jobId}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAttackSurfaceQueryControllerJobQueryKey = (jobId: string) => {
+  return [`/api/attack-surface/jobs/${jobId}`] as const;
+};
+
+export const getAttackSurfaceQueryControllerJobQueryOptions = <
+  TData = Awaited<ReturnType<typeof attackSurfaceQueryControllerJob>>,
+  TError = unknown,
+>(
+  jobId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof attackSurfaceQueryControllerJob>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAttackSurfaceQueryControllerJobQueryKey(jobId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof attackSurfaceQueryControllerJob>>
+  > = ({ signal }) =>
+    attackSurfaceQueryControllerJob(jobId, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: jobId !== null && jobId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof attackSurfaceQueryControllerJob>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AttackSurfaceQueryControllerJobQueryResult = NonNullable<
+  Awaited<ReturnType<typeof attackSurfaceQueryControllerJob>>
+>;
+export type AttackSurfaceQueryControllerJobQueryError = unknown;
+
+export function useAttackSurfaceQueryControllerJob<
+  TData = Awaited<ReturnType<typeof attackSurfaceQueryControllerJob>>,
+  TError = unknown,
+>(
+  jobId: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof attackSurfaceQueryControllerJob>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof attackSurfaceQueryControllerJob>>,
+          TError,
+          Awaited<ReturnType<typeof attackSurfaceQueryControllerJob>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAttackSurfaceQueryControllerJob<
+  TData = Awaited<ReturnType<typeof attackSurfaceQueryControllerJob>>,
+  TError = unknown,
+>(
+  jobId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof attackSurfaceQueryControllerJob>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof attackSurfaceQueryControllerJob>>,
+          TError,
+          Awaited<ReturnType<typeof attackSurfaceQueryControllerJob>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAttackSurfaceQueryControllerJob<
+  TData = Awaited<ReturnType<typeof attackSurfaceQueryControllerJob>>,
+  TError = unknown,
+>(
+  jobId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof attackSurfaceQueryControllerJob>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Report job state
+ */
+
+export function useAttackSurfaceQueryControllerJob<
+  TData = Awaited<ReturnType<typeof attackSurfaceQueryControllerJob>>,
+  TError = unknown,
+>(
+  jobId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof attackSurfaceQueryControllerJob>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAttackSurfaceQueryControllerJobQueryOptions(
+    jobId,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * @summary List saved queries
+ */
+export const attackSurfaceQueryControllerListSaved = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SavedQueryDto[]>(
+    { url: `/api/attack-surface/saved-queries`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAttackSurfaceQueryControllerListSavedQueryKey = () => {
+  return [`/api/attack-surface/saved-queries`] as const;
+};
+
+export const getAttackSurfaceQueryControllerListSavedQueryOptions = <
+  TData = Awaited<ReturnType<typeof attackSurfaceQueryControllerListSaved>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof attackSurfaceQueryControllerListSaved>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAttackSurfaceQueryControllerListSavedQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof attackSurfaceQueryControllerListSaved>>
+  > = ({ signal }) =>
+    attackSurfaceQueryControllerListSaved(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof attackSurfaceQueryControllerListSaved>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AttackSurfaceQueryControllerListSavedQueryResult = NonNullable<
+  Awaited<ReturnType<typeof attackSurfaceQueryControllerListSaved>>
+>;
+export type AttackSurfaceQueryControllerListSavedQueryError = unknown;
+
+export function useAttackSurfaceQueryControllerListSaved<
+  TData = Awaited<ReturnType<typeof attackSurfaceQueryControllerListSaved>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof attackSurfaceQueryControllerListSaved>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof attackSurfaceQueryControllerListSaved>>,
+          TError,
+          Awaited<ReturnType<typeof attackSurfaceQueryControllerListSaved>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAttackSurfaceQueryControllerListSaved<
+  TData = Awaited<ReturnType<typeof attackSurfaceQueryControllerListSaved>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof attackSurfaceQueryControllerListSaved>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof attackSurfaceQueryControllerListSaved>>,
+          TError,
+          Awaited<ReturnType<typeof attackSurfaceQueryControllerListSaved>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAttackSurfaceQueryControllerListSaved<
+  TData = Awaited<ReturnType<typeof attackSurfaceQueryControllerListSaved>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof attackSurfaceQueryControllerListSaved>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List saved queries
+ */
+
+export function useAttackSurfaceQueryControllerListSaved<
+  TData = Awaited<ReturnType<typeof attackSurfaceQueryControllerListSaved>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof attackSurfaceQueryControllerListSaved>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAttackSurfaceQueryControllerListSavedQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Saves a named query batch; the batch is validated against the catalog and your permissions.
+ * @summary Save a query
+ */
+export const attackSurfaceQueryControllerCreateSaved = (
+  createSavedQueryDto: CreateSavedQueryDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SavedQueryDto>(
+    {
+      url: `/api/attack-surface/saved-queries`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createSavedQueryDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAttackSurfaceQueryControllerCreateSavedMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof attackSurfaceQueryControllerCreateSaved>>,
+    TError,
+    { data: CreateSavedQueryDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof attackSurfaceQueryControllerCreateSaved>>,
+  TError,
+  { data: CreateSavedQueryDto },
+  TContext
+> => {
+  const mutationKey = ['attackSurfaceQueryControllerCreateSaved'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof attackSurfaceQueryControllerCreateSaved>>,
+    { data: CreateSavedQueryDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return attackSurfaceQueryControllerCreateSaved(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AttackSurfaceQueryControllerCreateSavedMutationResult = NonNullable<
+  Awaited<ReturnType<typeof attackSurfaceQueryControllerCreateSaved>>
+>;
+export type AttackSurfaceQueryControllerCreateSavedMutationBody =
+  CreateSavedQueryDto;
+export type AttackSurfaceQueryControllerCreateSavedMutationError = unknown;
+
+/**
+ * @summary Save a query
+ */
+export const useAttackSurfaceQueryControllerCreateSaved = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof attackSurfaceQueryControllerCreateSaved>>,
+      TError,
+      { data: CreateSavedQueryDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof attackSurfaceQueryControllerCreateSaved>>,
+  TError,
+  { data: CreateSavedQueryDto },
+  TContext
+> => {
+  return useMutation(
+    getAttackSurfaceQueryControllerCreateSavedMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * @summary Get a saved query
+ */
+export const attackSurfaceQueryControllerGetSaved = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SavedQueryDto>(
+    { url: `/api/attack-surface/saved-queries/${id}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAttackSurfaceQueryControllerGetSavedQueryKey = (id: string) => {
+  return [`/api/attack-surface/saved-queries/${id}`] as const;
+};
+
+export const getAttackSurfaceQueryControllerGetSavedQueryOptions = <
+  TData = Awaited<ReturnType<typeof attackSurfaceQueryControllerGetSaved>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof attackSurfaceQueryControllerGetSaved>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAttackSurfaceQueryControllerGetSavedQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof attackSurfaceQueryControllerGetSaved>>
+  > = ({ signal }) =>
+    attackSurfaceQueryControllerGetSaved(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof attackSurfaceQueryControllerGetSaved>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AttackSurfaceQueryControllerGetSavedQueryResult = NonNullable<
+  Awaited<ReturnType<typeof attackSurfaceQueryControllerGetSaved>>
+>;
+export type AttackSurfaceQueryControllerGetSavedQueryError = unknown;
+
+export function useAttackSurfaceQueryControllerGetSaved<
+  TData = Awaited<ReturnType<typeof attackSurfaceQueryControllerGetSaved>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof attackSurfaceQueryControllerGetSaved>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof attackSurfaceQueryControllerGetSaved>>,
+          TError,
+          Awaited<ReturnType<typeof attackSurfaceQueryControllerGetSaved>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAttackSurfaceQueryControllerGetSaved<
+  TData = Awaited<ReturnType<typeof attackSurfaceQueryControllerGetSaved>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof attackSurfaceQueryControllerGetSaved>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof attackSurfaceQueryControllerGetSaved>>,
+          TError,
+          Awaited<ReturnType<typeof attackSurfaceQueryControllerGetSaved>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAttackSurfaceQueryControllerGetSaved<
+  TData = Awaited<ReturnType<typeof attackSurfaceQueryControllerGetSaved>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof attackSurfaceQueryControllerGetSaved>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get a saved query
+ */
+
+export function useAttackSurfaceQueryControllerGetSaved<
+  TData = Awaited<ReturnType<typeof attackSurfaceQueryControllerGetSaved>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof attackSurfaceQueryControllerGetSaved>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAttackSurfaceQueryControllerGetSavedQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * @summary Update a saved query
+ */
+export const attackSurfaceQueryControllerUpdateSaved = (
+  id: string,
+  updateSavedQueryDto: UpdateSavedQueryDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<SavedQueryDto>(
+    {
+      url: `/api/attack-surface/saved-queries/${id}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateSavedQueryDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAttackSurfaceQueryControllerUpdateSavedMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof attackSurfaceQueryControllerUpdateSaved>>,
+    TError,
+    { id: string; data: UpdateSavedQueryDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof attackSurfaceQueryControllerUpdateSaved>>,
+  TError,
+  { id: string; data: UpdateSavedQueryDto },
+  TContext
+> => {
+  const mutationKey = ['attackSurfaceQueryControllerUpdateSaved'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof attackSurfaceQueryControllerUpdateSaved>>,
+    { id: string; data: UpdateSavedQueryDto }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return attackSurfaceQueryControllerUpdateSaved(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AttackSurfaceQueryControllerUpdateSavedMutationResult = NonNullable<
+  Awaited<ReturnType<typeof attackSurfaceQueryControllerUpdateSaved>>
+>;
+export type AttackSurfaceQueryControllerUpdateSavedMutationBody =
+  UpdateSavedQueryDto;
+export type AttackSurfaceQueryControllerUpdateSavedMutationError = unknown;
+
+/**
+ * @summary Update a saved query
+ */
+export const useAttackSurfaceQueryControllerUpdateSaved = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof attackSurfaceQueryControllerUpdateSaved>>,
+      TError,
+      { id: string; data: UpdateSavedQueryDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof attackSurfaceQueryControllerUpdateSaved>>,
+  TError,
+  { id: string; data: UpdateSavedQueryDto },
+  TContext
+> => {
+  return useMutation(
+    getAttackSurfaceQueryControllerUpdateSavedMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * @summary Delete a saved query
+ */
+export const attackSurfaceQueryControllerDeleteSaved = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/attack-surface/saved-queries/${id}`,
+      method: 'DELETE',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAttackSurfaceQueryControllerDeleteSavedMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof attackSurfaceQueryControllerDeleteSaved>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof attackSurfaceQueryControllerDeleteSaved>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['attackSurfaceQueryControllerDeleteSaved'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof attackSurfaceQueryControllerDeleteSaved>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return attackSurfaceQueryControllerDeleteSaved(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AttackSurfaceQueryControllerDeleteSavedMutationResult = NonNullable<
+  Awaited<ReturnType<typeof attackSurfaceQueryControllerDeleteSaved>>
+>;
+
+export type AttackSurfaceQueryControllerDeleteSavedMutationError = unknown;
+
+/**
+ * @summary Delete a saved query
+ */
+export const useAttackSurfaceQueryControllerDeleteSaved = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof attackSurfaceQueryControllerDeleteSaved>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof attackSurfaceQueryControllerDeleteSaved>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getAttackSurfaceQueryControllerDeleteSavedMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Runs a saved batch with your current permissions.
+ * @summary Run a saved query
+ */
+export const attackSurfaceQueryControllerRunSaved = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<QueryBatchResultDto>(
+    {
+      url: `/api/attack-surface/saved-queries/${id}/run`,
+      method: 'POST',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAttackSurfaceQueryControllerRunSavedMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof attackSurfaceQueryControllerRunSaved>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof attackSurfaceQueryControllerRunSaved>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['attackSurfaceQueryControllerRunSaved'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof attackSurfaceQueryControllerRunSaved>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return attackSurfaceQueryControllerRunSaved(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AttackSurfaceQueryControllerRunSavedMutationResult = NonNullable<
+  Awaited<ReturnType<typeof attackSurfaceQueryControllerRunSaved>>
+>;
+
+export type AttackSurfaceQueryControllerRunSavedMutationError = unknown;
+
+/**
+ * @summary Run a saved query
+ */
+export const useAttackSurfaceQueryControllerRunSaved = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof attackSurfaceQueryControllerRunSaved>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof attackSurfaceQueryControllerRunSaved>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getAttackSurfaceQueryControllerRunSavedMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
  * Keyset-paginated notifications of the current user, newest first
  * @summary Get all notifications
  */
@@ -47360,6 +47104,1628 @@ export const useNotificationsControllerDeleteNotification = <
     queryClient,
   );
 };
+
+/**
+ * Retrieves statistics for a workspace including total targets, assets, vulnerabilities, and unique technologies.
+ * @summary Get workspace statistics
+ */
+export const statisticControllerGetStatistics = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<StatisticResponseDto>(
+    { url: `/api/statistic`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getStatisticControllerGetStatisticsQueryKey = () => {
+  return [`/api/statistic`] as const;
+};
+
+export const getStatisticControllerGetStatisticsQueryOptions = <
+  TData = Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getStatisticControllerGetStatisticsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof statisticControllerGetStatistics>>
+  > = ({ signal }) => statisticControllerGetStatistics(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StatisticControllerGetStatisticsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof statisticControllerGetStatistics>>
+>;
+export type StatisticControllerGetStatisticsQueryError = unknown;
+
+export function useStatisticControllerGetStatistics<
+  TData = Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetStatistics>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetStatistics<
+  TData = Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetStatistics>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetStatistics<
+  TData = Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get workspace statistics
+ */
+
+export function useStatisticControllerGetStatistics<
+  TData = Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetStatistics>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getStatisticControllerGetStatisticsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Retrieves statistics for a workspace over the last 3 months, showing trends and changes over time.
+ * @summary Get timeline statistics for a workspace
+ */
+export const statisticControllerGetTimelineStatistics = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<TimelineResponseDto>(
+    { url: `/api/statistic/timeline`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getStatisticControllerGetTimelineStatisticsQueryKey = () => {
+  return [`/api/statistic/timeline`] as const;
+};
+
+export const getStatisticControllerGetTimelineStatisticsQueryOptions = <
+  TData = Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getStatisticControllerGetTimelineStatisticsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>
+  > = ({ signal }) =>
+    statisticControllerGetTimelineStatistics(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StatisticControllerGetTimelineStatisticsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>
+>;
+export type StatisticControllerGetTimelineStatisticsQueryError = unknown;
+
+export function useStatisticControllerGetTimelineStatistics<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTimelineStatistics<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTimelineStatistics<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get timeline statistics for a workspace
+ */
+
+export function useStatisticControllerGetTimelineStatistics<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTimelineStatistics>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getStatisticControllerGetTimelineStatisticsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Retrieves issues timeline statistics for a workspace, showing the number of vulnerabilities over time.
+ * @summary Get issues timeline statistics for a workspace
+ */
+export const statisticControllerGetIssuesTimeline = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<IssuesTimelineResponseDto>(
+    { url: `/api/statistic/issues-timeline`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getStatisticControllerGetIssuesTimelineQueryKey = () => {
+  return [`/api/statistic/issues-timeline`] as const;
+};
+
+export const getStatisticControllerGetIssuesTimelineQueryOptions = <
+  TData = Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getStatisticControllerGetIssuesTimelineQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>
+  > = ({ signal }) =>
+    statisticControllerGetIssuesTimeline(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StatisticControllerGetIssuesTimelineQueryResult = NonNullable<
+  Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>
+>;
+export type StatisticControllerGetIssuesTimelineQueryError = unknown;
+
+export function useStatisticControllerGetIssuesTimeline<
+  TData = Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetIssuesTimeline<
+  TData = Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetIssuesTimeline<
+  TData = Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get issues timeline statistics for a workspace
+ */
+
+export function useStatisticControllerGetIssuesTimeline<
+  TData = Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetIssuesTimeline>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getStatisticControllerGetIssuesTimelineQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Retrieves the top 10 tags with the most assets in a workspace.
+ * @summary Get top 10 tags with the most assets in a workspace
+ */
+export const statisticControllerGetTopTagsAssets = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<TopTagAsset[]>(
+    { url: `/api/statistic/top-tags-assets`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getStatisticControllerGetTopTagsAssetsQueryKey = () => {
+  return [`/api/statistic/top-tags-assets`] as const;
+};
+
+export const getStatisticControllerGetTopTagsAssetsQueryOptions = <
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getStatisticControllerGetTopTagsAssetsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>
+  > = ({ signal }) =>
+    statisticControllerGetTopTagsAssets(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StatisticControllerGetTopTagsAssetsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>
+>;
+export type StatisticControllerGetTopTagsAssetsQueryError = unknown;
+
+export function useStatisticControllerGetTopTagsAssets<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTopTagsAssets<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTopTagsAssets<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get top 10 tags with the most assets in a workspace
+ */
+
+export function useStatisticControllerGetTopTagsAssets<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopTagsAssets>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getStatisticControllerGetTopTagsAssetsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Retrieves the top 10 countries by IP count for a workspace. Batches IP lookups to the geo IP service and aggregates results by country.
+ * @summary Get asset locations
+ */
+export const statisticControllerGetAssetLocations = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AssetLocationDto[]>(
+    { url: `/api/statistic/asset-locations`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getStatisticControllerGetAssetLocationsQueryKey = () => {
+  return [`/api/statistic/asset-locations`] as const;
+};
+
+export const getStatisticControllerGetAssetLocationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getStatisticControllerGetAssetLocationsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>
+  > = ({ signal }) =>
+    statisticControllerGetAssetLocations(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StatisticControllerGetAssetLocationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>
+>;
+export type StatisticControllerGetAssetLocationsQueryError = unknown;
+
+export function useStatisticControllerGetAssetLocations<
+  TData = Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetAssetLocations<
+  TData = Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetAssetLocations<
+  TData = Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get asset locations
+ */
+
+export function useStatisticControllerGetAssetLocations<
+  TData = Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetAssetLocations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getStatisticControllerGetAssetLocationsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Retrieves TLS certificate statistics grouped by expiration status using not_after field, and counts newly discovered certificates within the last 30 days.
+ * @summary Get TLS certificate statistics for a workspace
+ */
+export const statisticControllerGetTlsStatistics = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<TlsStatisticResponseDto>(
+    { url: `/api/statistic/tls`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getStatisticControllerGetTlsStatisticsQueryKey = () => {
+  return [`/api/statistic/tls`] as const;
+};
+
+export const getStatisticControllerGetTlsStatisticsQueryOptions = <
+  TData = Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getStatisticControllerGetTlsStatisticsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>
+  > = ({ signal }) =>
+    statisticControllerGetTlsStatistics(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StatisticControllerGetTlsStatisticsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>
+>;
+export type StatisticControllerGetTlsStatisticsQueryError = unknown;
+
+export function useStatisticControllerGetTlsStatistics<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTlsStatistics<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTlsStatistics<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get TLS certificate statistics for a workspace
+ */
+
+export function useStatisticControllerGetTlsStatistics<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTlsStatistics>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getStatisticControllerGetTlsStatisticsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Open critical and SLA-overdue findings, runs with a failed job in 7 days, TLS certificates expired or expiring within 30 days, targets not discovered for 30 days or without a scan schedule, and AI proposals waiting for review. Worst first; kinds with a zero count are left out.
+ * @summary Get what needs attention in a workspace
+ */
+export const statisticControllerGetAttention = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<WorkspaceAttentionResponseDto>(
+    { url: `/api/statistic/attention`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getStatisticControllerGetAttentionQueryKey = () => {
+  return [`/api/statistic/attention`] as const;
+};
+
+export const getStatisticControllerGetAttentionQueryOptions = <
+  TData = Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getStatisticControllerGetAttentionQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof statisticControllerGetAttention>>
+  > = ({ signal }) => statisticControllerGetAttention(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StatisticControllerGetAttentionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof statisticControllerGetAttention>>
+>;
+export type StatisticControllerGetAttentionQueryError = unknown;
+
+export function useStatisticControllerGetAttention<
+  TData = Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetAttention>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetAttention<
+  TData = Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetAttention>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetAttention<
+  TData = Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get what needs attention in a workspace
+ */
+
+export function useStatisticControllerGetAttention<
+  TData = Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetAttention>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getStatisticControllerGetAttentionQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Retrieves the top 10 assets with the most vulnerabilities in a workspace.
+ * @summary Get top 10 assets with the most vulnerabilities in a workspace
+ */
+export const statisticControllerGetTopAssetsWithMostVulnerabilities = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<TopAssetVulnerabilities[]>(
+    { url: `/api/statistic/top-assets-vulnerabilities`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getStatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryKey =
+  () => {
+    return [`/api/statistic/top-assets-vulnerabilities`] as const;
+  };
+
+export const getStatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryOptions =
+  <
+    TData = Awaited<
+      ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+    >,
+    TError = unknown,
+  >(options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+          >
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  }) => {
+    const { query: queryOptions, request: requestOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getStatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryKey();
+
+    const queryFn: QueryFunction<
+      Awaited<
+        ReturnType<
+          typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+        >
+      >
+    > = ({ signal }) =>
+      statisticControllerGetTopAssetsWithMostVulnerabilities(
+        requestOptions,
+        signal,
+      );
+
+    return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+      Awaited<
+        ReturnType<
+          typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+        >
+      >,
+      TError,
+      TData
+    > & { queryKey: DataTag<QueryKey, TData, TError> };
+  };
+
+export type StatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryResult =
+  NonNullable<
+    Awaited<
+      ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+    >
+  >;
+export type StatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryError =
+  unknown;
+
+export function useStatisticControllerGetTopAssetsWithMostVulnerabilities<
+  TData = Awaited<
+    ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+  >,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+          >
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<
+              typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+            >
+          >,
+          TError,
+          Awaited<
+            ReturnType<
+              typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+            >
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTopAssetsWithMostVulnerabilities<
+  TData = Awaited<
+    ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+          >
+        >,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<
+              typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+            >
+          >,
+          TError,
+          Awaited<
+            ReturnType<
+              typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+            >
+          >
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTopAssetsWithMostVulnerabilities<
+  TData = Awaited<
+    ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+          >
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get top 10 assets with the most vulnerabilities in a workspace
+ */
+
+export function useStatisticControllerGetTopAssetsWithMostVulnerabilities<
+  TData = Awaited<
+    ReturnType<typeof statisticControllerGetTopAssetsWithMostVulnerabilities>
+  >,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof statisticControllerGetTopAssetsWithMostVulnerabilities
+          >
+        >,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getStatisticControllerGetTopAssetsWithMostVulnerabilitiesQueryOptions(
+      options,
+    );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Retrieves the top 10 ports by number of exposed services, classified as standard (IANA) or non-standard, plus distinct port totals.
+ * @summary Get top exposed ports for a workspace
+ */
+export const statisticControllerGetTopPorts = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<TopPortsResponseDto>(
+    { url: `/api/statistic/top-ports`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getStatisticControllerGetTopPortsQueryKey = () => {
+  return [`/api/statistic/top-ports`] as const;
+};
+
+export const getStatisticControllerGetTopPortsQueryOptions = <
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getStatisticControllerGetTopPortsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof statisticControllerGetTopPorts>>
+  > = ({ signal }) => statisticControllerGetTopPorts(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StatisticControllerGetTopPortsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof statisticControllerGetTopPorts>>
+>;
+export type StatisticControllerGetTopPortsQueryError = unknown;
+
+export function useStatisticControllerGetTopPorts<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetTopPorts>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTopPorts<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetTopPorts>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTopPorts<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get top exposed ports for a workspace
+ */
+
+export function useStatisticControllerGetTopPorts<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopPorts>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getStatisticControllerGetTopPortsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Retrieves the top 10 technologies detected on the latest HTTP response of each service, ranked by number of services.
+ * @summary Get top technologies for a workspace
+ */
+export const statisticControllerGetTopTechnologies = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<TopTechnologiesResponseDto>(
+    { url: `/api/statistic/top-technologies`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getStatisticControllerGetTopTechnologiesQueryKey = () => {
+  return [`/api/statistic/top-technologies`] as const;
+};
+
+export const getStatisticControllerGetTopTechnologiesQueryOptions = <
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getStatisticControllerGetTopTechnologiesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>
+  > = ({ signal }) =>
+    statisticControllerGetTopTechnologies(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type StatisticControllerGetTopTechnologiesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>
+>;
+export type StatisticControllerGetTopTechnologiesQueryError = unknown;
+
+export function useStatisticControllerGetTopTechnologies<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTopTechnologies<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+          TError,
+          Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useStatisticControllerGetTopTechnologies<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get top technologies for a workspace
+ */
+
+export function useStatisticControllerGetTopTechnologies<
+  TData = Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof statisticControllerGetTopTechnologies>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getStatisticControllerGetTopTechnologiesQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
 
 /**
  * Project cards: assets, workflows, open vulnerabilities by severity, last run and triggers.
@@ -61250,6 +62616,101 @@ export const useReportsControllerGenerateVulReport = <
 > => {
   return useMutation(
     getReportsControllerGenerateVulReportMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Renders a saved attack surface query (one table per query) as a PDF report, run with your current permissions.
+ * @summary Generate query PDF report
+ */
+export const reportsControllerGenerateQueryReport = (
+  generateQueryReportBodyDto: GenerateQueryReportBodyDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    {
+      url: `/api/reports/generate/query`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: generateQueryReportBodyDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getReportsControllerGenerateQueryReportMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reportsControllerGenerateQueryReport>>,
+    TError,
+    { data: GenerateQueryReportBodyDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reportsControllerGenerateQueryReport>>,
+  TError,
+  { data: GenerateQueryReportBodyDto },
+  TContext
+> => {
+  const mutationKey = ['reportsControllerGenerateQueryReport'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reportsControllerGenerateQueryReport>>,
+    { data: GenerateQueryReportBodyDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return reportsControllerGenerateQueryReport(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReportsControllerGenerateQueryReportMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reportsControllerGenerateQueryReport>>
+>;
+export type ReportsControllerGenerateQueryReportMutationBody =
+  GenerateQueryReportBodyDto;
+export type ReportsControllerGenerateQueryReportMutationError = unknown;
+
+/**
+ * @summary Generate query PDF report
+ */
+export const useReportsControllerGenerateQueryReport = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof reportsControllerGenerateQueryReport>>,
+      TError,
+      { data: GenerateQueryReportBodyDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof reportsControllerGenerateQueryReport>>,
+  TError,
+  { data: GenerateQueryReportBodyDto },
+  TContext
+> => {
+  return useMutation(
+    getReportsControllerGenerateQueryReportMutationOptions(options),
     queryClient,
   );
 };

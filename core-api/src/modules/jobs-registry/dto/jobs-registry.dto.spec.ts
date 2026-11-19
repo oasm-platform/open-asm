@@ -1,5 +1,5 @@
-import { ValidationPipe } from '@nestjs/common';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ValidationPipe } from '@nestjs/common';
+
 import {
   HttpProbeResultDto,
   PortsResultDto,
@@ -8,6 +8,7 @@ import {
   UrlDiscoveryResultDto,
   VulnerabilitiesResultDto,
 } from './jobs-registry.dto';
+
 
 /**
  * Trust-boundary test for the REST result endpoints.
