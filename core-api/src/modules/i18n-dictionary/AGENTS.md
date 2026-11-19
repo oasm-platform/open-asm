@@ -24,6 +24,8 @@ None. Reads translations already loaded by `nestjs-i18n`; never reads JSON files
 
 - New language = new `src/i18n/<lang>/` folder only. No code change here: supported codes come from the loader, not a whitelist.
 - No `routers` pseudo-language: URLs are built by `notification-link.ts`, not served here.
+- Every `src/i18n/<lang>/` mirrors `en/` key for key; `i18n.layout.spec.ts` fails on a missing or extra key. Plurals: backend namespaces use ICU (`{count, plural, ...}`); `ui` keys the console reads use `<key>.one|few|many|other` siblings, picked by `Intl.PluralRules` in `console/src/lib/i18n-dictionary.ts` (`.other` is required).
+- The console sends the chosen language as `Accept-Language` (`console/src/utils/languageState.ts`), so notifications and validation errors come back in it.
 
 ## Coupling
 

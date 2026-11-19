@@ -1,10 +1,7 @@
 import { NotificationList } from '@/components/notifications/notification-list';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  resolveDictText,
-  useDictionary,
-} from '@/lib/i18n-dictionary';
+import { useT } from '@/lib/i18n-dictionary';
 import {
   getNotificationsControllerGetNotificationsInfiniteQueryKey,
   getNotificationsControllerGetUnreadCountQueryKey,
@@ -16,9 +13,7 @@ import { Bell, CheckCheck, Loader2 } from 'lucide-react';
 
 export default function NotificationsPage() {
   const queryClient = useQueryClient();
-  const { data: dict } = useDictionary('en');
-  const t = (key: string, vars?: Record<string, string | number>) =>
-    resolveDictText(dict ?? null, key, vars);
+  const t = useT();
   const { data: unreadCountData } = useNotificationsControllerGetUnreadCount();
   const unreadCount = typeof unreadCountData === 'number' ? unreadCountData : 0;
   const markAllAsRead = useNotificationsControllerMarkAllAsRead({
@@ -46,10 +41,7 @@ export default function NotificationsPage() {
               </CardTitle>
               {unreadCount > 0 && (
                 <p className="text-sm text-muted-foreground">
-                  {t('ui.notifications.unread', {
-                    count: unreadCount,
-                    s: unreadCount > 1 ? 's' : '',
-                  })}
+                  {t('ui.notifications.unread', { count: unreadCount })}
                 </p>
               )}
             </div>

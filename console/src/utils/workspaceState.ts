@@ -33,6 +33,7 @@ const UNSCOPED_QUERY_ROOTS = new Set([
   '/api/metadata',
   '/api/workspaces',
   'workspaces',
+  'i18n',
   // Carries its own workspace id (see use-template-tabs.ts).
   'template-tabs',
 ]);

@@ -7,5 +7,6 @@
   "IS_UUID": "{property} must be a valid id",
   "IS_ARRAY": "{property} must be a list",
   "ARRAY_NOT_EMPTY": "{property} should not be empty",
-  "MATCHES": "{property} has an invalid format"
+  "MATCHES": "{property} has an invalid format",
+  "PERMISSION_KEY": "Invalid permission key. Use \"*\" or \"domain.action\" (e.g. target.read)"
 }

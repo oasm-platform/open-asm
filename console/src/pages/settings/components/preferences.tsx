@@ -1,3 +1,4 @@
+import { LanguageSwitcher } from './language-switcher';
 import { ThemeSwitcher } from './theme-switcher';
 import UpdateUser from './update-user';
 
@@ -10,6 +11,7 @@ export default function Preferences() {
     <div className="space-y-4">
       <UpdateUser />
       <ThemeSwitcher />
+      <LanguageSwitcher />
     </div>
   );
 }

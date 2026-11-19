@@ -3,26 +3,50 @@ import { resolveDictText } from './i18n-dictionary';
 
 // Mirrors backend shape: { [namespaceFile]: { [key]: template } }
 // e.g. src/i18n/en/ui.json -> dictionaries.ui['notifications.title']
-const DICT = {
+const EN = {
   ui: {
     'notifications.title': 'Notifications',
-    'notifications.unread': '{count} unread notification{s}',
+    'notifications.unread.one': '{count} unread notification',
+    'notifications.unread.other': '{count} unread notifications',
     'notifications.markAllRead': 'Mark all as read',
   },
 };
 
+const RU = {
+  ui: {
+    'notifications.unread.one': '{count} непрочитанное уведомление',
+    'notifications.unread.few': '{count} непрочитанных уведомления',
+    'notifications.unread.many': '{count} непрочитанных уведомлений',
+    'notifications.unread.other': '{count} непрочитанного уведомления',
+  },
+};
+
 describe('resolveDictText', () => {
-  it('resolves a namespaced key with variables', () => {
-    expect(resolveDictText(DICT, 'ui.notifications.title')).toBe(
+  it('resolves a namespaced key and picks the plural form', () => {
+    expect(resolveDictText(EN, 'ui.notifications.title')).toBe(
       'Notifications',
     );
-    expect(
-      resolveDictText(DICT, 'ui.notifications.unread', { count: 3, s: 's' }),
-    ).toBe('3 unread notifications');
+    expect(resolveDictText(EN, 'ui.notifications.unread', { count: 1 })).toBe(
+      '1 unread notification',
+    );
+    expect(resolveDictText(EN, 'ui.notifications.unread', { count: 3 })).toBe(
+      '3 unread notifications',
+    );
   });
 
-  it('returns the raw key when missing or fetch failed', () => {
-    expect(resolveDictText(DICT, 'ui.notifications.missing')).toBe(
+  it('uses the CLDR plural rules of the language', () => {
+    const t = (count: number) =>
+      resolveDictText(RU, 'ui.notifications.unread', { count }, 'ru');
+    expect(t(1)).toBe('1 непрочитанное уведомление');
+    expect(t(3)).toBe('3 непрочитанных уведомления');
+    expect(t(5)).toBe('5 непрочитанных уведомлений');
+  });
+
+  it('falls back to EN, then to the raw key', () => {
+    expect(
+      resolveDictText(RU, 'ui.notifications.title', undefined, 'ru', EN),
+    ).toBe('Notifications');
+    expect(resolveDictText(EN, 'ui.notifications.missing')).toBe(
       'ui.notifications.missing',
     );
     expect(resolveDictText(null, 'ui.notifications.title')).toBe(

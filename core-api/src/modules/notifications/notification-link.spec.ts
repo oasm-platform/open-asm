@@ -35,6 +35,13 @@ describe('buildNotificationUrl', () => {
     expect(buildNotificationUrl('WORKSPACE_INVITATION', {})).toBe(
       '/invite/{token}',
     );
+    // ICU `other` branch filled the token too
+    expect(
+      buildNotificationUrl('WORKSPACE_INVITATION', {
+        action: 'resent',
+        token: 'xyz',
+      }),
+    ).toBe('/invite/xyz');
   });
 
   it('keeps missing placeholders and never throws on hostile input', () => {

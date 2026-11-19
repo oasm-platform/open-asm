@@ -120,7 +120,8 @@ export class NotificationsService {
     const data: NotificationResponseDto[] = notifications.map((n) => {
       // Template key: a new NotificationType without an en/notification.json
       // entry fails type-check here, not at runtime.
-      const key = `notification.${n.notification.type}` as I18nPath;
+      const key =
+        `notification.${n.notification.type}` as const satisfies I18nPath;
       const message = this.i18n.translate(key, {
         lang,
         args: n.notification.metadata || {},

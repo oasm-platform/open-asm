@@ -8,9 +8,6 @@ function fill(template: string, args: Record<string, string>): string {
 }
 
 const STATIC_URLS: Partial<Record<NotificationType, string>> = {
-  // ponytail: NotificationType imported as a value only for the integer check
-  // below; all static urls stay in the lookup above. Collapse into one map
-  // keyed by NotificationType.X when the next branch is added.
   WORKSPACE_CREATED: '/settings/workspaces',
   VULNERABILITY_ANALYSIS_COMPLETED: '/vulnerabilities/{id}?tab=analysis',
   ASSET_NEW_DETECT: '/targets/{targetId}/inventory?isNew=true',
@@ -23,10 +20,9 @@ export function buildNotificationUrl(
   args: Record<string, string>,
 ): string {
   if (type === NotificationType.WORKSPACE_INVITATION) {
-    if (args['action'] === 'created') return fill('/invite/{token}', args);
     if (args['action'] === 'accepted' || args['action'] === 'declined')
       return '/settings/members';
-    return '/invite/{token}';
+    return fill('/invite/{token}', args);
   }
   const template = STATIC_URLS[type];
   return template ? fill(template, args) : '/notifications';

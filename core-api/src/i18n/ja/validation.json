@@ -1,0 +1,12 @@
+{
+  "NOT_EMPTY": "{property} は空にできません",
+  "IS_STRING": "{property} は文字列である必要があります",
+  "IS_EMAIL": "{property} は有効なメールアドレスである必要があります",
+  "MIN_LENGTH": "{property} が短すぎます（最小 {constraints.0} 文字）",
+  "MAX_LENGTH": "{property} が長すぎます（最大 {constraints.0} 文字）",
+  "IS_UUID": "{property} は有効な ID である必要があります",
+  "IS_ARRAY": "{property} はリストである必要があります",
+  "ARRAY_NOT_EMPTY": "{property} は空にできません",
+  "MATCHES": "{property} の形式が無効です",
+  "PERMISSION_KEY": "無効な権限キーです。\"*\" または \"domain.action\" を使用してください（例: target.read）"
+}

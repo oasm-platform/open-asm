@@ -16,8 +16,12 @@ export type I18nTranslations = {
     };
     "ui": {
         "notifications.title": string;
-        "notifications.unread": string;
+        "notifications.unread.one": string;
+        "notifications.unread.other": string;
         "notifications.markAllRead": string;
+        "preferences.language": string;
+        "notifications.unread.few": string;
+        "notifications.unread.many": string;
     };
     "validation": {
         "NOT_EMPTY": string;
@@ -29,6 +33,7 @@ export type I18nTranslations = {
         "IS_ARRAY": string;
         "ARRAY_NOT_EMPTY": string;
         "MATCHES": string;
+        "PERMISSION_KEY": string;
     };
 };
 /* prettier-ignore */

@@ -1,0 +1,6 @@
+{
+  "notifications.title": "通知",
+  "notifications.unread.other": "{count} 条未读通知",
+  "notifications.markAllRead": "全部标为已读",
+  "preferences.language": "语言"
+}

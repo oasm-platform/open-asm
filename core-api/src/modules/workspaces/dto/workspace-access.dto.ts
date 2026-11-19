@@ -78,7 +78,7 @@ export class CreatePermissionGroupDto {
   })
   @Matches(PERMISSION_KEY_REGEX, {
     each: true,
-    message: i18nValidationMessage('validation.MATCHES'),
+    message: i18nValidationMessage('validation.PERMISSION_KEY'),
   })
   permissions: string[];
 }
@@ -105,7 +105,7 @@ export class UpdatePermissionGroupDto {
   })
   @Matches(PERMISSION_KEY_REGEX, {
     each: true,
-    message: i18nValidationMessage('validation.MATCHES'),
+    message: i18nValidationMessage('validation.PERMISSION_KEY'),
   })
   permissions?: string[];
 }

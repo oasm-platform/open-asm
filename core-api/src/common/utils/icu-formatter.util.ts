@@ -54,8 +54,17 @@ export function icuFormatter(
     }
   }
 
-  return template.replace(/\{(\w+)\}/g, (_: string, key: string) => {
-    const val = values[key];
+  // Dotted paths reach into nested args, e.g. validation's {constraints.0}.
+  return template.replace(/\{([\w.]+)\}/g, (_: string, key: string) => {
+    const val = key
+      .split('.')
+      .reduce<unknown>(
+        (obj, part) =>
+          obj !== null && typeof obj === 'object'
+            ? (obj as Record<string, unknown>)[part]
+            : undefined,
+        values,
+      );
     if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
       return String(val);
     }

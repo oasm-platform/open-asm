@@ -1,0 +1,7 @@
+{
+  "notifications.title": "Notificaciones",
+  "notifications.unread.one": "{count} notificación sin leer",
+  "notifications.unread.other": "{count} notificaciones sin leer",
+  "notifications.markAllRead": "Marcar todas como leídas",
+  "preferences.language": "Idioma"
+}

@@ -1,0 +1,12 @@
+{
+  "NOT_EMPTY": "{property} non può essere vuoto",
+  "IS_STRING": "{property} deve essere una stringa",
+  "IS_EMAIL": "{property} deve essere un indirizzo email valido",
+  "MIN_LENGTH": "{property} è troppo corto (minimo {constraints.0} caratteri)",
+  "MAX_LENGTH": "{property} è troppo lungo (massimo {constraints.0} caratteri)",
+  "IS_UUID": "{property} deve essere un ID valido",
+  "IS_ARRAY": "{property} deve essere un elenco",
+  "ARRAY_NOT_EMPTY": "{property} non può essere vuoto",
+  "MATCHES": "{property} ha un formato non valido",
+  "PERMISSION_KEY": "Chiave di permesso non valida. Usa \"*\" oppure \"domain.action\" (es. target.read)"
+}
