@@ -16,6 +16,7 @@ import {
   useAiChatPanelOpen,
 } from '@/hooks/useAiChatPanel';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import { stripPageContextFromTitle } from '@/lib/page-context';
 import { cn } from '@/lib/utils';
 import { useAgentsControllerGetConversationsInfinite } from '@/services/apis/gen/queries';
 
@@ -64,7 +65,8 @@ export function AiChatPanelHeader({
     [data],
   );
   const listedTitle = conversations.find((c) => c.id === conversationId)?.title;
-  const displayTitle = listedTitle || title || UNTITLED;
+  const displayTitle =
+    stripPageContextFromTitle(listedTitle || title || '') || UNTITLED;
 
   const openInStudio = () => {
     close();
@@ -115,9 +117,11 @@ export function AiChatPanelHeader({
                 <DropdownMenuItem
                   key={c.id}
                   onClick={() => openConversation(c.id)}
-                  title={c.title || UNTITLED}
+                  title={stripPageContextFromTitle(c.title ?? '') || UNTITLED}
                 >
-                  <span className="truncate">{c.title || UNTITLED}</span>
+                  <span className="truncate">
+                    {stripPageContextFromTitle(c.title ?? '') || UNTITLED}
+                  </span>
                   <Check
                     className={cn(
                       'ms-auto size-4 shrink-0',

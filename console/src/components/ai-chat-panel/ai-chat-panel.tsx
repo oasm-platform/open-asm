@@ -1,5 +1,5 @@
 import { Plus, Sparkles } from 'lucide-react';
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -22,11 +22,13 @@ import { restoreApprovalMode } from '@/hooks/use-approval-mode';
 import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
+import { usePageContextChip } from '@/hooks/usePageContextChip';
 import {
   useAiChatConversation,
   useAiChatPanelOpen,
 } from '@/hooks/useAiChatPanel';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import { withPageContext } from '@/lib/page-context';
 import { cn } from '@/lib/utils';
 import { ChatConversation } from '@/pages/agents/components/chat-conversation';
 import { CommandApprovalPrompt } from '@/pages/agents/components/command-approval-prompt';
@@ -66,6 +68,17 @@ function PanelConversation({ conversationId, isNew }: PanelConversationProps) {
   const chat = useAgentChat({ conversationId, isNew });
   const { workers, isLoading: isLoadingWorkers } = useAgentWorkers();
   const { openDialog: openConnectWorker } = useConnectWorkerState();
+  const { context: pageContext, dismiss: removePageContext } =
+    usePageContextChip();
+
+  // Every message from the panel carries the page the user is on (unless
+  // they removed it): appended to the question, so the chat API is unchanged
+  const { onSendMessage } = chat;
+  const sendMessage = useCallback(
+    (text: string, options?: { agentMode?: string }) =>
+      onSendMessage(withPageContext(text, pageContext), options),
+    [onSendMessage, pageContext],
+  );
 
   // How this chat was asked to start (useAiChat), if it was
   const startConfig =
@@ -128,11 +141,12 @@ function PanelConversation({ conversationId, isNew }: PanelConversationProps) {
       }
     }
     setPendingText(null);
-    chat.onSendMessage(pendingText, { agentMode: newChatMode });
+    sendMessage(pendingText, { agentMode: newChatMode });
   }, [
     pendingText,
     newChatMode,
     chat,
+    sendMessage,
     isLoadingWorkers,
     workers.length,
     openConnectWorker,
@@ -176,7 +190,9 @@ function PanelConversation({ conversationId, isNew }: PanelConversationProps) {
       />
       <ChatConversation
         messages={chat.messages}
-        onSendMessage={chat.onSendMessage}
+        onSendMessage={sendMessage}
+        pageContextLabel={pageContext?.title ?? null}
+        onRemovePageContext={removePageContext}
         onRetry={chat.onRetry}
         onStop={chat.onStop}
         isStreaming={chat.isStreaming}

@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { stripPageContextFromTitle } from '@/lib/page-context';
 import { cn } from '@/lib/utils';
 import type { ConversationResponseDto } from '@/services/apis/gen/queries';
 import { MessageSquarePlus, Pencil, Search, Trash2 } from 'lucide-react';
@@ -16,6 +17,9 @@ interface ChatHistoryProps {
   onDeleteAllConversations?: () => void;
   onRenameConversation?: (conversationId: string, newTitle: string) => void;
 }
+
+const titleOf = (conv: ConversationResponseDto) =>
+  stripPageContextFromTitle(conv.title ?? '') || 'New conversation';
 
 /**
  * Chat history sidebar component displaying conversation list
@@ -37,7 +41,7 @@ export function ChatHistory({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const filteredConversations = conversations.filter((conv) =>
-    (conv.title ?? 'New conversation')
+    titleOf(conv)
       .toLowerCase()
       .includes(searchQuery.toLowerCase()),
   );
@@ -48,7 +52,7 @@ export function ChatHistory({
     (e: React.MouseEvent, conv: ConversationResponseDto) => {
       e.stopPropagation();
       setEditingId(conv.id);
-      setEditingTitle(conv.title ?? 'New conversation');
+      setEditingTitle(titleOf(conv));
       setTimeout(() => inputRef.current?.select(), 0);
     },
     [],
@@ -155,9 +159,9 @@ export function ChatHistory({
                                   ? 'text-accent-foreground'
                                   : 'text-muted-foreground',
                               )}
-                              title={conv.title ?? 'New conversation'}
+                              title={titleOf(conv)}
                             >
-                              {conv.title ?? 'New conversation'}
+                              {titleOf(conv)}
                             </button>
                             
                             <div className="flex items-center shrink-0 pr-1 transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">

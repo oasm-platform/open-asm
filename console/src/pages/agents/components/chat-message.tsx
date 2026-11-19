@@ -19,11 +19,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import { splitPageContext } from '@/lib/page-context';
 import { cn } from '@/lib/utils';
 import type { RemoteExecuteStreamEvent } from '@/hooks/use-remote-execute-stream';
 import type { UIMessage } from 'ai';
 import { motion } from 'framer-motion';
-import { ChevronRightIcon } from 'lucide-react';
+import { ChevronRightIcon, PanelsTopLeft } from 'lucide-react';
 import { memo, useMemo, useState } from 'react';
 import {
   CopyButton,
@@ -216,6 +217,17 @@ export const ChatMessage = memo(function ChatMessage({
     !showInitialThinking &&
     !isReasoningStreaming;
 
+  // The page a user message was sent from (the Ask AI sidebar appends it):
+  // shown as a label, the block itself is for the model only
+  const isUser = message.role === 'user';
+  const pageTitle = useMemo(() => {
+    if (!isUser) return null;
+    const lastText = [...parts].reverse().find((p) => p.type === 'text');
+    return lastText && 'text' in lastText
+      ? splitPageContext((lastText as { text: string }).text).pageTitle
+      : null;
+  }, [isUser, parts]);
+
   const renderItems = useMemo(() => {
     const items: RenderItem[] = [];
 
@@ -241,7 +253,8 @@ export const ChatMessage = memo(function ChatMessage({
         flushReasoning(false);
 
         if (part.type === 'text' && 'text' in part) {
-          const text = (part as { text: string }).text;
+          const raw = (part as { text: string }).text;
+          const text = isUser ? splitPageContext(raw).text : raw;
           if (text.trim()) {
             items.push({ kind: 'text', text });
           }
@@ -287,7 +300,7 @@ export const ChatMessage = memo(function ChatMessage({
     }
 
     return groupToolCalls(items);
-  }, [parts, isReasoningStreaming, showGenerating, showInitialThinking]);
+  }, [parts, isUser, isReasoningStreaming, showGenerating, showInitialThinking]);
 
   return (
     // Fades up into place once, when it first renders. Off screen the
@@ -299,6 +312,12 @@ export const ChatMessage = memo(function ChatMessage({
     >
       <MessageContent expandable={message.role === 'user'}>
         <div className="flex flex-col w-full gap-2.5">
+          {pageTitle && (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <PanelsTopLeft className="size-3 shrink-0" />
+              <span className="truncate">{pageTitle}</span>
+            </span>
+          )}
           {renderItems.map((item, i) => {
             switch (item.kind) {
               case 'reasoning':

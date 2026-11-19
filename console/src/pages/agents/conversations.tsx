@@ -2,6 +2,7 @@ import Page from '@/components/common/page';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import { stripPageContextFromTitle } from '@/lib/page-context';
 import {
   useAgentsControllerDeleteAllConversations,
   useAgentsControllerDeleteConversation,
@@ -16,6 +17,9 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 
 dayjs.extend(relativeTime);
+
+const titleOf = (conv: { title?: string | null }) =>
+  stripPageContextFromTitle(conv.title ?? '') || 'New conversation';
 
 export default function AgentConversationsPage() {
   const navigate = useNavigate();
@@ -90,7 +94,7 @@ export default function AgentConversationsPage() {
     (e: React.MouseEvent, conv: { id: string; title?: string | null }) => {
       e.stopPropagation();
       setEditingId(conv.id);
-      setEditingTitle(conv.title ?? 'New conversation');
+      setEditingTitle(titleOf(conv));
       setTimeout(() => inputRef.current?.select(), 0);
     },
     [],
@@ -178,7 +182,7 @@ export default function AgentConversationsPage() {
                   >
                     <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground" />
                     <span className="flex-1 truncate text-foreground">
-                      {conv.title ?? 'New conversation'}
+                      {titleOf(conv)}
                     </span>
                     <span className="text-xs text-muted-foreground shrink-0">
                       {dayjs(conv.updatedAt).fromNow()}

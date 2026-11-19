@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import { stripPageContextFromTitle } from '@/lib/page-context';
 import { cn } from '@/lib/utils';
 import {
   formatCost,
@@ -389,7 +390,8 @@ export default function AgentUsagePage() {
                   >
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">
-                        {session.title ?? 'New conversation'}
+                        {stripPageContextFromTitle(session.title ?? '') ||
+                          'New conversation'}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {formatDistanceToNow(new Date(session.lastActiveAt), {
