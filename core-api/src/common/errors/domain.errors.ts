@@ -7,8 +7,10 @@
  * Without a message, each error uses the text Nest's matching HTTP exception
  * would, so a response reads the same either way.
  */
+import type { I18nPath } from '@/i18n/i18n.generated';
+
 export interface DomainErrorI18n {
-  key: string;
+  key: I18nPath;
   args?: Record<string, unknown>;
 }
 

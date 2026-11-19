@@ -99,10 +99,13 @@ export class UpdatePermissionGroupDto {
   @IsArray()
   @ArrayMaxSize(50)
   @ArrayUnique()
-  @IsString({ each: true })
+  @IsString({
+    each: true,
+    message: i18nValidationMessage('validation.IS_STRING'),
+  })
   @Matches(PERMISSION_KEY_REGEX, {
     each: true,
-    message: 'Invalid permission key. Use "*" or "domain.action" (e.g. target.read)',
+    message: i18nValidationMessage('validation.MATCHES'),
   })
   permissions?: string[];
 }

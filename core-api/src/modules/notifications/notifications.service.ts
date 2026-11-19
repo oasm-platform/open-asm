@@ -7,6 +7,7 @@ import { Notification } from './entities/notification.entity';
 
 import { NotificationsSink } from '../event-bridge/sinks/notifications/notifications.sink';
 import { I18nService } from 'nestjs-i18n';
+import type { I18nPath, I18nTranslations } from '@/i18n/i18n.generated';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import {
   GetNotificationsQueryDto,
@@ -27,7 +28,7 @@ export class NotificationsService {
     private notificationRecipientRepo: Repository<NotificationRecipient>,
     @InjectRepository(Notification)
     private notificationRepo: Repository<Notification>,
-    private readonly i18n: I18nService,
+    private readonly i18n: I18nService<I18nTranslations>,
     private readonly sink: NotificationsSink,
   ) {}
 
@@ -117,11 +118,13 @@ export class NotificationsService {
     const lastTs = last && raw.find((r) => r.recipient_id === last.id)?.cursor_ts;
 
     const data: NotificationResponseDto[] = notifications.map((n) => {
-      const key = `notification.${n.notification.type}`;
-      const message = this.i18n.translate<string>(key, {
+      // Template key: a new NotificationType without an en/notification.json
+      // entry fails type-check here, not at runtime.
+      const key = `notification.${n.notification.type}` as I18nPath;
+      const message = this.i18n.translate(key, {
         lang,
         args: n.notification.metadata || {},
-      }) as string;
+      });
       const url = buildNotificationUrl(
         n.notification.type,
         n.notification.metadata || {},
