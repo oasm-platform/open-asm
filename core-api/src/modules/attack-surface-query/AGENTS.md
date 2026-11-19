@@ -4,9 +4,9 @@ AttackSurfaceQuery (ASQ): a JSON query language over the attack surface tables (
 
 ## Layout
 
-- `domain/`: pure, no TypeORM. `query.schema.ts` (zod `QueryBatchSchema`, `.strict()` everywhere), `query-validator.ts` (`parseBatch`, `validateBatch`: paths, operators, values, limits, permissions; collects every issue with its path), `query-cost.ts` (static cost + hints), `query-limits.ts` (`limitsFor(caller, mode)`), `time-window.ts` (`now-5d`, ISO with offset), `query-signature.ts` (what a cursor is bound to), `query-errors.ts` (`AsqError`, codes → HTTP status).
-- `catalog/`: `resources.ts` (one `ResourceDef` per resource: fields with SQL fragments, one-relations = JOIN, many-relations = include/EXISTS), `catalog.ts` (`CATALOG`, `assertCatalog` boot check, `describeCatalog`, type operators and value checks), `paths.ts` (`resolvePath` with "did you mean").
-- `engine/`: `planner.ts` (`planQuery` → `QueryPlan`: list, aggregate, capped total, LATERAL includes), `compile-where.ts` (filter tree → SQL via the shared `compileFilter`; list paths → correlated `EXISTS`), `sql-builder.ts` (aliases, joins, scope predicates), `cursor.ts` (HMAC keyset cursors), `executor.ts` (`withReadOnlyUnit`, `executePlans`), `preflight.ts` (EXPLAIN gate), `pg-errors.ts`, `result-shaper.ts`, `concurrency.ts`.
+- `domain/`: pure, no TypeORM. `query.schema.ts` (zod `QueryBatchSchema`, `.strict()` everywhere; `where`/`having` are only shape-checked there), `query-validator.ts` (`parseBatch`, `validateBatch`: paths, operators, values, limits, permissions, `having`, `fill`, `options.timezone`; collects every issue with its path), `where.ts` (the `where` language: `normalizeWhere` → `WhereNode` tree of conditions, nested groups, `not`, relation tests; `conditionsOf`/`relationsOf`/`ownConditionsOf`), `having.ts` (`normalizeHaving`, `aggregateType`), `query-params.ts` (`applyParams`: saved-query `params` + `{ "$param" }` markers), `query-cost.ts` (static cost + hints), `query-limits.ts` (`limitsFor(caller, mode)`, incl. `filter` caps), `time-window.ts` (`now-5d`, ISO with offset), `query-signature.ts` (what a cursor is bound to), `query-errors.ts` (`AsqError`, codes → HTTP status).
+- `catalog/`: `resources.ts` (one `ResourceDef` per resource: fields with SQL fragments, one-relations = JOIN, many-relations = include/EXISTS/relation tests), `catalog.ts` (`CATALOG`, `assertCatalog` boot check, `describeCatalog`, `TYPE_OPS` + `NULL_OPS` per field, `OP_VALUE_SHAPE`, value checks), `paths.ts` (`resolvePath` with "did you mean").
+- `engine/`: `planner.ts` (`planQuery` → `QueryPlan`: list, aggregate, capped total, LATERAL includes), `compile-where.ts` (`WhereNode` → SQL: list paths → correlated `EXISTS`, relation tests → `(NOT) EXISTS` / `COUNT(*)` subqueries; ASQ's own compiler, the shared `common/utils/filter-tree.ts` is not used), `aggregate-sql.ts` (`aggregateExpr` with `FILTER (WHERE …)`, `compileHaving`, `fillSeries`), `sql-builder.ts` (aliases, joins, `tenantTerm`, scope predicates), `cursor.ts` (HMAC keyset cursors), `executor.ts` (`withReadOnlyUnit`, `executePlans`), `preflight.ts` (EXPLAIN gate), `pg-errors.ts`, `result-shaper.ts`, `concurrency.ts`.
 - `attack-surface-query.service.ts` (run, explain, describe, report jobs), `asq-connections.service.ts` (semaphore, cursor codec, replica, RLS detection, catalog boot check), `asq-saved-queries.service.ts`, `asq-rollups.service.ts` (cron), `processors/asq-report.processor.ts`, `asq-error.interceptor.ts`.
 - `entities/`: `AsqSavedQuery` (`asq_saved_queries`), `AsqSurfaceRollup` (`asq_surface_rollups`).
 - Ops scripts: `core-api/scripts/asq-backfill.ts` (`task api:asq:backfill`), `core-api/scripts/asq-benchmark.ts` (`task api:asq:bench`, local DB only).
@@ -16,7 +16,7 @@ AttackSurfaceQuery (ASQ): a JSON query language over the attack surface tables (
 | Route | Permission |
 |---|---|
 | `GET attack-surface/schema`, `POST attack-surface/query`, `POST attack-surface/explain`, `GET attack-surface/jobs/:jobId` | membership (`@WorkspaceAccess()`); every resource a query reads is then checked: `asset.read`, `vulnerability.read`, `target.read` |
-| `GET attack-surface/saved-queries[/:id]`, `POST saved-queries/:id/run` | `report.read` |
+| `GET attack-surface/saved-queries[/:id]`, `POST saved-queries/:id/run` (body `{ params? }`, optional) | `report.read` |
 | `POST/PATCH/DELETE attack-surface/saved-queries[/:id]` | `report.write` |
 
 - `POST query` with `options.mode = "report"` queues BullMQ `ASQ_REPORT` (`asq-report`, concurrency 1) and returns `{ jobId, status }`; the state and result live in Redis `asq:report:<workspaceId>:<jobId>` for 1 h (`REPORT_RESULT_TTL_S`). Report mode is HTTP only.
@@ -29,13 +29,15 @@ AttackSurfaceQuery (ASQ): a JSON query language over the attack surface tables (
 
 ## Data model
 
-- `asq_saved_queries`: unique `(workspaceId, name)`, `spec` jsonb (a `QueryBatchInput`, re-validated on every run), `createdBy` SET NULL. Workspace CASCADE.
+- `asq_saved_queries`: unique `(workspaceId, name)`, `spec` jsonb (a `QueryBatchInput`, plus an optional `params` declaration; re-validated on every run), `createdBy` SET NULL. Workspace CASCADE.
 - `asq_surface_rollups`: unique `(workspaceId, metric, key)`; metrics `port`, `technology`, `webserver`, `statusCode`, `tlsVersion` over each service's latest response. Replaced per workspace in one transaction.
 - Reads the tenant columns added by migrations `AddWorkspaceScopeColumns` / `AddWorkspaceScopeConstraints`: `workspaceId` on every attack surface table (+ `targetId` on `asset_services`, `discovered_urls`), `asset_services.latestHttpResponseId`, `lastSeenAt` on assets and services. See `assets/AGENTS.md`.
 
 ## Invariants
 
-- **Tenant scope is compiled, never supplied.** `workspaceId` comes from the guard or the agent run; zod `.strict()` refuses a `workspaceId` key anywhere. Every statement's WHERE starts with `<root>."workspaceId" = :ws`; every other term (project, base predicate, window, the caller's filter, keyset) is its own parenthesized AND term, so an `or` cannot escape. Every JOIN also matches `workspaceId`; every include and EXISTS re-applies the scope. `planner.spec.ts` checks this for every resource × field × operator.
+- **Tenant scope is compiled, never supplied.** `workspaceId` comes from the guard or the agent run; zod `.strict()` refuses a `workspaceId` key anywhere. Every statement's WHERE starts with the root's tenant term (`tenantTerm`: `<root>."workspaceId" = :ws`, or the resource's `scopePredicate`); every other term (project, base predicate, window, the caller's filter, keyset, HAVING) is its own parenthesized AND term, so an `or` or a `not` cannot escape. Every JOIN also matches `workspaceId` (or the `:ws` parameter / predicate when either side has no column); every include, EXISTS, relation test and `COUNT` subquery re-applies the child's tenant term. `planner.spec.ts` checks this for every resource × field × operator (negated) and every relation × quantifier/count.
+- **Saved-query params never reach SQL text.** `applyParams` swaps `{ "$param" }` markers on the raw JSON before `parseBatch`, only in `value` / `limit` / `since` / `until` positions; zod and the validator then check the substituted values like literal ones. Every param must declare a default, and the spec is validated with the defaults when saved; reports (`runSpec`) run it with the defaults.
+- `options.timezone` must pass `Intl.DateTimeFormat` and a name regex; it reaches SQL as a parameter (`date_trunc(…, CAST(:p AS text))`, the 4-argument `generate_series`, Postgres 16+). Without it the literal `'UTC'` is emitted, so older queries compile to the same SQL.
 - The DB enforces the same: composite FKs `(parentId, workspaceId) → parent(id, workspaceId)`, and when role `asq_reader` exists, each unit runs `SET LOCAL ROLE asq_reader` + `app.workspace_id` under RLS policies `asq_tenant`/`asq_others` (`AsqConnectionsService.rls`; without the role it logs a warning and relies on the compiler).
 - Only catalog names reach SQL; values only travel as parameters (`compileFilter`, `ParamBag`). `assertCatalog` runs at boot: a fragment using an undeclared alias or a resource without a valid relation stops the boot. `describeCatalog` never exposes SQL or table names.
 - Execution: one `BEGIN … READ ONLY` unit per query (or one REPEATABLE READ unit with `consistent`), `SET LOCAL statement_timeout`, always ROLLBACK + release. At most `ASQ_MAX_CONNECTIONS` (3) units per process; waiting > 2 s is `BUSY`. Interactive queries run `EXPLAIN (FORMAT JSON)` first and are refused over `maxPlannerCost`, or when a `bounded` sort covers more than `maxSortRows`.
@@ -51,11 +53,21 @@ AttackSurfaceQuery (ASQ): a JSON query language over the attack surface tables (
 
 ## Gotchas
 
-- A list path in `where` means "has at least one related row"; `neq`/`notIn`/`notContains` on it mean "has no related row that…" (compileFilter negates the whole EXISTS).
+- A list path in `where` means "has at least one related row"; `neq`/`notIn`/`notContains` on it mean "has no related row that…" (the compiler negates the whole EXISTS).
+- Relation tests: `every` is true for a row with no related rows; inside a relation test's `where` there is no second list (`NESTED_RULES`). `between` includes both ends. Group depth counts groups only (`filter.depth`, root = 1); `not` chains are capped at 8.
+- `fill` sizes the series from the window (`fillPoints`, an upper bound) and sets `limit` to it when the caller gave none; `having` runs inside the series, so a bucket it drops comes back as 0.
+- Aggregate filters compile with their own sub-alias counter (`r_x0` may appear in both the WHERE and a `FILTER`): each lives in its own subquery, so this is legal SQL.
+
+## Adding a resource
+
+1. The table (a migration, approved first: see the repo `AGENTS.md`) carries `workspaceId` with a composite FK to its parent and the `asq_fill_scope` trigger, and the migration grants `SELECT` to `asq_reader` and adds the `asq_tenant`/`asq_others` policies (as `AddWorkspaceScopeConstraints` does for `RLS_TABLES`). A table without `workspaceId` instead declares `scopePredicate` (`{a}`, `{ws}`, a `"workspaceId"` column) and only needs the `SELECT` grant (like `RLS_PLAIN_GRANTS`).
+2. A `ResourceDef` in `resources.ts`, listed in `RESOURCES`: `permission` is an existing route key; never declare secret or encrypted columns (every declared field is selectable, filterable and groupable by whoever reads the resource; `heavy` keeps a field from agents only).
+3. Many-relations from the parents that should reach it, with `indexedOrder` backed by an index.
+4. `SKILL.md` (table of resources, recipes) and the e2e isolation test. `catalog and database agree` in `test/attack-surface-query.e2e-spec.ts` fails when the grant, the column or the policy is missing, and when a declared field does not run under `asq_reader`.
 - `timestamp` columns are `timestamp without time zone`; the compiler compares and selects them as `timestamptz` (session time zone), and cursors carry ISO instants.
 - Include orders are limited to `ManyRelationDef.indexedOrder` (LATERAL … LIMIT stops early only on an index).
 - MCP calls have no member: they read `asset.read`, `vulnerability.read`, `target.read` of the API key's workspace.
 
 ## Testing
 
-Unit: `domain/*.spec.ts`, `catalog/catalog.spec.ts`, `engine/planner.spec.ts` (with the scope property test), `engine/cursor.spec.ts`, `engine/runtime.spec.ts`, `engine/executor.spec.ts`, `attack-surface-query.service.spec.ts`, `attack-surface-query.controller.spec.ts`, `asq-background.spec.ts`. E2E (live DB): `core-api/test/attack-surface-query.e2e-spec.ts` (tenant isolation over every resource, triggers, composite FKs, RLS, read-only, timeouts, cursors, HTTP, report jobs).
+Unit: `domain/*.spec.ts` (`query-validator.spec.ts` covers `where`, aggregates, `having`, `fill`, time zones; `query-params.spec.ts`), `catalog/catalog.spec.ts`, `engine/planner.spec.ts` (with the scope property test and a predicate-scoped test catalog), `engine/cursor.spec.ts`, `engine/runtime.spec.ts`, `engine/executor.spec.ts`, `attack-surface-query.service.spec.ts`, `attack-surface-query.controller.spec.ts`, `asq-background.spec.ts`. E2E (live DB): `core-api/test/attack-surface-query.e2e-spec.ts` (tenant isolation over every resource, triggers, composite FKs, RLS, read-only, timeouts, cursors, the new language constructs on Postgres, catalog ↔ database agreement, HTTP incl. saved-query params, report jobs).

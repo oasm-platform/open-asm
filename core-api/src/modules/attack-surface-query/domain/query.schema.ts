@@ -25,13 +25,13 @@ export const OrderBySchema = z
   .strict();
 
 /**
- * The filter tree keeps its own validator (`validateFilter` of
- * common/utils/filter-tree.ts); zod only checks the outer shape.
+ * The filter tree has its own validator (`normalizeWhere` of domain/where.ts,
+ * which also caps its size per caller); zod only checks the outer shape.
  */
 export const FilterSchema = z
   .object({
     logic: z.enum(['and', 'or']),
-    items: z.array(z.unknown()).max(20),
+    items: z.array(z.unknown()).max(50),
   })
   .strict();
 
@@ -45,13 +45,19 @@ export const GroupBySchema = z.union([
 export const AggregateFnSchema = z.enum([
   'count',
   'countDistinct',
+  'sum',
   'min',
   'max',
   'avg',
 ]);
 
 export const AggregateSchema = z
-  .object({ fn: AggregateFnSchema, field: PathSchema.optional() })
+  .object({
+    fn: AggregateFnSchema,
+    field: PathSchema.optional(),
+    /** Only the rows matching it count (`FILTER (WHERE …)`). */
+    where: FilterSchema.optional(),
+  })
   .strict();
 
 export interface IncludeInput {
@@ -84,6 +90,10 @@ export const QuerySpecSchema = z
     windowField: PathSchema.optional(),
     groupBy: z.array(GroupBySchema).max(3).optional(),
     aggregate: z.record(NameSchema, AggregateSchema).optional(),
+    /** Filter on the grouped rows: group keys and aggregate names. */
+    having: FilterSchema.optional(),
+    /** One row per time bucket of the window, empty buckets included. */
+    fill: z.boolean().optional(),
     orderBy: z.array(OrderBySchema).max(3).optional(),
     limit: z.number().int().min(1).max(50_000).optional(),
     cursor: z.string().max(2048).optional(),
@@ -96,7 +106,8 @@ export const MAX_QUERIES_PER_BATCH = 10;
 export const QueryOptionsSchema = z
   .object({
     consistent: z.boolean().optional(),
-    timezone: z.literal('UTC').optional(),
+    /** IANA time zone of time buckets (checked by the validator). */
+    timezone: z.string().min(1).max(64).optional(),
     mode: z.enum(['interactive', 'report']).optional(),
   })
   .strict();

@@ -31,6 +31,7 @@ import {
   QueryBatchDto,
   QueryBatchResultDto,
   ReportJobDto,
+  RunSavedQueryDto,
   SavedQueryDto,
   SchemaResponseDto,
   UpdateSavedQueryDto,
@@ -203,7 +204,7 @@ export class AttackSurfaceQueryController {
 
   @Doc({
     summary: 'Run a saved query',
-    description: 'Runs a saved batch with your current permissions.',
+    description: 'Runs a saved batch with your current permissions; params the batch declares can be set in the body.',
     response: { serialization: QueryBatchResultDto },
     request: { getWorkspaceId: true, params: idParam },
   })
@@ -214,7 +215,10 @@ export class AttackSurfaceQueryController {
     @Req() req: RequestWithMetadata,
     @WorkspaceId() workspaceId: string,
     @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RunSavedQueryDto,
   ) {
-    return this.savedQueries.run(this.scope(req, workspaceId), id);
+    // No body (older clients) runs with the defaults.
+    this.assertBodySize(dto?.params);
+    return this.savedQueries.run(this.scope(req, workspaceId), id, dto?.params ?? {});
   }
 }

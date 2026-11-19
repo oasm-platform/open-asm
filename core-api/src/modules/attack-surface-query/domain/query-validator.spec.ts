@@ -88,7 +88,8 @@ describe('validateBatch', () => {
     const byPath = Object.fromEntries(issues.map((i) => [i.path, i]));
     expect(byPath['queries.a.select[0]'].message).toMatch(/Did you mean "port"/);
     expect(byPath['queries.a.select[1]'].message).toMatch(/Did you mean "value"/);
-    expect(byPath['queries.a.where'].code).toBe('OP_NOT_ALLOWED');
+    expect(byPath['queries.a.where.items[0].op'].code).toBe('OP_NOT_ALLOWED');
+    expect(byPath['queries.a.where.items[0].op'].message).toMatch(/ops: eq, neq/);
     expect(byPath['queries.b.from'].code).toBe('UNKNOWN_RESOURCE');
   });
 
@@ -109,7 +110,9 @@ describe('validateBatch', () => {
         a: { from: 'tls', where: { logic: 'and', items: [{ field: 'notAfter', op: 'lt', value: 'now+30d' }] } },
       },
     });
-    expect(batch.queries[0].where?.items[0]).toEqual({ field: 'notAfter', op: 'lt', value: '2026-12-18T07:00:00.000Z' });
+    const where = batch.queries[0].where;
+    const cond = where?.kind === 'group' ? where.items[0] : undefined;
+    expect(cond).toMatchObject({ kind: 'cond', op: 'lt', values: ['2026-12-18T07:00:00.000Z'] });
   });
 
   it('refuses list relations outside where and include', () => {
@@ -123,7 +126,9 @@ describe('validateBatch', () => {
         a: { from: 'services', where: { logic: 'and', items: [{ field: 'technologies.name', op: 'eq', value: 'nginx' }] } },
       },
     });
-    expect(batch.queries[0].wherePaths.get('technologies.name')?.hops[0].kind).toBe('many');
+    const where = batch.queries[0].where;
+    const cond = where?.kind === 'group' ? where.items[0] : undefined;
+    expect(cond?.kind === 'cond' && cond.path.hops[0].kind).toBe('many');
   });
 
   it('refuses mixing aggregate with select, include, cursor or withTotal', () => {
@@ -298,5 +303,191 @@ describe('estimateCost', () => {
   it('keeps the default agent query under the agent budget', () => {
     const [query] = validate({ window: { since: 'now-5d' }, queries: { a: { from: 'hosts' } } }).queries;
     expect(estimateCost(query).cost).toBeLessThan(300);
+  });
+
+  it('charges a relation count more than a relation test', () => {
+    const cost = (rel: Record<string, unknown>) =>
+      estimateCost(validate({ queries: { a: { from: 'hosts', where: { logic: 'and', items: [rel] } } } }).queries[0]).cost;
+    expect(cost({ relation: 'services', count: { op: 'gte', value: '5' } })).toBeGreaterThan(cost({ relation: 'services' }));
+  });
+});
+
+describe('aggregates', () => {
+  const agg = (query: Record<string, unknown>, scope: QueryScope = ALL, options?: Record<string, unknown>) =>
+    validate({ ...(options ? { options } : {}), queries: { a: { from: 'vulnerabilities', window: null, ...query } } }, scope).queries[0];
+
+  it('accepts sum on a number and a filter per aggregate', () => {
+    const q = agg({
+      groupBy: ['severity'],
+      aggregate: { n: { fn: 'sum', field: 'cvssScore' }, open: { fn: 'count', where: { logic: 'and', items: [{ field: 'isOpen', op: 'eq', value: 'true' }] } } },
+    });
+    expect(q.aggregate.map((a) => [a.fn, a.where?.kind])).toEqual([['sum', undefined], ['count', 'group']]);
+  });
+
+  it('refuses sum on text, and an aggregate filter on a resource the member cannot read', () => {
+    expect(issuesOf(() => agg({ aggregate: { n: { fn: 'sum', field: 'name' } } }))[0].code).toBe('NOT_GROUPABLE');
+    expect(() =>
+      validate(
+        { queries: { a: { from: 'hosts', aggregate: { n: { fn: 'count', where: { logic: 'and', items: [{ relation: 'vulnerabilities' }] } } } } } },
+        { ...ALL, permissions: ['asset.read'] },
+      ),
+    ).toThrow(expect.objectContaining({ code: 'PERMISSION_DENIED' }));
+  });
+
+  it('resolves having against group keys and aggregate names', () => {
+    const q = agg({
+      groupBy: ['severity'],
+      aggregate: { n: { fn: 'count' } },
+      having: { logic: 'or', items: [{ field: 'n', op: 'gte', value: '10' }, { field: 'severity', op: 'in', value: ['critical', 'high'] }] },
+    });
+    expect(q.having).toMatchObject({
+      kind: 'group',
+      items: [
+        { kind: 'cond', ref: { kind: 'aggregate', index: 0 }, type: 'int' },
+        { kind: 'cond', ref: { kind: 'group', index: 0 }, op: 'in' },
+      ],
+    });
+  });
+
+  it.each([
+    ['an unknown name', { field: 'x', op: 'eq', value: '1' }, 'UNKNOWN_FIELD'],
+    ['an order test on text', { field: 'severity', op: 'gt', value: 'high' }, 'OP_NOT_ALLOWED'],
+    ['a value outside the enum', { field: 'severity', op: 'eq', value: 'urgent' }, 'INVALID_VALUE'],
+    ['a non-number count', { field: 'n', op: 'gt', value: 'many' }, 'INVALID_VALUE'],
+  ])('refuses having on %s', (_label, cond, code) => {
+    const issues = issuesOf(() => agg({ groupBy: ['severity'], aggregate: { n: { fn: 'count' } }, having: { logic: 'and', items: [cond] } }));
+    expect(issues[0].code).toBe(code);
+  });
+
+  it('refuses having, fill and groupBy without aggregate', () => {
+    const issues = issuesOf(() => validate({ queries: { a: { from: 'hosts', having: { logic: 'and', items: [] }, fill: true } } }));
+    expect(issues.map((i) => i.path).sort()).toEqual(['queries.a.fill', 'queries.a.having']);
+  });
+
+  it('fills a time series over the window and sizes it', () => {
+    const q = validate({
+      queries: { a: { from: 'hosts', window: { since: 'now-24h' }, groupBy: [{ field: 'firstSeen', bucket: 'hour' }], aggregate: { n: { fn: 'count' } }, fill: true } },
+    }).queries[0];
+    expect(q.fill).toBe(true);
+    expect(q.limit).toBe(26);
+    expect(q.orderBy).toMatchObject([{ key: 'firstSeen', dir: 'asc' }]);
+  });
+
+  it.each([
+    ['no window', { window: null, groupBy: [{ field: 'firstSeen', bucket: 'day' }] }, 'MODE_CONFLICT'],
+    ['no time group', { window: { since: 'now-1d' }, groupBy: ['kind'] }, 'MODE_CONFLICT'],
+    ['too many buckets', { window: { since: 'now-3650d' }, groupBy: [{ field: 'firstSeen', bucket: 'hour' }] }, 'LIMIT_EXCEEDED'],
+  ])('refuses fill with %s', (_label, query, code) => {
+    const issues = issuesOf(() => validate({ queries: { a: { from: 'hosts', aggregate: { n: { fn: 'count' } }, fill: true, ...query } } }));
+    expect(issues[0].code).toBe(code);
+  });
+
+  it('takes an IANA time zone and refuses anything else', () => {
+    expect(agg({ aggregate: { n: { fn: 'count' } } }, ALL, { timezone: 'Asia/Ho_Chi_Minh' }).timezone).toBe('Asia/Ho_Chi_Minh');
+    expect(agg({ aggregate: { n: { fn: 'count' } } }).timezone).toBe('UTC');
+    expect(issuesOf(() => agg({ aggregate: { n: { fn: 'count' } } }, ALL, { timezone: "UTC'; --" }))[0].path).toBe('options.timezone');
+  });
+});
+
+describe('where', () => {
+  const where = (from: string, items: unknown[], scope: QueryScope = ALL) =>
+    validate({ queries: { a: { from, where: { logic: 'and', items } } } }, scope).queries[0].where;
+
+  it('nests groups and negations', () => {
+    const tree = where('services', [
+      { logic: 'or', items: [{ field: 'port', op: 'eq', value: '22' }, { not: { logic: 'and', items: [{ field: 'port', op: 'gt', value: '1024' }] } }] },
+    ]);
+    expect(tree).toMatchObject({
+      kind: 'group',
+      items: [{ kind: 'group', logic: 'or', items: [{ kind: 'cond' }, { kind: 'not', item: { kind: 'group' } }] }],
+    });
+  });
+
+  it('still reads the legacy {logic, conditions} group', () => {
+    const tree = where('services', [{ logic: 'or', conditions: [{ field: 'port', op: 'eq', value: '22' }] }]);
+    expect(tree).toMatchObject({ items: [{ kind: 'group', items: [{ kind: 'cond' }] }] });
+  });
+
+  it('caps the group depth and the not chain', () => {
+    const port = { field: 'port', op: 'eq', value: '22' };
+    const group = (item: unknown) => ({ logic: 'and', items: [item] });
+    expect(() => where('services', [group(group(group(port)))])).not.toThrow();
+    expect(issuesOf(() => where('services', [group(group(group(group(port))))]))[0].code).toBe('LIMIT_EXCEEDED');
+    let nots: unknown = port;
+    for (let i = 0; i < 9; i++) nots = { not: nots };
+    expect(issuesOf(() => where('services', [nots]))[0].code).toBe('LIMIT_EXCEEDED');
+  });
+
+  it('caps the condition count per caller', () => {
+    const items = Array.from({ length: 21 }, () => ({ field: 'port', op: 'eq', value: '22' }));
+    expect(() => where('services', items)).not.toThrow();
+    const issues = issuesOf(() => where('services', items, { ...ALL, caller: 'agent' }));
+    expect(issues[0].code).toBe('LIMIT_EXCEEDED');
+  });
+
+  it.each([
+    ['services', 'port', 'between', ['1', '1024']],
+    ['services', 'lastSeen', 'isNull', undefined],
+    ['services', 'lastSeen', 'between', ['now-7d', 'now']],
+    ['hosts', 'value', 'startsWith', 'api.'],
+    ['hosts', 'value', 'endsWith', '.example.com'],
+    ['ips', 'ip', 'notInSubnet', ['10.0.0.0/8']],
+    ['vulnerabilities', 'cve', 'containsAll', ['CVE-2024-1', 'CVE-2024-2']],
+    ['vulnerabilities', 'cve', 'containsAny', ['CVE-2024-1']],
+    ['hosts', 'isPrimary', 'neq', 'true'],
+  ])('accepts %s.%s %s', (from, field, op, value) => {
+    expect(() => where(from, [{ field, op, ...(value === undefined ? {} : { value }) }])).not.toThrow();
+  });
+
+  it.each([
+    ['isNull on a field that is never NULL', 'services', { field: 'port', op: 'isNull' }],
+    ['isNull with a value', 'services', { field: 'lastSeen', op: 'isNull', value: 'x' }],
+    ['between with one value', 'services', { field: 'port', op: 'between', value: ['1'] }],
+    ['between in the wrong order', 'services', { field: 'port', op: 'between', value: ['100', '1'] }],
+    ['startsWith on a number', 'services', { field: 'port', op: 'startsWith', value: '8' }],
+    ['notInSubnet with an IP', 'ips', { field: 'ip', op: 'notInSubnet', value: ['10.0.0.1'] }],
+  ])('refuses %s', (_label, from, cond) => {
+    expect(issuesOf(() => where(from, [cond])).length).toBeGreaterThan(0);
+  });
+
+  it('resolves a relation test against the child resource', () => {
+    const tree = where('hosts', [
+      { relation: 'services', quantifier: 'none', where: { logic: 'and', items: [{ field: 'port', op: 'eq', value: '22' }] } },
+    ]);
+    expect(tree).toMatchObject({
+      items: [{ kind: 'rel', quantifier: 'none', relation: { path: 'services', child: { name: 'services' } }, where: { kind: 'group' } }],
+    });
+  });
+
+  it('reads a relation through one-relations', () => {
+    const tree = where('services', [{ relation: 'host.vulnerabilities', count: { op: 'gte', value: '3' } }]);
+    expect(tree).toMatchObject({ items: [{ kind: 'rel', count: { op: 'gte', value: 3 }, relation: { chain: ['host'] } }] });
+  });
+
+  it.each([
+    ['an unknown relation', { relation: 'ports' }, 'UNKNOWN_RELATION'],
+    ['a one-relation', { relation: 'host' }, 'UNKNOWN_RELATION'],
+    ['every without where', { relation: 'services', quantifier: 'every' }, 'INVALID_SHAPE'],
+    ['quantifier and count together', { relation: 'services', quantifier: 'none', count: { op: 'gt', value: '1' } }, 'MODE_CONFLICT'],
+    ['a negative count', { relation: 'services', count: { op: 'gt', value: '-1' } }, 'INVALID_VALUE'],
+    [
+      'a nested relation test',
+      { relation: 'services', where: { logic: 'and', items: [{ relation: 'urls' }] } },
+      'UNKNOWN_RELATION',
+    ],
+    [
+      'a list path inside a relation test',
+      { relation: 'services', where: { logic: 'and', items: [{ field: 'urls.url', op: 'eq', value: 'x' }] } },
+      'UNKNOWN_RELATION',
+    ],
+  ])('refuses %s', (_label, rel, code) => {
+    const issues = issuesOf(() => where('hosts', [rel]));
+    expect(issues[0].code).toBe(code);
+  });
+
+  it('requires the permission of the resource a relation test reads', () => {
+    expect(() =>
+      where('hosts', [{ relation: 'vulnerabilities', quantifier: 'none' }], { ...ALL, permissions: ['asset.read'] }),
+    ).toThrow(expect.objectContaining({ code: 'PERMISSION_DENIED' }));
   });
 });

@@ -1,11 +1,12 @@
 import type { Catalog, FieldType } from '../catalog/catalog.types';
-import { SCOPE_COLUMN } from '../catalog/catalog.types';
 import type { ResolvedPath } from '../catalog/paths';
 import type {
   NormalizedInclude,
   NormalizedOrder,
   NormalizedQuery,
 } from '../domain/query.types';
+import { aggregateType } from '../domain/having';
+import { aggregateExpr, compileHaving, fillSeries } from './aggregate-sql';
 import { compileWhere } from './compile-where';
 import { keysetPredicate, type CursorValue, type KeysetColumn } from './cursor';
 import {
@@ -16,6 +17,7 @@ import {
   q,
   scopePredicates,
   selectExpr,
+  tenantTerm,
   withClause,
   type CompiledSql,
   type ScopeParams,
@@ -139,7 +141,7 @@ function compileInclude(
   parentCols.push(`${expand(include.def.parentKey, { a: parentFrom.aliasOf([]) })} AS ${q(parentKeyAlias)}`);
 
   const childAlias = `i${index}`;
-  const from = new FromBuilder(parentFrom.catalog, include.resource, childAlias);
+  const from = new FromBuilder(parentFrom.catalog, include.resource, childAlias, scope.workspace);
   const child = from.aliasOf([]);
   const cols: string[] = [];
   const shape = selectColumns(from, include.select, cols);
@@ -148,11 +150,11 @@ function compileInclude(
   );
   const order = orderSql(from, include.orderBy);
   const childParams = new ParamBag(`${queryPrefix}i${index}_`);
-  const where = compileWhere(from, include.where, include.wherePaths, scope, `${queryPrefix}i${index}_w`);
+  const where = compileWhere(from, include.where, scope, `${queryPrefix}i${index}_w`);
   if (where) childParams.merge(where.params);
   const predicates = [
     `${child}.${include.def.childKey} = asq_p.k`,
-    `${child}.${SCOPE_COLUMN} = ${scope.workspace}`,
+    tenantTerm(include.resource, child, scope.workspace),
     ...(include.def.extra ? [`(${expand(include.def.extra, { c: child })})`] : []),
     ...(include.resource.basePredicate ? [`(${expand(include.resource.basePredicate, { a: child })})`] : []),
     ...(where ? [where.sql] : []),
@@ -204,7 +206,7 @@ export function planQuery(
     workspace: params.add(scopeValues.workspaceId),
     project: scopeValues.projectId ? params.add(scopeValues.projectId) : undefined,
   };
-  const from = new FromBuilder(catalog, query.resource, 'r');
+  const from = new FromBuilder(catalog, query.resource, 'r', scope.workspace);
   const root = from.aliasOf([]);
   const terms = scopePredicates(query.resource, root, scope);
 
@@ -214,42 +216,37 @@ export function planQuery(
       `(${sql} >= CAST(${params.add(query.window.since.toISOString())} AS timestamptz) AND ${sql} < CAST(${params.add(query.window.until.toISOString())} AS timestamptz))`,
     );
   }
-  const where = compileWhere(from, query.where, query.wherePaths, scope, `${prefix}w`);
+  const where = compileWhere(from, query.where, scope, `${prefix}w`);
   if (where) {
     params.merge(where.params);
     terms.push(where.sql);
   }
 
   if (query.mode === 'aggregate') {
+    // 'UTC' stays a literal (the SQL of a query without a time zone is unchanged).
+    const tz = query.timezone === 'UTC' ? `'UTC'` : `CAST(${params.add(query.timezone)} AS text)`;
     const cols: string[] = [];
     const groups: string[] = [];
+    const aggregates: string[] = [];
     const shape: ShapeSpec = { columns: [], relations: [] };
     for (const [i, group] of query.groupBy.entries()) {
       const sql = from.pathSql(group.path);
       const expr = group.bucket
-        ? `date_trunc('${group.bucket}', ${sql}::timestamptz, 'UTC')`
+        ? `date_trunc('${group.bucket}', ${sql}::timestamptz, ${tz})`
         : selectExpr(sql, group.path.field);
       cols.push(`${expr} AS ${q(`g${i}`)}`);
       groups.push(expr);
       shape.columns.push({ alias: `g${i}`, path: group.key.split('.'), type: group.path.field.type });
     }
     for (const [i, agg] of query.aggregate.entries()) {
-      const sql = agg.path ? from.pathSql(agg.path) : '';
-      const expr =
-        agg.fn === 'count'
-          ? agg.path ? `COUNT(${sql})::int8` : 'COUNT(*)::int8'
-          : agg.fn === 'countDistinct'
-            ? `COUNT(DISTINCT ${sql})::int8`
-            : agg.fn === 'avg'
-              ? `AVG(${sql})::float8`
-              : `${agg.fn.toUpperCase()}(${selectExpr(sql, agg.path!.field)})`;
+      const filter = compileWhere(from, agg.where, scope, `${prefix}a${i}w`);
+      if (filter) params.merge(filter.params);
+      const expr = aggregateExpr(agg, agg.path ? from.pathSql(agg.path) : '', filter?.sql);
+      aggregates.push(expr);
       cols.push(`${expr} AS ${q(`a${i}`)}`);
-      shape.columns.push({
-        alias: `a${i}`,
-        path: [agg.alias],
-        type: agg.fn === 'count' || agg.fn === 'countDistinct' ? 'int' : agg.fn === 'avg' ? 'float' : agg.path!.field.type,
-      });
+      shape.columns.push({ alias: `a${i}`, path: [agg.alias], type: aggregateType(agg) });
     }
+    const having = query.having ? compileHaving(query.having, groups, aggregates, params) : '';
     const orderExprs = query.orderBy.map((o) => {
       if (o.alias) return `${q(`a${query.aggregate.findIndex((a) => a.alias === o.alias)}`)} ${nullsLast(o.dir)}`;
       return `${q(`g${query.groupBy.findIndex((g) => g.key === o.key)}`)} ${nullsLast(o.dir)}`;
@@ -257,10 +254,12 @@ export function planQuery(
     for (const [i, group] of query.groupBy.entries()) {
       if (!query.orderBy.some((o) => o.key === group.key)) orderExprs.push(`${q(`g${i}`)} ASC NULLS LAST`);
     }
-    const limit = params.add(query.limit);
-    const sql = `${withClause(from.usesFreshCte, scope.workspace)}SELECT ${cols.join(', ')}
+    const grouped = `SELECT ${cols.join(', ')}
 FROM ${from.renderFrom()}
-WHERE ${terms.join('\n  AND ')}${groups.length ? `\nGROUP BY ${groups.join(', ')}` : ''}${orderExprs.length ? `\nORDER BY ${orderExprs.join(', ')}` : ''}
+WHERE ${terms.join('\n  AND ')}${groups.length ? `\nGROUP BY ${groups.join(', ')}` : ''}${having ? `\nHAVING ${having}` : ''}`;
+    const body = query.fill && query.window ? fillSeries(query, grouped, tz, params) : grouped;
+    const limit = params.add(query.limit);
+    const sql = `${withClause(from.usesFreshCte, scope.workspace)}${body}${orderExprs.length ? `\nORDER BY ${orderExprs.join(', ')}` : ''}
 LIMIT ${limit}`;
     return {
       name: query.name,

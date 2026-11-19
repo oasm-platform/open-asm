@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 
 import { AttackSurfaceQueryService } from './attack-surface-query.service';
 import { AsqError } from './domain/query-errors';
+import { applyParams } from './domain/query-params';
 import type { QueryScope } from './domain/query.types';
 import type { CreateSavedQueryDto, UpdateSavedQueryDto } from './dto/attack-surface-query.dto';
 import { AsqSavedQuery } from './entities/asq-saved-query.entity';
@@ -35,7 +36,8 @@ export class AsqSavedQueriesService {
   }
 
   async create(scope: QueryScope, userId: string, dto: CreateSavedQueryDto): Promise<AsqSavedQuery> {
-    this.attackSurfaceQuery.validate(scope, dto.spec);
+    // Params are checked with their defaults: a saved spec always runs as is.
+    this.attackSurfaceQuery.validate(scope, applyParams(dto.spec));
     try {
       return await this.repo.save(
         this.repo.create({
@@ -54,7 +56,7 @@ export class AsqSavedQueriesService {
 
   async update(scope: QueryScope, id: string, dto: UpdateSavedQueryDto): Promise<AsqSavedQuery> {
     const row = await this.get(scope.workspaceId, id);
-    if (dto.spec) this.attackSurfaceQuery.validate(scope, dto.spec);
+    if (dto.spec) this.attackSurfaceQuery.validate(scope, applyParams(dto.spec));
     if (dto.name !== undefined) row.name = dto.name.trim();
     if (dto.description !== undefined) row.description = dto.description;
     if (dto.spec !== undefined) row.spec = dto.spec;
@@ -71,14 +73,14 @@ export class AsqSavedQueriesService {
     await this.repo.delete({ id: row.id, workspaceId });
   }
 
-  /** Runs a saved batch as the caller (their permissions, now). */
-  async run(scope: QueryScope, id: string) {
+  /** Runs a saved batch as the caller (their permissions, now), with `params` over the defaults. */
+  async run(scope: QueryScope, id: string, params: Record<string, unknown> = {}) {
     const row = await this.get(scope.workspaceId, id);
-    return this.attackSurfaceQuery.run(scope, row.spec);
+    return this.attackSurfaceQuery.run(scope, applyParams(row.spec, params));
   }
 
-  /** Runs a (saved, possibly adjusted) spec as the caller: query reports. */
+  /** Runs a (saved, possibly adjusted) spec as the caller, params at their defaults: query reports. */
   runSpec(scope: QueryScope, spec: Record<string, unknown>) {
-    return this.attackSurfaceQuery.run(scope, spec);
+    return this.attackSurfaceQuery.run(scope, applyParams(spec));
   }
 }
