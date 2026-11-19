@@ -1,12 +1,17 @@
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { usePermission } from '@/hooks/usePermission';
 import { Loader2 } from 'lucide-react';
-import { useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import AccessDenied from './access-denied';
 
 interface PageProps {
   children?: React.ReactNode;
   title?: string | React.ReactNode;
+  /**
+   * The browser tab's title, e.g. the item the page shows. Defaults to a
+   * string `title`, else the route's name.
+   */
+  documentTitle?: string;
   description?: string;
   header?: React.ReactNode;
   action?: React.ReactNode;
@@ -19,6 +24,7 @@ interface PageProps {
 const Page = ({
   children,
   title,
+  documentTitle,
   description,
   header,
   action,
@@ -28,14 +34,7 @@ const Page = ({
 }: PageProps) => {
   const { hasPermission, isLoading } = usePermission();
 
-  useEffect(() => {
-    if (typeof title === 'string' && title) {
-      document.title = `${title} | OASM`;
-    }
-    return () => {
-      document.title = 'OASM';
-    };
-  }, [title]);
+  useDocumentTitle(documentTitle ?? (typeof title === 'string' ? title : null));
 
   const canRender = !permission || hasPermission(permission);
 

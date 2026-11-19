@@ -34,7 +34,7 @@ export default function UserDetail() {
   if (!user) return <DetailNotFound entity="User" />;
 
   return (
-    <Page>
+    <Page documentTitle={user.name ? `${user.name} · Admin` : undefined}>
       <div className="mb-4 space-y-4">
         <DetailHero
           media={

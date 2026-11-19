@@ -3,6 +3,7 @@ import type { RouterContext } from '@/router';
 import { useWorkspaceSync } from '@/hooks/useWorkspaceSelector';
 import { usePermission } from '@/hooks/usePermission';
 import { OpenLinkDialog } from '@/components/ui/open-link';
+import { DocumentTitle } from '@/components/common/document-title';
 
 /**
  * Selects the workspace and warms its permissions for every route, so direct
@@ -24,6 +25,7 @@ function RootComponent() {
   return (
     <>
       <RootBootstrap />
+      <DocumentTitle />
       <Outlet />
       <OpenLinkDialog />
     </>

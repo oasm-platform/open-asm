@@ -69,6 +69,7 @@ export function GitOrgDetail({
   return (
     <Page
       permission="target.read"
+      documentTitle={target.value}
       title={
         <TargetSwitcher
           currentTargetId={target.id}

@@ -36,7 +36,7 @@ export default function WorkspaceDetail() {
   if (!workspace) return <DetailNotFound entity="Workspace" />;
 
   return (
-    <Page>
+    <Page documentTitle={workspace.name ? `${workspace.name} · Admin` : undefined}>
       <div className="mb-4 space-y-4">
         <DetailHero
           media={

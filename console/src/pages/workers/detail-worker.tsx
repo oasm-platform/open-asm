@@ -151,7 +151,7 @@ export default function WorkerDetail() {
   );
 
   return (
-    <Page permission="worker.read">
+    <Page permission="worker.read" documentTitle={worker.name || undefined}>
       <div className="space-y-6">
         <WorkerTelemetry
           telemetry={worker.telemetry}
