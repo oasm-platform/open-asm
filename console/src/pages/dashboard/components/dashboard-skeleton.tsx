@@ -15,7 +15,7 @@ import {
 import type { ReactNode } from 'react';
 
 const cardSurface =
-  'overflow-hidden border-border/70 bg-card/90 shadow-sm [&_[data-slot=skeleton]]:motion-reduce:animate-none';
+  'overflow-hidden border-border/70 bg-card/90 shadow-sm dark:border-transparent dark:bg-card-surface [&_[data-slot=skeleton]]:motion-reduce:animate-none';
 
 const statSparklines = [
   'M2 34 C24 30, 34 18, 54 24 S82 39, 102 19 S136 10, 158 16',
@@ -365,7 +365,7 @@ export function IpLocationsSkeleton() {
         title="Locations"
         description="Distribution of asset IPs by location"
       />
-      <div className="grid flex-1 gap-4 p-4 lg:grid-cols-[minmax(0,3fr)_minmax(13rem,1fr)]">
+      <div className="grid flex-1 gap-4 p-4 @3xl/dashboard-main:grid-cols-[minmax(0,3fr)_minmax(13rem,1fr)]">
         <div className="relative min-h-[350px] overflow-hidden rounded-xl border bg-muted/20">
           <div
             className="absolute inset-0 opacity-40"
@@ -444,7 +444,7 @@ export function DashboardStatsSkeleton() {
     <section
       aria-busy="true"
       aria-label="Loading dashboard statistics"
-      className="grid h-full grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-4 [&_[data-slot=skeleton]]:motion-reduce:animate-none"
+      className="grid h-full grid-cols-1 gap-4 @md/dashboard-main:grid-cols-2 @3xl/dashboard-main:grid-cols-4 [&_[data-slot=skeleton]]:motion-reduce:animate-none"
       role="status"
     >
       {stats.map((stat, index) => (

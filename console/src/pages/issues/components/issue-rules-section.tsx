@@ -180,7 +180,7 @@ export function IssueRulesSection() {
           </Button>
         </div>
       ) : (
-        <ul className="flex flex-col divide-y rounded-lg border">
+        <ul className="flex flex-col divide-y rounded-lg border dark:bg-card-surface">
           {rules.map((rule) => (
             <li
               key={rule.id}

@@ -1,4 +1,3 @@
-import { RouteProgress } from '@/components/common/route-progress';
 import { Toaster } from '@/components/ui/sonner';
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
 import {
@@ -194,20 +193,35 @@ function AppRouter() {
     setGlobalWorkspaceId(null);
   }, [isPending, session]);
 
-  // The HTML #boot-splash covers the screen until the app is ready:
-  // - no session → login/init-admin render immediately → remove it now
-  // - session → the _authed layout removes it when its workspace load
-  //   finishes; this timeout is a fallback for non-_authed routes
-  //   (e.g. /settings) so the splash can never get stuck.
+  // The HTML #boot-splash covers the screen until the first page is on it,
+  // not before the router has loaded the page's code-split chunks and
+  // mounted it (onResolved): on a slow network, removing it earlier left a
+  // blank screen while the chunks downloaded. Pages under _authed wait
+  // further: that layout removes it once its workspace load finishes. Other
+  // pages (login, /settings, ...) are done at onResolved.
   useEffect(() => {
     if (isPending) return;
-    if (!session) {
-      removeBootSplash();
-      return;
+    const onFirstPage = () => {
+      const underAuthed = router.state.matches.some(
+        (match) => match.routeId === '/_authed',
+      );
+      if (!underAuthed) removeBootSplash();
+    };
+    const unsubscribe = router.subscribe('onResolved', onFirstPage);
+    // Already resolved before this effect ran
+    if (
+      router.state.status === 'idle' &&
+      router.state.resolvedLocation?.href === router.state.location.href
+    ) {
+      onFirstPage();
     }
-    const timeout = setTimeout(removeBootSplash, 800);
-    return () => clearTimeout(timeout);
-  }, [isPending, session]);
+    // Last resort, so the splash can never stay up for good
+    const fallback = setTimeout(removeBootSplash, 15_000);
+    return () => {
+      unsubscribe();
+      clearTimeout(fallback);
+    };
+  }, [isPending]);
 
   // Wait for session to load before rendering the router. The HTML
   // #boot-splash covers the screen while we wait — nothing renders
@@ -236,7 +250,6 @@ function App() {
             <TooltipProvider>
               <AppRouter />
               <Toaster position="bottom-center" />
-              <RouteProgress />
             </TooltipProvider>
           </ThemeProvider>
         </MetadataProvider>

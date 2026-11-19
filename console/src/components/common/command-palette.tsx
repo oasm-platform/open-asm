@@ -8,13 +8,16 @@ import {
 } from '@/components/ui/command';
 import { menu } from '@/components/common/layout/menu-bar';
 import { useAskAi } from '@/components/common/ask-ai-button';
+import { ASK_PROMPT_GROUPS } from '@/pages/agents/components/landing-constants';
 import {
   useSearchControllerSearchAssetsTargets,
   type SearchData,
 } from '@/services/apis/gen/queries';
 import useDebounce from '@/hooks/use-debounce';
+import { useTypewriter } from '@/hooks/use-typewriter';
 import { keepPreviousData } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
+import { useReducedMotion } from 'framer-motion';
 import {
   Bug,
   CloudCheck,
@@ -25,10 +28,64 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
+/** What the placeholder types out, so the box shows what it takes */
+const SEARCH_HINTS = [
+  'Search a host, e.g. api.example.com',
+  'Search a CVE, e.g. CVE-2024-3400',
+  'Search a technology, e.g. nginx',
+  'Jump to a page, e.g. Vulnerabilities',
+  'Ask AI what is exposed to the internet',
+];
+
+const AI_SUGGESTIONS = ASK_PROMPT_GROUPS.flatMap((group) => group.prompts);
+// Few enough that pages and results still show below them
+const AI_SUGGESTION_COUNT = 3;
+
+/** A random few Ask-mode starters */
+function pickAiSuggestions(): string[] {
+  const pool = [...AI_SUGGESTIONS];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, AI_SUGGESTION_COUNT);
+}
+
+/** Own component, so each typed character re-renders only the hint */
+function TriggerHint({ animate }: { animate: boolean }) {
+  const hint = useTypewriter(SEARCH_HINTS, { animate });
+  return (
+    <span aria-hidden className="hidden flex-1 truncate md:inline">
+      {hint}
+    </span>
+  );
+}
+
+interface PaletteInputProps {
+  value: string;
+  onValueChange: (value: string) => void;
+  animate: boolean;
+}
+
+function PaletteInput({ value, onValueChange, animate }: PaletteInputProps) {
+  // Only types while the placeholder shows
+  const hint = useTypewriter(SEARCH_HINTS, {
+    animate: animate && value.length === 0,
+  });
+  return (
+    <CommandInput
+      value={value}
+      onValueChange={onValueChange}
+      placeholder={hint}
+    />
+  );
+}
+
 /**
  * Global quick switcher: navigation plus targets/assets/findings in one list.
  * Bindings: ⌘K / Ctrl+K toggles, ↑↓ moves, Enter opens, Esc closes (cmdk).
- * No match at all offers "Ask AI", which Enter picks as the only item.
+ * No match at all offers "Ask AI", which Enter picks as the only item; an
+ * empty input offers starter questions for the AI instead.
  */
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
@@ -36,7 +93,16 @@ export function CommandPalette() {
   const debounced = useDebounce(query, 250);
   const navigate = useNavigate();
   const askAi = useAskAi();
+  const animate = !useReducedMotion();
   const term = query.trim();
+
+  // A fresh few each time the palette opens, steady while it stays open
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setSuggestions(pickAiSuggestions());
+  }
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -96,10 +162,13 @@ export function CommandPalette() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Open command palette"
-        className="flex size-9 shrink-0 items-center justify-center gap-2 rounded-md border border-border/60 bg-muted/40 text-sm text-muted-foreground transition-colors hover:bg-muted md:w-full md:max-w-sm md:shrink md:justify-start md:px-3 md:text-left"
+        // Mobile: a round icon button like the header's AI, theme and
+        // notification buttons. From md: a search bar.
+        className="flex size-9 shrink-0 scale-95 items-center justify-center rounded-full text-foreground transition-colors hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 md:w-full md:min-w-0 md:max-w-sm md:shrink md:scale-100 md:justify-start md:gap-2 md:rounded-md md:border md:border-border/60 md:bg-muted/40 md:px-3 md:text-left md:text-sm md:text-muted-foreground md:hover:bg-muted md:hover:text-muted-foreground"
       >
-        <Search className="size-4 shrink-0" aria-hidden />
-        <span className="hidden flex-1 truncate md:inline">Search or jump to…</span>
+        <Search className="size-5 shrink-0 md:size-4" aria-hidden />
+        {/* Paused behind the open dialog */}
+        <TriggerHint animate={animate && !open} />
         <kbd className="hidden rounded border bg-background px-1.5 py-0.5 font-mono text-[11px] leading-none md:inline">
           Ctrl K
         </kbd>
@@ -109,17 +178,16 @@ export function CommandPalette() {
         onOpenChange={setOpen}
         title="Command palette"
         description="Search findings, assets, targets or jump to a page"
-        className="sm:max-w-xl"
+        // Mobile (as the icon trigger): the whole screen, not a box in the
+        // middle of a small one
+        className="sm:max-w-xl max-md:top-0 max-md:left-0 max-md:h-dvh max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:grid-rows-[minmax(0,1fr)] max-md:rounded-none max-md:border-0"
         // Results are already matched by the server and the page filter above;
         // cmdk's fuzzy filter would hide findings matched on other fields.
         shouldFilter={false}
       >
-        <CommandInput
-          value={query}
-          onValueChange={setQuery}
-          placeholder="Search findings, assets, targets or pages…"
-        />
-        <CommandList>
+        <PaletteInput value={query} onValueChange={setQuery} animate={animate} />
+        {/* Full screen on mobile: the list takes the height left */}
+        <CommandList className="max-md:max-h-none max-md:min-h-0 max-md:flex-1">
           {term.length > 0 && !settled && !hasHits && (
             <p role="status" className="py-6 text-center text-sm">
               Searching…
@@ -138,6 +206,21 @@ export function CommandPalette() {
                 </span>
                 <CommandShortcut>Enter</CommandShortcut>
               </CommandItem>
+            </CommandGroup>
+          )}
+
+          {term.length === 0 && suggestions.length > 0 && (
+            <CommandGroup heading="Ask AI">
+              {suggestions.map((prompt) => (
+                <CommandItem
+                  key={prompt}
+                  value={`ask ${prompt}`}
+                  onSelect={() => go(() => askAi(prompt))}
+                >
+                  <Sparkles className="size-4 text-primary" aria-hidden />
+                  <span className="min-w-0 flex-1 truncate">{prompt}</span>
+                </CommandItem>
+              ))}
             </CommandGroup>
           )}
 
@@ -227,7 +310,8 @@ export function CommandPalette() {
             </CommandGroup>
           )}
         </CommandList>
-        <div className="flex items-center gap-2 border-t px-4 py-2 text-xs text-muted-foreground">
+        {/* Key hints: no keyboard to use them on mobile */}
+        <div className="flex items-center gap-2 border-t px-4 py-2 text-xs text-muted-foreground max-md:hidden">
           <CornerDownLeft className="size-3.5" aria-hidden />
           Enter opens · Esc closes
           <kbd className="ml-auto font-mono tracking-widest">⌘K</kbd>

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Search from './search';
 
 const navigateMock = vi.fn();
+const openChatMock = vi.fn();
 const refetchMock = vi.fn();
 const state = vi.hoisted(() => ({
   query: '',
@@ -13,6 +14,10 @@ const state = vi.hoisted(() => ({
 vi.mock('@tanstack/react-router', () => ({
   getRouteApi: () => ({ useSearch: () => ({ query: state.query }) }),
   useNavigate: () => navigateMock,
+}));
+
+vi.mock('@/hooks/useAiChat', () => ({
+  useAiChat: () => ({ openChat: openChatMock }),
 }));
 
 vi.mock('@/hooks/useWorkspaceSelector', () => ({
@@ -34,20 +39,23 @@ const empty = {
 describe('Search page Ask AI', () => {
   beforeEach(() => {
     navigateMock.mockReset();
+    openChatMock.mockReset();
     state.query = 'nginx 1.18 ';
     state.search = { data: empty, isFetching: false, isError: false };
   });
 
-  it('offers Ask AI on no results and opens AI Studio with the query', async () => {
+  it('offers Ask AI on no results and opens the AI sidebar with the query', async () => {
     const user = userEvent.setup();
     render(<Search />);
     expect(screen.getByText('No results')).toBeInTheDocument();
     expect(screen.getByText(/Nothing matched “nginx 1.18”/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Ask AI' }));
-    expect(navigateMock).toHaveBeenCalledWith({
-      to: '/aistudio',
-      search: { text: 'nginx 1.18', mode: 'ask' },
+    expect(openChatMock).toHaveBeenCalledWith({
+      text: 'nginx 1.18',
+      agentMode: 'ask',
     });
+    // Stays on the search page: the chat opens beside it
+    expect(navigateMock).not.toHaveBeenCalled();
   });
 
   it('clears the query from the URL, not only the input', async () => {
