@@ -36,7 +36,7 @@ export class QueryBatchDto {
     type: 'object',
     additionalProperties: true,
     description:
-      'Named queries: { <name>: { from, select?, include?, where?, window?, windowField?, groupBy?, aggregate?, orderBy?, limit?, cursor?, withTotal? } }. See GET attack-surface/schema.',
+      'Named queries: { <name>: { from, select?, include?, where?, window?, windowField?, groupBy?, aggregate?, having?, fill?, orderBy?, limit?, cursor?, withTotal? } }. See GET attack-surface/schema.',
     example: QUERY_EXAMPLE.queries,
   })
   @IsObject()
@@ -55,7 +55,7 @@ export class QueryBatchDto {
   @ApiPropertyOptional({
     type: 'object',
     additionalProperties: true,
-    description: '{ consistent?: boolean, timezone?: "UTC", mode?: "interactive" | "report" }',
+    description: '{ consistent?: boolean, timezone?: IANA name (default "UTC"), mode?: "interactive" | "report" }',
   })
   @IsOptional()
   @IsObject()

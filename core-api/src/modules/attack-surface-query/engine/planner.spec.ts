@@ -206,6 +206,50 @@ describe('planQuery', () => {
     expectScopedFirst(p.root.sql);
   });
 
+  it('compiles conditional aggregates, sum and having', () => {
+    const p = plan({
+      from: 'vulnerabilities',
+      groupBy: ['host.value'],
+      aggregate: {
+        total: { fn: 'count' },
+        critical: { fn: 'count', where: { logic: 'and', items: [{ field: 'severity', op: 'eq', value: 'critical' }] } },
+        score: { fn: 'sum', field: 'cvssScore' },
+      },
+      having: { logic: 'and', items: [{ field: 'critical', op: 'gt', value: '0' }, { not: { field: 'host.value', op: 'eq', value: 'a.io' } }] },
+      orderBy: [{ field: 'critical', dir: 'desc' }],
+    });
+    expect(p.root.sql).toContain('COUNT(*)::int8 AS "a0"');
+    expect(p.root.sql).toContain('(COUNT(*) FILTER (WHERE ((("r".severity) = ANY(CAST(:asq_q0_a1w0 AS text[]))))))::int8 AS "a1"');
+    expect(p.root.sql).toContain('SUM(("r"."cvssScore"))::float8 AS "a2"');
+    expect(p.root.sql).toMatch(/\nHAVING \(\(COALESCE\(\(COUNT\(\*\) FILTER \(WHERE .*\)\)::int8 > CAST\(:asq_q0_p\d+ AS int8\), false\)\) AND NOT \(\(COALESCE\(\("r__host"\)?.*= ANY\(CAST\(:asq_q0_p\d+ AS text\[\]\)\), false\)\)\)\)\nORDER BY "a1" DESC NULLS LAST/);
+    expect(p.shape.columns.map((c) => c.type)).toEqual(['text', 'int', 'int', 'float']);
+    expectScopedFirst(p.root.sql);
+  });
+
+  it('fills every bucket of the window, in the requested time zone', () => {
+    const p = plan(
+      { from: 'hosts', groupBy: [{ field: 'firstSeen', bucket: 'day' }], aggregate: { n: { fn: 'count' }, last: { fn: 'max', field: 'firstSeen' } }, fill: true },
+      {},
+      { since: 'now-7d' },
+    );
+    expect(p.root.sql).toMatch(/^SELECT asq_s\.g AS "g0", COALESCE\(asq_f\."a0", 0\) AS "a0", asq_f\."a1" AS "a1"\nFROM generate_series\(date_trunc\('day', CAST\(:asq_q0_p\d+ AS timestamptz\), 'UTC'\), CAST\(:asq_q0_p\d+ AS timestamptz\), interval '1 day', 'UTC'\) AS asq_s\(g\)\nLEFT JOIN \(/);
+    expect(p.root.sql).toMatch(/\) asq_f ON asq_f\."g0" = asq_s\.g\nORDER BY "g0" ASC NULLS LAST\nLIMIT/);
+    expect(p.limit).toBe(9);
+    expectScopedFirst(p.root.sql);
+
+    const batch = validateBatch(
+      CATALOG,
+      parseBatch({ window: { since: 'now-7d' }, options: { timezone: 'Asia/Ho_Chi_Minh' }, queries: { q: { from: 'hosts', groupBy: [{ field: 'firstSeen', bucket: 'day' }], aggregate: { n: { fn: 'count' } }, fill: true } } }),
+      SCOPE,
+      NOW,
+    );
+    const zoned = planQuery(CATALOG, batch.queries[0], { workspaceId: WS }, undefined, 0);
+    expect(zoned.root.sql).toMatch(/date_trunc\('day', \("r"\."createdAt"\)::timestamptz, CAST\(:asq_q0_p\d+ AS text\)\)/);
+    expect(zoned.root.sql).toMatch(/interval '1 day', CAST\(:asq_q0_p\d+ AS text\)\) AS asq_s\(g\)/);
+    expect(Object.values(zoned.root.params)).toContain('Asia/Ho_Chi_Minh');
+    expect(zoned.root.sql).not.toContain('Asia/');
+  });
+
   it('builds includes as scoped LATERAL fetches by parent key, without ROW_NUMBER', () => {
     const p = plan({ from: 'services', select: ['port'], include: { urls: { select: ['url'], limit: 3 }, technologies: {} } });
     expect(p.root.sql).toMatch(/\("r"\."latestHttpResponseId"\) AS "k1"|"r"\."latestHttpResponseId" AS "k1"/);

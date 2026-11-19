@@ -15,7 +15,10 @@ import {
   type TimeWindowSpec,
 } from './query.schema';
 import { querySignature } from './query-signature';
+import { normalizeHaving } from './having';
 import type {
+  Bucket,
+  HavingNode,
   NormalizedAggregate,
   NormalizedBatch,
   NormalizedGroup,
@@ -81,6 +84,23 @@ interface Ctx {
   now: Date;
   issues: IssueBag;
   resources: Set<string>;
+  timezone: string;
+}
+
+const TIME_ZONE_NAME = /^[A-Za-z][A-Za-z0-9_+-]*(\/[A-Za-z0-9_+-]+){0,2}$/;
+
+/**
+ * Only names the runtime knows reach SQL (as a parameter). `Intl` accepts the
+ * IANA aliases too (`Asia/Ho_Chi_Minh`), which `supportedValuesOf` omits.
+ */
+function isTimeZone(name: string): boolean {
+  if (!TIME_ZONE_NAME.test(name)) return false;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: name });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Validates and resolves a `where` (domain/where.ts), recording what it reads. */
@@ -282,7 +302,7 @@ function normalizeAggregate(
   resource: ResourceDef,
   spec: QuerySpecInput,
   at: string,
-): { groupBy: NormalizedGroup[]; aggregate: NormalizedAggregate[]; orderBy: NormalizedOrder[] } {
+): { groupBy: NormalizedGroup[]; aggregate: NormalizedAggregate[]; having?: HavingNode; orderBy: NormalizedOrder[] } {
   const groupBy: NormalizedGroup[] = [];
   for (const [i, g] of (spec.groupBy ?? []).entries()) {
     const field = typeof g === 'string' ? g : g.field;
@@ -325,15 +345,16 @@ function normalizeAggregate(
   if (entries.length > ctx.limits.aggregates) {
     ctx.issues.add(`${at}.aggregate`, 'LIMIT_EXCEEDED', `at most ${ctx.limits.aggregates} aggregates`);
   }
-  for (const [alias, { fn, field }] of entries) {
+  for (const [alias, { fn, field, where: filter }] of entries) {
     const here = `${at}.aggregate.${alias}`;
     if (groupBy.some((g) => g.key === alias)) {
       ctx.issues.add(here, 'MODE_CONFLICT', `"${alias}" is also a group key`);
       continue;
     }
+    const where = filter ? normalizeWhere(ctx, resource, filter, `${here}.where`) : undefined;
     if (!field) {
       if (fn !== 'count') ctx.issues.add(here, 'INVALID_SHAPE', `${fn} needs a field`);
-      else aggregate.push({ alias, fn });
+      else aggregate.push({ alias, fn, where });
       continue;
     }
     const resolved = resolvePath(ctx.catalog, resource, field, SELECT_RULES);
@@ -350,13 +371,27 @@ function normalizeAggregate(
       ctx.issues.add(`${here}.field`, 'NOT_GROUPABLE', `${fn} needs a number, time or text field`);
       continue;
     }
-    if (fn === 'avg' && !AVG_TYPES.has(type)) {
-      ctx.issues.add(`${here}.field`, 'NOT_GROUPABLE', 'avg needs a number field');
+    if ((fn === 'avg' || fn === 'sum') && !AVG_TYPES.has(type)) {
+      ctx.issues.add(`${here}.field`, 'NOT_GROUPABLE', `${fn} needs a number field`);
       continue;
     }
     for (const r of resourcesOf(resolved.value)) ctx.resources.add(r.name);
-    aggregate.push({ alias, fn, path: resolved.value });
+    aggregate.push({ alias, fn, path: resolved.value, where });
   }
+
+  const having = spec.having
+    ? normalizeHaving(
+        {
+          now: ctx.now,
+          limits: ctx.limits.filter,
+          groupBy,
+          aggregate,
+          issue: (path, code, message) => ctx.issues.add(path, code, message),
+        },
+        spec.having,
+        `${at}.having`,
+      )
+    : undefined;
 
   const orderBy: NormalizedOrder[] = [];
   for (const [i, { field, dir }] of (spec.orderBy ?? []).entries()) {
@@ -372,9 +407,32 @@ function normalizeAggregate(
     ctx.issues.add(`${at}.orderBy[${i}].field`, 'NOT_SORTABLE', `in an aggregate query, order by a group key or an aggregate name`);
   }
   if (orderBy.length === 0 && !spec.orderBy) {
-    if (aggregate.length) orderBy.push({ key: aggregate[0].alias, dir: 'desc', alias: aggregate[0].alias });
+    // A filled series reads in time order; other counts biggest first.
+    if (spec.fill && groupBy.length) orderBy.push({ key: groupBy[0].key, dir: 'asc', path: groupBy[0].path, bucket: groupBy[0].bucket });
+    else if (aggregate.length) orderBy.push({ key: aggregate[0].alias, dir: 'desc', alias: aggregate[0].alias });
   }
-  return { groupBy, aggregate, orderBy };
+  return { groupBy, aggregate, having, orderBy };
+}
+
+const BUCKET_MS: Record<Bucket, number> = {
+  hour: 3_600_000,
+  day: 86_400_000,
+  week: 7 * 86_400_000,
+  // A month is at least 28 days: the bound may overcount, never under.
+  month: 28 * 86_400_000,
+};
+
+/** Points of a filled series over `window`, or an issue. */
+function fillPoints(ctx: Ctx, groupBy: NormalizedGroup[], window: NormalizedWindow | undefined, at: string): number | undefined {
+  if (groupBy.length !== 1 || !groupBy[0].bucket) {
+    ctx.issues.add(`${at}.fill`, 'MODE_CONFLICT', 'fill needs exactly one groupBy on a time with a bucket');
+    return undefined;
+  }
+  if (!window) {
+    ctx.issues.add(`${at}.fill`, 'MODE_CONFLICT', 'fill needs a window: the series spans it');
+    return undefined;
+  }
+  return Math.floor((window.until.getTime() - window.since.getTime()) / BUCKET_MS[groupBy[0].bucket]) + 2;
 }
 
 function normalizeQuery(
@@ -399,8 +457,10 @@ function normalizeQuery(
   ctx.resources.add(resource.name);
 
   const isAggregate = spec.aggregate !== undefined;
-  if (spec.groupBy && !isAggregate) {
-    ctx.issues.add(`${at}.groupBy`, 'MODE_CONFLICT', 'groupBy needs aggregate');
+  if (!isAggregate) {
+    for (const key of ['groupBy', 'having', 'fill'] as const) {
+      if (spec[key] !== undefined) ctx.issues.add(`${at}.${key}`, 'MODE_CONFLICT', `${key} needs aggregate`);
+    }
   }
   if (isAggregate) {
     for (const key of ['select', 'include', 'cursor', 'withTotal'] as const) {
@@ -428,7 +488,16 @@ function normalizeQuery(
   });
 
   if (isAggregate) {
-    const { groupBy, aggregate, orderBy } = normalizeAggregate(ctx, resource, spec, at);
+    const { groupBy, aggregate, having, orderBy } = normalizeAggregate(ctx, resource, spec, at);
+    let rows = Math.min(limit, ctx.limits.maxLimit);
+    if (spec.fill) {
+      const points = fillPoints(ctx, groupBy, window, at);
+      if (points !== undefined && points > ctx.limits.maxLimit) {
+        ctx.issues.add(`${at}.fill`, 'LIMIT_EXCEEDED', `the series has up to ${points} buckets (at most ${ctx.limits.maxLimit}): use a larger bucket or a shorter window`);
+      }
+      // A filled series returns every bucket unless a limit is set.
+      if (points !== undefined && spec.limit === undefined) rows = Math.min(points, ctx.limits.maxLimit);
+    }
     return {
       name,
       resource,
@@ -439,8 +508,11 @@ function normalizeQuery(
       window,
       groupBy,
       aggregate,
+      having,
+      fill: spec.fill ?? false,
+      timezone: ctx.timezone,
       orderBy,
-      limit: Math.min(limit, ctx.limits.maxLimit),
+      limit: rows,
       withTotal: false,
       signature,
     };
@@ -456,6 +528,8 @@ function normalizeQuery(
     window,
     groupBy: [],
     aggregate: [],
+    fill: false,
+    timezone: ctx.timezone,
     orderBy: resolveListOrder(ctx, resource, spec.orderBy, `${at}.orderBy`),
     limit: Math.min(limit, ctx.limits.maxLimit),
     cursor: spec.cursor,
@@ -482,7 +556,11 @@ export function validateBatch(
     issues.add('options.mode', 'MODE_CONFLICT', 'report mode is only available through the HTTP API');
   }
   const limits = limitsFor(scope.caller, mode);
-  const ctx: Ctx = { catalog, scope, limits, now, issues, resources: new Set() };
+  const timezone = input.options?.timezone ?? 'UTC';
+  if (!isTimeZone(timezone)) {
+    issues.add('options.timezone', 'INVALID_VALUE', `"${timezone}" is not an IANA time zone (e.g. "UTC", "Asia/Ho_Chi_Minh")`);
+  }
+  const ctx: Ctx = { catalog, scope, limits, now, issues, resources: new Set(), timezone };
 
   const names = Object.keys(input.queries);
   if (names.length > limits.queriesPerBatch) {

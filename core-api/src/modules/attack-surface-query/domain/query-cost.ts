@@ -49,6 +49,7 @@ export function estimateCost(query: NormalizedQuery): QueryCostBreakdown {
     ...query.groupBy.map((g) => g.path),
     ...query.aggregate.flatMap((a) => (a.path ? [a.path] : [])),
     ...topLevelPaths(query.where),
+    ...query.aggregate.flatMap((a) => topLevelPaths(a.where)),
     ...(query.window ? [query.window.path] : []),
   ];
   const joins = joinChains(allPaths).size;
@@ -62,7 +63,8 @@ export function estimateCost(query: NormalizedQuery): QueryCostBreakdown {
     );
   }
 
-  const conds = conditionsOf(query.where);
+  const filters = [query.where, ...query.aggregate.map((a) => a.where)];
+  const conds = filters.flatMap(conditionsOf);
   for (const { path, op } of conds) {
     if (path.hops.some((h) => h.kind === 'many')) cost += 50;
     if (TEXT_SEARCH_OPS.has(op) && path.field.costlyContains) {
@@ -71,7 +73,7 @@ export function estimateCost(query: NormalizedQuery): QueryCostBreakdown {
     }
     if (path.field.cte === 'fresh') cost += 30;
   }
-  for (const rel of relationsOf(query.where)) {
+  for (const rel of filters.flatMap(relationsOf)) {
     cost += rel.count ? 100 : 50;
     if (rel.count) hints.add(`count over ${rel.relation.path} reads every related row: add a window`);
   }

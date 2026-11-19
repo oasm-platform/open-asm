@@ -312,6 +312,83 @@ describe('estimateCost', () => {
   });
 });
 
+describe('aggregates', () => {
+  const agg = (query: Record<string, unknown>, scope: QueryScope = ALL, options?: Record<string, unknown>) =>
+    validate({ ...(options ? { options } : {}), queries: { a: { from: 'vulnerabilities', window: null, ...query } } }, scope).queries[0];
+
+  it('accepts sum on a number and a filter per aggregate', () => {
+    const q = agg({
+      groupBy: ['severity'],
+      aggregate: { n: { fn: 'sum', field: 'cvssScore' }, open: { fn: 'count', where: { logic: 'and', items: [{ field: 'isOpen', op: 'eq', value: 'true' }] } } },
+    });
+    expect(q.aggregate.map((a) => [a.fn, a.where?.kind])).toEqual([['sum', undefined], ['count', 'group']]);
+  });
+
+  it('refuses sum on text, and an aggregate filter on a resource the member cannot read', () => {
+    expect(issuesOf(() => agg({ aggregate: { n: { fn: 'sum', field: 'name' } } }))[0].code).toBe('NOT_GROUPABLE');
+    expect(() =>
+      validate(
+        { queries: { a: { from: 'hosts', aggregate: { n: { fn: 'count', where: { logic: 'and', items: [{ relation: 'vulnerabilities' }] } } } } } },
+        { ...ALL, permissions: ['asset.read'] },
+      ),
+    ).toThrow(expect.objectContaining({ code: 'PERMISSION_DENIED' }));
+  });
+
+  it('resolves having against group keys and aggregate names', () => {
+    const q = agg({
+      groupBy: ['severity'],
+      aggregate: { n: { fn: 'count' } },
+      having: { logic: 'or', items: [{ field: 'n', op: 'gte', value: '10' }, { field: 'severity', op: 'in', value: ['critical', 'high'] }] },
+    });
+    expect(q.having).toMatchObject({
+      kind: 'group',
+      items: [
+        { kind: 'cond', ref: { kind: 'aggregate', index: 0 }, type: 'int' },
+        { kind: 'cond', ref: { kind: 'group', index: 0 }, op: 'in' },
+      ],
+    });
+  });
+
+  it.each([
+    ['an unknown name', { field: 'x', op: 'eq', value: '1' }, 'UNKNOWN_FIELD'],
+    ['an order test on text', { field: 'severity', op: 'gt', value: 'high' }, 'OP_NOT_ALLOWED'],
+    ['a value outside the enum', { field: 'severity', op: 'eq', value: 'urgent' }, 'INVALID_VALUE'],
+    ['a non-number count', { field: 'n', op: 'gt', value: 'many' }, 'INVALID_VALUE'],
+  ])('refuses having on %s', (_label, cond, code) => {
+    const issues = issuesOf(() => agg({ groupBy: ['severity'], aggregate: { n: { fn: 'count' } }, having: { logic: 'and', items: [cond] } }));
+    expect(issues[0].code).toBe(code);
+  });
+
+  it('refuses having, fill and groupBy without aggregate', () => {
+    const issues = issuesOf(() => validate({ queries: { a: { from: 'hosts', having: { logic: 'and', items: [] }, fill: true } } }));
+    expect(issues.map((i) => i.path).sort()).toEqual(['queries.a.fill', 'queries.a.having']);
+  });
+
+  it('fills a time series over the window and sizes it', () => {
+    const q = validate({
+      queries: { a: { from: 'hosts', window: { since: 'now-24h' }, groupBy: [{ field: 'firstSeen', bucket: 'hour' }], aggregate: { n: { fn: 'count' } }, fill: true } },
+    }).queries[0];
+    expect(q.fill).toBe(true);
+    expect(q.limit).toBe(26);
+    expect(q.orderBy).toMatchObject([{ key: 'firstSeen', dir: 'asc' }]);
+  });
+
+  it.each([
+    ['no window', { window: null, groupBy: [{ field: 'firstSeen', bucket: 'day' }] }, 'MODE_CONFLICT'],
+    ['no time group', { window: { since: 'now-1d' }, groupBy: ['kind'] }, 'MODE_CONFLICT'],
+    ['too many buckets', { window: { since: 'now-3650d' }, groupBy: [{ field: 'firstSeen', bucket: 'hour' }] }, 'LIMIT_EXCEEDED'],
+  ])('refuses fill with %s', (_label, query, code) => {
+    const issues = issuesOf(() => validate({ queries: { a: { from: 'hosts', aggregate: { n: { fn: 'count' } }, fill: true, ...query } } }));
+    expect(issues[0].code).toBe(code);
+  });
+
+  it('takes an IANA time zone and refuses anything else', () => {
+    expect(agg({ aggregate: { n: { fn: 'count' } } }, ALL, { timezone: 'Asia/Ho_Chi_Minh' }).timezone).toBe('Asia/Ho_Chi_Minh');
+    expect(agg({ aggregate: { n: { fn: 'count' } } }).timezone).toBe('UTC');
+    expect(issuesOf(() => agg({ aggregate: { n: { fn: 'count' } } }, ALL, { timezone: "UTC'; --" }))[0].path).toBe('options.timezone');
+  });
+});
+
 describe('where', () => {
   const where = (from: string, items: unknown[], scope: QueryScope = ALL) =>
     validate({ queries: { a: { from, where: { logic: 'and', items } } } }, scope).queries[0].where;

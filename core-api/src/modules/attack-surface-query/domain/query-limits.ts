@@ -40,7 +40,7 @@ const HTTP: AsqLimits = {
   defaultIncludeLimit: 10,
   maxIncludeLimit: 50,
   groupBy: 3,
-  aggregates: 5,
+  aggregates: 8,
   orderBy: 3,
   costBudget: 1000,
   maxPlannerCost: 200_000,
