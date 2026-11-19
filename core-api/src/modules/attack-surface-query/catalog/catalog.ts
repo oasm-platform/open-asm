@@ -104,6 +104,7 @@ export function checkFieldValue(field: FieldDef, value: string, op: AsqOp): bool
 
 const PLACEHOLDER = /\{([a-z]+)(?::([a-zA-Z]+))?\}/g;
 const ALLOWED_PLACEHOLDERS = new Set(['a', 'one', 'project', 'b', 'c']);
+const SCOPE_PLACEHOLDERS = new Set(['a', 'ws']);
 
 /**
  * Boot check of a catalog: throws on the first rule broken, naming the
@@ -121,6 +122,16 @@ export function assertCatalog(catalog: Catalog): void {
     if (res.global) {
       if (res.root) fail(res.name, 'a global resource cannot be a root');
       if (Object.keys(res.many).length > 0) fail(res.name, 'a global resource cannot have many-relations');
+      if (res.scopePredicate) fail(res.name, 'a global resource has no tenant scope');
+    }
+    if (res.scopePredicate !== undefined) {
+      const sql = res.scopePredicate;
+      if (!sql.includes('{a}') || !sql.includes('{ws}') || !sql.includes('"workspaceId"')) {
+        fail(res.name, 'scopePredicate must use {a} and compare a "workspaceId" column with {ws}');
+      }
+      for (const match of sql.matchAll(PLACEHOLDER)) {
+        if (!SCOPE_PLACEHOLDERS.has(match[1])) fail(res.name, `scopePredicate uses {${match[1]}}`);
+      }
     }
     if (res.root && res.projectScope !== null && !res.projectScope.includes('{project}')) {
       fail(res.name, 'projectScope must use {project}');

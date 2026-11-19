@@ -1,5 +1,4 @@
 import type { Catalog, FieldType } from '../catalog/catalog.types';
-import { SCOPE_COLUMN } from '../catalog/catalog.types';
 import type { ResolvedPath } from '../catalog/paths';
 import type {
   NormalizedInclude,
@@ -18,6 +17,7 @@ import {
   q,
   scopePredicates,
   selectExpr,
+  tenantTerm,
   withClause,
   type CompiledSql,
   type ScopeParams,
@@ -141,7 +141,7 @@ function compileInclude(
   parentCols.push(`${expand(include.def.parentKey, { a: parentFrom.aliasOf([]) })} AS ${q(parentKeyAlias)}`);
 
   const childAlias = `i${index}`;
-  const from = new FromBuilder(parentFrom.catalog, include.resource, childAlias);
+  const from = new FromBuilder(parentFrom.catalog, include.resource, childAlias, scope.workspace);
   const child = from.aliasOf([]);
   const cols: string[] = [];
   const shape = selectColumns(from, include.select, cols);
@@ -154,7 +154,7 @@ function compileInclude(
   if (where) childParams.merge(where.params);
   const predicates = [
     `${child}.${include.def.childKey} = asq_p.k`,
-    `${child}.${SCOPE_COLUMN} = ${scope.workspace}`,
+    tenantTerm(include.resource, child, scope.workspace),
     ...(include.def.extra ? [`(${expand(include.def.extra, { c: child })})`] : []),
     ...(include.resource.basePredicate ? [`(${expand(include.resource.basePredicate, { a: child })})`] : []),
     ...(where ? [where.sql] : []),
@@ -206,7 +206,7 @@ export function planQuery(
     workspace: params.add(scopeValues.workspaceId),
     project: scopeValues.projectId ? params.add(scopeValues.projectId) : undefined,
   };
-  const from = new FromBuilder(catalog, query.resource, 'r');
+  const from = new FromBuilder(catalog, query.resource, 'r', scope.workspace);
   const root = from.aliasOf([]);
   const terms = scopePredicates(query.resource, root, scope);
 

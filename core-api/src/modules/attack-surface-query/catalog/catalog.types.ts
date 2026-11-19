@@ -101,6 +101,15 @@ export interface ResourceDef {
    */
   basePredicate?: string;
   /**
+   * Tenant test of a table without a `workspaceId` column: SQL with `{a}`
+   * (this alias) and `{ws}` (the workspace parameter) that must reach a
+   * `"workspaceId"` column, e.g. `EXISTS (SELECT 1 FROM "targets" t WHERE
+   * t.id = {a}."targetId" AND t."workspaceId" = {ws})`. It takes the place of
+   * `<alias>."workspaceId" = :ws` everywhere the compiler scopes a row.
+   * Without it the table must carry `workspaceId` (SCOPE_COLUMN).
+   */
+  scopePredicate?: string;
+  /**
    * Restricts rows to a project's assets: SQL with `{a}` and `{project}`.
    * `null` = the resource cannot be read in a project-locked scope.
    */

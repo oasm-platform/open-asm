@@ -1,4 +1,4 @@
-import { assertCatalog, buildCatalog, CATALOG, checkFieldValue, describeCatalog } from './catalog';
+import { assertCatalog, buildCatalog, CATALOG, checkFieldValue, describeCatalog, fieldOps, OP_VALUE_SHAPE } from './catalog';
 import type { ResourceDef } from './catalog.types';
 import { RESOURCES, servicesResource } from './resources';
 
@@ -34,6 +34,36 @@ describe('catalog boot check', () => {
     const bad = clone(servicesResource, { projectScope: 'true' });
     const catalog = buildCatalog(RESOURCES.map((r) => (r.name === 'services' ? bad : r)));
     expect(() => assertCatalog(catalog)).toThrow(/projectScope must use \{project\}/);
+  });
+
+  it.each([
+    ['without the workspace parameter', 'EXISTS (SELECT 1 FROM "targets" t WHERE t.id = {a}."targetId" AND t."workspaceId" IS NOT NULL)'],
+    ['without a workspace column', 'EXISTS (SELECT 1 FROM "targets" t WHERE t.id = {a}."targetId" AND t.id = {ws})'],
+    ['with another placeholder', 'EXISTS (SELECT 1 FROM "targets" t WHERE t.id = {a}."targetId" AND t."workspaceId" = {ws} AND {project} IS NULL)'],
+  ])('refuses a scope predicate %s', (_label, scopePredicate) => {
+    const catalog = buildCatalog(RESOURCES.map((r) => (r.name === 'services' ? clone(servicesResource, { scopePredicate }) : r)));
+    expect(() => assertCatalog(catalog)).toThrow(/scopePredicate/);
+  });
+
+  it('accepts a scope predicate that compares a workspace column with {ws}', () => {
+    const scopePredicate = 'EXISTS (SELECT 1 FROM "targets" t WHERE t.id = {a}."targetId" AND t."workspaceId" = {ws})';
+    const catalog = buildCatalog(RESOURCES.map((r) => (r.name === 'services' ? clone(servicesResource, { scopePredicate }) : r)));
+    expect(() => assertCatalog(catalog)).not.toThrow();
+  });
+});
+
+describe('field operators', () => {
+  it('adds the null tests to nullable fields only', () => {
+    expect(fieldOps(CATALOG.services.fields.lastSeen)).toEqual(expect.arrayContaining(['isNull', 'isNotNull']));
+    expect(fieldOps(CATALOG.services.fields.port)).not.toContain('isNull');
+  });
+
+  it('describes every operator with its value shape', () => {
+    for (const res of Object.values(CATALOG)) {
+      for (const field of Object.values(res.fields)) {
+        for (const op of fieldOps(field)) expect(OP_VALUE_SHAPE[op]).toBeDefined();
+      }
+    }
   });
 });
 

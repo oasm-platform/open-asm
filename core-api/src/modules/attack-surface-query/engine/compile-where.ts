@@ -1,5 +1,4 @@
-import type { AsqOp, FieldDef } from '../catalog/catalog.types';
-import { SCOPE_COLUMN } from '../catalog/catalog.types';
+import type { AsqOp, FieldDef, ResourceDef } from '../catalog/catalog.types';
 import type { ResolvedPath } from '../catalog/paths';
 import type { WhereNode } from '../domain/where';
 import {
@@ -7,6 +6,7 @@ import {
   FromBuilder,
   PG_ARRAY_TYPE,
   PG_SCALAR_TYPE,
+  tenantTerm,
   type ScopeParams,
 } from './sql-builder';
 
@@ -73,14 +73,14 @@ function wrapTests(tests: FieldTests, wrap: (sql: string) => string): FieldTests
 /** Correlation of a list relation's child rows with their parent row. */
 function correlation(
   hop: { childKey: string; parentKey: string; extra?: string },
-  childResource: { basePredicate?: string },
+  childResource: ResourceDef,
   child: string,
   parentAlias: string,
   scope: ScopeParams,
 ): string {
   return [
     `${child}.${hop.childKey} = ${expand(hop.parentKey, { a: parentAlias })}`,
-    `${child}.${SCOPE_COLUMN} = ${scope.workspace}`,
+    tenantTerm(childResource, child, scope.workspace),
     ...(hop.extra ? [`(${expand(hop.extra, { c: child, a: parentAlias })})`] : []),
     ...(childResource.basePredicate ? [`(${expand(childResource.basePredicate, { a: child })})`] : []),
   ].join(' AND ');
@@ -121,7 +121,7 @@ class WhereCompiler {
     const parentChain = FromBuilder.oneChain(path);
     from.ensureChain(parentChain);
     const parentAlias = from.aliasOf(parentChain);
-    const inner = new FromBuilder(from.catalog, hop.to, this.subAlias(from));
+    const inner = new FromBuilder(from.catalog, hop.to, this.subAlias(from), this.scope.workspace);
     const innerChain = path.hops.slice(manyIndex + 1).map((h) => h.name);
     const expr = inner.fieldSql(innerChain, path.field);
     if (inner.usesFreshCte) from.usesFreshCte = true;
@@ -180,7 +180,7 @@ class WhereCompiler {
     const { relation } = node;
     from.ensureChain(relation.chain);
     const parentAlias = from.aliasOf(relation.chain);
-    const inner = new FromBuilder(from.catalog, relation.child, this.subAlias(from));
+    const inner = new FromBuilder(from.catalog, relation.child, this.subAlias(from), this.scope.workspace);
     const on = correlation(relation.def, relation.child, inner.aliasOf([]), parentAlias, this.scope);
     // Compile the child filter first: it adds the joins the FROM renders.
     const test = node.where ? this.node(inner, node.where) : undefined;

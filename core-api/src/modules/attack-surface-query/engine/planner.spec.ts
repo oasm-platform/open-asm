@@ -1,5 +1,6 @@
-import { CATALOG, fieldOps, OP_VALUE_SHAPE } from '../catalog/catalog';
-import type { FieldDef } from '../catalog/catalog.types';
+import { assertCatalog, buildCatalog, CATALOG, fieldOps, OP_VALUE_SHAPE } from '../catalog/catalog';
+import type { FieldDef, ResourceDef } from '../catalog/catalog.types';
+import { RESOURCES, targetsResource } from '../catalog/resources';
 import type { QueryScope } from '../domain/query.types';
 import { parseBatch, validateBatch } from '../domain/query-validator';
 import { planQuery, type QueryPlan } from './planner';
@@ -262,6 +263,62 @@ describe('planQuery', () => {
     expect(urls.params.asq_q0_p0).toBe(WS);
     const tech = p.includes[1].build(['b0b0b0b0-0000-4000-8000-000000000000']);
     expect(tech.sql).toMatch(/"i1"\."httpResponseId" = asq_p\.k/);
+  });
+});
+
+describe('planQuery with a predicate-scoped resource', () => {
+  // A table without a workspaceId column, scoped through its target.
+  const runs: ResourceDef = {
+    name: 'runs',
+    table: 'jobs',
+    description: 'Runs',
+    permission: 'target.read',
+    root: true,
+    projectScope: null,
+    scopePredicate: 'EXISTS (SELECT 1 FROM "targets" asq_rt WHERE asq_rt.id = {a}."targetId" AND asq_rt."workspaceId" = {ws})',
+    fields: {
+      id: { sql: '{a}.id', type: 'uuid', description: 'Row id' },
+      status: { sql: '{a}.status', type: 'text', description: 'Status' },
+      createdAt: { sql: '{a}."createdAt"', type: 'timestamp', description: 'Created', sortable: 'indexed' },
+    },
+    one: { target: { resource: 'targets', description: 'Target', on: '{b}.id = {a}."targetId"', join: 'inner' } },
+    many: {},
+    defaultSelect: ['status'],
+    defaultOrder: [{ field: 'createdAt', dir: 'desc' }],
+    defaultTimeField: 'createdAt',
+  };
+  const targets: ResourceDef = {
+    ...targetsResource,
+    many: { ...targetsResource.many, runs: { resource: 'runs', description: 'Runs', childKey: '"targetId"', parentKey: '{a}.id', indexedOrder: [] } },
+  };
+  const catalog = buildCatalog([...RESOURCES.map((r) => (r.name === 'targets' ? targets : r)), runs]);
+  const scopedRun = (alias: string) =>
+    `(EXISTS (SELECT 1 FROM "targets" asq_rt WHERE asq_rt.id = ${alias}."targetId" AND asq_rt."workspaceId" = :asq_q0_p0))`;
+  const planOn = (query: Record<string, unknown>) => {
+    const batch = validateBatch(catalog, parseBatch({ queries: { q: query } }), SCOPE, NOW);
+    return planQuery(catalog, batch.queries[0], { workspaceId: WS }, undefined, 0);
+  };
+
+  it('passes the boot check', () => {
+    expect(() => assertCatalog(catalog)).not.toThrow();
+  });
+
+  it('scopes the root with its predicate, first', () => {
+    const p = planOn({ from: 'runs', select: ['status', 'target.value'] });
+    expect(whereOf(p.root.sql).startsWith(scopedRun('"r"'))).toBe(true);
+    // The joined target has a column, but its parent does not: it gets the parameter.
+    expect(p.root.sql).toMatch(/INNER JOIN "targets" "r__target" ON \("r__target"\.id = "r"\."targetId"\) AND "r__target"\."workspaceId" = :asq_q0_p0/);
+  });
+
+  it('scopes a relation test and an include on it with its predicate', () => {
+    const p = planOn({
+      from: 'targets',
+      select: ['value'],
+      where: { logic: 'and', items: [{ relation: 'runs', where: { logic: 'and', items: [{ field: 'status', op: 'eq', value: 'failed' }] } }] },
+      include: { runs: {} },
+    });
+    expect(p.root.sql).toContain(`"r_x0"."targetId" = "r".id AND ${scopedRun('"r_x0"')}`);
+    expect(p.includes[0].build(['66666666-6666-4666-8666-666666666666']).sql).toContain(`AND ${scopedRun('"i0"')}`);
   });
 });
 
