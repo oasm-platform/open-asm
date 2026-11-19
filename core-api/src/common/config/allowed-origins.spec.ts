@@ -1,5 +1,5 @@
 import {
-  DEFAULT_CORS_ALLOWED_ORIGINS,
+  LOCAL_TRUSTED_ORIGINS,
   parseAllowedOrigins,
   resolveTrustedOrigins,
   trustedRequestOrigins,
@@ -12,10 +12,10 @@ describe('resolveTrustedOrigins', () => {
 
   it('trusts the local dev servers in development and test', () => {
     expect(resolveTrustedOrigins({ NODE_ENV: 'development' })).toEqual(
-      DEFAULT_CORS_ALLOWED_ORIGINS,
+      LOCAL_TRUSTED_ORIGINS,
     );
     expect(resolveTrustedOrigins({ NODE_ENV: 'test' })).toEqual(
-      DEFAULT_CORS_ALLOWED_ORIGINS,
+      LOCAL_TRUSTED_ORIGINS,
     );
   });
 
@@ -111,8 +111,8 @@ describe('parseAllowedOrigins', () => {
 
   it('returns fallback for undefined', () => {
     expect(
-      parseAllowedOrigins(undefined, DEFAULT_CORS_ALLOWED_ORIGINS),
-    ).toEqual(DEFAULT_CORS_ALLOWED_ORIGINS);
+      parseAllowedOrigins(undefined, LOCAL_TRUSTED_ORIGINS),
+    ).toEqual(LOCAL_TRUSTED_ORIGINS);
   });
 
   it('returns fallback for whitespace-only input', () => {

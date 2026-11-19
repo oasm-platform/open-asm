@@ -22,7 +22,7 @@ S3-compatible object storage (RustFS locally, any S3 in the cloud): bucket setup
 
 ## Buckets
 
-`BUCKET_ACCESS` is the single list of buckets; `onModuleInit` creates each one, applies CORS (when `CORS_ALLOWED_ORIGINS` is set) and a public-read policy for `PUBLIC_READ_BUCKETS`.
+`BUCKET_ACCESS` is the single list of buckets; `onModuleInit` creates each one, applies CORS for the API's trusted origins (`resolveTrustedOrigins`: `TRUSTED_ORIGINS`, the `BASE_URL` origin, the dev servers in local env; skipped when empty) and a public-read policy for `PUBLIC_READ_BUCKETS`. `CORS_ALLOWED_ORIGINS` is no longer read; `parseStorageConfig` only warns when it is set.
 
 | Bucket | Class | Written by |
 |---|---|---|

@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
-import { parseAllowedOrigins } from '@/common/config/allowed-origins';
+import { resolveTrustedOrigins } from '@/common/config/allowed-origins';
 
 /**
  * Minimal shape of `ConfigService` the helper depends on. Accepting a callback
@@ -25,7 +25,10 @@ export interface StorageConfig {
   forcePathStyle: boolean;
   /** Clamped into [MIN_S3_PRESIGN_TTL_SECONDS, MAX_S3_PRESIGN_TTL_SECONDS]. */
   presignTtlSeconds: number;
-  /** Trimmed, empty entries dropped. */
+  /**
+   * Bucket CORS origins: the API's trusted origins (`TRUSTED_ORIGINS`, the
+   * `BASE_URL` origin, the dev servers in local env). Empty skips bucket CORS.
+   */
   corsAllowedOrigins: string[];
   accessKey: string;
   secretKey: string;
@@ -103,6 +106,31 @@ function parseCredentials(source: StorageConfigSource): {
     : { accessKey: '', secretKey: '' };
 }
 
+/**
+ * The same origins the API trusts for CORS and sign-in, so one variable
+ * covers the API and the buckets. An invalid value warns and yields none:
+ * the API itself refuses to boot on it (`resolveTrustedOrigins` in auth.ts).
+ */
+function parseCorsOrigins(source: StorageConfigSource): string[] {
+  if (readString(source, 'CORS_ALLOWED_ORIGINS') !== '') {
+    logger.warn(
+      'CORS_ALLOWED_ORIGINS is no longer read; bucket CORS uses TRUSTED_ORIGINS (and BASE_URL). Move its origins there.',
+    );
+  }
+  try {
+    return resolveTrustedOrigins({
+      TRUSTED_ORIGINS: readString(source, 'TRUSTED_ORIGINS'),
+      BASE_URL: readString(source, 'BASE_URL'),
+      NODE_ENV: readString(source, 'NODE_ENV'),
+    });
+  } catch (error) {
+    logger.warn(
+      `Bucket CORS skipped: ${error instanceof Error ? error.message : 'invalid trusted origins'}`,
+    );
+    return [];
+  }
+}
+
 /** Unset => same-origin proxy prefix; explicitly empty => absolute mode. */
 function parseUrlBase(source: StorageConfigSource): string {
   const raw = source.get<string>('STORAGE_URL_BASE');
@@ -132,9 +160,7 @@ export function parseStorageConfig(
       DEFAULT_S3_FORCE_PATH_STYLE,
     ),
     presignTtlSeconds: parsePresignTtl(source),
-    corsAllowedOrigins: parseAllowedOrigins(
-      readString(source, 'CORS_ALLOWED_ORIGINS'),
-    ),
+    corsAllowedOrigins: parseCorsOrigins(source),
     accessKey,
     secretKey,
     useDefaultCredentials: parseBoolean(

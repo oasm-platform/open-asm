@@ -12,6 +12,7 @@ This guide provides detailed instructions for setting up your local development 
   - [Console (Web Interface)](#console-web-interface)
   - [Workers](#workers)
   - [All Services with Task](#all-services-with-task)
+  - [Allowed browser origins (`TRUSTED_ORIGINS`)](#allowed-browser-origins-trusted_origins)
 - [Database Setup](#database-setup)
 - [Database Migration](#database-migration)
 - [Development Conventions](#development-conventions)
@@ -121,6 +122,28 @@ task dev
 This starts:
 - Core API at `http://localhost:6276`
 - Console at `http://localhost:5173` (Vite dev server)
+
+### Allowed browser origins (`TRUSTED_ORIGINS`)
+
+`TRUSTED_ORIGINS` in `core-api/.env` is the one list of browser origins the API
+accepts with a user's session: it drives the API's CORS, the storage buckets'
+CORS and better-auth's sign-in origin check (`resolveTrustedOrigins` in
+`core-api/src/common/config/allowed-origins.ts`). The `BASE_URL` origin is
+always added, and local development adds `http://localhost:5173` and `:3000`.
+
+Any other address the console is opened from over plain http, such as a LAN or
+VPN IP (`http://192.168.1.10:5173`, `http://192.168.1.10:3000`) or a host name
+without TLS, must be listed, comma-separated:
+
+```bash
+TRUSTED_ORIGINS=http://192.168.1.10:5173,http://192.168.1.10:3000
+```
+
+Browsers send `Sec-Fetch-Site` only to https or localhost, so the API cannot
+tell such a request is same-origin; without the entry sign-in fails with
+`403 INVALID_ORIGIN`. Values must be exact `http(s)` origins: a wildcard or
+any other value stops the API at boot. Restart `task api:dev`, or recreate the
+`core-api` container, after changing it.
 
 ### Core API
 
@@ -585,11 +608,13 @@ has a working default). For real S3, set in `core-api/.env`:
 | `S3_FORCE_PATH_STYLE` | `true` (default) for RustFS/MinIO, `false` for AWS S3. Applies to **both** clients, including the plain-URL builder. Ignored for public-read plain URLs when `STORAGE_URL_BASE` is set. |
 | `STORAGE_URL_BASE` | Set **empty** (`STORAGE_URL_BASE=`) => absolute URLs. Unset defaults to `/api/storage` (same-origin relative URLs; see Relative vs absolute browser URLs). |
 | `S3_USE_DEFAULT_CREDENTIALS` | `true` for IAM roles / instance profiles; otherwise leave `false` and set `RUSTFS_ACCESS_KEY` + `RUSTFS_SECRET_KEY` |
-| `CORS_ALLOWED_ORIGINS` | Comma-separated console origins applied as S3 bucket CORS. Cross-origin direct fetches need their origin listed here; empty (default) skips bucket CORS |
+| `TRUSTED_ORIGINS` / `BASE_URL` | Not storage-specific: the origins the API trusts are also applied as S3 bucket CORS. A console origin that fetches the bucket directly must be one of them. (`CORS_ALLOWED_ORIGINS` is no longer read; the API logs a warning when it is set.) |
 
 `StorageService.onModuleInit` applies the CORS rule to every bucket on boot
-(`GET, PUT, POST, HEAD`, `AllowedHeaders: *`, exposes `ETag`), and skips it
-entirely when the origins list is empty.
+(`GET, PUT, POST, HEAD`, `AllowedHeaders: *`, exposes `ETag`) for the trusted
+origins (`TRUSTED_ORIGINS`, the `BASE_URL` origin, and `localhost:5173`/`:3000`
+in local development), replacing any CORS rule set on the bucket by hand. It
+skips it entirely when that list is empty.
 
 The nginx public prefixes above are self-hosted, same-origin storage
 only. For cloud S3 the operator must additionally disable S3 Block
@@ -684,6 +709,9 @@ Notes:
   trusted connector images.
 - The one-shot `migration` service runs pending migrations and gates `core-api`
   startup, so the API never serves against an out-of-date schema.
+- Opening the console from anything but `http://localhost:3000` over plain
+  http needs that origin in `TRUSTED_ORIGINS`; see
+  [Allowed browser origins](#allowed-browser-origins-trusted_origins).
 
 The worker spawns connector containers through the host Docker daemon over the mounted `docker.sock`, so it must join the socket's owning group. `task docker-compose` reads that gid from the socket automatically. If you start with raw `docker compose`, set it yourself (a non-standard socket path also needs the worker's volume mount in `docker-compose.yml` changed):
 

@@ -64,8 +64,10 @@ export function configureApp(app: NestNodeApplication): void {
   });
 
   // Only trusted origins get CORS headers, so no other site can read
-  // responses made with a user's session. The console needs none: it reaches
-  // the API through its own origin (nginx, or the Vite proxy in development).
+  // responses made with a user's session. The console reaches the API through
+  // its own origin (nginx, or the Vite proxy in development); it still has to
+  // be listed in TRUSTED_ORIGINS when opened over plain http off localhost,
+  // for better-auth's origin check (see trustedRequestOrigins).
   app.enableCors({
     origin: resolveTrustedOrigins(),
     credentials: true,
