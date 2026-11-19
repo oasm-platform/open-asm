@@ -1065,6 +1065,69 @@ describe('StorageService', () => {
     });
   });
 
+  describe('applyBucketCors', () => {
+    const initWith = async (values: Record<string, string>) => {
+      // Every key the trusted-origin list reads is set, since the mock config
+      // answers 'test-secret' for an unknown key
+      configValues = {
+        STORAGE_URL_BASE: '',
+        BASE_URL: '',
+        NODE_ENV: '',
+        TRUSTED_ORIGINS: '',
+        CORS_ALLOWED_ORIGINS: '',
+        ...values,
+      };
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          StorageService,
+          { provide: RustFsClient, useValue: mockRustFsClient },
+          { provide: ConfigService, useValue: mockConfigService },
+          { provide: DataSource, useValue: { query: dataSourceQuery } },
+        ],
+      }).compile();
+      sendMock.mockResolvedValue({});
+      await module.get<StorageService>(StorageService).onModuleInit();
+      return sendMock.mock.calls
+        .map(([cmd]: [object]) => cmd)
+        .filter(
+          (cmd): cmd is PutBucketCorsCommand =>
+            cmd instanceof PutBucketCorsCommand,
+        );
+    };
+
+    it('should apply the trusted origins as CORS on every bucket', async () => {
+      const commands = await initWith({
+        TRUSTED_ORIGINS: 'http://100.64.0.1:5173',
+        BASE_URL: 'https://app.example.com',
+      });
+
+      expect(commands.map((cmd) => cmd.input.Bucket).sort()).toEqual(
+        [
+          'artifacts',
+          'cached-static',
+          'default',
+          'job-results',
+          'reports',
+          'screenshot',
+          'system',
+        ].sort(),
+      );
+      for (const cmd of commands) {
+        expect(cmd.input.CORSConfiguration?.CORSRules?.[0]?.AllowedOrigins).toEqual(
+          ['http://100.64.0.1:5173', 'https://app.example.com'],
+        );
+      }
+    });
+
+    it('should skip bucket CORS when no origin is trusted, even with CORS_ALLOWED_ORIGINS set', async () => {
+      const commands = await initWith({
+        CORS_ALLOWED_ORIGINS: 'http://legacy.example.com',
+      });
+
+      expect(commands).toHaveLength(0);
+    });
+  });
+
   describe('generateObjectKey', () => {
     it('should generate a key preserving the extension', () => {
       expect(service.generateObjectKey('a.png')).toMatch(/\.png$/);

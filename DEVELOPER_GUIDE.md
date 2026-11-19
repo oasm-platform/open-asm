@@ -585,11 +585,13 @@ has a working default). For real S3, set in `core-api/.env`:
 | `S3_FORCE_PATH_STYLE` | `true` (default) for RustFS/MinIO, `false` for AWS S3. Applies to **both** clients, including the plain-URL builder. Ignored for public-read plain URLs when `STORAGE_URL_BASE` is set. |
 | `STORAGE_URL_BASE` | Set **empty** (`STORAGE_URL_BASE=`) => absolute URLs. Unset defaults to `/api/storage` (same-origin relative URLs; see Relative vs absolute browser URLs). |
 | `S3_USE_DEFAULT_CREDENTIALS` | `true` for IAM roles / instance profiles; otherwise leave `false` and set `RUSTFS_ACCESS_KEY` + `RUSTFS_SECRET_KEY` |
-| `CORS_ALLOWED_ORIGINS` | Comma-separated console origins applied as S3 bucket CORS. Cross-origin direct fetches need their origin listed here; empty (default) skips bucket CORS |
+| `TRUSTED_ORIGINS` / `BASE_URL` | Not storage-specific: the origins the API trusts are also applied as S3 bucket CORS. A console origin that fetches the bucket directly must be one of them. (`CORS_ALLOWED_ORIGINS` is no longer read; the API logs a warning when it is set.) |
 
 `StorageService.onModuleInit` applies the CORS rule to every bucket on boot
-(`GET, PUT, POST, HEAD`, `AllowedHeaders: *`, exposes `ETag`), and skips it
-entirely when the origins list is empty.
+(`GET, PUT, POST, HEAD`, `AllowedHeaders: *`, exposes `ETag`) for the trusted
+origins (`TRUSTED_ORIGINS`, the `BASE_URL` origin, and `localhost:5173`/`:3000`
+in local development), replacing any CORS rule set on the bucket by hand. It
+skips it entirely when that list is empty.
 
 The nginx public prefixes above are self-hosted, same-origin storage
 only. For cloud S3 the operator must additionally disable S3 Block

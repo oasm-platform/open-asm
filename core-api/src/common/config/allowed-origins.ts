@@ -1,6 +1,6 @@
 import { isLocalEnv } from './runtime-env';
 
-export const DEFAULT_CORS_ALLOWED_ORIGINS = [
+export const LOCAL_TRUSTED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:3000',
 ];
@@ -18,7 +18,8 @@ export function parseAllowedOrigins(
 
 /**
  * Browser origins other than the API's own that may call it with the user's
- * session: they get CORS headers, and better-auth accepts their requests.
+ * session: they get CORS headers (from the API and the storage buckets), and
+ * better-auth accepts their requests.
  * That is `TRUSTED_ORIGINS`, the console at `BASE_URL`, and the dev servers
  * in local development. Empty means same-origin only, which is all the
  * console needs behind its nginx proxy.
@@ -35,7 +36,7 @@ export function resolveTrustedOrigins(
   );
   const baseUrl = env.BASE_URL?.trim();
   if (baseUrl) origins.push(toOrigin('BASE_URL', baseUrl));
-  if (isLocalEnv(env)) origins.push(...DEFAULT_CORS_ALLOWED_ORIGINS);
+  if (isLocalEnv(env)) origins.push(...LOCAL_TRUSTED_ORIGINS);
   return [...new Set(origins)];
 }
 
