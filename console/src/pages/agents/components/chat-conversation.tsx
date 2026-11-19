@@ -80,6 +80,9 @@ interface ChatConversationProps {
   placeholder?: string;
   selectedToolCallId?: string | null;
   remoteExecuteEvents?: Map<string, RemoteExecuteStreamEvent[]>;
+  /** Label of the page attached to the next message (Ask AI sidebar) */
+  pageContextLabel?: string | null;
+  onRemovePageContext?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -119,6 +122,8 @@ export const ChatConversation = ({
   placeholder = 'Ask anything about security…',
   selectedToolCallId,
   remoteExecuteEvents,
+  pageContextLabel,
+  onRemovePageContext,
 }: ChatConversationProps) => {
   const isLoadingMoreRef = useRef(false);
   const onLoadMoreRef = useRef(onLoadMore);
@@ -411,6 +416,8 @@ export const ChatConversation = ({
               value={inputValue}
               onValueChange={onInputValueChange}
               showSettingsButton={false}
+              pageContextLabel={pageContextLabel}
+              onRemovePageContext={onRemovePageContext}
               placeholder={isStreaming ? 'Waiting for response…' : placeholder}
               // Same rounder box and round send button as the landing input
               className="[&_[data-slot=input-group]]:rounded-2xl [&_[data-slot=input-group]]:bg-card [&_[data-slot=input-group]]:shadow-sm [&_[data-slot=input-group]]:dark:bg-card [&_button[type=submit]]:rounded-full"

@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/sheet';
 import { useAgentChat } from '@/hooks/use-agent-chat';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import { stripPageContextFromTitle } from '@/lib/page-context';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useParams } from '@tanstack/react-router';
@@ -78,8 +79,8 @@ export default function AgentsChatPage() {
     onDecideApproval,
   } = useAgentChat({ conversationId });
 
-  // The tab shows the chat's title
-  useDocumentTitle(title);
+  // The tab shows the chat's title (without a sidebar question's page block)
+  useDocumentTitle(title ? stripPageContextFromTitle(title) : null);
 
   // The side panel opens from the header; the choice is kept per browser
   const [panelOpen, setPanelOpen] = useState(() => {

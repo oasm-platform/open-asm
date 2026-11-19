@@ -2,6 +2,7 @@ import {
   PromptInput,
   PromptInputBody,
   PromptInputFooter,
+  PromptInputHeader,
   PromptInputSubmit,
   PromptInputTools,
   type PromptInputMessage,
@@ -10,6 +11,7 @@ import { AgentMentionTextarea } from '@/components/agent-mention-textarea';
 import { AgentModeToggle } from '@/components/ui/agent-mode-toggle';
 import { ApprovalModeSelect } from '@/components/ui/approval-mode-select';
 import { ChatModelSwitcher } from '@/components/ui/chat-model-switcher';
+import { PanelsTopLeft, X } from 'lucide-react';
 import { useState } from 'react';
 
 interface AgentPromptInputProps {
@@ -34,6 +36,10 @@ interface AgentPromptInputProps {
   value?: string;
   /** Required with `value` to make the input controlled. */
   onValueChange?: (value: string) => void;
+  /** Label of the page attached to the next message; no chip when null. */
+  pageContextLabel?: string | null;
+  /** Detaches the page; required with `pageContextLabel` for the X button. */
+  onRemovePageContext?: () => void;
 }
 
 export default function AgentPromptInput({
@@ -50,6 +56,8 @@ export default function AgentPromptInput({
   className,
   value,
   onValueChange,
+  pageContextLabel,
+  onRemovePageContext,
 }: AgentPromptInputProps) {
   const [internalInput, setInternalInput] = useState('');
   const input = value ?? internalInput;
@@ -68,6 +76,28 @@ export default function AgentPromptInput({
   return (
     <div className={className}>
       <PromptInput onSubmit={handleSubmit} className="w-full">
+        {/* Its own row: the footer has no room left in the narrow sidebar */}
+        {pageContextLabel && (
+          <PromptInputHeader className="px-3 pt-2.5 pb-0">
+            <span
+              className="flex h-6 min-w-0 max-w-full items-center gap-1.5 rounded-md border bg-muted/50 pl-2 pr-1 text-xs text-muted-foreground"
+              title="This page is sent with your message"
+            >
+              <PanelsTopLeft className="size-3.5 shrink-0" />
+              <span className="truncate">{pageContextLabel}</span>
+              {onRemovePageContext && (
+                <button
+                  type="button"
+                  onClick={onRemovePageContext}
+                  aria-label="Remove page context"
+                  className="shrink-0 rounded-sm p-0.5 hover:bg-accent hover:text-foreground"
+                >
+                  <X className="size-3" />
+                </button>
+              )}
+            </span>
+          </PromptInputHeader>
+        )}
         <PromptInputBody>
           <AgentMentionTextarea
             value={input}

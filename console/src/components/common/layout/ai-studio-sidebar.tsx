@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/sidebar';
 import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import { stripPageContextFromTitle } from '@/lib/page-context';
 import { cn } from '@/lib/utils';
 import {
   useAgentsControllerDeleteAllConversations,
@@ -73,7 +74,7 @@ function ConversationItem({
   onDelete,
 }: ConversationItemProps) {
   const { isMobile } = useSidebar();
-  const title = conversation.title ?? UNTITLED;
+  const title = stripPageContextFromTitle(conversation.title ?? '') || UNTITLED;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(title);
   const [menuOpen, setMenuOpen] = useState(false);

@@ -7,6 +7,7 @@ import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import { stripPageContextFromTitle } from '@/lib/page-context';
 import { cn } from '@/lib/utils';
 import {
   SendMessageDtoAgentMode,
@@ -68,7 +69,8 @@ export function ChatHeader({
         .find((c) => c.id === conversationId)?.title,
     [data, conversationId],
   );
-  const displayTitle = listedTitle || title || UNTITLED;
+  const displayTitle =
+    stripPageContextFromTitle(listedTitle || title || '') || UNTITLED;
   const isMobile = useIsMobile();
 
   return (
