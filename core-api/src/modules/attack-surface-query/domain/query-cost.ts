@@ -1,9 +1,10 @@
-import type { FilterTree } from '@/common/utils/filter-tree';
-
 import type { ResolvedPath } from '../catalog/paths';
 import { AsqError } from './query-errors';
 import type { AsqLimits } from './query-limits';
 import type { NormalizedInclude, NormalizedQuery } from './query.types';
+import { conditionsOf, ownConditionsOf, relationsOf, topLevelPaths } from './where';
+
+const TEXT_SEARCH_OPS = new Set(['contains', 'notContains', 'startsWith', 'endsWith']);
 
 /** One-relation chains a set of paths needs (`host`, `host.target`). */
 export function joinChains(paths: Iterable<ResolvedPath>): Set<string> {
@@ -20,11 +21,6 @@ export function joinChains(paths: Iterable<ResolvedPath>): Set<string> {
     }
   }
   return chains;
-}
-
-function conditions(tree: FilterTree | undefined) {
-  if (!tree) return [];
-  return tree.items.flatMap((item) => ('conditions' in item ? item.conditions : [item]));
 }
 
 function includeCost(rootLimit: number, include: NormalizedInclude, parentRows: number): number {
@@ -52,7 +48,7 @@ export function estimateCost(query: NormalizedQuery): QueryCostBreakdown {
     ...query.orderBy.flatMap((o) => (o.path ? [o.path] : [])),
     ...query.groupBy.map((g) => g.path),
     ...query.aggregate.flatMap((a) => (a.path ? [a.path] : [])),
-    ...query.wherePaths.values(),
+    ...topLevelPaths(query.where),
     ...(query.window ? [query.window.path] : []),
   ];
   const joins = joinChains(allPaths).size;
@@ -66,16 +62,18 @@ export function estimateCost(query: NormalizedQuery): QueryCostBreakdown {
     );
   }
 
-  const conds = conditions(query.where);
-  for (const c of conds) {
-    const path = query.wherePaths.get(c.field);
-    if (!path) continue;
+  const conds = conditionsOf(query.where);
+  for (const { path, op } of conds) {
     if (path.hops.some((h) => h.kind === 'many')) cost += 50;
-    if ((c.op === 'contains' || c.op === 'notContains') && path.field.costlyContains) {
+    if (TEXT_SEARCH_OPS.has(op) && path.field.costlyContains) {
       cost += 200;
-      hints.add(`use eq/in instead of contains on ${path.path} (no text index)`);
+      hints.add(`use eq/in instead of ${op} on ${path.path} (no text index)`);
     }
     if (path.field.cte === 'fresh') cost += 30;
+  }
+  for (const rel of relationsOf(query.where)) {
+    cost += rel.count ? 100 : 50;
+    if (rel.count) hints.add(`count over ${rel.relation.path} reads every related row: add a window`);
   }
   for (const p of query.select) {
     if (p.field.heavy) cost += query.limit * 2;
@@ -87,10 +85,9 @@ export function estimateCost(query: NormalizedQuery): QueryCostBreakdown {
   }
   if (query.mode === 'aggregate') cost += 100 + 50 * query.groupBy.length;
 
-  const hasIndexedFilter = conds.some((c) => {
-    const path = query.wherePaths.get(c.field);
-    return path && path.hops.length === 0 && (c.op === 'eq' || c.op === 'in') && (path.field.sortable === 'indexed' || path.field.type === 'uuid');
-  });
+  const hasIndexedFilter = ownConditionsOf(query.where).some(({ path, op }) =>
+    path.hops.length === 0 && (op === 'eq' || op === 'in') && (path.field.sortable === 'indexed' || path.field.type === 'uuid'),
+  );
   if (!query.window && !hasIndexedFilter) {
     cost += 150;
     hints.add('add a window (e.g. "window": { "since": "now-7d" })');

@@ -25,13 +25,13 @@ export const OrderBySchema = z
   .strict();
 
 /**
- * The filter tree keeps its own validator (`validateFilter` of
- * common/utils/filter-tree.ts); zod only checks the outer shape.
+ * The filter tree has its own validator (`normalizeWhere` of domain/where.ts,
+ * which also caps its size per caller); zod only checks the outer shape.
  */
 export const FilterSchema = z
   .object({
     logic: z.enum(['and', 'or']),
-    items: z.array(z.unknown()).max(20),
+    items: z.array(z.unknown()).max(50),
   })
   .strict();
 

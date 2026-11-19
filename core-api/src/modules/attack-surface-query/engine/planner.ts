@@ -148,7 +148,7 @@ function compileInclude(
   );
   const order = orderSql(from, include.orderBy);
   const childParams = new ParamBag(`${queryPrefix}i${index}_`);
-  const where = compileWhere(from, include.where, include.wherePaths, scope, `${queryPrefix}i${index}_w`);
+  const where = compileWhere(from, include.where, scope, `${queryPrefix}i${index}_w`);
   if (where) childParams.merge(where.params);
   const predicates = [
     `${child}.${include.def.childKey} = asq_p.k`,
@@ -214,7 +214,7 @@ export function planQuery(
       `(${sql} >= CAST(${params.add(query.window.since.toISOString())} AS timestamptz) AND ${sql} < CAST(${params.add(query.window.until.toISOString())} AS timestamptz))`,
     );
   }
-  const where = compileWhere(from, query.where, query.wherePaths, scope, `${prefix}w`);
+  const where = compileWhere(from, query.where, scope, `${prefix}w`);
   if (where) {
     params.merge(where.params);
     terms.push(where.sql);

@@ -1,8 +1,7 @@
 import { isIP, isUUID } from 'class-validator';
 
-import type { FilterOp } from '@/common/utils/filter-tree';
-
 import type {
+  AsqOp,
   Catalog,
   FieldDef,
   FieldType,
@@ -11,17 +10,45 @@ import type {
 import { RESOURCES } from './resources';
 
 /** Operators each field type allows (a field may narrow them with `ops`). */
-export const TYPE_OPS: Record<FieldType, readonly FilterOp[]> = {
-  text: ['eq', 'neq', 'contains', 'notContains', 'in', 'notIn'],
-  int: ['eq', 'neq', 'in', 'notIn', 'gt', 'gte', 'lt', 'lte'],
-  float: ['eq', 'neq', 'gt', 'gte', 'lt', 'lte'],
-  bool: ['eq'],
+export const TYPE_OPS: Record<FieldType, readonly AsqOp[]> = {
+  text: ['eq', 'neq', 'contains', 'notContains', 'startsWith', 'endsWith', 'in', 'notIn'],
+  int: ['eq', 'neq', 'in', 'notIn', 'gt', 'gte', 'lt', 'lte', 'between'],
+  float: ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'between'],
+  bool: ['eq', 'neq'],
   uuid: ['eq', 'neq', 'in', 'notIn'],
-  ip: ['eq', 'neq', 'in', 'notIn', 'inSubnet'],
-  timestamp: ['gt', 'gte', 'lt', 'lte'],
+  ip: ['eq', 'neq', 'in', 'notIn', 'inSubnet', 'notInSubnet'],
+  timestamp: ['gt', 'gte', 'lt', 'lte', 'between'],
   enum: ['eq', 'neq', 'in', 'notIn'],
-  textArray: ['eq', 'neq', 'contains', 'in', 'notIn'],
+  textArray: ['eq', 'neq', 'contains', 'in', 'notIn', 'containsAll', 'containsAny'],
   json: [],
+};
+
+/** Operators that test for NULL: every nullable field allows them. */
+export const NULL_OPS: readonly AsqOp[] = ['isNull', 'isNotNull'];
+
+/** How many values an operator takes. */
+export type ValueShape = 'none' | 'one' | 'list' | 'pair';
+
+export const OP_VALUE_SHAPE: Record<AsqOp, ValueShape> = {
+  eq: 'one',
+  neq: 'one',
+  contains: 'one',
+  notContains: 'one',
+  startsWith: 'one',
+  endsWith: 'one',
+  gt: 'one',
+  gte: 'one',
+  lt: 'one',
+  lte: 'one',
+  in: 'list',
+  notIn: 'list',
+  inSubnet: 'list',
+  notInSubnet: 'list',
+  containsAll: 'list',
+  containsAny: 'list',
+  between: 'pair',
+  isNull: 'none',
+  isNotNull: 'none',
 };
 
 export function isCidr(value: string): boolean {
@@ -38,7 +65,7 @@ export function isCidr(value: string): boolean {
  * refused here: otherwise it is a 500 instead of a 400. Timestamps arrive
  * already resolved to ISO strings (domain/query-validator.ts).
  */
-export function typeCheck(type: FieldType, value: string, op: FilterOp): boolean {
+export function typeCheck(type: FieldType, value: string, op: AsqOp): boolean {
   switch (type) {
     case 'int':
       return /^-?\d{1,10}$/.test(value) && Math.abs(Number(value)) <= 2_147_483_647;
@@ -50,7 +77,9 @@ export function typeCheck(type: FieldType, value: string, op: FilterOp): boolean
       return isUUID(value);
     case 'ip':
       // inet rejects zone ids (`fe80::1%eth0`): refuse them here
-      return op === 'inSubnet' ? isCidr(value) : isIP(value) && !value.includes('%');
+      return op === 'inSubnet' || op === 'notInSubnet'
+        ? isCidr(value)
+        : isIP(value) && !value.includes('%');
     case 'timestamp':
       return !Number.isNaN(new Date(value).getTime());
     case 'text':
@@ -61,12 +90,13 @@ export function typeCheck(type: FieldType, value: string, op: FilterOp): boolean
   }
 }
 
-export function fieldOps(field: FieldDef): readonly FilterOp[] {
-  return field.ops ?? TYPE_OPS[field.type];
+export function fieldOps(field: FieldDef): readonly AsqOp[] {
+  const ops = field.ops ?? TYPE_OPS[field.type];
+  return field.nullable ? [...ops, ...NULL_OPS] : ops;
 }
 
 /** Checks the type, the enum list and the field's own check. */
-export function checkFieldValue(field: FieldDef, value: string, op: FilterOp): boolean {
+export function checkFieldValue(field: FieldDef, value: string, op: AsqOp): boolean {
   if (!typeCheck(field.type, value, op)) return false;
   if (field.enumValues && !field.enumValues.includes(value)) return false;
   return field.check ? field.check(value, op) : true;
@@ -207,7 +237,7 @@ export interface FieldDescription {
   name: string;
   type: FieldType;
   description: string;
-  ops: readonly FilterOp[];
+  ops: readonly AsqOp[];
   enumValues?: readonly string[];
   sortable?: string;
   groupable?: boolean;

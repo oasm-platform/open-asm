@@ -1,15 +1,6 @@
-import {
-  validateFilter,
-  type FilterCondition,
-  type FilterFieldSpec,
-  type FilterGroup,
-  type FilterSchema,
-  type FilterTree,
-} from '@/common/utils/filter-tree';
 import { firstMissingPermission } from '@/common/utils/permission-keys.util';
 import type { ZodIssue } from 'zod';
 
-import { checkFieldValue, fieldOps } from '../catalog/catalog';
 import type { Catalog, FieldDef, ResourceDef } from '../catalog/catalog.types';
 import { resolvePath, resourcesOf, type ResolvedPath } from '../catalog/paths';
 import { AsqError, invalidQuery, type AsqIssue } from './query-errors';
@@ -34,11 +25,11 @@ import type {
   NormalizedWindow,
   QueryScope,
 } from './query.types';
-import { parseTimeExpr, resolveWindow, type ResolvedWindow } from './time-window';
+import { resolveWindow, type ResolvedWindow } from './time-window';
+import { normalizeWhere as resolveWhere, relationsOf, topLevelPaths, type WhereNode } from './where';
 
 const MAX_ISSUES = 50;
 const SELECT_RULES = { allowMany: false, maxOneHops: 2 };
-const WHERE_RULES = { allowMany: true, maxOneHops: 3 };
 
 const MIN_MAX_TYPES = new Set(['int', 'float', 'timestamp', 'text', 'enum']);
 const AVG_TYPES = new Set(['int', 'float']);
@@ -83,16 +74,6 @@ class IssueBag {
   }
 }
 
-type Condition = FilterCondition<string>;
-
-function conditionsOf(tree: FilterInput): unknown[] {
-  return tree.items.flatMap((item) =>
-    typeof item === 'object' && item !== null && 'conditions' in item && Array.isArray((item as FilterGroup).conditions)
-      ? (item as FilterGroup).conditions
-      : [item],
-  );
-}
-
 interface Ctx {
   catalog: Catalog;
   scope: QueryScope;
@@ -102,91 +83,21 @@ interface Ctx {
   resources: Set<string>;
 }
 
-/**
- * Resolves the paths of a `where` tree, turns timestamp values (`now-5d`) into
- * ISO strings, and runs the shared filter-tree validator over a schema built
- * from the catalog (operators and value checks per field).
- */
-function normalizeWhere(
-  ctx: Ctx,
-  root: ResourceDef,
-  where: FilterInput,
-  at: string,
-): { tree?: FilterTree; paths: Map<string, ResolvedPath> } {
-  const paths = new Map<string, ResolvedPath>();
-  let broken = false;
-  for (const raw of conditionsOf(where)) {
-    if (typeof raw !== 'object' || raw === null) continue; // validateFilter reports it
-    const field = (raw as { field?: unknown }).field;
-    if (typeof field !== 'string' || paths.has(field)) continue;
-    const resolved = resolvePath(ctx.catalog, root, field, WHERE_RULES);
-    if (!resolved.ok) {
-      ctx.issues.add(`${at}.field "${field}"`, resolved.code, resolved.message);
-      broken = true;
-      continue;
-    }
-    if (resolved.value.field.heavy && !ctx.limits.allowHeavy) {
-      ctx.issues.add(at, 'HEAVY_FIELD_NOT_ALLOWED', `"${field}" is a large field and cannot be filtered here`);
-      broken = true;
-    }
-    if (resolved.value.field.type === 'json') {
-      ctx.issues.add(at, 'OP_NOT_ALLOWED', `"${field}" cannot be filtered`);
-      broken = true;
-    }
-    paths.set(field, resolved.value);
-    for (const r of resourcesOf(resolved.value)) ctx.resources.add(r.name);
-  }
-  if (broken) return { paths };
-
-  // Resolve time expressions in place, on a copy.
-  const resolveValue = (path: ResolvedPath, value: unknown): unknown => {
-    if (path.field.type !== 'timestamp' || typeof value !== 'string') return value;
-    const parsed = parseTimeExpr(value, ctx.now, { allowFuture: true });
-    if (!parsed.ok) {
-      ctx.issues.add(at, 'INVALID_TIME', `${path.path}: ${parsed.message}`);
-      broken = true;
-      return value;
-    }
-    return parsed.value.toISOString();
-  };
-  const copyCondition = (raw: unknown): unknown => {
-    if (typeof raw !== 'object' || raw === null) return raw;
-    const c = raw as Condition;
-    const path = paths.get(c.field);
-    if (!path) return raw;
-    return {
-      ...c,
-      value: Array.isArray(c.value) ? c.value.map((v) => resolveValue(path, v)) : resolveValue(path, c.value),
-    };
-  };
-  const tree = {
-    logic: where.logic,
-    items: where.items.map((item) =>
-      typeof item === 'object' && item !== null && 'conditions' in item
-        ? { ...(item as FilterGroup), conditions: (item as FilterGroup).conditions.map(copyCondition) }
-        : copyCondition(item),
-    ),
-  };
-  if (broken) return { paths };
-
-  const schema: FilterSchema<string> = {};
-  for (const [name, path] of paths) {
-    const spec: FilterFieldSpec = {
-      ops: fieldOps(path.field),
-      check: (v, op) => checkFieldValue(path.field, v, op),
-      any: () => '',
-      like: () => '',
-      subnet: () => '',
-      cmp: () => '',
-    };
-    schema[name] = spec;
-  }
-  const error = validateFilter(schema, tree);
-  if (error) {
-    ctx.issues.add(at, error.includes('is not allowed') ? 'OP_NOT_ALLOWED' : 'INVALID_VALUE', error);
-    return { paths };
-  }
-  return { tree: tree as FilterTree, paths };
+/** Validates and resolves a `where` (domain/where.ts), recording what it reads. */
+function normalizeWhere(ctx: Ctx, root: ResourceDef, where: FilterInput, at: string): WhereNode | undefined {
+  return resolveWhere(
+    {
+      catalog: ctx.catalog,
+      now: ctx.now,
+      limits: ctx.limits.filter,
+      allowHeavy: ctx.limits.allowHeavy,
+      read: (resource) => ctx.resources.add(resource.name),
+      issue: (path, code, message) => ctx.issues.add(path, code, message),
+    },
+    root,
+    where,
+    at,
+  );
 }
 
 function resolveSelect(
@@ -311,7 +222,7 @@ function resolveIncludes(
       if (resolved.ok) orderBy.push({ key: field, dir: 'desc', path: resolved.value });
     }
     const where = spec.where ? normalizeWhere(ctx, child, spec.where, `${here}.where`) : undefined;
-    if (where && [...where.paths.values()].some((p) => p.hops.some((h) => h.kind === 'many'))) {
+    if (where && (relationsOf(where).length > 0 || topLevelPaths(where).some((p) => p.hops.some((h) => h.kind === 'many')))) {
       ctx.issues.add(`${here}.where`, 'UNKNOWN_RELATION', 'an include filter cannot test a nested list');
     }
     out.push({
@@ -319,8 +230,7 @@ function resolveIncludes(
       def,
       resource: child,
       select: resolveSelect(ctx, child, spec.select, `${here}.select`),
-      where: where?.tree,
-      wherePaths: where?.paths ?? new Map(),
+      where,
       orderBy,
       limit: Math.min(limit, ctx.limits.maxIncludeLimit),
       include: resolveIncludes(ctx, child, spec.include, `${here}.include`, depth + 1, counter),
@@ -525,8 +435,7 @@ function normalizeQuery(
       mode: 'aggregate',
       select: [],
       include: [],
-      where: where?.tree,
-      wherePaths: where?.paths ?? new Map(),
+      where,
       window,
       groupBy,
       aggregate,
@@ -543,8 +452,7 @@ function normalizeQuery(
     mode: 'list',
     select: resolveSelect(ctx, resource, spec.select, `${at}.select`),
     include: resolveIncludes(ctx, resource, spec.include, `${at}.include`, 1, { n: 0 }),
-    where: where?.tree,
-    wherePaths: where?.paths ?? new Map(),
+    where,
     window,
     groupBy: [],
     aggregate: [],

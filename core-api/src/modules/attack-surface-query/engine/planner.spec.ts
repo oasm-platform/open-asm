@@ -1,4 +1,4 @@
-import { CATALOG, fieldOps } from '../catalog/catalog';
+import { CATALOG, fieldOps, OP_VALUE_SHAPE } from '../catalog/catalog';
 import type { FieldDef } from '../catalog/catalog.types';
 import type { QueryScope } from '../domain/query.types';
 import { parseBatch, validateBatch } from '../domain/query-validator';
@@ -88,6 +88,60 @@ describe('planQuery', () => {
     expect(p.root.sql).toMatch(/EXISTS \(SELECT 1 FROM "vulnerabilities" "r_x0" WHERE "r_x0"\."assetId" = "r"\.id AND "r_x0"\."workspaceId" = :asq_q0_p0 AND \("r_x0"\."reviewStatus" = 'approved'\)/);
     expect(p.root.sql).toMatch(/NOT \(EXISTS \(SELECT 1 FROM "asset_services" "r_x1"/);
     expectScopedFirst(p.root.sql);
+  });
+
+  it('compiles nested groups and negations with their own parentheses', () => {
+    const p = plan({
+      from: 'services',
+      select: ['port'],
+      where: {
+        logic: 'or',
+        items: [
+          { field: 'port', op: 'eq', value: '22' },
+          { not: { logic: 'and', items: [{ field: 'port', op: 'gte', value: '1024' }, { field: 'lastSeen', op: 'isNull' }] } },
+        ],
+      },
+    });
+    expect(p.root.sql).toContain(
+      '((("r".port) = ANY(CAST(:asq_q0_w0 AS int8[]))) OR NOT (((("r".port) >= CAST(:asq_q0_w1 AS int8)) AND (("r"."lastSeenAt") IS NULL))))',
+    );
+    expectScopedFirst(p.root.sql);
+  });
+
+  it('compiles the new operators to parameterized tests', () => {
+    const sql = (from: string, cond: Record<string, unknown>) => {
+      const p = plan({ from, where: { logic: 'and', items: [cond] } });
+      return { sql: whereOf(p.root.sql), params: Object.values(p.root.params) };
+    };
+    expect(sql('services', { field: 'port', op: 'between', value: ['1', '1024'] }).sql).toContain(
+      '("r".port) >= CAST(:asq_q0_w0 AS int8) AND ("r".port) <= CAST(:asq_q0_w1 AS int8)',
+    );
+    const starts = sql('hosts', { field: 'value', op: 'startsWith', value: 'a_b%' });
+    expect(starts.sql).toContain('("r".value) ILIKE :asq_q0_w0');
+    expect(starts.params).toContain('a\\_b\\%%');
+    expect(sql('hosts', { field: 'value', op: 'endsWith', value: '.io' }).params).toContain('%.io');
+    expect(sql('ips', { field: 'ip', op: 'notInSubnet', value: ['10.0.0.0/8'] }).sql).toMatch(/NOT \(.*<<= ANY\(CAST\(:asq_q0_w0 AS inet\[\]\)\)/);
+    expect(sql('vulnerabilities', { field: 'cve', op: 'containsAll', value: ['CVE-1'] }).sql).toMatch(/@> CAST\(:asq_q0_w0 AS text\[\]\)/);
+    expect(sql('services', { field: 'lastSeen', op: 'isNotNull' }).sql).toContain('(("r"."lastSeenAt") IS NOT NULL)');
+  });
+
+  it('compiles relation tests to scoped (NOT) EXISTS and COUNT subqueries', () => {
+    const rel = (test: Record<string, unknown>) =>
+      whereOf(plan({ from: 'hosts', select: ['value'], where: { logic: 'and', items: [{ relation: 'services', ...test }] } }).root.sql);
+    const port22 = { logic: 'and', items: [{ field: 'port', op: 'eq', value: '22' }] };
+    const scoped = '"r_x0"."assetId" = "r".id AND "r_x0"."workspaceId" = :asq_q0_p0';
+    expect(rel({ where: port22 })).toContain(`(EXISTS (SELECT 1 FROM "asset_services" "r_x0" WHERE ${scoped} AND ((("r_x0".port)`);
+    expect(rel({ quantifier: 'none', where: port22 })).toContain(`(NOT EXISTS (SELECT 1 FROM "asset_services" "r_x0" WHERE ${scoped} AND (`);
+    expect(rel({ quantifier: 'every', where: port22 })).toContain(`(NOT EXISTS (SELECT 1 FROM "asset_services" "r_x0" WHERE ${scoped} AND NOT ((`);
+    expect(rel({ count: { op: 'gte', value: '5' } })).toContain(
+      `((SELECT COUNT(*) FROM "asset_services" "r_x0" WHERE ${scoped}) >= CAST(:asq_q0_w0 AS int8))`,
+    );
+  });
+
+  it('joins the parent chain of a relation test and keeps the child base predicate', () => {
+    const p = plan({ from: 'services', select: ['port'], where: { logic: 'and', items: [{ relation: 'host.vulnerabilities', quantifier: 'some' }] } });
+    expect(p.root.sql).toMatch(/INNER JOIN "assets" "r__host"/);
+    expect(p.root.sql).toMatch(/"r_x0"\."assetId" = "r__host"\.id AND "r_x0"\."workspaceId" = :asq_q0_p0 AND \("r_x0"\."reviewStatus" = 'approved'\)/);
   });
 
   it('adds the project scope and the base predicate as their own terms', () => {
@@ -193,7 +247,9 @@ describe('planQuery property: every statement is workspace-scoped', () => {
   for (const res of roots) {
     for (const [name, field] of Object.entries(res.fields)) {
       for (const op of fieldOps(field)) {
-        const value = op === 'inSubnet' ? ['10.0.0.0/8'] : ['in', 'notIn'].includes(op) ? [sample(field)] : sample(field);
+        const shape = OP_VALUE_SHAPE[op];
+        const one = op === 'inSubnet' || op === 'notInSubnet' ? '10.0.0.0/8' : sample(field);
+        const value = shape === 'none' ? undefined : shape === 'list' ? [one] : shape === 'pair' ? [one, one] : one;
         cases.push([
           `${res.name}.${name} ${op}`,
           {
@@ -201,7 +257,7 @@ describe('planQuery property: every statement is workspace-scoped', () => {
             where: {
               logic: 'or',
               items: [
-                { field: name, op, value },
+                { not: { field: name, op, ...(value === undefined ? {} : { value }) } },
                 { logic: 'or', conditions: [{ field: 'id', op: 'eq', value: '44444444-4444-4444-8444-444444444444' }] },
               ],
             },
@@ -217,12 +273,28 @@ describe('planQuery property: every statement is workspace-scoped', () => {
         `${res.name} where ${relation}.${fieldName}`,
         { from: res.name, where: { logic: 'or', items: [{ field: `${relation}.${fieldName}`, op: 'eq', value: sample(field) }] } },
       ]);
+      const childWhere = { logic: 'or', items: [{ field: fieldName, op: 'eq', value: sample(field) }] };
+      for (const test of [
+        { quantifier: 'some', where: childWhere },
+        { quantifier: 'none', where: childWhere },
+        { quantifier: 'every', where: childWhere },
+        { count: { op: 'gte', value: '2' }, where: childWhere },
+      ]) {
+        cases.push([
+          `${res.name} ${JSON.stringify(test.quantifier ?? 'count')} ${relation}`,
+          { from: res.name, where: { logic: 'or', items: [{ relation, ...test }, { field: 'id', op: 'eq', value: '44444444-4444-4444-8444-444444444444' }] } },
+        ]);
+      }
     }
   }
 
   it.each(cases)('%s', (_label, query) => {
     const p = plan(query, { projectId: CATALOG[query.from as string].projectScope ? '55555555-5555-4555-8555-555555555555' : undefined });
     expectScopedFirst(p.root.sql);
+    // Every sub-select re-applies the workspace scope on its own row.
+    for (const [, alias] of p.root.sql.matchAll(/FROM "[a-z_]+" "(r_x\d+)"/g)) {
+      expect(p.root.sql).toContain(`"${alias}"."workspaceId" = :asq_q0_p0`);
+    }
     for (const value of Object.values(p.root.params)) {
       if (typeof value === 'string' && value.length > 3) expect(p.root.sql).not.toContain(value);
     }

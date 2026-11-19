@@ -1,8 +1,7 @@
-import type { FilterTree } from '@/common/utils/filter-tree';
-
 import type { ManyRelationDef, ResourceDef } from '../catalog/catalog.types';
 import type { ResolvedPath } from '../catalog/paths';
 import type { QueryMode } from './query.schema';
+import type { WhereNode } from './where';
 
 export type AsqCaller = 'http' | 'agent' | 'mcp';
 
@@ -41,8 +40,7 @@ export interface NormalizedInclude {
   def: ManyRelationDef;
   resource: ResourceDef;
   select: ResolvedPath[];
-  where?: FilterTree;
-  wherePaths: ReadonlyMap<string, ResolvedPath>;
+  where?: WhereNode;
   orderBy: NormalizedOrder[];
   /** Rows per parent. */
   limit: number;
@@ -74,10 +72,8 @@ export interface NormalizedQuery {
   mode: 'list' | 'aggregate';
   select: ResolvedPath[];
   include: NormalizedInclude[];
-  /** Filter tree with timestamp values resolved to ISO strings. */
-  where?: FilterTree;
-  /** Paths named in `where`, by path. */
-  wherePaths: ReadonlyMap<string, ResolvedPath>;
+  /** Resolved filter, timestamp values as ISO strings. */
+  where?: WhereNode;
   window?: NormalizedWindow;
   groupBy: NormalizedGroup[];
   aggregate: NormalizedAggregate[];

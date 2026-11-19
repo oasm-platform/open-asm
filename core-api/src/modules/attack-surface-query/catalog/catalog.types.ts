@@ -1,5 +1,17 @@
 import type { FilterOp } from '@/common/utils/filter-tree';
 
+/** Operators of an ASQ condition: the shared filter-tree ones plus ASQ's own. */
+export type AsqOp =
+  | FilterOp
+  | 'notInSubnet'
+  | 'startsWith'
+  | 'endsWith'
+  | 'between'
+  | 'containsAll'
+  | 'containsAny'
+  | 'isNull'
+  | 'isNotNull';
+
 export type FieldType =
   | 'text'
   | 'int'
@@ -33,9 +45,9 @@ export interface FieldDef {
   /** NULL possible: filters wrap the test in COALESCE(…, false) so neq/notIn keep NULL rows. */
   nullable?: boolean;
   /** Narrower than the type's operators. */
-  ops?: readonly FilterOp[];
+  ops?: readonly AsqOp[];
   /** Extra value check on top of the type's check. */
-  check?: (value: string, op: FilterOp) => boolean;
+  check?: (value: string, op: AsqOp) => boolean;
   enumValues?: readonly string[];
   sortable?: SortKind;
   groupable?: boolean;
