@@ -67,22 +67,37 @@ Only through a relation: `http` = a service's latest HTTP response (`url`, `titl
     { "field": "technologies.name", "op": "eq", "value": "Jenkins" } ] } ] } } } }
 ```
 
-- Up to 20 items; an item is a condition or one group (`logic` + `conditions`). Values are **strings**, or arrays of strings for `in`/`notIn`/`inSubnet`.
+- An item is a condition, a group `{ "logic": "and" | "or", "items": [...] }` (groups nest up to 4 levels; the old `"conditions"` key still works), a negation `{ "not": <item> }`, or a relation test (below). At most 20 conditions per filter. Values are **strings**; arrays of strings for `in`, `notIn`, `inSubnet`, `notInSubnet`, `containsAll`, `containsAny`; `[from, to]` for `between`; no `value` for `isNull` / `isNotNull`.
 - A **list path** (`technologies.name`, `vulnerabilities.severity`, `services.port`) means "has at least one related row that matches"; with `neq`/`notIn`/`notContains` it means "has **no** related row that matches".
 
 | field type | operators | value |
 |---|---|---|
-| text | eq, neq, contains, notContains, in, notIn | `contains` is case-insensitive |
-| int (`port`, `statusCode`…) | eq, neq, in, notIn, gt, gte, lt, lte | `"443"` |
-| number (`cvssScore`, `epssScore`) | eq, neq, gt, gte, lt, lte | `"7.5"` |
-| bool (`isOpen`, `isNew`…) | eq | `"true"` / `"false"` |
+| text | eq, neq, contains, notContains, startsWith, endsWith, in, notIn | case-insensitive for contains/startsWith/endsWith |
+| int (`port`, `statusCode`…) | eq, neq, in, notIn, gt, gte, lt, lte, between | `"443"`; between `["1", "1024"]` (both ends included) |
+| number (`cvssScore`, `epssScore`) | eq, neq, gt, gte, lt, lte, between | `"7.5"` |
+| bool (`isOpen`, `isNew`…) | eq, neq | `"true"` / `"false"` |
 | enum (`type`, `kind`, `severity`…) | eq, neq, in, notIn | one of the listed values |
 | id | eq, neq, in, notIn | an id from an earlier row |
-| ip | eq, neq, in, notIn, inSubnet | `"10.0.0.1"`; inSubnet takes CIDRs: `["10.0.0.0/8"]` |
-| time | gt, gte, lt, lte | a time (below) |
-| list (`cve`, `cwe`, `tags`, `ports`) | eq, neq, contains, in, notIn | eq/in: contains that element |
+| ip | eq, neq, in, notIn, inSubnet, notInSubnet | `"10.0.0.1"`; the subnet ops take CIDRs: `["10.0.0.0/8"]` |
+| time | gt, gte, lt, lte, between | a time (below); between `["now-7d", "now"]` |
+| list (`cve`, `cwe`, `tags`, `ports`) | eq, neq, contains, in, notIn, containsAll, containsAny | eq/in: contains that element; containsAll: every listed element |
+| any field that may be empty (`lastSeen`, `version`, `cvssScore`…) | isNull, isNotNull | no value |
 
-`contains` on `value`, `url`, `title`, `name` of findings is slower than `eq`/`in`: prefer exact values when you have them.
+`contains`, `startsWith` and `endsWith` on `value`, `url`, `title`, `name` of findings are slower than `eq`/`in`: prefer exact values when you have them.
+
+### Relation tests
+
+A relation test checks the related rows of a list as a whole:
+
+```
+{ "relation": "<list>", "quantifier": "some" | "none" | "every", "where": { "logic": "and", "items": [...] } }
+{ "relation": "<list>", "count": { "op": "eq" | "neq" | "gt" | "gte" | "lt" | "lte", "value": "<n>" }, "where"?: {...} }
+```
+
+- `relation` is a list of the resource (`services` on hosts), or one reached through related rows (`host.vulnerabilities` on services).
+- `some` (the default): at least one related row matches `where` (no `where`: has any). `none`: no related row matches. `every`: every related row matches (needs `where`; a row with no related rows passes).
+- `count`: the number of related rows (matching `where`, if given) compared with a number.
+- Inside `where` the fields are the related resource's (`port`, not `services.port`); no list inside it.
 
 ## Time
 
@@ -92,8 +107,10 @@ Only through a relation: `http` = a service's latest HTTP response (`url`, `titl
 
 ## Counting and grouping
 
-- `aggregate: { "<name>": { "fn": "count" | "countDistinct" | "min" | "max" | "avg", "field"?: "…" } }` (count without a field counts rows; avg needs a number). Up to 5 aggregates, 3 group keys.
+- `aggregate: { "<name>": { "fn": "count" | "countDistinct" | "sum" | "min" | "max" | "avg", "field"?: "…", "where"?: {...} } }` (count without a field counts rows; sum and avg need a number). `where` on an aggregate counts only the rows it matches: one query gives a whole matrix (open, critical, high… per host). Up to 8 aggregates, 3 group keys.
 - `groupBy` takes groupable fields, related ones too (`target.value`, `host.value`). A time needs a bucket: `{ "field": "firstSeen", "bucket": "hour" | "day" | "week" | "month" }`.
+- `having` filters the grouped rows; its fields are the group keys and the aggregate names: `"having": { "logic": "and", "items": [{ "field": "critical", "op": "gt", "value": "0" }] }` (eq, neq, in, notIn; gt, gte, lt, lte on numbers and times).
+- `"fill": true` returns every bucket of the window, the empty ones with 0 (needs a `window` and one time group key). Time buckets are cut in UTC; `"options": { "timezone": "Asia/Ho_Chi_Minh" }` on the call cuts them in that zone.
 - An aggregate query has no `select`, `include`, `cursor` or `withTotal`; its `orderBy` names a group key or an aggregate name.
 - Workspace-wide distributions (ports, technologies, webservers, status codes, TLS versions) are instant in `rollups` (refreshed every 15 minutes).
 
@@ -224,4 +241,44 @@ Trends:
 { "window": { "since": "now-30d" }, "queries": {
   "hostsPerDay": { "from": "hosts", "groupBy": [{ "field": "firstSeen", "bucket": "day" }], "aggregate": { "n": { "fn": "count" } }, "limit": 31 },
   "findingsPerWeek": { "from": "vulnerabilities", "groupBy": [{ "field": "firstSeen", "bucket": "week" }, "severity"], "aggregate": { "n": { "fn": "count" } }, "limit": 50 } } }
+```
+
+Every day of the last two weeks, empty days included, in the user's time zone:
+
+```json
+{ "window": { "since": "now-14d" }, "options": { "timezone": "Asia/Ho_Chi_Minh" }, "queries": {
+  "newPortsPerDay": { "from": "services", "groupBy": [{ "field": "firstSeen", "bucket": "day" }], "aggregate": { "n": { "fn": "count" } }, "fill": true } } }
+```
+
+Hosts ranked by open findings, one row per host with a column per severity, only hosts with something critical or high:
+
+```json
+{ "queries": {
+  "riskByHost": { "from": "vulnerabilities", "groupBy": ["host.value"], "limit": 50,
+    "where": { "logic": "and", "items": [{ "field": "isOpen", "op": "eq", "value": "true" }] },
+    "aggregate": {
+      "open": { "fn": "count" },
+      "critical": { "fn": "count", "where": { "logic": "and", "items": [{ "field": "severity", "op": "eq", "value": "critical" }] } },
+      "high": { "fn": "count", "where": { "logic": "and", "items": [{ "field": "severity", "op": "eq", "value": "high" }] } },
+      "maxCvss": { "fn": "max", "field": "cvssScore" } },
+    "having": { "logic": "or", "items": [{ "field": "critical", "op": "gt", "value": "0" }, { "field": "high", "op": "gt", "value": "0" }] },
+    "orderBy": [{ "field": "critical", "dir": "desc" }] } } }
+```
+
+Hosts by what they lack or have (relation tests, nesting, negation):
+
+```json
+{ "queries": {
+  "webWithoutTls": { "from": "hosts", "select": ["value", "target.value"], "limit": 100,
+    "where": { "logic": "and", "items": [
+      { "relation": "services", "where": { "logic": "and", "items": [{ "field": "port", "op": "in", "value": ["80", "8080"] }] } },
+      { "relation": "services", "quantifier": "none", "where": { "logic": "and", "items": [{ "field": "port", "op": "eq", "value": "443" }] } } ] } },
+  "manyPorts": { "from": "hosts", "select": ["value"], "limit": 100,
+    "where": { "logic": "and", "items": [{ "relation": "services", "count": { "op": "gte", "value": "10" } }] } },
+  "notInternal": { "from": "hosts", "select": ["value", "lastSeen"], "limit": 100,
+    "where": { "logic": "and", "items": [
+      { "not": { "logic": "or", "items": [
+        { "field": "value", "op": "endsWith", "value": ".internal" },
+        { "field": "value", "op": "startsWith", "value": "dev-" } ] } },
+      { "field": "lastSeen", "op": "isNotNull" } ] } } } }
 ```

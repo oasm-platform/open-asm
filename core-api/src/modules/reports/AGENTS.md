@@ -30,7 +30,7 @@ PDF reports for a workspace: a summary (attack surface) report and a vulnerabili
 ## Data model
 
 - `reports` (`Report`, extends `BaseEntity`): `workspaceId` (ManyToOne, CASCADE, no explicit column property), `userId` (CASCADE), `type` varchar `'SUMMARY' | 'VULNERABILITY' | 'QUERY'` (default `SUMMARY`), `path` = `reports/<fileName>`, `fileName` = `report-<type>-<token>-<ms>.pdf`. Hard delete.
-- `QUERY` reports render a saved attack surface query (`services/query-report.ts` flattens each query to a table, at most `QUERY_REPORT_MAX_ROWS` rows; `renderer/query/QueryReportDocument.tsx`), run as the caller in one consistent snapshot.
+- `QUERY` reports render a saved attack surface query (`services/query-report.ts` flattens each query to a table, at most `QUERY_REPORT_MAX_ROWS` rows; `renderer/query/QueryReportDocument.tsx`), run as the caller in one consistent snapshot, with the saved query's params at their defaults (`AsqSavedQueriesService.runSpec`).
 
 ## Invariants
 
