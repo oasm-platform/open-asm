@@ -2,6 +2,10 @@ import { NotificationList } from '@/components/notifications/notification-list';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
+  resolveDictText,
+  useDictionary,
+} from '@/lib/i18n-dictionary';
+import {
   getNotificationsControllerGetNotificationsInfiniteQueryKey,
   getNotificationsControllerGetUnreadCountQueryKey,
   useNotificationsControllerGetUnreadCount,
@@ -12,6 +16,9 @@ import { Bell, CheckCheck, Loader2 } from 'lucide-react';
 
 export default function NotificationsPage() {
   const queryClient = useQueryClient();
+  const { data: dict } = useDictionary('en');
+  const t = (key: string, vars?: Record<string, string | number>) =>
+    resolveDictText(dict ?? null, key, vars);
   const { data: unreadCountData } = useNotificationsControllerGetUnreadCount();
   const unreadCount = typeof unreadCountData === 'number' ? unreadCountData : 0;
   const markAllAsRead = useNotificationsControllerMarkAllAsRead({
@@ -35,12 +42,14 @@ export default function NotificationsPage() {
             <Bell className="h-6 w-6" />
             <div>
               <CardTitle className="text-2xl font-bold">
-                Notifications
+                {t('ui.notifications.title')}
               </CardTitle>
               {unreadCount > 0 && (
                 <p className="text-sm text-muted-foreground">
-                  {unreadCount} unread notification
-                  {unreadCount > 1 ? 's' : ''}
+                  {t('ui.notifications.unread', {
+                    count: unreadCount,
+                    s: unreadCount > 1 ? 's' : '',
+                  })}
                 </p>
               )}
             </div>
@@ -58,7 +67,7 @@ export default function NotificationsPage() {
               ) : (
                 <CheckCheck className="h-4 w-4" />
               )}
-              Mark all as read
+              {t('ui.notifications.markAllRead')}
             </Button>
           </div>
         </CardHeader>

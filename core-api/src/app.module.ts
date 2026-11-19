@@ -15,6 +15,7 @@ import { icuFormatter } from './common/utils/icu-formatter.util';
 import { DatabaseModule } from './database/database.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { CombineModule } from './modules/combine.module';
+import { I18nDictionaryModule } from './modules/i18n-dictionary/i18n-dictionary.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { McpServerModule } from './mcp/mcp.module';
@@ -32,6 +33,7 @@ import { EventBridgeModule } from './modules/event-bridge/event-bridge.module';
     ScheduleModule.forRoot(),
     I18nModule.forRoot({
       fallbackLanguage: 'en',
+      typesOutputPath: 'src/i18n/i18n.generated.ts',
       formatter: icuFormatter,
       loaderOptions: {
         path: path.join(__dirname, '/i18n/'),
@@ -60,6 +62,7 @@ import { EventBridgeModule } from './modules/event-bridge/event-bridge.module';
     AuditModule,
     EventBridgeModule,
     CombineModule,
+    I18nDictionaryModule,
     NotificationsModule,
     StorageModule,
     ServicesModule,

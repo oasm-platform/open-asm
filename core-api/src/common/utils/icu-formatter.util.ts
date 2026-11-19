@@ -1,3 +1,4 @@
+import { I18nContext } from 'nestjs-i18n';
 import { IntlMessageFormat } from 'intl-messageformat';
 
 const ICU_PATTERN = /\{\w+,\s*(plural|select|selectordinal)\s*,/;
@@ -43,7 +44,10 @@ export function icuFormatter(
         }
       }
 
-      const msg = getFormatter(template, 'en');
+      const msg = getFormatter(
+        template,
+        I18nContext.current()?.lang ?? 'en',
+      );
       return msg.format(numericValues) as string;
     } catch {
       // Fall through to simple interpolation

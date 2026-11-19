@@ -4,7 +4,7 @@ import { DomainExceptionFilter } from '@/common/filters/domain-exception.filter'
 import { AuthGuard } from '@/common/guards/auth.guard';
 import { requestIdMiddleware } from '@/common/middleware/request-id.middleware';
 import { UserPresenceService } from '@/modules/auth/user-presence.service';
-import { ValidationPipe } from '@nestjs/common';
+import { I18nValidationExceptionFilter, I18nValidationPipe } from 'nestjs-i18n';
 import { Reflector } from '@nestjs/core';
 import { NodeAdapter } from '@nestjs/platform-node';
 import type { NestNodeApplication, NodeResponse } from '@nestjs/platform-node';
@@ -102,12 +102,15 @@ export function configureApp(app: NestNodeApplication): void {
   // answered with the status and body Nest gives its own HTTP exceptions
   app.useGlobalFilters(new DomainExceptionFilter(app.getHttpAdapter()));
 
-  // Configure global validation
+  // Configure global validation (messages come from src/i18n/<lang>/validation.json)
   app.useGlobalPipes(
-    new ValidationPipe({
+    new I18nValidationPipe({
       whitelist: true,
       transform: true,
     }),
+  );
+  app.useGlobalFilters(
+    new I18nValidationExceptionFilter({ detailedErrors: false }),
   );
 
   // Configure global prefix

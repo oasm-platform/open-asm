@@ -14,6 +14,7 @@ import {
   MinLength,
 } from 'class-validator';
 import { InvitationStatus } from '@/modules/workspaces/enums/workspace.enums';
+import { i18nValidationMessage } from 'nestjs-i18n';
 
 /** Wildcard, or lowercase domain.action keys, e.g. target.read */
 export const PERMISSION_KEY_REGEX = /^\*$|^[a-z]+\.[a-z]+$/;
@@ -57,9 +58,9 @@ export class CreatePermissionGroupDto {
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim() : value,
   )
-  @IsString()
-  @MinLength(1)
-  @MaxLength(100)
+  @IsString({ message: i18nValidationMessage('validation.IS_STRING') })
+  @MinLength(1, { message: i18nValidationMessage('validation.MIN_LENGTH') })
+  @MaxLength(100, { message: i18nValidationMessage('validation.MAX_LENGTH') })
   name: string;
 
   @ApiProperty({
@@ -71,10 +72,13 @@ export class CreatePermissionGroupDto {
   @ArrayNotEmpty()
   @ArrayMaxSize(50)
   @ArrayUnique()
-  @IsString({ each: true })
+  @IsString({
+    each: true,
+    message: i18nValidationMessage('validation.IS_STRING'),
+  })
   @Matches(PERMISSION_KEY_REGEX, {
     each: true,
-    message: 'Invalid permission key. Use "*" or "domain.action" (e.g. target.read)',
+    message: i18nValidationMessage('validation.MATCHES'),
   })
   permissions: string[];
 }

@@ -63,6 +63,41 @@ describe('toHttpException', () => {
   });
 });
 
+describe('toHttpException with i18n', () => {
+  it('keeps the raw message when the error carries no i18n key', () => {
+    const http = toHttpException(
+      new NotFoundError('Target not found'),
+    ) as HttpException;
+
+    expect(http.getResponse()).toEqual({
+      statusCode: 404,
+      message: 'Target not found',
+      error: 'Not Found',
+    });
+  });
+
+  it('translates the message when the error carries an i18n key', () => {
+    const error = new NotFoundError('Target not found', {
+      i18n: { key: 'notification.WORKSPACE_CREATED', args: { name: 'A' } },
+    });
+    const translate = jest.fn().mockReturnValue('Workspace A created');
+    const i18n = { translate } as never;
+    const lang = 'en';
+
+    const http = toHttpException(error, i18n, lang) as HttpException;
+
+    expect(translate).toHaveBeenCalledWith('notification.WORKSPACE_CREATED', {
+      lang,
+      args: { name: 'A' },
+    });
+    expect(http.getResponse()).toEqual({
+      statusCode: 404,
+      message: 'Workspace A created',
+      error: 'Not Found',
+    });
+  });
+});
+
 describe('DomainExceptionFilter', () => {
   it('hands the mapped exception to the base filter', () => {
     const base = jest

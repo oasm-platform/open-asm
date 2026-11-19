@@ -1,0 +1,5 @@
+{
+  "notifications.title": "Notifications",
+  "notifications.unread": "{count} unread notification{s}",
+  "notifications.markAllRead": "Mark all as read"
+}

@@ -18,6 +18,7 @@ import {
   decodeNotificationCursor,
   encodeNotificationCursor,
 } from './notification-cursor';
+import { buildNotificationUrl } from './notification-link';
 
 @Injectable()
 export class NotificationsService {
@@ -121,10 +122,10 @@ export class NotificationsService {
         lang,
         args: n.notification.metadata || {},
       }) as string;
-      const url = this.i18n.translate<string>(key, {
-        lang: 'routers',
-        args: n.notification.metadata || {},
-      }) as string;
+      const url = buildNotificationUrl(
+        n.notification.type,
+        n.notification.metadata || {},
+      );
 
       return {
         id: n.id,
