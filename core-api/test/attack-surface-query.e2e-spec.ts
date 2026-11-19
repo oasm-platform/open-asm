@@ -432,7 +432,7 @@ describe('Attack surface query (e2e)', () => {
                   EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1 AND column_name = 'workspaceId') AS scoped,
                   EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = $1 AND policyname = 'asq_tenant') AS policy`,
           [res.table],
-        )) as Array<{ readable: boolean; scoped: boolean; policy: boolean }>;
+        ));
         if (!row.readable) problems.push(`${res.name}: asq_reader cannot SELECT ${res.table}`);
         if (!res.global && !res.scopePredicate && !row.scoped) problems.push(`${res.name}: ${res.table} has no workspaceId (declare a scopePredicate)`);
         if (!res.global && !res.scopePredicate && !row.policy) problems.push(`${res.name}: ${res.table} has no asq_tenant policy`);

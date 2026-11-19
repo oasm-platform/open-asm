@@ -447,7 +447,7 @@ describe('where', () => {
     ['startsWith on a number', 'services', { field: 'port', op: 'startsWith', value: '8' }],
     ['notInSubnet with an IP', 'ips', { field: 'ip', op: 'notInSubnet', value: ['10.0.0.1'] }],
   ])('refuses %s', (_label, from, cond) => {
-    expect(issuesOf(() => where(from as string, [cond])).length).toBeGreaterThan(0);
+    expect(issuesOf(() => where(from, [cond])).length).toBeGreaterThan(0);
   });
 
   it('resolves a relation test against the child resource', () => {

@@ -88,7 +88,7 @@ describe('applyParams', () => {
     ['a param without a default', { params: { x: { type: 'string' } }, queries: { a: { from: 'hosts' } } }, {}, 'params.x.default'],
     ['an unused param', { params: { x: { type: 'string', default: 'a' } }, queries: { a: { from: 'hosts' } } }, {}, 'params.x'],
   ])('refuses %s', (_label, spec, supplied, path) => {
-    const issues = issuesOf(() => applyParams(spec as Record<string, unknown>, supplied));
+    const issues = issuesOf(() => applyParams(spec, supplied));
     expect(issues.map((i) => i.path)).toContain(path);
   });
 });

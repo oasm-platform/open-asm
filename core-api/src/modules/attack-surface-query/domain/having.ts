@@ -112,7 +112,7 @@ export function normalizeHaving(ctx: HavingContext, input: unknown, at: string):
         return undefined;
       }
       const items = n.items.map((item, i) => node(item, `${here}.items[${i}]`, depth + 1, 0));
-      return items.every((i) => i !== undefined) ? { kind: 'group', logic: n.logic, items: items as HavingNode[] } : undefined;
+      return items.every((i) => i !== undefined) ? { kind: 'group', logic: n.logic, items: items } : undefined;
     }
     if ('not' in n) {
       if (notChain >= 8) {
