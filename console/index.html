@@ -28,13 +28,32 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="OASM" />
     <title>OASM</title>
+    <script>
+      // The saved app theme (ThemeProvider's 'theme' key) before first paint,
+      // so the boot splash shows the app's background, not the OS scheme's.
+      (function () {
+        try {
+          var theme = localStorage.getItem('theme');
+          var dark =
+            theme === 'dark' ||
+            (theme !== 'light' &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.classList.add(dark ? 'dark' : 'light');
+        } catch (e) {
+          // storage blocked: the splash stays light until the app starts
+        }
+      })();
+    </script>
     <style>
+      /* Explicit box sizes: the app's CSS (Tailwind preflight) switches to
+         border-box when it loads, which used to shrink the spinner mid-load. */
       #boot-splash{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#fafcfe;z-index:9999;transition:opacity .25s ease}
-      .boot-logo{border-radius:8px}
-      .boot-spinner{width:24px;height:24px;border:2px solid #d4d4d8;border-top-color:#3b5bdb;border-radius:50%;animation:boot-spin .8s linear infinite}
+      .boot-logo{display:block;width:48px;height:48px;max-width:none;border-radius:8px}
+      .boot-spinner{box-sizing:border-box;width:28px;height:28px;border:2px solid #d4d4d8;border-top-color:#3b5bdb;border-radius:50%;animation:boot-spin .8s linear infinite}
       #boot-splash.hide{opacity:0;pointer-events:none}
       @keyframes boot-spin{to{transform:rotate(360deg)}}
-      @media (prefers-color-scheme:dark){#boot-splash{background:#070a12}.boot-spinner{border-color:#27272a;border-top-color:#3b5bdb}}
+      .dark #boot-splash{background:#070a12}
+      .dark .boot-spinner{border-color:#27272a;border-top-color:#3b5bdb}
     </style>
   </head>
   <body>
