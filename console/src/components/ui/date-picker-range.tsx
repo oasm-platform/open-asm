@@ -1,5 +1,6 @@
 'use client';
 
+import { useT } from '@/lib/i18n-dictionary';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Field } from '@/components/ui/field';
@@ -20,13 +21,7 @@ interface DatePickerWithRangeProps {
   label?: string;
 }
 
-const PRESET_OPTIONS = [
-  { label: 'Today', days: 0 },
-  { label: 'Last 7 days', days: 7 },
-  { label: 'Last 30 days', days: 30 },
-  { label: 'Last 60 days', days: 60 },
-  { label: 'Last 90 days', days: 90 },
-];
+const PRESET_DAYS = [0, 7, 30, 60, 90];
 
 export function DatePickerWithRange({
   value,
@@ -34,6 +29,7 @@ export function DatePickerWithRange({
   className,
   label,
 }: DatePickerWithRangeProps) {
+  const t = useT();
   const isMobile = useIsMobile();
   const internalDate = value ?? {
     from: new Date(new Date().getFullYear(), 0, 20),
@@ -78,7 +74,7 @@ export function DatePickerWithRange({
             ) : value?.to ? (
               format(value.to, 'LLL dd, y')
             ) : (
-              <span>{label ?? 'Pick a date range'}</span>
+              <span>{label ?? t('components.dateRange.placeholder')}</span>
             )}
           </Button>
         </PopoverTrigger>
@@ -91,17 +87,19 @@ export function DatePickerWithRange({
             {/* Quick select options */}
             <div className="flex flex-row flex-wrap gap-1 p-2 border-b border-border bg-muted/20 md:flex-col md:flex-nowrap md:border-b-0 md:border-r">
               <span className="w-full text-xs font-medium text-muted-foreground mb-1 px-2 md:w-auto">
-                Quick select
+                {t('components.dateRange.quickSelect')}
               </span>
-              {PRESET_OPTIONS.map((option) => (
+              {PRESET_DAYS.map((days) => (
                 <Button
-                  key={option.days}
+                  key={days}
                   variant="ghost"
                   size="sm"
                   className="justify-start h-7 text-xs font-normal"
-                  onClick={() => handlePresetClick(option.days)}
+                  onClick={() => handlePresetClick(days)}
                 >
-                  {option.label}
+                  {days === 0
+                    ? t('components.dateRange.today')
+                    : t('components.dateRange.lastDays', { days })}
                 </Button>
               ))}
             </div>
@@ -122,7 +120,7 @@ export function DatePickerWithRange({
                     className="w-full h-7 text-xs text-muted-foreground hover:text-foreground"
                     onClick={handleClear}
                   >
-                    Clear filters
+                    {t('components.filter.clear')}
                   </Button>
                 </div>
               )}

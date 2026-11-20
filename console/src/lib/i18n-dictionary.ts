@@ -1,31 +1,161 @@
 import { useQuery } from '@tanstack/react-query';
-import { useCallback } from 'react';
+import { useSyncExternalStore } from 'react';
+import { flushSync } from 'react-dom';
 import { orvalClient } from '@/services/apis/axios-client';
-import { DEFAULT_LANGUAGE, useLanguage } from '@/utils/languageState';
+import {
+  DEFAULT_LANGUAGE,
+  getLanguage,
+  setLanguage,
+} from '@/utils/languageState';
 
 export type I18nDictionary = Record<string, Record<string, string>> | null;
-type Vars = Record<string, string | number>;
+export type TVars = Record<string, string | number>;
+export type TFunction = (key: string, vars?: TVars) => string;
 
 interface DictionaryResponse {
   lang: string;
   dictionaries: Record<string, Record<string, string>>;
 }
 
-/** Non-blocking: components render the raw key/EN text while this loads. */
-export function useDictionary(lang = DEFAULT_LANGUAGE) {
-  return useQuery({
-    queryKey: ['i18n', lang],
-    queryFn: async (): Promise<I18nDictionary> => {
-      // The axios interceptor already unwraps the body.
-      const data = await orvalClient<DictionaryResponse>({
-        url: `/api/i18n/${encodeURIComponent(lang)}`,
-        method: 'GET',
-      });
-      return data.dictionaries;
-    },
-    staleTime: 60 * 60 * 1000,
-    retry: 1,
+const CACHE_PREFIX = 'i18n:';
+
+function readCache(lang: string): string | null {
+  try {
+    return localStorage.getItem(CACHE_PREFIX + lang);
+  } catch {
+    return null;
+  }
+}
+
+function parse(raw: string | null): I18nDictionary {
+  try {
+    return raw ? (JSON.parse(raw) as I18nDictionary) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The active dictionary lives outside React so `t()` also works in toasts,
+ * mutation callbacks and column builders. A version counter tells React
+ * when to re-render.
+ */
+let cachedRaw = readCache(getLanguage());
+let dictionary = parse(cachedRaw);
+let ready = dictionary !== null;
+const listeners = new Set<() => void>();
+
+function emit() {
+  // New identity per change so memoised children and deps see it.
+  boundT = (key, vars) => t(key, vars);
+  for (const listener of listeners) listener();
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+async function fetchDictionary(lang: string): Promise<string> {
+  const data = await orvalClient<DictionaryResponse>({
+    url: `/api/i18n/${encodeURIComponent(lang)}`,
+    method: 'GET',
   });
+  const raw = JSON.stringify(data.dictionaries);
+  try {
+    localStorage.setItem(CACHE_PREFIX + lang, raw);
+  } catch {
+    // Quota or private mode: the dictionary stays in memory only.
+  }
+  return raw;
+}
+
+/** Swap in a fresh copy of `lang`; re-render only when the text changed. */
+async function refresh(lang: string) {
+  const raw = await fetchDictionary(lang);
+  if (getLanguage() !== lang || raw === cachedRaw) return;
+  cachedRaw = raw;
+  dictionary = parse(raw);
+  emit();
+}
+
+/**
+ * Boot: a cached dictionary renders at once and is refreshed in the
+ * background; without one the boot splash waits for the fetch. A language
+ * the API no longer serves falls back to EN.
+ */
+export async function initI18n(): Promise<void> {
+  try {
+    await refresh(getLanguage());
+  } catch {
+    if (getLanguage() !== DEFAULT_LANGUAGE) {
+      setLanguage(DEFAULT_LANGUAGE);
+      cachedRaw = readCache(DEFAULT_LANGUAGE);
+      dictionary = parse(cachedRaw);
+      await refresh(DEFAULT_LANGUAGE).catch(() => undefined);
+    }
+  } finally {
+    if (!ready) {
+      ready = true;
+      emit();
+    }
+  }
+}
+
+// Every evaluation refreshes, including a Vite HMR reload of this module,
+// which would otherwise keep serving the cached copy it booted with.
+if (import.meta.env.MODE !== 'test') void initI18n();
+
+// In-flight/fresh fetches started ahead of a switch (see prefetchLanguages).
+const prefetched = new Map<string, Promise<string>>();
+
+/** Warm the dictionaries a switch may need, e.g. when the language menu opens. */
+export function prefetchLanguages(langs: string[]) {
+  for (const lang of langs) {
+    if (lang === getLanguage() || prefetched.has(lang)) continue;
+    const p = fetchDictionary(lang);
+    p.catch(() => prefetched.delete(lang));
+    prefetched.set(lang, p);
+  }
+}
+
+/**
+ * Loads the dictionary first, then swaps language + text in one synchronous
+ * render inside a view transition, so the page cross-fades instead of
+ * flashing raw keys or reflowing text piece by piece.
+ */
+export async function changeLanguage(lang: string): Promise<void> {
+  if (lang === getLanguage()) return;
+  const fresh = await prefetched.get(lang)?.catch(() => null);
+  prefetched.delete(lang);
+  const cached = fresh ? null : readCache(lang);
+  const raw = fresh ?? cached ?? (await fetchDictionary(lang));
+  const swap = () => {
+    cachedRaw = raw;
+    dictionary = parse(raw);
+    setLanguage(lang);
+    flushSync(emit);
+  };
+  const reduceMotion = window.matchMedia?.(
+    '(prefers-reduced-motion: reduce)',
+  ).matches;
+  if (document.startViewTransition && !reduceMotion) {
+    await document.startViewTransition(swap).finished.catch(() => undefined);
+  } else {
+    swap();
+  }
+  // A copy from an earlier visit may predate a deploy.
+  if (cached) void refresh(lang).catch(() => undefined);
+}
+
+/** Tests: install a dictionary synchronously (setup.ts loads EN from core-api). */
+export function setDictionaryForTests(dict: I18nDictionary) {
+  dictionary = dict;
+  cachedRaw = JSON.stringify(dict);
+  ready = true;
+  emit();
 }
 
 export function useSupportedLanguages() {
@@ -37,11 +167,11 @@ export function useSupportedLanguages() {
   });
 }
 
-function lookup(dict: I18nDictionary, key: string, lang: string, vars?: Vars) {
-  const [ns, ...rest] = key.split('.');
-  const table = dict?.[ns];
+function lookup(dict: I18nDictionary, key: string, lang: string, vars?: TVars) {
+  const dot = key.indexOf('.');
+  const table = dict?.[key.slice(0, dot)];
   if (!table) return undefined;
-  const name = rest.join('.');
+  const name = key.slice(dot + 1);
   // Plural keys are stored as `<key>.one|few|many|other`, picked per CLDR rules.
   if (typeof vars?.count === 'number') {
     const form = new Intl.PluralRules(lang).select(vars.count);
@@ -50,20 +180,14 @@ function lookup(dict: I18nDictionary, key: string, lang: string, vars?: Vars) {
   return table[name];
 }
 
-/**
- * Pure lookup with {var} interpolation. Falls back to the EN dictionary, then
- * to the raw key; never throws.
- */
+/** Pure lookup with {var} interpolation. Missing key → raw key, never throws. */
 export function resolveDictText(
   dict: I18nDictionary,
   key: string,
-  vars?: Vars,
+  vars?: TVars,
   lang = DEFAULT_LANGUAGE,
-  fallback: I18nDictionary = null,
 ): string {
-  const template =
-    lookup(dict, key, lang, vars) ??
-    lookup(fallback, key, DEFAULT_LANGUAGE, vars);
+  const template = lookup(dict, key, lang, vars);
   if (typeof template !== 'string') return key;
   if (!vars) return template;
   return template.replace(/\{(\w+)\}/g, (m, name: string) =>
@@ -71,14 +195,18 @@ export function resolveDictText(
   );
 }
 
-/** `t(key, vars)` for the selected language, EN as fallback. */
-export function useT() {
-  const lang = useLanguage();
-  const { data: dict } = useDictionary(lang);
-  const { data: en } = useDictionary(DEFAULT_LANGUAGE);
-  return useCallback(
-    (key: string, vars?: Vars) =>
-      resolveDictText(dict ?? null, key, vars, lang, en ?? null),
-    [dict, en, lang],
-  );
+/** Translate outside React (toasts, callbacks). Components use `useT()`. */
+export const t: TFunction = (key, vars) =>
+  resolveDictText(dictionary, key, vars, getLanguage());
+
+let boundT: TFunction = (key, vars) => t(key, vars);
+
+/** `t` that re-renders the component when the language changes. */
+export function useT(): TFunction {
+  return useSyncExternalStore(subscribe, () => boundT);
+}
+
+/** False until the first dictionary is usable (cache or network). */
+export function useI18nReady() {
+  return useSyncExternalStore(subscribe, () => ready);
 }

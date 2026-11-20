@@ -1,3 +1,4 @@
+import { type TFunction, useT } from '@/lib/i18n-dictionary';
 import {
   CommandDialog,
   CommandGroup,
@@ -8,7 +9,10 @@ import {
 } from '@/components/ui/command';
 import { menu } from '@/components/common/layout/menu-bar';
 import { useAskAi } from '@/components/common/ask-ai-button';
-import { ASK_PROMPT_GROUPS } from '@/pages/agents/components/landing-constants';
+import {
+  ASK_PROMPT_GROUPS,
+  translatePromptGroups,
+} from '@/pages/agents/components/landing-constants';
 import {
   useSearchControllerSearchAssetsTargets,
   type SearchData,
@@ -29,21 +33,27 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 
 /** What the placeholder types out, so the box shows what it takes */
-const SEARCH_HINTS = [
-  'Search a host, e.g. api.example.com',
-  'Search a CVE, e.g. CVE-2024-3400',
-  'Search a technology, e.g. nginx',
-  'Jump to a page, e.g. Vulnerabilities',
-  'Ask AI what is exposed to the internet',
+const SEARCH_HINT_KEYS = [
+  'shell.palette.hint.host',
+  'shell.palette.hint.cve',
+  'shell.palette.hint.technology',
+  'shell.palette.hint.page',
+  'shell.palette.hint.askAi',
 ];
 
-const AI_SUGGESTIONS = ASK_PROMPT_GROUPS.flatMap((group) => group.prompts);
+function useSearchHints() {
+  const t = useT();
+  return useMemo(() => SEARCH_HINT_KEYS.map((key) => t(key)), [t]);
+}
+
 // Few enough that pages and results still show below them
 const AI_SUGGESTION_COUNT = 3;
 
-/** A random few Ask-mode starters */
-function pickAiSuggestions(): string[] {
-  const pool = [...AI_SUGGESTIONS];
+/** A random few Ask-mode starters, in the current language */
+function pickAiSuggestions(t: TFunction): string[] {
+  const pool = translatePromptGroups(ASK_PROMPT_GROUPS, t).flatMap(
+    (group) => group.prompts,
+  );
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
@@ -53,7 +63,7 @@ function pickAiSuggestions(): string[] {
 
 /** Own component, so each typed character re-renders only the hint */
 function TriggerHint({ animate }: { animate: boolean }) {
-  const hint = useTypewriter(SEARCH_HINTS, { animate });
+  const hint = useTypewriter(useSearchHints(), { animate });
   return (
     <span aria-hidden className="hidden flex-1 truncate md:inline">
       {hint}
@@ -69,7 +79,7 @@ interface PaletteInputProps {
 
 function PaletteInput({ value, onValueChange, animate }: PaletteInputProps) {
   // Only types while the placeholder shows
-  const hint = useTypewriter(SEARCH_HINTS, {
+  const hint = useTypewriter(useSearchHints(), {
     animate: animate && value.length === 0,
   });
   return (
@@ -88,6 +98,7 @@ function PaletteInput({ value, onValueChange, animate }: PaletteInputProps) {
  * empty input offers starter questions for the AI instead.
  */
 export function CommandPalette() {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const debounced = useDebounce(query, 250);
@@ -101,7 +112,7 @@ export function CommandPalette() {
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (open) setSuggestions(pickAiSuggestions());
+    if (open) setSuggestions(pickAiSuggestions(t));
   }
 
   useEffect(() => {
@@ -135,9 +146,11 @@ export function CommandPalette() {
     () =>
       menu
         .flatMap((group) => group.items)
-        .filter((item) => item.title.toLowerCase().includes(term.toLowerCase()))
+        .filter((item) =>
+          t(item.title).toLowerCase().includes(term.toLowerCase()),
+        )
         .slice(0, 6),
-    [term],
+    [term, t],
   );
 
   // Only once the typed term itself came back empty, not while it is loading
@@ -161,7 +174,7 @@ export function CommandPalette() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label="Open command palette"
+        aria-label={t('shell.palette.open')}
         // Mobile: a round icon button like the header's AI, theme and
         // notification buttons. From md: a search bar.
         className="flex size-9 shrink-0 scale-95 items-center justify-center rounded-full text-foreground transition-colors hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 md:w-full md:min-w-0 md:max-w-sm md:shrink md:scale-100 md:justify-start md:gap-2 md:rounded-md md:border md:border-border/60 md:bg-muted/40 md:px-3 md:text-left md:text-sm md:text-muted-foreground md:hover:bg-muted md:hover:text-muted-foreground"
@@ -176,8 +189,8 @@ export function CommandPalette() {
       <CommandDialog
         open={open}
         onOpenChange={setOpen}
-        title="Command palette"
-        description="Search findings, assets, targets or jump to a page"
+        title={t('shell.palette.title')}
+        description={t('shell.palette.description')}
         // Mobile (as the icon trigger): the whole screen, not a box in the
         // middle of a small one
         className="sm:max-w-xl max-md:top-0 max-md:left-0 max-md:h-dvh max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:grid-rows-[minmax(0,1fr)] max-md:rounded-none max-md:border-0"
@@ -190,27 +203,27 @@ export function CommandPalette() {
         <CommandList className="max-md:max-h-none max-md:min-h-0 max-md:flex-1">
           {term.length > 0 && !settled && !hasHits && (
             <p role="status" className="py-6 text-center text-sm">
-              Searching…
+              {t('shell.palette.searching')}
             </p>
           )}
 
           {noResults && (
-            <CommandGroup heading={`No results for “${term}”`}>
+            <CommandGroup heading={t('shell.palette.noResults', { term })}>
               <CommandItem
                 value="ask-ai"
                 onSelect={() => go(() => askAi(term))}
               >
                 <Sparkles className="size-4 text-primary" aria-hidden />
                 <span className="min-w-0 flex-1 truncate">
-                  Ask AI about “{term}”
+                  {t('shell.palette.askAbout', { term })}
                 </span>
-                <CommandShortcut>Enter</CommandShortcut>
+                <CommandShortcut>{t('shell.palette.enter')}</CommandShortcut>
               </CommandItem>
             </CommandGroup>
           )}
 
           {term.length === 0 && suggestions.length > 0 && (
-            <CommandGroup heading="Ask AI">
+            <CommandGroup heading={t('components.askAi.label')}>
               {suggestions.map((prompt) => (
                 <CommandItem
                   key={prompt}
@@ -225,22 +238,22 @@ export function CommandPalette() {
           )}
 
           {pages.length > 0 && (
-            <CommandGroup heading="Pages">
+            <CommandGroup heading={t('shell.palette.pages')}>
               {pages.map((item) => (
                 <CommandItem
                   key={item.url}
-                  value={`page ${item.title}`}
+                  value={`page ${t(item.title)}`}
                   onSelect={() => go(() => navigate({ to: item.url }))}
                 >
                   <span className="size-4 [&>svg]:size-4">{item.icon}</span>
-                  {item.title}
+                  {t(item.title)}
                 </CommandItem>
               ))}
             </CommandGroup>
           )}
 
           {!!results?.targets?.length && (
-            <CommandGroup heading="Targets">
+            <CommandGroup heading={t('shell.nav.targets')}>
               {results.targets.map((target) => (
                 <CommandItem
                   key={target.id}
@@ -262,7 +275,7 @@ export function CommandPalette() {
           )}
 
           {!!results?.assets?.length && (
-            <CommandGroup heading="Assets">
+            <CommandGroup heading={t('shell.nav.assets')}>
               {results.assets.map((asset) => (
                 <CommandItem
                   key={asset.id}
@@ -284,7 +297,7 @@ export function CommandPalette() {
           )}
 
           {!!results?.vulnerabilities?.length && (
-            <CommandGroup heading="Findings">
+            <CommandGroup heading={t('shell.palette.findings')}>
               {results.vulnerabilities.map((vulnerability) => (
                 <CommandItem
                   key={vulnerability.id}
@@ -313,7 +326,7 @@ export function CommandPalette() {
         {/* Key hints: no keyboard to use them on mobile */}
         <div className="flex items-center gap-2 border-t px-4 py-2 text-xs text-muted-foreground max-md:hidden">
           <CornerDownLeft className="size-3.5" aria-hidden />
-          Enter opens · Esc closes
+          {t('shell.palette.keyHints')}
           <kbd className="ml-auto font-mono tracking-widest">⌘K</kbd>
         </div>
       </CommandDialog>

@@ -42,10 +42,7 @@ describe('resolveDictText', () => {
     expect(t(5)).toBe('5 непрочитанных уведомлений');
   });
 
-  it('falls back to EN, then to the raw key', () => {
-    expect(
-      resolveDictText(RU, 'ui.notifications.title', undefined, 'ru', EN),
-    ).toBe('Notifications');
+  it('returns the raw key when missing or not loaded', () => {
     expect(resolveDictText(EN, 'ui.notifications.missing')).toBe(
       'ui.notifications.missing',
     );

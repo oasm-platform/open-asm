@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Badge } from '@/components/ui/badge';
 import { StatCard } from '@/components/common/stat-card';
 import { Button } from '@/components/ui/button';
@@ -49,9 +50,6 @@ dayjs.extend(relativeTime);
 const LIST_CARD = 'h-[26rem]';
 const LIST_CONTENT = 'flex min-h-0 flex-1 flex-col divide-y overflow-y-auto';
 
-const plural = (n: number, one: string, many = `${one}s`) =>
-  `${n} ${n === 1 ? one : many}`;
-
 type GoTab = (tab: string, search?: Record<string, string>) => void;
 
 const LEVEL_STYLE: Record<InsightLevel, { icon: LucideIcon; className: string }> = {
@@ -71,6 +69,7 @@ function InsightRow({
   onRescan: () => void;
   rescanning: boolean;
 }) {
+  const t = useT();
   const navigate = useNavigate();
   const count = insight.count ?? 0;
   const { text, action, onAction } = ((): {
@@ -81,41 +80,41 @@ function InsightRow({
     switch (insight.kind) {
       case TargetInsightKind.critical_open:
         return {
-          text: `${plural(count, 'open critical vulnerability', 'open critical vulnerabilities')}`,
-          action: 'Review',
+          text: t('targets.insights.criticalOpen', { count }),
+          action: t('targets.insights.review'),
           onAction: () => goTab('vulnerabilities'),
         };
       case TargetInsightKind.last_run_failed:
         return {
-          text: 'The last run failed',
-          action: 'Open run',
+          text: t('targets.insights.lastRunFailed'),
+          action: t('targets.insights.openRun'),
           onAction: () =>
             insight.runId &&
             void navigate({ to: '/jobs/runs/$id', params: { id: insight.runId } }),
         };
       case TargetInsightKind.tls_expiring:
         return {
-          text: `${plural(count, 'TLS certificate')} expired or expiring within ${insight.days ?? 30} days`,
-          action: 'See TLS',
+          text: t('targets.insights.tlsExpiring', { count, days: insight.days ?? 30 }),
+          action: t('targets.insights.seeTls'),
           onAction: () => goTab('assets', { tab: 'tls' }),
         };
       case TargetInsightKind.stale_scan:
         return {
-          text: `Not discovered for ${insight.days} days`,
-          action: 'Re-discover',
+          text: t('targets.insights.staleScan', { days: insight.days ?? 0 }),
+          action: t('targets.insights.rediscover'),
           onAction: onRescan,
         };
       case TargetInsightKind.new_assets:
         return {
-          text: `${plural(count, 'new asset')} in the last ${insight.days ?? 7} days`,
-          action: 'See assets',
+          text: t('targets.insights.newAssets', { count, days: insight.days ?? 7 }),
+          action: t('targets.insights.seeAssets'),
           onAction: () => goTab('assets', { tab: 'host' }),
         };
       case TargetInsightKind.no_schedule:
       default:
         return {
-          text: 'No scan schedule: the target is only scanned by hand',
-          action: 'Schedule',
+          text: t('targets.insights.noSchedule'),
+          action: t('targets.insights.schedule'),
           onAction: () => goTab('settings'),
         };
     }
@@ -138,14 +137,15 @@ function InsightRow({
   );
 }
 
-const CHANGE_LABELS: Record<TargetChangeKind, { label: string; className: string }> = {
-  [TargetChangeKind.asset]: { label: 'New asset', className: 'text-sky-600 dark:text-sky-400' },
-  [TargetChangeKind.service]: { label: 'New service', className: 'text-violet-600 dark:text-violet-400' },
-  [TargetChangeKind.vulnerability]: { label: 'Found', className: 'text-red-600 dark:text-red-400' },
-  [TargetChangeKind.fixed]: { label: 'Fixed', className: 'text-green-600 dark:text-green-400' },
+const CHANGE_LABELS: Record<TargetChangeKind, { labelKey: string; className: string }> = {
+  [TargetChangeKind.asset]: { labelKey: 'targets.changes.newAsset', className: 'text-sky-600 dark:text-sky-400' },
+  [TargetChangeKind.service]: { labelKey: 'targets.changes.newService', className: 'text-violet-600 dark:text-violet-400' },
+  [TargetChangeKind.vulnerability]: { labelKey: 'targets.changes.found', className: 'text-red-600 dark:text-red-400' },
+  [TargetChangeKind.fixed]: { labelKey: 'targets.changes.fixed', className: 'text-green-600 dark:text-green-400' },
 };
 
 export function ChangeRow({ change }: { change: TargetChangeDto }) {
+  const t = useT();
   const kind = CHANGE_LABELS[change.kind];
   const isVulnerability =
     change.kind === TargetChangeKind.vulnerability ||
@@ -159,7 +159,7 @@ export function ChangeRow({ change }: { change: TargetChangeDto }) {
         {dayjs(change.at).fromNow()}
       </span>
       <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
-        <span className={cn('font-medium', kind.className)}>{kind.label}</span>
+        <span className={cn('font-medium', kind.className)}>{t(kind.labelKey)}</span>
         {change.severity && isVulnerability && (
           <SeverityBadge severity={change.severity} variant="text" />
         )}
@@ -176,7 +176,7 @@ export function ChangeRow({ change }: { change: TargetChangeDto }) {
         )}
         {change.assetValue && (
           <span className="truncate text-muted-foreground">
-            on {change.assetValue}
+            {t('targets.changes.on', { asset: change.assetValue })}
           </span>
         )}
       </span>
@@ -195,6 +195,7 @@ function ExposureList({
   onOpen: () => void;
   mono?: boolean;
 }) {
+  const t = useT();
   const max = Math.max(1, ...rows.map((row) => row.count));
   return (
     <div className="flex flex-col gap-1.5">
@@ -206,7 +207,7 @@ function ExposureList({
         {title}
       </button>
       {rows.length === 0 ? (
-        <span className="text-sm text-muted-foreground">None found</span>
+        <span className="text-sm text-muted-foreground">{t('targets.overview.noneFound')}</span>
       ) : (
         rows.map((row) => (
           <div key={row.name} className="flex items-center gap-2 text-sm">
@@ -255,6 +256,7 @@ function OverviewSkeleton() {
 }
 
 export function TargetOverviewTab({ target }: { target: Target }) {
+  const t = useT();
   const navigate = useNavigate();
   const { data: overview, isLoading, refetch } =
     useTargetsControllerGetTargetOverview(target.id, {
@@ -275,11 +277,11 @@ export function TargetOverviewTab({ target }: { target: Target }) {
     useTargetsControllerReScanTarget({
       mutation: {
         onSuccess: () => {
-          toast.success('Discovery started');
+          toast.success(t('targets.settingsTab.discoveryStarted'));
           void refetch();
         },
         onError: (error) =>
-          toast.error(apiErrorMessage(error, 'Failed to start the discovery')),
+          toast.error(apiErrorMessage(error, t('targets.settingsTab.discoveryFailed'))),
       },
     });
 
@@ -300,27 +302,27 @@ export function TargetOverviewTab({ target }: { target: Target }) {
     <div className="flex flex-col gap-4">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="Assets"
+          label={t('targets.overview.assets')}
           value={String(overview.totalAssets)}
           icon={Waypoints}
           onClick={() => goTab('assets', { tab: 'host' })}
         >
           <span className="text-sm text-muted-foreground">
-            +{overview.newAssets} in the last 7 days
+            {t('targets.overview.newAssets', { count: overview.newAssets })}
           </span>
         </StatCard>
         <StatCard
-          label="Services"
+          label={t('targets.overview.services')}
           value={String(overview.totalServices)}
           icon={Network}
           onClick={() => goTab('assets', { tab: 'service' })}
         >
           <span className="text-sm text-muted-foreground">
-            {plural(overview.openPorts, 'open port')} · +{overview.newServices} in 7 days
+            {t('targets.overview.openPorts', { count: overview.openPorts, services: overview.newServices })}
           </span>
         </StatCard>
         <StatCard
-          label="Open vulnerabilities"
+          label={t('targets.overview.openVulnerabilities')}
           value={String(open)}
           icon={Bug}
           onClick={() => goTab('vulnerabilities')}
@@ -328,7 +330,7 @@ export function TargetOverviewTab({ target }: { target: Target }) {
           <SeverityBreakdown counts={overview.openVulnerabilities} />
         </StatCard>
         <StatCard
-          label="Next scan"
+          label={t('targets.overview.nextScan')}
           value={overview.nextScanAt ? dayjs(overview.nextScanAt).fromNow(true) : '—'}
           icon={CalendarClock}
           onClick={() => goTab('settings')}
@@ -340,7 +342,7 @@ export function TargetOverviewTab({ target }: { target: Target }) {
                     ? ` · ${dayjs(overview.nextScanAt).format('DD MMM HH:mm')}`
                     : ''
                 }`
-              : 'Only when run by hand'}
+              : t('targets.overview.manualOnly')}
           </span>
         </StatCard>
       </div>
@@ -350,13 +352,13 @@ export function TargetOverviewTab({ target }: { target: Target }) {
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="flex items-center gap-2">
               <Radar className="size-5 text-primary" />
-              Running now
+              {t('targets.overview.runningNow')}
               {overview.activeRuns.length > 0 && (
                 <Badge variant="secondary">{overview.activeRuns.length}</Badge>
               )}
             </CardTitle>
             <Button variant="link" size="sm" className="h-auto p-0" onClick={() => goTab('activity')}>
-              All runs
+              {t('targets.overview.allRuns')}
             </Button>
           </CardHeader>
           <CardContent className="flex flex-col divide-y">
@@ -367,17 +369,17 @@ export function TargetOverviewTab({ target }: { target: Target }) {
                 <div className="flex items-center gap-3 text-sm">
                   <CircleCheck className="size-5 text-green-500" />
                   <span>
-                    Nothing is scanning this target.
+                    {t('targets.overview.nothingScanning')}
                     {lastRun && (
                       <span className="text-muted-foreground">
                         {' '}
-                        Last run{' '}
+                        {t('targets.overview.lastRun')}{' '}
                         <Link
                           to="/jobs/runs/$id"
                           params={{ id: lastRun.id }}
                           className="hover:underline"
                         >
-                          {lastRun.workflowName || 'run'}
+                          {lastRun.workflowName || t('targets.overview.run')}
                         </Link>{' '}
                         {dayjs(lastRun.updatedAt).fromNow()} ({lastRun.status.replace('_', ' ')}).
                       </span>
@@ -386,7 +388,7 @@ export function TargetOverviewTab({ target }: { target: Target }) {
                 </div>
                 <Button size="sm" variant="outline" onClick={onRescan} disabled={rescanning}>
                   <RefreshCw className={cn('size-4', rescanning && 'animate-spin')} />
-                  Re-discover
+                  {t('targets.insights.rediscover')}
                 </Button>
               </div>
             )}
@@ -397,14 +399,14 @@ export function TargetOverviewTab({ target }: { target: Target }) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <ShieldAlert className="size-5 text-primary" />
-              Needs attention
+              {t('targets.overview.needsAttention')}
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col divide-y">
             {overview.insights.length === 0 ? (
               <p className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
                 <ShieldCheck className="size-4 text-green-500" />
-                Nothing needs attention.
+                {t('targets.overview.nothingNeedsAttention')}
               </p>
             ) : (
               overview.insights.map((insight) => (
@@ -426,7 +428,7 @@ export function TargetOverviewTab({ target }: { target: Target }) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <ChartColumnStacked className="size-5 text-primary" />
-              New vulnerabilities per week
+              {t('targets.overview.newVulnsPerWeek')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -437,7 +439,7 @@ export function TargetOverviewTab({ target }: { target: Target }) {
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="flex items-center gap-2">
               <Bug className="size-5 text-primary" />
-              Fix first
+              {t('targets.overview.fixFirst')}
             </CardTitle>
             <Button
               variant="link"
@@ -445,12 +447,12 @@ export function TargetOverviewTab({ target }: { target: Target }) {
               className="h-auto p-0"
               onClick={() => goTab('vulnerabilities')}
             >
-              See all
+              {t('targets.overview.seeAll')}
             </Button>
           </CardHeader>
           <CardContent className="flex flex-col divide-y">
             {overview.topVulnerabilities.length === 0 ? (
-              <p className="py-2 text-sm text-muted-foreground">No open vulnerabilities.</p>
+              <p className="py-2 text-sm text-muted-foreground">{t('targets.overview.noOpenVulns')}</p>
             ) : (
               overview.topVulnerabilities.map((vuln) => (
                 <Link
@@ -479,12 +481,12 @@ export function TargetOverviewTab({ target }: { target: Target }) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Activity className="size-5 text-primary" />
-              Recent changes
+              {t('targets.overview.recentChanges')}
             </CardTitle>
           </CardHeader>
           <CardContent className={LIST_CONTENT}>
             {(changesPage?.data ?? []).length === 0 ? (
-              <p className="py-2 text-sm text-muted-foreground">Nothing yet.</p>
+              <p className="py-2 text-sm text-muted-foreground">{t('targets.activity.nothingYet')}</p>
             ) : (
               changesPage!.data.map((change) => (
                 <ChangeRow key={`${change.kind}-${change.id}`} change={change} />
@@ -496,23 +498,23 @@ export function TargetOverviewTab({ target }: { target: Target }) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Network className="size-5 text-primary" />
-              Exposure
+              {t('targets.overview.exposure')}
             </CardTitle>
           </CardHeader>
           <CardContent className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
             <ExposureList
-              title="Ports"
+              title={t('targets.overview.ports')}
               rows={overview.exposure.ports}
               onOpen={() => goTab('assets', { tab: 'port' })}
               mono
             />
             <ExposureList
-              title="Technologies"
+              title={t('targets.overview.technologies')}
               rows={overview.exposure.technologies}
               onOpen={() => goTab('assets', { tab: 'technology' })}
             />
             <ExposureList
-              title="Status codes"
+              title={t('targets.overview.statusCodes')}
               rows={overview.exposure.statusCodes}
               onOpen={() => goTab('assets', { tab: 'status-code' })}
               mono
@@ -523,24 +525,24 @@ export function TargetOverviewTab({ target }: { target: Target }) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Info className="size-5 text-primary" />
-              About
+              {t('targets.overview.about')}
             </CardTitle>
           </CardHeader>
           <CardContent className="flex min-h-0 flex-1 flex-col overflow-y-auto">
             <div className="divide-y">
-              <InfoRow label="Type">{target.type}</InfoRow>
-              <InfoRow label="Scope">{target.internalNetworkId ? 'Internal network' : 'External'}</InfoRow>
-              <InfoRow label="Schedule">{scheduleLabel(target.scanSchedule)}</InfoRow>
-              <InfoRow label="Last discovery">
+              <InfoRow label={t('targets.overview.type')}>{target.type}</InfoRow>
+              <InfoRow label={t('targets.overview.scope')}>{target.internalNetworkId ? t('targets.overview.internalNetwork') : t('targets.overview.external')}</InfoRow>
+              <InfoRow label={t('targets.overview.schedule')}>{scheduleLabel(target.scanSchedule)}</InfoRow>
+              <InfoRow label={t('targets.overview.lastDiscovery')}>
                 {target.lastDiscoveredAt ? dayjs(target.lastDiscoveredAt).fromNow() : '—'}
               </InfoRow>
-              <InfoRow label="Added">{dayjs(target.createdAt).format('DD MMM YYYY')}</InfoRow>
+              <InfoRow label={t('targets.overview.added')}>{dayjs(target.createdAt).format('DD MMM YYYY')}</InfoRow>
             </div>
             <p className="mt-4 mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Projects
+              {t('targets.overview.projects')}
             </p>
             {overview.projects.length === 0 ? (
-              <span className="text-sm text-muted-foreground">In no project</span>
+              <span className="text-sm text-muted-foreground">{t('targets.overview.inNoProject')}</span>
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {overview.projects.map((project) => (
@@ -562,10 +564,10 @@ export function TargetOverviewTab({ target }: { target: Target }) {
               </div>
             )}
             <p className="mt-4 mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Open issues
+              {t('targets.overview.openIssues')}
             </p>
             {overview.issues.length === 0 ? (
-              <span className="text-sm text-muted-foreground">None</span>
+              <span className="text-sm text-muted-foreground">{t('targets.list.none')}</span>
             ) : (
               overview.issues.map((issue) => (
                 <Link

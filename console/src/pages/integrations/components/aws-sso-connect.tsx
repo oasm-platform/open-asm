@@ -1,3 +1,4 @@
+import { t as translate, useT } from '@/lib/i18n-dictionary';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -83,6 +84,7 @@ export function AwsSsoConnect({
   syncSchedule,
   onConnected,
 }: AwsSsoConnectProps) {
+  const t = useT();
   const queryClient = useQueryClient();
 
   const [region, setRegion] = useState(DEFAULT_REGION);
@@ -135,8 +137,7 @@ export function AwsSsoConnect({
         const message = errorMessage(err);
         setPhase('expired');
         toast.error(
-          message ||
-            'AWS SSO authorization expired — restart the connect flow',
+          message || translate('integrations.awsSso.expiredToast'),
         );
       }
     };
@@ -160,7 +161,7 @@ export function AwsSsoConnect({
 
   const handleStart = async () => {
     if (!region.trim() || !startUrl.trim()) {
-      toast.error('Region and Start URL are required');
+      toast.error(t('integrations.awsSso.regionStartUrlRequired'));
       return;
     }
     setIsStarting(true);
@@ -174,7 +175,7 @@ export function AwsSsoConnect({
       setDevice(result);
       setPhase('authorizing');
     } catch {
-      toast.error('Failed to start AWS SSO authorization');
+      toast.error(t('integrations.awsSso.startFailed'));
     } finally {
       setIsStarting(false);
     }
@@ -182,11 +183,11 @@ export function AwsSsoConnect({
 
   const handleConnect = async () => {
     if (!name.trim()) {
-      toast.error('Integration name is required');
+      toast.error(t('integrations.form.nameRequired'));
       return;
     }
     if (!device || !accountId || !roleName || !refreshToken) {
-      toast.error('Select an account and role before connecting');
+      toast.error(t('integrations.awsSso.selectAccountRole'));
       return;
     }
     setIsCompleting(true);
@@ -202,13 +203,13 @@ export function AwsSsoConnect({
         refreshToken,
         syncSchedule: syncSchedule || 'disabled',
       });
-      toast.success('AWS integration connected');
+      toast.success(t('integrations.awsSso.connected'));
       queryClient.invalidateQueries({
         queryKey: getIntegrationsControllerGetManyIntegrationsQueryKey(),
       });
       onConnected?.();
     } catch {
-      toast.error('Failed to connect AWS integration');
+      toast.error(t('integrations.awsSso.connectFailed'));
     } finally {
       setIsCompleting(false);
     }
@@ -220,7 +221,7 @@ export function AwsSsoConnect({
     <div className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="aws-sso-region">
-          Region <span className="text-destructive">*</span>
+          {t('integrations.awsSso.region')} <span className="text-destructive">*</span>
         </Label>
         <Input
           id="aws-sso-region"
@@ -233,7 +234,7 @@ export function AwsSsoConnect({
 
       <div className="space-y-2">
         <Label htmlFor="aws-sso-start-url">
-          Start URL <span className="text-destructive">*</span>
+          {t('integrations.awsSso.startUrl')} <span className="text-destructive">*</span>
         </Label>
         <Input
           id="aws-sso-start-url"
@@ -248,8 +249,7 @@ export function AwsSsoConnect({
         <div className="space-y-2 rounded-lg border p-3">
           {phase === 'expired' && (
             <p className="text-sm text-destructive">
-              The device code expired before authorization. Restart to
-              continue.
+              {t('integrations.awsSso.expired')}
             </p>
           )}
           <Button
@@ -267,8 +267,8 @@ export function AwsSsoConnect({
               <KeyRound className="size-4" />
             )}
             {phase === 'expired'
-              ? 'Restart authorization'
-              : 'Start authorization'}
+              ? t('integrations.awsSso.restartAuth')
+              : t('integrations.awsSso.startAuth')}
           </Button>
         </div>
       ) : null}
@@ -277,11 +277,11 @@ export function AwsSsoConnect({
         <div className="space-y-3 rounded-lg border p-3">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" />
-            Waiting for authorization…
+            {t('integrations.awsSso.waiting')}
           </div>
           <div className="flex flex-col items-center gap-2">
             <p className="text-xs text-muted-foreground">
-              Enter this code in the AWS access portal:
+              {t('integrations.awsSso.enterCode')}
             </p>
             <code className="rounded-md bg-muted px-4 py-2 font-mono text-lg tracking-widest">
               {device.userCode}
@@ -294,7 +294,7 @@ export function AwsSsoConnect({
                   rel="noopener noreferrer"
                 >
                   <ExternalLink className="size-4" />
-                  Open verification page
+                  {t('integrations.awsSso.openVerification')}
                 </OpenLink>
               </Button>
             )}
@@ -306,11 +306,13 @@ export function AwsSsoConnect({
         <div className="space-y-3 rounded-lg border p-3">
           <div className="flex items-center gap-2 text-sm font-medium text-green-600 dark:text-green-400">
             <ShieldCheck className="size-4" />
-            Authorization complete
+            {t('integrations.awsSso.complete')}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="aws-sso-account">Account ID</Label>
+            <Label htmlFor="aws-sso-account">
+              {t('integrations.awsSso.accountId')}
+            </Label>
             <Select
               name="accountId"
               value={accountId || undefined}
@@ -321,10 +323,10 @@ export function AwsSsoConnect({
             >
               <SelectTrigger
                 id="aws-sso-account"
-                aria-label="Account ID"
+                aria-label={t('integrations.awsSso.accountId')}
                 className="w-full"
               >
-                <SelectValue placeholder="Select an account" />
+                <SelectValue placeholder={t('integrations.awsSso.selectAccount')} />
               </SelectTrigger>
               <SelectContent>
                 {accounts.map((account) => (
@@ -339,7 +341,9 @@ export function AwsSsoConnect({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="aws-sso-role">Role name</Label>
+            <Label htmlFor="aws-sso-role">
+              {t('integrations.awsSso.roleName')}
+            </Label>
             <Select
               name="roleName"
               value={roleName || undefined}
@@ -348,10 +352,10 @@ export function AwsSsoConnect({
             >
               <SelectTrigger
                 id="aws-sso-role"
-                aria-label="Role name"
+                aria-label={t('integrations.awsSso.roleName')}
                 className="w-full"
               >
-                <SelectValue placeholder="Select a role" />
+                <SelectValue placeholder={t('integrations.awsSso.selectRole')} />
               </SelectTrigger>
               <SelectContent>
                 {(selectedAccount?.roles ?? []).map((role) => (
@@ -372,7 +376,7 @@ export function AwsSsoConnect({
               onClick={resetToIdle}
             >
               <RefreshCw className="size-3.5" />
-              Restart
+              {t('integrations.awsSso.restart')}
             </Button>
             <Button
               type="button"
@@ -385,7 +389,7 @@ export function AwsSsoConnect({
               ) : (
                 <Check className="size-4" />
               )}
-              Connect
+              {t('integrations.connect.action')}
             </Button>
           </div>
         </div>

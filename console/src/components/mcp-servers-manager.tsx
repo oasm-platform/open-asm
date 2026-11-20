@@ -33,20 +33,22 @@ import { useFieldArray, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { cn } from '@/lib/utils';
+import { useT } from '@/lib/i18n-dictionary';
 
 const MCP_QUERY_KEY = '/api/agents/mcp-configs';
 
 type MCPServerStatus = 'checking' | 'online' | 'offline' | 'unknown';
 
+// Messages are dictionary keys, translated where they show
 const serverSchema = z.object({
   name: z
     .string()
-    .min(1, 'Server name is required')
+    .min(1, 'agents.mcp.nameRequired')
     .regex(
       /^[a-z0-9-_]+$/i,
-      'Only letters, numbers, hyphens and underscores',
+      'agents.mcp.namePattern',
     ),
-  url: z.string().url('URL is required'),
+  url: z.string().url('agents.mcp.urlRequired'),
   transport: z.enum(['sse', 'streamable-http']).default('sse'),
   headers: z
     .array(
@@ -63,6 +65,7 @@ const serverSchema = z.object({
 type ServerFormData = z.input<typeof serverSchema>;
 
 function StatusDot({ status }: { status: MCPServerStatus }) {
+  const t = useT();
   if (status === 'checking') {
     return (
       <Loader2 className="size-3 animate-spin text-muted-foreground shrink-0" />
@@ -76,18 +79,18 @@ function StatusDot({ status }: { status: MCPServerStatus }) {
     online: {
       bg: 'bg-emerald-500',
       shadow: 'shadow-[0_0_8px_rgba(16,185,129,0.6)]',
-      label: 'Online',
+      label: t('agents.mcp.status.online'),
       animate: 'animate-pulse',
     },
     offline: {
       bg: 'bg-rose-500',
       shadow: 'shadow-[0_0_8px_rgba(244,63,94,0.4)]',
-      label: 'Offline',
+      label: t('agents.mcp.status.offline'),
     },
     unknown: {
       bg: 'bg-slate-500/50',
       shadow: '',
-      label: 'Unknown',
+      label: t('agents.mcp.status.unknown'),
     },
   };
 
@@ -120,6 +123,7 @@ function AddServerForm({
   onSuccess: () => void;
   onCancel: () => void;
 }) {
+  const t = useT();
   const queryClient = useQueryClient();
 
   const {
@@ -149,10 +153,10 @@ function AddServerForm({
     mutation: {
       onSuccess: () => {
         void queryClient.invalidateQueries({ queryKey: [MCP_QUERY_KEY] });
-        toast.success('MCP server added');
+        toast.success(t('agents.mcp.added'));
         onSuccess();
       },
-      onError: () => toast.error('Failed to add MCP server'),
+      onError: () => toast.error(t('agents.mcp.addFailed')),
     },
   });
 
@@ -188,36 +192,42 @@ function AddServerForm({
       className="border rounded-xl p-5 bg-card/50 backdrop-blur-sm flex flex-col gap-4 shadow-sm"
     >
       <div className="flex items-center justify-between">
-        <p className="text-sm font-bold tracking-tight">New MCP Server</p>
+        <p className="text-sm font-bold tracking-tight">{t('agents.mcp.newServer')}</p>
         <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest bg-muted px-2 py-0.5 rounded-full">
-          Configuration
+          {t('agents.mcp.configuration')}
         </span>
       </div>
 
       <div className="grid gap-3">
         <div className="space-y-1">
-          <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">Server Name</label>
+          <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">
+            {t('agents.mcp.serverName')}
+          </label>
           <Input
             {...register('name')}
-            placeholder="e.g. my-mcp-server"
-            error={errors.name?.message}
+            placeholder={t('agents.mcp.serverNamePlaceholder')}
+            error={errors.name?.message && t(errors.name.message)}
             className="bg-background/50 h-10"
           />
         </div>
 
         <div className="space-y-1">
-          <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">Endpoint URL</label>
+          <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">
+            {t('agents.mcp.endpointUrl')}
+          </label>
           <Input
             {...register('url')}
             type="url"
             placeholder="https://mcp.example.com/sse"
-            error={errors.url?.message}
+            error={errors.url?.message && t(errors.url.message)}
             className="bg-background/50 h-10 font-mono text-xs"
           />
         </div>
 
         <div className="space-y-2">
-          <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">Transport Type</label>
+          <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">
+            {t('agents.mcp.transportType')}
+          </label>
           <RadioGroup
             value={transportValue}
             onValueChange={(val) => {
@@ -229,13 +239,13 @@ function AddServerForm({
             <div className="flex items-center gap-2">
               <RadioGroupItem value="sse" id="transport-sse" />
               <Label htmlFor="transport-sse" className="text-sm font-medium cursor-pointer">
-                Server-Sent Events
+                {t('agents.mcp.sse')}
               </Label>
             </div>
             <div className="flex items-center gap-2">
               <RadioGroupItem value="streamable-http" id="transport-streamable" />
               <Label htmlFor="transport-streamable" className="text-sm font-medium cursor-pointer">
-                Streamable HTTP
+                {t('agents.mcp.streamableHttp')}
               </Label>
             </div>
           </RadioGroup>
@@ -243,7 +253,9 @@ function AddServerForm({
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">Custom Headers</label>
+            <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">
+              {t('agents.mcp.customHeaders')}
+            </label>
             <Button
               type="button"
               variant="ghost"
@@ -252,7 +264,7 @@ function AddServerForm({
               className="h-6 text-xs"
             >
               <Plus className="size-3 mr-1" />
-              Add
+              {t('agents.mcp.add')}
             </Button>
           </div>
           {fields.length > 0 && (
@@ -261,12 +273,12 @@ function AddServerForm({
                 <div key={field.id} className="flex items-center gap-2">
                   <Input
                     {...register(`headers.${index}.key`)}
-                    placeholder="Key"
+                    placeholder={t('agents.mcp.key')}
                     className="h-8 text-xs font-mono bg-background/50"
                   />
                   <Input
                     {...register(`headers.${index}.value`)}
-                    placeholder="Value"
+                    placeholder={t('agents.mcp.value')}
                     className="h-8 text-xs font-mono bg-background/50"
                   />
                   <Button
@@ -289,7 +301,7 @@ function AddServerForm({
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">
-              Timeout
+              {t('agents.mcp.timeout')}
             </label>
             <div className="flex items-center gap-2">
               <Input
@@ -298,14 +310,16 @@ function AddServerForm({
                 min={1}
                 className="w-20 h-8 text-xs bg-background/50"
               />
-              <span className="text-[10px] text-muted-foreground">seconds</span>
+              <span className="text-[10px] text-muted-foreground">
+                {t('agents.mcp.seconds')}
+              </span>
             </div>
           </div>
 
           {transportValue === 'sse' && (
             <div className="flex items-center gap-2">
               <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">
-                SSE Read Timeout
+                {t('agents.mcp.sseReadTimeout')}
               </label>
               <div className="flex items-center gap-2">
                 <Input
@@ -314,7 +328,9 @@ function AddServerForm({
                   min={1}
                   className="w-20 h-8 text-xs bg-background/50"
                 />
-                <span className="text-[10px] text-muted-foreground">seconds</span>
+                <span className="text-[10px] text-muted-foreground">
+                {t('agents.mcp.seconds')}
+              </span>
               </div>
             </div>
           )}
@@ -322,7 +338,7 @@ function AddServerForm({
 
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" size="sm" onClick={onCancel} className="font-semibold h-8">
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button type="submit" size="sm" disabled={upsert.isPending} className="font-bold h-8">
             {upsert.isPending ? (
@@ -330,7 +346,7 @@ function AddServerForm({
             ) : (
               <Plus className="size-3 mr-2" />
             )}
-            Add Server
+            {t('agents.mcp.addServer')}
           </Button>
         </div>
       </div>
@@ -349,6 +365,7 @@ function ServerRow({
   status: MCPServerStatus;
   onPing: (name: string) => void;
 }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(false);
 
@@ -358,7 +375,7 @@ function ServerRow({
         void queryClient.invalidateQueries({ queryKey: [MCP_QUERY_KEY] });
         onPing(server.name);
       },
-      onError: () => toast.error('Failed to toggle server'),
+      onError: () => toast.error(t('agents.mcp.toggleFailed')),
     },
   });
 
@@ -366,9 +383,9 @@ function ServerRow({
     mutation: {
       onSuccess: () => {
         void queryClient.invalidateQueries({ queryKey: [MCP_QUERY_KEY] });
-        toast.success('Server removed');
+        toast.success(t('agents.mcp.removed'));
       },
-      onError: () => toast.error('Failed to remove server'),
+      onError: () => toast.error(t('agents.mcp.removeFailed')),
     },
   });
 
@@ -401,7 +418,7 @@ function ServerRow({
             <p className="text-sm font-semibold tracking-tight truncate">{server.name}</p>
             {server.disabled && (
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground uppercase tracking-wider">
-                Disabled
+                {t('agents.mcp.disabled')}
               </span>
             )}
           </div>
@@ -417,7 +434,7 @@ function ServerRow({
             onClick={() => onPing(server.name)}
             disabled={status === 'checking' || server.disabled}
             className="text-muted-foreground hover:text-foreground"
-            title="Re-check status"
+            title={t('agents.mcp.recheck')}
           >
             <RefreshCw className={cn("size-3.5", status === 'checking' && "animate-spin")} />
           </Button>
@@ -445,10 +462,12 @@ function ServerRow({
           </Button>
 
           <ConfirmDialog
-            title="Remove MCP Server"
-            description={`Are you sure you want to remove the server "${server.name}"? This action cannot be undone.`}
+            title={t('agents.mcp.removeTitle')}
+            description={t('agents.mcp.removeDescription', {
+              name: server.name,
+            })}
             onConfirm={handleDelete}
-            confirmText="Remove"
+            confirmText={t('agents.mcp.remove')}
             trigger={
               <Button
                 variant="ghost"
@@ -473,16 +492,20 @@ function ServerRow({
           )}
           {server.transport && (
             <div className="flex gap-4">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">Transport</span>
+              <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">
+                {t('agents.mcp.transport')}
+              </span>
               <span className="font-mono text-muted-foreground/90 uppercase tracking-wider text-[10px]">
-                {server.transport === 'streamable-http' ? 'Streamable HTTP' : 'SSE'}
+                {server.transport === 'streamable-http'
+                  ? t('agents.mcp.streamableHttp')
+                  : 'SSE'}
               </span>
             </div>
           )}
           {server.headers && Object.keys(server.headers).length > 0 && (
             <div className="flex gap-4">
               <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">
-                Headers
+                {t('agents.mcp.headers')}
               </span>
               <span className="font-mono text-muted-foreground/90">
                 {Object.keys(server.headers).join(', ')}
@@ -493,7 +516,7 @@ function ServerRow({
             server.allowed_tools.length > 0 && (
               <div className="flex gap-4">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">
-                  Tools
+                  {t('agents.mcp.tools')}
                 </span>
                 <span className="flex flex-wrap gap-1">
                   {(server.allowed_tools as unknown as string[]).map(t => (
@@ -503,17 +526,23 @@ function ServerRow({
               </div>
             )}
           <div className="flex gap-4">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">Timeout</span>
+            <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">
+              {t('agents.mcp.timeout')}
+            </span>
             <span className="text-muted-foreground/90 font-semibold">{server.timeout ?? 60}s</span>
           </div>
           {server.transport === 'sse' && (
             <div className="flex gap-4">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">SSE Read Timeout</span>
+              <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">
+                {t('agents.mcp.sseReadTimeout')}
+              </span>
               <span className="text-muted-foreground/90 font-semibold">{server.sse_read_timeout ?? 300}s</span>
             </div>
           )}
           <div className="flex gap-4">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">Status</span>
+            <span className="text-[10px] font-bold text-muted-foreground uppercase w-20 shrink-0">
+              {t('agents.mcp.status')}
+            </span>
             <span
               className={cn(
                 "font-bold uppercase tracking-wider text-[10px]",
@@ -527,14 +556,14 @@ function ServerRow({
               )}
             >
               {server.disabled
-                ? 'Disabled'
+                ? t('agents.mcp.disabled')
                 : status === 'online'
-                  ? 'Online • Reachable'
+                  ? t('agents.mcp.detail.online')
                   : status === 'offline'
-                    ? 'Offline • Unreachable'
+                    ? t('agents.mcp.detail.offline')
                     : status === 'checking'
-                      ? 'Checking…'
-                      : 'Active • Protocol Status Unknown'}
+                      ? t('agents.mcp.detail.checking')
+                      : t('agents.mcp.detail.unknown')}
             </span>
           </div>
         </div>
@@ -546,6 +575,7 @@ function ServerRow({
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export function MCPServersManager() {
+  const t = useT();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -606,8 +636,8 @@ export function MCPServersManager() {
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           {servers.length === 0
-            ? 'No MCP servers configured'
-            : `${servers.length} server${servers.length !== 1 ? 's' : ''}`}
+            ? t('agents.mcp.none')
+            : t('agents.mcp.count', { count: servers.length })}
         </p>
         {!showAddForm && (
           <Button
@@ -617,7 +647,7 @@ export function MCPServersManager() {
             className="gap-1.5"
           >
             <Plus className="size-3.5" />
-            Add Server
+            {t('agents.mcp.addServer')}
           </Button>
         )}
       </div>
@@ -642,7 +672,7 @@ export function MCPServersManager() {
         <div className="rounded-lg border border-dashed p-6 text-center">
           <Server className="size-8 mx-auto text-muted-foreground mb-2" />
           <p className="text-sm text-muted-foreground">
-            Add MCP servers to extend the agent with external tools
+            {t('agents.mcp.empty')}
           </p>
         </div>
       ) : (

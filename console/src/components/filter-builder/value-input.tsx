@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +16,7 @@ export function ValueInput({ field, condition, onChange, error }: {
   onChange: (value: string | string[]) => void;
   error: string | null;
 }) {
+  const t = useT();
   const isList = LIST_OPS.has(condition.op);
   const values = Array.isArray(condition.value) ? condition.value : [];
   // Scalar ops are fully controlled by the draft; local text is only the list-op chip entry.
@@ -27,13 +29,13 @@ export function ValueInput({ field, condition, onChange, error }: {
   const { options, isFetching } = field.useSuggestions(search, open && condition.op !== 'inSubnet');
 
   const commit = (v: string) => {
-    const t = v.trim();
-    if (!t) return;
+    const next = v.trim();
+    if (!next) return;
     if (isList) {
-      if (!values.includes(t)) onChange([...values, t]);
+      if (!values.includes(next)) onChange([...values, next]);
       setListText('');
     } else {
-      onChange(t);
+      onChange(next);
       setOpen(false);
     }
   };
@@ -41,10 +43,10 @@ export function ValueInput({ field, condition, onChange, error }: {
   const input = (
     <Input
       ref={inputRef}
-      aria-label="Value"
+      aria-label={t('components.filter.value')}
       aria-invalid={!!error}
       value={text}
-      placeholder={condition.op === 'inSubnet' ? '10.0.0.0/8' : isList ? 'Type and press Enter' : 'Value'}
+      placeholder={condition.op === 'inSubnet' ? '10.0.0.0/8' : isList ? t('components.filter.typeAndEnter') : t('components.filter.value')}
       onFocus={() => setOpen(true)}
       onChange={(e) => {
         setOpen(true);
@@ -75,7 +77,7 @@ export function ValueInput({ field, condition, onChange, error }: {
   const list = (
     <Command shouldFilter={false}>
       <CommandList className={isMobile ? 'max-h-48' : undefined}>
-        <CommandEmpty>{isFetching ? 'Loading…' : 'No suggestions'}</CommandEmpty>
+        <CommandEmpty>{isFetching ? t('components.filter.loading') : t('components.filter.noSuggestions')}</CommandEmpty>
         <CommandGroup>
           {options.map((o) => (
             <CommandItem key={o.value} value={o.value} onMouseDown={(e) => e.preventDefault()} onSelect={() => commit(o.value)}>
@@ -94,7 +96,7 @@ export function ValueInput({ field, condition, onChange, error }: {
           {values.map((v) => (
             <Badge key={v} variant="secondary" className="gap-1">
               {v}
-              <button type="button" aria-label={`Remove ${v}`} onClick={() => onChange(values.filter((x) => x !== v))}>
+              <button type="button" aria-label={t('components.filter.removeValue', { value: v })} onClick={() => onChange(values.filter((x) => x !== v))}>
                 <X className="size-3" />
               </button>
             </Badge>

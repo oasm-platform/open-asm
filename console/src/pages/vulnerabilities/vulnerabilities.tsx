@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import Page from '@/components/common/page';
 import { usePermission } from '@/hooks/usePermission';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
@@ -31,13 +32,14 @@ function OpenSeverityBreakdown() {
 }
 
 const Vulnerabilities = () => {
+  const t = useT();
   const { workspaces } = useWorkspaceSelector();
   const { hasPermission } = usePermission();
   const hasWorkspace = workspaces.length > 0;
   return (
     <Page
-      title="Vulnerabilities"
-      description="Security findings from scans and AI agents across your assets"
+      title={t('vulnerabilities.page.title')}
+      description={t('vulnerabilities.page.description')}
       permission="vulnerability.read"
       header={
         hasWorkspace ? (

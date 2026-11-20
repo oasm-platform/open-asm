@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { CheckCircleIcon, CircleIcon } from 'lucide-react';
 
 interface StatusBadgeProps {
@@ -7,6 +8,8 @@ interface StatusBadgeProps {
 }
 
 export const StatusBadge = ({ status }: StatusBadgeProps) => {
+  const t = useT();
+  const normalized = status?.toLowerCase();
   let statusColor = 'text-gray-500';
   let StatusIcon = CircleIcon;
 
@@ -22,7 +25,9 @@ export const StatusBadge = ({ status }: StatusBadgeProps) => {
       className={`${statusColor} flex items-center gap-1 capitalize font-bold border p-1 rounded-md`}
     >
       <StatusIcon size={14} />
-      {status}
+      {normalized === 'open' || normalized === 'closed'
+        ? t(`components.status.${normalized}`)
+        : status}
     </div>
   );
 };

@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { JobStatus } from '@/services/apis/gen/queries';
 import {
   BadgeCheckIcon,
@@ -12,7 +13,7 @@ import { Badge } from './badge';
 interface StatusConfig {
   icon: React.ReactNode;
   className: string;
-  label: string;
+  labelKey: string;
   variant: 'default' | 'outline';
 }
 
@@ -20,37 +21,37 @@ const statusConfigs: Record<JobStatus, StatusConfig> = {
   [JobStatus.pending]: {
     icon: <ClockIcon className="h-4 w-4" />,
     className: 'text-yellow-500',
-    label: 'Pending',
+    labelKey: 'components.jobStatus.pending',
     variant: 'outline',
   },
   [JobStatus.in_progress]: {
     icon: <Loader2Icon className="animate-spin h-4 w-4" />,
     className: 'text-purple-500',
-    label: 'In Progress',
+    labelKey: 'components.jobStatus.inProgress',
     variant: 'outline',
   },
   [JobStatus.completed]: {
     icon: <BadgeCheckIcon className="h-4 w-4" />,
     className: 'text-green-500',
-    label: 'Completed',
+    labelKey: 'components.jobStatus.completed',
     variant: 'outline',
   },
   [JobStatus.failed]: {
     icon: <XCircleIcon className="h-4 w-4" />,
     className: 'text-red-500',
-    label: 'Failed',
+    labelKey: 'components.jobStatus.failed',
     variant: 'outline',
   },
   [JobStatus.cancelled]: {
     icon: <XCircleIcon className="h-4 w-4" />,
     className: 'text-gray-500',
-    label: 'Cancelled',
+    labelKey: 'components.jobStatus.cancelled',
     variant: 'outline',
   },
   [JobStatus.skipped]: {
     icon: <CircleAlert className="h-4 w-4" />,
     className: 'text-gray-400',
-    label: 'Skipped',
+    labelKey: 'components.jobStatus.skipped',
     variant: 'outline',
   },
 };
@@ -58,7 +59,7 @@ const statusConfigs: Record<JobStatus, StatusConfig> = {
 const defaultConfig: StatusConfig = {
   icon: null,
   className: 'text-gray-500 text-white',
-  label: 'Unknown',
+  labelKey: 'common.unknown',
   variant: 'outline',
 };
 
@@ -77,6 +78,7 @@ const JobStatusBadge = ({
   onClick,
   className,
 }: JobStatusProps) => {
+  const t = useT();
   const config = statusConfigs[status] || defaultConfig;
   return (
     <Badge
@@ -105,7 +107,7 @@ const JobStatusBadge = ({
     >
       <span className="flex items-center">
         {config.icon}
-        {!onlyIcon && <span className="ml-1">{config.label}</span>}
+        {!onlyIcon && <span className="ml-1">{t(config.labelKey)}</span>}
       </span>
     </Badge>
   );

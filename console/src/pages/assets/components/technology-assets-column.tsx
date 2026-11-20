@@ -1,4 +1,5 @@
 import { type GetTechnologyAssetsDTO } from '@/services/apis/gen/queries';
+import { t } from '@/lib/i18n-dictionary';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Boxes } from 'lucide-react';
 import BadgeList from './badge-list';
@@ -6,7 +7,7 @@ import BadgeList from './badge-list';
 export const technologyAssetsColumn: ColumnDef<GetTechnologyAssetsDTO>[] = [
   {
     accessorKey: 'technology',
-    header: 'Technology',
+    header: () => t('assets.columns.technology'),
     enableHiding: false,
     size: 250,
     cell: ({ row }) => {
@@ -54,7 +55,7 @@ export const technologyAssetsColumn: ColumnDef<GetTechnologyAssetsDTO>[] = [
   },
   {
     accessorKey: 'description',
-    header: 'Description',
+    header: () => t('common.description'),
     enableHiding: false,
     // Enriched after the query, so the API cannot sort by it.
     enableSorting: false,
@@ -64,7 +65,7 @@ export const technologyAssetsColumn: ColumnDef<GetTechnologyAssetsDTO>[] = [
         <div className="flex items-center whitespace-normal">
           <p className="text-sm text-muted-foreground">
             {(data.technology?.description as string) ||
-              'No description available'}
+              t('assets.columns.noDescription')}
           </p>
         </div>
       );
@@ -72,14 +73,14 @@ export const technologyAssetsColumn: ColumnDef<GetTechnologyAssetsDTO>[] = [
   },
   {
     accessorKey: 'assetCount',
-    header: 'Number of services',
+    header: () => t('assets.columns.numberOfServices'),
     enableSorting: true,
     size: 100,
     cell: ({ row }) => {
       const data = row.original;
       return (
         <div className="flex items-center ">
-          {data.assetCount} {data.assetCount > 1 ? 'services' : 'service'}
+          {t('assets.columns.serviceCount', { count: data.assetCount })}
         </div>
       );
     },

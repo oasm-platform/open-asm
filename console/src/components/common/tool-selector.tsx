@@ -1,5 +1,6 @@
 'use client';
 
+import { useT } from '@/lib/i18n-dictionary';
 import { Image } from '@/components/ui/image';
 import {
   Tooltip,
@@ -46,11 +47,16 @@ export function ToolSelector({
   selectedIds,
   onToggle,
   disabled = false,
-  emptyMessage = 'No scanning tools installed',
+  emptyMessage,
   getToolState,
 }: ToolSelectorProps) {
+  const t = useT();
   if (tools.length === 0) {
-    return <p className="text-sm text-muted-foreground">{emptyMessage}</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        {emptyMessage ?? t('components.toolSelector.empty')}
+      </p>
+    );
   }
 
   return (

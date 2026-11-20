@@ -17,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useT } from '@/lib/i18n-dictionary';
 import {
   ProjectAssetSource,
   ProjectScopeRuleMode,
@@ -49,14 +50,15 @@ const PAGE_SIZE = 20;
 const RECENT_DAYS = 7;
 
 const TYPE_LABEL: Record<string, string> = {
-  target: 'Target',
-  hostname: 'Hostname',
-  cidr: 'CIDR',
-  asset: 'Asset',
+  target: 'projects.scope.type.target',
+  hostname: 'projects.scope.type.hostname',
+  cidr: 'projects.scope.type.cidr',
+  asset: 'projects.scope.type.asset',
 };
 
 /** Rule list of the project with an editor dialog. */
 function ScopeCard({ projectId, archived }: { projectId: string; archived: boolean }) {
+  const t = useT();
   const invalidate = useInvalidateProjects();
   const { data: scope } = useProjectsControllerGetScopeRules(projectId);
   const replace = useProjectsControllerReplaceScopeRules();
@@ -91,12 +93,15 @@ function ScopeCard({ projectId, archived }: { projectId: string; archived: boole
       {
         onSuccess: (result) => {
           toast.success(
-            `Scope saved: ${result.added} added, ${result.removed} removed`,
+            t('projects.assets.scopeSaved', {
+              added: result.added,
+              removed: result.removed,
+            }),
           );
           void invalidate();
           setOpen(false);
         },
-        onError: (error) => toast.error(apiErrorMessage(error, 'Failed to save the rules')),
+        onError: (error) => toast.error(apiErrorMessage(error, t('projects.assets.saveRulesFailed'))),
       },
     );
 
@@ -106,19 +111,19 @@ function ScopeCard({ projectId, archived }: { projectId: string; archived: boole
         <div className="flex flex-col gap-1.5">
           <CardTitle className="flex items-center gap-2">
             <Crosshair className="size-5 text-primary" />
-            Scope
+            {t('projects.create.steps.scope')}
           </CardTitle>
           {scope && (
             <CardDescription>
               {scope.autoAddAssets
-                ? 'New assets that match the rules join on their own.'
-                : 'Rules apply when they are saved.'}
+                ? t('projects.assets.autoAddOn')
+                : t('projects.assets.autoAddOff')}
             </CardDescription>
           )}
         </div>
         <Button variant="outline" disabled={archived} onClick={startEdit}>
           <Pencil className="size-4" />
-          Edit rules
+          {t('projects.assets.editRules')}
         </Button>
       </CardHeader>
       <CardContent className="flex flex-wrap gap-2">
@@ -129,23 +134,22 @@ function ScopeCard({ projectId, archived }: { projectId: string; archived: boole
             ) : (
               <Minus className="size-3.5 text-destructive" />
             )}
-            <span className="text-muted-foreground">{TYPE_LABEL[rule.type]}</span>
+            <span className="text-muted-foreground">{TYPE_LABEL[rule.type] ? t(TYPE_LABEL[rule.type]) : rule.type}</span>
             {rule.label}
             <span className="tabular-nums text-muted-foreground">· {rule.matched}</span>
           </Badge>
         ))}
         <Badge variant="outline" className="border-dashed py-1 text-sm font-normal text-muted-foreground">
-          + {scope?.manualAssets ?? 0} picked by hand
+          {t('projects.assets.manualCount', { n: scope?.manualAssets ?? 0 })}
         </Badge>
       </CardContent>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Scope rules</DialogTitle>
+            <DialogTitle>{t('projects.assets.scopeRules')}</DialogTitle>
             <DialogDescription>
-              Include rules add matching assets; exclude rules keep them out.
-              Assets picked by hand stay until you remove them.
+              {t('projects.assets.scopeRulesHint')}
             </DialogDescription>
           </DialogHeader>
           <ScopeRulesEditor
@@ -157,10 +161,10 @@ function ScopeCard({ projectId, archived }: { projectId: string; archived: boole
           />
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button disabled={replace.isPending} onClick={save}>
-              Save rules
+              {t('projects.assets.saveRules')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -170,6 +174,7 @@ function ScopeCard({ projectId, archived }: { projectId: string; archived: boole
 }
 
 export function AssetsTab({ projectId, archived }: { projectId: string; archived: boolean }) {
+  const t = useT();
   const invalidate = useInvalidateProjects();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
@@ -197,10 +202,10 @@ export function AssetsTab({ projectId, archived }: { projectId: string; archived
       { id: projectId, data: { assetIds: [removing.id] } },
       {
         onSuccess: () => {
-          toast.success(`${removing.value} removed from the project`);
+          toast.success(t('projects.assets.removed', { value: removing.value }));
           void invalidate();
         },
-        onError: (error) => toast.error(apiErrorMessage(error, 'Failed to remove the asset')),
+        onError: (error) => toast.error(apiErrorMessage(error, t('projects.assets.removeFailed'))),
       },
     );
   };
@@ -209,19 +214,19 @@ export function AssetsTab({ projectId, archived }: { projectId: string; archived
   const columns: ColumnDef<ProjectAssetDto>[] = [
     {
       accessorKey: 'value',
-      header: 'Asset',
+      header: t('projects.assets.colAsset'),
       cell: ({ row }) => (
         <span className="flex items-center gap-2">
           <span className="font-medium">{row.original.value}</span>
           {dayjs(row.original.addedAt).isAfter(recent) && (
-            <Badge variant="soft">New</Badge>
+            <Badge variant="soft">{t('projects.assets.new')}</Badge>
           )}
         </span>
       ),
     },
     {
       accessorKey: 'targetType',
-      header: 'Type',
+      header: t('common.type'),
       cell: ({ row }) => (
         <Badge variant="outline" className="capitalize">
           {row.original.targetType.toLowerCase().replace('_', ' ')}
@@ -230,27 +235,29 @@ export function AssetsTab({ projectId, archived }: { projectId: string; archived
     },
     {
       accessorKey: 'source',
-      header: 'Source',
+      header: t('projects.assets.colSource'),
       cell: ({ row }) =>
         row.original.source === ProjectAssetSource.rule ? (
           <span>
-            <span className="text-muted-foreground">Rule · </span>
-            {row.original.rule?.label ?? 'deleted rule'}
+            <span className="text-muted-foreground">{t('projects.assets.rulePrefix')} </span>
+            {row.original.rule?.label ?? t('projects.assets.deletedRule')}
           </span>
         ) : (
-          <span className="text-muted-foreground">Picked by hand</span>
+          <span className="text-muted-foreground">
+            {t('projects.assets.pickedByHand')}
+          </span>
         ),
     },
     {
       id: 'vulnerabilities',
-      header: 'Vulnerabilities',
+      header: t('projects.tabs.vulnerabilities'),
       cell: ({ row }) => (
         <SeverityCounts counts={row.original.vulnerabilities} empty="—" />
       ),
     },
     {
       id: 'lastScan',
-      header: 'Last scan',
+      header: t('projects.assets.colLastScan'),
       cell: ({ row }) =>
         row.original.lastScan ? (
           <Link
@@ -262,12 +269,12 @@ export function AssetsTab({ projectId, archived }: { projectId: string; archived
             {dayjs(row.original.lastScan.createdAt).fromNow()}
           </Link>
         ) : (
-          <span className="text-muted-foreground">Never</span>
+          <span className="text-muted-foreground">{t('projects.list.never')}</span>
         ),
     },
     {
       accessorKey: 'addedAt',
-      header: 'Added',
+      header: t('projects.assets.colAdded'),
       cell: ({ row }) => (
         <span className="tabular-nums">
           {new Date(row.original.addedAt).toLocaleDateString()}
@@ -282,7 +289,7 @@ export function AssetsTab({ projectId, archived }: { projectId: string; archived
           variant="ghost"
           size="icon"
           disabled={archived}
-          aria-label={`Remove ${row.original.value}`}
+          aria-label={t('projects.assets.removeAria', { value: row.original.value })}
           onClick={(e) => {
             e.stopPropagation();
             setRemoving(row.original);
@@ -312,36 +319,38 @@ export function AssetsTab({ projectId, archived }: { projectId: string; archived
         filterColumnKey="value"
         filterValue={text}
         onFilterChange={onSearch}
-        filterPlaceholder="Search assets"
+        filterPlaceholder={t('projects.assets.search')}
         filterComponents={[
           <FilterSelect
             key="source"
-            label="Source"
+            label={t('projects.assets.colSource')}
             value={source}
             onValueChange={(value) => {
               setSource(value as ProjectAssetSource | 'all');
               setPage(1);
             }}
             options={[
-              { value: 'all', label: 'All sources' },
-              { value: ProjectAssetSource.rule, label: 'From rules', dot: 'bg-blue-500' },
-              { value: ProjectAssetSource.manual, label: 'Picked by hand', dot: 'bg-green-500' },
+              { value: 'all', label: t('projects.assets.allSources') },
+              { value: ProjectAssetSource.rule, label: t('projects.assets.fromRules'), dot: 'bg-blue-500' },
+              { value: ProjectAssetSource.manual, label: t('projects.assets.pickedByHand'), dot: 'bg-green-500' },
             ]}
           />,
         ]}
         toolbarComponents={
           archived ? [] : [<SelectAssetsDialog key="add" projectId={projectId} />]
         }
-        emptyMessage="No assets in this project yet"
+        emptyMessage={t('projects.assets.empty')}
       />
       <ConfirmDialog
         open={!!removing}
         onOpenChange={(open) => !open && setRemoving(null)}
-        title="Remove asset"
+        title={t('projects.assets.removeTitle')}
         description={
           removing?.source === ProjectAssetSource.rule
-            ? `${removing.value} was added by a rule. Removing it adds an exclude rule so it stays out.`
-            : `Remove ${removing?.value ?? 'this asset'} from the project? Its findings stay in the workspace.`
+            ? t('projects.assets.removeRuleDescription', { value: removing.value })
+            : t('projects.assets.removeDescription', {
+                value: removing?.value ?? t('projects.assets.thisAsset'),
+              })
         }
         onConfirm={confirmRemove}
         disabled={remove.isPending}

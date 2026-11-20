@@ -13,10 +13,9 @@ import {
   SendMessageDtoAgentMode,
   useAgentsControllerGetConversationsInfinite,
 } from '@/services/apis/gen/queries';
+import { useT } from '@/lib/i18n-dictionary';
 
 dayjs.extend(relativeTime);
-
-const UNTITLED = 'New conversation';
 
 interface ChatHeaderProps {
   conversationId?: string;
@@ -45,6 +44,7 @@ export function ChatHeader({
   hasActivity = false,
   agentMode,
 }: ChatHeaderProps) {
+  const t = useT();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -70,7 +70,8 @@ export function ChatHeader({
     [data, conversationId],
   );
   const displayTitle =
-    stripPageContextFromTitle(listedTitle || title || '') || UNTITLED;
+    stripPageContextFromTitle(listedTitle || title || '') ||
+    t('agents.conversations.newConversation');
   const isMobile = useIsMobile();
 
   return (
@@ -119,8 +120,8 @@ export function ChatHeader({
             variant="ghost"
             size="icon-sm"
             className="rounded-full text-muted-foreground"
-            aria-label="New chat"
-            title="New chat"
+            aria-label={t('agents.header.newChat')}
+            title={t('agents.header.newChat')}
           >
             <Link
               to={
@@ -141,8 +142,8 @@ export function ChatHeader({
               'relative text-muted-foreground hover:cursor-pointer',
               isMobile && 'rounded-full',
             )}
-            aria-label="Open side panel"
-            title="Open side panel"
+            aria-label={t('agents.header.openSidePanel')}
+            title={t('agents.header.openSidePanel')}
             onClick={onOpenPanel}
           >
             {/* Mobile opens it full screen, not as a split: a menu-like icon */}

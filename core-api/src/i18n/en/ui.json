@@ -3,5 +3,10 @@
   "notifications.unread.one": "{count} unread notification",
   "notifications.unread.other": "{count} unread notifications",
   "notifications.markAllRead": "Mark all as read",
-  "preferences.language": "Language"
+  "userMenu.language": "Language",
+  "userMenu.settings": "Settings",
+  "userMenu.admin": "Admin",
+  "userMenu.docs": "Docs",
+  "userMenu.reportIssue": "Report an issue",
+  "userMenu.logout": "Log out"
 }

@@ -21,6 +21,7 @@ import {
   getNextRun,
   getTimezoneLabel,
 } from '@/lib/cron-schedule';
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import {
   ProjectTriggerType,
@@ -49,6 +50,7 @@ function useWeek(
   names: Map<string, string>,
   timezone: string,
 ) {
+  const t = useT();
   return useMemo(() => {
     const start = dayjs().startOf('day');
     const end = start.add(DAYS, 'day').toDate();
@@ -67,7 +69,7 @@ function useWeek(
         const index = dayjs(at).startOf('day').diff(start, 'day');
         days[index]?.runs.push({
           at,
-          workflow: names.get(trigger.projectWorkflowId) ?? 'Workflow',
+          workflow: names.get(trigger.projectWorkflowId) ?? t('projects.schedule.workflowFallback'),
           triggerId: trigger.id,
         });
         from = new Date(at.getTime() + 60_000);
@@ -75,7 +77,7 @@ function useWeek(
     }
     for (const day of days) day.runs.sort((a, b) => a.at.getTime() - b.at.getTime());
     return days;
-  }, [triggers, names, timezone]);
+  }, [triggers, names, timezone, t]);
 }
 
 /**
@@ -103,6 +105,7 @@ export function ScheduleTab({
   workflows: ProjectWorkflow[];
   archived: boolean;
 }) {
+  const t = useT();
   const timezone = getLocalTimezone();
   const { data: triggers = [], isLoading } = useProjectsControllerGetTriggers(projectId);
   const names = useMemo(
@@ -118,10 +121,10 @@ export function ScheduleTab({
           <div className="flex flex-col gap-1.5">
             <CardTitle className="flex items-center gap-2">
               <CalendarDays className="size-5 text-primary" />
-              Next 7 days
+              {t('projects.schedule.next7Days')}
             </CardTitle>
             <CardDescription>
-              Event triggers have no fixed time, so they are not shown here.
+              {t('projects.schedule.next7DaysHint')}
             </CardDescription>
           </div>
           <span className="text-sm text-muted-foreground">{getTimezoneLabel(timezone)}</span>
@@ -162,18 +165,16 @@ export function ScheduleTab({
           <div className="flex flex-col gap-1.5">
             <CardTitle className="flex items-center gap-2">
               <Zap className="size-5 text-primary" />
-              Triggers
+              {t('projects.create.steps.triggers')}
             </CardTitle>
             <CardDescription>
-              Set when each workflow runs while adding or editing it on the
-              Workflows tab. Archiving the project stops every trigger until it
-              is reopened.
+              {t('projects.schedule.triggersHint')}
             </CardDescription>
           </div>
           <Button variant="outline" asChild>
             <Link to="/projects/$id/$tab" params={{ id: projectId, tab: 'workflows' }}>
               <Workflow className="size-4" />
-              Workflows
+              {t('projects.tabs.workflows')}
             </Link>
           </Button>
         </CardHeader>
@@ -182,19 +183,19 @@ export function ScheduleTab({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Workflow</TableHead>
-                  <TableHead>Runs</TableHead>
-                  <TableHead>Condition</TableHead>
-                  <TableHead>Last fired</TableHead>
-                  <TableHead>Next</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>{t('projects.schedule.colWorkflow')}</TableHead>
+                  <TableHead>{t('projects.tabs.runs')}</TableHead>
+                  <TableHead>{t('projects.schedule.colCondition')}</TableHead>
+                  <TableHead>{t('projects.schedule.colLastFired')}</TableHead>
+                  <TableHead>{t('projects.schedule.colNext')}</TableHead>
+                  <TableHead>{t('common.status')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {!isLoading && triggers.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
-                      No triggers: workflows run only when started by hand.
+                      {t('projects.schedule.noTriggers')}
                     </TableCell>
                   </TableRow>
                 )}
@@ -216,10 +217,10 @@ export function ScheduleTab({
                             <Zap className="size-3" />
                           )}
                           {isCron
-                            ? 'Schedule'
+                            ? t('projects.runTrigger.schedule')
                             : trigger.event
                               ? TRIGGER_EVENT_LABELS[trigger.event]
-                              : 'Event'}
+                              : t('projects.runTrigger.event')}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -242,13 +243,13 @@ export function ScheduleTab({
                           ? dayjs(next).format('YYYY-MM-DD HH:mm')
                           : isCron || !active
                             ? '—'
-                            : 'On its event'}
+                            : t('projects.schedule.onItsEvent')}
                       </TableCell>
                       <TableCell>
                         {active ? (
-                          <Badge variant="soft">Active</Badge>
+                          <Badge variant="soft">{t('projects.list.status.active')}</Badge>
                         ) : (
-                          <Badge variant="secondary">{archived ? 'Archived' : 'Off'}</Badge>
+                          <Badge variant="secondary">{archived ? t('projects.archived') : t('projects.schedule.off')}</Badge>
                         )}
                       </TableCell>
                     </TableRow>

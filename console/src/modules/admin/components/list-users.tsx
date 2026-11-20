@@ -8,31 +8,35 @@ import {
 import { useNavigate } from '@tanstack/react-router';
 import { type ColumnDef } from '@tanstack/react-table';
 import { useMemo } from 'react';
+import { type TFunction, useT } from '@/lib/i18n-dictionary';
 import { AddUserDialog } from './add-user-dialog';
 import { UserPresence } from './user-presence';
 
-const buildUserColumns = (ownerId?: string): ColumnDef<AdminUserDto>[] => [
+const buildUserColumns = (
+  t: TFunction,
+  ownerId?: string,
+): ColumnDef<AdminUserDto>[] => [
   {
     accessorKey: 'name',
-    header: 'Name',
+    header: t('common.name'),
     enableSorting: true,
     cell: ({ row }) => (
       <div className="flex items-center gap-2">
         <span>{row.original.name}</span>
         {row.original.id === ownerId && (
-          <Badge variant="outline">Owner</Badge>
+          <Badge variant="outline">{t('admin.users.owner')}</Badge>
         )}
       </div>
     ),
   },
   {
     accessorKey: 'email',
-    header: 'Email',
+    header: t('admin.users.col.email'),
     enableSorting: true,
   },
   {
     accessorKey: 'role',
-    header: 'Role',
+    header: t('admin.users.col.role'),
     cell: ({ row }) => (
       <Badge variant="secondary" className="capitalize">
         {row.original.role}
@@ -41,19 +45,25 @@ const buildUserColumns = (ownerId?: string): ColumnDef<AdminUserDto>[] => [
   },
   {
     accessorKey: 'banned',
-    header: 'Status',
+    header: t('common.status'),
     cell: ({ row }) =>
       row.original.pendingApproval ? (
-        <Badge variant="outline">Pending approval</Badge>
+        <Badge variant="outline">
+          {t('admin.detail.status.pendingApproval')}
+        </Badge>
       ) : row.original.banned ? (
-        <Badge variant="destructive">Banned</Badge>
+        <Badge variant="destructive">
+          {t('admin.detail.status.banned')}
+        </Badge>
       ) : (
-        <Badge variant="secondary">Active</Badge>
+        <Badge variant="secondary">
+          {t('admin.detail.status.active')}
+        </Badge>
       ),
   },
   {
     accessorKey: 'lastActiveAt',
-    header: 'Last active',
+    header: t('admin.users.col.lastActive'),
     // Presence lives in Redis, so the server cannot sort by it.
     enableSorting: false,
     cell: ({ row }) => (
@@ -75,7 +85,8 @@ export function ListUsers({ workspaceId, ownerId }: ListUsersProps) {
     tableHandlers: { setPage, setPageSize, setParams, setFilter },
   } = useServerDataTable();
   const navigate = useNavigate();
-  const columns = useMemo(() => buildUserColumns(ownerId), [ownerId]);
+  const t = useT();
+  const columns = useMemo(() => buildUserColumns(t, ownerId), [t, ownerId]);
 
   const { data, isLoading } = useAdminUsersControllerGetUsers({
     page,
@@ -103,7 +114,7 @@ export function ListUsers({ workspaceId, ownerId }: ListUsersProps) {
       toolbarComponents={
         workspaceId ? [] : [<AddUserDialog key="add-user" />]
       }
-      emptyMessage={workspaceId ? 'No members found' : 'No users found'}
+      emptyMessage={workspaceId ? t('admin.users.emptyMembers') : t('admin.users.empty')}
       filterColumnKey="value"
       filterValue={filter}
       onFilterChange={setFilter}

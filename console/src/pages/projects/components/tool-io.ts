@@ -1,3 +1,4 @@
+import { t } from '@/lib/i18n-dictionary';
 import {
   DataKind,
   type Tool,
@@ -11,15 +12,29 @@ import {
  * takes, per asset, the first of its input kinds that has something.
  */
 
-/** Plural nouns for the kinds, as read in "takes web services". */
+/** Plural nouns for the kinds, as read in "takes web services"; resolved on read. */
 export const KIND_LABEL: Record<DataKind, string> = {
-  target: 'targets',
-  host: 'hosts',
-  service: 'open ports',
-  web: 'web services',
-  url: 'URLs',
-  repository: 'repositories',
-  vulnerability: 'vulnerabilities',
+  get target() {
+    return t('projects.kind.target');
+  },
+  get host() {
+    return t('projects.kind.host');
+  },
+  get service() {
+    return t('projects.kind.service');
+  },
+  get web() {
+    return t('projects.kind.web');
+  },
+  get url() {
+    return t('projects.kind.url');
+  },
+  get repository() {
+    return t('projects.kind.repository');
+  },
+  get vulnerability() {
+    return t('projects.kind.vulnerability');
+  },
 };
 
 /** Every run has these from the start: they come with the targets. */
@@ -41,7 +56,7 @@ export function capabilityOf(
 
 /** "web services, else hosts" */
 export function describeKinds(kinds: readonly DataKind[]): string {
-  return kinds.map((kind) => KIND_LABEL[kind]).join(', else ');
+  return kinds.map((kind) => KIND_LABEL[kind]).join(t('projects.toolIo.elseSeparator'));
 }
 
 /**
@@ -62,6 +77,6 @@ export function pipelineHint(
   const fallback = inputs.find(available);
   const wanted = KIND_LABEL[inputs[0]];
   return fallback
-    ? `No earlier step finds ${wanted}, so it scans ${KIND_LABEL[fallback]} unless an earlier run found their ${wanted}.`
-    : `No earlier step finds ${wanted}, so it only scans ${wanted} found by earlier runs.`;
+    ? t('projects.toolIo.hintFallback', { wanted, fallback: KIND_LABEL[fallback] })
+    : t('projects.toolIo.hintOnly', { wanted });
 }

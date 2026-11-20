@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
+import { t, useT } from '@/lib/i18n-dictionary';
 import {
   CreateIssueDtoPriority,
   CreateIssueDtoType,
@@ -37,11 +38,11 @@ export interface IssueCandidate {
   severity?: string | null;
 }
 
-const PRIORITY_LABELS: Record<CreateIssueDtoPriority, string> = {
-  p1: 'P1 · Urgent',
-  p2: 'P2 · High',
-  p3: 'P3 · Medium',
-  p4: 'P4 · Low',
+const PRIORITY_LABEL_KEYS: Record<CreateIssueDtoPriority, string> = {
+  p1: 'vulnerabilities.priority.p1',
+  p2: 'vulnerabilities.priority.p2',
+  p3: 'vulnerabilities.priority.p3',
+  p4: 'vulnerabilities.priority.p4',
 };
 
 const SEVERITY_PRIORITY: Record<string, CreateIssueDtoPriority> = {
@@ -55,7 +56,10 @@ const NO_ASSIGNEE = 'none';
 function defaultTitle(items: IssueCandidate[]): string {
   if (items.length === 0) return '';
   if (items.length === 1) return items[0].name;
-  return `${items[0].name} and ${items.length - 1} more`;
+  return t('vulnerabilities.createIssue.defaultTitle', {
+    name: items[0].name,
+    count: String(items.length - 1),
+  });
 }
 
 /** The most urgent severity in the selection decides the starting priority. */
@@ -99,6 +103,7 @@ export function CreateIssueDialog({
   trigger: ReactNode;
   onCreated?: () => void;
 }) {
+  const tr = useT();
   const navigate = useNavigate();
   const { selectedWorkspace } = useWorkspaceSelector();
   const [open, setOpen] = useState(false);
@@ -135,10 +140,10 @@ export function CreateIssueDialog({
       },
       {
         onSuccess: (issue) => {
-          toast.success(`Issue #${issue.no} created`, {
+          toast.success(tr('vulnerabilities.createIssue.toastCreated', { no: issue.no }), {
             description: issue.title,
             action: {
-              label: 'Open',
+              label: tr('vulnerabilities.createIssue.toastOpen'),
               onClick: () => navigate({ to: '/issues/$id', params: { id: issue.id } }),
             },
           });
@@ -146,9 +151,9 @@ export function CreateIssueDialog({
           onCreated?.();
         },
         onError: (error) => {
-          toast.error('Failed to create issue', {
+          toast.error(tr('vulnerabilities.createIssue.toastError'), {
             description:
-              error instanceof Error ? error.message : 'An unexpected error occurred.',
+              error instanceof Error ? error.message : tr('vulnerabilities.unexpectedError'),
           });
         },
       },
@@ -160,15 +165,16 @@ export function CreateIssueDialog({
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Create issue</DialogTitle>
+          <DialogTitle>{tr('vulnerabilities.createIssue.title')}</DialogTitle>
           <DialogDescription>
-            A remediation issue linking {vulnerabilities.length} finding
-            {vulnerabilities.length === 1 ? '' : 's'}.
+            {tr('vulnerabilities.createIssue.description', {
+              count: vulnerabilities.length,
+            })}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="issue-title">Title</Label>
+            <Label htmlFor="issue-title">{tr('vulnerabilities.createIssue.titleLabel')}</Label>
             <Input
               id="issue-title"
               value={title}
@@ -178,7 +184,7 @@ export function CreateIssueDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="issue-priority">Priority</Label>
+              <Label htmlFor="issue-priority">{tr('vulnerabilities.createIssue.priority')}</Label>
               <Select
                 value={priority}
                 onValueChange={(v) => setPriority(v as CreateIssueDtoPriority)}
@@ -189,20 +195,20 @@ export function CreateIssueDialog({
                 <SelectContent>
                   {Object.values(CreateIssueDtoPriority).map((p) => (
                     <SelectItem key={p} value={p}>
-                      {PRIORITY_LABELS[p]}
+                      {tr(PRIORITY_LABEL_KEYS[p])}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="issue-assignee">Assignee</Label>
+              <Label htmlFor="issue-assignee">{tr('vulnerabilities.createIssue.assignee')}</Label>
               <Select value={assignee} onValueChange={setAssignee}>
                 <SelectTrigger id="issue-assignee" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NO_ASSIGNEE}>Unassigned</SelectItem>
+                  <SelectItem value={NO_ASSIGNEE}>{tr('vulnerabilities.createIssue.unassigned')}</SelectItem>
                   {(members ?? [])
                     .filter((m) => m.user)
                     .map((m) => (
@@ -221,11 +227,11 @@ export function CreateIssueDialog({
             onClick={() => setOpen(false)}
             disabled={createIssue.isPending}
           >
-            Cancel
+            {tr('common.cancel')}
           </Button>
           <Button onClick={submit} disabled={!title.trim() || createIssue.isPending}>
             {createIssue.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Create issue
+            {tr('vulnerabilities.createIssue.title')}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,14 +1,16 @@
 import { Button } from '@/components/ui/button';
 import { Copy } from 'lucide-react';
 import { toast } from 'sonner';
+import { useT } from '@/lib/i18n-dictionary';
 
 interface ViewCodeProps {
   code: string;
 }
 export default function ViewCode({ code }: ViewCodeProps) {
+  const t = useT();
   const handleCopyHeader = async () => {
     await navigator.clipboard.writeText(code ?? '');
-    toast.success('Copied to clipboard');
+    toast.success(t('assets.copiedToClipboard'));
   };
   return (
     <div className="relative font-mono rounded-xl p-4 sm:p-6 shadow-lg border border-gray-200 dark:border-stone-800 w-full max-w-full overflow-x-auto">

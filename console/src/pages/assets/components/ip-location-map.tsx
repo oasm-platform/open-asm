@@ -1,4 +1,5 @@
 import { useTheme } from '@/components/ui/theme-provider';
+import { useT } from '@/lib/i18n-dictionary';
 import type { GeoIp } from '@/services/apis/gen/queries';
 import { MapPin } from 'lucide-react';
 import { MapContainer, TileLayer } from 'react-leaflet';
@@ -8,6 +9,7 @@ interface IpLocationMapProps {
 }
 
 export default function IpLocationMap({ geoIp }: IpLocationMapProps) {
+  const t = useT();
   const { resolvedTheme } = useTheme();
   const mapTheme = resolvedTheme === 'dark' ? 'dark_all' : 'light_all';
 
@@ -22,7 +24,7 @@ export default function IpLocationMap({ geoIp }: IpLocationMapProps) {
       <div className="flex items-center justify-center h-20 w-40 rounded border border-dashed border-muted-foreground/30 bg-muted/30">
         <div className="flex flex-col items-center gap-1 text-muted-foreground">
           <MapPin className="h-3 w-3" />
-          <span className="text-[10px]">No location</span>
+          <span className="text-[10px]">{t('assets.ip.noLocation')}</span>
         </div>
       </div>
     );

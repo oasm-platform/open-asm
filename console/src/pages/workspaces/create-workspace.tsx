@@ -18,6 +18,7 @@ import { Loader2Icon } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
+import { useT } from '@/lib/i18n-dictionary';
 
 type FormData = {
   name: string;
@@ -25,6 +26,7 @@ type FormData = {
 };
 
 const CreateWorkspace = () => {
+  const t = useT();
   const navigate = useNavigate();
   const { mutate, isPending } = useWorkspacesControllerCreateWorkspace();
   const { workspaces, isLoading: isWorkspacesLoading, refetch, handleSelectWorkspace } =
@@ -42,10 +44,12 @@ const CreateWorkspace = () => {
     if (!isWorkspacesLoading && workspaces.length === 0 && session?.user?.name) {
       reset((formValues) => ({
         ...formValues,
-        name: `${session.user.name.charAt(0).toUpperCase() + session.user.name.slice(1)}'s workspace`,
+        name: t('workspaces.create.defaultName', {
+          name: session.user.name.charAt(0).toUpperCase() + session.user.name.slice(1),
+        }),
       }));
     }
-  }, [isWorkspacesLoading, workspaces.length, session?.user?.name, reset]);
+  }, [isWorkspacesLoading, workspaces.length, session?.user?.name, reset, t]);
 
   const onSubmit = (data: FormData) => {
     mutate(
@@ -57,7 +61,7 @@ const CreateWorkspace = () => {
       },
       {
         onSuccess: (data) => {
-          toast.success('Workspace created successfully');
+          toast.success(t('workspaces.create.success'));
           refetch().then(() => {
             handleSelectWorkspace(data.id);
             navigate({ to: workspaces.length === 0 ? '/targets/start-discovery' : '/' });
@@ -65,7 +69,7 @@ const CreateWorkspace = () => {
           reset();
         },
         onError: () => {
-          toast.error('Failed to create workspace');
+          toast.error(t('workspaces.create.failed'));
         },
       },
     );
@@ -75,10 +79,9 @@ const CreateWorkspace = () => {
     <div className="h-[50vh] w-full flex flex-col justify-center items-center">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Create a new workspace</CardTitle>
+          <CardTitle>{t('workspaces.create.title')}</CardTitle>
           <CardDescription>
-            A workspace helps you organize your targets, assets, and
-            vulnerabilities.
+            {t('workspaces.create.description')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -89,10 +92,10 @@ const CreateWorkspace = () => {
             <div>
               <Input
                 {...register('name', {
-                  required: 'Workspace name is required',
+                  required: t('workspaces.create.nameRequired'),
                 })}
                 onFocus={(e) => e.target.select()}
-                placeholder="Workspace Name"
+                placeholder={t('workspaces.create.namePlaceholder')}
               />
               {errors.name && (
                 <p className="text-red-600 text-sm mt-1">
@@ -105,10 +108,10 @@ const CreateWorkspace = () => {
                 {...register('description', {
                   maxLength: {
                     value: 120,
-                    message: 'Description must be 120 characters or less',
+                    message: t('workspaces.create.descriptionMax'),
                   },
                 })}
-                placeholder="Description (optional)"
+                placeholder={t('workspaces.create.descriptionPlaceholder')}
                 className="h-32"
                 rows={8}
               />
@@ -125,7 +128,7 @@ const CreateWorkspace = () => {
                   variant="outline"
                   onClick={() => navigate({ to: '/' })}
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
               )}
               <Button
@@ -134,7 +137,7 @@ const CreateWorkspace = () => {
                 className={workspaces.length > 0 ? '' : 'w-full'}
               >
                 {isPending && <Loader2Icon className="animate-spin mr-2" />}
-                Create workspace
+                {t('workspaces.create.submit')}
               </Button>
             </div>
           </form>

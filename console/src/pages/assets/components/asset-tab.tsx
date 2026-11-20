@@ -1,5 +1,6 @@
 import { DataTable } from '@/components/ui/data-table';
 import { DataTableError } from '@/components/ui/data-table-error-boundary';
+import { useT } from '@/lib/i18n-dictionary';
 import { TabsContent } from '@/components/ui/tabs';
 import { useAssetsControllerGetAssetsInWorkspace } from '@/services/apis/gen/queries';
 import { useAsset } from '../context/asset-context';
@@ -8,6 +9,7 @@ import { assetColumns } from './asset-column';
 import { useNavigate } from '@tanstack/react-router';
 
 export default function AssetTab() {
+  const t = useT();
   const navigate = useNavigate();
 
   const {
@@ -35,7 +37,7 @@ export default function AssetTab() {
 
   if (!data && !isLoading)
     return (
-      <DataTableError message="Failed to load assets." onRetry={refetch} />
+      <DataTableError message={t('assets.errors.assets')} onRetry={refetch} />
     );
 
   return (

@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { ScanScheduleSelect } from '@/components/scan-schedule-select';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -35,6 +36,7 @@ const SettingTarget = ({
   target: Target;
   refetch: () => void;
 }) => {
+  const t = useT();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -53,7 +55,7 @@ const SettingTarget = ({
   const { mutate: deleteTarget } = useTargetsControllerDeleteTarget({
     mutation: {
       onSuccess: () => {
-        toast.success('Target deleted successfully');
+        toast.success(t('targets.settings.deleted'));
         queryClient.refetchQueries({
           queryKey: ['targets'],
         });
@@ -63,7 +65,7 @@ const SettingTarget = ({
       onError: (err) => {
         const axiosErr = err as AxiosError<{ message: string }>;
         toast.error(
-          axiosErr.response?.data.message ?? 'Failed to delete target',
+          axiosErr.response?.data.message ?? t('targets.settings.deleteFailed'),
         );
         setIsDeleting(false);
       },
@@ -86,10 +88,10 @@ const SettingTarget = ({
     {
       mutation: {
         onSuccess: () => {
-          toast.success('Updated');
+          toast.success(t('targets.settings.updated'));
           refetch();
         },
-        onError: () => toast.error('Failed to update target scan schedule'),
+        onError: () => toast.error(t('targets.settings.scheduleUpdateFailed')),
       },
     },
   );
@@ -134,7 +136,7 @@ const SettingTarget = ({
                         htmlFor="scan-frequency"
                         className="text-sm font-medium"
                       >
-                        {isGitOrg ? 'Sync Schedule' : 'Scan Schedule'}
+                        {isGitOrg ? t('targets.settings.syncSchedule') : t('targets.settings.scanSchedule')}
                       </label>
                       <ScanScheduleSelect
                         value={frequency}
@@ -159,11 +161,11 @@ const SettingTarget = ({
                     <div className="p-2.5 rounded-lg bg-purple-100 dark:bg-purple-900/30">
                       <GitFork className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                     </div>
-                    <p className="text-sm font-medium">Repositories to scan</p>
+                    <p className="text-sm font-medium">{t('targets.settings.reposToScan')}</p>
                   </div>
                   <div className="flex items-center justify-between gap-2 pl-12">
                     <Label htmlFor="setting-include-archived" className="font-normal">
-                      Archived repositories
+                      {t('targets.settings.archivedRepos')}
                     </Label>
                     <Switch
                       id="setting-include-archived"
@@ -175,7 +177,7 @@ const SettingTarget = ({
                   </div>
                   <div className="flex items-center justify-between gap-2 pl-12">
                     <Label htmlFor="setting-include-forks" className="font-normal">
-                      Forks
+                      {t('targets.settings.forks')}
                     </Label>
                     <Switch
                       id="setting-include-forks"
@@ -191,11 +193,11 @@ const SettingTarget = ({
               <div className="space-y-0.5">
                 <div className="space-y-1">
                   <ConfirmDialog
-                    title={isGitOrg ? 'Sync repositories' : 'Re-discover target'}
+                    title={isGitOrg ? t('targets.settings.syncReposTitle') : t('targets.settings.rediscoverTitle')}
                     description={
                       isGitOrg
-                        ? 'This fetches the repository list from the provider again.'
-                        : 'This will initiate a new scan of the target. The process might take a few minutes to complete.'
+                        ? t('targets.settings.syncReposDescription')
+                        : t('targets.settings.rediscoverDescription')
                     }
                     onConfirm={() => {
                       setIsRediscovering(true);
@@ -208,11 +210,11 @@ const SettingTarget = ({
                             const err = e as AxiosError<{ message: string }>;
                             toast.error(
                               err.response?.data.message ??
-                                'Failed to re-discover target',
+                                t('targets.settings.rediscoverFailed'),
                             );
                           },
                           onSuccess: () => {
-                            toast.success('Target re-discovered successfully');
+                            toast.success(t('targets.settings.rediscovered'));
                             setIsRediscovering(false);
                           },
                         },
@@ -243,14 +245,14 @@ const SettingTarget = ({
                           </div>
                           <div className="flex-1">
                             <p className="font-medium">
-                              {isGitOrg ? 'Sync Repositories' : 'Re-discover Target'}
+                              {isGitOrg ? t('targets.settings.syncReposButton') : t('targets.settings.rediscoverButton')}
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {target.status !== JobStatus.completed
-                                ? 'Target is currently being processed'
+                                ? t('targets.settings.processing')
                                 : isGitOrg
-                                  ? 'Fetch new, renamed and removed repositories'
-                                  : 'Scan the target again for changes'}
+                                  ? t('targets.settings.syncReposHint')
+                                  : t('targets.settings.rediscoverHint')}
                             </p>
                           </div>
                           {target.status !== JobStatus.completed && (
@@ -269,8 +271,8 @@ const SettingTarget = ({
         <SheetFooter className="p-4 mt-auto">
           <div className="flex justify-center">
             <ConfirmDialog
-              title="Delete target"
-              description="This action cannot be undone. This will permanently delete the target and all its data."
+              title={t('targets.settings.deleteTitle')}
+              description={t('targets.settings.deleteDescription')}
               onConfirm={() => {
                 setIsDeleting(true);
                 deleteTarget({
@@ -287,12 +289,12 @@ const SettingTarget = ({
                   {isDeleting ? (
                     <>
                       <RefreshCw className="mr-2 h-4 w-4 animate-spin text-red-500 hover:text-red-600" />
-                      Deleting...
+                      {t('targets.settings.deleting')}
                     </>
                   ) : (
                     <>
                       <Trash2 className="mr-2 h-4 w-4 text-red-500 hover:text-red-600" />
-                      Delete Target
+                      {t('targets.settings.deleteButton')}
                     </>
                   )}
                 </Button>

@@ -9,6 +9,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { useT } from '@/lib/i18n-dictionary';
 import {
   useProjectsControllerArchive,
   useProjectsControllerUnarchive,
@@ -48,6 +49,7 @@ export function SettingsTab({
   project: Project;
   onDelete: () => void;
 }) {
+  const t = useT();
   const invalidate = useInvalidateProjects();
   const update = useProjectsControllerUpdate();
   const archive = useProjectsControllerArchive();
@@ -78,10 +80,10 @@ export function SettingsTab({
       },
       {
         onSuccess: () => {
-          toast.success('Project saved');
+          toast.success(t('projects.settings.saved'));
           void invalidate();
         },
-        onError: (error) => toast.error(apiErrorMessage(error, 'Failed to save the project')),
+        onError: (error) => toast.error(apiErrorMessage(error, t('projects.settings.saveFailed'))),
       },
     );
 
@@ -90,10 +92,14 @@ export function SettingsTab({
       { id: project.id },
       {
         onSuccess: () => {
-          toast.success(archived ? 'Project reopened' : 'Project archived');
+          toast.success(
+            archived
+              ? t('projects.overview.audit.reopened')
+              : t('projects.overview.audit.archived'),
+          );
           void invalidate();
         },
-        onError: (error) => toast.error(apiErrorMessage(error, 'Failed to update the project')),
+        onError: (error) => toast.error(apiErrorMessage(error, t('projects.settings.updateFailed'))),
       },
     );
 
@@ -101,11 +107,11 @@ export function SettingsTab({
     <div className="max-w-3xl space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Information</CardTitle>
+          <CardTitle>{t('projects.settings.information')}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="project-name">Name</Label>
+            <Label htmlFor="project-name">{t('common.name')}</Label>
             <Input
               id="project-name"
               value={name}
@@ -114,13 +120,13 @@ export function SettingsTab({
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="project-description">Description</Label>
+            <Label htmlFor="project-description">{t('common.description')}</Label>
             <Textarea
               id="project-description"
               value={description}
               disabled={archived}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="What this project covers"
+              placeholder={t('projects.create.descriptionPlaceholder')}
               rows={3}
             />
           </div>
@@ -129,7 +135,7 @@ export function SettingsTab({
               disabled={archived || !dirty || !name.trim() || update.isPending}
               onClick={save}
             >
-              Save
+              {t('common.save')}
             </Button>
           </div>
         </CardContent>
@@ -139,27 +145,25 @@ export function SettingsTab({
 
       <Card>
         <CardHeader>
-          <CardTitle>Notifications</CardTitle>
+          <CardTitle>{t('projects.settings.notifications')}</CardTitle>
           <CardDescription>
-            Runs of this project notify like any scan: new vulnerabilities and
-            scan results go to the workspace's notification and integration
-            channels.
+            {t('projects.settings.notificationsHint')}
           </CardDescription>
         </CardHeader>
       </Card>
 
       <Card className="border-[0.5px] border-destructive">
         <CardHeader>
-          <CardTitle className="text-destructive">Danger Zone</CardTitle>
-          <CardDescription>Actions that stop or remove this project</CardDescription>
+          <CardTitle className="text-destructive">{t('projects.settings.dangerZone')}</CardTitle>
+          <CardDescription>{t('projects.settings.dangerZoneHint')}</CardDescription>
         </CardHeader>
         <CardContent>
           <Row
-            title={archived ? 'Reopen project' : 'Archive project'}
+            title={archived ? t('projects.settings.reopenTitle') : t('projects.settings.archiveTitle')}
             description={
               archived
-                ? 'Registers the enabled schedules again and allows changes.'
-                : 'Turns every schedule and trigger off and keeps the data read-only. Reopen any time.'
+                ? t('projects.settings.reopenHint')
+                : t('projects.settings.archiveHint')
             }
           >
             <Button
@@ -167,16 +171,16 @@ export function SettingsTab({
               disabled={archive.isPending || unarchive.isPending}
               onClick={toggleArchive}
             >
-              {archived ? 'Reopen' : 'Archive'}
+              {archived ? t('projects.settings.reopen') : t('projects.settings.archive')}
             </Button>
           </Row>
           <Row
-            title="Delete project"
-            description="Deletes the project's workflows, their run history and its AI Studio chats. Vulnerabilities stay in the workspace."
+            title={t('projects.detail.deleteTitle')}
+            description={t('projects.settings.deleteHint')}
           >
             <Button variant="outline" onClick={onDelete}>
               <Trash2 className="size-4" />
-              Delete
+              {t('common.delete')}
             </Button>
           </Row>
         </CardContent>

@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { NumberAnimate } from '@/components/ui/number-animate';
 import { useStatistics } from '@/hooks/useStatistics';
@@ -20,6 +21,7 @@ import { Area, AreaChart, ResponsiveContainer } from 'recharts';
 import { DashboardStatsSkeleton } from './dashboard-skeleton';
 
 export default function Statistic() {
+  const t = useT();
   const navigate = useNavigate();
 
   const { statistics, isLoading } = useStatistics();
@@ -44,7 +46,7 @@ export default function Statistic() {
     field: keyof TimelineStatistic;
   }> = [
     {
-      title: 'Targets',
+      title: t('dashboard.stats.targets'),
       field: 'targets',
       icon: <Target className="h-5 w-5 text-primary" />,
       value: statistics?.targets || 0,
@@ -52,7 +54,7 @@ export default function Statistic() {
       trend: calculateTrend('targets'),
     },
     {
-      title: 'Assets',
+      title: t('dashboard.stats.assets'),
       field: 'assets',
       icon: <CloudCheck className="h-5 w-5 text-primary" />,
       value: statistics?.assets || 0,
@@ -60,7 +62,7 @@ export default function Statistic() {
       trend: calculateTrend('assets'),
     },
     {
-      title: 'Services',
+      title: t('dashboard.stats.services'),
       field: 'services',
       icon: <Server className="h-5 w-5 text-primary" />,
       value: statistics?.services || 0,
@@ -68,7 +70,7 @@ export default function Statistic() {
       trend: calculateTrend('services'),
     },
     {
-      title: 'Technologies',
+      title: t('dashboard.stats.technologies'),
       field: 'techs',
       icon: <Cpu className="h-5 w-5 text-primary" />,
       value: statistics?.techs || 0,
@@ -101,7 +103,7 @@ export default function Statistic() {
               {card.trend && card.trend.difference !== 0 && (
                 <div
                   className="flex items-center text-sm text-muted-foreground"
-                  title={`Change over the last ${TREND_WINDOW_DAYS} days`}
+                  title={t('dashboard.vulnStats.trendTitle', { days: TREND_WINDOW_DAYS })}
                 >
                   {card.trend.isIncreasing ? (
                     <TrendingUp className="h-4 w-4 mr-1" />
@@ -111,7 +113,7 @@ export default function Statistic() {
                   <span className="font-medium font-mono">
                     {Math.abs(card.trend.difference)}
                   </span>
-                  <span className="ml-1 text-xs">{TREND_WINDOW_DAYS}d</span>
+                  <span className="ml-1 text-xs">{t('dashboard.vulnStats.days', { days: TREND_WINDOW_DAYS })}</span>
                 </div>
               )}
             </div>

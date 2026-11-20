@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { CalendarClockIcon, Clock } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -15,6 +16,7 @@ import {
   DEFAULT_CRON_STATE,
   buildCronExpression,
   formatCronLabel,
+  weekdayLabel,
   formatNextRun,
   getLocalTimezone,
   getNextRun,
@@ -41,21 +43,13 @@ export interface CronScheduleBuilderProps {
   disabled?: boolean;
 }
 
-const FREQUENCIES: { value: CronFrequency; label: string }[] = [
-  { value: 'daily', label: 'Daily' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
+const FREQUENCIES: { value: CronFrequency; labelKey: string }[] = [
+  { value: 'daily', labelKey: 'components.cron.daily' },
+  { value: 'weekly', labelKey: 'components.cron.weekly' },
+  { value: 'monthly', labelKey: 'components.cron.monthly' },
 ];
 
-const WEEKDAYS = [
-  { value: 1, label: 'Mon' },
-  { value: 2, label: 'Tue' },
-  { value: 3, label: 'Wed' },
-  { value: 4, label: 'Thu' },
-  { value: 5, label: 'Fri' },
-  { value: 6, label: 'Sat' },
-  { value: 7, label: 'Sun' },
-];
+const WEEKDAYS = [1, 2, 3, 4, 5, 6, 7].map((value) => ({ value }));
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5);
@@ -99,6 +93,7 @@ export function CronScheduleBuilder({
   onTimezoneChange,
   disabled,
 }: CronScheduleBuilderProps) {
+  const t = useT();
   const initial = useMemo(() => {
     // `defaultValue` is consumed on mount and re-synced by the effect below
     // whenever the parent changes it. The cron is stored in UTC, so convert
@@ -171,7 +166,9 @@ export function CronScheduleBuilder({
   );
   const cronLabel = useMemo(
     () => formatCronLabel(cron, tz),
-    [cron, tz],
+    // t: the label is translated, so a language switch rebuilds it
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cron, tz, t],
   );
 
   useEffect(() => {
@@ -219,7 +216,7 @@ export function CronScheduleBuilder({
                 }),
               )}
             >
-              {f.label}
+              {t(f.labelKey)}
             </button>
           ))}
         </div>
@@ -243,7 +240,7 @@ export function CronScheduleBuilder({
                     'w-16',
                   )}
                 >
-                  {d.label}
+                  {weekdayLabel(d.value - 1)}
                 </button>
               );
             })}
@@ -253,7 +250,7 @@ export function CronScheduleBuilder({
         {frequency === 'monthly' && (
           <div className="flex flex-col gap-2">
             <span className="text-muted-foreground text-xs">
-              Days of month
+              {t('components.cron.daysOfMonth')}
             </span>
             <div className="grid w-fit grid-cols-7 gap-1.5">
               {MONTH_DAYS.map((d) => {
@@ -264,7 +261,7 @@ export function CronScheduleBuilder({
                     type="button"
                     disabled={disabled}
                     aria-pressed={active}
-                    aria-label={`Day ${d}`}
+                    aria-label={t('components.cron.day', { day: d })}
                     onClick={() => toggleMonthDay(d)}
                     className={cn(
                       buttonVariants({
@@ -288,7 +285,7 @@ export function CronScheduleBuilder({
             value={String(hour)}
             onValueChange={(v) => setHour(Number(v))}
           >
-            <SelectTrigger id="cron-hour" aria-label="Hour" className="w-full">
+            <SelectTrigger id="cron-hour" aria-label={t('components.cron.hour')} className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -306,7 +303,7 @@ export function CronScheduleBuilder({
           >
             <SelectTrigger
               id="cron-minute"
-              aria-label="Minute"
+              aria-label={t('components.cron.minute')}
               className="w-full"
             >
               <SelectValue />
@@ -330,7 +327,7 @@ export function CronScheduleBuilder({
           >
             <SelectTrigger
               id="cron-timezone"
-              aria-label="Timezone"
+              aria-label={t('components.cron.timezone')}
               className="col-span-2 w-full"
             >
               <SelectValue />
@@ -351,7 +348,7 @@ export function CronScheduleBuilder({
               <Clock className="size-4 text-muted-foreground" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Schedule</p>
+              <p className="text-xs text-muted-foreground">{t('components.cron.schedule')}</p>
               <p className="text-sm font-medium text-foreground">
                 {cronLabel ?? cron}
               </p>
@@ -363,11 +360,11 @@ export function CronScheduleBuilder({
               <CalendarClockIcon className="size-4 text-muted-foreground" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Next run</p>
+              <p className="text-xs text-muted-foreground">{t('components.cron.nextRun')}</p>
               <p className="text-sm font-medium text-foreground tabular-nums">
                 {nextRun
                   ? formatNextRun(nextRun, tz)
-                  : 'Schedule not available'}
+                  : t('components.cron.notAvailable')}
               </p>
             </div>
           </div>

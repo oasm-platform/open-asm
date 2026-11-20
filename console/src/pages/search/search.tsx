@@ -17,6 +17,7 @@ import {
   type SearchData,
 } from '@/services/apis/gen/queries';
 import { SeverityBadge } from '@/components/ui/severity-badge';
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import {
   Bug,
@@ -81,6 +82,7 @@ function Section({ icon, label, children }: SectionProps) {
 }
 
 export default function Search() {
+  const t = useT();
   const { query: urlQuery } = routeApi.useSearch();
   const [input, setInput] = React.useState(urlQuery ?? '');
   const [tab, setTab] = React.useState<'all' | 'targets' | 'assets' | 'findings'>(
@@ -127,9 +129,9 @@ export default function Search() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Search</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('search.title')}</h1>
         <p className="text-sm text-muted-foreground">
-          Findings, targets and assets in one place. Field filters:{' '}
+          {t('search.subtitle')}{' '}
           <code className="rounded bg-muted px-1 text-xs">
             severity:critical
           </code>
@@ -143,18 +145,18 @@ export default function Search() {
         <Input
           value={input}
           onChange={(event) => setInput(event.target.value)}
-          placeholder='Try "severity:critical" or a hostname'
-          aria-label="Search query"
+          placeholder={t('search.placeholder')}
+          aria-label={t('search.queryAria')}
           autoFocus
         />
         <Button type="submit">
           <SearchIcon className="mr-1 size-4" aria-hidden />
-          Search
+          {t('common.search')}
         </Button>
       </form>
 
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted-foreground">Examples:</span>
+        <span className="text-xs text-muted-foreground">{t('search.examples')}</span>
         {[
           'severity:critical',
           'cve:CVE-2024',
@@ -183,24 +185,24 @@ export default function Search() {
 
       {!urlQuery ? (
         <EmptyState
-          title="Search your attack surface"
-          description="Type a hostname, CVE or field filter. Results include findings so you can jump straight into triage."
+          title={t('search.empty.title')}
+          description={t('search.empty.description')}
           icon={<SearchIcon className="size-5" aria-hidden />}
         />
       ) : isError ? (
         <EmptyState
-          title="Search failed"
-          description="The server did not answer. Try again."
-          action={<Button onClick={() => refetch()}>Retry</Button>}
+          title={t('search.failed.title')}
+          description={t('search.failed.description')}
+          action={<Button onClick={() => refetch()}>{t('common.retry')}</Button>}
         />
       ) : isFetching ? (
         <p className="py-8 text-center text-sm text-muted-foreground">
-          Searching…
+          {t('search.searching')}
         </p>
       ) : total === 0 ? (
         <EmptyState
-          title="No results"
-          description={`Nothing matched “${urlQuery.trim()}”. Try a shorter term, drop a filter, or ask AI about it.`}
+          title={t('search.noResults.title')}
+          description={t('search.noResults.description', { query: urlQuery.trim() })}
           action={<AskAiButton query={urlQuery} />}
           secondaryAction={
             <Button
@@ -210,7 +212,7 @@ export default function Search() {
                 navigate({ to: '/search', search: { query: '' } });
               }}
             >
-              Clear search
+              {t('search.noResults.clear')}
             </Button>
           }
         />
@@ -222,19 +224,19 @@ export default function Search() {
               onValueChange={(value) => setTab(value as typeof tab)}
             >
               <TabsList>
-                <TabsTrigger value="all">All {total}</TabsTrigger>
+                <TabsTrigger value="all">{t('search.tabs.all', { count: total })}</TabsTrigger>
                 <TabsTrigger value="findings">
-                  Findings {vulnerabilities.length}
+                  {t('search.tabs.findings', { count: vulnerabilities.length })}
                 </TabsTrigger>
                 <TabsTrigger value="targets">
-                  Targets {targets.length}
+                  {t('search.tabs.targets', { count: targets.length })}
                 </TabsTrigger>
-                <TabsTrigger value="assets">Assets {assets.length}</TabsTrigger>
+                <TabsTrigger value="assets">{t('search.tabs.assets', { count: assets.length })}</TabsTrigger>
               </TabsList>
             </Tabs>
             {parsed.severity.length > 0 && (
               <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                Severity
+                {t('search.severity')}
                 <Select
                   value={parsed.severity[0]}
                   onValueChange={(value) => {
@@ -252,7 +254,7 @@ export default function Search() {
                 >
                   <SelectTrigger
                     size="sm"
-                    aria-label="Filter findings by severity"
+                    aria-label={t('search.severityAria')}
                   >
                     <SelectValue />
                   </SelectTrigger>
@@ -272,7 +274,7 @@ export default function Search() {
             vulnerabilities.length > 0 && (
               <Section
                 icon={<Bug className="size-4 text-red-500" aria-hidden />}
-                label={`Findings (${vulnerabilities.length})`}
+                label={t('search.sections.findings', { count: vulnerabilities.length })}
               >
                 {vulnerabilities.map((vulnerability) => (
                   <button
@@ -294,7 +296,7 @@ export default function Search() {
                       <span className="block truncate text-xs text-muted-foreground">
                         {vulnerability.affectedUrl ||
                           vulnerability.asset?.value ||
-                          'No asset'}
+                          t('search.noAsset')}
                       </span>
                     </span>
                     <ExternalLink className="size-4 shrink-0" aria-hidden />
@@ -306,7 +308,7 @@ export default function Search() {
           {(tab === 'all' || tab === 'targets') && targets.length > 0 && (
             <Section
               icon={<TargetIcon className="size-4 text-orange-500" aria-hidden />}
-              label={`Targets (${targets.length})`}
+              label={t('search.sections.targets', { count: targets.length })}
             >
               {targets.map((target) => (
                 <button
@@ -339,7 +341,7 @@ export default function Search() {
                   aria-hidden
                 />
               }
-              label={`Assets (${assets.length})`}
+              label={t('search.sections.assets', { count: assets.length })}
             >
               {assets.map((asset) => (
                 <button

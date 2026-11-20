@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -48,6 +49,7 @@ export function FileGrid({
   onOpenFolder,
   actions,
 }: FileGridProps) {
+  const t = useT();
   if (isLoading && folders.length === 0 && files.length === 0)
     return (
       <div className={GRID}>
@@ -68,8 +70,8 @@ export function FileGrid({
   return (
     <div className="space-y-6">
       {folders.length > 0 && (
-        <section className="space-y-2" aria-label="Folders">
-          <h3 className="text-sm font-medium text-muted-foreground">Folders</h3>
+        <section className="space-y-2" aria-label={t('files.grid.folders')}>
+          <h3 className="text-sm font-medium text-muted-foreground">{t('files.grid.folders')}</h3>
           <div className={GRID}>
             {folders.map((folder) => (
               <button
@@ -87,8 +89,8 @@ export function FileGrid({
         </section>
       )}
       {files.length > 0 && (
-        <section className="space-y-2" aria-label="Files">
-          <h3 className="text-sm font-medium text-muted-foreground">Files</h3>
+        <section className="space-y-2" aria-label={t('files.grid.files')}>
+          <h3 className="text-sm font-medium text-muted-foreground">{t('files.grid.files')}</h3>
           <div className={GRID}>
             {files.map((file) => (
               <FileCard key={file.id} file={file} actions={actions} />
@@ -107,6 +109,7 @@ function FileCard({
   file: ArtifactDto;
   actions: FileActions;
 }) {
+  const t = useT();
   const canDownload = actions.canDownload(file);
   const canShare = actions.canShare(file);
   const canDelete = actions.canDelete(file);
@@ -127,7 +130,7 @@ function FileCard({
         {file.source === 'agent' && (
           <Badge variant="secondary" className="absolute left-2 top-2 gap-1">
             <Bot className="h-3 w-3" />
-            Agent
+            {t('files.grid.agent')}
           </Badge>
         )}
       </div>
@@ -158,7 +161,7 @@ function FileCard({
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 shrink-0"
-                aria-label={`Actions for ${file.name}`}
+                aria-label={t('files.grid.actionsFor', { name: file.name })}
               >
                 <EllipsisVertical className="h-4 w-4" />
               </Button>
@@ -167,13 +170,13 @@ function FileCard({
               {canDownload && (
                 <DropdownMenuItem onSelect={() => actions.download(file)}>
                   <Download />
-                  Download
+                  {t('common.download')}
                 </DropdownMenuItem>
               )}
               {canShare && (
                 <DropdownMenuItem onSelect={() => actions.share(file)}>
                   <Share2 />
-                  Share
+                  {t('files.share.share')}
                 </DropdownMenuItem>
               )}
               {canDelete && (
@@ -182,7 +185,7 @@ function FileCard({
                   onSelect={() => actions.remove(file)}
                 >
                   <Trash2 />
-                  Delete
+                  {t('common.delete')}
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>

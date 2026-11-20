@@ -73,6 +73,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useT, t } from '@/lib/i18n-dictionary';
 
 // ============================================================================
 // Helpers
@@ -415,9 +416,10 @@ export type PromptInputActionAddAttachmentsProps = ComponentProps<
 };
 
 export const PromptInputActionAddAttachments = ({
-  label = "Add photos or files",
+  label = t('agents.ai.addFiles'),
   ...props
 }: PromptInputActionAddAttachmentsProps) => {
+  useT(); // re-render on language change
   const attachments = usePromptInputAttachments();
 
   const handleSelect = useCallback(
@@ -442,10 +444,11 @@ export type PromptInputActionAddScreenshotProps = ComponentProps<
 };
 
 export const PromptInputActionAddScreenshot = ({
-  label = "Take screenshot",
+  label = t('agents.ai.screenshot'),
   onSelect,
   ...props
 }: PromptInputActionAddScreenshotProps) => {
+  useT(); // re-render on language change
   const attachments = usePromptInputAttachments();
 
   const handleSelect = useCallback(
@@ -524,6 +527,7 @@ export const PromptInput = ({
   children,
   ...props
 }: PromptInputProps) => {
+  const t = useT();
   // Try to use a provider controller if present
   const controller = useOptionalPromptInputController();
   const usingProvider = !!controller;
@@ -582,7 +586,7 @@ export const PromptInput = ({
       if (incoming.length && accepted.length === 0) {
         onError?.({
           code: "accept",
-          message: "No files match the accepted types.",
+          message: t('agents.ai.files.noMatch'),
         });
         return;
       }
@@ -592,7 +596,7 @@ export const PromptInput = ({
       if (accepted.length > 0 && sized.length === 0) {
         onError?.({
           code: "max_file_size",
-          message: "All files exceed the maximum size.",
+          message: t('agents.ai.files.tooLarge'),
         });
         return;
       }
@@ -607,7 +611,7 @@ export const PromptInput = ({
         if (typeof capacity === "number" && sized.length > capacity) {
           onError?.({
             code: "max_files",
-            message: "Too many files. Some were not added.",
+            message: t('agents.ai.files.tooMany'),
           });
         }
         const next: (FileUIPart & { id: string })[] = [];
@@ -623,7 +627,7 @@ export const PromptInput = ({
         return [...prev, ...next];
       });
     },
-    [matchesAccept, maxFiles, maxFileSize, onError]
+    [matchesAccept, maxFiles, maxFileSize, onError, t]
   );
 
   const removeLocal = useCallback(
@@ -646,7 +650,7 @@ export const PromptInput = ({
       if (incoming.length && accepted.length === 0) {
         onError?.({
           code: "accept",
-          message: "No files match the accepted types.",
+          message: t('agents.ai.files.noMatch'),
         });
         return;
       }
@@ -656,7 +660,7 @@ export const PromptInput = ({
       if (accepted.length > 0 && sized.length === 0) {
         onError?.({
           code: "max_file_size",
-          message: "All files exceed the maximum size.",
+          message: t('agents.ai.files.tooLarge'),
         });
         return;
       }
@@ -671,7 +675,7 @@ export const PromptInput = ({
       if (typeof capacity === "number" && sized.length > capacity) {
         onError?.({
           code: "max_files",
-          message: "Too many files. Some were not added.",
+          message: t('agents.ai.files.tooMany'),
         });
       }
 
@@ -679,7 +683,7 @@ export const PromptInput = ({
         controller?.attachments.add(capped);
       }
     },
-    [matchesAccept, maxFileSize, maxFiles, onError, files.length, controller]
+    [matchesAccept, maxFileSize, maxFiles, onError, files.length, controller, t]
   );
 
   const clearAttachments = useCallback(
@@ -914,12 +918,12 @@ export const PromptInput = ({
     <>
       <input
         accept={accept}
-        aria-label="Upload files"
+        aria-label={t('agents.ai.uploadFiles')}
         className="hidden"
         multiple={multiple}
         onChange={handleChange}
         ref={inputRef}
-        title="Upload files"
+        title={t('agents.ai.uploadFiles')}
         type="file"
       />
       <form
@@ -964,9 +968,10 @@ export const PromptInputTextarea = ({
   onChange,
   onKeyDown,
   className,
-  placeholder = "What would you like to know?",
+  placeholder = t('agents.ai.promptPlaceholder'),
   ...props
 }: PromptInputTextareaProps) => {
+  useT(); // re-render on language change
   const controller = useOptionalPromptInputController();
   const attachments = usePromptInputAttachments();
   const [isComposing, setIsComposing] = useState(false);
@@ -1231,6 +1236,7 @@ export const PromptInputSubmit = ({
   children,
   ...props
 }: PromptInputSubmitProps) => {
+  const t = useT();
   const isGenerating = status === "submitted" || status === "streaming";
 
   let Icon = <CornerDownLeftIcon className="size-4" />;
@@ -1257,7 +1263,7 @@ export const PromptInputSubmit = ({
 
   return (
     <InputGroupButton
-      aria-label={isGenerating ? "Stop" : "Submit"}
+      aria-label={isGenerating ? t('agents.ai.stop') : t('agents.ai.submit')}
       className={cn(className)}
       onClick={handleClick}
       size={size}

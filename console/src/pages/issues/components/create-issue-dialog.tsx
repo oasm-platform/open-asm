@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useT } from '@/lib/i18n-dictionary';
 import {
   useIssuesControllerCreate,
   type CreateIssueDto,
@@ -53,6 +54,7 @@ export function CreateIssueDialog({
   defaultType?: CreatableType;
   defaultTitle?: string;
 }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [title, setTitle] = useState(defaultTitle);
@@ -86,14 +88,14 @@ export function CreateIssueDialog({
       { data },
       {
         onSuccess: (issue) => {
-          toast.success(`${formatIssueNo(issue.no)} created`);
+          toast.success(t('issues.create.created', { no: formatIssueNo(issue.no) }));
           void queryClient.invalidateQueries({ queryKey: ['/api/issues'] });
           reset();
           onOpenChange(false);
           void navigate({ to: '/issues/$id', params: { id: issue.id } });
         },
         onError: (error) =>
-          toast.error(apiErrorMessage(error, 'Failed to create the issue')),
+          toast.error(apiErrorMessage(error, t('issues.create.failed'))),
       },
     );
   };
@@ -102,26 +104,26 @@ export function CreateIssueDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>New issue</DialogTitle>
+          <DialogTitle>{t('issues.create.title')}</DialogTitle>
           <DialogDescription>
-            Track work on findings, assets or anything else in this workspace.
+            {t('issues.create.description')}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
           <div className="grid gap-1.5">
-            <Label htmlFor="issue-title">Title</Label>
+            <Label htmlFor="issue-title">{t('issues.create.titleLabel')}</Label>
             <Input
               id="issue-title"
               value={title}
               maxLength={500}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="What needs to be done?"
+              placeholder={t('issues.create.titlePlaceholder')}
               autoFocus
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
-              <Label htmlFor="issue-type">Type</Label>
+              <Label htmlFor="issue-type">{t('issues.create.type')}</Label>
               <Select
                 value={type}
                 onValueChange={(v) => setType(v as CreatableType)}
@@ -130,16 +132,16 @@ export function CreateIssueDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {CREATABLE_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {ISSUE_TYPE_LABELS[t]}
+                  {CREATABLE_TYPES.map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {ISSUE_TYPE_LABELS[key]}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="issue-priority">Priority</Label>
+              <Label htmlFor="issue-priority">{t('issues.create.priority')}</Label>
               <Select
                 value={priority}
                 onValueChange={(v) => setPriority(v as IssuePriority)}
@@ -161,7 +163,7 @@ export function CreateIssueDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
-              <Label htmlFor="issue-due">Due date</Label>
+              <Label htmlFor="issue-due">{t('issues.create.dueDate')}</Label>
               <Input
                 id="issue-due"
                 type="date"
@@ -170,7 +172,7 @@ export function CreateIssueDialog({
               />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="issue-assignee">Assignee</Label>
+              <Label htmlFor="issue-assignee">{t('issues.create.assignee')}</Label>
               <MemberSelect
                 id="issue-assignee"
                 value={assigneeId}
@@ -179,25 +181,27 @@ export function CreateIssueDialog({
             </div>
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="issue-description">Description</Label>
+            <Label htmlFor="issue-description">
+              {t('issues.create.descriptionLabel')}
+            </Label>
             <Textarea
               id="issue-description"
               rows={4}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Context, scope, acceptance criteria…"
+              placeholder={t('issues.create.descriptionPlaceholder')}
             />
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             disabled={!title.trim() || create.isPending}
             onClick={submit}
           >
-            Create issue
+            {t('issues.create.submit')}
           </Button>
         </DialogFooter>
       </DialogContent>

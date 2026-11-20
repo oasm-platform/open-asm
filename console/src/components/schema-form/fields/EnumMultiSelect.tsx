@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -29,6 +30,7 @@ export function EnumMultiSelect({
   onChange: (val: unknown) => void;
   placeholder: string;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
 
   const getLabel = (value: string): string => {
@@ -67,7 +69,7 @@ export function EnumMultiSelect({
                   <span
                     role="button"
                     tabIndex={0}
-                    aria-label={`Remove ${getLabel(value)}`}
+                    aria-label={t('components.schemaForm.removeValue', { value: getLabel(value) })}
                     className="rounded-full p-0.5 hover:bg-foreground/10"
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
@@ -95,9 +97,9 @@ export function EnumMultiSelect({
         align="start"
       >
         <Command>
-          <CommandInput placeholder="Search..." />
+          <CommandInput placeholder={t('components.schemaForm.searchPlaceholder')} />
           <CommandList>
-            <CommandEmpty>No results found.</CommandEmpty>
+            <CommandEmpty>{t('components.schemaForm.noResults')}</CommandEmpty>
             <CommandGroup>
               {options.map((option) => (
                 <CommandItem
@@ -125,7 +127,7 @@ export function EnumMultiSelect({
                 className="w-full text-xs"
                 onClick={() => onChange([])}
               >
-                Clear all
+                {t('components.schemaForm.clearAll')}
               </Button>
             </div>
           )}

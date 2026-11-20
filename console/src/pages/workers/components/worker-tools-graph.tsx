@@ -22,6 +22,7 @@ import '@xyflow/react/dist/style.css';
 import { Crosshair, Server } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { isWorkerOnline } from '../worker-status';
+import { useT } from '@/lib/i18n-dictionary';
 
 /** What the worker tier draws: its OS mark, its name, and whether it is live.
  * The page above the graph owns every other fact about the worker — the diagram
@@ -438,6 +439,7 @@ function OasmNodeComponent() {
  * answers the one question a topology diagram is asked ("is that box up?"). It
  * sits on the circle's edge so the OS mark keeps the circle to itself. */
 function WorkerNodeComponent({ data }: NodeProps<WorkerFlowNode>) {
+  const t = useT();
   const { worker } = data;
   const online = isWorkerOnline(worker);
   return (
@@ -458,13 +460,13 @@ function WorkerNodeComponent({ data }: NodeProps<WorkerFlowNode>) {
           )}
         </span>
         <span
-          title={online ? 'Online' : 'Offline'}
+          title={online ? t('workers.graph.online') : t('workers.graph.offline')}
           className={`absolute -right-0.5 -bottom-0.5 size-3.5 rounded-full border-2 border-card ${
             online ? 'bg-emerald-500' : 'bg-muted-foreground/60'
           }`}
         />
       </span>
-      <span className={LABEL_CLASS}>{worker.name || 'Unnamed worker'}</span>
+      <span className={LABEL_CLASS}>{worker.name || t('workers.detail.unnamed')}</span>
     </div>
   );
 }
@@ -541,8 +543,9 @@ function ToolNodeComponent({ data }: NodeProps<ToolFlowNode>) {
  * with no spaces, so word boundaries alone would let a long one overflow the
  * fixed node width. */
 function JobNodeComponent({ data }: NodeProps<JobFlowNode>) {
+  const t = useT();
   const { job, tool } = data;
-  const label = job.service ?? job.target ?? 'Unknown target';
+  const label = job.service ?? job.target ?? t('workers.graph.unknownTarget');
 
   return (
     <div className="flex w-[92px] flex-col items-center rounded-lg py-1 text-center">
@@ -667,6 +670,7 @@ export function WorkerToolsGraph({
   tools: WorkerToolDto[];
   worker: WorkerTierInfo;
 }) {
+  const t = useT();
   const { resolvedTheme } = useTheme();
   const { name, os, isOnline, lastSeenAt } = worker;
   // The graph is an execution view, not a tool catalog: only tools with
@@ -721,7 +725,7 @@ export function WorkerToolsGraph({
         className="relative w-full rounded-lg border bg-background p-1.5"
         style={{ minWidth: width, height: contentHeight }}
         role="application"
-        aria-label="Connected tools graph"
+        aria-label={t('workers.graph.ariaLabel')}
       >
         <ReactFlowProvider>
           <ReactFlow

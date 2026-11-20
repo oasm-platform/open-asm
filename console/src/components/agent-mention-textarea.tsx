@@ -23,6 +23,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from 'react';
+import { useT } from '@/lib/i18n-dictionary';
 
 interface MentionOption {
   kind: MentionKind;
@@ -62,6 +63,7 @@ export function AgentMentionTextarea({
   placeholder,
   disabled,
 }: AgentMentionTextareaProps) {
+  const t = useT();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mirrorRef = useRef<HTMLDivElement>(null);
   const pendingCaretRef = useRef<number | null>(null);
@@ -254,16 +256,18 @@ export function AgentMentionTextarea({
       >
         {query.trim().length === 0 ? (
           <p className="px-2 py-1.5 text-sm text-muted-foreground">
-            Type to mention a target, asset or vulnerability
+            {t('agents.mention.hint')}
           </p>
         ) : options.length === 0 ? (
           <p className="px-2 py-1.5 text-sm text-muted-foreground">
-            {isSettled ? `No results for “${query}”` : 'Searching…'}
+            {isSettled
+              ? t('agents.mention.noResults', { query })
+              : t('agents.mention.searching')}
           </p>
         ) : (
           <ul
             role="listbox"
-            aria-label="Mentions"
+            aria-label={t('agents.mention.label')}
             aria-busy={!isSettled}
             className={cn(!isSettled && 'opacity-60')}
           >
@@ -291,7 +295,7 @@ export function AgentMentionTextarea({
                 {KIND_ICONS[option.kind]}
                 <span className="min-w-0 flex-1 truncate">{option.label}</span>
                 <span className="text-xs capitalize text-muted-foreground">
-                  {option.detail ?? option.kind}
+                  {option.detail ?? t(`agents.mention.kind.${option.kind}`)}
                 </span>
               </li>
             ))}

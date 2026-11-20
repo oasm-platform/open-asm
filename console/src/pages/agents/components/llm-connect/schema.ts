@@ -1,4 +1,5 @@
 import type { LLMConfigWithProviderDto } from '@/services/apis/gen/queries';
+import type { TFunction } from '@/lib/i18n-dictionary';
 import { z } from 'zod';
 
 // ─── Schema ────────────────────────────────────────────────────────────────
@@ -6,17 +7,18 @@ import { z } from 'zod';
 export function getConnectSchema(
   isCustomProvider: boolean,
   isAcceptCustomApiUrl: boolean,
+  t: TFunction,
 ) {
   const requiresApiKey = !isCustomProvider && !isAcceptCustomApiUrl;
   return z
     .object({
       name: z.string().optional(),
       apiUrl: z
-        .union([z.literal(''), z.string().url('Invalid URL format')])
+        .union([z.literal(''), z.string().url(t('agents.connect.invalidUrl'))])
         .optional()
         .transform((val) => (val === '' ? undefined : val)),
       apiKey: requiresApiKey
-        ? z.string().min(1, 'API key is required')
+        ? z.string().min(1, t('agents.connect.apiKeyRequired'))
         : z.string().optional(),
     })
     .refine(
@@ -26,7 +28,7 @@ export function getConnectSchema(
         return requiresApiKey || trimmedUrl || trimmedKey;
       },
       {
-        message: 'API key or URL is required',
+        message: t('agents.connect.keyOrUrlRequired'),
         path: ['apiKey'],
       },
     )

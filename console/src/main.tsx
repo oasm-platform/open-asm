@@ -17,6 +17,7 @@ import { AxiosError } from 'axios';
 import { toast } from 'sonner';
 import { handleServerError } from './lib/handle-server-error';
 import { removeBootSplash } from '@/lib/boot-splash';
+import { useI18nReady, t } from '@/lib/i18n-dictionary';
 import { getWorkspaceListQueryOptions } from './hooks/useWorkspaceSelector';
 import {
   refetchSession,
@@ -57,7 +58,7 @@ const queryClient = new QueryClient({
         handleServerError(error);
         if (error instanceof AxiosError) {
           if (error.response?.status === 304) {
-            toast.error('Content not modified!');
+            toast.error(t('shell.toast.notModified'));
           }
         }
       },
@@ -109,7 +110,9 @@ persistQueryClient({
 });
 
 function AppRouter() {
-  const { data: session, isPending } = useSession();
+  const { data: session, isPending: sessionPending } = useSession();
+  const i18nReady = useI18nReady();
+  const isPending = sessionPending || !i18nReady;
   // Init to undefined (not session) so the first effect run is detectable:
   // on first render session is null, which would be indistinguishable from
   // a later null state. The very first run must be skipped (see effect below).
@@ -138,7 +141,7 @@ function AppRouter() {
     // /login instead of letting _authed re-render and flash through
     // /workspaces/create first.
     if (prevSession && !session) {
-      if (!isVoluntaryLogout) toast.error('Session expired!');
+      if (!isVoluntaryLogout) toast.error(t('shell.toast.sessionExpired'));
       const currentPath = router.history.location.pathname;
       if (currentPath !== '/login') {
         router.navigate({

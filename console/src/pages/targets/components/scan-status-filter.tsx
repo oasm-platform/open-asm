@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 /**
  * ScanStatusFilter Component
  *
@@ -20,12 +21,12 @@ const ALL_VALUE = 'ALL';
 
 /** Status filter options with display labels and colors matching JobStatusBadge */
 const STATUS_OPTIONS = [
-  { value: ALL_VALUE, label: 'All statuses', color: 'bg-muted-foreground' },
-  { value: JobStatus.pending, label: 'Pending', color: 'bg-yellow-500' },
-  { value: JobStatus.in_progress, label: 'In Progress', color: 'bg-purple-500' },
-  { value: JobStatus.completed, label: 'Completed', color: 'bg-green-500' },
-  { value: JobStatus.failed, label: 'Failed', color: 'bg-red-500' },
-  { value: JobStatus.cancelled, label: 'Cancelled', color: 'bg-gray-500' },
+  { value: ALL_VALUE, label: 'targets.filters.allStatuses', color: 'bg-muted-foreground' },
+  { value: JobStatus.pending, label: 'targets.filters.pending', color: 'bg-yellow-500' },
+  { value: JobStatus.in_progress, label: 'targets.filters.inProgress', color: 'bg-purple-500' },
+  { value: JobStatus.completed, label: 'targets.filters.completed', color: 'bg-green-500' },
+  { value: JobStatus.failed, label: 'targets.filters.failed', color: 'bg-red-500' },
+  { value: JobStatus.cancelled, label: 'targets.filters.cancelled', color: 'bg-gray-500' },
 ] as const;
 
 interface ScanStatusFilterProps {
@@ -39,6 +40,7 @@ interface ScanStatusFilterProps {
  * Renders a select dropdown for filtering targets by scan status.
  */
 export function ScanStatusFilter({ value, onValueChange }: ScanStatusFilterProps) {
+  const t = useT();
   const currentValue = value ?? ALL_VALUE;
 
   const handleChange = (val: string) => {
@@ -48,14 +50,14 @@ export function ScanStatusFilter({ value, onValueChange }: ScanStatusFilterProps
   return (
     <Select value={currentValue} onValueChange={handleChange}>
       <SelectTrigger className="border-dashed text-xs py-0 focus:ring-0 focus:ring-offset-0 focus:outline-none">
-        <SelectValue placeholder="Status" />
+        <SelectValue placeholder={t('targets.filters.status')} />
       </SelectTrigger>
       <SelectContent>
         {STATUS_OPTIONS.map((option) => (
           <SelectItem key={option.value} value={option.value}>
             <div className="flex items-center gap-2">
               <span className={`size-2 rounded-full ${option.color}`} />
-              {option.label}
+              {t(option.label)}
             </div>
           </SelectItem>
         ))}

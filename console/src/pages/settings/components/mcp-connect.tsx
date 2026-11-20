@@ -17,6 +17,7 @@ import {
   Terminal,
 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
+import { t, useT } from '@/lib/i18n-dictionary';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -55,7 +56,9 @@ const MCP_CLIENTS: McpClient[] = [
     icon: '/images/mcp/vscode.svg',
     iconAlt: 'VS Code',
     configPath: '.vscode/mcp.json',
-    configNote: 'Workspace folder or user profile',
+    get configNote() {
+      return t('settings.mcp.note.vscode');
+    },
     generateConfig: (b, k) =>
       JSON.stringify({ servers: baseConfig(b, k) }, null, 2),
   },
@@ -65,7 +68,9 @@ const MCP_CLIENTS: McpClient[] = [
     icon: '/images/mcp/cursor.svg',
     iconAlt: 'Cursor',
     configPath: '.cursor/mcp.json',
-    configNote: 'Project root or ~/.cursor/mcp.json',
+    get configNote() {
+      return t('settings.mcp.note.projectRoot', { path: '~/.cursor/mcp.json' });
+    },
     generateConfig: (b, k) =>
       JSON.stringify({ mcpServers: baseConfig(b, k) }, null, 2),
   },
@@ -75,7 +80,9 @@ const MCP_CLIENTS: McpClient[] = [
     icon: '/images/mcp/claude.svg',
     iconAlt: 'Claude Code',
     configPath: '.mcp.json',
-    configNote: 'Project root or ~/.claude.json',
+    get configNote() {
+      return t('settings.mcp.note.projectRoot', { path: '~/.claude.json' });
+    },
     generateConfig: (b, k) =>
       JSON.stringify(
         {
@@ -97,7 +104,12 @@ const MCP_CLIENTS: McpClient[] = [
     icon: '/images/mcp/claude.svg',
     iconAlt: 'Claude Desktop',
     configPath: 'claude_desktop_config.json',
-    configNote: '~/Library/Application Support/Claude/ (macOS) or %APPDATA%\\Claude\\ (Windows)',
+    get configNote() {
+      return t('settings.mcp.note.claudeDesktop', {
+        mac: '~/Library/Application Support/Claude/',
+        win: '%APPDATA%\\Claude\\',
+      });
+    },
     generateConfig: (b, k) =>
       JSON.stringify(
         {
@@ -118,7 +130,9 @@ const MCP_CLIENTS: McpClient[] = [
     icon: '/images/mcp/windsurf.svg',
     iconAlt: 'Windsurf',
     configPath: 'mcp_config.json',
-    configNote: '~/.codeium/windsurf/ (global only)',
+    get configNote() {
+      return t('settings.mcp.note.globalOnly', { path: '~/.codeium/windsurf/' });
+    },
     generateConfig: (b, k) =>
       JSON.stringify(
         {
@@ -139,7 +153,9 @@ const MCP_CLIENTS: McpClient[] = [
     icon: '/images/mcp/copilot.svg',
     iconAlt: 'GitHub Copilot',
     configPath: '.github/mcp.json',
-    configNote: 'Project root or ~/.copilot/mcp-config.json',
+    get configNote() {
+      return t('settings.mcp.note.projectRoot', { path: '~/.copilot/mcp-config.json' });
+    },
     generateConfig: (b, k) =>
       JSON.stringify(
         {
@@ -161,7 +177,9 @@ const MCP_CLIENTS: McpClient[] = [
     icon: '/images/mcp/kimi.svg',
     iconAlt: 'Kimi Code',
     configPath: '.kimi-code/mcp.json',
-    configNote: 'Project root or ~/.kimi-code/mcp.json',
+    get configNote() {
+      return t('settings.mcp.note.projectRoot', { path: '~/.kimi-code/mcp.json' });
+    },
     generateConfig: (b, k) =>
       JSON.stringify({ mcpServers: baseConfig(b, k) }, null, 2),
   },
@@ -171,7 +189,9 @@ const MCP_CLIENTS: McpClient[] = [
     icon: '/images/mcp/devin.svg',
     iconAlt: 'Devin',
     configPath: '.devin/mcp_config.json',
-    configNote: 'Project root or ~/.config/devin/mcp_config.json',
+    get configNote() {
+      return t('settings.mcp.note.projectRoot', { path: '~/.config/devin/mcp_config.json' });
+    },
     generateConfig: (b, k) =>
       JSON.stringify({ mcpServers: baseConfig(b, k) }, null, 2),
   },
@@ -181,7 +201,9 @@ const MCP_CLIENTS: McpClient[] = [
     icon: '/images/mcp/gemini.svg',
     iconAlt: 'Gemini CLI',
     configPath: '.gemini/settings.json',
-    configNote: 'Project root or ~/.gemini/settings.json',
+    get configNote() {
+      return t('settings.mcp.note.projectRoot', { path: '~/.gemini/settings.json' });
+    },
     generateConfig: (b, k) =>
       JSON.stringify(
         {
@@ -202,7 +224,9 @@ const MCP_CLIENTS: McpClient[] = [
     icon: '/images/mcp/opencode.svg',
     iconAlt: 'OpenCode',
     configPath: 'opencode.json',
-    configNote: 'Project root or ~/.config/opencode/opencode.json',
+    get configNote() {
+      return t('settings.mcp.note.projectRoot', { path: '~/.config/opencode/opencode.json' });
+    },
     generateConfig: (b, k) =>
       JSON.stringify(
         {
@@ -275,6 +299,7 @@ function tokenizeJsonLine(line: string): HlPart[] {
 // ---------------------------------------------------------------------------
 
 export default function McpConnect() {
+  const t = useT();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -324,12 +349,12 @@ export default function McpConnect() {
     try {
       await navigator.clipboard.writeText(copyConfigJson);
       setCopied(true);
-      toast.success('Configuration copied to clipboard');
+      toast.success(t('settings.mcp.copied'));
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error('Failed to copy configuration');
+      toast.error(t('settings.mcp.copyFailed'));
     }
-  }, [copyConfigJson]);
+  }, [copyConfigJson, t]);
 
   const openInClient = useCallback(() => {
     const deepLinks: Record<string, string> = {
@@ -350,7 +375,7 @@ export default function McpConnect() {
       <div className="flex items-center justify-center py-8">
         <RefreshCw className="h-4 w-4 animate-spin" />
         <span className="ml-2 text-sm text-muted-foreground">
-          Loading configuration...
+          {t('settings.mcp.loading')}
         </span>
       </div>
     );
@@ -364,13 +389,13 @@ export default function McpConnect() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
         {/* Label + Select */}
         <div className="flex items-center gap-3 sm:w-48 shrink-0">
-          <span className="text-sm font-medium">Client</span>
+          <span className="text-sm font-medium">{t('settings.mcp.client')}</span>
           <Select
             value={selectedClientId}
             onValueChange={setSelectedClientId}
           >
             <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue placeholder="Select client" />
+              <SelectValue placeholder={t('settings.mcp.selectClient')} />
             </SelectTrigger>
             <SelectContent>
               {MCP_CLIENTS.map((client) => (
@@ -396,7 +421,7 @@ export default function McpConnect() {
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Terminal className="h-4 w-4 shrink-0" />
         <span>
-          Add this configuration to{' '}
+          {t('settings.mcp.addTo')}{' '}
           <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono text-foreground">
             {selectedClient.configPath}
           </code>
@@ -423,7 +448,7 @@ export default function McpConnect() {
               ) : (
                 <Copy className="h-3.5 w-3.5" />
               )}
-              {copied ? 'Copied!' : 'Copy'}
+              {copied ? t('settings.mcp.copiedShort') : t('common.copy')}
             </Button>
             <Button
               variant="ghost"
@@ -432,7 +457,7 @@ export default function McpConnect() {
               onClick={openInClient}
             >
               <ExternalLink className="h-3.5 w-3.5" />
-              Open
+              {t('settings.mcp.open')}
             </Button>
           </div>
         </div>

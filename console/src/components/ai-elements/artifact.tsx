@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
 import { XIcon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes } from "react";
+import { useT } from '@/lib/i18n-dictionary';
 
 export type ArtifactProps = HTMLAttributes<HTMLDivElement>;
 
@@ -47,7 +48,9 @@ export const ArtifactClose = ({
   size = "sm",
   variant = "ghost",
   ...props
-}: ArtifactCloseProps) => (
+}: ArtifactCloseProps) => {
+  const t = useT();
+  return (
   <Button
     className={cn(
       "size-8 p-0 text-muted-foreground hover:text-foreground",
@@ -59,9 +62,10 @@ export const ArtifactClose = ({
     {...props}
   >
     {children ?? <XIcon className="size-4" />}
-    <span className="sr-only">Close</span>
+    <span className="sr-only">{t('agents.ai.close')}</span>
   </Button>
 );
+};
 
 export type ArtifactTitleProps = HTMLAttributes<HTMLParagraphElement>;
 

@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { useMemo } from 'react';
 import {
   Terminal,
@@ -18,6 +19,7 @@ export function RemoteExecuteTerminal({
   toolCall: ToolCallState;
   streamEvents?: RemoteExecuteStreamEvent[];
 }) {
+  const t = useT();
   const command = String(
     toolCall.input?.command ||
       toolCall.input?.cmd ||
@@ -76,7 +78,7 @@ export function RemoteExecuteTerminal({
       className="w-full max-w-2xl text-xs"
     >
       <TerminalHeader>
-        <TerminalTitle>Terminal</TerminalTitle>
+        <TerminalTitle>{t('components.terminal.title')}</TerminalTitle>
         <div className="flex items-center gap-1 ml-auto">
           <TerminalStatus />
           <TerminalActions>

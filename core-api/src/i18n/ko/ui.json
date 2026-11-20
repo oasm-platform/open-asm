@@ -2,5 +2,10 @@
   "notifications.title": "알림",
   "notifications.unread.other": "읽지 않은 알림 {count}개",
   "notifications.markAllRead": "모두 읽음으로 표시",
-  "preferences.language": "언어"
+  "userMenu.language": "언어",
+  "userMenu.settings": "설정",
+  "userMenu.admin": "관리자",
+  "userMenu.docs": "문서",
+  "userMenu.reportIssue": "문제 신고",
+  "userMenu.logout": "로그아웃"
 }

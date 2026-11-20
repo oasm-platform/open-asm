@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import type { ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -48,16 +49,17 @@ import CreateWorkspace from '../workspaces/create-workspace';
 dayjs.extend(relativeTime);
 
 const SEVERITY_OPTIONS = [
-  { value: 'CRITICAL', label: 'Critical', color: 'text-red-500' },
-  { value: 'HIGH', label: 'High', color: 'text-orange-500' },
-  { value: 'MEDIUM', label: 'Medium', color: 'text-yellow-600' },
-  { value: 'LOW', label: 'Low', color: 'text-blue-500' },
-  { value: 'INFO', label: 'Info', color: 'text-gray-500' },
+  { value: 'CRITICAL', label: 'reports.severity.critical', color: 'text-red-500' },
+  { value: 'HIGH', label: 'reports.severity.high', color: 'text-orange-500' },
+  { value: 'MEDIUM', label: 'reports.severity.medium', color: 'text-yellow-600' },
+  { value: 'LOW', label: 'reports.severity.low', color: 'text-blue-500' },
+  { value: 'INFO', label: 'reports.severity.info', color: 'text-gray-500' },
 ] as const;
 
 type ReportType = 'SUMMARY' | 'VULNERABILITY';
 
 export default function Reports() {
+  const t = useT();
   const [generateOpen, setGenerateOpen] = useState(false);
   const [reportType, setReportType] = useState<ReportType>('SUMMARY');
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
@@ -111,11 +113,11 @@ export default function Reports() {
       onSuccess: () => {
         setGenerateOpen(false);
         resetForm();
-        toast.success('Summary report generated successfully');
+        toast.success(t('reports.toast.summaryGenerated'));
         refetch();
       },
       onError: () => {
-        toast.error('Failed to generate summary report');
+        toast.error(t('reports.toast.summaryFailed'));
       },
     },
   });
@@ -125,11 +127,11 @@ export default function Reports() {
       onSuccess: () => {
         setGenerateOpen(false);
         resetForm();
-        toast.success('Vulnerability report generated successfully');
+        toast.success(t('reports.toast.vulnGenerated'));
         refetch();
       },
       onError: () => {
-        toast.error('Failed to generate vulnerability report');
+        toast.error(t('reports.toast.vulnFailed'));
       },
     },
   });
@@ -137,11 +139,11 @@ export default function Reports() {
   const deleteMutation = useReportsControllerDeleteReport({
     mutation: {
       onSuccess: () => {
-        toast.success('Report deleted successfully');
+        toast.success(t('reports.toast.deleted'));
         refetch();
       },
       onError: () => {
-        toast.error('Failed to delete report');
+        toast.error(t('reports.toast.deleteFailed'));
       },
     },
   });
@@ -184,7 +186,7 @@ export default function Reports() {
   const columns: ColumnDef<ReportResponseDto>[] = [
     {
       accessorKey: 'fileName',
-      header: 'File name',
+      header: t('reports.columns.fileName'),
       cell: ({ row }) => (
         <div className="flex items-center gap-2 font-medium">
           <FileText className="h-4 w-4 text-slate-400" />
@@ -194,7 +196,7 @@ export default function Reports() {
     },
     {
       accessorKey: 'createdAt',
-      header: 'Created',
+      header: t('reports.columns.created'),
       cell: ({ row }) => {
         const value: string = row.getValue('createdAt');
         return (
@@ -212,16 +214,16 @@ export default function Reports() {
           <Button asChild variant="ghost" size="sm">
             <OpenLink
               href={row.original.downloadUrl}
-              aria-label={`Download ${row.original.fileName}`}
+              aria-label={t('reports.download', { name: row.original.fileName })}
               onClick={(e) => e.stopPropagation()}
             >
               <Download className="h-4 w-4" />
             </OpenLink>
           </Button>
           <ConfirmDialog
-            title="Delete Report"
-            description={`Are you sure you want to delete "${row.original.fileName}"?`}
-            confirmText="Delete"
+            title={t('reports.delete.title')}
+            description={t('reports.delete.description', { name: row.original.fileName })}
+            confirmText={t('common.delete')}
             disabled={deleteMutation.isPending}
             onConfirm={() => handleDelete(row.original)}
             trigger={
@@ -243,8 +245,8 @@ export default function Reports() {
 
   return (
     <Page
-      title="Reports"
-      description="Generate and download security reports for your workspace"
+      title={t('reports.page.title')}
+      description={t('reports.page.description')}
       action={null}
       permission="report.read"
     >
@@ -257,13 +259,13 @@ export default function Reports() {
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Generate Report</DialogTitle>
+            <DialogTitle>{t('reports.generate.title')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             {/* Report Type */}
             <Field>
               <Label className="text-sm font-medium mb-2 block">
-                Report Type
+                {t('reports.generate.reportType')}
               </Label>
               <RadioGroup
                 value={reportType}
@@ -278,7 +280,7 @@ export default function Reports() {
                     htmlFor="summary"
                     className="font-medium cursor-pointer"
                   >
-                    Summary Report
+                    {t('reports.generate.summary')}
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -287,7 +289,7 @@ export default function Reports() {
                     htmlFor="vulnerability"
                     className="font-medium cursor-pointer"
                   >
-                    Vulnerability Report
+                    {t('reports.generate.vulnerability')}
                   </Label>
                 </div>
               </RadioGroup>
@@ -297,23 +299,23 @@ export default function Reports() {
             <DatePickerWithRange
               value={dateRange}
               onChange={setDateRange}
-              label="Date range (optional)"
+              label={t('reports.generate.dateRange')}
             />
 
             {/* Min Severity - vuln only */}
             {reportType === 'VULNERABILITY' && (
               <Field>
                 <Label className="text-sm font-medium mb-2 block">
-                  Minimum Severity
+                  {t('reports.generate.minSeverity')}
                 </Label>
                 <Select value={minSeverity} onValueChange={setMinSeverity}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="All severities" />
+                    <SelectValue placeholder={t('reports.generate.allSeverities')} />
                   </SelectTrigger>
                   <SelectContent>
                     {SEVERITY_OPTIONS.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
-                        <span className={opt.color}>{opt.label}</span>
+                        <span className={opt.color}>{t(opt.label)}</span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -329,10 +331,10 @@ export default function Reports() {
                 resetForm();
               }}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleGenerate} disabled={isPending}>
-              {isPending ? 'Generating...' : 'Generate'}
+              {isPending ? t('reports.generate.generating') : t('reports.generate.generate')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -340,7 +342,7 @@ export default function Reports() {
       {workspaces.length === 0 ? (
         <CreateWorkspace />
       ) : !data && !isLoading ? (
-        <DataTableError message="Failed to load reports." onRetry={refetch} />
+        <DataTableError message={t('reports.loadFailed')} onRetry={refetch} />
       ) : (
         <Tabs
           value={activeTab}
@@ -351,10 +353,10 @@ export default function Reports() {
           className="gap-4"
         >
           <TabsList>
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="SUMMARY">Summary</TabsTrigger>
-            <TabsTrigger value="VULNERABILITY">Vulnerability</TabsTrigger>
-            <TabsTrigger value="templates">Templates</TabsTrigger>
+            <TabsTrigger value="all">{t('reports.tabs.all')}</TabsTrigger>
+            <TabsTrigger value="SUMMARY">{t('reports.tabs.summary')}</TabsTrigger>
+            <TabsTrigger value="VULNERABILITY">{t('reports.tabs.vulnerability')}</TabsTrigger>
+            <TabsTrigger value="templates">{t('reports.tabs.templates')}</TabsTrigger>
           </TabsList>
           <TabsContent value="all">
             <DataTable
@@ -468,7 +470,7 @@ export default function Reports() {
                 </div>
                 <div className="px-3 py-2">
                   <p className="font-semibold text-xs leading-tight">
-                    Summary Report
+                    {t('reports.generate.summary')}
                   </p>
                 </div>
               </div>
@@ -519,7 +521,7 @@ export default function Reports() {
                 </div>
                 <div className="px-3 py-2">
                   <p className="font-semibold text-xs leading-tight">
-                    Vulnerability Report
+                    {t('reports.generate.vulnerability')}
                   </p>
                 </div>
               </div>

@@ -1,4 +1,5 @@
 import { getNextRun } from '@/lib/cron-schedule';
+import { t } from '@/lib/i18n-dictionary';
 import { SEVERITY_BG_CLASS, SEVERITY_TEXT_CLASS } from '@/pages/dashboard/severity';
 import type { PipelineToolEntry } from '@/pages/projects/components/tool-pipeline-builder';
 import {
@@ -18,15 +19,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { AxiosError } from 'axios';
 import { useCallback } from 'react';
 
-/** Tabs of the project page, in order; the first one is the default. */
+/** Tabs of the project page, in order; the first one is the default. Labels resolve at read time. */
 export const PROJECT_TABS = [
-  { value: 'overview', label: 'Overview' },
-  { value: 'assets', label: 'Assets' },
-  { value: 'vulnerabilities', label: 'Vulnerabilities' },
-  { value: 'workflows', label: 'Workflows' },
-  { value: 'schedule', label: 'Schedule' },
-  { value: 'runs', label: 'Runs' },
-  { value: 'settings', label: 'Settings' },
+  { value: 'overview', get label() { return t('projects.tabs.overview'); } },
+  { value: 'assets', get label() { return t('projects.tabs.assets'); } },
+  { value: 'vulnerabilities', get label() { return t('projects.tabs.vulnerabilities'); } },
+  { value: 'workflows', get label() { return t('projects.tabs.workflows'); } },
+  { value: 'schedule', get label() { return t('projects.tabs.schedule'); } },
+  { value: 'runs', get label() { return t('projects.tabs.runs'); } },
+  { value: 'settings', get label() { return t('projects.tabs.settings'); } },
 ] as const;
 
 export type ProjectTab = (typeof PROJECT_TABS)[number]['value'];
@@ -36,11 +37,11 @@ export const isProjectTab = (tab: string | undefined): tab is ProjectTab =>
 
 /** Severities from the worst down, in the dashboard's colours. */
 export const SEVERITIES = [
-  { key: 'critical', label: 'Critical', bar: SEVERITY_BG_CLASS.critical, text: SEVERITY_TEXT_CLASS.critical },
-  { key: 'high', label: 'High', bar: SEVERITY_BG_CLASS.high, text: SEVERITY_TEXT_CLASS.high },
-  { key: 'medium', label: 'Medium', bar: SEVERITY_BG_CLASS.medium, text: SEVERITY_TEXT_CLASS.medium },
-  { key: 'low', label: 'Low', bar: SEVERITY_BG_CLASS.low, text: SEVERITY_TEXT_CLASS.low },
-  { key: 'info', label: 'Info', bar: SEVERITY_BG_CLASS.info, text: SEVERITY_TEXT_CLASS.info },
+  { key: 'critical', get label() { return t('projects.severity.critical'); }, bar: SEVERITY_BG_CLASS.critical, text: SEVERITY_TEXT_CLASS.critical },
+  { key: 'high', get label() { return t('projects.severity.high'); }, bar: SEVERITY_BG_CLASS.high, text: SEVERITY_TEXT_CLASS.high },
+  { key: 'medium', get label() { return t('projects.severity.medium'); }, bar: SEVERITY_BG_CLASS.medium, text: SEVERITY_TEXT_CLASS.medium },
+  { key: 'low', get label() { return t('projects.severity.low'); }, bar: SEVERITY_BG_CLASS.low, text: SEVERITY_TEXT_CLASS.low },
+  { key: 'info', get label() { return t('projects.severity.info'); }, bar: SEVERITY_BG_CLASS.info, text: SEVERITY_TEXT_CLASS.info },
 ] as const satisfies ReadonlyArray<{
   key: keyof SeverityCountsDto;
   label: string;
@@ -49,7 +50,7 @@ export const SEVERITIES = [
 }>;
 
 /** "1 asset", "3 assets". */
-export const assetCount = (n: number) => `${n} asset${n === 1 ? '' : 's'}`;
+export const assetCount = (n: number) => t('projects.assetCount', { count: n });
 
 export const totalOf = (counts?: SeverityCountsDto | null) =>
   counts
@@ -107,9 +108,15 @@ export function nextCronRun(
 
 /** What each event a project workflow can run on is called. */
 export const TRIGGER_EVENT_LABELS: Record<ProjectTriggerEvent, string> = {
-  [ProjectTriggerEvent.projectassetsadded]: 'Assets added',
-  [ProjectTriggerEvent.projectruncompleted]: 'After a workflow',
-  [ProjectTriggerEvent.vulnerabilitydetected]: 'Vulnerability found',
+  get [ProjectTriggerEvent.projectassetsadded]() {
+    return t('projects.triggerEvent.assetsAdded');
+  },
+  get [ProjectTriggerEvent.projectruncompleted]() {
+    return t('projects.triggerEvent.afterWorkflow');
+  },
+  get [ProjectTriggerEvent.vulnerabilitydetected]() {
+    return t('projects.triggerEvent.vulnerabilityFound');
+  },
 };
 
 /**
@@ -120,11 +127,11 @@ export function runTriggerLabel(
   jobRunType?: string | null,
   triggerEvent?: string | null,
 ): string {
-  if (jobRunType === JobRunType.scheduled) return 'Schedule';
+  if (jobRunType === JobRunType.scheduled) return t('projects.runTrigger.schedule');
   if (jobRunType === JobRunType.event) {
-    return TRIGGER_EVENT_LABELS[triggerEvent as ProjectTriggerEvent] ?? 'Event';
+    return TRIGGER_EVENT_LABELS[triggerEvent as ProjectTriggerEvent] ?? t('projects.runTrigger.event');
   }
-  return 'Manual';
+  return t('projects.runTrigger.manual');
 }
 
 /** "critical, high" from a list of values. */
@@ -139,27 +146,34 @@ export function eventConditionLabel(
   config: EventTriggerConfig,
 ): { title: string; detail: string } {
   const window = config.windowMinutes ?? 10;
-  const gather = window === 0 ? 'starts right away' : `gathers ${window} min`;
+  const gather =
+    window === 0
+      ? t('projects.condition.startsNow')
+      : t('projects.condition.gathers', { window });
   const detail = [
     gather,
-    `up to ${config.maxAssets ?? 200} assets/run`,
-    ...(config.targetTypes?.length ? [`only ${listOf(config.targetTypes)}`] : []),
+    t('projects.condition.upTo', { max: config.maxAssets ?? 200 }),
+    ...(config.targetTypes?.length ? [t('projects.condition.only', { types: listOf(config.targetTypes) })] : []),
   ].join(' · ');
   switch (event) {
     case ProjectTriggerEvent.projectruncompleted: {
       const status = config.status ?? [RunOutcome.success];
       const outcome =
         status.length === 2 ? 'finishes' : status[0] === RunOutcome.failure ? 'fails' : 'succeeds';
-      const after = config.workflows?.length ? config.workflows.join(', ') : 'any other workflow';
-      return { title: `When ${after} ${outcome}`, detail };
+      const after = config.workflows?.length
+        ? config.workflows.join(', ')
+        : t('projects.condition.anyOtherWorkflow');
+      return { title: t(`projects.condition.when.${outcome}`, { after }), detail };
     }
     case ProjectTriggerEvent.vulnerabilitydetected:
       return {
-        title: `On ${listOf(config.severity ?? ['critical', 'high'])} findings`,
+        title: t('projects.condition.onFindings', {
+          severities: listOf(config.severity ?? ['critical', 'high']),
+        }),
         detail,
       };
     default:
-      return { title: 'When assets join the project', detail };
+      return { title: t('projects.condition.assetsJoin'), detail };
   }
 }
 
@@ -169,7 +183,7 @@ export function eventConditionLabel(
  */
 export function workflowLabel(workflow?: { name?: string } | null): string {
   const name = workflow?.name?.trim();
-  if (!name || /^Group Workflow - /.test(name)) return 'Pipeline';
+  if (!name || /^Group Workflow - /.test(name)) return t('projects.pipeline');
   return name;
 }
 

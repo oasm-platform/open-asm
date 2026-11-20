@@ -1,4 +1,5 @@
 import { isAxiosError } from 'axios';
+import { t } from '@/lib/i18n-dictionary';
 
 /** The batch shown when the playground opens. */
 export const DEFAULT_QUERY = `{
@@ -36,14 +37,14 @@ export function parseQueryText(text: string): ParsedQuery {
   try {
     value = JSON.parse(text);
   } catch (error) {
-    return { ok: false, message: `Invalid JSON: ${(error as Error).message}` };
+    return { ok: false, message: t('asq.parse.invalidJson', { error: (error as Error).message }) };
   }
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return { ok: false, message: 'The query must be a JSON object' };
+    return { ok: false, message: t('asq.parse.notObject') };
   }
   const queries = (value as { queries?: unknown }).queries;
   if (!queries || typeof queries !== 'object' || Array.isArray(queries)) {
-    return { ok: false, message: '"queries" must be an object of named queries' };
+    return { ok: false, message: t('asq.parse.queriesNotObject') };
   }
   return { ok: true, value: value as QueryBatch };
 }

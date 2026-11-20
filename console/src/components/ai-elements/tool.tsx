@@ -20,6 +20,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { isValidElement } from "react";
 
 import { CodeBlock } from "./code-block";
+import { useT, t } from '@/lib/i18n-dictionary';
 
 export type ToolProps = ComponentProps<typeof Collapsible>;
 
@@ -44,14 +45,15 @@ export type ToolHeaderProps = {
     }
 );
 
+// Dictionary keys, translated at render
 const statusLabels: Record<ToolPart["state"], string> = {
-  "approval-requested": "Awaiting Approval",
-  "approval-responded": "Responded",
-  "input-available": "Running",
-  "input-streaming": "Pending",
-  "output-available": "Completed",
-  "output-denied": "Denied",
-  "output-error": "Error",
+  "approval-requested": "agents.ai.tool.status.approvalRequested",
+  "approval-responded": "agents.ai.tool.status.approvalResponded",
+  "input-available": "agents.ai.tool.status.running",
+  "input-streaming": "agents.ai.tool.status.pending",
+  "output-available": "agents.ai.tool.status.completed",
+  "output-denied": "agents.ai.tool.status.denied",
+  "output-error": "agents.ai.tool.status.error",
 };
 
 const statusIcons: Record<ToolPart["state"], ReactNode> = {
@@ -67,7 +69,7 @@ const statusIcons: Record<ToolPart["state"], ReactNode> = {
 export const getStatusBadge = (status: ToolPart["state"]) => (
   <Badge className="gap-1.5 rounded-full text-xs" variant="secondary">
     {statusIcons[status]}
-    {statusLabels[status]}
+    {t(statusLabels[status])}
   </Badge>
 );
 
@@ -116,16 +118,19 @@ export type ToolInputProps = ComponentProps<"div"> & {
   input: ToolPart["input"];
 };
 
-export const ToolInput = ({ className, input, ...props }: ToolInputProps) => (
+export const ToolInput = ({ className, input, ...props }: ToolInputProps) => {
+  const t = useT();
+  return (
   <div className={cn("space-y-2 overflow-hidden", className)} {...props}>
     <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-      Parameters
+      {t('agents.ai.tool.parameters')}
     </h4>
     <div className="rounded-md bg-muted/50">
       <CodeBlock code={JSON.stringify(input, null, 2)} language="json" />
     </div>
   </div>
 );
+};
 
 export type ToolOutputProps = ComponentProps<"div"> & {
   output: ToolPart["output"];
@@ -138,6 +143,7 @@ export const ToolOutput = ({
   errorText,
   ...props
 }: ToolOutputProps) => {
+  const t = useT();
   if (!(output || errorText)) {
     return null;
   }
@@ -155,7 +161,7 @@ export const ToolOutput = ({
   return (
     <div className={cn("space-y-2", className)} {...props}>
       <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-        {errorText ? "Error" : "Result"}
+        {errorText ? t('agents.ai.tool.error') : t('agents.ai.tool.result')}
       </h4>
       <div
         className={cn(

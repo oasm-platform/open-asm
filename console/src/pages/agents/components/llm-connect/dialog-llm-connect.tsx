@@ -7,6 +7,7 @@ import Image from '@/components/ui/image';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ConnectForm } from './connect-form';
 import type { ConnectFormData } from './schema';
+import { useT } from '@/lib/i18n-dictionary';
 
 const ALL_PROVIDERS = Object.values(
   LLMConfigWithProviderDtoProviderId,
@@ -19,6 +20,7 @@ export function DialogLLMConnect({
   providersList: LLMConfigWithProviderDto[];
   onSubmit: (data: ConnectFormData, providerId: string) => Promise<boolean>;
 }) {
+  const t = useT();
   const [dialogProvider, setDialogProvider] =
     useState<LLMConfigWithProviderDto | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -80,7 +82,7 @@ export function DialogLLMConnect({
                 className="gap-1"
               >
                 <Plus size={14} />
-                <span className="hidden sm:inline">Connect</span>
+                <span className="hidden sm:inline">{t('agents.connect.connect')}</span>
               </Button>
             </div>
           );
@@ -90,7 +92,11 @@ export function DialogLLMConnect({
       <Dialog open={!!dialogProvider} onOpenChange={handleDialogClose}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Connect {dialogProvider?.providerName}</DialogTitle>
+            <DialogTitle>
+              {t('agents.connect.title', {
+                provider: dialogProvider?.providerName ?? '',
+              })}
+            </DialogTitle>
           </DialogHeader>
           {dialogProvider && (
             <ConnectForm

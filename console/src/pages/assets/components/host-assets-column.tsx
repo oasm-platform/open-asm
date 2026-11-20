@@ -1,4 +1,5 @@
 import { type GetHostAssetsDTO } from '@/services/apis/gen/queries';
+import { t } from '@/lib/i18n-dictionary';
 import type { ColumnDef } from '@tanstack/react-table';
 import { CloudCheck } from 'lucide-react';
 import BadgeList from './badge-list';
@@ -8,7 +9,7 @@ import SwitchEnableAsset from './switch-enable-asset';
 export const hostAssetsColumn: ColumnDef<GetHostAssetsDTO>[] = [
   {
     accessorKey: 'host',
-    header: 'Host',
+    header: () => t('assets.columns.host'),
     enableHiding: false,
     size: 500,
     cell: ({ row }) => {
@@ -23,21 +24,21 @@ export const hostAssetsColumn: ColumnDef<GetHostAssetsDTO>[] = [
   },
   {
     accessorKey: 'assetCount',
-    header: 'Number of services',
+    header: () => t('assets.columns.numberOfServices'),
     size: 250,
     cell: ({ row }) => {
       const data = row.original;
 
       return (
         <div className="flex flex-wrap gap-1 items-center">
-          {data.assetCount} {data.assetCount > 1 ? 'services' : 'service'}
+          {t('assets.columns.serviceCount', { count: data.assetCount })}
         </div>
       );
     },
   },
   {
     accessorKey: 'isEnabled',
-    header: 'Enabled',
+    header: () => t('assets.columns.enabled'),
     size: 120,
     cell: ({ row }) => {
       const data = row.original;

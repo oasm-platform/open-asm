@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { NumberAnimate } from '@/components/ui/number-animate';
 import { useStatistics } from '@/hooks/useStatistics';
@@ -9,6 +10,7 @@ import { SEVERITY_TEXT_CLASS } from '../severity';
 import Score from './score';
 
 export default function VulnerabilityStatistic() {
+  const t = useT();
   const { statistics, isLoading } = useStatistics();
   const { calculateTrend } = useTimelineTrend();
 
@@ -19,38 +21,38 @@ export default function VulnerabilityStatistic() {
   const vulnerabilityStats = [
     {
       severity: 'total',
-      label: 'Open',
+      label: t('dashboard.severity.open'),
       colorClass: '',
       count: statistics?.vuls || 0,
     },
     {
       severity: 'critical',
-      label: 'Critical',
+      label: t('dashboard.severity.critical'),
       colorClass: SEVERITY_TEXT_CLASS.critical,
       count: statistics?.criticalVuls || 0,
     },
     {
       severity: 'high',
-      label: 'High',
+      label: t('dashboard.severity.high'),
       colorClass: SEVERITY_TEXT_CLASS.high,
       count: statistics?.highVuls || 0,
     },
     {
       severity: 'medium',
-      label: 'Medium',
+      label: t('dashboard.severity.medium'),
       colorClass: SEVERITY_TEXT_CLASS.medium,
       count: statistics?.mediumVuls || 0,
     },
     {
       severity: 'low',
-      label: 'Low',
+      label: t('dashboard.severity.low'),
       colorClass: SEVERITY_TEXT_CLASS.low,
       count: statistics?.lowVuls || 0,
     },
     {
       severity: 'info',
-      label: 'Info',
-      hint: 'Informational findings are not counted as open',
+      label: t('dashboard.severity.info'),
+      hint: t('dashboard.vulnStats.infoHint'),
       colorClass: SEVERITY_TEXT_CLASS.info,
       count: statistics?.infoVuls || 0,
     },
@@ -64,7 +66,7 @@ export default function VulnerabilityStatistic() {
     return (
       <div
         className={`flex items-center text-sm ${trend.isIncreasing ? 'text-destructive' : trend.isDecreasing ? 'text-success' : 'text-muted-foreground'}`}
-        title={`Change over the last ${TREND_WINDOW_DAYS} days`}
+        title={t('dashboard.vulnStats.trendTitle', { days: TREND_WINDOW_DAYS })}
       >
         {trend.isIncreasing ? (
           <TrendingUp className="h-4 w-4 mr-1" />
@@ -75,7 +77,7 @@ export default function VulnerabilityStatistic() {
           {Math.abs(trend.difference)}
         </span>
         <span className="ml-1 text-xs text-muted-foreground">
-          {TREND_WINDOW_DAYS}d
+          {t('dashboard.vulnStats.days', { days: TREND_WINDOW_DAYS })}
         </span>
       </div>
     );
@@ -87,7 +89,7 @@ export default function VulnerabilityStatistic() {
         <Score />
         <CardHeader className="flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <CardTitle>Open vulnerabilities</CardTitle>
+            <CardTitle>{t('dashboard.vulnStats.title')}</CardTitle>
             {totalVulsTrend?.difference !== 0 && renderTrend(totalVulsTrend)}
           </div>
           <Bug />

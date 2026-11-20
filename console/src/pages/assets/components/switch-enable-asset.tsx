@@ -2,6 +2,7 @@ import { Switch } from '@/components/ui/switch';
 import { useAssetsControllerToggleAsset } from '@/services/apis/gen/queries';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { useT } from '@/lib/i18n-dictionary';
 
 export default function SwitchEnableAsset({
     id,
@@ -12,6 +13,7 @@ export default function SwitchEnableAsset({
     currentStatus: boolean,
     onUpdate?: () => void;
 }) {
+  const t = useT();
     const [isEnabled, setIsEnabled] = useState(currentStatus);
     const { mutate: toggleAsset, isPending } = useAssetsControllerToggleAsset();
 
@@ -31,11 +33,11 @@ export default function SwitchEnableAsset({
         }, {
             onSuccess: () => {
                 setIsEnabled(checked);
-                toast.success('Asset status updated');
+                toast.success(t('assets.toggle.updated'));
             },
             onError: () => {
                 setIsEnabled(!checked);
-                toast.error('Failed to update asset status');
+                toast.error(t('assets.toggle.updateFailed'));
             }
         });
     };

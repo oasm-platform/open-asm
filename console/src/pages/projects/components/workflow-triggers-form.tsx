@@ -7,6 +7,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { t, useT } from '@/lib/i18n-dictionary';
 import {
   ProjectTriggerEvent,
   ProjectTriggerType,
@@ -65,24 +66,80 @@ const COMPLETED = ProjectTriggerEvent.projectruncompleted;
 const DETECTED = ProjectTriggerEvent.vulnerabilitydetected;
 const EVENTS = [ADDED, COMPLETED, DETECTED] as const;
 
+// Labels are getters, so they follow the language at render.
 const TARGET_TYPES: Array<{ value: TargetType; label: string }> = [
-  { value: TargetType.DOMAIN, label: 'Domains' },
-  { value: TargetType.IP, label: 'IPs' },
-  { value: TargetType.CIDR, label: 'CIDR ranges' },
-  { value: TargetType.GIT_ORG, label: 'Repositories' },
+  {
+    value: TargetType.DOMAIN,
+    get label() {
+      return t('projects.triggers.targetType.domains');
+    },
+  },
+  {
+    value: TargetType.IP,
+    get label() {
+      return t('projects.triggers.targetType.ips');
+    },
+  },
+  {
+    value: TargetType.CIDR,
+    get label() {
+      return t('projects.triggers.targetType.cidrRanges');
+    },
+  },
+  {
+    value: TargetType.GIT_ORG,
+    get label() {
+      return t('projects.triggers.targetType.repositories');
+    },
+  },
 ];
 
 const OUTCOMES: Array<{ value: RunOutcome; label: string }> = [
-  { value: RunOutcome.success, label: 'Succeeded' },
-  { value: RunOutcome.failure, label: 'Failed' },
+  {
+    value: RunOutcome.success,
+    get label() {
+      return t('projects.triggers.outcome.succeeded');
+    },
+  },
+  {
+    value: RunOutcome.failure,
+    get label() {
+      return t('projects.triggers.outcome.failed');
+    },
+  },
 ];
 
 const SEVERITIES: Array<{ value: Severity; label: string }> = [
-  { value: Severity.critical, label: 'Critical' },
-  { value: Severity.high, label: 'High' },
-  { value: Severity.medium, label: 'Medium' },
-  { value: Severity.low, label: 'Low' },
-  { value: Severity.info, label: 'Info' },
+  {
+    value: Severity.critical,
+    get label() {
+      return t('projects.severity.critical');
+    },
+  },
+  {
+    value: Severity.high,
+    get label() {
+      return t('projects.severity.high');
+    },
+  },
+  {
+    value: Severity.medium,
+    get label() {
+      return t('projects.severity.medium');
+    },
+  },
+  {
+    value: Severity.low,
+    get label() {
+      return t('projects.severity.low');
+    },
+  },
+  {
+    value: Severity.info,
+    get label() {
+      return t('projects.severity.info');
+    },
+  },
 ];
 
 let nextLocalId = 0;
@@ -213,6 +270,7 @@ const ScheduleRow = memo(function ScheduleRow({
   onEnabled: (id: string, enabled: boolean) => void;
   onRemove: (id: string) => void;
 }) {
+  const t = useT();
   // Stable per row: the builder reports its cron whenever this changes.
   const handleChange = useCallback(
     (change: CronScheduleChange) => onCron(schedule.id, change.cron),
@@ -221,14 +279,16 @@ const ScheduleRow = memo(function ScheduleRow({
   return (
     <div className="flex flex-col gap-3 rounded-lg border p-3">
       <div className="flex items-center gap-3">
-        <span className="text-sm font-medium">Schedule {index + 1}</span>
+        <span className="text-sm font-medium">
+          {t('projects.triggers.scheduleN', { n: index + 1 })}
+        </span>
         <label className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
-          Active
+          {t('projects.triggers.active')}
           <Switch
             checked={schedule.enabled}
             disabled={disabled}
             onCheckedChange={(value) => onEnabled(schedule.id, value)}
-            aria-label={`Schedule ${index + 1} active`}
+            aria-label={t('projects.triggers.scheduleActiveAria', { n: index + 1 })}
           />
         </label>
         <Button
@@ -236,7 +296,7 @@ const ScheduleRow = memo(function ScheduleRow({
           size="icon"
           disabled={disabled}
           onClick={() => onRemove(schedule.id)}
-          aria-label={`Remove schedule ${index + 1}`}
+          aria-label={t('projects.triggers.removeScheduleAria', { n: index + 1 })}
         >
           <Trash2 className="size-4" />
         </Button>
@@ -248,7 +308,7 @@ const ScheduleRow = memo(function ScheduleRow({
       />
       {duplicateOf >= 0 && (
         <p className="text-sm text-destructive">
-          Same time as Schedule {duplicateOf + 1}. Pick another time or remove it.
+          {t('projects.triggers.duplicate', { n: duplicateOf + 1 })}
         </p>
       )}
     </div>
@@ -317,6 +377,7 @@ function EventCard({
   onChange: (patch: Partial<EventDraft>) => void;
   children: ReactNode;
 }) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-3 rounded-lg border p-3">
       <div className="flex items-center gap-3">
@@ -330,12 +391,12 @@ function EventCard({
         </label>
         {draft.on && (
           <label className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
-            Active
+            {t('projects.triggers.active')}
             <Switch
               checked={draft.enabled}
               disabled={disabled}
               onCheckedChange={(enabled) => onChange({ enabled })}
-              aria-label={`${title} active`}
+              aria-label={t('projects.triggers.eventActiveAria', { title })}
             />
           </label>
         )}
@@ -361,10 +422,11 @@ function GatherFields({
   disabled?: boolean;
   onChange: (patch: Partial<EventDraft>) => void;
 }) {
+  const t = useT();
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <div className="flex flex-col gap-2">
-        <Label htmlFor={`${id}-window`}>Gather for (minutes)</Label>
+        <Label htmlFor={`${id}-window`}>{t('projects.triggers.gatherFor')}</Label>
         <Input
           id={`${id}-window`}
           type="number"
@@ -375,12 +437,11 @@ function GatherFields({
           onChange={(e) => onChange({ windowMinutes: Number(e.target.value) })}
         />
         <span className="text-xs text-muted-foreground">
-          Events within this window go into one run, so it is also the least
-          time between two runs.
+          {t('projects.triggers.gatherHint')}
         </span>
       </div>
       <div className="flex flex-col gap-2">
-        <Label htmlFor={`${id}-max`}>Most assets per run</Label>
+        <Label htmlFor={`${id}-max`}>{t('projects.triggers.maxAssets')}</Label>
         <Input
           id={`${id}-max`}
           type="number"
@@ -391,7 +452,7 @@ function GatherFields({
           onChange={(e) => onChange({ maxAssets: Number(e.target.value) })}
         />
         <span className="text-xs text-muted-foreground">
-          More start further runs right away.
+          {t('projects.triggers.maxAssetsHint')}
         </span>
       </div>
     </div>
@@ -411,6 +472,7 @@ export function WorkflowTriggersForm({
   /** Names of the project's other workflows, which this one can follow. */
   otherWorkflows?: string[];
 }) {
+  const t = useT();
   const patchSchedule = useCallback(
     (id: string, patch: Partial<ScheduleDraft>) =>
       onChange((prev) => {
@@ -463,11 +525,9 @@ export function WorkflowTriggersForm({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <Label>When it runs</Label>
+        <Label>{t('projects.triggers.title')}</Label>
         <p className="text-sm text-muted-foreground">
-          Every run scans this project&apos;s assets. Times show in your
-          timezone and are stored in UTC. With nothing here, the workflow runs
-          only when started.
+          {t('projects.triggers.description')}
         </p>
       </div>
 
@@ -496,34 +556,34 @@ export function WorkflowTriggersForm({
           }
         >
           <Plus className="size-4" />
-          Add schedule
+          {t('projects.triggers.addSchedule')}
         </Button>
       </div>
 
       <EventCard
-        title="When assets join the project"
-        summary="Scans only the assets that joined, not the whole scope."
+        title={t('projects.condition.assetsJoin')}
+        summary={t('projects.triggers.addedSummary')}
         draft={added}
         disabled={disabled}
         onChange={patchEvent(ADDED)}
       >
         <GatherFields id="assets" draft={added} disabled={disabled} onChange={patchEvent(ADDED)} />
         <CheckboxList
-          label="Only assets of"
+          label={t('projects.triggers.onlyAssetsOf')}
           options={TARGET_TYPES}
           value={added.targetTypes}
           disabled={disabled}
           onChange={(targetTypes) => patchEvent(ADDED)({ targetTypes })}
-          hint="None checked = every new asset."
+          hint={t('projects.triggers.noneEveryAsset')}
         />
       </EventCard>
 
       <EventCard
-        title="After another workflow of this project"
-        summary="Scans the assets that run scanned."
+        title={t('projects.triggers.afterTitle')}
+        summary={t('projects.triggers.afterSummary')}
         unavailable={
           followable.length === 0
-            ? 'Add another workflow to the project to run after it.'
+            ? t('projects.triggers.afterUnavailable')
             : undefined
         }
         draft={completed}
@@ -531,20 +591,20 @@ export function WorkflowTriggersForm({
         onChange={patchEvent(COMPLETED)}
       >
         <CheckboxList
-          label="After"
+          label={t('projects.triggers.after')}
           options={followable.map((name) => ({ value: name, label: name }))}
           value={completed.workflows}
           disabled={disabled}
           onChange={(workflows) => patchEvent(COMPLETED)({ workflows })}
-          hint="None checked = any other workflow."
+          hint={t('projects.triggers.noneAnyWorkflow')}
         />
         <CheckboxList
-          label="When the run"
+          label={t('projects.triggers.whenTheRun')}
           options={OUTCOMES}
           value={completed.status}
           disabled={disabled}
           onChange={(status) => patchEvent(COMPLETED)({ status })}
-          hint={completed.status.length === 0 ? 'Pick at least one.' : undefined}
+          hint={completed.status.length === 0 ? t('projects.triggers.pickOne') : undefined}
         />
         <GatherFields
           id="completed"
@@ -555,22 +615,22 @@ export function WorkflowTriggersForm({
       </EventCard>
 
       <EventCard
-        title="When a vulnerability is found"
-        summary="Scans the asset it was found on, whichever workflow found it."
+        title={t('projects.triggers.detectedTitle')}
+        summary={t('projects.triggers.detectedSummary')}
         draft={detected}
         disabled={disabled}
         onChange={patchEvent(DETECTED)}
       >
         <CheckboxList
-          label="Severity"
+          label={t('projects.triggers.severity')}
           options={SEVERITIES}
           value={detected.severity}
           disabled={disabled}
           onChange={(severity) => patchEvent(DETECTED)({ severity })}
           hint={
             detected.severity.length === 0
-              ? 'Pick at least one.'
-              : "This workflow's own findings never start it again."
+              ? t('projects.triggers.pickOne')
+              : t('projects.triggers.ownFindings')
           }
         />
         <GatherFields

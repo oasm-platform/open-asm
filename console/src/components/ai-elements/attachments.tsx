@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import type { ComponentProps, HTMLAttributes, ReactNode } from "react";
 import { createContext, useCallback, useContext, useMemo } from "react";
+import { useT, t } from '@/lib/i18n-dictionary';
 
 // ============================================================================
 // Types
@@ -82,7 +83,7 @@ export const getAttachmentLabel = (data: AttachmentData): string => {
   }
 
   const category = getMediaCategory(data);
-  return data.filename || (category === "image" ? "Image" : "Attachment");
+  return data.filename || (category === "image" ? t('agents.ai.image') : t('agents.ai.attachment'));
 };
 
 const renderAttachmentImage = (
@@ -92,7 +93,7 @@ const renderAttachmentImage = (
 ) =>
   isGrid ? (
     <img
-      alt={filename || "Image"}
+      alt={filename || t('agents.ai.image')}
       className="size-full object-cover"
       height={96}
       src={url}
@@ -100,7 +101,7 @@ const renderAttachmentImage = (
     />
   ) : (
     <img
-      alt={filename || "Image"}
+      alt={filename || t('agents.ai.image')}
       className="size-full rounded object-cover"
       height={20}
       src={url}
@@ -316,11 +317,12 @@ export type AttachmentRemoveProps = ComponentProps<typeof Button> & {
 };
 
 export const AttachmentRemove = ({
-  label = "Remove",
+  label = t('agents.ai.remove'),
   className,
   children,
   ...props
 }: AttachmentRemoveProps) => {
+  useT(); // re-render on language change
   const { onRemove, variant } = useAttachmentContext();
 
   const handleClick = useCallback(
@@ -413,7 +415,9 @@ export const AttachmentEmpty = ({
   className,
   children,
   ...props
-}: AttachmentEmptyProps) => (
+}: AttachmentEmptyProps) => {
+  const t = useT();
+  return (
   <div
     className={cn(
       "flex items-center justify-center p-4 text-muted-foreground text-sm",
@@ -421,6 +425,7 @@ export const AttachmentEmpty = ({
     )}
     {...props}
   >
-    {children ?? "No attachments"}
+    {children ?? t('agents.ai.noAttachments')}
   </div>
 );
+};

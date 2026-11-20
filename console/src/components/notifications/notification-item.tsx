@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   DropdownMenu,
@@ -36,6 +37,7 @@ export const NotificationItem = memo(function NotificationItem({
   onClick,
   onClose,
 }: NotificationItemProps) {
+  const t = useT();
   const queryClient = useQueryClient();
   // Reading a not-yet-seen ('sent') item changes the badge, so that one count
   // request is still needed. The paginated list is patched in place instead.
@@ -132,7 +134,7 @@ export const NotificationItem = memo(function NotificationItem({
               : 'text-muted-foreground',
           )}
         >
-          {notification.message || 'New notification'}
+          {notification.message || t('components.notifications.new')}
         </p>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>{dayjs(notification.createdAt).fromNow()}</span>
@@ -160,20 +162,22 @@ export const NotificationItem = memo(function NotificationItem({
               ) : (
                 <Mail className="h-4 w-4" />
               )}
-              {isUnread ? 'Mark as read' : 'Mark as unread'}
+              {isUnread
+                ? t('components.notifications.markRead')
+                : t('components.notifications.markUnread')}
             </DropdownMenuItem>
             <ConfirmDialog
-              title="Delete notification"
-              description="Are you sure you want to delete this notification? This action cannot be undone."
+              title={t('components.notifications.deleteTitle')}
+              description={t('components.notifications.deleteDescription')}
               onConfirm={handleDelete}
-              confirmText="Delete"
+              confirmText={t('common.delete')}
               trigger={
                 <DropdownMenuItem
                   variant="destructive"
                   onSelect={(e) => e.preventDefault()}
                 >
                   <Trash2 className="h-4 w-4" />
-                  Delete
+                  {t('common.delete')}
                 </DropdownMenuItem>
               }
             />

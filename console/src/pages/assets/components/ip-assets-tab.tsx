@@ -1,5 +1,6 @@
 import { CollapsibleDataTable } from '@/components/ui/collapsible-data-table';
 import { DataTableError } from '@/components/ui/data-table-error-boundary';
+import { useT } from '@/lib/i18n-dictionary';
 import { TabsContent } from '@/components/ui/tabs';
 import { useAssetsControllerGetIpAssets } from '@/services/apis/gen/queries';
 import { useAsset } from '../context/asset-context';
@@ -7,6 +8,7 @@ import { ipAssetsColumn } from './ip-assets-column';
 import { AssetTable } from './asset-table';
 
 export default function IpAssetsTab() {
+  const t = useT();
   const {
     tableHandlers: { setPage, setPageSize, setParams },
     tableParams: { page, pageSize, sortBy, sortOrder },
@@ -26,7 +28,7 @@ export default function IpAssetsTab() {
   const total = data?.total ?? 0;
 
   if (!data && !isLoading)
-    return <DataTableError message="Failed to load IP assets." onRetry={refetch} />;
+    return <DataTableError message={t('assets.errors.ip')} onRetry={refetch} />;
 
   return (
     <>

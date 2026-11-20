@@ -4,6 +4,7 @@ import { Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { memo } from 'react';
 import Image from '@/components/ui/image';
 import { ModelSelectForm } from './model-select-form';
+import { useT } from '@/lib/i18n-dictionary';
 
 export const ConnectedConfigRow = memo(function ConnectedConfigRow({
   item,
@@ -22,6 +23,7 @@ export const ConnectedConfigRow = memo(function ConnectedConfigRow({
   onSetPreferred: (configId: string) => void;
   isUpdating: boolean;
 }) {
+  const t = useT();
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
       <div className="flex items-center justify-between p-3">
@@ -36,7 +38,7 @@ export const ConnectedConfigRow = memo(function ConnectedConfigRow({
               </span>
               {item.isPreferred && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 font-medium leading-none">
-                  default
+                  {t('agents.llm.defaultBadge')}
                 </span>
               )}
             </div>
@@ -53,7 +55,7 @@ export const ConnectedConfigRow = memo(function ConnectedConfigRow({
           className="gap-1 border border-green-600 text-green-600 hover:bg-green-50"
         >
           <Check size={16} />
-          <span className="hidden sm:inline">Connected</span>
+          <span className="hidden sm:inline">{t('agents.llm.connected')}</span>
           {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </Button>
       </div>

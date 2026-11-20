@@ -4,6 +4,7 @@ import type {
   GetAssetsResponseDto,
   TechnologyDetailDTO,
 } from '@/services/apis/gen/queries';
+import { t } from '@/lib/i18n-dictionary';
 import type { ColumnDef } from '@tanstack/react-table';
 import dayjs from 'dayjs';
 import { BriefcaseBusiness, Globe, Network } from 'lucide-react';
@@ -18,7 +19,7 @@ import { asTlsInfo } from '../tls-info';
 export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
   {
     accessorKey: 'value',
-    header: 'Service',
+    header: () => t('assets.columns.service'),
     enableHiding: false,
     size: 500,
     cell: ({ row }) => {
@@ -66,7 +67,7 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
   },
   {
     accessorKey: 'screenshotPath',
-    header: 'Screenshot',
+    header: () => t('assets.columns.screenshot'),
     enableHiding: false,
     // Not a server-side sort key: the API would silently fall back.
     enableSorting: false,
@@ -77,7 +78,8 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
     },
   },
   {
-    header: 'Technologies',
+    id: 'Technologies',
+    header: () => t('assets.columns.technologies'),
     size: 250,
     cell: ({ row }) => {
       const data = row.original;
@@ -102,7 +104,8 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
     },
   },
   {
-    header: 'Certificate',
+    id: 'Certificate',
+    header: () => t('assets.columns.certificate'),
     size: 200,
     cell: ({ row }) => {
       const data = row.original;
@@ -127,7 +130,8 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
     },
   },
   {
-    header: 'Time',
+    id: 'Time',
+    header: () => t('assets.columns.time'),
     size: 120,
     cell: ({ row }) => {
       const data = row.original;

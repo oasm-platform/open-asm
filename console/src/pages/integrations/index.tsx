@@ -12,15 +12,16 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { t as translate, useT } from '@/lib/i18n-dictionary';
 import { getSchemaCapabilities } from './capabilities';
 import { AppsTabContent } from './components/apps-tab-content';
 import { ConnectIntegrationSheet } from './components/connect-integration-sheet';
 import { ConnectedTabContent } from './components/connected-tab-content';
 import { IntegrationDetailSheet } from './components/integration-detail-sheet';
 
-const TABS: { value: string; label: string }[] = [
-  { value: 'applications', label: 'Applications' },
-  { value: 'connected', label: 'Connected' },
+const TABS: { value: string; labelKey: string }[] = [
+  { value: 'applications', labelKey: 'integrations.tabs.applications' },
+  { value: 'connected', labelKey: 'integrations.tabs.connected' },
 ];
 
 export interface SchemaOneOfItem {
@@ -42,6 +43,7 @@ interface SchemaResponse {
 }
 
 export default function Integrations() {
+  const t = useT();
   const [selectedSchema, setSelectedSchema] = useState<SchemaOneOfItem | null>(
     null,
   );
@@ -91,13 +93,13 @@ export default function Integrations() {
     useIntegrationsControllerDeleteIntegration({
       mutation: {
         onSuccess: () => {
-          toast.success('Integration disconnected');
+          toast.success(translate('integrations.toast.disconnected'));
           queryClient.invalidateQueries({
             queryKey: getIntegrationsControllerGetManyIntegrationsQueryKey(),
           });
         },
         onError: () => {
-          toast.error('Failed to disconnect integration');
+          toast.error(translate('integrations.toast.disconnectFailed'));
         },
       },
     });
@@ -173,8 +175,8 @@ export default function Integrations() {
   return (
     <Page
       permission="integration.read"
-      title="Integrations"
-      description="Connect third-party applications to your workspace"
+      title={t('integrations.page.title')}
+      description={t('integrations.page.description')}
     >
       <Tabs
         value={activeTab}
@@ -188,7 +190,7 @@ export default function Integrations() {
               value={tab.value}
               className="hover:cursor-pointer"
             >
-              {tab.label}
+              {t(tab.labelKey)}
             </TabsTrigger>
           ))}
         </TabsList>

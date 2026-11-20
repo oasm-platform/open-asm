@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/select';
 import { useTheme } from '@/components/ui/theme-provider';
 import { usePermission } from '@/hooks/usePermission';
+import { t as translate, useT } from '@/lib/i18n-dictionary';
 import {
   getAttackSurfaceQueryControllerListSavedQueryKey,
   useAttackSurfaceQueryControllerCreateSaved,
@@ -63,6 +64,7 @@ const isJob = (value: unknown): value is ReportJobDto =>
   typeof value === 'object' && value !== null && 'jobId' in value;
 
 function ErrorPanel({ error }: { error: AsqErrorBody }) {
+  const t = useT();
   return (
     <div className="flex items-start gap-2 rounded-md border border-destructive/40 p-3 text-sm">
       <CircleAlert className="mt-0.5 size-4 shrink-0 text-destructive" />
@@ -75,7 +77,7 @@ function ErrorPanel({ error }: { error: AsqErrorBody }) {
             <span className="font-mono">{issue.path}</span> ({issue.code}): {issue.message}
           </div>
         ))}
-        {error.hints?.length ? <div className="text-muted-foreground">Hints: {error.hints.join('; ')}</div> : null}
+        {error.hints?.length ? <div className="text-muted-foreground">{t('asq.hints', { hints: error.hints.join('; ') })}</div> : null}
       </div>
     </div>
   );
@@ -91,6 +93,7 @@ function ErrorPanel({ error }: { error: AsqErrorBody }) {
  * item in `components/common/layout/menu-bar.tsx` (permission `asset.read`).
  */
 export default function AttackSurfaceQuery() {
+  const t = useT();
   const { resolvedTheme } = useTheme();
   const { hasPermission } = usePermission();
   const queryClient = useQueryClient();
@@ -152,7 +155,7 @@ export default function AttackSurfaceQuery() {
             if (isJob(response)) {
               setResult(null);
               setJobId(response.jobId);
-              toast.info('Report job queued');
+              toast.info(translate('asq.toast.jobQueued'));
               return;
             }
             setLastBatch(batch);
@@ -218,7 +221,7 @@ export default function AttackSurfaceQuery() {
         { id: savedId, data: { name: saveName.trim(), spec } },
         {
           onSuccess: () => {
-            toast.success('Saved query updated');
+            toast.success(translate('asq.toast.updated'));
             setSaveOpen(false);
             void refreshSaved();
           },
@@ -230,7 +233,7 @@ export default function AttackSurfaceQuery() {
         { data: { name: saveName.trim(), spec } },
         {
           onSuccess: (created) => {
-            toast.success('Query saved');
+            toast.success(translate('asq.toast.saved'));
             setSavedId(created.id);
             setSaveOpen(false);
             void refreshSaved();
@@ -247,7 +250,7 @@ export default function AttackSurfaceQuery() {
       { id: savedId },
       {
         onSuccess: () => {
-          toast.success('Saved query deleted');
+          toast.success(translate('asq.toast.deleted'));
           setSavedId('');
           setSaveName('');
           void refreshSaved();
@@ -263,15 +266,15 @@ export default function AttackSurfaceQuery() {
 
   return (
     <Page
-      title="Attack Surface Query"
+      title={t('asq.page.title')}
       permission="asset.read"
-      description="Query hosts, services, technologies, TLS, URLs, IPs, DNS and findings with a JSON query batch."
+      description={t('asq.page.description')}
       action={
         <div className="flex items-center gap-2">
           {savedQueries && savedQueries.length > 0 && (
             <Select value={savedId} onValueChange={loadSaved}>
               <SelectTrigger className="w-56">
-                <SelectValue placeholder="Saved queries" />
+                <SelectValue placeholder={t('asq.savedQueries')} />
               </SelectTrigger>
               <SelectContent>
                 {savedQueries.map((q) => (
@@ -284,18 +287,18 @@ export default function AttackSurfaceQuery() {
           )}
           {canWriteSaved && (
             <Button variant="outline" disabled={!parsed.ok} onClick={() => setSaveOpen(true)}>
-              <Save className="size-4" /> Save
+              <Save className="size-4" /> {t('common.save')}
             </Button>
           )}
           {canWriteSaved && savedId && (
             <ConfirmDialog
-              title="Delete saved query"
-              description={`Delete "${saveName}"?`}
-              confirmText="Delete"
+              title={t('asq.delete.title')}
+              description={t('asq.delete.description', { name: saveName })}
+              confirmText={t('common.delete')}
               disabled={deleteSaved.isPending}
               onConfirm={remove}
               trigger={
-                <Button variant="ghost" size="icon" aria-label="Delete saved query">
+                <Button variant="ghost" size="icon" aria-label={t('asq.delete.title')}>
                   <Trash2 className="size-4" />
                 </Button>
               }
@@ -318,25 +321,25 @@ export default function AttackSurfaceQuery() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={() => run('interactive')} disabled={!parsed.ok || busy}>
-              <Play className="size-4" /> {busy ? 'Running…' : 'Run'}
+              <Play className="size-4" /> {busy ? t('asq.running') : t('asq.run')}
             </Button>
             <Button variant="outline" onClick={runExplain} disabled={!parsed.ok || explainMutation.isPending}>
-              <Gauge className="size-4" /> Explain
+              <Gauge className="size-4" /> {t('asq.explain')}
             </Button>
             <Button variant="outline" onClick={() => run('report')} disabled={!parsed.ok || busy}>
-              <FileClock className="size-4" /> Run as report
+              <FileClock className="size-4" /> {t('asq.runAsReport')}
             </Button>
-            <span className="text-xs text-muted-foreground">Ctrl/⌘ + Enter to run</span>
+            <span className="text-xs text-muted-foreground">{t('asq.shortcutHint')}</span>
             {!parsed.ok && <span className="text-xs text-destructive">{parsed.message}</span>}
             {result?.meta.tookMs !== undefined && !jobResult && (
-              <span className="ml-auto text-xs text-muted-foreground">{result.meta.tookMs} ms</span>
+              <span className="ml-auto text-xs text-muted-foreground">{t('asq.tookMs', { ms: result.meta.tookMs })}</span>
             )}
           </div>
 
           {error && <ErrorPanel error={error} />}
           {jobId && job?.status !== 'completed' && (
             <div className="rounded-md border p-3 text-sm">
-              Report job <span className="font-mono">{jobId}</span>: {job?.status ?? 'queued'}
+              {t('asq.reportJob')} <span className="font-mono">{jobId}</span>: {job?.status ?? 'queued'}
               {job?.status === 'failed' && job.error ? ` (${String((job.error as { message?: unknown }).message ?? '')})` : ''}
             </div>
           )}
@@ -360,15 +363,15 @@ export default function AttackSurfaceQuery() {
       <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{savedId ? 'Update saved query' : 'Save query'}</DialogTitle>
+            <DialogTitle>{savedId ? t('asq.saveDialog.updateTitle') : t('asq.saveDialog.title')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
-            <Label htmlFor="asq-save-name">Name</Label>
+            <Label htmlFor="asq-save-name">{t('common.name')}</Label>
             <Input id="asq-save-name" maxLength={120} value={saveName} onChange={(e) => setSaveName(e.target.value)} />
           </div>
           <DialogFooter>
             <Button onClick={save} disabled={!saveName.trim() || createSaved.isPending || updateSaved.isPending}>
-              Save
+              {t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>

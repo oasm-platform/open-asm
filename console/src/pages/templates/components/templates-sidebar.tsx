@@ -25,13 +25,14 @@ import {
 } from '@/services/apis/gen/queries';
 import { useTemplateTabs } from '../hooks/use-template-tabs';
 import { TemplateActionsMenu } from './template-actions-menu';
+import { useT } from '@/lib/i18n-dictionary';
 
 type Filter = 'all' | 'mine' | 'shared';
 
-const FILTERS: { value: Filter; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'mine', label: 'Mine' },
-  { value: 'shared', label: 'Shared' },
+const FILTERS: { value: Filter; labelKey: string }[] = [
+  { value: 'all', labelKey: 'templates.sidebar.filter.all' },
+  { value: 'mine', labelKey: 'templates.sidebar.filter.mine' },
+  { value: 'shared', labelKey: 'templates.sidebar.filter.shared' },
 ];
 
 type Props = ComponentProps<typeof Sidebar> & {
@@ -40,9 +41,10 @@ type Props = ComponentProps<typeof Sidebar> & {
 };
 
 export function TemplatesSidebar({ onCollapse, ...props }: Props) {
+  const t = useT();
   const { tabs, activeId, open } = useTemplateTabs();
   const { isMobile, setOpenMobile } = useSidebar();
-  const activeArtifactId = tabs.find((t) => t.id === activeId)?.artifactId;
+  const activeArtifactId = tabs.find((tab) => tab.id === activeId)?.artifactId;
 
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
@@ -77,9 +79,9 @@ export function TemplatesSidebar({ onCollapse, ...props }: Props) {
     const active = file.id === activeArtifactId;
     const owner = file.isOwner
       ? file.shareType === 'private'
-        ? 'Private'
-        : 'Shared'
-      : (file.createdBy?.name ?? 'Unknown');
+        ? t('templates.sidebar.private')
+        : t('templates.sidebar.shared')
+      : (file.createdBy?.name ?? t('templates.sidebar.unknown'));
     return (
       <SidebarMenuItem key={file.id}>
         <SidebarMenuButton
@@ -105,7 +107,7 @@ export function TemplatesSidebar({ onCollapse, ...props }: Props) {
           side="right"
           align="start"
           trigger={
-            <SidebarMenuAction showOnHover aria-label={`Actions for ${file.name}`}>
+            <SidebarMenuAction showOnHover aria-label={t('templates.sidebar.actionsFor', { name: file.name })}>
               <MoreVertical />
             </SidebarMenuAction>
           }
@@ -120,12 +122,12 @@ export function TemplatesSidebar({ onCollapse, ...props }: Props) {
       <SidebarContent>
         <SidebarGroup className="gap-2">
           <Input
-            placeholder="Search templates"
-            aria-label="Search templates"
+            placeholder={t('templates.sidebar.search')}
+            aria-label={t('templates.sidebar.search')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <div role="group" aria-label="Filter templates" className="flex gap-1">
+          <div role="group" aria-label={t('templates.sidebar.filterLabel')} className="flex gap-1">
             {FILTERS.map((f) => (
               <button
                 key={f.value}
@@ -139,7 +141,7 @@ export function TemplatesSidebar({ onCollapse, ...props }: Props) {
                     : 'bg-muted text-muted-foreground hover:bg-muted/70',
                 )}
               >
-                {f.label} {counts[f.value]}
+                {t(f.labelKey)} {counts[f.value]}
               </button>
             ))}
           </div>
@@ -156,17 +158,17 @@ export function TemplatesSidebar({ onCollapse, ...props }: Props) {
                 <SidebarMenu>{items.map(renderItem)}</SidebarMenu>
                 {total > shown && (
                   <p className="px-2 py-1 text-xs text-muted-foreground">
-                    {`Showing ${shown} of ${total} — search to narrow`}
+                    {t('templates.sidebar.showing', { shown, total })}
                   </p>
                 )}
               </>
             ) : (
               <p className="px-2 py-1 text-sm text-muted-foreground">
                 {debounced
-                  ? 'No templates match your search.'
+                  ? t('templates.sidebar.noMatch')
                   : filter === 'shared'
-                    ? 'Nothing shared with you yet'
-                    : 'No templates yet. Start one with New, Upload or AI gen.'}
+                    ? t('templates.sidebar.nothingShared')
+                    : t('templates.sidebar.empty')}
               </p>
             )}
           </SidebarGroupContent>
@@ -180,7 +182,7 @@ export function TemplatesSidebar({ onCollapse, ...props }: Props) {
             className="justify-start text-muted-foreground"
             onClick={onCollapse}
           >
-            <PanelLeftClose /> Hide list
+            <PanelLeftClose /> {t('templates.sidebar.hideList')}
           </Button>
         </SidebarFooter>
       )}
@@ -189,11 +191,12 @@ export function TemplatesSidebar({ onCollapse, ...props }: Props) {
 }
 
 function LoadError({ onRetry }: { onRetry: () => void }) {
+  const t = useT();
   return (
     <div className="flex flex-col items-start gap-2 px-2 py-1 text-sm text-muted-foreground">
-      <p>Could not load templates.</p>
+      <p>{t('templates.sidebar.loadError')}</p>
       <Button size="sm" variant="outline" onClick={onRetry}>
-        Retry
+        {t('common.retry')}
       </Button>
     </div>
   );

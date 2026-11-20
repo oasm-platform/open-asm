@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -32,6 +33,7 @@ import { toast } from 'sonner';
  * target is created its repositories are synced in as assets.
  */
 export function GitOrgPicker() {
+  const t = useT();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [integrationId, setIntegrationId] = useState<string>();
@@ -82,7 +84,7 @@ export function GitOrgPicker() {
       {
         onSuccess: (res: BulkTargetResultDto) => {
           toast.success(
-            `Added ${res.totalCreated} organization${res.totalCreated === 1 ? '' : 's'} — syncing repositories.`,
+            t('targets.picker.added', { count: res.totalCreated }),
           );
           queryClient.refetchQueries({ queryKey: ['targets'] });
           navigate({ to: '/targets', search: { page: 1, pageSize: 100 } });
@@ -90,7 +92,7 @@ export function GitOrgPicker() {
         onError: (error) => {
           const err = error as AxiosError<{ message?: string }>;
           toast.error(
-            err.response?.data?.message ?? 'Failed to add organizations',
+            err.response?.data?.message ?? t('targets.picker.addFailed'),
           );
         },
       },
@@ -104,13 +106,14 @@ export function GitOrgPicker() {
   if (integrations.length === 0) {
     return (
       <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-        Connect GitHub or GitLab with the <strong>Repositories</strong>{' '}
-        capability first.{' '}
+        {t('targets.picker.connectPrefix')}{' '}
+        <strong>{t('targets.picker.repositoriesCapability')}</strong>{' '}
+        {t('targets.picker.connectSuffix')}{' '}
         <Link
           to="/integrations"
           className="font-medium text-foreground underline underline-offset-4"
         >
-          Go to Integrations
+          {t('targets.picker.goToIntegrations')}
         </Link>
       </div>
     );
@@ -119,7 +122,7 @@ export function GitOrgPicker() {
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="git-integration">Integration</Label>
+        <Label htmlFor="git-integration">{t('targets.picker.integration')}</Label>
         <Select
           value={activeIntegrationId}
           onValueChange={(value) => {
@@ -128,7 +131,7 @@ export function GitOrgPicker() {
           }}
         >
           <SelectTrigger id="git-integration" className="w-full">
-            <SelectValue placeholder="Select an integration" />
+            <SelectValue placeholder={t('targets.picker.selectIntegration')} />
           </SelectTrigger>
           <SelectContent>
             {integrations.map((integration) => (
@@ -144,7 +147,7 @@ export function GitOrgPicker() {
       </div>
 
       <div className="space-y-2">
-        <Label>Organizations</Label>
+        <Label>{t('targets.picker.organizations')}</Label>
         {loadingOrgs && (
           <div className="space-y-2">
             <Skeleton className="h-9 w-full" />
@@ -153,8 +156,7 @@ export function GitOrgPicker() {
         )}
         {orgsError && (
           <p className="text-sm text-destructive">
-            Could not load organizations. Test the integration from the
-            Integrations page.
+            {t('targets.picker.loadFailed')}
           </p>
         )}
         {!loadingOrgs && !orgsError && (
@@ -194,7 +196,7 @@ export function GitOrgPicker() {
             })}
             {organizations?.length === 0 && (
               <li className="p-3 text-sm text-muted-foreground">
-                No organizations visible to this token.
+                {t('targets.picker.noOrganizations')}
               </li>
             )}
           </ul>
@@ -204,7 +206,7 @@ export function GitOrgPicker() {
       <div className="space-y-3 rounded-md border p-3">
         <div className="flex items-center justify-between gap-2">
           <Label htmlFor="include-archived" className="font-normal">
-            Scan archived repositories
+            {t('targets.picker.scanArchived')}
           </Label>
           <Switch
             id="include-archived"
@@ -214,7 +216,7 @@ export function GitOrgPicker() {
         </div>
         <div className="flex items-center justify-between gap-2">
           <Label htmlFor="include-forks" className="font-normal">
-            Scan forks
+            {t('targets.picker.scanForks')}
           </Label>
           <Switch
             id="include-forks"
@@ -223,7 +225,7 @@ export function GitOrgPicker() {
           />
         </div>
         <p className="text-xs text-muted-foreground">
-          Skipped repositories are still listed, just not scanned.
+          {t('targets.picker.skippedHint')}
         </p>
       </div>
 
@@ -233,7 +235,7 @@ export function GitOrgPicker() {
           type="button"
           onClick={() => navigate({ to: '/targets' })}
         >
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button
           type="button"
@@ -242,8 +244,9 @@ export function GitOrgPicker() {
           className="bg-purple-500 text-white hover:bg-purple-600"
         >
           {isPending && <Loader2Icon className="animate-spin" />}
-          Add {selected.length > 0 ? selected.length : ''} organization
-          {selected.length === 1 ? '' : 's'}
+          {selected.length > 0
+            ? t('targets.picker.add', { count: selected.length })
+            : t('targets.picker.addNone')}
         </Button>
       </div>
     </div>

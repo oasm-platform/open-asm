@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TopAssetsVulnerabilitiesSkeleton } from './dashboard-skeleton';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
@@ -11,6 +12,7 @@ import { SEVERITY_BG_CLASS } from '../severity';
 const severityOrder = ['critical', 'high', 'medium', 'low'] as const;
 
 const TopAssetsVulnerabilities = () => {
+  const t = useT();
   const navigate = useNavigate();
   const {
     state: { selectedWorkspaceId },
@@ -35,11 +37,11 @@ const TopAssetsVulnerabilities = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Bug className="h-5 w-5 text-primary" />
-            Most vulnerable assets
+            {t('dashboard.topAssets.title')}
           </CardTitle>
         </CardHeader>
         <CardContent className="flex h-full items-center justify-center text-sm text-destructive">
-          Couldn&apos;t load data
+          {t('dashboard.topAssets.loadFailed')}
         </CardContent>
       </Card>
     );
@@ -50,13 +52,13 @@ const TopAssetsVulnerabilities = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Bug className="h-5 w-5 text-primary" />
-          Most vulnerable assets
+          {t('dashboard.topAssets.title')}
         </CardTitle>
       </CardHeader>
       <CardContent className="min-h-0 flex-1">
         {assets.length === 0 ? (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            No assets with open vulnerabilities
+            {t('dashboard.topAssets.empty')}
           </div>
         ) : (
           <div className="min-h-0 h-full space-y-1 overflow-y-auto pr-1">

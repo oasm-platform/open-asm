@@ -16,6 +16,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router';
 import { Search } from 'lucide-react';
 import useDebounce from '@/hooks/use-debounce';
 import Marketplace from './components/marketplace';
+import { useT } from '@/lib/i18n-dictionary';
 
 const TAB_VALUES = ['all', 'builtin', 'connector', 'installed'];
 
@@ -28,7 +29,7 @@ const TAB_TO_TYPE: Record<string, ToolsControllerGetManyToolsType | undefined> =
   };
 
 const CATEGORY_OPTIONS = [
-  { value: 'ALL', label: 'All categories' },
+  { value: 'ALL', label: '' },
   ...Object.values(ToolsControllerGetManyToolsCategory).map((value) => ({
     value,
     label: value
@@ -38,6 +39,7 @@ const CATEGORY_OPTIONS = [
 ];
 
 const Tools = () => {
+  const t = useT();
   const navigate = useNavigate();
   const search = useSearch({ strict: false }) as Record<string, string>;
   const [activeTab, setActiveTab] = useQueryTab({
@@ -68,8 +70,8 @@ const Tools = () => {
 
   return (
     <Page
-      title="Tools"
-      description="Browse the marketplace and add tools to your workspace"
+      title={t('tools.page.title')}
+      description={t('tools.page.description')}
     >
       <Tabs
         value={activeTab}
@@ -77,17 +79,21 @@ const Tools = () => {
         className="w-full"
       >
         <TabsList className="mb-4">
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="builtin">Built-in</TabsTrigger>
-          <TabsTrigger value="connector">Connector</TabsTrigger>
-          <TabsTrigger value="installed">Installed</TabsTrigger>
+          <TabsTrigger value="all">{t('tools.tabs.all')}</TabsTrigger>
+          <TabsTrigger value="builtin">{t('tools.tabs.builtin')}</TabsTrigger>
+          <TabsTrigger value="connector">
+            {t('tools.tabs.connector')}
+          </TabsTrigger>
+          <TabsTrigger value="installed">
+            {t('tools.tabs.installed')}
+          </TabsTrigger>
         </TabsList>
       </Tabs>
       <div className="flex items-center gap-2 mb-4">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search tools..."
+            placeholder={t('tools.searchPlaceholder')}
             value={searchInput}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="h-9 pl-8 text-xs"
@@ -104,12 +110,12 @@ const Tools = () => {
           }
         >
           <SelectTrigger className="w-[150px] border-dashed py-0 text-xs focus:outline-none focus:ring-0 focus:ring-offset-0">
-            <SelectValue placeholder="Category" />
+            <SelectValue placeholder={t('tools.categoryPlaceholder')} />
           </SelectTrigger>
           <SelectContent>
             {CATEGORY_OPTIONS.map(({ value, label }) => (
               <SelectItem key={value} value={value}>
-                {label}
+                {value === 'ALL' ? t('tools.allCategories') : label}
               </SelectItem>
             ))}
           </SelectContent>

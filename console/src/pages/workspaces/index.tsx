@@ -21,10 +21,12 @@ import {
 } from '@/services/apis/gen/queries';
 import { Crown, Plus, Target, Users } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
+import { useT } from '@/lib/i18n-dictionary';
 
 const PAGE_SIZE = 12;
 
 export default function Workspaces() {
+  const t = useT();
   const navigate = useNavigate();
   const { handleSelectWorkspace } = useWorkspaceSelector();
   const { data: session } = useSession();
@@ -48,7 +50,7 @@ export default function Workspaces() {
 
   return (
     <Page
-      title="Workspaces"
+      title={t('workspaces.list.title')}
       action={
         <Button
           variant="outline"
@@ -56,7 +58,7 @@ export default function Workspaces() {
           onClick={() => navigate({ to: '/workspaces/create' })}
         >
           <Plus size={16} className="mr-2" />
-          New workspace
+          {t('workspaces.list.new')}
         </Button>
       }
     >
@@ -93,7 +95,7 @@ export default function Workspaces() {
                                 <Crown size={20} className="text-yellow-500" />
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p>Owner</p>
+                                <p>{t('workspaces.list.owner')}</p>
                               </TooltipContent>
                             </Tooltip>
                           )}
@@ -105,7 +107,9 @@ export default function Workspaces() {
                               : 'bg-green-500 text-white'
                           }
                         >
-                          {workspace.archivedAt ? 'Archived' : 'Active'}
+                          {workspace.archivedAt
+                            ? t('workspaces.list.archived')
+                            : t('workspaces.list.active')}
                         </Badge>
                       </div>
                       <div className="flex gap-4 pt-2 text-sm text-muted-foreground">
@@ -114,14 +118,14 @@ export default function Workspaces() {
                           <span className="font-medium">
                             {workspace.memberCount}
                           </span>
-                          <span>members</span>
+                          <span>{t('workspaces.list.members')}</span>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <Target size={14} className="text-muted-foreground" />
                           <span className="font-medium">
                             {workspace.targetCount}
                           </span>
-                          <span>targets</span>
+                          <span>{t('workspaces.list.targets')}</span>
                         </div>
                       </div>
                     </CardHeader>
@@ -129,7 +133,7 @@ export default function Workspaces() {
                       <CardDescription className="line-clamp-2">
                         {typeof workspace.description === 'string'
                           ? workspace.description
-                          : 'No description'}
+                          : t('workspaces.list.noDescription')}
                       </CardDescription>
                     </CardContent>
                   </Card>

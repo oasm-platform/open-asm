@@ -11,11 +11,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useT } from '@/lib/i18n-dictionary';
 
 /** AGENT_INSTRUCTION_MAX_LENGTH on the API */
 const MAX_LENGTH = 20_000;
 
 export function InstructionManager() {
+  const t = useT();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -48,9 +50,9 @@ export function InstructionManager() {
             next,
           );
           setDraft(null);
-          toast.success('Instruction saved');
+          toast.success(t('agents.instruction.saved'));
         },
-        onError: () => toast.error('Failed to save instruction'),
+        onError: () => toast.error(t('agents.instruction.saveFailed')),
       },
     );
   };
@@ -65,7 +67,7 @@ export function InstructionManager() {
     return (
       <div className="rounded-xl border border-dashed p-6 text-center">
         <p className="text-sm text-muted-foreground">
-          Failed to load the instruction.
+          {t('agents.instruction.loadFailed')}
         </p>
         <Button
           size="sm"
@@ -73,7 +75,7 @@ export function InstructionManager() {
           className="mt-3"
           onClick={() => void refetch()}
         >
-          Retry
+          {t('agents.settings.retry')}
         </Button>
       </div>
     );
@@ -82,19 +84,19 @@ export function InstructionManager() {
   return (
     <div className="flex flex-col gap-3">
       <Textarea
-        aria-label="Instruction"
+        aria-label={t('agents.instruction.label')}
         value={value}
         onChange={(e) => setDraft(e.target.value)}
         maxLength={MAX_LENGTH}
         disabled={upsert.isPending}
-        placeholder={
-          'e.g.\n- Prefer passive recon before active scans.\n- Report findings in a table with severity and affected asset.\n- Keep answers short.'
-        }
+        placeholder={t('agents.instruction.placeholder')}
         className="min-h-64 max-h-[60vh] font-mono"
       />
       <p className="text-xs text-muted-foreground">
-        Added to the agent&apos;s system prompt in every conversation ·{' '}
-        {value.length.toLocaleString()} / {MAX_LENGTH.toLocaleString()}
+        {t('agents.instruction.hint', {
+          length: value.length.toLocaleString(),
+          max: MAX_LENGTH.toLocaleString(),
+        })}
       </p>
       <SettingsHeaderActions>
         {dirty && (
@@ -104,7 +106,7 @@ export function InstructionManager() {
             disabled={upsert.isPending}
             onClick={() => setDraft(null)}
           >
-            Discard
+            {t('agents.settings.discard')}
           </Button>
         )}
         <Button
@@ -114,7 +116,7 @@ export function InstructionManager() {
           onClick={save}
         >
           {upsert.isPending && <Loader2 className="animate-spin" />}
-          Save
+          {t('common.save')}
         </Button>
       </SettingsHeaderActions>
     </div>

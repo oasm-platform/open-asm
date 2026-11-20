@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { useTheme } from '@/components/ui/theme-provider';
 import { IpLocationsSkeleton } from './dashboard-skeleton';
 import countriesData from '@/data/countries.json';
@@ -42,6 +43,7 @@ export default function IpLocationsCard({
   onCountrySelect,
   isLoading = false,
 }: IpLocationsCardProps) {
+  const t = useT();
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   const chartRef = useRef<ReactEChartsCore>(null);
@@ -81,7 +83,7 @@ export default function IpLocationsCard({
           fontFamily: 'system-ui, sans-serif',
         },
         formatter: (params: { name?: string; value?: number | null }) => {
-          const name = params.name ?? 'Unknown';
+          const name = params.name ?? t('common.unknown');
           const value = params.value ?? 0;
           if (!params.value) return '';
           return `<div style="font-weight:600;margin-bottom:4px">${name}</div>
@@ -172,7 +174,7 @@ export default function IpLocationsCard({
         },
       ],
     }),
-    [data, maxIpCount, isDark],
+    [data, maxIpCount, isDark, t],
   );
 
   const onEvents = useMemo(
@@ -193,9 +195,9 @@ export default function IpLocationsCard({
       className={`rounded-xl border h-full relative ${isDark ? 'bg-card-surface' : 'bg-white'}`}
     >
       <div className="absolute top-4 left-4 z-10">
-        <h3 className="font-semibold text-base">Locations</h3>
+        <h3 className="font-semibold text-base">{t('dashboard.locations.title')}</h3>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Distribution of asset IPs by location
+          {t('dashboard.locations.description')}
         </p>
       </div>
       {/* Sized by the dashboard's main column (`dashboard-main` container) */}

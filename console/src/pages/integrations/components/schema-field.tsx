@@ -1,3 +1,4 @@
+import { t as translate, useT } from '@/lib/i18n-dictionary';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -123,7 +124,7 @@ function renderEdit(
           aria-label={prop.title ?? fieldKey}
           className="w-full"
         >
-          <SelectValue placeholder={placeholder || 'Select...'} />
+          <SelectValue placeholder={placeholder || translate('integrations.field.selectPlaceholder')} />
         </SelectTrigger>
         <SelectContent>
           {enumOptions.map((option) => (
@@ -312,6 +313,7 @@ function ArrayField({
   autoComplete: string;
   placeholder: string;
 }) {
+  const t = useT();
   const items: string[] =
     Array.isArray(value) && value.length > 0
       ? (value as string[])
@@ -353,7 +355,10 @@ function ArrayField({
               variant="ghost"
               size="icon-sm"
               onClick={() => removeItem(index)}
-              aria-label={`Remove ${fieldKey} item ${index + 1}`}
+              aria-label={t('integrations.field.removeItem', {
+                field: fieldKey,
+                index: index + 1,
+              })}
               className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-destructive"
             >
               <X className="size-4" />
@@ -369,7 +374,7 @@ function ArrayField({
         className="w-full"
       >
         <Plus className="size-4" />
-        Add
+        {t('common.add')}
       </Button>
     </div>
   );

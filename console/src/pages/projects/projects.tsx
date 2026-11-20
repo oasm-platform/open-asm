@@ -19,6 +19,7 @@ import {
 import useDebounce from '@/hooks/use-debounce';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import { getLocalTimezone } from '@/lib/cron-schedule';
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import {
   ProjectStatusFilter,
@@ -53,11 +54,11 @@ const GRID_CLASS =
 const PAGE_SIZE = 12;
 
 const SORT_OPTIONS = {
-  risk: { label: 'Highest risk', sortBy: 'risk', sortOrder: 'DESC' },
-  newest: { label: 'Newest', sortBy: 'createdAt', sortOrder: 'DESC' },
-  lastRun: { label: 'Last run', sortBy: 'lastRunAt', sortOrder: 'DESC' },
-  name: { label: 'Name', sortBy: 'name', sortOrder: 'ASC' },
-  assets: { label: 'Most assets', sortBy: 'totalAssets', sortOrder: 'DESC' },
+  risk: { labelKey: 'projects.list.sort.risk', sortBy: 'risk', sortOrder: 'DESC' },
+  newest: { labelKey: 'projects.list.sort.newest', sortBy: 'createdAt', sortOrder: 'DESC' },
+  lastRun: { labelKey: 'projects.list.sort.lastRun', sortBy: 'lastRunAt', sortOrder: 'DESC' },
+  name: { labelKey: 'common.name', sortBy: 'name', sortOrder: 'ASC' },
+  assets: { labelKey: 'projects.list.sort.assets', sortBy: 'totalAssets', sortOrder: 'DESC' },
 } as const;
 
 type SortKey = keyof typeof SORT_OPTIONS;
@@ -68,9 +69,9 @@ const toSortKey = (sortBy: string): SortKey =>
   ) ?? 'risk';
 
 const STATUS_OPTIONS = [
-  { value: ProjectStatusFilter.active, label: 'Active' },
-  { value: ProjectStatusFilter.archived, label: 'Archived' },
-  { value: ProjectStatusFilter.all, label: 'All' },
+  { value: ProjectStatusFilter.active, labelKey: 'projects.list.status.active' },
+  { value: ProjectStatusFilter.archived, labelKey: 'projects.archived' },
+  { value: ProjectStatusFilter.all, labelKey: 'common.all' },
 ];
 
 function Meta({ label, value, title }: { label: string; value: string; title?: string }) {
@@ -88,6 +89,7 @@ function Meta({ label, value, title }: { label: string; value: string; title?: s
 
 /** How the project runs on its own, at a glance. */
 function TriggerChips({ project }: { project: ProjectListItemDto }) {
+  const t = useT();
   const enabled = project.triggers.filter((t) => t.enabled);
   const hasCron = enabled.some((t) => t.type === ProjectTriggerType.cron);
   const events = [
@@ -99,13 +101,13 @@ function TriggerChips({ project }: { project: ProjectListItemDto }) {
   ];
   const chip = 'gap-1 font-normal';
   if (project.archivedAt) {
-    return <Badge variant="outline" className={chip}>Triggers off</Badge>;
+    return <Badge variant="outline" className={chip}>{t('projects.list.triggersOff')}</Badge>;
   }
   if (!hasCron && events.length === 0) {
     return (
       <Badge variant="outline" className={chip}>
         <Play className="size-3" />
-        Manual only
+        {t('projects.list.manualOnly')}
       </Badge>
     );
   }
@@ -114,7 +116,7 @@ function TriggerChips({ project }: { project: ProjectListItemDto }) {
       {hasCron && (
         <Badge variant="outline" className={chip}>
           <CalendarClock className="size-3" />
-          Schedule
+          {t('projects.tabs.schedule')}
         </Badge>
       )}
       {events.map((event) => (
@@ -134,6 +136,7 @@ const ProjectCard = memo(function ProjectCard({
   project: ProjectListItemDto;
   timezone: string;
 }) {
+  const t = useT();
   const navigate = useNavigate();
   const next = project.archivedAt ? null : nextCronRun(project.triggers, timezone);
 
@@ -164,9 +167,11 @@ const ProjectCard = memo(function ProjectCard({
           {project.name}
         </h3>
         {project.archivedAt ? (
-          <Badge variant="secondary">Archived</Badge>
+          <Badge variant="secondary">{t('projects.archived')}</Badge>
         ) : project.newVulnerabilities > 0 ? (
-          <Badge variant="soft">+{project.newVulnerabilities} new</Badge>
+          <Badge variant="soft">
+            {t('projects.list.newBadge', { n: project.newVulnerabilities })}
+          </Badge>
         ) : null}
       </div>
       {project.description && (
@@ -179,11 +184,11 @@ const ProjectCard = memo(function ProjectCard({
         <SeverityCounts counts={project.openVulnerabilities} />
       </div>
       <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
-        <Meta label="Assets" value={String(project.totalAssets)} />
-        <Meta label="Workflows" value={String(project.workflowCount)} />
+        <Meta label={t('projects.tabs.assets')} value={String(project.totalAssets)} />
+        <Meta label={t('projects.tabs.workflows')} value={String(project.workflowCount)} />
         <Meta
-          label="Last run"
-          value={project.lastRunAt ? dayjs(project.lastRunAt).fromNow() : 'Never'}
+          label={t('projects.list.sort.lastRun')}
+          value={project.lastRunAt ? dayjs(project.lastRunAt).fromNow() : t('projects.list.never')}
           title={
             project.lastRunAt
               ? dayjs(project.lastRunAt).format('DD MMM YYYY, HH:mm')
@@ -191,7 +196,7 @@ const ProjectCard = memo(function ProjectCard({
           }
         />
         <Meta
-          label="Next run"
+          label={t('projects.list.nextRun')}
           value={next ? dayjs(next).fromNow() : '—'}
           title={next ? dayjs(next).format('DD MMM YYYY, HH:mm') : undefined}
         />
@@ -202,6 +207,7 @@ const ProjectCard = memo(function ProjectCard({
 });
 
 export function Projects() {
+  const t = useT();
   const navigate = useNavigate();
   const timezone = getLocalTimezone();
   const {
@@ -263,12 +269,11 @@ export function Projects() {
       </div>
       <h3 className="text-lg font-medium text-muted-foreground">
         {status === ProjectStatusFilter.archived
-          ? 'No archived projects'
-          : 'No projects yet'}
+          ? t('projects.list.noArchived')
+          : t('projects.list.empty')}
       </h3>
       <p className="text-sm text-muted-foreground">
-        Create a project to keep a set of assets scanned: pick them by hand or
-        by rules, choose the pipeline, and when it runs.
+        {t('projects.list.emptyHint')}
       </p>
     </div>
   );
@@ -279,9 +284,11 @@ export function Projects() {
         <SearchX className="h-6 w-6 text-muted-foreground" />
       </div>
       <h3 className="text-lg font-medium text-muted-foreground">
-        No matching projects
+        {t('projects.list.noMatch')}
       </h3>
-      <p className="text-sm text-muted-foreground">Try a different search.</p>
+      <p className="text-sm text-muted-foreground">
+        {t('projects.list.noMatchHint')}
+      </p>
     </div>
   );
 
@@ -299,8 +306,8 @@ export function Projects() {
 
   return (
     <Page
-      title="Projects"
-      description="Keep a set of assets scanned and see what each run found"
+      title={t('projects.list.title')}
+      description={t('projects.list.description')}
       permission="project.read"
     >
       <div className="flex flex-col gap-4">
@@ -313,14 +320,14 @@ export function Projects() {
               onClick={() => navigate({ to: '/projects/create' })}
             >
               <Plus />
-              Create
+              {t('common.create')}
             </Button>
           </div>
           <div className="flex flex-wrap items-center gap-2 md:min-w-0 md:flex-1">
             <div className="relative w-full md:min-w-48 md:max-w-xs md:flex-1 xl:max-w-sm">
               <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search projects..."
+                placeholder={t('projects.list.searchPlaceholder')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="h-9 pl-8 text-xs"
@@ -334,7 +341,7 @@ export function Projects() {
               }}
             >
               <SelectTrigger
-                aria-label="Project status"
+                aria-label={t('projects.list.statusLabel')}
                 className="w-[120px] border-dashed py-0 text-xs focus:outline-none focus:ring-0 focus:ring-offset-0"
               >
                 <SelectValue />
@@ -342,7 +349,7 @@ export function Projects() {
               <SelectContent>
                 {STATUS_OPTIONS.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
-                    {option.label}
+                    {t(option.labelKey)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -359,7 +366,7 @@ export function Projects() {
               }}
             >
               <SelectTrigger
-                aria-label="Sort projects"
+                aria-label={t('projects.list.sortLabel')}
                 className="w-[150px] border-dashed py-0 text-xs focus:outline-none focus:ring-0 focus:ring-offset-0"
               >
                 <SelectValue />
@@ -367,7 +374,7 @@ export function Projects() {
               <SelectContent>
                 {(Object.keys(SORT_OPTIONS) as SortKey[]).map((key) => (
                   <SelectItem key={key} value={key}>
-                    {SORT_OPTIONS[key].label}
+                    {t(SORT_OPTIONS[key].labelKey)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -391,7 +398,7 @@ export function Projects() {
                 />
               </PaginationItem>
               <PaginationItem className="px-2 text-sm text-muted-foreground">
-                Page {page} of {pageCount}
+                {t('projects.list.pageOf', { page, pageCount })}
               </PaginationItem>
               <PaginationItem>
                 <PaginationNext

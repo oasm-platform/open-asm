@@ -6,12 +6,14 @@ import { usePermission } from '@/hooks/usePermission';
 import { useTemplateTabs } from '../hooks/use-template-tabs';
 import { useTemplateUpload } from '../hooks/use-template-upload';
 import { AiGenButton } from './ai-gen-button';
+import { useT } from '@/lib/i18n-dictionary';
 
 const NEW_SHORTCUT = /Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘I' : 'Ctrl+I';
 const LABEL = 'sr-only sm:not-sr-only';
 
 /** Every way to start a template, in the Templates page header. */
 export function TemplatesHeaderActions() {
+  const t = useT();
   const { hasPermission } = usePermission();
   const canWrite = hasPermission('artifact.write');
   const { openNew } = useTemplateTabs();
@@ -31,16 +33,16 @@ export function TemplatesHeaderActions() {
     <div className="flex shrink-0 gap-2">
       <AiGenButton>
         <Sparkles className="size-4" />
-        <span className={LABEL}>AI gen</span>
+        <span className={LABEL}>{t('templates.aiGen.label')}</span>
       </AiGenButton>
       {canWrite && (
         <>
           <Button size="sm" variant="outline" onClick={pick}>
-            <Upload /> <span className={LABEL}>Upload</span>
+            <Upload /> <span className={LABEL}>{t('templates.actions.upload')}</span>
           </Button>
           {input}
           <Button size="sm" onClick={openNew}>
-            <Plus /> <span className={LABEL}>New</span>
+            <Plus /> <span className={LABEL}>{t('templates.actions.new')}</span>
             <kbd className="ml-1 hidden rounded bg-primary-foreground/20 px-1 text-xs sm:inline">
               {NEW_SHORTCUT}
             </kbd>

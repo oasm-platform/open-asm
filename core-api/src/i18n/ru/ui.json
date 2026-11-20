@@ -5,5 +5,10 @@
   "notifications.unread.many": "{count} непрочитанных уведомлений",
   "notifications.unread.other": "{count} непрочитанного уведомления",
   "notifications.markAllRead": "Отметить все как прочитанные",
-  "preferences.language": "Язык"
+  "userMenu.language": "Язык",
+  "userMenu.settings": "Настройки",
+  "userMenu.admin": "Администрирование",
+  "userMenu.docs": "Документация",
+  "userMenu.reportIssue": "Сообщить о проблеме",
+  "userMenu.logout": "Выйти"
 }

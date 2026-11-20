@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -37,6 +38,7 @@ export function ConnectedCard({
   onDisconnect,
   formatCategory,
 }: ConnectedCardProps) {
+  const t = useT();
   const [showDialog, setShowDialog] = useState(false);
 
   return (
@@ -61,11 +63,15 @@ export function ConnectedCard({
           ))}
         </div>
         <p className="text-sm text-muted-foreground">
-          Connected {dayjs(integration.createdAt).fromNow()}
+          {t('integrations.connected.connectedAgo', {
+            time: dayjs(integration.createdAt).fromNow(),
+          })}
         </p>
         {integration.lastRunAt && (
           <p className="text-sm text-muted-foreground">
-            Last sync {dayjs(integration.lastRunAt).fromNow()}
+            {t('integrations.connected.lastSyncAgo', {
+              time: dayjs(integration.lastRunAt).fromNow(),
+            })}
           </p>
         )}
       </button>
@@ -76,7 +82,7 @@ export function ConnectedCard({
             variant="ghost"
             size="icon-sm"
             className="shrink-0"
-            aria-label="Integration actions"
+            aria-label={t('integrations.connected.actions')}
           >
             <MoreHorizontal className="size-4" />
           </Button>
@@ -87,7 +93,7 @@ export function ConnectedCard({
             onClick={() => setShowDialog(true)}
           >
             <Unplug className="size-4 text-destructive" />
-            Disconnect
+            {t('integrations.disconnect.action')}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -95,15 +101,14 @@ export function ConnectedCard({
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Disconnect Integration</DialogTitle>
+            <DialogTitle>{t('integrations.disconnect.title')}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to disconnect &quot;{integration.name}
-              &quot;? This action cannot be undone.
+              {t('integrations.disconnect.confirm', { name: integration.name })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDialog(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               onClick={() => {
@@ -111,7 +116,7 @@ export function ConnectedCard({
                 setShowDialog(false);
               }}
             >
-              Disconnect
+              {t('integrations.disconnect.action')}
             </Button>
           </DialogFooter>
         </DialogContent>

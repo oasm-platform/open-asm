@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -8,9 +9,10 @@ interface DataTableErrorProps {
 }
 
 export function DataTableError({
-  message = 'Failed to load data.',
+  message,
   onRetry,
 }: DataTableErrorProps) {
+  const t = useT();
   return (
     <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-destructive/20 bg-destructive/5 px-6 py-16">
       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
@@ -18,14 +20,16 @@ export function DataTableError({
       </div>
       <div className="space-y-1 text-center">
         <p className="text-sm font-medium text-foreground">
-          Unable to load data
+          {t('components.dataTable.unableToLoad')}
         </p>
-        <p className="text-sm text-muted-foreground">{message}</p>
+        <p className="text-sm text-muted-foreground">
+          {message ?? t('components.dataTable.loadFailed')}
+        </p>
       </div>
       {onRetry && (
         <Button variant="outline" size="sm" onClick={onRetry} className="gap-2">
           <RefreshCw className="h-3.5 w-3.5" />
-          Retry
+          {t('common.retry')}
         </Button>
       )}
     </div>

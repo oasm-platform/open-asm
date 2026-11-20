@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
 import type {
@@ -85,11 +86,12 @@ const ModelListContent = memo(
     activeProviderLogo,
     onSelect,
   }: ModelListProps) => {
+    const t = useT();
     if (isLoading && models.length === 0) {
       return (
         <CommandEmpty className="py-6 flex items-center justify-center gap-2 text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Loading models...
+          {t('components.modelSwitcher.loading')}
         </CommandEmpty>
       );
     }
@@ -108,7 +110,7 @@ const ModelListContent = memo(
           ))
         ) : (
           <CommandEmpty>
-            {searchQuery ? 'No models found' : 'No models available'}
+            {searchQuery ? t('components.modelSwitcher.noneFound') : t('components.modelSwitcher.noneAvailable')}
           </CommandEmpty>
         )}
       </CommandList>
@@ -124,6 +126,7 @@ export function ChatModelSwitcher({
   onSelectModel,
   showSettingsButton = true,
 }: ChatModelSwitcherProps) {
+  const t = useT();
   const { open: openSettings } = useAgentSettingsDialog();
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -204,14 +207,14 @@ export function ChatModelSwitcher({
             void queryClient.invalidateQueries({
               queryKey: ['/api/agents/llm-configs'],
             });
-            toast.success('Model updated');
+            toast.success(t('components.modelSwitcher.updated'));
           },
-          onError: () => toast.error('Failed to sync model preference'),
+          onError: () => toast.error(t('components.modelSwitcher.syncFailed')),
           onSettled: () => setIsUpdating(false),
         },
       );
     },
-    [activeConfig, onSelectModel, updateLLMConfig, queryClient],
+    [activeConfig, onSelectModel, updateLLMConfig, queryClient, t],
   );
 
   const handleOpenChange = useCallback((isOpen: boolean) => {
@@ -253,12 +256,12 @@ export function ChatModelSwitcher({
             }),
           onError: () => {
             setPickedEffort(null);
-            toast.error('Failed to save reasoning effort');
+            toast.error(t('components.modelSwitcher.effortFailed'));
           },
         },
       );
     },
-    [configId, updateLLMConfig, queryClient],
+    [configId, updateLLMConfig, queryClient, t],
   );
 
   if (connectedConfigs.length === 0) {
@@ -269,7 +272,7 @@ export function ChatModelSwitcher({
         className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors text-muted-foreground"
       >
         <Settings className="h-3.5 w-3.5" />
-        Connect LLM
+        {t('components.modelSwitcher.connectLlm')}
       </button>
     );
   }
@@ -282,7 +285,7 @@ export function ChatModelSwitcher({
             <button
               disabled={isUpdating}
               className="flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors disabled:opacity-50"
-              aria-label="Select model"
+              aria-label={t('components.modelSwitcher.select')}
             >
               {currentDisplay && (
                 <Image
@@ -294,7 +297,7 @@ export function ChatModelSwitcher({
               {/* Narrower on phones so the footer keeps room for the
                   mode select and send button */}
               <span className="text-muted-foreground max-w-[110px] truncate sm:max-w-[140px]">
-                {currentDisplay?.label ?? 'Select model'}
+                {currentDisplay?.label ?? t('components.modelSwitcher.select')}
               </span>
               <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             </button>
@@ -306,7 +309,7 @@ export function ChatModelSwitcher({
           >
             <Command shouldFilter={false} className="p-1">
               <CommandInput
-                placeholder="Search models..."
+                placeholder={t('components.modelSwitcher.search')}
                 value={searchQuery}
                 onValueChange={setSearchQuery}
               />
@@ -332,7 +335,7 @@ export function ChatModelSwitcher({
           <button
             type="button"
             onClick={() => openSettings('provider')}
-            aria-label="Agent settings"
+            aria-label={t('components.modelSwitcher.agentSettings')}
             className="flex items-center gap-1.5 rounded-md p-1.5 text-sm hover:bg-accent transition-colors text-muted-foreground"
           >
             <Settings className="h-3.5 w-3.5" />

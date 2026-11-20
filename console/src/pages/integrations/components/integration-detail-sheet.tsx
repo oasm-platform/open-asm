@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CronScheduleBuilder } from '@/components/ui/cron-schedule-builder';
@@ -93,6 +94,7 @@ export function IntegrationDetailSheet({
   open,
   onOpenChange,
 }: IntegrationDetailSheetProps) {
+  const t = useT();
   const queryClient = useQueryClient();
 
   const capabilityMeta = getCapabilityMeta(schema);
@@ -158,7 +160,7 @@ export function IntegrationDetailSheet({
           }
         },
         onError: () => {
-          toast.error('Failed to test integration');
+          toast.error(t('integrations.detail.testFailed'));
         },
       },
     });
@@ -172,10 +174,10 @@ export function IntegrationDetailSheet({
           queryClient.invalidateQueries({
             queryKey: getIntegrationsControllerGetManyIntegrationsQueryKey(),
           });
-          toast.success('Sync started — it may take a few minutes');
+          toast.success(t('integrations.detail.syncStarted'));
         },
         onError: () => {
-          toast.error('Failed to sync integration');
+          toast.error(t('integrations.detail.syncFailed'));
         },
       },
     });
@@ -184,14 +186,14 @@ export function IntegrationDetailSheet({
     useIntegrationsControllerUpdateIntegration({
       mutation: {
         onSuccess: () => {
-          toast.success('Integration updated successfully');
+          toast.success(t('integrations.detail.updated'));
           queryClient.invalidateQueries({
             queryKey: getIntegrationsControllerGetManyIntegrationsQueryKey(),
           });
           setIsEditing(false);
         },
         onError: () => {
-          toast.error('Failed to update integration');
+          toast.error(t('integrations.detail.updateFailed'));
         },
       },
     });
@@ -233,7 +235,7 @@ export function IntegrationDetailSheet({
       ? (formatCronLabel(integration.syncSchedule, getLocalTimezone()) ??
         integration.syncSchedule)
       : integration.syncSchedule === 'disabled'
-        ? 'No schedule — automatic syncs are off'
+        ? t('integrations.sync.off')
         : '—';
   const lastRunLabel = integration.lastRunAt
     ? formatNextRun(new Date(integration.lastRunAt), getLocalTimezone())
@@ -282,7 +284,7 @@ export function IntegrationDetailSheet({
   const handleSave = (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!editName.trim()) {
-      toast.error('Integration name is required');
+      toast.error(t('integrations.form.nameRequired'));
       return;
     }
 
@@ -299,7 +301,9 @@ export function IntegrationDetailSheet({
           return value === undefined || value === null;
         });
     if (missing.length > 0) {
-      toast.error('Please fill in required fields: ' + missing.join(', '));
+      toast.error(
+        t('integrations.form.missingRequired', { fields: missing.join(', ') }),
+      );
       return;
     }
 
@@ -366,7 +370,9 @@ export function IntegrationDetailSheet({
           )}
           {capabilityMeta && !isEditing && (
             <div className="space-y-2 rounded-lg border p-3">
-              <Label className="text-sm font-medium">Capabilities</Label>
+              <Label className="text-sm font-medium">
+                {t('integrations.capabilities.label')}
+              </Label>
               {integrationCapabilities.map((capability) => (
                 <div
                   key={capability}
@@ -396,7 +402,7 @@ export function IntegrationDetailSheet({
                     }
                   >
                     <Play className="size-3.5" />
-                    Test
+                    {t('integrations.detail.test')}
                   </Button>
                 </div>
               ))}
@@ -410,7 +416,7 @@ export function IntegrationDetailSheet({
 
           {formProperties.length === 0 && (
             <p className="text-sm text-muted-foreground">
-              No configuration data available.
+              {t('integrations.detail.noConfig')}
             </p>
           )}
 
@@ -418,7 +424,7 @@ export function IntegrationDetailSheet({
           {isEditing && (
             <div className="space-y-2">
               <Label htmlFor="edit-integration-name">
-                Integration name <span className="text-destructive">*</span>
+                {t('integrations.form.name')} <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="edit-integration-name"
@@ -562,10 +568,10 @@ export function IntegrationDetailSheet({
                         htmlFor="sync-schedule-toggle"
                         className="text-sm font-medium"
                       >
-                        Sync schedule
+                        {t('integrations.sync.schedule')}
                       </Label>
                       <p className="text-xs text-muted-foreground">
-                        Optionally run automatic syncs on a schedule.
+                        {t('integrations.sync.hint')}
                       </p>
                     </div>
                     <Switch
@@ -578,7 +584,7 @@ export function IntegrationDetailSheet({
                   {scheduleEnabled ? (
                     <div className="space-y-2 pt-1">
                       <p className="text-xs text-muted-foreground">
-                        Schedule (stored in UTC)
+                        {t('integrations.sync.utc')}
                       </p>
                       <CronScheduleBuilder
                         defaultValue={editSchedule || undefined}
@@ -587,7 +593,7 @@ export function IntegrationDetailSheet({
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      No schedule — automatic syncs are off
+                      {t('integrations.sync.off')}
                     </p>
                   )}
                 </>
@@ -596,7 +602,7 @@ export function IntegrationDetailSheet({
                   <div className="flex items-center justify-between gap-2">
                     <div className="space-y-1">
                       <Label className="text-sm font-medium">
-                        Sync schedule
+                        {t('integrations.sync.schedule')}
                       </Label>
                       <p className="text-sm text-muted-foreground">
                         {scheduleLabel}
@@ -614,11 +620,15 @@ export function IntegrationDetailSheet({
                       ) : (
                         <RefreshCw className="size-4" />
                       )}
-                      {isSyncing ? 'Syncing...' : 'Sync now'}
+                      {isSyncing
+                        ? t('integrations.sync.syncing')
+                        : t('integrations.sync.now')}
                     </Button>
                   </div>
                   <div className="space-y-1 border-t pt-3">
-                    <Label className="text-sm font-medium">Last sync</Label>
+                    <Label className="text-sm font-medium">
+                      {t('integrations.sync.last')}
+                    </Label>
                     <p className="text-sm text-muted-foreground">
                       {lastRunLabel}
                     </p>
@@ -639,7 +649,7 @@ export function IntegrationDetailSheet({
                 onClick={handleCancel}
                 disabled={isSaving}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 type="submit"
@@ -648,7 +658,7 @@ export function IntegrationDetailSheet({
                 disabled={isSaving}
               >
                 {isSaving && <Loader2 className="mr-2 size-4 animate-spin" />}
-                {isSaving ? 'Saving...' : 'Save'}
+                {isSaving ? t('integrations.detail.saving') : t('common.save')}
               </Button>
             </div>
           ) : (
@@ -661,7 +671,7 @@ export function IntegrationDetailSheet({
                 disabled={isSyncing}
               >
                 <Pencil className="size-4" />
-                Edit
+                {t('common.edit')}
               </Button>
               <Button
                 type="button"
@@ -677,7 +687,9 @@ export function IntegrationDetailSheet({
                 ) : (
                   <Play className="size-4" />
                 )}
-                {isTesting ? 'Testing...' : 'Test Integration'}
+                {isTesting
+                  ? t('integrations.detail.testing')
+                  : t('integrations.detail.testIntegration')}
               </Button>
             </div>
           )}

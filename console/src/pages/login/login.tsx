@@ -19,17 +19,22 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useRouter, useSearch } from '@tanstack/react-router';
 import { Loader2Icon, MailCheck, MailWarning } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useT, type TFunction } from '@/lib/i18n-dictionary';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
-const formSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-});
+const makeFormSchema = (t: TFunction) =>
+  z.object({
+    email: z.string().email(t('auth.errors.invalidEmail')),
+    password: z.string().min(8, t('auth.errors.passwordMin')),
+  });
+type FormValues = z.infer<ReturnType<typeof makeFormSchema>>;
 
 export default function Login() {
+  const t = useT();
+  const formSchema = useMemo(() => makeFormSchema(t), [t]);
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -66,7 +71,7 @@ export default function Login() {
     }
   }, [router, redirect]);
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: FormValues) {
     setLoading(true);
     try {
       // Don't navigate on success — session hasn't propagated to
@@ -92,18 +97,18 @@ export default function Login() {
         // field. Anything else (5xx, gateway errors) is a server problem.
         if (res.error.status === 401 || res.error.status === 403) {
           form.setError('password', {
-            message: res.error.message || 'Invalid email or password',
+            message: res.error.message || t('auth.errors.invalidCredentials'),
           });
         } else {
           toast.error(
-            res.error.message || 'Something went wrong. Please try again later.',
+            res.error.message || t('auth.errors.generic'),
             { richColors: true },
           );
         }
       }
     } catch {
       setLoading(false);
-      toast.error('Unable to reach the server. Please try again later.', {
+      toast.error(t('auth.errors.unreachable'), {
         richColors: true,
       });
     }
@@ -119,12 +124,12 @@ export default function Login() {
       .catch(() => null);
     setResending(false);
     if (res && !res.error) {
-      toast.success('Verification email sent', {
-        description: `Check ${email} for the link.`,
+      toast.success(t('auth.verify.sent'), {
+        description: t('auth.verify.sentDescription', { email }),
       });
     } else {
       toast.error(
-        res?.error?.message || 'Failed to send the verification email.',
+        res?.error?.message || t('auth.verify.sendFailed'),
         { richColors: true },
       );
     }
@@ -136,26 +141,26 @@ export default function Login() {
         <div className="w-full max-w-sm space-y-8">
           <div className="space-y-2 text-center lg:text-left">
             <h1 className="text-balance text-2xl font-semibold tracking-tight">
-              Welcome back
+              {t('auth.login.title')}
             </h1>
             <p className="text-pretty text-sm text-muted-foreground">
-              Sign in to access your workspace.
+              {t('auth.login.subtitle')}
             </p>
           </div>
           {verificationError ? (
             <Alert variant="destructive">
               <MailWarning />
-              <AlertTitle>The verification link didn&apos;t work</AlertTitle>
+              <AlertTitle>{t('auth.verify.linkFailed')}</AlertTitle>
               <AlertDescription>
-                It may have expired. Sign in to get a new one.
+                {t('auth.verify.linkFailedDescription')}
               </AlertDescription>
             </Alert>
           ) : verified ? (
             <Alert>
               <MailCheck />
-              <AlertTitle>Email confirmed</AlertTitle>
+              <AlertTitle>{t('auth.verify.confirmed')}</AlertTitle>
               <AlertDescription>
-                You can sign in once an administrator approves your account.
+                {t('auth.verify.confirmedDescription')}
               </AlertDescription>
             </Alert>
           ) : null}
@@ -166,7 +171,7 @@ export default function Login() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>{t('auth.fields.email')}</FormLabel>
                     <FormControl>
                       <Input placeholder="email@example.com" {...field} />
                     </FormControl>
@@ -179,7 +184,7 @@ export default function Login() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>{t('auth.fields.password')}</FormLabel>
                     <FormControl>
                       <Input
                         type="password"
@@ -197,7 +202,7 @@ export default function Login() {
                 className="w-full"
               >
                 {loading && <Loader2Icon className="animate-spin" />}
-                Sign in
+                {t('auth.login.submit')}
               </Button>
               {unverifiedEmail && (
                 <Button
@@ -208,20 +213,20 @@ export default function Login() {
                   onClick={() => void resendVerification(unverifiedEmail)}
                 >
                   {resending && <Loader2Icon className="animate-spin" />}
-                  Send the verification email again
+                  {t('auth.verify.resend')}
                 </Button>
               )}
             </form>
           </Form>
           {metadata?.allowSignUp && (
             <p className="text-center text-sm text-muted-foreground">
-              Don&apos;t have an account?{' '}
+              {t('auth.login.noAccount')}{' '}
               <Link
                 to="/signup"
                 search={{ redirect }}
                 className="font-medium text-primary underline-offset-4 hover:underline"
               >
-                Sign up
+                {t('auth.login.signUp')}
               </Link>
             </p>
           )}

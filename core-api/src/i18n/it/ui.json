@@ -3,5 +3,10 @@
   "notifications.unread.one": "{count} notifica non letta",
   "notifications.unread.other": "{count} notifiche non lette",
   "notifications.markAllRead": "Segna tutte come lette",
-  "preferences.language": "Lingua"
+  "userMenu.language": "Lingua",
+  "userMenu.settings": "Impostazioni",
+  "userMenu.admin": "Amministrazione",
+  "userMenu.docs": "Documentazione",
+  "userMenu.reportIssue": "Segnala un problema",
+  "userMenu.logout": "Esci"
 }

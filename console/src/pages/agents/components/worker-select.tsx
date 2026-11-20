@@ -11,6 +11,7 @@ import { WorkerInstanceScope } from '@/services/apis/gen/queries';
 import { MonitorIcon } from 'lucide-react';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
+import { useT } from '@/lib/i18n-dictionary';
 
 const AUTO = 'auto';
 
@@ -26,6 +27,7 @@ export function WorkerSelect({
   onChange,
   className,
 }: WorkerSelectProps) {
+  const t = useT();
   const { workers, isSuccess, isFetching, refetch } = useAgentWorkers();
 
   // A chosen worker that went offline drops out of the list; fall back to
@@ -38,8 +40,8 @@ export function WorkerSelect({
   useEffect(() => {
     if (!selectedIsOffline) return;
     onChange(null);
-    toast.info('The selected worker went offline, switched to Auto');
-  }, [selectedIsOffline, onChange]);
+    toast.info(t('agents.worker.offline'));
+  }, [selectedIsOffline, onChange, t]);
 
   return (
     <Select
@@ -53,7 +55,7 @@ export function WorkerSelect({
     >
       <SelectTrigger
         size="sm"
-        aria-label="Device"
+        aria-label={t('agents.worker.label')}
         className={cn(
           'w-auto max-w-64 data-[size=sm]:h-7 gap-1.5 border-none bg-transparent px-2 text-xs text-muted-foreground shadow-none hover:bg-accent dark:bg-transparent',
           className,
@@ -65,11 +67,12 @@ export function WorkerSelect({
         <SelectValue />
       </SelectTrigger>
       <SelectContent align="start">
-        <SelectItem value={AUTO}>Auto (any worker)</SelectItem>
+        <SelectItem value={AUTO}>{t('agents.worker.auto')}</SelectItem>
         {workers.map((worker) => (
           <SelectItem key={worker.id} value={worker.id}>
             {worker.name ?? worker.id.slice(0, 8)}
-            {worker.scope === WorkerInstanceScope.cloud && ' (Global)'}
+            {worker.scope === WorkerInstanceScope.cloud &&
+              t('agents.worker.global')}
           </SelectItem>
         ))}
       </SelectContent>

@@ -7,6 +7,7 @@ import { ArrowDownIcon, DownloadIcon } from 'lucide-react';
 import type { ComponentProps } from 'react';
 import { useCallback } from 'react';
 import { StickToBottom, useStickToBottomContext } from 'use-stick-to-bottom';
+import { useT, t } from '@/lib/i18n-dictionary';
 
 export type ConversationProps = ComponentProps<typeof StickToBottom>;
 
@@ -45,12 +46,14 @@ export type ConversationEmptyStateProps = ComponentProps<'div'> & {
 
 export const ConversationEmptyState = ({
   className,
-  title = 'No messages yet',
-  description = 'Start a conversation to see messages here',
+  title = t('agents.ai.conversation.emptyTitle'),
+  description = t('agents.ai.conversation.emptyDescription'),
   icon,
   children,
   ...props
-}: ConversationEmptyStateProps) => (
+}: ConversationEmptyStateProps) => {
+  useT(); // re-render on language change
+  return (
   <div
     className={cn(
       'flex size-full flex-col items-center justify-center gap-3 p-8 text-center',
@@ -71,6 +74,7 @@ export const ConversationEmptyState = ({
     )}
   </div>
 );
+};
 
 export type ConversationScrollButtonProps = ComponentProps<typeof Button>;
 

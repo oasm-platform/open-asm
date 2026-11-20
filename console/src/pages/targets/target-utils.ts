@@ -1,18 +1,19 @@
+import { t } from '@/lib/i18n-dictionary';
 import { CronSchedule } from '@/services/apis/gen/queries';
 
 /** Tabs of a (non Git org) target page, in order; the first is the default. */
 export const TARGET_TABS = [
-  { value: 'overview', label: 'Overview' },
-  { value: 'assets', label: 'Assets' },
-  { value: 'vulnerabilities', label: 'Vulnerabilities' },
-  { value: 'activity', label: 'Activity' },
-  { value: 'settings', label: 'Settings' },
+  { value: 'overview', labelKey: 'targets.tabs.overview' },
+  { value: 'assets', labelKey: 'targets.tabs.assets' },
+  { value: 'vulnerabilities', labelKey: 'targets.tabs.vulnerabilities' },
+  { value: 'activity', labelKey: 'targets.tabs.activity' },
+  { value: 'settings', labelKey: 'targets.tabs.settings' },
 ] as const;
 
 export type TargetTab = (typeof TARGET_TABS)[number]['value'];
 
 export const isTargetTab = (tab: string | undefined): tab is TargetTab =>
-  TARGET_TABS.some((t) => t.value === tab);
+  TARGET_TABS.some((item) => item.value === tab);
 
 /** Old path tabs and the tab they are now. */
 export const LEGACY_TARGET_TABS: Record<string, TargetTab> = {
@@ -40,17 +41,18 @@ export function targetTabRedirect(
 }
 
 const SCHEDULE_LABELS: Record<string, string> = {
-  [CronSchedule.disabled]: 'Not scheduled',
-  [CronSchedule['0_0_*_*_*']]: 'Daily',
-  [CronSchedule['0_0_*/3_*_*']]: 'Every 3 days',
-  [CronSchedule['0_0_*_*_0']]: 'Weekly',
-  [CronSchedule['0_0_*/14_*_*']]: 'Every 2 weeks',
-  [CronSchedule['0_0_1_*_*']]: 'Monthly',
+  [CronSchedule.disabled]: 'targets.schedule.disabled',
+  [CronSchedule['0_0_*_*_*']]: 'targets.schedule.daily',
+  [CronSchedule['0_0_*/3_*_*']]: 'targets.schedule.every3Days',
+  [CronSchedule['0_0_*_*_0']]: 'targets.schedule.weekly',
+  [CronSchedule['0_0_*/14_*_*']]: 'targets.schedule.every2Weeks',
+  [CronSchedule['0_0_1_*_*']]: 'targets.schedule.monthly',
 };
 
 /** "Weekly", "Not scheduled"… for a target's scan schedule. */
 export function scheduleLabel(schedule?: string | null): string {
-  return SCHEDULE_LABELS[schedule ?? CronSchedule.disabled] ?? schedule ?? '';
+  const key = SCHEDULE_LABELS[schedule ?? CronSchedule.disabled];
+  return key ? t(key) : (schedule ?? '');
 }
 
 export const isScheduled = (schedule?: string | null) =>

@@ -19,6 +19,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useT } from '@/lib/i18n-dictionary';
 
 interface SnippetContextType {
   code: string;
@@ -96,6 +97,7 @@ export const SnippetCopyButton = ({
   className,
   ...props
 }: SnippetCopyButtonProps) => {
+  const t = useT();
   const [isCopied, setIsCopied] = useState(false);
   const timeoutRef = useRef<number>(0);
   const { code } = useContext(SnippetContext);
@@ -132,11 +134,11 @@ export const SnippetCopyButton = ({
 
   return (
     <InputGroupButton
-      aria-label="Copy"
+      aria-label={t('agents.ai.copy')}
       className={className}
       onClick={copyToClipboard}
       size="icon-sm"
-      title="Copy"
+      title={t('agents.ai.copy')}
       {...props}
     >
       {children ?? <Icon className="size-3.5" size={14} />}

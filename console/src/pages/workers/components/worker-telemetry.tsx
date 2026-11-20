@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { formatBytes } from '@/utils/format-bytes';
+import { t, useT } from '@/lib/i18n-dictionary';
 
 const CONTAINERS_PER_PAGE = 12;
 
@@ -43,9 +44,12 @@ const formatUptime = (seconds: number) => {
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
-  if (days > 0) return `${days}d ${hours}h`;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m ${Math.floor(seconds % 60)}s`;
+  if (days > 0) return t('workers.telemetry.uptime.days', { days, hours });
+  if (hours > 0) return t('workers.telemetry.uptime.hours', { hours, minutes });
+  return t('workers.telemetry.uptime.minutes', {
+    minutes,
+    seconds: Math.floor(seconds % 60),
+  });
 };
 
 const stateTone = (state: string) => {
@@ -150,9 +154,10 @@ const ContainerCard = ({
   item: ManagedContainerTelemetryDto;
   tool?: WorkerToolDto;
 }) => {
+  const t = useT();
   const cpuLimit = item.cpuLimitMillicores;
   const memoryLimit = item.memoryLimitBytes;
-  const toolName = tool?.name || item.tool || 'Unknown tool';
+  const toolName = tool?.name || item.tool || t('workers.telemetry.unknownTool');
 
   return (
     <Card
@@ -174,25 +179,30 @@ const ContainerCard = ({
                 className="truncate text-sm"
                 title={item.containerName || item.containerId}
               >
-                {item.containerName || 'Unnamed container'}
+                {item.containerName || t('workers.telemetry.unnamedContainer')}
               </CardTitle>
               <CardDescription className="mt-1 break-all text-xs">
-                {item.image || 'Unknown image'}
+                {item.image || t('workers.telemetry.unknownImage')}
                 {item.imageVersion ? ` · v${item.imageVersion}` : ''}
               </CardDescription>
             </div>
           </div>
           <dl className="grid shrink-0 grid-cols-3 gap-6">
-            <InfoValue label="Pool" value={item.pooled ? 'Warm pool' : 'Ephemeral'} />
             <InfoValue
-              label="CPU limit"
+              label={t('workers.telemetry.pool')}
+              value={item.pooled ? t('workers.telemetry.warmPool') : t('workers.telemetry.ephemeral')}
+            />
+            <InfoValue
+              label={t('workers.telemetry.cpuLimit')}
               value={
                 cpuLimit > 0
-                  ? `${(cpuLimit / 1000).toFixed(cpuLimit % 1000 ? 2 : 0)} cores`
-                  : 'Not reported'
+                  ? t('workers.telemetry.cores', {
+                      count: (cpuLimit / 1000).toFixed(cpuLimit % 1000 ? 2 : 0),
+                    })
+                  : t('workers.telemetry.notReported')
               }
             />
-            <InfoValue label="Memory limit" value={formatBytes(memoryLimit)} />
+            <InfoValue label={t('workers.telemetry.memoryLimit')} value={formatBytes(memoryLimit)} />
           </dl>
         </div>
       </CardContent>
@@ -210,11 +220,16 @@ const ContainerPagination = ({
   pageCount: number;
   total: number;
   onPageChange: (page: number) => void;
-}) => (
+}) => {
+  const t = useT();
+  return (
   <div className="flex flex-col items-center justify-between gap-3 pt-2 sm:flex-row">
     <p className="text-xs text-muted-foreground">
-      Showing {Math.min((page - 1) * CONTAINERS_PER_PAGE + 1, total)}–
-      {Math.min(page * CONTAINERS_PER_PAGE, total)} of {total} reported containers
+      {t('workers.telemetry.showing', {
+        from: Math.min((page - 1) * CONTAINERS_PER_PAGE + 1, total),
+        to: Math.min(page * CONTAINERS_PER_PAGE, total),
+        total,
+      })}
     </p>
     <div className="flex items-center gap-2">
       <button
@@ -223,10 +238,10 @@ const ContainerPagination = ({
         disabled={page <= 1}
         onClick={() => onPageChange(page - 1)}
       >
-        <ChevronLeft className="size-4" /> Previous
+        <ChevronLeft className="size-4" /> {t('workers.telemetry.previous')}
       </button>
       <span className="min-w-24 text-center text-xs text-muted-foreground tabular-nums">
-        Page {page} of {pageCount}
+        {t('workers.telemetry.page', { page, pageCount })}
       </span>
       <button
         type="button"
@@ -234,27 +249,30 @@ const ContainerPagination = ({
         disabled={page >= pageCount}
         onClick={() => onPageChange(page + 1)}
       >
-        Next <ChevronRight className="size-4" />
+        {t('workers.telemetry.next')} <ChevronRight className="size-4" />
       </button>
     </div>
   </div>
-);
+  );
+};
 
-const TelemetryUnavailable = ({ header }: { header?: ReactNode }) => (
+const TelemetryUnavailable = ({ header }: { header?: ReactNode }) => {
+  const t = useT();
+  return (
   <Card className="gap-0 overflow-hidden border-dashed py-0">
     {header}
     <CardHeader className="px-6 py-6">
       <CardTitle className="flex items-center gap-2 text-sm">
-        <Activity className="size-4 text-muted-foreground" /> Worker runtime unavailable
+        <Activity className="size-4 text-muted-foreground" />
+        {t('workers.telemetry.unavailable.title')}
       </CardTitle>
       <CardDescription>
-        The worker has not reported a current Redis snapshot, or the snapshot
-        has expired. The worker will appear here automatically after its next
-        report.
+        {t('workers.telemetry.unavailable.description')}
       </CardDescription>
     </CardHeader>
   </Card>
-);
+  );
+};
 
 export function WorkerTelemetry({
   telemetry,
@@ -265,6 +283,7 @@ export function WorkerTelemetry({
   header?: ReactNode;
   tools?: WorkerToolDto[];
 }) {
+  const t = useT();
   const [containerPage, setContainerPage] = useState(1);
 
   if (!telemetry) return <TelemetryUnavailable header={header} />;
@@ -288,53 +307,54 @@ export function WorkerTelemetry({
       className={`gap-0 overflow-hidden py-0 ${
         telemetry.freshness === 'stale' ? 'border-amber-500/50' : ''
       }`}
-      aria-label="Worker runtime"
+      aria-label={t('workers.telemetry.title')}
     >
       {header}
       <section>
         <CardHeader className="px-6 pt-6 pb-0">
-          <CardTitle>Worker runtime</CardTitle>
+          <CardTitle>{t('workers.telemetry.title')}</CardTitle>
           <CardDescription>
-            Current resource usage and managed container state.
+            {t('workers.telemetry.description')}
           </CardDescription>
         </CardHeader>
         {telemetry.freshness === 'stale' ? (
           <div className="flex items-center gap-2 border-y border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-700 dark:text-amber-300 md:px-6">
             <Clock3 className="size-3.5" />
-            This snapshot is older than 30 seconds. Values may no longer reflect
-            the current worker runtime.
+            {t('workers.telemetry.stale')}
           </div>
         ) : null}
         <CardContent className="grid gap-4 px-6 pt-4 pb-6 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard
             icon={Cpu}
-            label="CPU"
+            label={t('workers.telemetry.cpu')}
             value={`${telemetry.node.cpuUsagePercent.toFixed(1)}%`}
-            detail={`${telemetry.node.cpuCount} logical cores`}
+            detail={t('workers.telemetry.logicalCores', {
+              count: telemetry.node.cpuCount,
+            })}
             progress={telemetry.node.cpuUsagePercent}
             testId="telemetry-cpu"
           />
           <MetricCard
             icon={MemoryStick}
-            label="Memory"
+            label={t('workers.telemetry.memory')}
             value={formatBytes(memoryUsed)}
-            detail={`of ${formatBytes(memoryTotal)}`}
+            detail={t('workers.telemetry.ofTotal', { total: formatBytes(memoryTotal) })}
             progress={memoryPercent}
             testId="telemetry-memory"
           />
           <MetricCard
             icon={Gauge}
-            label="Jobs"
+            label={t('workers.telemetry.jobs')}
             value={`${activeJobs} / ${maxJobs || '∞'}`}
-            detail="Active / configured concurrency"
+            detail={t('workers.telemetry.jobsDetail')}
             progress={jobPercent}
             testId="telemetry-jobs"
           />
           <MetricCard
             icon={Timer}
-            label="Uptime"
+            label={t('workers.telemetry.uptime')}
             value={formatUptime(telemetry.uptimeSeconds)}
-            detail="Current worker process runtime"
+            detail={t('workers.telemetry.uptimeDetail')}
             testId="telemetry-uptime"
           />
         </CardContent>
@@ -343,45 +363,48 @@ export function WorkerTelemetry({
       <Separator />
       <section>
         <CardHeader className="px-6 pt-6 pb-0">
-          <CardTitle>Containers</CardTitle>
+          <CardTitle>{t('workers.telemetry.containers')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6 px-6 pt-4 pb-6">
           {telemetry.containers.truncated ? (
             <div className="flex flex-wrap justify-end gap-2">
               <Badge variant="outline" className={stateTone('UNKNOWN')}>
-                Truncated · {containerItems.length}/{telemetry.containers.total} shown
+                {t('workers.telemetry.truncated', {
+                  shown: containerItems.length,
+                  total: telemetry.containers.total,
+                })}
               </Badge>
             </div>
           ) : null}
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-            <MetricCard icon={Box} label="Total" value={String(telemetry.containers.total)} />
+            <MetricCard icon={Box} label={t('workers.telemetry.total')} value={String(telemetry.containers.total)} />
             <MetricCard
               icon={Activity}
-              label="Active"
+              label={t('workers.telemetry.active')}
               value={String(telemetry.containers.active)}
-              detail="Owned by an execution"
+              detail={t('workers.telemetry.activeDetail')}
             />
             <MetricCard
               icon={Clock3}
-              label="Idle"
+              label={t('workers.telemetry.idle')}
               value={String(telemetry.containers.idle)}
-              detail="Available in warm pool"
+              detail={t('workers.telemetry.idleDetail')}
             />
             <MetricCard
               icon={XCircle}
-              label="Unhealthy"
+              label={t('workers.telemetry.unhealthy')}
               value={String(telemetry.containers.unhealthy)}
-              detail="Docker healthcheck failures"
+              detail={t('workers.telemetry.unhealthyDetail')}
             />
             <MetricCard
               icon={Network}
-              label="Reported"
+              label={t('workers.telemetry.reported')}
               value={String(containerItems.length)}
               detail={
                 telemetry.containers.truncated
-                  ? `Snapshot capped at ${containerItems.length}`
-                  : 'All tracked containers'
+                  ? t('workers.telemetry.cappedAt', { count: containerItems.length })
+                  : t('workers.telemetry.allTracked')
               }
             />
           </div>
@@ -389,11 +412,11 @@ export function WorkerTelemetry({
           <div className="space-y-4">
             {!telemetry.containers.supported ? (
               <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                This worker mode does not manage Docker containers.
+                {t('workers.telemetry.unsupported')}
               </div>
             ) : containerItems.length === 0 ? (
               <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                No managed containers are currently reported.
+                {t('workers.telemetry.noContainers')}
               </div>
             ) : (
               <>

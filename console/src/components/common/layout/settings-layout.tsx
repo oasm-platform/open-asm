@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { settingsTabGroups } from '@/pages/settings/settings';
 import type { JSX, ReactNode } from 'react';
@@ -25,12 +26,13 @@ const settingsMenu: NavGroup[] = settingsTabGroups.map((group) => ({
 export default function SettingsLayout({
   children,
 }: SettingsLayoutProps): JSX.Element {
+  const t = useT();
   return (
     <SidebarProvider>
       <AppSidebar
         groups={settingsMenu}
         primary={false}
-        title="Settings"
+        title={t('shell.settings.title')}
         showSwitchWorkspace
       />
       {/* min-w-0: wide content (long template lines) scrolls inside its own

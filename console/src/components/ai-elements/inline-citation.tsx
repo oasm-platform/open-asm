@@ -22,6 +22,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { useT } from '@/lib/i18n-dictionary';
 
 export type InlineCitationProps = ComponentProps<"span">;
 
@@ -199,6 +200,7 @@ export const InlineCitationCarouselPrev = ({
   className,
   ...props
 }: InlineCitationCarouselPrevProps) => {
+  const t = useT();
   const api = useCarouselApi();
 
   const handleClick = useCallback(() => {
@@ -209,7 +211,7 @@ export const InlineCitationCarouselPrev = ({
 
   return (
     <button
-      aria-label="Previous"
+      aria-label={t('agents.ai.previous')}
       className={cn("shrink-0", className)}
       onClick={handleClick}
       type="button"
@@ -226,6 +228,7 @@ export const InlineCitationCarouselNext = ({
   className,
   ...props
 }: InlineCitationCarouselNextProps) => {
+  const t = useT();
   const api = useCarouselApi();
 
   const handleClick = useCallback(() => {
@@ -236,7 +239,7 @@ export const InlineCitationCarouselNext = ({
 
   return (
     <button
-      aria-label="Next"
+      aria-label={t('agents.ai.next')}
       className={cn("shrink-0", className)}
       onClick={handleClick}
       type="button"

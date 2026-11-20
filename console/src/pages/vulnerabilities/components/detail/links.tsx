@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import { Link } from '@tanstack/react-router';
 import { MessageSquare, PlayCircle } from 'lucide-react';
@@ -10,6 +11,7 @@ export function RunLink({
   id?: string | null;
   className?: string;
 }) {
+  const t = useT();
   if (!id) return null;
   return (
     <Link
@@ -19,10 +21,10 @@ export function RunLink({
         'inline-flex items-center gap-1 text-primary hover:underline',
         className,
       )}
-      title={`Run ${id}`}
+      title={t('vulnerabilities.links.runTitle', { id })}
     >
       <PlayCircle className="size-3" />
-      run {id.slice(0, 8)}
+      {t('vulnerabilities.links.run', { id: id.slice(0, 8) })}
     </Link>
   );
 }
@@ -30,13 +32,14 @@ export function RunLink({
 /** Link to an agent conversation in AI Studio. */
 export function ConversationLink({
   id,
-  label = 'Conversation',
+  label,
   className,
 }: {
   id?: string | null;
   label?: string;
   className?: string;
 }) {
+  const t = useT();
   if (!id) return null;
   return (
     <Link
@@ -48,7 +51,7 @@ export function ConversationLink({
       )}
     >
       <MessageSquare className="size-3" />
-      {label}
+      {label ?? t('vulnerabilities.links.conversation')}
     </Link>
   );
 }

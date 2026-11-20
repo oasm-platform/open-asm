@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,6 +21,7 @@ import { toast } from 'sonner';
 import { useSession } from '@/utils/authClient';
 
 export function WorkspaceSwitcher() {
+  const t = useT();
   const { workspaces, isLoading, selectedWorkspace, handleSelectWorkspace } =
     useWorkspaceSelector();
   const { hasPermission } = usePermission();
@@ -50,7 +52,7 @@ export function WorkspaceSwitcher() {
             >
               <div className="grid flex-1 text-start text-sm leading-tight">
                 <span className="truncate font-semibold">
-                  {currentWorkspace?.name || 'Select workspace'}
+                  {currentWorkspace?.name || t('shell.workspace.select')}
                 </span>
               </div>
               <ChevronsUpDown className="ms-auto" />
@@ -65,7 +67,7 @@ export function WorkspaceSwitcher() {
             <div className="px-2 py-1.5">
               <div className="flex items-center gap-1.5">
                 <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-                  {currentWorkspace?.name || 'Select workspace'}
+                  {currentWorkspace?.name || t('shell.workspace.select')}
                 </span>
                 {currentWorkspace?.ownerId === currentUserId && (
                   <Crown className="size-4 shrink-0 text-amber-500" />
@@ -73,7 +75,7 @@ export function WorkspaceSwitcher() {
               </div>
               <span className="mt-0.5 block truncate text-xs text-muted-foreground">
                 {currentWorkspace
-                  ? `${currentWorkspace.memberCount} member${currentWorkspace.memberCount === 1 ? '' : 's'}`
+                  ? t('shell.workspace.members', { count: currentWorkspace.memberCount })
                   : ''}
               </span>
             </div>
@@ -86,7 +88,7 @@ export function WorkspaceSwitcher() {
                     e.preventDefault();
                   }
                   handleSelectWorkspace(workspace.id);
-                  toast('Switched to ' + workspace.name);
+                  toast(t('shell.workspace.switched', { name: workspace.name }));
                   navigate({ to: '/' });
                 }}
                 className="gap-2 p-2"
@@ -113,7 +115,7 @@ export function WorkspaceSwitcher() {
                   <UserPlus className="size-4" />
                 </div>
                 <div className="font-medium text-muted-foreground">
-                  Invite members
+                  {t('shell.workspace.invite')}
                 </div>
               </DropdownMenuItem>
             )}
@@ -126,7 +128,7 @@ export function WorkspaceSwitcher() {
                 <Plus className="size-4" />
               </div>
               <div className="font-medium text-muted-foreground">
-                Add workspace
+                {t('shell.workspace.add')}
               </div>
             </DropdownMenuItem>
             <DropdownMenuItem
@@ -137,7 +139,7 @@ export function WorkspaceSwitcher() {
                 <GalleryVerticalEnd className="size-4" />
               </div>
               <div className="font-medium text-muted-foreground">
-                All workspaces
+                {t('shell.workspace.all')}
               </div>
             </DropdownMenuItem>
           </DropdownMenuContent>

@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -8,6 +9,7 @@ import relativeTime from "dayjs/plugin/relativeTime";
 dayjs.extend(relativeTime);
 
 const JobsRegistry = () => {
+  const t = useT();
     const { data } = useJobsRegistryControllerGetManyJobs(
         { limit: 100, page: 1, sortBy: "updatedAt", sortOrder: "DESC" },
         { query: { refetchInterval: 1000 } }
@@ -30,7 +32,7 @@ const JobsRegistry = () => {
         <div className="col-span-4 lg:col-span-1">
             <Card className="h-full">
                 <CardHeader>
-                    <CardTitle>Jobs Registry</CardTitle>
+                    <CardTitle>{t('dashboard.jobs.title')}</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
                     <ScrollArea className="h-[500px] p-4 space-y-4">
@@ -52,7 +54,7 @@ const JobsRegistry = () => {
                             );
                         })}
                         {data?.data?.length === 0 && (
-                            <p className="text-sm text-muted-foreground text-center">No jobs found.</p>
+                            <p className="text-sm text-muted-foreground text-center">{t('dashboard.jobs.empty')}</p>
                         )}
                     </ScrollArea>
                 </CardContent>

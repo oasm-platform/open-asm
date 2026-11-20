@@ -12,16 +12,21 @@ import { Input } from '@/components/ui/input';
 import { authClient } from '@/utils/authClient';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2Icon } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useT, type TFunction } from '@/lib/i18n-dictionary';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
-const formSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-});
+const makeFormSchema = (t: TFunction) =>
+  z.object({
+    name: z.string().min(1, t('settings.workspace.nameRequired')),
+  });
+type FormValues = z.infer<ReturnType<typeof makeFormSchema>>;
 
 export default function UpdateUser() {
+  const t = useT();
+  const formSchema = useMemo(() => makeFormSchema(t), [t]);
   const { data } = authClient.useSession();
 
   const form = useForm({
@@ -33,18 +38,18 @@ export default function UpdateUser() {
 
   const [loading, setLoading] = useState(false);
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: FormValues) {
     setLoading(true);
     try {
       const res = await authClient.updateUser({ ...values, image: '' });
       if (!res.data) {
-        form.setError('name', { message: 'Invalid name' });
+        form.setError('name', { message: t('settings.profile.invalidName') });
       } else {
-        toast.success('Name updated successfully');
+        toast.success(t('settings.profile.updated'));
         form.reset({ name: values.name });
       }
     } catch {
-      form.setError('name', { message: 'Failed to update name' });
+      form.setError('name', { message: t('settings.profile.updateFailed') });
     } finally {
       setLoading(false);
     }
@@ -52,7 +57,7 @@ export default function UpdateUser() {
 
   return (
     <Card className="p-4">
-      <CardTitle>Profile</CardTitle>
+      <CardTitle>{t('settings.profile.title')}</CardTitle>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <FormField
@@ -60,10 +65,10 @@ export default function UpdateUser() {
             name="name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Name</FormLabel>
+                <FormLabel>{t('common.name')}</FormLabel>
                 <FormControl>
                   <Input
-                    placeholder="Enter your name"
+                    placeholder={t('settings.profile.namePlaceholder')}
                     {...field}
                     className="w-full"
                     disabled={loading}
@@ -80,7 +85,7 @@ export default function UpdateUser() {
               size="sm"
             >
               {loading && <Loader2Icon className="w-4 h-4 mr-2 animate-spin" />}
-              Save
+              {t('common.save')}
             </Button>
           </div>
         </form>

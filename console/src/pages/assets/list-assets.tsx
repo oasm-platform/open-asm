@@ -1,4 +1,5 @@
 import { Tabs, useQueryTab } from '@/components/ui/tabs';
+import { useT } from '@/lib/i18n-dictionary';
 import type { ReactNode } from 'react';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
 import CreateWorkspace from '../workspaces/create-workspace';
@@ -44,50 +45,51 @@ export function ListAssets({
   extraTabs = [],
   urlsActions = <DiscoverUrlsDialog />,
 }: ListAssetsProps) {
+  const t = useT();
   const assetTabList = [
     {
       value: 'service',
-      text: 'Services',
+      text: t('assets.tabs.services'),
       tab: <AssetTabContent />,
     },
     {
       value: 'host',
-      text: 'Hosts',
+      text: t('assets.tabs.hosts'),
       tab: <HostAssetsTab />,
     },
     {
       value: 'port',
-      text: 'Ports',
+      text: t('assets.tabs.ports'),
       tab: <PortAssetsTab />,
     },
     {
       value: 'ip',
-      text: 'IP Addresses',
+      text: t('assets.tabs.ipAddresses'),
       tab: <IpAssetsTab />,
     },
     {
       value: 'urls',
-      text: 'URLs',
+      text: t('assets.tabs.urls'),
       tab: <UrlAssetsTab />,
     },
     {
       value: 'technology',
-      text: 'Technologies',
+      text: t('assets.tabs.technologies'),
       tab: <TechnologyAssetsTab />,
     },
     {
       value: 'status-code',
-      text: 'Status Code',
+      text: t('assets.tabs.statusCode'),
       tab: <StatusCodeAssetsTab />,
     },
     {
       value: 'tls',
-      text: 'TLS',
+      text: t('assets.tabs.tls'),
       tab: <TlsAssetsTab />,
     },
     {
       value: 'graph',
-      text: 'Graph',
+      text: t('assets.tabs.graph'),
       tab: <GraphTab />,
     },
   ];
@@ -97,9 +99,9 @@ export function ListAssets({
   const [tab, setTab] = useQueryTab({
     tabParam: 'tab',
     defaultValue: 'service',
-    validValues: [...VALID_VALUES, ...extraTabs.map((t) => t.value)],
+    validValues: [...VALID_VALUES, ...extraTabs.map((e) => e.value)],
   });
-  const isExtraTab = extraTabs.some((t) => t.value === tab);
+  const isExtraTab = extraTabs.some((e) => e.value === tab);
 
   if (workspaces.length === 0) return <CreateWorkspace />;
 
@@ -115,7 +117,7 @@ export function ListAssets({
             {tab === 'urls' && urlsActions}
           </div>
         )}
-        {tabList.find((t) => t.value == tab)?.tab}
+        {tabList.find((e) => e.value == tab)?.tab}
       </Tabs>
     </div>
   );

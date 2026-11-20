@@ -13,13 +13,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
+import { t, useT } from '@/lib/i18n-dictionary';
 
 const STATUS_LABEL = {
-  pending: 'Waiting for your response',
-  accepted: 'Invitation accepted',
-  declined: 'Invitation declined',
-  expired: 'Invitation expired',
-  cancelled: 'Invitation cancelled',
+  pending: () => t('workspaces.invite.status.pending'),
+  accepted: () => t('workspaces.invite.status.accepted'),
+  declined: () => t('workspaces.invite.status.declined'),
+  expired: () => t('workspaces.invite.status.expired'),
+  cancelled: () => t('workspaces.invite.status.cancelled'),
 } as const;
 
 /**
@@ -28,6 +29,7 @@ const STATUS_LABEL = {
  * matches accept or decline. Users not signed in are prompted to sign in.
  */
 export default function AcceptInvitePage({ token }: { token: string }) {
+  const t = useT();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { handleSelectWorkspace } = useWorkspaceSelector();
@@ -52,7 +54,7 @@ export default function AcceptInvitePage({ token }: { token: string }) {
     useWorkspacesControllerAcceptInvitation({
       mutation: {
         onSuccess: async () => {
-          toast.success('Invitation accepted');
+          toast.success(t('workspaces.invite.status.accepted'));
           // Mark handled and refresh the preview so the stale Accept button
           // disappears if the user navigates Back to this page.
           setHandled(true);
@@ -66,25 +68,27 @@ export default function AcceptInvitePage({ token }: { token: string }) {
           handleSelectWorkspace(preview?.workspaceId ?? '');
           navigate({ to: '/' });
         },
-        onError: () => toast.error('Failed to accept invitation'),
+        onError: () => toast.error(t('workspaces.invite.acceptFailed')),
       },
     });
   const { mutate: declineInvitation, isPending: isDeclining } =
     useWorkspacesControllerDeclineInvitation({
       mutation: {
         onSuccess: () => {
-          toast.success('Invitation declined');
+          toast.success(t('workspaces.invite.status.declined'));
           setHandled(true);
           refetchPreview();
         },
-        onError: () => toast.error('Failed to decline invitation'),
+        onError: () => toast.error(t('workspaces.invite.declineFailed')),
       },
     });
 
   if (isSessionPending || isPreviewLoading) {
     return (
       <CenteredCard>
-        <p className="text-sm text-muted-foreground">Loading invitation...</p>
+        <p className="text-sm text-muted-foreground">
+          {t('workspaces.invite.loading')}
+        </p>
       </CenteredCard>
     );
   }
@@ -95,8 +99,8 @@ export default function AcceptInvitePage({ token }: { token: string }) {
       <CenteredCard>
         <p className="text-sm text-muted-foreground">
           {notFound
-            ? 'This invitation link is invalid or has expired.'
-            : 'Something went wrong while loading the invitation.'}
+            ? t('workspaces.invite.invalidLink')
+            : t('workspaces.invite.loadFailed')}
         </p>
         {!notFound && (
           <Button
@@ -104,7 +108,7 @@ export default function AcceptInvitePage({ token }: { token: string }) {
             variant="outline"
             onClick={() => refetchPreview()}
           >
-            Retry
+            {t('common.retry')}
           </Button>
         )}
       </CenteredCard>
@@ -115,7 +119,7 @@ export default function AcceptInvitePage({ token }: { token: string }) {
     return (
       <CenteredCard>
         <p className="text-sm text-muted-foreground">
-          Invitation not found or the link is invalid.
+          {t('workspaces.invite.notFound')}
         </p>
       </CenteredCard>
     );
@@ -135,39 +139,39 @@ export default function AcceptInvitePage({ token }: { token: string }) {
           <div className="space-y-1">
             <h2 className="text-xl font-semibold">{preview.workspaceName}</h2>
             <p className="text-sm text-muted-foreground">
-              You have been invited to join this workspace.
+              {t('workspaces.invite.invited')}
             </p>
           </div>
 
           <div className="space-y-2 text-sm">
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Invited email</span>
+              <span className="text-muted-foreground">{t('workspaces.invite.email')}</span>
               <span className="font-medium">{preview.email}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Expires</span>
+              <span className="text-muted-foreground">{t('workspaces.invite.expires')}</span>
               <span className="font-medium">
                 {new Date(preview.expiresAt).toLocaleString()}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Status</span>
+              <span className="text-muted-foreground">{t('common.status')}</span>
               <Badge variant={isPending ? 'warning' : 'outline'}>
-                {STATUS_LABEL[preview.status] ?? preview.status}
+                {STATUS_LABEL[preview.status]?.() ?? preview.status}
               </Badge>
             </div>
           </div>
 
           {!isPending && (
             <p className="text-sm text-muted-foreground">
-              This invitation can no longer be answered.
+              {t('workspaces.invite.closed')}
             </p>
           )}
 
           {isPending && !signedInUserId && (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                Sign in to respond to this invitation.
+                {t('workspaces.invite.signInPrompt')}
               </p>
               <Button
                 className="w-full"
@@ -180,7 +184,7 @@ export default function AcceptInvitePage({ token }: { token: string }) {
                   })
                 }
               >
-                Sign in
+                {t('workspaces.invite.signIn')}
               </Button>
             </div>
           )}
@@ -189,9 +193,10 @@ export default function AcceptInvitePage({ token }: { token: string }) {
             <>
               {emailMismatch && (
                 <p className="text-sm text-destructive">
-                  You are signed in as {session?.user?.email}, but this
-                  invitation was sent to {preview.email}. Switch to the invited
-                  account to respond.
+                  {t('workspaces.invite.emailMismatch', {
+                    current: session?.user?.email ?? '',
+                    invited: preview.email,
+                  })}
                 </p>
               )}
               <div className="flex gap-3">
@@ -203,7 +208,7 @@ export default function AcceptInvitePage({ token }: { token: string }) {
                     declineInvitation({ data: { token } })
                   }
                 >
-                  {isDeclining ? 'Declining...' : 'Decline'}
+                  {isDeclining ? t('workspaces.invite.declining') : t('workspaces.invite.decline')}
                 </Button>
                 <Button
                   className="flex-1"
@@ -212,7 +217,7 @@ export default function AcceptInvitePage({ token }: { token: string }) {
                     acceptInvitation({ data: { token } })
                   }
                 >
-                  {isAccepting ? 'Accepting...' : 'Accept'}
+                  {isAccepting ? t('workspaces.invite.accepting') : t('workspaces.invite.accept')}
                 </Button>
               </div>
             </>

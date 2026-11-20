@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { ScanScheduleSelect } from '@/components/scan-schedule-select';
 import { Button } from '@/components/ui/button';
 import {
@@ -55,6 +56,7 @@ export function TargetSettingsTab({
   target: Target;
   refetch: () => void;
 }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [schedule, setSchedule] = useState<UpdateTargetDtoScanSchedule>(
@@ -66,7 +68,7 @@ export function TargetSettingsTab({
   const { mutate: update, isPending: saving } = useTargetsControllerUpdateTarget({
     mutation: {
       onSuccess: () => {
-        toast.success('Scan schedule updated');
+        toast.success(t('targets.settingsTab.scheduleUpdated'));
         refetch();
         void queryClient.invalidateQueries({
           queryKey: getTargetsControllerGetTargetOverviewQueryKey(target.id),
@@ -74,14 +76,14 @@ export function TargetSettingsTab({
       },
       onError: (error) => {
         setSchedule(target.scanSchedule as UpdateTargetDtoScanSchedule);
-        toast.error(apiErrorMessage(error, 'Failed to update the scan schedule'));
+        toast.error(apiErrorMessage(error, t('targets.settingsTab.scheduleUpdateFailed')));
       },
     },
   });
   const { mutate: rescan, isPending: rescanning } = useTargetsControllerReScanTarget({
     mutation: {
       onSuccess: () => {
-        toast.success('Discovery started');
+        toast.success(t('targets.settingsTab.discoveryStarted'));
         refetch();
         void navigate({
           to: '/targets/$id/$tab',
@@ -89,18 +91,18 @@ export function TargetSettingsTab({
         });
       },
       onError: (error) =>
-        toast.error(apiErrorMessage(error, 'Failed to start the discovery')),
+        toast.error(apiErrorMessage(error, t('targets.settingsTab.discoveryFailed'))),
     },
   });
   const { mutate: remove, isPending: deleting } = useTargetsControllerDeleteTarget({
     mutation: {
       onSuccess: () => {
-        toast.success('Target deleted');
+        toast.success(t('targets.settingsTab.deleted'));
         void queryClient.invalidateQueries({ queryKey: ['targets'] });
         void navigate({ to: '/targets' });
       },
       onError: (error) =>
-        toast.error(apiErrorMessage(error, 'Failed to delete the target')),
+        toast.error(apiErrorMessage(error, t('targets.settingsTab.deleteFailed'))),
     },
   });
 
@@ -108,15 +110,15 @@ export function TargetSettingsTab({
     <div className="flex max-w-3xl flex-col gap-4">
       <Card>
         <CardHeader>
-          <CardTitle>Scanning</CardTitle>
+          <CardTitle>{t('targets.settingsTab.scanning')}</CardTitle>
           <CardDescription>
-            When the target is discovered again, and scans to start now.
+            {t('targets.settingsTab.scanningDescription')}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col divide-y">
           <Row
-            title="Scan schedule"
-            description="Discovery runs again on this schedule (00:00 server time)."
+            title={t('targets.settingsTab.scanSchedule')}
+            description={t('targets.settingsTab.scanScheduleDescription')}
           >
             <ScanScheduleSelect
               value={schedule}
@@ -128,33 +130,33 @@ export function TargetSettingsTab({
             />
           </Row>
           <Row
-            title="Re-discover"
+            title={t('targets.settingsTab.rediscover')}
             description={
               busy
-                ? 'A scan of the target is still running.'
-                : 'Find subdomains, hosts and services again.'
+                ? t('targets.settingsTab.busy')
+                : t('targets.settingsTab.rediscoverDescription')
             }
           >
             <ConfirmDialog
-              title="Re-discover target"
-              description="This starts a new discovery of the target. It can take a few minutes."
+              title={t('targets.settings.rediscoverTitle')}
+              description={t('targets.settingsTab.rediscoverConfirm')}
               onConfirm={() => rescan({ id: target.id })}
               trigger={
                 <Button variant="outline" disabled={busy || rescanning}>
                   <RefreshCw className={rescanning ? 'size-4 animate-spin' : 'size-4'} />
-                  Re-discover
+                  {t('targets.settingsTab.rediscover')}
                 </Button>
               }
             />
           </Row>
           <Row
-            title="Vulnerability scan"
-            description="Scan the services found so far for known vulnerabilities."
+            title={t('targets.settingsTab.vulnScan')}
+            description={t('targets.settingsTab.vulnScanDescription')}
           >
             <FastScanDialog target={{ id: target.id, value: target.value }} disabled={busy} />
           </Row>
           {target.type === TargetType.DOMAIN && (
-            <Row title="URL discovery" description="Crawl the web services of the target for URLs.">
+            <Row title={t('targets.settingsTab.urlDiscovery')} description={t('targets.settingsTab.urlDiscoveryDescription')}>
               <DiscoverUrlsDialog target={{ id: target.id, value: target.value }} disabled={busy} />
             </Row>
           )}
@@ -163,22 +165,22 @@ export function TargetSettingsTab({
 
       <Card className="border-destructive/40">
         <CardHeader>
-          <CardTitle className="text-destructive">Danger zone</CardTitle>
+          <CardTitle className="text-destructive">{t('targets.settingsTab.dangerZone')}</CardTitle>
         </CardHeader>
         <CardContent>
           <Row
-            title="Delete target"
-            description="Deletes the target with its assets, vulnerabilities and scan history. This cannot be undone."
+            title={t('targets.settings.deleteTitle')}
+            description={t('targets.settingsTab.deleteDescription')}
           >
             <ConfirmDialog
-              title="Delete target"
-              description="This action cannot be undone. This will permanently delete the target and all its data."
+              title={t('targets.settings.deleteTitle')}
+              description={t('targets.settings.deleteDescription')}
               typeToConfirm={target.value}
               onConfirm={() => remove({ id: target.id })}
               trigger={
                 <Button variant="outline" className="text-destructive" disabled={deleting}>
                   <Trash2 className="size-4" />
-                  Delete target
+                  {t('targets.settingsTab.deleteButton')}
                 </Button>
               }
             />

@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 /**
  * ScopeFilter Component
  *
@@ -19,9 +20,9 @@ const ALL_VALUE = 'ALL';
 
 /** Scope filter options */
 const SCOPE_OPTIONS = [
-  { value: ALL_VALUE, label: 'All targets' },
-  { value: TargetScopeType.INTERNAL, label: 'Internal' },
-  { value: TargetScopeType.EXTERNAL, label: 'External' },
+  { value: ALL_VALUE, label: 'targets.filters.allTargets' },
+  { value: TargetScopeType.INTERNAL, label: 'targets.filters.internal' },
+  { value: TargetScopeType.EXTERNAL, label: 'targets.filters.external' },
 ] as const;
 
 interface ScopeFilterProps {
@@ -35,6 +36,7 @@ interface ScopeFilterProps {
  * Renders a select dropdown for filtering targets by scope.
  */
 export function ScopeFilter({ value, onValueChange }: ScopeFilterProps) {
+  const t = useT();
   const currentValue = value ?? ALL_VALUE;
 
   const handleChange = (val: string) => {
@@ -44,12 +46,12 @@ export function ScopeFilter({ value, onValueChange }: ScopeFilterProps) {
   return (
     <Select value={currentValue} onValueChange={handleChange}>
       <SelectTrigger className="border-dashed text-xs py-0 focus:ring-0 focus:ring-offset-0 focus:outline-none">
-        <SelectValue placeholder="Scope" />
+        <SelectValue placeholder={t('targets.filters.scope')} />
       </SelectTrigger>
       <SelectContent>
         {SCOPE_OPTIONS.map((option) => (
           <SelectItem key={option.value} value={option.value}>
-            {option.label}
+            {t(option.label)}
           </SelectItem>
         ))}
       </SelectContent>

@@ -1,6 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import {
   useAssetsControllerGetAssetById,
@@ -29,6 +30,7 @@ import ViewCode from './view-code';
 import { asTlsInfo } from '../tls-info';
 
 export default function AssetDetail({ id }: { id: string }) {
+  const t = useT();
   const screenshotOptions = useScreenshotQueryOptions();
   const { data, refetch } = useAssetsControllerGetAssetById(id, {
     query: { ...screenshotOptions },
@@ -60,7 +62,7 @@ export default function AssetDetail({ id }: { id: string }) {
     : undefined;
   const certAgeDisplay = certAgeStartDate
     ? dayjs(certAgeStartDate).fromNow()
-    : 'N/A';
+    : t('assets.detail.notAvailable');
 
   return (
     <ScrollArea className="grow min-h-0 pr-2 sm:pr-4 mt-4 [&>div>div]:block!">
@@ -68,17 +70,17 @@ export default function AssetDetail({ id }: { id: string }) {
         <section>
           <h3 className="font-bold text-blue-500 flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
             <Globe size={20} className="text-blue-500" />
-            General
+            {t('assets.detail.general')}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 sm:gap-y-4 gap-x-6 sm:gap-x-8">
             <div className="space-y-4">
               <div>
-                <span className="block mb-1">Domain</span>
+                <span className="block mb-1">{t('assets.detail.domain')}</span>
                 <AssetValue httpResponse={httpResponses} value={value} />
               </div>
               {httpResponses?.status_code && (
                 <div>
-                  <span className="block mb-1">HTTP Status</span>
+                  <span className="block mb-1">{t('assets.detail.httpStatus')}</span>
                   <HTTPXStatusCode httpResponse={httpResponses} />
                 </div>
               )}
@@ -87,18 +89,18 @@ export default function AssetDetail({ id }: { id: string }) {
             {/* IP Addresses */}
             {ipAddresses && ipAddresses.length > 0 ? (
               <div>
-                <span className="block mb-1">IP Addresses</span>
+                <span className="block mb-1">{t('assets.detail.ipAddresses')}</span>
                 <BadgeList list={ipAddresses} Icon={Network} />
               </div>
             ) : (
               <div>
-                <span className="block mb-1">IP Addresses</span>
-                <span className="italic">No IP addresses detected.</span>
+                <span className="block mb-1">{t('assets.detail.ipAddresses')}</span>
+                <span className="italic">{t('assets.detail.noIpAddresses')}</span>
               </div>
             )}
             {daysLeft !== undefined && (
               <div>
-                <span className="block mb-1">SSL Status</span>
+                <span className="block mb-1">{t('assets.detail.sslStatus')}</span>
                 <Badge
                   variant="outline"
                   className={cn(
@@ -112,17 +114,17 @@ export default function AssetDetail({ id }: { id: string }) {
                 >
                   <Lock size={16} /> SSL{' '}
                   {daysLeft < 0
-                    ? 'Expired'
+                    ? t('assets.tls.expired')
                     : daysLeft < 30
-                      ? 'Expiring Soon'
-                      : 'Valid'}
+                      ? t('assets.detail.expiringSoon')
+                      : t('assets.detail.valid')}
                 </Badge>
               </div>
             )}
 
             {httpResponses?.title && (
               <div className="md:col-span-2">
-                <span className="block mb-1">Page Title</span>
+                <span className="block mb-1">{t('assets.detail.pageTitle')}</span>
                 <p className="wrap-break-word">{httpResponses.title}</p>
               </div>
             )}
@@ -146,19 +148,19 @@ export default function AssetDetail({ id }: { id: string }) {
           <section>
             <Separator className="my-5" />
             <h3 className="font-bold text-indigo-500 flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
-              <Network size={20} className="text-indigo-500" /> Network
+              <Network size={20} className="text-indigo-500" /> {t('assets.detail.network')}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 sm:gap-y-4 gap-x-6 sm:gap-x-8">
               {tls?.host && (
                 <div>
-                  <span className="block mb-1">Host</span>
+                  <span className="block mb-1">{t('assets.detail.host')}</span>
                   <span className="">{tls.host}</span>
                 </div>
               )}
               {/* Port from TLS data, but presented in Network section */}
               {tls?.port && (
                 <div>
-                  <span className="block mb-1">Port</span>
+                  <span className="block mb-1">{t('assets.detail.port')}</span>
                   <span className="">{tls.port}</span>
                 </div>
               )}
@@ -172,11 +174,11 @@ export default function AssetDetail({ id }: { id: string }) {
             <section>
               <h3 className="font-bold text-green-500 flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
                 <ShieldCheck size={20} className="text-green-500" />{' '}
-                Certification
+                {t('assets.detail.certification')}
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 sm:gap-y-4 gap-x-6 sm:gap-x-8">
                 <div>
-                  <span className="block mb-1">Issuer</span>
+                  <span className="block mb-1">{t('assets.detail.issuer')}</span>
                   <div className="flex items-center gap-2">
                     <span className="">{tls?.issuer_org?.[0]}</span>
                     {tls?.issuer_org?.length > 1 && (
@@ -187,14 +189,14 @@ export default function AssetDetail({ id }: { id: string }) {
                   </div>
                 </div>
                 <div>
-                  <span className="block mb-1">Common Name</span>
+                  <span className="block mb-1">{t('assets.detail.commonName')}</span>
                   <span className=" break-words">{tls.subject_cn}</span>
                 </div>
 
                 {/* Adjusted Alternate Names display logic */}
                 {tls.subject_an && tls.subject_an.length > 1 && (
                   <div>
-                    <span className="block mb-1">Alternate Names</span>
+                    <span className="block mb-1">{t('assets.detail.alternateNames')}</span>
                     <div className="flex items-center gap-2">
                       {tls.subject_an[1] &&
                         tls.subject_an[1] !== tls.subject_cn && (
@@ -208,7 +210,7 @@ export default function AssetDetail({ id }: { id: string }) {
                         </Badge>
                       )}
                       {tls.subject_an.length === 2 && !tls.subject_an[1] && (
-                        <span className="italic">None</span>
+                        <span className="italic">{t('common.none')}</span>
                       )}
                     </div>
                   </div>
@@ -216,7 +218,7 @@ export default function AssetDetail({ id }: { id: string }) {
 
                 {certAgeStartDate && (
                   <div>
-                    <span className="block mb-1">Certificate Age</span>
+                    <span className="block mb-1">{t('assets.detail.certificateAge')}</span>
                     <span className="">
                       {certAgeDisplay} (
                       {dayjs(tls.not_before).format('DD MMM, YYYY')})
@@ -225,7 +227,7 @@ export default function AssetDetail({ id }: { id: string }) {
                 )}
                 {daysLeft !== undefined && (
                   <div>
-                    <span className="block mb-1">Expires On</span>
+                    <span className="block mb-1">{t('assets.detail.expiresOn')}</span>
                     <span className="">
                       {dayjs(tls.not_after).format('DD MMM, YYYY')}{' '}
                       <span
@@ -239,8 +241,8 @@ export default function AssetDetail({ id }: { id: string }) {
                       >
                         (
                         {daysLeft < 0
-                          ? Math.abs(daysLeft) + ' days ago'
-                          : daysLeft + ' days left'}
+                          ? t('assets.detail.daysAgo', { count: Math.abs(daysLeft) })
+                          : t('assets.detail.daysLeft', { count: daysLeft })}
                         )
                       </span>
                     </span>
@@ -257,7 +259,7 @@ export default function AssetDetail({ id }: { id: string }) {
             <section>
               <h3 className="font-bold text-purple-500 flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
                 <Layers size={20} className="text-purple-500" />
-                Technologies
+                {t('assets.detail.technologies')}
               </h3>
               <div className="flex flex-wrap gap-2">
                 {(
@@ -279,7 +281,7 @@ export default function AssetDetail({ id }: { id: string }) {
             <section className="pb-4">
               <h3 className="font-bold  flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
                 <ChartNoAxesGantt size={20} className="" />
-                HTTP Response
+                {t('assets.detail.httpResponse')}
               </h3>
               <ViewCode code={httpResponses.raw_header} />
             </section>
@@ -290,7 +292,7 @@ export default function AssetDetail({ id }: { id: string }) {
             <section className="pb-4">
               <h3 className="font-bold  flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
                 <Code size={20} className="" />
-                Body
+                {t('assets.detail.body')}
               </h3>
               <ViewCode code={httpResponses.body} />
             </section>

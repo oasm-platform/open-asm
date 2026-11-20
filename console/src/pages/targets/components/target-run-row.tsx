@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import JobStatusBadge from '@/components/ui/job-status';
@@ -26,20 +27,21 @@ const isActive = (run: TargetRunDto) =>
 
 /** One run on the target: what ran, its progress there, and a stop button while it runs. */
 export function TargetRunRow({ run }: { run: TargetRunDto }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const active = isActive(run);
   const { mutate: cancel, isPending } =
     useJobsRegistryControllerCancelJobHistory({
       mutation: {
         onSuccess: () => {
-          toast.success('Run cancelled');
+          toast.success(t('targets.run.cancelled'));
           void queryClient.invalidateQueries({
             predicate: (query) =>
               String(query.queryKey[0]).startsWith('/api/targets'),
           });
         },
         onError: (error) =>
-          toast.error(apiErrorMessage(error, 'Failed to cancel the run')),
+          toast.error(apiErrorMessage(error, t('targets.run.cancelFailed'))),
       },
     });
   const percent = progressPercent(
@@ -78,12 +80,12 @@ export function TargetRunRow({ run }: { run: TargetRunDto }) {
           </span>
         </span>
         {run.newVulnerabilities > 0 && (
-          <span className="text-primary">+{run.newVulnerabilities} new</span>
+          <span className="text-primary">{t('targets.run.new', { count: run.newVulnerabilities })}</span>
         )}
         {active && (
           <ConfirmDialog
-            title="Cancel run"
-            description="Jobs that have not finished are cancelled and the workflow starts no further steps."
+            title={t('targets.run.cancelTitle')}
+            description={t('targets.run.cancelDescription')}
             onConfirm={() => cancel({ id: run.id })}
             trigger={
               <Button
@@ -93,7 +95,7 @@ export function TargetRunRow({ run }: { run: TargetRunDto }) {
                 disabled={isPending}
               >
                 <Square className="size-3.5" />
-                Cancel
+                {t('common.cancel')}
               </Button>
             }
           />
@@ -107,7 +109,7 @@ export function TargetRunRow({ run }: { run: TargetRunDto }) {
             aria-valuenow={percent}
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-label={`${percent}% of jobs finished`}
+            aria-label={t('targets.run.jobsFinished', { percent })}
           >
             <span
               className="bg-primary transition-all"
@@ -119,11 +121,11 @@ export function TargetRunRow({ run }: { run: TargetRunDto }) {
             />
           </div>
           <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-            {run.jobsDone + run.jobsFailed}/{run.jobsTotal} jobs
+            {t('targets.run.jobs', { done: run.jobsDone + run.jobsFailed, total: run.jobsTotal })}
             {run.jobsFailed > 0 && (
               <span className="text-destructive">
                 {' '}
-                · {run.jobsFailed} failed
+                {t('targets.run.failed', { count: run.jobsFailed })}
               </span>
             )}
             {active && run.currentTool && <> · {run.currentTool}</>}

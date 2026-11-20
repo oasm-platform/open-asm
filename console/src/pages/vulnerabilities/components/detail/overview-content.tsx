@@ -1,6 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { OpenLink } from '@/components/ui/open-link';
+import { useT } from '@/lib/i18n-dictionary';
 import type { VulnerabilityDetailDto } from '@/services/apis/gen/queries';
 import { htmlToPlainText } from '@/utils/html';
 import dayjs from 'dayjs';
@@ -25,6 +26,7 @@ export const fieldLabel =
   'block mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground';
 
 export function CopyButton({ text }: { text: string }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(async () => {
@@ -42,7 +44,7 @@ export function CopyButton({ text }: { text: string }) {
       variant="ghost"
       size="sm"
       onClick={handleCopy}
-      aria-label={`Copy ${text}`}
+      aria-label={t('vulnerabilities.overview.copy', { text })}
       className="h-6 shrink-0 px-1.5 text-muted-foreground"
     >
       {copied ? (
@@ -178,6 +180,7 @@ export function VulnerabilityOverview({
 }: {
   data: VulnerabilityDetailDto;
 }) {
+  const t = useT();
   const description = data.description ? htmlToPlainText(data.description) : '';
   const synopsis =
     data.synopsis && data.synopsis !== data.description
@@ -215,7 +218,10 @@ export function VulnerabilityOverview({
   return (
     <div className="flex flex-col divide-y">
       {(description || synopsis) && (
-        <DetailSection title="Description" icon={<FileText />}>
+        <DetailSection
+          title={t('vulnerabilities.overview.description')}
+          icon={<FileText />}
+        >
           {description && (
             <p className="max-w-prose text-sm leading-relaxed whitespace-pre-line">
               {description}
@@ -229,7 +235,10 @@ export function VulnerabilityOverview({
         </DetailSection>
       )}
       {data.solution && (
-        <DetailSection title="Remediation" icon={<Wrench />}>
+        <DetailSection
+          title={t('vulnerabilities.overview.remediation')}
+          icon={<Wrench />}
+        >
           <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-4">
             <p className="max-w-prose text-sm leading-relaxed whitespace-pre-line">
               {htmlToPlainText(data.solution)}
@@ -238,10 +247,13 @@ export function VulnerabilityOverview({
         </DetailSection>
       )}
       {hasLocation && (
-        <DetailSection title="Affected location" icon={<MapPin />}>
+        <DetailSection
+          title={t('vulnerabilities.overview.location')}
+          icon={<MapPin />}
+        >
           <dl className="divide-y divide-dashed">
             {data.asset && (
-              <Field label="Asset">
+              <Field label={t('vulnerabilities.overview.asset')}>
                 <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <Link
                     to="/assets"
@@ -256,29 +268,29 @@ export function VulnerabilityOverview({
                       params={{ id: data.asset.targetId }}
                       className="text-xs text-muted-foreground hover:text-primary hover:underline"
                     >
-                      Open target
+                      {t('vulnerabilities.overview.openTarget')}
                     </Link>
                   )}
                 </span>
               </Field>
             )}
             {data.affectedUrl && (
-              <Field label="URL">
+              <Field label={t('vulnerabilities.overview.url')}>
                 <CopyValue value={data.affectedUrl} href={data.affectedUrl} />
               </Field>
             )}
             {data.host && (
-              <Field label="Host">
+              <Field label={t('vulnerabilities.overview.host')}>
                 <CopyValue value={data.host} />
               </Field>
             )}
             {data.ipAddress && (
-              <Field label="IP address">
+              <Field label={t('vulnerabilities.overview.ipAddress')}>
                 <CopyValue value={data.ipAddress} />
               </Field>
             )}
             {!!data.ports?.length && (
-              <Field label="Ports">
+              <Field label={t('vulnerabilities.overview.ports')}>
                 <span className="flex flex-wrap gap-1">
                   {data.ports.map((port) => (
                     <Badge key={port} variant="secondary" className="font-mono">
@@ -292,15 +304,21 @@ export function VulnerabilityOverview({
         </DetailSection>
       )}
       {(data.filePath || data.packageName) && (
-        <DetailSection title="Source code" icon={<FileCode />}>
+        <DetailSection
+          title={t('vulnerabilities.overview.sourceCode')}
+          icon={<FileCode />}
+        >
           <CodeLocation vulnerability={data} labelClassName={fieldLabel} />
         </DetailSection>
       )}
       {hasDetails && (
-        <DetailSection title="Detection details" icon={<Info />}>
+        <DetailSection
+          title={t('vulnerabilities.overview.detectionDetails')}
+          icon={<Info />}
+        >
           <dl className="divide-y divide-dashed">
             {!!data.authors?.length && (
-              <Field label="Template authors">
+              <Field label={t('vulnerabilities.overview.templateAuthors')}>
                 <span className="flex flex-wrap gap-1">
                   {data.authors.map((author) => (
                     <Badge key={author} variant="secondary">
@@ -311,26 +329,28 @@ export function VulnerabilityOverview({
               </Field>
             )}
             {data.extractorName && (
-              <Field label="Extractor">
+              <Field label={t('vulnerabilities.overview.extractor')}>
                 <span className="font-mono text-[13px]">
                   {data.extractorName}
                 </span>
               </Field>
             )}
             {data.publicationDate && (
-              <Field label="Published">
+              <Field label={t('vulnerabilities.overview.published')}>
                 {dayjs(data.publicationDate).format('YYYY-MM-DD HH:mm')}
               </Field>
             )}
             {data.modificationDate && (
-              <Field label="Modified">
+              <Field label={t('vulnerabilities.overview.modified')}>
                 {dayjs(data.modificationDate).format('YYYY-MM-DD HH:mm')}
               </Field>
             )}
           </dl>
           {!!data.extractedResults?.length && (
             <div className="flex flex-col gap-1.5">
-              <span className={fieldLabel}>Extracted results</span>
+              <span className={fieldLabel}>
+                {t('vulnerabilities.overview.extractedResults')}
+              </span>
               <pre className="max-h-64 overflow-auto rounded-lg bg-muted p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap break-all">
                 {data.extractedResults.join('\n')}
               </pre>
@@ -339,7 +359,10 @@ export function VulnerabilityOverview({
         </DetailSection>
       )}
       {references.length > 0 && (
-        <DetailSection title="References" icon={<Link2 />}>
+        <DetailSection
+          title={t('vulnerabilities.overview.references')}
+          icon={<Link2 />}
+        >
           <ul className="flex flex-col">
             {references.map((ref) => (
               <ReferenceLink key={ref} url={ref} />
@@ -349,7 +372,7 @@ export function VulnerabilityOverview({
       )}
       {isEmpty && (
         <p className="px-5 py-10 text-center text-sm text-muted-foreground">
-          The scanner reported no further details for this finding.
+          {t('vulnerabilities.overview.empty')}
         </p>
       )}
     </div>

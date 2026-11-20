@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState, type ComponentProps } from "react";
 import { toast } from "sonner";
+import { useT } from "@/lib/i18n-dictionary";
 
 interface ToolInstallButtonProps {
   tool: Tool;
@@ -49,6 +50,7 @@ const ToolInstallButton = ({
   className,
   onConfigure,
 }: ToolInstallButtonProps) => {
+  const t = useT();
   const [isInstalled, setIsInstalled] = useState(tool.isInstalled);
   const [confirmUninstall, setConfirmUninstall] = useState(false);
 
@@ -63,7 +65,7 @@ const ToolInstallButton = ({
 
   const handleInstall = () => {
     if (!workspaceId) {
-      toast.error("No workspace selected");
+      toast.error(t('tools.install.noWorkspace'));
       return;
     }
 
@@ -79,12 +81,12 @@ const ToolInstallButton = ({
       },
       {
         onSuccess: () => {
-          toast.success("Tool installed successfully");
+          toast.success(t('tools.install.installed'));
           if (onInstallChange) onInstallChange();
         },
         onError: () => {
           setIsInstalled(false);
-          toast.error("Failed to install tool");
+          toast.error(t('tools.install.installFailed'));
         },
       },
     );
@@ -92,7 +94,7 @@ const ToolInstallButton = ({
 
   const handleUninstall = () => {
     if (!workspaceId) {
-      toast.error("No workspace selected");
+      toast.error(t('tools.install.noWorkspace'));
       return;
     }
 
@@ -108,12 +110,12 @@ const ToolInstallButton = ({
       },
       {
         onSuccess: () => {
-          toast.success("Tool removed successfully");
+          toast.success(t('tools.install.removed'));
           if (onInstallChange) onInstallChange();
         },
         onError: () => {
           setIsInstalled(true);
-          toast.error("Failed to remove tool");
+          toast.error(t('tools.install.removeFailed'));
         },
       },
     );
@@ -132,14 +134,14 @@ const ToolInstallButton = ({
             onClick={onConfigure}
           >
             <Settings2 className="size-4" />
-            Config
+            {t('tools.install.config')}
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
                 size={size}
-                aria-label="More actions"
+                aria-label={t('tools.install.moreActions')}
                 className={cn(className, "min-w-0 px-1.5 has-[>svg]:px-1.5")}
                 disabled={uninstallToolMutation.isPending}
               >
@@ -156,7 +158,7 @@ const ToolInstallButton = ({
                 onSelect={() => setConfirmUninstall(true)}
               >
                 <Trash2 />
-                Uninstall
+                {t('tools.install.uninstall')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -164,8 +166,8 @@ const ToolInstallButton = ({
         <ConfirmDialog
           open={confirmUninstall}
           onOpenChange={setConfirmUninstall}
-          title="Remove Tool"
-          description={`Are you sure you want to remove "${tool.name}"?`}
+          title={t('tools.install.removeTitle')}
+          description={t('tools.install.removeConfirm', { name: tool.name })}
           onConfirm={handleUninstall}
         />
       </>
@@ -177,8 +179,8 @@ const ToolInstallButton = ({
   if (isInstalled) {
     return (
       <ConfirmDialog
-        title="Remove Tool"
-        description={`Are you sure you want to remove "${tool.name}"?`}
+        title={t('tools.install.removeTitle')}
+        description={t('tools.install.removeConfirm', { name: tool.name })}
         onConfirm={handleUninstall}
         disabled={isBuiltIn}
         trigger={
@@ -189,11 +191,11 @@ const ToolInstallButton = ({
             disabled={uninstallToolMutation.isPending || isBuiltIn}
           >
             {uninstallToolMutation.isPending ? (
-              "Removing..."
+              t('tools.install.removing')
             ) : (
               <>
                 <CheckCircle className="mr-2 h-4 w-4" />
-                {isBuiltIn ? "Built-in" : "Installed"}
+                {isBuiltIn ? t('tools.install.builtIn') : t('tools.install.installedLabel')}
               </>
             )}
           </Button>
@@ -216,12 +218,12 @@ const ToolInstallButton = ({
           {installToolMutation.isPending ? (
             <>
               <Loader2 className="size-4 animate-spin" />
-              Installing...
+              {t('tools.install.installing')}
             </>
           ) : (
             <>
               <Download className="size-4" />
-              Install
+              {t('tools.install.install')}
             </>
           )}
         </Button>

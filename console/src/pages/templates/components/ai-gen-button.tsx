@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { usePermission } from '@/hooks/usePermission';
+import { useT } from '@/lib/i18n-dictionary';
 
 /**
  * Opening words of the AI Studio chat: the user finishes the sentence with
@@ -18,6 +19,7 @@ export function AiGenButton({
   className,
   children,
 }: { className?: string; children?: ReactNode } = {}) {
+  const t = useT();
   const { hasPermission } = usePermission();
   if (!hasPermission('agent.read')) return null;
   return (
@@ -25,12 +27,12 @@ export function AiGenButton({
       <Link
         to="/aistudio"
         search={{ text: AI_GEN_TEMPLATE_PROMPT, autoSubmit: false }}
-        title="Write a template with OASM AI Studio"
+        title={t('templates.aiGen.title')}
       >
         {children ?? (
           <>
             <Sparkles className="size-4" />
-            AI gen
+            {t('templates.aiGen.label')}
           </>
         )}
       </Link>

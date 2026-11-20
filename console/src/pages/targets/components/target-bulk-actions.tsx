@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
@@ -23,8 +24,6 @@ import { scheduleLabel } from '../target-utils';
 
 const SCHEDULES = Object.values(CronSchedule);
 
-const targetCount = (n: number) => `${n} target${n === 1 ? '' : 's'}`;
-
 /**
  * Actions on the selected rows of the target list. Each one calls the
  * single-target endpoint per target and reports how many went through.
@@ -36,6 +35,8 @@ export function TargetBulkActions({
   targets: GetManyTargetResponseDto[];
   onDone: () => void;
 }) {
+  const t = useT();
+  const targetCount = (count: number) => t('targets.bulk.count', { count });
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
   const { mutateAsync: rescan } = useTargetsControllerReScanTarget();
@@ -43,7 +44,7 @@ export function TargetBulkActions({
   const { mutateAsync: remove } = useTargetsControllerDeleteTarget();
 
   const run = async (
-    verb: string,
+    verbKey: string,
     items: GetManyTargetResponseDto[],
     action: (target: GetManyTargetResponseDto) => Promise<unknown>,
     skipped = 0,
@@ -54,10 +55,10 @@ export function TargetBulkActions({
     const failed = results.filter((r) => r.status === 'rejected').length;
     const done = results.length - failed;
     const notes = [
-      failed ? `${failed} failed` : '',
-      skipped ? `${skipped} skipped (scan running)` : '',
+      failed ? t('targets.bulk.failed', { count: failed }) : '',
+      skipped ? t('targets.bulk.skipped', { count: skipped }) : '',
     ].filter(Boolean);
-    const message = `${verb} ${targetCount(done)}${notes.length ? ` · ${notes.join(', ')}` : ''}`;
+    const message = `${t(verbKey, { targets: targetCount(done) })}${notes.length ? ` · ${notes.join(', ')}` : ''}`;
     if (failed) toast.error(message);
     else toast.success(message);
     void queryClient.invalidateQueries({ queryKey: ['targets'] });
@@ -65,11 +66,11 @@ export function TargetBulkActions({
   };
 
   // The list reports the computed job status (typed as the older ScanStatus).
-  const idle = targets.filter((t) => String(t.status) === JobStatus.completed);
+  const idle = targets.filter((target) => String(target.status) === JobStatus.completed);
 
   return (
     <div className="flex flex-wrap items-center gap-2 normal-case">
-      <span className="text-sm font-medium">{targetCount(targets.length)} selected</span>
+      <span className="text-sm font-medium">{t('targets.bulk.selected', { targets: targetCount(targets.length) })}</span>
       <Button
         size="sm"
         variant="outline"
@@ -77,32 +78,32 @@ export function TargetBulkActions({
         disabled={busy || idle.length === 0}
         onClick={() =>
           void run(
-            'Re-discovery started for',
+            'targets.bulk.rediscoveryStarted',
             idle,
-            (t) => rescan({ id: t.id }),
+            (target) => rescan({ id: target.id }),
             targets.length - idle.length,
           )
         }
       >
         <RefreshCw className="size-3.5" />
-        Re-discover
+        {t('targets.bulk.rediscover')}
       </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button size="sm" variant="outline" className="h-7" disabled={busy}>
             <CalendarClock className="size-3.5" />
-            Schedule
+            {t('targets.bulk.schedule')}
             <ChevronDown className="size-3" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
-          <DropdownMenuLabel>Scan schedule</DropdownMenuLabel>
+          <DropdownMenuLabel>{t('targets.bulk.scanSchedule')}</DropdownMenuLabel>
           {SCHEDULES.map((schedule) => (
             <DropdownMenuItem
               key={schedule}
               onSelect={() =>
-                void run('Schedule set on', targets, (t) =>
-                  update({ id: t.id, data: { scanSchedule: schedule } }),
+                void run('targets.bulk.scheduleSet', targets, (target) =>
+                  update({ id: target.id, data: { scanSchedule: schedule } }),
                 )
               }
             >
@@ -112,18 +113,18 @@ export function TargetBulkActions({
         </DropdownMenuContent>
       </DropdownMenu>
       <ConfirmDialog
-        title={`Delete ${targetCount(targets.length)}`}
-        description="This permanently deletes the selected targets with their assets, vulnerabilities and scan history."
+        title={t('targets.bulk.deleteTitle', { targets: targetCount(targets.length) })}
+        description={t('targets.bulk.deleteDescription')}
         typeToConfirm="delete"
-        onConfirm={() => void run('Deleted', targets, (t) => remove({ id: t.id }))}
+        onConfirm={() => void run('targets.bulk.deleted', targets, (target) => remove({ id: target.id }))}
         trigger={
           <Button size="sm" variant="outline" className="h-7 text-destructive" disabled={busy}>
             <Trash2 className="size-3.5" />
-            Delete
+            {t('common.delete')}
           </Button>
         }
       />
-      <Button size="sm" variant="ghost" className="h-7" onClick={onDone} aria-label="Clear selection">
+      <Button size="sm" variant="ghost" className="h-7" onClick={onDone} aria-label={t('targets.bulk.clearSelection')}>
         <X className="size-3.5" />
       </Button>
     </div>

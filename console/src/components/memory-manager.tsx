@@ -16,6 +16,7 @@ import { BrainCircuit, ChevronDown, Trash2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useT } from '@/lib/i18n-dictionary';
 
 const PREVIEW_LINES = 3;
 
@@ -29,6 +30,7 @@ function MemoryItem({
   /** Memory is off: shown as saved, nothing to click */
   disabled: boolean;
 }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const lines = memory.content.split('\n');
   const isLong = lines.length > PREVIEW_LINES;
@@ -52,7 +54,9 @@ function MemoryItem({
                   expanded && 'rotate-180',
                 )}
               />
-              {expanded ? 'Show less' : 'Show more'}
+              {expanded
+                ? t('agents.approval.showLess')
+                : t('agents.memory.showMore')}
             </button>
           )}
           <p className="text-[10px] text-muted-foreground/60">
@@ -60,21 +64,21 @@ function MemoryItem({
           </p>
         </div>
         <ConfirmDialog
-          title="Delete memory"
-          description="Are you sure you want to delete this memory record? This action cannot be undone."
+          title={t('agents.memory.deleteTitle')}
+          description={t('agents.memory.deleteDescription')}
           onConfirm={() => onDelete(memory.id)}
           trigger={
             <Button
               variant="ghost"
               size="icon"
-              aria-label="Delete memory"
+              aria-label={t('agents.memory.deleteTitle')}
               disabled={disabled}
               className="size-7 text-muted-foreground hover:text-destructive"
             >
               <Trash2 className="size-3.5" />
             </Button>
           }
-          confirmText="Delete"
+          confirmText={t('common.delete')}
         />
       </div>
     </div>
@@ -82,6 +86,7 @@ function MemoryItem({
 }
 
 export function MemoryManager() {
+  const t = useT();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -105,10 +110,12 @@ export function MemoryManager() {
             saved,
           );
           toast.success(
-            next ? 'Long-term memory turned on' : 'Long-term memory turned off',
+            next
+              ? t('agents.memory.turnedOn')
+              : t('agents.memory.turnedOff'),
           );
         },
-        onError: () => toast.error('Failed to update long-term memory'),
+        onError: () => toast.error(t('agents.memory.updateFailed')),
       },
     );
   };
@@ -149,11 +156,11 @@ export function MemoryManager() {
             htmlFor="memory-enabled"
             className="text-xs text-muted-foreground"
           >
-            {memoryEnabled ? 'On' : 'Off'}
+            {memoryEnabled ? t('agents.memory.on') : t('agents.webSearch.off')}
           </Label>
           <Switch
             id="memory-enabled"
-            aria-label="Long-term memory"
+            aria-label={t('agents.memory.label')}
             checked={memoryEnabled}
             onCheckedChange={handleToggleMemory}
             disabled={!config || upsert.isPending}
@@ -179,11 +186,13 @@ export function MemoryManager() {
             >
               <BrainCircuit className="size-4 mt-0.5 shrink-0 text-muted-foreground" />
               <div className="space-y-1">
-                <p className="text-sm font-medium">Long-term memory is off</p>
+                <p className="text-sm font-medium">
+                  {t('agents.memory.offTitle')}
+                </p>
                 <p className="text-xs text-muted-foreground">
                   {memories.length > 0
-                    ? 'The agent does not save new memories or use the ones below. They are kept until deleted; turn memory on to manage them.'
-                    : 'The agent does not save memories across conversations. Turn it on to let the agent remember important information.'}
+                    ? t('agents.memory.offWithItems')
+                    : t('agents.memory.offEmpty')}
                 </p>
               </div>
             </div>
@@ -210,8 +219,7 @@ export function MemoryManager() {
             memoryEnabled && (
               <div className="rounded-xl border border-dashed p-6 text-center">
                 <p className="text-sm text-muted-foreground">
-                  No memory content yet. The AI agent will automatically store
-                  important information here.
+                  {t('agents.memory.empty')}
                 </p>
               </div>
             )

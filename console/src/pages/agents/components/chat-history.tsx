@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import type { ConversationResponseDto } from '@/services/apis/gen/queries';
 import { MessageSquarePlus, Pencil, Search, Trash2 } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
+import { t, useT } from '@/lib/i18n-dictionary';
 
 interface ChatHistoryProps {
   conversations: ConversationResponseDto[];
@@ -19,7 +20,15 @@ interface ChatHistoryProps {
 }
 
 const titleOf = (conv: ConversationResponseDto) =>
-  stripPageContextFromTitle(conv.title ?? '') || 'New conversation';
+  stripPageContextFromTitle(conv.title ?? '') || t('agents.conversations.newConversation');
+
+/** Dictionary key of each date group's heading */
+const GROUP_LABEL_KEYS: Record<string, string> = {
+  Today: 'agents.history.today',
+  Yesterday: 'agents.history.yesterday',
+  'Last 7 days': 'agents.history.last7Days',
+  Older: 'agents.history.older',
+};
 
 /**
  * Chat history sidebar component displaying conversation list
@@ -35,6 +44,7 @@ export function ChatHistory({
   onDeleteAllConversations,
   onRenameConversation,
 }: ChatHistoryProps) {
+  const t = useT();
   const [searchQuery, setSearchQuery] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
@@ -83,17 +93,17 @@ export function ChatHistory({
             onClick={onNewChat}
           >
             <MessageSquarePlus className="h-4 w-4" />
-            New Chat
+            {t('agents.history.newChat')}
           </Button>
 
           {conversations.length > 0 && onDeleteAllConversations && (
             <ConfirmDialog
-              title="Delete all conversations"
-              description="Are you sure you want to delete all conversations? This action cannot be undone."
+              title={t('agents.conversations.deleteAllTitle')}
+              description={t('agents.conversations.deleteAllDescription')}
               onConfirm={onDeleteAllConversations}
-              confirmText="Delete all"
+              confirmText={t('agents.conversations.deleteAll')}
               trigger={
-                <Button variant="outline" size="icon" className="shrink-0" title="Clear all history">
+                <Button variant="outline" size="icon" className="shrink-0" title={t('agents.history.clearAll')}>
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
               }
@@ -105,7 +115,7 @@ export function ChatHistory({
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search chats..."
+            placeholder={t('agents.history.search')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full h-9 rounded-md border border-input bg-background px-8 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -116,7 +126,7 @@ export function ChatHistory({
         <div className="p-2 space-y-4">
           {isLoading && (
             <p className="text-center text-sm text-muted-foreground py-8">
-              Loading conversations...
+              {t('agents.history.loading')}
             </p>
           )}
           {!isLoading &&
@@ -124,7 +134,7 @@ export function ChatHistory({
               ([group, groupConversations]) => (
                 <div key={group}>
                   <p className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase">
-                    {group}
+                    {t(GROUP_LABEL_KEYS[group])}
                   </p>
                   <div className="space-y-0.5">
                     {groupConversations.map((conv) => (
@@ -168,27 +178,27 @@ export function ChatHistory({
                               {onRenameConversation && (
                                 <button
                                   type="button"
-                                  aria-label="Rename conversation"
+                                  aria-label={t('agents.history.rename')}
                                   onClick={(e) => startEditing(e, conv)}
                                   className="p-1.5 rounded hover:bg-muted text-muted-foreground transition-colors"
-                                  title="Rename conversation"
+                                  title={t('agents.history.rename')}
                                 >
                                   <Pencil className="h-3.5 w-3.5" />
                                 </button>
                               )}
                               
                               <ConfirmDialog
-                                title="Delete conversation"
-                                description="Are you sure you want to delete this conversation? This action cannot be undone."
+                                title={t('agents.conversations.deleteTitle')}
+                                description={t('agents.conversations.deleteDescription')}
                                 onConfirm={() => onDeleteConversation(conv.id)}
-                                confirmText="Delete"
+                                confirmText={t('common.delete')}
                                 trigger={
                                   <button
                                     type="button"
-                                    aria-label="Delete conversation"
+                                    aria-label={t('agents.conversations.deleteTitle')}
                                     onClick={(e) => e.stopPropagation()}
                                     className="p-1.5 rounded hover:bg-destructive/10 hover:text-destructive transition-colors"
-                                    title="Delete conversation"
+                                    title={t('agents.conversations.deleteTitle')}
                                   >
                                     <Trash2 className="h-3.5 w-3.5" />
                                   </button>
@@ -205,7 +215,7 @@ export function ChatHistory({
             )}
           {!isLoading && filteredConversations.length === 0 && (
             <p className="text-center text-sm text-muted-foreground py-8">
-              No chats found
+              {t('agents.history.empty')}
             </p>
           )}
         </div>

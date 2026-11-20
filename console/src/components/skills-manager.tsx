@@ -40,11 +40,13 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { cn } from '@/lib/utils';
+import { useT } from '@/lib/i18n-dictionary';
 
+// Messages are dictionary keys, translated where they show
 const skillSchema = z.object({
-  name: z.string().min(1, 'Skill name is required'),
-  description: z.string().min(1, 'Description is required'),
-  content: z.string().min(1, 'Content is required'),
+  name: z.string().min(1, 'agents.skills.nameRequired'),
+  description: z.string().min(1, 'agents.skills.descriptionRequired'),
+  content: z.string().min(1, 'agents.skills.contentRequired'),
 });
 
 type SkillFormData = z.input<typeof skillSchema>;
@@ -58,6 +60,7 @@ function SkillFormDialog({
   onOpenChange: (open: boolean) => void;
   editSkill?: SkillResponseDto | null;
 }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const isEditing = !!editSkill;
 
@@ -89,11 +92,11 @@ function SkillFormDialog({
     mutation: {
       onSuccess: () => {
         void queryClient.invalidateQueries({ queryKey: getAgentsControllerGetSkillsQueryKey() });
-        toast.success('Skill created');
+        toast.success(t('agents.skills.created'));
         onOpenChange(false);
         reset();
       },
-      onError: () => toast.error('Failed to create skill'),
+      onError: () => toast.error(t('agents.skills.createFailed')),
     },
   });
 
@@ -101,11 +104,11 @@ function SkillFormDialog({
     mutation: {
       onSuccess: () => {
         void queryClient.invalidateQueries({ queryKey: getAgentsControllerGetSkillsQueryKey() });
-        toast.success('Skill updated');
+        toast.success(t('agents.skills.updated'));
         onOpenChange(false);
         reset();
       },
-      onError: () => toast.error('Failed to update skill'),
+      onError: () => toast.error(t('agents.skills.updateFailed')),
     },
   });
 
@@ -123,45 +126,45 @@ function SkillFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Edit Skill' : 'Add Skill'}</DialogTitle>
+          <DialogTitle>{isEditing ? t('agents.skills.editTitle') : t('agents.skills.add')}</DialogTitle>
           <DialogDescription>
             {isEditing
-              ? 'Update the skill instructions'
-              : 'Create a new skill for the agent'}
+              ? t('agents.skills.editDescription')
+              : t('agents.skills.addDescription')}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <div className="space-y-1">
-            <Label htmlFor="name">Name</Label>
+            <Label htmlFor="name">{t('agents.skills.name')}</Label>
             <Input
               id="name"
               {...register('name')}
-              placeholder="e.g. code-review"
-              error={errors.name?.message}
+              placeholder={t('agents.skills.namePlaceholder')}
+              error={errors.name?.message && t(errors.name.message)}
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">{t('agents.skills.description')}</Label>
             <Input
               id="description"
               {...register('description')}
-              placeholder="Brief description of when to use this skill"
-              error={errors.description?.message}
+              placeholder={t('agents.skills.descriptionPlaceholder')}
+              error={errors.description?.message && t(errors.description.message)}
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="content">Content</Label>
+            <Label htmlFor="content">{t('agents.skills.content')}</Label>
             <Textarea
               id="content"
               {...register('content')}
-              placeholder="Write the skill instructions in markdown..."
+              placeholder={t('agents.skills.contentPlaceholder')}
               className={cn(
                 'min-h-[200px] font-mono text-sm',
                 errors.content && 'border-destructive focus-visible:border-destructive focus-visible:ring-destructive/50',
               )}
             />
             {errors.content && (
-              <span className="text-xs text-destructive">{errors.content.message}</span>
+              <span className="text-xs text-destructive">{t(errors.content.message ?? '')}</span>
             )}
           </div>
           <div className="flex justify-end gap-2 pt-2 border-t">
@@ -171,7 +174,7 @@ function SkillFormDialog({
               size="sm"
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button type="submit" size="sm" disabled={isPending}>
               {isPending ? (
@@ -179,7 +182,7 @@ function SkillFormDialog({
               ) : (
                 <Plus className="size-3 mr-2" />
               )}
-              {isEditing ? 'Save Changes' : 'Add Skill'}
+              {isEditing ? t('agents.skills.saveChanges') : t('agents.skills.add')}
             </Button>
           </div>
         </form>
@@ -195,6 +198,7 @@ function SkillRow({
   skill: SkillResponseDto;
   onEdit: (skill: SkillResponseDto) => void;
 }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const isBuiltin = skill.isBuiltin;
   const [expanded, setExpanded] = useState(false);
@@ -204,7 +208,7 @@ function SkillRow({
       onSuccess: () => {
         void queryClient.invalidateQueries({ queryKey: getAgentsControllerGetSkillsQueryKey() });
       },
-      onError: () => toast.error('Failed to toggle skill'),
+      onError: () => toast.error(t('agents.skills.toggleFailed')),
     },
   });
 
@@ -212,9 +216,9 @@ function SkillRow({
     mutation: {
       onSuccess: () => {
         void queryClient.invalidateQueries({ queryKey: getAgentsControllerGetSkillsQueryKey() });
-        toast.success('Skill removed');
+        toast.success(t('agents.skills.removed'));
       },
-      onError: () => toast.error('Failed to remove skill'),
+      onError: () => toast.error(t('agents.skills.removeFailed')),
     },
   });
 
@@ -239,12 +243,12 @@ function SkillRow({
               <p className="text-sm font-semibold tracking-tight truncate">{skill.name}</p>
               {isBuiltin && (
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground uppercase tracking-wider">
-                  System
+                  {t('agents.skills.system')}
                 </span>
               )}
               {!isBuiltin && !skill.isEnabled && (
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground uppercase tracking-wider">
-                  Disabled
+                  {t('agents.skills.disabled')}
                 </span>
               )}
             </div>
@@ -283,10 +287,12 @@ function SkillRow({
               </Button>
 
               <ConfirmDialog
-                title="Remove Skill"
-                description={`Are you sure you want to remove the skill "${skill.name}"? This action cannot be undone.`}
+                title={t('agents.skills.removeTitle')}
+                description={t('agents.skills.removeDescription', {
+                  name: skill.name,
+                })}
                 onConfirm={handleDelete}
-                confirmText="Remove"
+                confirmText={t('agents.skills.remove')}
                 trigger={
                   <Button
                     variant="ghost"
@@ -313,6 +319,7 @@ function SkillRow({
 }
 
 export function SkillsManager() {
+  const t = useT();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -352,13 +359,13 @@ export function SkillsManager() {
           className="gap-1.5"
         >
           <Plus className="size-3.5" />
-          Add Skill
+          {t('agents.skills.add')}
         </Button>
       </SettingsHeaderActions>
       <p className="text-sm text-muted-foreground">
         {skills.length === 0
-          ? 'No skills configured'
-          : `${skills.length} skill${skills.length !== 1 ? 's' : ''}`}
+          ? t('agents.skills.none')
+          : t('agents.skills.count', { count: skills.length })}
       </p>
 
       <SkillFormDialog
@@ -380,7 +387,7 @@ export function SkillsManager() {
         <div className="rounded-lg border border-dashed p-6 text-center">
           <BookOpen className="size-8 mx-auto text-muted-foreground mb-2" />
           <p className="text-sm text-muted-foreground">
-            Add skills to give the agent specialized instructions
+            {t('agents.skills.empty')}
           </p>
         </div>
       ) : (
