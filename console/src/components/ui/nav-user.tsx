@@ -21,8 +21,9 @@ import {
 } from '@/components/ui/sidebar';
 import { OpenLink } from '@/components/ui/open-link';
 import { useBugReportUrl } from '@/hooks/use-bug-report-url';
+import { saveAccountLanguage } from '@/lib/account-language';
 import {
-  changeLanguage,
+  nativeName,
   prefetchLanguages,
   useSupportedLanguages,
   useT,
@@ -51,15 +52,6 @@ interface NavUserProps {
   dropdownSide?: 'top' | 'bottom' | 'left' | 'right';
 }
 
-/** Each language named in itself, e.g. "Tiếng Việt", "日本語". */
-function nativeName(code: string) {
-  try {
-    return new Intl.DisplayNames([code], { type: 'language' }).of(code) ?? code;
-  } catch {
-    return code;
-  }
-}
-
 function LanguageMenu() {
   const t = useT();
   const lang = useLanguage();
@@ -70,7 +62,7 @@ function LanguageMenu() {
   const select = (code: string) => {
     // Let the menu start closing before the page re-renders in the new language.
     requestAnimationFrame(() => {
-      void changeLanguage(code).then(() =>
+      void saveAccountLanguage(code).then(() =>
         // Only notifications are rendered server-side in the request language.
         queryClient.invalidateQueries({
           predicate: (q) =>

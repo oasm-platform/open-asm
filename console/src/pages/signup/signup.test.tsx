@@ -72,6 +72,8 @@ describe('SignUp', () => {
         name: 'Ada',
         email: 'ada@example.com',
         password: 'Password123!',
+        // The new account keeps the language the form was filled in
+        language: 'en',
         // The verification link lands on sign-in
         callbackURL: `${window.location.origin}/login?verified=1`,
       });

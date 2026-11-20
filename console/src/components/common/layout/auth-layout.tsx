@@ -1,5 +1,6 @@
 import { useT } from '@/lib/i18n-dictionary';
 import AppLogo from '@/components/ui/app-logo';
+import { AuthLanguageSelect } from '@/components/common/auth-language-select';
 import {
   ArrowRight,
   Bug,
@@ -52,6 +53,9 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
     <div className="flex min-h-svh w-full bg-background">
       <div className="absolute top-6 left-6 z-20">
         <AppLogo type="large" />
+      </div>
+      <div className="absolute top-6 right-6 z-20">
+        <AuthLanguageSelect />
       </div>
       {children}
       <div className="relative hidden lg:flex lg:w-1/2 items-center justify-center overflow-hidden border-l border-border bg-gradient-to-br from-primary/8 via-primary/3 to-background">

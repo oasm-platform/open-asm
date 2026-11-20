@@ -14,6 +14,7 @@ import {
   useRootControllerGetMetadata,
 } from '@/services/apis/gen/queries';
 import { authClient } from '@/utils/authClient';
+import { getLanguage } from '@/utils/languageState';
 import { verificationCallbackURL } from '@/utils/verification-url';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
@@ -143,6 +144,7 @@ function SignUpForm({ redirect }: { redirect?: string }) {
         name: values.name,
         email: values.email,
         password: values.password,
+        language: getLanguage(),
         callbackURL: verificationCallbackURL(redirect),
       });
       setLoading(false);

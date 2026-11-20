@@ -161,6 +161,15 @@ export function setDictionaryForTests(dict: I18nDictionary) {
   emit();
 }
 
+/** Each language named in itself, e.g. "Tiếng Việt", "日本語". */
+export function nativeName(code: string) {
+  try {
+    return new Intl.DisplayNames([code], { type: 'language' }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
 export function useSupportedLanguages() {
   return useQuery({
     queryKey: ['i18n', 'languages'],
