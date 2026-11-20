@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
 import { useSyncExternalStore } from 'react';
 import { flushSync } from 'react-dom';
 import { orvalClient } from '@/services/apis/axios-client';
@@ -89,8 +90,10 @@ async function refresh(lang: string) {
 export async function initI18n(): Promise<void> {
   try {
     await refresh(getLanguage());
-  } catch {
-    if (getLanguage() !== DEFAULT_LANGUAGE) {
+  } catch (error) {
+    // Only a 404 means the language is gone; a network blip or 5xx keeps the
+    // user's choice and whatever copy is cached.
+    if (isAxiosError(error) && error.response?.status === 404 && getLanguage() !== DEFAULT_LANGUAGE) {
       setLanguage(DEFAULT_LANGUAGE);
       cachedRaw = readCache(DEFAULT_LANGUAGE);
       dictionary = parse(cachedRaw);

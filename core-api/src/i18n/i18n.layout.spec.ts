@@ -66,7 +66,7 @@ describe('i18n layout (EN-first)', () => {
         )) {
           expect(tr[ns][key.replace(PLURAL_SUFFIX, '.other')]).toBeDefined();
         }
-        for (const [key, value] of Object.entries(tr[ns])) {
+        for (const value of Object.values(tr[ns])) {
           expect(value.trim().length).toBeGreaterThan(0);
           // Same gate as icuFormatter: only plural/select go through ICU
           if (/,\s*(plural|select|selectordinal)\s*,/.test(value)) {

@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest';
-import { resolveDictText } from './i18n-dictionary';
+import { http, HttpResponse } from 'msw';
+import { afterEach, describe, expect, it } from 'vitest';
+import { server } from '@/test/mocks/node';
+import { getLanguage, setLanguage } from '@/utils/languageState';
+import { initI18n, resolveDictText } from './i18n-dictionary';
 
 // Mirrors backend shape: { [namespaceFile]: { [key]: template } }
 // e.g. src/i18n/en/ui.json -> dictionaries.ui['notifications.title']
@@ -49,5 +52,28 @@ describe('resolveDictText', () => {
     expect(resolveDictText(null, 'ui.notifications.title')).toBe(
       'ui.notifications.title',
     );
+  });
+});
+
+describe('initI18n fallback', () => {
+  afterEach(() => setLanguage('en'));
+
+  it('keeps the chosen language when the API is unreachable', async () => {
+    setLanguage('vi');
+    server.use(http.get('/api/i18n/vi', () => HttpResponse.error()));
+    await initI18n();
+    expect(getLanguage()).toBe('vi');
+  });
+
+  it('falls back to EN when the API no longer serves the language', async () => {
+    setLanguage('vi');
+    server.use(
+      http.get('/api/i18n/vi', () => new HttpResponse(null, { status: 404 })),
+      http.get('/api/i18n/en', () =>
+        HttpResponse.json({ lang: 'en', dictionaries: {} }),
+      ),
+    );
+    await initI18n();
+    expect(getLanguage()).toBe('en');
   });
 });

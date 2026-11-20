@@ -1,6 +1,6 @@
 import { Public } from '@/common/decorators/app.decorator';
 import { Doc } from '@/common/doc/doc.decorator';
-import { Controller, Get, Header, NotFoundException, Param } from '@nestjs/common';
+import { Controller, Get, NotFoundException, Param } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { I18nService } from 'nestjs-i18n';
 
@@ -26,8 +26,9 @@ export class I18nDictionaryController {
     description:
       'Merged namespaces from backend memory (same source the API translates with). Missing languages fall back only when the service resolves them; unknown codes give 404.',
   })
+  // No HTTP cache: the console keeps its own copy and refreshes it on boot,
+  // a browser cache would hand that refresh a pre-deploy copy.
   @Get(':lang')
-  @Header('Cache-Control', 'public, max-age=3600')
   getDictionary(@Param('lang') lang: string): {
     lang: string;
     dictionaries: Record<string, Record<string, string>>;

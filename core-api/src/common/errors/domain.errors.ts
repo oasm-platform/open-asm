@@ -7,25 +7,12 @@
  * Without a message, each error uses the text Nest's matching HTTP exception
  * would, so a response reads the same either way.
  */
-import type { I18nPath } from '@/i18n/i18n.generated';
-
-export interface DomainErrorI18n {
-  key: I18nPath;
-  args?: Record<string, unknown>;
-}
-
 export abstract class DomainError extends Error {
   abstract readonly kind: DomainErrorKind;
 
-  readonly i18n?: DomainErrorI18n;
-
-  protected constructor(
-    message: string,
-    options?: { cause?: unknown; i18n?: DomainErrorI18n },
-  ) {
+  protected constructor(message: string, options?: { cause?: unknown }) {
     super(message, options);
     this.name = new.target.name;
-    this.i18n = options?.i18n;
   }
 }
 

@@ -49,7 +49,9 @@ const CreateWorkspace = () => {
         }),
       }));
     }
-  }, [isWorkspacesLoading, workspaces.length, session?.user?.name, reset, t]);
+    // No `t` in deps: a language switch must not overwrite a typed name.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isWorkspacesLoading, workspaces.length, session?.user?.name, reset]);
 
   const onSubmit = (data: FormData) => {
     mutate(

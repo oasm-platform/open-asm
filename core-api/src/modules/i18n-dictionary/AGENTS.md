@@ -14,7 +14,7 @@ All routes `@Public()` (no session needed — the console needs labels before lo
 | Route | Behaviour |
 |---|---|
 | `GET i18n/languages` | supported language codes from `I18nService.getSupportedLanguages()` |
-| `GET i18n/:lang` | merged namespaces from `I18nService.getTranslations()` (same memory the API translates with); unknown code → 404; `Cache-Control: public, max-age=3600` |
+| `GET i18n/:lang` | merged namespaces from `I18nService.getTranslations()` (same memory the API translates with); unknown code → 404; no HTTP cache header (the console caches in localStorage) |
 
 ## Data model
 

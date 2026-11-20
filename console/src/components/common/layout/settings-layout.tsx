@@ -9,24 +9,24 @@ interface SettingsLayoutProps {
   children: ReactNode;
 }
 
-// Settings tab groups in the shape the shared sidebar expects.
-// Permission/role filtering is done by AppSidebar.
-const settingsMenu: NavGroup[] = settingsTabGroups.map((group) => ({
-  title: group.name,
-  url: '#',
-  roles: group.roles,
-  items: group.tabs.map((tab) => ({
-    title: tab.label,
-    icon: tab.icon,
-    url: tab.path,
-    permission: tab.permission,
-  })),
-}));
-
 export default function SettingsLayout({
   children,
 }: SettingsLayoutProps): JSX.Element {
   const t = useT();
+  // Settings tab groups in the shape the shared sidebar expects, rebuilt each
+  // render (useT re-renders on a language switch): the getters translate when read.
+  // Permission/role filtering is done by AppSidebar.
+  const settingsMenu: NavGroup[] = settingsTabGroups.map((group) => ({
+    title: group.name,
+    url: '#',
+    roles: group.roles,
+    items: group.tabs.map((tab) => ({
+      title: tab.label,
+      icon: tab.icon,
+      url: tab.path,
+      permission: tab.permission,
+    })),
+  }));
   return (
     <SidebarProvider>
       <AppSidebar

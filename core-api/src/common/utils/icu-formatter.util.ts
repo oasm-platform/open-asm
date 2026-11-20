@@ -44,6 +44,8 @@ export function icuFormatter(
         }
       }
 
+      // shortcut: plural rules follow the request's language, not translate()'s
+      // `lang` option; pass the locale in args once something translates outside a request.
       const msg = getFormatter(
         template,
         I18nContext.current()?.lang ?? 'en',
