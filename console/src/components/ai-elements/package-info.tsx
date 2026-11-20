@@ -208,13 +208,13 @@ export const PackageInfoDependencies = ({
 }: PackageInfoDependenciesProps) => {
   const t = useT();
   return (
-  <div className={cn("space-y-2", className)} {...props}>
-    <span className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-      {t('agents.ai.dependencies')}
-    </span>
-    <div className="space-y-1">{children}</div>
-  </div>
-);
+    <div className={cn("space-y-2", className)} {...props}>
+      <span className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+        {t('agents.ai.dependencies')}
+      </span>
+      <div className="space-y-1">{children}</div>
+    </div>
+  );
 };
 
 export type PackageInfoDependencyProps = HTMLAttributes<HTMLDivElement> & {

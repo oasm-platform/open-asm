@@ -43,20 +43,20 @@ export const ModelSelectorContent = ({
 }: ModelSelectorContentProps) => {
   useT(); // re-render on language change
   return (
-  <DialogContent
-    aria-describedby={undefined}
-    className={cn(
-      "outline! border-none! p-0 outline-border! outline-solid!",
-      className
-    )}
-    {...props}
-  >
-    <DialogTitle className="sr-only">{title}</DialogTitle>
-    <Command className="**:data-[slot=command-input-wrapper]:h-auto">
-      {children}
-    </Command>
-  </DialogContent>
-);
+    <DialogContent
+      aria-describedby={undefined}
+      className={cn(
+        "outline! border-none! p-0 outline-border! outline-solid!",
+        className
+      )}
+      {...props}
+    >
+      <DialogTitle className="sr-only">{title}</DialogTitle>
+      <Command className="**:data-[slot=command-input-wrapper]:h-auto">
+        {children}
+      </Command>
+    </DialogContent>
+  );
 };
 
 export type ModelSelectorDialogProps = ComponentProps<typeof CommandDialog>;

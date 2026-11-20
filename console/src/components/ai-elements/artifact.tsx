@@ -51,20 +51,20 @@ export const ArtifactClose = ({
 }: ArtifactCloseProps) => {
   const t = useT();
   return (
-  <Button
-    className={cn(
-      "size-8 p-0 text-muted-foreground hover:text-foreground",
-      className
-    )}
-    size={size}
-    type="button"
-    variant={variant}
-    {...props}
-  >
-    {children ?? <XIcon className="size-4" />}
-    <span className="sr-only">{t('agents.ai.close')}</span>
-  </Button>
-);
+    <Button
+      className={cn(
+        "size-8 p-0 text-muted-foreground hover:text-foreground",
+        className
+      )}
+      size={size}
+      type="button"
+      variant={variant}
+      {...props}
+    >
+      {children ?? <XIcon className="size-4" />}
+      <span className="sr-only">{t('agents.ai.close')}</span>
+    </Button>
+  );
 };
 
 export type ArtifactTitleProps = HTMLAttributes<HTMLParagraphElement>;

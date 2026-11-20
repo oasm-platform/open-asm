@@ -102,10 +102,10 @@ export const EnvironmentVariablesTitle = ({
 }: EnvironmentVariablesTitleProps) => {
   const t = useT();
   return (
-  <h3 className={cn("font-medium text-sm", className)} {...props}>
-    {children ?? t('agents.ai.envVars')}
-  </h3>
-);
+    <h3 className={cn("font-medium text-sm", className)} {...props}>
+      {children ?? t('agents.ai.envVars')}
+    </h3>
+  );
 };
 
 export type EnvironmentVariablesToggleProps = ComponentProps<typeof Switch>;

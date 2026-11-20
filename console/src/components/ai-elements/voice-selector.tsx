@@ -117,17 +117,17 @@ export const VoiceSelectorContent = ({
 }: VoiceSelectorContentProps) => {
   useT(); // re-render on language change
   return (
-  <DialogContent
-    aria-describedby={undefined}
-    className={cn("p-0", className)}
-    {...props}
-  >
-    <DialogTitle className="sr-only">{title}</DialogTitle>
-    <Command className="**:data-[slot=command-input-wrapper]:h-auto">
-      {children}
-    </Command>
-  </DialogContent>
-);
+    <DialogContent
+      aria-describedby={undefined}
+      className={cn("p-0", className)}
+      {...props}
+    >
+      <DialogTitle className="sr-only">{title}</DialogTitle>
+      <Command className="**:data-[slot=command-input-wrapper]:h-auto">
+        {children}
+      </Command>
+    </DialogContent>
+  );
 };
 
 export type VoiceSelectorDialogProps = ComponentProps<typeof CommandDialog>;

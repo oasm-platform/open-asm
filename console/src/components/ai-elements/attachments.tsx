@@ -418,14 +418,14 @@ export const AttachmentEmpty = ({
 }: AttachmentEmptyProps) => {
   const t = useT();
   return (
-  <div
-    className={cn(
-      "flex items-center justify-center p-4 text-muted-foreground text-sm",
-      className
-    )}
-    {...props}
-  >
-    {children ?? t('agents.ai.noAttachments')}
-  </div>
-);
+    <div
+      className={cn(
+        "flex items-center justify-center p-4 text-muted-foreground text-sm",
+        className
+      )}
+      {...props}
+    >
+      {children ?? t('agents.ai.noAttachments')}
+    </div>
+  );
 };

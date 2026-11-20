@@ -54,26 +54,26 @@ export const ConversationEmptyState = ({
 }: ConversationEmptyStateProps) => {
   useT(); // re-render on language change
   return (
-  <div
-    className={cn(
-      'flex size-full flex-col items-center justify-center gap-3 p-8 text-center',
-      className,
-    )}
-    {...props}
-  >
-    {children ?? (
-      <>
-        {icon && <div className="text-muted-foreground">{icon}</div>}
-        <div className="space-y-1">
-          <h3 className="font-medium text-sm">{title}</h3>
-          {description && (
-            <p className="text-muted-foreground text-sm">{description}</p>
-          )}
-        </div>
-      </>
-    )}
-  </div>
-);
+    <div
+      className={cn(
+        'flex size-full flex-col items-center justify-center gap-3 p-8 text-center',
+        className,
+      )}
+      {...props}
+    >
+      {children ?? (
+        <>
+          {icon && <div className="text-muted-foreground">{icon}</div>}
+          <div className="space-y-1">
+            <h3 className="font-medium text-sm">{title}</h3>
+            {description && (
+              <p className="text-muted-foreground text-sm">{description}</p>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
 };
 
 export type ConversationScrollButtonProps = ComponentProps<typeof Button>;

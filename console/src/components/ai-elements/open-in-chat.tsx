@@ -243,15 +243,15 @@ export type OpenInTriggerProps = ComponentProps<typeof DropdownMenuTrigger>;
 export const OpenInTrigger = ({ children, ...props }: OpenInTriggerProps) => {
   const t = useT();
   return (
-  <DropdownMenuTrigger {...props} asChild>
-    {children ?? (
-      <Button type="button" variant="outline">
-        {t('agents.ai.openInChat')}
-        <ChevronDownIcon className="size-4" />
-      </Button>
-    )}
-  </DropdownMenuTrigger>
-);
+    <DropdownMenuTrigger {...props} asChild>
+      {children ?? (
+        <Button type="button" variant="outline">
+          {t('agents.ai.openInChat')}
+          <ChevronDownIcon className="size-4" />
+        </Button>
+      )}
+    </DropdownMenuTrigger>
+  );
 };
 
 export type OpenInChatGPTProps = ComponentProps<typeof DropdownMenuItem>;

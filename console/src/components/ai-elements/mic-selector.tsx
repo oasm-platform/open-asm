@@ -279,8 +279,8 @@ export type MicSelectorInputProps = ComponentProps<typeof CommandInput> & {
 export const MicSelectorInput = ({ ...props }: MicSelectorInputProps) => {
   const t = useT();
   return (
-  <CommandInput placeholder={t('agents.ai.mic.search')} {...props} />
-);
+    <CommandInput placeholder={t('agents.ai.mic.search')} {...props} />
+  );
 };
 
 export type MicSelectorListProps = Omit<
