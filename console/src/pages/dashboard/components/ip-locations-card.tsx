@@ -1,4 +1,4 @@
-import { useT } from '@/lib/i18n-dictionary';
+import { countryName, useT } from '@/lib/i18n-dictionary';
 import { useTheme } from '@/components/ui/theme-provider';
 import { IpLocationsSkeleton } from './dashboard-skeleton';
 import countriesData from '@/data/countries.json';
@@ -27,6 +27,10 @@ const allCountryNames = (
     code: f.properties.ISO_A2,
   }))
   .filter((c) => c.name) as { name: string; code?: string }[];
+
+// Regions are keyed by the English NAME; only the shown text is localized
+const codeByName = new Map(allCountryNames.map((c) => [c.name, c.code]));
+const localName = (name: string) => countryName(codeByName.get(name), name);
 
 interface IpLocationsCardProps {
   data: IpLocationData[];
@@ -83,7 +87,9 @@ export default function IpLocationsCard({
           fontFamily: 'system-ui, sans-serif',
         },
         formatter: (params: { name?: string; value?: number | null }) => {
-          const name = params.name ?? t('common.unknown');
+          const name = params.name
+            ? localName(params.name)
+            : t('common.unknown');
           const value = params.value ?? 0;
           if (!params.value) return '';
           return `<div style="font-weight:600;margin-bottom:4px">${name}</div>
@@ -125,6 +131,7 @@ export default function IpLocationsCard({
           nameProperty: 'NAME',
           selectedMode: 'single',
           select: {
+            label: { formatter: (p: { name: string }) => localName(p.name) },
             itemStyle: {
               areaColor: isDark
                 ? 'rgba(96, 165, 250, 0.5)'
@@ -161,6 +168,7 @@ export default function IpLocationsCard({
             },
             label: {
               show: false,
+              formatter: (p: { name: string }) => localName(p.name),
             },
           },
           itemStyle: {
@@ -170,6 +178,7 @@ export default function IpLocationsCard({
           },
           label: {
             show: false,
+            formatter: (p: { name: string }) => localName(p.name),
           },
         },
       ],

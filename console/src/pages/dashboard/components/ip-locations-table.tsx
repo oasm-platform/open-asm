@@ -1,4 +1,4 @@
-import { useT } from '@/lib/i18n-dictionary';
+import { countryName, useT } from '@/lib/i18n-dictionary';
 import type { IpLocationData } from '@/hooks/useIpLocationData';
 import { useMemo } from 'react';
 
@@ -51,7 +51,9 @@ export default function IpLocationsTable({
                 }}
               >
                 <td className="px-4 py-3">
-                  <span className="font-medium">{item.country}</span>
+                  <span className="font-medium">
+                    {countryName(item.countryCode, item.country)}
+                  </span>
                 </td>
                 <td className="px-4 py-3 text-right">
                   <span className="text-sm text-muted-foreground font-medium">

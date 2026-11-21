@@ -225,3 +225,16 @@ export function useT(): TFunction {
 export function useI18nReady() {
   return useSyncExternalStore(subscribe, () => ready);
 }
+
+/** A country in the UI language from its ISO code ("RU" → "Россия"). */
+export function countryName(code: string | undefined, fallback: string) {
+  if (!code || !/^[A-Z]{2}$/.test(code)) return fallback;
+  try {
+    return (
+      new Intl.DisplayNames([getLanguage()], { type: 'region' }).of(code) ??
+      fallback
+    );
+  } catch {
+    return fallback;
+  }
+}
