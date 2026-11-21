@@ -11,7 +11,9 @@ import {
 } from 'react-day-picker';
 
 import { Button } from '@/components/ui/button';
+import { dateFnsLocale } from '@/lib/date-locale';
 import { cn } from '@/lib/utils';
+import { getLanguage } from '@/utils/languageState';
 import { buttonVariants } from './button-variants';
 
 function Calendar({
@@ -30,6 +32,7 @@ function Calendar({
 
   return (
     <DayPicker
+      locale={dateFnsLocale()}
       showOutsideDays={showOutsideDays}
       className={cn(
         'bg-background group/calendar p-3 [--cell-size:--spacing(8)] [[data-slot=card-content]_&]:bg-transparent [[data-slot=popover-content]_&]:bg-transparent',
@@ -40,7 +43,7 @@ function Calendar({
       captionLayout={captionLayout}
       formatters={{
         formatMonthDropdown: (date) =>
-          date.toLocaleString('default', { month: 'short' }),
+          date.toLocaleString(getLanguage(), { month: 'short' }),
         ...formatters,
       }}
       classNames={{

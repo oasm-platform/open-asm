@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/popover';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { addDays, format } from 'date-fns';
+import { dateFnsLocale } from '@/lib/date-locale';
 import { CalendarIcon } from 'lucide-react';
 import { type DateRange } from 'react-day-picker';
 
@@ -65,14 +66,14 @@ export function DatePickerWithRange({
             {value?.from ? (
               value.to ? (
                 <>
-                  {format(value.from, 'LLL dd, y')} -{' '}
-                  {format(value.to, 'LLL dd, y')}
+                  {format(value.from, 'LLL dd, y', { locale: dateFnsLocale() })} -{' '}
+                  {format(value.to, 'LLL dd, y', { locale: dateFnsLocale() })}
                 </>
               ) : (
-                format(value.from, 'LLL dd, y')
+                format(value.from, 'LLL dd, y', { locale: dateFnsLocale() })
               )
             ) : value?.to ? (
-              format(value.to, 'LLL dd, y')
+              format(value.to, 'LLL dd, y', { locale: dateFnsLocale() })
             ) : (
               <span>{label ?? t('components.dateRange.placeholder')}</span>
             )}
