@@ -1,3 +1,4 @@
+import { fromNow } from '@/lib/date-locale';
 import { useT } from '@/lib/i18n-dictionary';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
@@ -5,10 +6,7 @@ import { RecentAssetsSkeleton } from './dashboard-skeleton';
 import { useAssetsControllerGetHostAssets } from '@/services/apis/gen/queries';
 import { ChevronRight, Clock } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 
-dayjs.extend(relativeTime);
 
 const RecentAssets = () => {
   const t = useT();
@@ -83,7 +81,7 @@ const RecentAssets = () => {
               >
                 <span className="truncate text-sm">{host.host}</span>
                 <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                  {dayjs(host.createdAt).fromNow()}
+                  {fromNow(host.createdAt)}
                   <ChevronRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
                 </span>
               </button>

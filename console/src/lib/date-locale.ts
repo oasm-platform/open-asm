@@ -1,24 +1,24 @@
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
-import 'dayjs/locale/es';
-import 'dayjs/locale/it';
-import 'dayjs/locale/ja';
-import 'dayjs/locale/ko';
-import 'dayjs/locale/ru';
-import 'dayjs/locale/vi';
-import 'dayjs/locale/zh-cn';
-import type { Locale } from 'date-fns';
+import { format, formatDistanceToNow, isValid, type Locale } from 'date-fns';
 import { enUS, es, it, ja, ko, ru, vi, zhCN } from 'date-fns/locale';
-import { getLanguage, subscribeLanguage } from '@/utils/languageState';
+import { getLanguage } from '@/utils/languageState';
 
-const DAYJS: Record<string, string> = { zh: 'zh-cn' };
 const DATE_FNS: Record<string, Locale> = { es, it, ja, ko, ru, vi, zh: zhCN };
 
 /** date-fns locale of the UI language, for `formatDistanceToNow` & co. */
 export const dateFnsLocale = (): Locale => DATE_FNS[getLanguage()] ?? enUS;
 
-// dayjs keeps one global locale: follow the UI language ("9 giờ trước")
-dayjs.extend(relativeTime);
-const apply = () => dayjs.locale(DAYJS[getLanguage()] ?? getLanguage());
-apply();
-subscribeLanguage(apply);
+type DateInput = string | number | Date | null | undefined;
+
+const toDate = (value: DateInput) => (value instanceof Date ? value : new Date(value ?? NaN));
+
+/** "3 hours ago" / "in 2 days" in the UI language; '—' for a missing or invalid date. */
+export const fromNow = (value: DateInput, addSuffix = true): string => {
+  const date = toDate(value);
+  return isValid(date) ? formatDistanceToNow(date, { addSuffix, locale: dateFnsLocale() }) : '—';
+};
+
+/** date-fns `format` (tokens: yyyy, dd, MMM, HH:mm) in the UI language; '—' for a missing or invalid date. */
+export const formatDate = (value: DateInput, pattern: string): string => {
+  const date = toDate(value);
+  return isValid(date) ? format(date, pattern, { locale: dateFnsLocale() }) : '—';
+};

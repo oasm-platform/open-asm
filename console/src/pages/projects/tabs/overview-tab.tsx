@@ -1,3 +1,4 @@
+import { formatDate, fromNow } from '@/lib/date-locale';
 import { StatCard } from '@/components/common/stat-card';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,8 +32,6 @@ import {
   type WeeklyNewVulnerabilitiesDto,
 } from '@/services/apis/gen/queries';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import {
   Activity,
   Bug,
@@ -54,7 +53,6 @@ import {
   workflowLabel,
 } from '../project-utils';
 
-dayjs.extend(relativeTime);
 
 /** Rows of "To fix" (as many as the API's recent activity). */
 const LIST_LIMIT = 15;
@@ -153,7 +151,7 @@ export const WeeklyChart = memo(function WeeklyChart({
                       type="button"
                       className="relative flex h-40 w-full flex-col-reverse items-center justify-start rounded-sm hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       aria-label={t('projects.overview.weekAria', {
-                        date: dayjs(week.week).format('DD MMM'),
+                        date: formatDate(week.week, 'dd MMM'),
                         n: totals[i],
                       })}
                     >
@@ -177,7 +175,7 @@ export const WeeklyChart = memo(function WeeklyChart({
                   <TooltipContent side="top">
                     <p className="font-medium">
                       {t('projects.overview.weekTooltip', {
-                        date: dayjs(week.week).format('DD MMM YYYY'),
+                        date: formatDate(week.week, 'dd MMM yyyy'),
                         n: totals[i],
                       })}
                     </p>
@@ -193,7 +191,7 @@ export const WeeklyChart = memo(function WeeklyChart({
                   </TooltipContent>
                 </Tooltip>
                 <span className="text-[11px] tabular-nums text-muted-foreground">
-                  {dayjs(week.week).format('DD/MM')}
+                  {formatDate(week.week, 'dd/MM')}
                 </span>
               </div>
             ))}
@@ -483,7 +481,7 @@ export function OverviewTab({
         </StatCard>
         <StatCard
           label={t('projects.list.nextRun')}
-          value={next ? dayjs(next.at).fromNow() : '—'}
+          value={next ? fromNow(next.at) : '—'}
           icon={CalendarClock}
           onClick={() => goTab('schedule')}
         >
@@ -579,9 +577,9 @@ export function OverviewTab({
                 >
                   <span
                     className="truncate whitespace-nowrap tabular-nums text-muted-foreground"
-                    title={dayjs(item.at).format('YYYY-MM-DD HH:mm')}
+                    title={formatDate(item.at, 'yyyy-MM-dd HH:mm')}
                   >
-                    {dayjs(item.at).fromNow()}
+                    {fromNow(item.at)}
                   </span>
                   <ActivityItem item={item} projectId={projectId} />
                 </div>

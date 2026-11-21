@@ -1,3 +1,4 @@
+import { fromNow } from '@/lib/date-locale';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,8 +17,6 @@ import {
   type ProjectWorkflow,
 } from '@/services/apis/gen/queries';
 import { Link } from '@tanstack/react-router';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import {
   CalendarClock,
   Pencil,
@@ -40,7 +39,6 @@ import {
   workflowLabel,
 } from '../project-utils';
 
-dayjs.extend(relativeTime);
 
 function WorkflowCard({
   projectId,
@@ -125,7 +123,7 @@ function WorkflowCard({
                 params={{ id: lastRun.id }}
                 className="hover:underline"
               >
-                {dayjs(lastRun.createdAt).fromNow()}
+                {fromNow(lastRun.createdAt)}
               </Link>
               <span>· {runTriggerLabel(lastRun.jobRunType, lastRun.triggerEvent)}</span>
             </>

@@ -15,7 +15,7 @@ import {
   useRootControllerGetMetadata,
   type GetVersionDto,
 } from '@/services/apis/gen/queries';
-import dayjs from 'dayjs';
+import { formatDate as formatLocalDate } from '@/lib/date-locale';
 import {
   Bug,
   ChevronDown,
@@ -53,7 +53,7 @@ const getLinks = (t: TFunction, repoUrl: string) => [
 ];
 
 const formatDate = (value: string | null) =>
-  value ? dayjs(value).format('MMM D, YYYY') : null;
+  value ? formatLocalDate(value, 'MMM d, yyyy') : null;
 
 export default function GetAboutProject() {
   const t = useT();

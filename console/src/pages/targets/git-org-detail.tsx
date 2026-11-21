@@ -1,3 +1,4 @@
+import { fromNow } from '@/lib/date-locale';
 import { useT } from '@/lib/i18n-dictionary';
 import Page from '@/components/common/page';
 import { Badge } from '@/components/ui/badge';
@@ -15,7 +16,6 @@ import {
 } from '@/services/apis/gen/queries';
 import { useNavigate } from '@tanstack/react-router';
 import type { AxiosError } from 'axios';
-import dayjs from 'dayjs';
 import {
   ExternalLink,
   GitBranch,
@@ -92,7 +92,7 @@ export function GitOrgDetail({
           </div>
           <div className="flex items-center gap-3">
             <p className="hidden text-muted-foreground md:block">
-              {t('targets.gitOrg.synced', { time: dayjs(target.lastDiscoveredAt).fromNow() })}
+              {t('targets.gitOrg.synced', { time: fromNow(target.lastDiscoveredAt) })}
             </p>
             <Button
               variant="outline"
@@ -208,7 +208,7 @@ function RepositoriesTable({ targetId }: { targetId: string }) {
                     </span>
                   )}
                   {repo.pushedAt && (
-                    <span>{t('targets.gitOrg.updated', { time: dayjs(repo.pushedAt).fromNow() })}</span>
+                    <span>{t('targets.gitOrg.updated', { time: fromNow(repo.pushedAt) })}</span>
                   )}
                 </div>
               </div>

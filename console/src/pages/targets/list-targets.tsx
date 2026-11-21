@@ -1,10 +1,6 @@
+import { formatDate, fromNow } from '@/lib/date-locale';
 import { type TFunction, useT } from '@/lib/i18n-dictionary';
 import { type ColumnDef } from '@tanstack/react-table';
-import dayjs from 'dayjs';
-import duration from 'dayjs/plugin/duration';
-import relativeTime from 'dayjs/plugin/relativeTime';
-dayjs.extend(duration);
-dayjs.extend(relativeTime);
 
 import { DataTable } from '@/components/ui/data-table';
 import { DataTableError } from '@/components/ui/data-table-error-boundary';
@@ -206,12 +202,12 @@ const getTargetColumns = (t: TFunction): ColumnDef<GetManyTargetResponseDto>[] =
       const { lastDiscoveredAt, nextScanAt, scanSchedule } = row.original;
       return (
         <div className="flex flex-col text-sm">
-          <span className="font-medium" title={dayjs(lastDiscoveredAt).format('YYYY-MM-DD HH:mm')}>
-            {dayjs(lastDiscoveredAt).fromNow()}
+          <span className="font-medium" title={formatDate(lastDiscoveredAt, 'yyyy-MM-dd HH:mm')}>
+            {fromNow(lastDiscoveredAt)}
           </span>
           <span className="text-muted-foreground">
             {nextScanAt
-              ? t('targets.list.next', { time: dayjs(nextScanAt).fromNow() })
+              ? t('targets.list.next', { time: fromNow(nextScanAt) })
               : isScheduled(scanSchedule)
                 ? scheduleLabel(scanSchedule)
                 : t('targets.list.manual')}

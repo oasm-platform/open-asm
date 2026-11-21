@@ -1,3 +1,4 @@
+import { formatDate, fromNow } from '@/lib/date-locale';
 import Page from '@/components/common/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,8 +16,6 @@ import {
   useAssetsControllerGetAssetById,
   type TechnologyDetailDTO,
 } from '@/services/apis/gen/queries';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import {
   Check,
   Copy,
@@ -33,7 +32,6 @@ import { useScreenshotQueryOptions } from '@/hooks/use-screenshot-query-options'
 import { TechnologyTooltip } from './components/technology-tooltip';
 import { asTlsInfo } from './tls-info';
 
-dayjs.extend(relativeTime);
 
 /** Shared label style so every field label in the page reads the same. */
 const fieldLabel =
@@ -121,7 +119,7 @@ export default function DetailAsset() {
     ? new Date(tls.not_before as unknown as Date)
     : undefined;
   const certAgeDisplay = certAgeStartDate
-    ? dayjs(certAgeStartDate).fromNow()
+    ? fromNow(certAgeStartDate)
     : t('assets.detail.notAvailable');
 
   const techs = (
@@ -291,7 +289,7 @@ export default function DetailAsset() {
                       <span className={fieldLabel}>{t('assets.detail.certificateAge')}</span>
                       <p className="text-sm">
                         {certAgeDisplay} (
-                        {dayjs(tls.not_before).format('DD MMM, YYYY')})
+                        {formatDate(tls.not_before, 'dd MMM, yyyy')})
                       </p>
                     </div>
                   )}
@@ -299,7 +297,7 @@ export default function DetailAsset() {
                     <div>
                       <span className={fieldLabel}>{t('assets.detail.expiresOn')}</span>
                       <p className="text-sm">
-                        {dayjs(tls.not_after).format('DD MMM, YYYY')}{' '}
+                        {formatDate(tls.not_after, 'dd MMM, yyyy')}{' '}
                         <span className={cn(sslTone)}>
                           (
                           {daysLeft < 0

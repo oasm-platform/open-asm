@@ -1,3 +1,4 @@
+import { fromNow } from '@/lib/date-locale';
 import { TlsDateBadge } from '@/components/tls-date-badge';
 import { Badge } from '@/components/ui/badge';
 import type {
@@ -6,7 +7,6 @@ import type {
 } from '@/services/apis/gen/queries';
 import { t } from '@/lib/i18n-dictionary';
 import type { ColumnDef } from '@tanstack/react-table';
-import dayjs from 'dayjs';
 import { BriefcaseBusiness, Globe, Network } from 'lucide-react';
 import AssetValue from './asset-value';
 import BadgeList from './badge-list';
@@ -140,7 +140,7 @@ export const assetColumns: ColumnDef<GetAssetsResponseDto>[] = [
 
       return (
         <div className="flex flex-col gap-1 max-w-30 min-h-15 justify-center">
-          <span>{dayjs(createdAt).fromNow()}</span>
+          <span>{fromNow(createdAt)}</span>
         </div>
       );
     },

@@ -1,3 +1,4 @@
+import { fromNow } from '@/lib/date-locale';
 import Page from '@/components/common/page';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -10,14 +11,11 @@ import {
   useAgentsControllerUpdateConversation,
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import { MessageSquare, Pencil, Trash2 } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { t, useT } from '@/lib/i18n-dictionary';
 
-dayjs.extend(relativeTime);
 
 const titleOf = (conv: { title?: string | null }) =>
   stripPageContextFromTitle(conv.title ?? '') || t('agents.conversations.newConversation');
@@ -187,7 +185,7 @@ export default function AgentConversationsPage() {
                       {titleOf(conv)}
                     </span>
                     <span className="text-xs text-muted-foreground shrink-0">
-                      {dayjs(conv.updatedAt).fromNow()}
+                      {fromNow(conv.updatedAt)}
                     </span>
                   </button>
                 )}

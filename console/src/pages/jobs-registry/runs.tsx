@@ -41,7 +41,8 @@ import {
 } from '@/services/apis/gen/queries';
 import type { BugReport } from '@/utils/bug-report-url';
 import { useQueryClient } from '@tanstack/react-query';
-import dayjs from 'dayjs';
+import { differenceInSeconds } from 'date-fns';
+import { formatDate as formatLocalDate } from '@/lib/date-locale';
 import { toast } from 'sonner';
 import {
   ArrowRight,
@@ -78,25 +79,15 @@ const formatEta = (seconds?: number | null): string | null => {
 };
 
 const formatDate = (value?: string) =>
-  value && dayjs(value).isValid()
-    ? dayjs(value).format('YYYY-MM-DD HH:mm:ss')
-    : '—';
+formatLocalDate(value, 'yyyy-MM-dd HH:mm:ss');
 
 /** Elapsed time between pickup and completion; only meaningful once completed. */
 const formatDuration = (job: JobListItemDto): string | null => {
-  const pickJobAt = dayjs(job.pickJobAt);
-  const completedAt = dayjs(job.completedAt);
+  if (job.status !== JobStatus.completed) return null;
 
-  if (
-    job.status !== JobStatus.completed ||
-    !pickJobAt.isValid() ||
-    !completedAt.isValid()
-  ) {
-    return null;
-  }
-
-  const totalSeconds = completedAt.diff(pickJobAt, 'second');
-  if (totalSeconds < 0) return null;
+  // NaN when either date is missing or invalid
+  const totalSeconds = differenceInSeconds(new Date(job.completedAt ?? NaN), new Date(job.pickJobAt ?? NaN));
+  if (!(totalSeconds >= 0)) return null;
 
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);

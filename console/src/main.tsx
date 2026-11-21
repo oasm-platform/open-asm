@@ -18,7 +18,6 @@ import { toast } from 'sonner';
 import { handleServerError } from './lib/handle-server-error';
 import { removeBootSplash } from '@/lib/boot-splash';
 import { useI18nReady, t } from '@/lib/i18n-dictionary';
-import '@/lib/date-locale';
 import { getWorkspaceListQueryOptions } from './hooks/useWorkspaceSelector';
 import {
   refetchSession,

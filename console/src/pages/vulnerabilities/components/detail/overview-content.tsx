@@ -1,10 +1,10 @@
+import { formatDate } from '@/lib/date-locale';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { OpenLink } from '@/components/ui/open-link';
 import { useT } from '@/lib/i18n-dictionary';
 import type { VulnerabilityDetailDto } from '@/services/apis/gen/queries';
 import { htmlToPlainText } from '@/utils/html';
-import dayjs from 'dayjs';
 import {
   Check,
   Copy,
@@ -337,12 +337,12 @@ export function VulnerabilityOverview({
             )}
             {data.publicationDate && (
               <Field label={t('vulnerabilities.overview.published')}>
-                {dayjs(data.publicationDate).format('YYYY-MM-DD HH:mm')}
+                {formatDate(data.publicationDate, 'yyyy-MM-dd HH:mm')}
               </Field>
             )}
             {data.modificationDate && (
               <Field label={t('vulnerabilities.overview.modified')}>
-                {dayjs(data.modificationDate).format('YYYY-MM-DD HH:mm')}
+                {formatDate(data.modificationDate, 'yyyy-MM-dd HH:mm')}
               </Field>
             )}
           </dl>

@@ -1,3 +1,4 @@
+import { formatDate, fromNow } from '@/lib/date-locale';
 import { useT } from '@/lib/i18n-dictionary';
 import { Badge } from '@/components/ui/badge';
 import { StatCard } from '@/components/common/stat-card';
@@ -19,8 +20,6 @@ import {
   type TargetOverviewDto,
 } from '@/services/apis/gen/queries';
 import { Link, useNavigate } from '@tanstack/react-router';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import {
   Activity,
   AlertTriangle,
@@ -44,7 +43,6 @@ import { WeeklyChart } from '../../projects/tabs/overview-tab';
 import { TargetRunRow } from '../components/target-run-row';
 import { isScheduled, scheduleLabel } from '../target-utils';
 
-dayjs.extend(relativeTime);
 
 /** Lists side by side share one height; longer ones scroll. */
 const LIST_CARD = 'h-[26rem]';
@@ -154,9 +152,9 @@ export function ChangeRow({ change }: { change: TargetChangeDto }) {
     <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-baseline gap-2 py-2 text-sm">
       <span
         className="truncate tabular-nums text-muted-foreground"
-        title={dayjs(change.at).format('YYYY-MM-DD HH:mm')}
+        title={formatDate(change.at, 'yyyy-MM-dd HH:mm')}
       >
-        {dayjs(change.at).fromNow()}
+        {fromNow(change.at)}
       </span>
       <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
         <span className={cn('font-medium', kind.className)}>{t(kind.labelKey)}</span>
@@ -331,7 +329,7 @@ export function TargetOverviewTab({ target }: { target: Target }) {
         </StatCard>
         <StatCard
           label={t('targets.overview.nextScan')}
-          value={overview.nextScanAt ? dayjs(overview.nextScanAt).fromNow(true) : '—'}
+          value={overview.nextScanAt ? fromNow(overview.nextScanAt, false) : '—'}
           icon={CalendarClock}
           onClick={() => goTab('settings')}
         >
@@ -339,7 +337,7 @@ export function TargetOverviewTab({ target }: { target: Target }) {
             {scheduled
               ? `${scheduleLabel(target.scanSchedule)}${
                   overview.nextScanAt
-                    ? ` · ${dayjs(overview.nextScanAt).format('DD MMM HH:mm')}`
+                    ? ` · ${formatDate(overview.nextScanAt, 'dd MMM HH:mm')}`
                     : ''
                 }`
               : t('targets.overview.manualOnly')}
@@ -381,7 +379,7 @@ export function TargetOverviewTab({ target }: { target: Target }) {
                         >
                           {lastRun.workflowName || t('targets.overview.run')}
                         </Link>{' '}
-                        {dayjs(lastRun.updatedAt).fromNow()} ({lastRun.status.replace('_', ' ')}).
+                        {fromNow(lastRun.updatedAt)} ({lastRun.status.replace('_', ' ')}).
                       </span>
                     )}
                   </span>
@@ -534,9 +532,9 @@ export function TargetOverviewTab({ target }: { target: Target }) {
               <InfoRow label={t('targets.overview.scope')}>{target.internalNetworkId ? t('targets.overview.internalNetwork') : t('targets.overview.external')}</InfoRow>
               <InfoRow label={t('targets.overview.schedule')}>{scheduleLabel(target.scanSchedule)}</InfoRow>
               <InfoRow label={t('targets.overview.lastDiscovery')}>
-                {target.lastDiscoveredAt ? dayjs(target.lastDiscoveredAt).fromNow() : '—'}
+                {target.lastDiscoveredAt ? fromNow(target.lastDiscoveredAt) : '—'}
               </InfoRow>
-              <InfoRow label={t('targets.overview.added')}>{dayjs(target.createdAt).format('DD MMM YYYY')}</InfoRow>
+              <InfoRow label={t('targets.overview.added')}>{formatDate(target.createdAt, 'dd MMM yyyy')}</InfoRow>
             </div>
             <p className="mt-4 mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {t('targets.overview.projects')}

@@ -1,3 +1,4 @@
+import { formatDate } from '@/lib/date-locale';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SeverityBadge } from '@/components/ui/severity-badge';
@@ -16,7 +17,6 @@ import {
 } from '@/services/apis/gen/queries';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import type { ProjectDetailSearch } from '@/routes/_authed/projects/$id/$tab';
-import dayjs from 'dayjs';
 import { ExternalLink } from 'lucide-react';
 import { ProvenanceBadge } from '../../vulnerabilities/components/provenance-badge';
 import { VulnerabilitiesView } from '../../vulnerabilities/vulnerabilities-view';
@@ -92,7 +92,7 @@ export function TimelineSheet({
                       {workflowLabel({ name: run.workflowName })}
                     </span>
                     <span className="ml-auto text-xs tabular-nums text-muted-foreground">
-                      {dayjs(run.createdAt).format('YYYY-MM-DD HH:mm')}
+                      {formatDate(run.createdAt, 'yyyy-MM-dd HH:mm')}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground">

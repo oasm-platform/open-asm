@@ -1,3 +1,4 @@
+import { fromNow } from '@/lib/date-locale';
 import Page from '@/components/common/page';
 import { Badge } from '@/components/ui/badge';
 import { ConnectWorkerTrigger } from '@/components/ui/connect-worker-trigger';
@@ -22,8 +23,6 @@ import type {
   WorkersControllerGetWorkersParams,
 } from '@/services/apis/gen/queries';
 import { useNavigate } from '@tanstack/react-router';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import { Loader2Icon, Search, SearchX, Server } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { isWorkerOnline, WorkerStatus } from './worker-status';
@@ -31,7 +30,6 @@ import { useT } from '@/lib/i18n-dictionary';
 
 // `fromNow()` below needs the plugin; registered here so this file does not
 // silently depend on worker-status.tsx having been loaded first.
-dayjs.extend(relativeTime);
 
 const COMMON_PARAMS = {
   limit: 100,
@@ -240,7 +238,7 @@ const ListWorkers = () => {
             )}
             <span>
               {t('workers.list.created', {
-                time: dayjs(worker.createdAt).fromNow(),
+                time: fromNow(worker.createdAt),
               })}
             </span>
           </div>

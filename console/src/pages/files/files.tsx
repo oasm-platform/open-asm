@@ -1,3 +1,4 @@
+import { fromNow } from '@/lib/date-locale';
 import { useT } from '@/lib/i18n-dictionary';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -31,8 +32,6 @@ import { formatBytes } from '@/utils/format-bytes';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { type ColumnDef } from '@tanstack/react-table';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import {
   ArrowDownWideNarrow,
   ArrowUp,
@@ -56,7 +55,6 @@ import { ShareFileDialog } from './components/share-file-dialog';
 import { StorageUsage } from './components/storage-usage';
 import { useFolderPath, useFolders } from './components/use-folders';
 
-dayjs.extend(relativeTime);
 
 type FolderRow = ArtifactFolderDto & { isFolder: true };
 type Row = ArtifactDto | FolderRow;
@@ -315,7 +313,7 @@ export function Files() {
       header: t('files.columns.modified'),
       cell: ({ row }) => (
         <span className="text-muted-foreground">
-          {dayjs(row.original.updatedAt).fromNow()}
+          {fromNow(row.original.updatedAt)}
         </span>
       ),
     },

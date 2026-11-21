@@ -1,7 +1,5 @@
+import { fromNow } from '@/lib/date-locale';
 import { type ColumnDef } from '@tanstack/react-table';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
-dayjs.extend(relativeTime);
 
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
@@ -75,7 +73,7 @@ export function ListInternalNetworks() {
         const value: string = row.getValue('createdAt');
         return (
           <div className="text-gray-400 font-semibold">
-            {dayjs(value).fromNow()}
+            {fromNow(value)}
           </div>
         );
       },

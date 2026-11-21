@@ -15,8 +15,6 @@ import {
 } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useNavigate, useSearch } from '@tanstack/react-router';
-import dayjs from 'dayjs';
-import duration from 'dayjs/plugin/duration';
 import { format } from 'date-fns';
 import { Calendar } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -25,7 +23,6 @@ import {
   RunStatusFilter,
   RunTypeFilter,
 } from './components/run-status-filter';
-dayjs.extend(duration);
 
 /** Every filter except search lives in its own URL param, next to the table's
  * own params, so a filtered view is shareable and survives a reload. */

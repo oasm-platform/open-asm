@@ -1,3 +1,4 @@
+import { fromNow } from '@/lib/date-locale';
 import { useT } from '@/lib/i18n-dictionary';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,12 +14,9 @@ import type {
   ArtifactFolderDto,
 } from '@/services/apis/gen/queries';
 import { formatBytes } from '@/utils/format-bytes';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import { Bot, Download, EllipsisVertical, Share2, Trash2 } from 'lucide-react';
 import { FileIcon, FolderIcon } from './file-icon';
 
-dayjs.extend(relativeTime);
 
 export interface FileActions {
   canDownload: (file: ArtifactDto) => boolean;
@@ -148,7 +146,7 @@ function FileCard({
           </div>
           <p className="truncate text-xs text-muted-foreground">
             {file.sizeBytes ? formatBytes(file.sizeBytes) : '0 B'} ·{' '}
-            {dayjs(file.updatedAt).fromNow()}
+            {fromNow(file.updatedAt)}
             {!file.isOwner && file.createdBy?.name
               ? ` · ${file.createdBy.name}`
               : ''}

@@ -1,7 +1,6 @@
+import { fromNow } from '@/lib/date-locale';
 import { useT } from '@/lib/i18n-dictionary';
 import type { ColumnDef } from '@tanstack/react-table';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import { Download, FileText, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { type DateRange } from 'react-day-picker';
@@ -46,7 +45,6 @@ import {
 } from '@/services/apis/gen/queries';
 import CreateWorkspace from '../workspaces/create-workspace';
 
-dayjs.extend(relativeTime);
 
 const SEVERITY_OPTIONS = [
   { value: 'CRITICAL', label: 'reports.severity.critical', color: 'text-red-500' },
@@ -201,7 +199,7 @@ export default function Reports() {
         const value: string = row.getValue('createdAt');
         return (
           <div className="text-gray-400 font-semibold">
-            {dayjs(value).fromNow()}
+            {fromNow(value)}
           </div>
         );
       },

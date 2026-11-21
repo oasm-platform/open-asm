@@ -1,3 +1,5 @@
+import { isAfter, subDays } from 'date-fns';
+import { formatDate, fromNow } from '@/lib/date-locale';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,8 +31,6 @@ import {
 } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Link } from '@tanstack/react-router';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import { Crosshair, Minus, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
@@ -44,7 +44,6 @@ import { SelectAssetsDialog } from '../components/select-assets-dialog';
 import { SeverityCounts } from '../components/severity-bar';
 import { apiErrorMessage, useInvalidateProjects } from '../project-utils';
 
-dayjs.extend(relativeTime);
 
 const PAGE_SIZE = 20;
 const RECENT_DAYS = 7;
@@ -210,7 +209,7 @@ export function AssetsTab({ projectId, archived }: { projectId: string; archived
     );
   };
 
-  const recent = dayjs().subtract(RECENT_DAYS, 'day');
+  const recent = subDays(new Date(), RECENT_DAYS);
   const columns: ColumnDef<ProjectAssetDto>[] = [
     {
       accessorKey: 'value',
@@ -218,7 +217,7 @@ export function AssetsTab({ projectId, archived }: { projectId: string; archived
       cell: ({ row }) => (
         <span className="flex items-center gap-2">
           <span className="font-medium">{row.original.value}</span>
-          {dayjs(row.original.addedAt).isAfter(recent) && (
+          {isAfter(new Date(row.original.addedAt), recent) && (
             <Badge variant="soft">{t('projects.assets.new')}</Badge>
           )}
         </span>
@@ -264,9 +263,9 @@ export function AssetsTab({ projectId, archived }: { projectId: string; archived
             to="/jobs/runs/$id"
             params={{ id: row.original.lastScan.runId }}
             className="hover:underline"
-            title={dayjs(row.original.lastScan.createdAt).format('YYYY-MM-DD HH:mm')}
+            title={formatDate(row.original.lastScan.createdAt, 'yyyy-MM-dd HH:mm')}
           >
-            {dayjs(row.original.lastScan.createdAt).fromNow()}
+            {fromNow(row.original.lastScan.createdAt)}
           </Link>
         ) : (
           <span className="text-muted-foreground">{t('projects.list.never')}</span>

@@ -1,3 +1,5 @@
+import { differenceInSeconds } from 'date-fns';
+import { formatDate } from '@/lib/date-locale';
 import { DataTable } from '@/components/ui/data-table';
 import JobStatusBadge from '@/components/ui/job-status';
 import { t, useT } from '@/lib/i18n-dictionary';
@@ -11,7 +13,6 @@ import {
 import type { ColumnDef } from '@tanstack/react-table';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import type { ProjectDetailSearch } from '@/routes/_authed/projects/$id/$tab';
-import dayjs from 'dayjs';
 import { CalendarDays, Clock } from 'lucide-react';
 import { useState } from 'react';
 import { FilterSelect } from '../components/filter-select';
@@ -22,7 +23,7 @@ const PAGE_SIZE = 20;
 /** "4m 14s", as on the jobs registry's run page. */
 function formatDuration(run: ProjectRunDto): string {
   if (!run.isCompleted) return t('projects.runs.running');
-  const total = Math.max(0, dayjs(run.updatedAt).diff(dayjs(run.createdAt), 'second'));
+  const total = Math.max(0, differenceInSeconds(new Date(run.updatedAt), new Date(run.createdAt)));
   const hours = Math.floor(total / 3600);
   const minutes = Math.floor((total % 3600) / 60);
   const parts: string[] = [];
@@ -149,7 +150,7 @@ export function RunsTab({
       cell: ({ row }) => (
         <span className="flex items-center gap-2 tabular-nums text-muted-foreground">
           <CalendarDays className="size-4" />
-          {dayjs(row.original.createdAt).format('YYYY-MM-DD HH:mm:ss')}
+          {formatDate(row.original.createdAt, 'yyyy-MM-dd HH:mm:ss')}
         </span>
       ),
     },

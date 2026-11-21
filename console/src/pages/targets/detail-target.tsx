@@ -1,3 +1,4 @@
+import { fromNow } from '@/lib/date-locale';
 import { useT } from '@/lib/i18n-dictionary';
 import Page from '@/components/common/page';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +10,6 @@ import {
   useTargetsControllerGetTargetById,
 } from '@/services/apis/gen/queries';
 import { getRouteApi, useNavigate, useParams } from '@tanstack/react-router';
-import dayjs from 'dayjs';
 import { CalendarClock, Loader2 } from 'lucide-react';
 import { useEffect } from 'react';
 import AssetProvider from '../assets/context/asset-context';
@@ -164,7 +164,7 @@ export function DetailTarget() {
               : t('targets.detail.manual')}
           </Badge>
           <p className="text-sm text-muted-foreground hidden md:block">
-            {t('targets.detail.discovered', { time: dayjs(target.lastDiscoveredAt).fromNow() })}
+            {t('targets.detail.discovered', { time: fromNow(target.lastDiscoveredAt) })}
           </p>
         </div>
       }

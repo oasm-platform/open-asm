@@ -1,9 +1,7 @@
+import { fromNow } from '@/lib/date-locale';
 import type { WorkerInstance } from '@/services/apis/gen/queries';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import { useT } from '@/lib/i18n-dictionary';
 
-dayjs.extend(relativeTime);
 
 type WorkerStatusInput = Pick<WorkerInstance, 'isOnline' | 'lastSeenAt'>;
 
@@ -23,7 +21,7 @@ export const WorkerStatus = ({ worker }: { worker: WorkerStatusInput }) => {
     </>
   ) : (
     <span className="text-sm text-muted-foreground">
-      {dayjs(worker.lastSeenAt).fromNow()}
+      {fromNow(worker.lastSeenAt)}
     </span>
   );
 };

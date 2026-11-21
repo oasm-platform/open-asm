@@ -1,3 +1,4 @@
+import { fromNow } from '@/lib/date-locale';
 import { useT } from '@/lib/i18n-dictionary';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,14 +17,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import type { GetIntegrationDto } from '@/services/apis/gen/queries';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import { MoreHorizontal, Unplug } from 'lucide-react';
 import { useState } from 'react';
 import { getIntegrationCapabilities } from '../capabilities';
 import { IntegrationLogo } from './integration-logo';
 
-dayjs.extend(relativeTime);
 
 interface ConnectedCardProps {
   integration: GetIntegrationDto;
@@ -64,13 +62,13 @@ export function ConnectedCard({
         </div>
         <p className="text-sm text-muted-foreground">
           {t('integrations.connected.connectedAgo', {
-            time: dayjs(integration.createdAt).fromNow(),
+            time: fromNow(integration.createdAt),
           })}
         </p>
         {integration.lastRunAt && (
           <p className="text-sm text-muted-foreground">
             {t('integrations.connected.lastSyncAgo', {
-              time: dayjs(integration.lastRunAt).fromNow(),
+              time: fromNow(integration.lastRunAt),
             })}
           </p>
         )}

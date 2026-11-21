@@ -1,12 +1,10 @@
+import { fromNow } from '@/lib/date-locale';
 import { useT } from '@/lib/i18n-dictionary';
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useJobsRegistryControllerGetManyJobs } from "@/services/apis/gen/queries";
-import dayjs from "dayjs";
-import relativeTime from "dayjs/plugin/relativeTime";
 
-dayjs.extend(relativeTime);
 
 const JobsRegistry = () => {
   const t = useT();
@@ -48,7 +46,7 @@ const JobsRegistry = () => {
                                         </Badge>
                                     </div>
                                     <div className="text-sm mt-1 text-muted-foreground">
-                                        {dayjs(job.createdAt).fromNow()}
+                                        {fromNow(job.createdAt)}
                                     </div>
                                 </div>
                             );

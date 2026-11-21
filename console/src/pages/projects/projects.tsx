@@ -1,3 +1,4 @@
+import { formatDate, fromNow } from '@/lib/date-locale';
 import Page from '@/components/common/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,8 +30,6 @@ import {
   type ProjectListItemDto,
 } from '@/services/apis/gen/queries';
 import { useNavigate } from '@tanstack/react-router';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import {
   CalendarClock,
   FolderKanban,
@@ -44,7 +43,6 @@ import { memo, useEffect, useState } from 'react';
 import { SeverityBar, SeverityCounts } from './components/severity-bar';
 import { nextCronRun, TRIGGER_EVENT_LABELS } from './project-utils';
 
-dayjs.extend(relativeTime);
 
 // Same grid as the workers, tools and integrations pages
 const GRID_CLASS =
@@ -188,17 +186,17 @@ const ProjectCard = memo(function ProjectCard({
         <Meta label={t('projects.tabs.workflows')} value={String(project.workflowCount)} />
         <Meta
           label={t('projects.list.sort.lastRun')}
-          value={project.lastRunAt ? dayjs(project.lastRunAt).fromNow() : t('projects.list.never')}
+          value={project.lastRunAt ? fromNow(project.lastRunAt) : t('projects.list.never')}
           title={
             project.lastRunAt
-              ? dayjs(project.lastRunAt).format('DD MMM YYYY, HH:mm')
+              ? formatDate(project.lastRunAt, 'dd MMM yyyy, HH:mm')
               : undefined
           }
         />
         <Meta
           label={t('projects.list.nextRun')}
-          value={next ? dayjs(next).fromNow() : '—'}
-          title={next ? dayjs(next).format('DD MMM YYYY, HH:mm') : undefined}
+          value={next ? fromNow(next) : '—'}
+          title={next ? formatDate(next, 'dd MMM yyyy, HH:mm') : undefined}
         />
       </dl>
       <TriggerChips project={project} />

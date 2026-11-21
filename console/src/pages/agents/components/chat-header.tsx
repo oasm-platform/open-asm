@@ -1,5 +1,4 @@
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
+import { fromNow } from '@/lib/date-locale';
 import { Link } from '@tanstack/react-router';
 import { MoreVertical, PanelRightOpen, SquarePen } from 'lucide-react';
 import { useMemo } from 'react';
@@ -15,7 +14,6 @@ import {
 } from '@/services/apis/gen/queries';
 import { useT } from '@/lib/i18n-dictionary';
 
-dayjs.extend(relativeTime);
 
 interface ChatHeaderProps {
   conversationId?: string;
@@ -97,7 +95,7 @@ export function ChatHeader({
           </h1>
           {createdAt && (
             <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
-              · {dayjs(createdAt).fromNow()}
+              · {fromNow(createdAt)}
             </span>
           )}
         </div>

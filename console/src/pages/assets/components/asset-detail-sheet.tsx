@@ -7,13 +7,10 @@ import {
 } from '@/components/ui/sheet';
 import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import { Maximize2 } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 import AssetDetail from './asset-detail';
 
-dayjs.extend(relativeTime);
 
 interface Props {
   open: boolean;

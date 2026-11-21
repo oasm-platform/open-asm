@@ -1,8 +1,6 @@
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
+import { fromNow } from '@/lib/date-locale';
 import { useT } from '@/lib/i18n-dictionary';
 
-dayjs.extend(relativeTime);
 
 /** A request within this window shows the user as online. */
 const ONLINE_WINDOW_MS = 60_000;
@@ -32,7 +30,7 @@ export const UserPresence = ({
     </span>
   ) : (
     <span className="text-sm text-muted-foreground">
-      {dayjs(lastActiveAt).fromNow()}
+      {fromNow(lastActiveAt)}
     </span>
   );
 };

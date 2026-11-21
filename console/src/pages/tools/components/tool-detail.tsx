@@ -1,3 +1,4 @@
+import { formatDate } from '@/lib/date-locale';
 import Page from '@/components/common/page';
 import { ToolConnectorConfigSheet } from '@/components/tools/tool-connector-config-sheet';
 import { Badge } from '@/components/ui/badge';
@@ -35,7 +36,6 @@ import {
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { getRouteApi, useParams } from '@tanstack/react-router';
-import dayjs from 'dayjs';
 import {
   BadgeCheck,
   Box,
@@ -573,7 +573,7 @@ function ConfigProfilesSection({ tool }: { tool: Tool }) {
                     {maskConfig(profile.config)}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {dayjs(profile.createdAt).format('DD MMM YYYY')}
+                    {formatDate(profile.createdAt, 'dd MMM yyyy')}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">

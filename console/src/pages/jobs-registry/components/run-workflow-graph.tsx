@@ -1,3 +1,4 @@
+import { formatDate } from '@/lib/date-locale';
 import { ToolLogo } from '@/components/ui/tool-logo';
 import {
   Tooltip,
@@ -23,7 +24,6 @@ import {
   type NodeTypes,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import dayjs from 'dayjs';
 import {
   CalendarClock,
   CircleAlert,
@@ -263,7 +263,7 @@ function WorkflowTriggerNode({ data }: NodeProps) {
         <span className="truncate text-base font-semibold">{t(meta.labelKey)}</span>
         {startedAt && (
           <span className="truncate font-mono text-xs text-muted-foreground">
-            {dayjs(startedAt).format('YYYY-MM-DD HH:mm')}
+            {formatDate(startedAt, 'yyyy-MM-dd HH:mm')}
           </span>
         )}
       </div>

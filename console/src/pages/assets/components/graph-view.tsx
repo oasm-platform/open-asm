@@ -1,3 +1,4 @@
+import { fromNow } from '@/lib/date-locale';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ReactFlow,
@@ -16,8 +17,6 @@ import {
 import '@xyflow/react/dist/style.css';
 import { Clock, Focus, Lock, LockOpen, RefreshCw } from 'lucide-react';
 import { useReducedMotion } from 'framer-motion';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import { useTheme } from '@/components/ui/theme-provider';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -55,7 +54,6 @@ import { GraphNodeSearch } from './graph-node-search';
 import AssetDetailSheet from './asset-detail-sheet';
 import GraphDetailSheet from './graph-detail-sheet';
 
-dayjs.extend(relativeTime);
 
 const nodeTypes = {
   target: GraphNodeComponent,
@@ -746,7 +744,7 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
       if (Number.isFinite(ts) && (latest === null || ts > latest)) latest = ts;
     }
     if (latest === null) return null;
-    return t('assets.graph.lastScanned', { time: dayjs(latest).fromNow() });
+    return t('assets.graph.lastScanned', { time: fromNow(latest) });
   }, [graphData, t]);
 
   const fPressed = useKeyPress('f');

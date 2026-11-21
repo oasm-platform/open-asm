@@ -1,3 +1,4 @@
+import { formatDate, fromNow } from '@/lib/date-locale';
 import { useT } from '@/lib/i18n-dictionary';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -9,8 +10,6 @@ import {
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import { Square } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -20,7 +19,6 @@ import {
 } from '../../projects/project-utils';
 import { progressPercent } from '../target-utils';
 
-dayjs.extend(relativeTime);
 
 const isActive = (run: TargetRunDto) =>
   run.status === JobStatus.pending || run.status === JobStatus.in_progress;
@@ -75,8 +73,8 @@ export function TargetRunRow({ run }: { run: TargetRunDto }) {
             </>
           ) : null}
           {' · '}
-          <span title={dayjs(run.createdAt).format('YYYY-MM-DD HH:mm')}>
-            {dayjs(run.createdAt).fromNow()}
+          <span title={formatDate(run.createdAt, 'yyyy-MM-dd HH:mm')}>
+            {fromNow(run.createdAt)}
           </span>
         </span>
         {run.newVulnerabilities > 0 && (

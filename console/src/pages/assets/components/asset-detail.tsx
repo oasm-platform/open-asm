@@ -1,3 +1,4 @@
+import { formatDate, fromNow } from '@/lib/date-locale';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -7,7 +8,6 @@ import {
   useAssetsControllerGetAssetById,
   type TechnologyDetailDTO,
 } from '@/services/apis/gen/queries';
-import dayjs from 'dayjs';
 import {
   ChartNoAxesGantt,
   Code,
@@ -61,7 +61,7 @@ export default function AssetDetail({ id }: { id: string }) {
     ? new Date(tls.not_before as unknown as Date)
     : undefined;
   const certAgeDisplay = certAgeStartDate
-    ? dayjs(certAgeStartDate).fromNow()
+    ? fromNow(certAgeStartDate)
     : t('assets.detail.notAvailable');
 
   return (
@@ -221,7 +221,7 @@ export default function AssetDetail({ id }: { id: string }) {
                     <span className="block mb-1">{t('assets.detail.certificateAge')}</span>
                     <span className="">
                       {certAgeDisplay} (
-                      {dayjs(tls.not_before).format('DD MMM, YYYY')})
+                      {formatDate(tls.not_before, 'dd MMM, yyyy')})
                     </span>
                   </div>
                 )}
@@ -229,7 +229,7 @@ export default function AssetDetail({ id }: { id: string }) {
                   <div>
                     <span className="block mb-1">{t('assets.detail.expiresOn')}</span>
                     <span className="">
-                      {dayjs(tls.not_after).format('DD MMM, YYYY')}{' '}
+                      {formatDate(tls.not_after, 'dd MMM, yyyy')}{' '}
                       <span
                         className={cn(
                           daysLeft < 0

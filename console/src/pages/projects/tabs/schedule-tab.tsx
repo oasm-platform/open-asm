@@ -1,3 +1,5 @@
+import { addDays, differenceInCalendarDays, startOfDay } from 'date-fns';
+import { formatDate, fromNow } from '@/lib/date-locale';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,8 +32,6 @@ import {
   type ProjectWorkflowTrigger,
 } from '@/services/apis/gen/queries';
 import { Link } from '@tanstack/react-router';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import { CalendarClock, CalendarDays, Workflow, Zap } from 'lucide-react';
 import { useMemo } from 'react';
 import {
@@ -40,7 +40,6 @@ import {
   workflowLabel,
 } from '../project-utils';
 
-dayjs.extend(relativeTime);
 
 const DAYS = 7;
 
@@ -52,10 +51,10 @@ function useWeek(
 ) {
   const t = useT();
   return useMemo(() => {
-    const start = dayjs().startOf('day');
-    const end = start.add(DAYS, 'day').toDate();
+    const start = startOfDay(new Date());
+    const end = addDays(start, DAYS);
     const days = Array.from({ length: DAYS }, (_, i) => ({
-      date: start.add(i, 'day'),
+      date: addDays(start, i),
       runs: [] as Array<{ at: Date; workflow: string; triggerId: string }>,
     }));
     for (const trigger of triggers) {
@@ -66,7 +65,7 @@ function useWeek(
       for (let guard = 0; guard < 200; guard++) {
         const at = getNextRun(trigger.cron, timezone, from);
         if (!at || at >= end) break;
-        const index = dayjs(at).startOf('day').diff(start, 'day');
+        const index = differenceInCalendarDays(at, start);
         days[index]?.runs.push({
           at,
           workflow: names.get(trigger.projectWorkflowId) ?? t('projects.schedule.workflowFallback'),
@@ -140,8 +139,8 @@ export function ScheduleTab({
                 )}
               >
                 <span className="text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">{day.date.format('ddd')}</span>{' '}
-                  {day.date.format('DD/MM')}
+                  <span className="font-medium text-foreground">{formatDate(day.date, 'EEE')}</span>{' '}
+                  {formatDate(day.date, 'dd/MM')}
                 </span>
                 {day.runs.map((run) => (
                   <span
@@ -149,7 +148,7 @@ export function ScheduleTab({
                     className="rounded-md border-l-2 border-primary bg-primary/5 px-2 py-1 text-xs leading-tight"
                   >
                     <span className="block font-medium tabular-nums">
-                      {dayjs(run.at).format('HH:mm')}
+                      {formatDate(run.at, 'HH:mm')}
                     </span>
                     {run.workflow}
                   </span>
@@ -236,11 +235,11 @@ export function ScheduleTab({
                         )}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {trigger.lastFiredAt ? dayjs(trigger.lastFiredAt).fromNow() : '—'}
+                        {trigger.lastFiredAt ? fromNow(trigger.lastFiredAt) : '—'}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {next
-                          ? dayjs(next).format('YYYY-MM-DD HH:mm')
+                          ? formatDate(next, 'yyyy-MM-dd HH:mm')
                           : isCron || !active
                             ? '—'
                             : t('projects.schedule.onItsEvent')}
