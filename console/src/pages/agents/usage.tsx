@@ -26,6 +26,7 @@ import {
 } from '@/services/apis/gen/queries';
 import { Link } from '@tanstack/react-router';
 import { format, formatDistanceToNow, parseISO } from 'date-fns';
+import { dateFnsLocale } from '@/lib/date-locale';
 import { useState, type ReactNode } from 'react';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { t, useT } from '@/lib/i18n-dictionary';
@@ -398,6 +399,7 @@ export default function AgentUsagePage() {
                       <p className="text-xs text-muted-foreground">
                         {formatDistanceToNow(new Date(session.lastActiveAt), {
                           addSuffix: true,
+                          locale: dateFnsLocale(),
                         })}
                       </p>
                     </div>

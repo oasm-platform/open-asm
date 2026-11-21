@@ -5,6 +5,7 @@ import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import type { IssueDetailDto } from '@/services/apis/gen/queries';
 import { formatDistanceToNowStrict } from 'date-fns';
+import { dateFnsLocale } from '@/lib/date-locale';
 import { CalendarClock, UserRound, Workflow } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { formatIssueNo, type IssuePriority } from '../issue-utils';
@@ -84,6 +85,7 @@ export function IssueHero({
               {t('issues.hero.opened', {
                 time: formatDistanceToNowStrict(new Date(issue.createdAt), {
                   addSuffix: true,
+                  locale: dateFnsLocale(),
                 }),
               })}
               {issue.createdBy

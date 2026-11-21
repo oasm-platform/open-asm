@@ -35,7 +35,7 @@ export function setLanguage(lang: string) {
   for (const listener of listeners) listener();
 }
 
-function subscribe(listener: () => void) {
+export function subscribeLanguage(listener: () => void) {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
@@ -43,5 +43,5 @@ function subscribe(listener: () => void) {
 }
 
 export function useLanguage() {
-  return useSyncExternalStore(subscribe, getLanguage);
+  return useSyncExternalStore(subscribeLanguage, getLanguage);
 }

@@ -1,4 +1,5 @@
 import { formatDistanceToNow } from 'date-fns';
+import { dateFnsLocale } from '@/lib/date-locale';
 import { FileCode, MoreVertical, PanelLeftClose } from 'lucide-react';
 import { useState, type ComponentProps } from 'react';
 
@@ -98,7 +99,7 @@ export function TemplatesSidebar({ onCollapse, ...props }: Props) {
           <span className="flex min-w-0 flex-col">
             <span className="truncate">{file.name}</span>
             <span className="truncate text-xs text-muted-foreground">
-              {owner} · {formatDistanceToNow(new Date(file.updatedAt), { addSuffix: true })}
+              {owner} · {formatDistanceToNow(new Date(file.updatedAt), { addSuffix: true, locale: dateFnsLocale() })}
             </span>
           </span>
         </SidebarMenuButton>
