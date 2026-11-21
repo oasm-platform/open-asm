@@ -164,7 +164,10 @@ export function setDictionaryForTests(dict: I18nDictionary) {
 /** Each language named in itself, e.g. "Tiếng Việt", "日本語". */
 export function nativeName(code: string) {
   try {
-    return new Intl.DisplayNames([code], { type: 'language' }).of(code) ?? code;
+    const name =
+      new Intl.DisplayNames([code], { type: 'language' }).of(code) ?? code;
+    // "español" → "Español"; scripts without case (日本語) stay as they are
+    return name.charAt(0).toLocaleUpperCase(code) + name.slice(1);
   } catch {
     return code;
   }
