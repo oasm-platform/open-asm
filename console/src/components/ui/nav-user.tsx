@@ -5,7 +5,12 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -16,6 +21,13 @@ import {
 } from '@/components/ui/sidebar';
 import { OpenLink } from '@/components/ui/open-link';
 import { useBugReportUrl } from '@/hooks/use-bug-report-url';
+import { saveAccountLanguage } from '@/lib/account-language';
+import {
+  nativeName,
+  prefetchLanguages,
+  useSupportedLanguages,
+  useT,
+} from '@/lib/i18n-dictionary';
 import { isAdminUser } from '@/modules/admin/utils';
 import { useRootControllerGetMetadata } from '@/services/apis/gen/queries';
 import {
@@ -23,12 +35,65 @@ import {
   markVoluntaryLogout,
   type User,
 } from '@/utils/authClient';
+import { useLanguage } from '@/utils/languageState';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { BookOpen, Bug, LogOut, Settings, ShieldUser } from 'lucide-react';
+import {
+  BookOpen,
+  Bug,
+  Languages,
+  LogOut,
+  Settings,
+  ShieldUser,
+} from 'lucide-react';
 
 interface NavUserProps {
   isOnlyAvatar?: boolean;
   dropdownSide?: 'top' | 'bottom' | 'left' | 'right';
+}
+
+function LanguageMenu() {
+  const t = useT();
+  const lang = useLanguage();
+  const queryClient = useQueryClient();
+  const { data: languages } = useSupportedLanguages();
+  const options = languages?.length ? languages : [lang];
+
+  const select = (code: string) => {
+    // Let the menu start closing before the page re-renders in the new language.
+    requestAnimationFrame(() => {
+      void saveAccountLanguage(code).then(() =>
+        // Only notifications are rendered server-side in the request language.
+        queryClient.invalidateQueries({
+          predicate: (q) =>
+            String(q.queryKey[0]).startsWith('/api/notifications'),
+        }),
+      );
+    });
+  };
+
+  return (
+    <DropdownMenuSub
+      onOpenChange={(open) => open && prefetchLanguages(options)}
+    >
+      <DropdownMenuSubTrigger>
+        <Languages />
+        <span className="flex-1">{t('ui.userMenu.language')}</span>
+        <span className="text-muted-foreground text-xs">
+          {nativeName(lang)}
+        </span>
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent className="min-w-40">
+        <DropdownMenuRadioGroup value={lang} onValueChange={select}>
+          {options.map((code) => (
+            <DropdownMenuRadioItem key={code} value={code} lang={code}>
+              {nativeName(code)}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
 }
 
 export function NavUser({ isOnlyAvatar = false, dropdownSide }: NavUserProps) {
@@ -38,6 +103,7 @@ export function NavUser({ isOnlyAvatar = false, dropdownSide }: NavUserProps) {
   const { data: session } = useSession();
   const { data: metadata } = useRootControllerGetMetadata();
   const bugReportUrl = useBugReportUrl();
+  const t = useT();
   const user = session?.user;
   if (!user) {
     return <></>;
@@ -111,14 +177,15 @@ export function NavUser({ isOnlyAvatar = false, dropdownSide }: NavUserProps) {
             <DropdownMenuGroup>
               <DropdownMenuItem onClick={() => navigate({ to: '/settings' })}>
                 <Settings />
-                Settings
+                {t('ui.userMenu.settings')}
               </DropdownMenuItem>
               {isAdminUser(user as User) && (
                 <DropdownMenuItem onClick={() => navigate({ to: '/admin' })}>
                   <ShieldUser />
-                  Admin
+                  {t('ui.userMenu.admin')}
                 </DropdownMenuItem>
               )}
+              <LanguageMenu />
             </DropdownMenuGroup>
             {(metadata?.docsUrl || bugReportUrl) && (
               <>
@@ -132,7 +199,7 @@ export function NavUser({ isOnlyAvatar = false, dropdownSide }: NavUserProps) {
                         rel="noreferrer noopener"
                       >
                         <BookOpen />
-                        Docs
+                        {t('ui.userMenu.docs')}
                       </OpenLink>
                     </DropdownMenuItem>
                   )}
@@ -144,7 +211,7 @@ export function NavUser({ isOnlyAvatar = false, dropdownSide }: NavUserProps) {
                         rel="noreferrer noopener"
                       >
                         <Bug />
-                        Report an issue
+                        {t('ui.userMenu.reportIssue')}
                       </OpenLink>
                     </DropdownMenuItem>
                   )}
@@ -154,7 +221,7 @@ export function NavUser({ isOnlyAvatar = false, dropdownSide }: NavUserProps) {
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>
               <LogOut />
-              Log out
+              {t('ui.userMenu.logout')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

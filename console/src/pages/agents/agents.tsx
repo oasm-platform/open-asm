@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/side-panel-resizer';
 import { isSubagentActive } from './components/subagents-panel';
 import { useMediaQuery } from './components/use-media-query';
+import { useT } from '@/lib/i18n-dictionary';
 
 const SIDE_PANEL_STORAGE_KEY = 'agent-side-panel-open';
 const SIDE_PANEL_WIDTH_STORAGE_KEY = 'agent-side-panel-width';
@@ -42,6 +43,7 @@ const SIDE_PANEL_LIMITS: PanelLimits = { panelMin: 360, restMin: 420 };
 export default function AgentsChatPage() {
   const { conversationId } = useParams({ strict: false });
   const isMobile = useIsMobile();
+  const t = useT();
   const isLargeScreen = useMediaQuery('(min-width: 1024px)');
 
   const {
@@ -239,7 +241,7 @@ export default function AgentsChatPage() {
               onResize={panelWidth.setWidth}
               onCommit={panelWidth.save}
               limits={SIDE_PANEL_LIMITS}
-              label="Resize side panel"
+              label={t('agents.sidePanel.resize')}
               className="hidden lg:block"
             />
             <aside
@@ -268,10 +270,9 @@ export default function AgentsChatPage() {
           className="w-full gap-0 p-0 sm:max-w-none [&>button]:hidden"
         >
           <SheetHeader className="sr-only">
-            <SheetTitle>Side panel</SheetTitle>
+            <SheetTitle>{t('agents.sidePanel.title')}</SheetTitle>
             <SheetDescription>
-              Plan, subagents, browser, tool calls and stats of this
-              conversation.
+              {t('agents.sidePanel.description')}
             </SheetDescription>
           </SheetHeader>
           {renderSidePanel(() => setSheetOpen(false))}

@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import useDebounce from '@/hooks/use-debounce';
+import { useT } from '@/lib/i18n-dictionary';
 import {
   useProjectsControllerGetAssets,
   useProjectsControllerRunWorkflow,
@@ -54,6 +55,7 @@ export function RunWorkflowDialog({
   onOpenChange,
   bindingId,
 }: RunWorkflowDialogProps) {
+  const t = useT();
   const navigate = useNavigate();
   const invalidate = useInvalidateProjects();
   const [selectedBinding, setSelectedBinding] = useState(bindingId);
@@ -92,9 +94,9 @@ export function RunWorkflowDialog({
       },
       {
         onSuccess: (result) => {
-          toast.success(`Run started on ${assetCount(result.assets)}`, {
+          toast.success(t('projects.runDialog.started', { assets: assetCount(result.assets) }), {
             action: {
-              label: 'Open run',
+              label: t('projects.runDialog.openRun'),
               onClick: () =>
                 navigate({ to: '/jobs/runs/$id', params: { id: result.jobHistoryId } }),
             },
@@ -103,7 +105,7 @@ export function RunWorkflowDialog({
           onOpenChange(false);
         },
         onError: (error) =>
-          toast.error(apiErrorMessage(error, 'Failed to start the run')),
+          toast.error(apiErrorMessage(error, t('projects.runDialog.failed'))),
       },
     );
   };
@@ -123,18 +125,18 @@ export function RunWorkflowDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Run workflow</DialogTitle>
+          <DialogTitle>{t('projects.runDialog.title')}</DialogTitle>
           <DialogDescription>
-            Starts a manual run now. Scheduled and event runs are not affected.
+            {t('projects.runDialog.description')}
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-4">
           {workflows.length > 1 && (
             <div className="flex flex-col gap-2">
-              <Label>Workflow</Label>
+              <Label>{t('projects.schedule.colWorkflow')}</Label>
               <Select value={selectedBinding} onValueChange={setSelectedBinding}>
-                <SelectTrigger aria-label="Workflow">
-                  <SelectValue placeholder="Pick a workflow" />
+                <SelectTrigger aria-label={t('projects.schedule.colWorkflow')}>
+                  <SelectValue placeholder={t('projects.runDialog.pickWorkflow')} />
                 </SelectTrigger>
                 <SelectContent>
                   {workflows.map((binding) => (
@@ -154,18 +156,18 @@ export function RunWorkflowDialog({
             <Label className="flex cursor-pointer items-start gap-3 rounded-md border p-3 font-normal has-[[data-state=checked]]:border-primary">
               <RadioGroupItem value="all" className="mt-0.5" />
               <span className="flex flex-col gap-0.5">
-                <span className="font-medium">Whole scope</span>
+                <span className="font-medium">{t('projects.runDialog.wholeScope')}</span>
                 <span className="text-xs text-muted-foreground">
-                  {assetCount(totalAssets)} in the project
+                  {t('projects.runDialog.inProject', { assets: assetCount(totalAssets) })}
                 </span>
               </span>
             </Label>
             <Label className="flex cursor-pointer items-start gap-3 rounded-md border p-3 font-normal has-[[data-state=checked]]:border-primary">
               <RadioGroupItem value="some" className="mt-0.5" />
               <span className="flex flex-col gap-0.5">
-                <span className="font-medium">Selected assets</span>
+                <span className="font-medium">{t('projects.runDialog.selectedAssets')}</span>
                 <span className="text-xs text-muted-foreground">
-                  Scan only the assets you pick below
+                  {t('projects.runDialog.selectedHint')}
                 </span>
               </span>
             </Label>
@@ -173,7 +175,7 @@ export function RunWorkflowDialog({
           {scope === 'some' && (
             <div className="flex flex-col gap-2">
               <Input
-                placeholder="Search assets..."
+                placeholder={t('projects.runDialog.searchAssets')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="h-8 text-xs"
@@ -182,10 +184,10 @@ export function RunWorkflowDialog({
                 {assetsQuery.isLoading ? (
                   <p className="flex items-center gap-2 p-3 text-xs text-muted-foreground">
                     <LoaderCircle className="size-3 animate-spin" />
-                    Loading assets...
+                    {t('projects.runDialog.loadingAssets')}
                   </p>
                 ) : (assetsQuery.data?.data ?? []).length === 0 ? (
-                  <p className="p-3 text-xs text-muted-foreground">No assets</p>
+                  <p className="p-3 text-xs text-muted-foreground">{t('projects.runDialog.noAssets')}</p>
                 ) : (
                   (assetsQuery.data?.data ?? []).map((asset) => (
                     <label
@@ -195,7 +197,7 @@ export function RunWorkflowDialog({
                       <Checkbox
                         checked={picked.has(asset.id)}
                         onCheckedChange={() => toggle(asset.id)}
-                        aria-label={`Select ${asset.value}`}
+                        aria-label={t('projects.runDialog.selectAria', { value: asset.value })}
                       />
                       <span className="truncate text-sm">{asset.value}</span>
                     </label>
@@ -203,14 +205,14 @@ export function RunWorkflowDialog({
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                {picked.size} selected
+                {t('projects.runDialog.selected', { n: picked.size })}
               </p>
             </div>
           )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button disabled={!canRun || isPending} onClick={run}>
             {isPending ? (
@@ -218,7 +220,7 @@ export function RunWorkflowDialog({
             ) : (
               <Play className="size-4" />
             )}
-            Run
+            {t('projects.detail.run')}
           </Button>
         </DialogFooter>
       </DialogContent>

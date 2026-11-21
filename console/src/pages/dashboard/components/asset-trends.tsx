@@ -1,5 +1,7 @@
 'use client';
 
+import { type TFunction, useT } from '@/lib/i18n-dictionary';
+
 import { useState } from 'react';
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
 
@@ -16,13 +18,14 @@ import { AssetTrendsSkeleton } from './dashboard-skeleton';
 import { TrendingUp } from 'lucide-react';
 import { format } from 'date-fns';
 
-const chartConfig = {
-  assets: { label: 'Assets', color: 'var(--chart-2)' },
-  techs: { label: 'Technologies', color: 'var(--chart-1)' },
-  ports: { label: 'Ports', color: 'var(--chart-4)' },
-  services: { label: 'Services', color: 'var(--chart-3)' },
-  targets: { label: 'Targets', color: 'var(--chart-5)' },
-} satisfies ChartConfig;
+const getChartConfig = (t: TFunction) =>
+  ({
+  assets: { label: t('dashboard.trends.assets'), color: 'var(--chart-2)' },
+  techs: { label: t('dashboard.trends.technologies'), color: 'var(--chart-1)' },
+  ports: { label: t('dashboard.trends.ports'), color: 'var(--chart-4)' },
+  services: { label: t('dashboard.trends.services'), color: 'var(--chart-3)' },
+  targets: { label: t('dashboard.trends.targets'), color: 'var(--chart-5)' },
+}) satisfies ChartConfig;
 
 const metricsOrder = [
   'assets',
@@ -34,6 +37,8 @@ const metricsOrder = [
 type MetricKey = (typeof metricsOrder)[number];
 
 export function AssetTrends() {
+  const t = useT();
+  const chartConfig = getChartConfig(t);
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -77,7 +82,7 @@ export function AssetTrends() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <TrendingUp className="h-5 w-5 text-primary" />
-          Attack surface trend
+          {t('dashboard.trends.title')}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -140,7 +145,7 @@ export function AssetTrends() {
         </ChartContainer>
 
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-6 pt-4 border-t border-border text-sm">
-          <span className="text-muted-foreground text-xs">Current</span>
+          <span className="text-muted-foreground text-xs">{t('dashboard.trends.current')}</span>
           {metricsOrder.map((key) => {
             const { label, color } = chartConfig[key];
             const isVisible = visibleMetrics[key];

@@ -1,3 +1,4 @@
+import { t } from '@/lib/i18n-dictionary';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import type { UIMessage } from 'ai';
@@ -680,7 +681,7 @@ export function useAgentChat({
 
       console.error('[Chat] Error:', error);
       // Always set streamError so the auto-retry effect can evaluate it.
-      setStreamError(error.message ?? 'An error occurred while streaming');
+      setStreamError(error.message ?? t('components.aiChat.streamError'));
 
       // For permanent errors or retries exhausted, reset retry state immediately.
       if (
@@ -923,9 +924,7 @@ export function useAgentChat({
           setStreamError(null);
         } else {
           console.error('[Chat] Failed to submit approval decision', error);
-          setStreamError(
-            'Could not submit approval decision. Please try again.',
-          );
+          setStreamError(t('components.aiChat.approvalSubmitFailed'));
         }
       } finally {
         setIsDecidingApproval(false);

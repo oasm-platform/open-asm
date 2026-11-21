@@ -1,3 +1,4 @@
+import { fromNow } from '@/lib/date-locale';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +9,7 @@ import {
 } from '@/components/common/workflow-file-sheet';
 import JobStatusBadge from '@/components/ui/job-status';
 import { formatCronLabel, getLocalTimezone } from '@/lib/cron-schedule';
+import { useT } from '@/lib/i18n-dictionary';
 import {
   ProjectTriggerType,
   useProjectsControllerRemoveWorkflow,
@@ -15,8 +17,6 @@ import {
   type ProjectWorkflow,
 } from '@/services/apis/gen/queries';
 import { Link } from '@tanstack/react-router';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import {
   CalendarClock,
   Pencil,
@@ -39,7 +39,6 @@ import {
   workflowLabel,
 } from '../project-utils';
 
-dayjs.extend(relativeTime);
 
 function WorkflowCard({
   projectId,
@@ -54,6 +53,7 @@ function WorkflowCard({
   onRun: () => void;
   onEdit: () => void;
 }) {
+  const t = useT();
   const timezone = getLocalTimezone();
   const invalidate = useInvalidateProjects();
   const remove = useProjectsControllerRemoveWorkflow();
@@ -66,10 +66,10 @@ function WorkflowCard({
       { id: projectId, bindingId: binding.id },
       {
         onSuccess: () => {
-          toast.success('Workflow removed');
+          toast.success(t('projects.workflows.removed'));
           void invalidate();
         },
-        onError: (error) => toast.error(apiErrorMessage(error, 'Failed to remove the workflow')),
+        onError: (error) => toast.error(apiErrorMessage(error, t('projects.workflows.removeFailed'))),
       },
     );
 
@@ -82,7 +82,7 @@ function WorkflowCard({
         </CardTitle>
         <Button disabled={archived} onClick={onRun}>
           <Play className="size-4" />
-          Run
+          {t('projects.detail.run')}
         </Button>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -90,7 +90,7 @@ function WorkflowCard({
         <div className="flex flex-wrap gap-1.5">
           {(binding.triggers ?? []).length === 0 && (
             <Badge variant="outline" className="font-normal">
-              Manual only
+              {t('projects.list.manualOnly')}
             </Badge>
           )}
           {(binding.triggers ?? []).map((trigger) =>
@@ -103,13 +103,13 @@ function WorkflowCard({
               >
                 <CalendarClock className="size-3" />
                 {formatCronLabel(trigger.cron ?? '', timezone) ?? trigger.cron}
-                {!trigger.enabled && ' (off)'}
+                {!trigger.enabled && t('projects.workflows.offSuffix')}
               </Badge>
             ) : (
               <Badge key={trigger.id} variant="outline" className="gap-1 font-normal">
                 <Zap className="size-3" />
-                {trigger.event ? TRIGGER_EVENT_LABELS[trigger.event] : 'Event'}
-                {!trigger.enabled && ' (off)'}
+                {trigger.event ? TRIGGER_EVENT_LABELS[trigger.event] : t('projects.runTrigger.event')}
+                {!trigger.enabled && t('projects.workflows.offSuffix')}
               </Badge>
             ),
           )}
@@ -123,33 +123,33 @@ function WorkflowCard({
                 params={{ id: lastRun.id }}
                 className="hover:underline"
               >
-                {dayjs(lastRun.createdAt).fromNow()}
+                {fromNow(lastRun.createdAt)}
               </Link>
               <span>· {runTriggerLabel(lastRun.jobRunType, lastRun.triggerEvent)}</span>
             </>
           ) : (
-            <span>Never run</span>
+            <span>{t('projects.workflows.neverRun')}</span>
           )}
           <span className="ml-auto flex gap-1">
             <WorkflowFileSheet
               yaml={workflowYaml(binding.workflow.content)}
-              description="What this workflow runs, as its file."
+              description={t('projects.workflows.fileDescription')}
             />
             <Button
               variant="ghost"
               size="sm"
               disabled={archived || !owned}
-              title={owned ? undefined : 'Not owned by this project'}
+              title={owned ? undefined : t('projects.workflows.notOwned')}
               onClick={onEdit}
             >
               <Pencil className="size-4" />
-              Edit
+              {t('common.edit')}
             </Button>
             <Button
               variant="ghost"
               size="icon"
               disabled={archived}
-              aria-label="Remove workflow"
+              aria-label={t('projects.workflows.removeTitle')}
               onClick={() => setConfirm(true)}
             >
               <Trash2 className="size-4" />
@@ -160,8 +160,10 @@ function WorkflowCard({
       <ConfirmDialog
         open={confirm}
         onOpenChange={setConfirm}
-        title="Remove workflow"
-        description={`Remove "${workflowLabel(binding.workflow)}"? Its triggers and run history are deleted with it. Vulnerabilities stay.`}
+        title={t('projects.workflows.removeTitle')}
+        description={t('projects.workflows.removeDescription', {
+          name: workflowLabel(binding.workflow),
+        })}
         onConfirm={handleRemove}
         typeToConfirm="delete"
         disabled={remove.isPending}
@@ -181,6 +183,7 @@ export function WorkflowsTab({
   archived: boolean;
   onRun: (bindingId: string) => void;
 }) {
+  const t = useT();
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<ProjectWorkflow | undefined>();
 
@@ -208,8 +211,8 @@ export function WorkflowsTab({
         className="flex min-h-40 flex-col items-center justify-center gap-2 rounded-xl border border-dashed text-muted-foreground transition-colors hover:bg-accent/70 disabled:pointer-events-none disabled:opacity-50"
       >
         <Plus className="size-5" />
-        <span className="font-medium text-foreground">Add workflow</span>
-        <span className="text-sm">From a template, your own tools, or a copy</span>
+        <span className="font-medium text-foreground">{t('projects.workflows.add')}</span>
+        <span className="text-sm">{t('projects.workflows.addHint')}</span>
       </button>
       <WorkflowEditorSheet
         projectId={projectId}

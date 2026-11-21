@@ -25,6 +25,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { t } from '@/lib/i18n-dictionary';
 
 // Regex patterns for parsing stack traces
 const STACK_FRAME_WITH_PARENS_REGEX = /^at\s+(.+?)\s+\((.+):(\d+):(\d+)\)$/;
@@ -509,7 +510,9 @@ export const StackTraceFrames = memo(
           </div>
         ))}
         {framesToShow.length === 0 && (
-          <div className="text-muted-foreground text-xs">No stack frames</div>
+          <div className="text-muted-foreground text-xs">
+            {t('agents.ai.noStackFrames')}
+          </div>
         )}
       </div>
     );

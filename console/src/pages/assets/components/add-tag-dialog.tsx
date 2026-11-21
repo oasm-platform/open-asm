@@ -18,6 +18,7 @@ import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import { Loader2, Plus, Sparkles, Tag } from 'lucide-react';
 import { useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { toast } from 'sonner';
+import { t as translate, useT } from '@/lib/i18n-dictionary';
 
 interface AddTagDialogProps {
   id: string;
@@ -25,6 +26,7 @@ interface AddTagDialogProps {
   refetch: () => void;
 }
 const AddTagDialog = (props: AddTagDialogProps) => {
+  const t = useT();
   const { id, tags, refetch } = props;
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
@@ -61,16 +63,16 @@ const AddTagDialog = (props: AddTagDialogProps) => {
         onSuccess: (response) => {
           const generatedTags = response.tags;
           if (generatedTags.length === 0) {
-            toast.error('AI did not generate any tags');
+            toast.error(translate('assets.tags.noneGenerated'));
             return;
           }
           setTagList((prev) => [
             ...new Set([...prev, ...generatedTags]),
           ]);
-          toast.success(`Generated ${generatedTags.length} tags`);
+          toast.success(translate('assets.tags.generated', { count: generatedTags.length }));
         },
         onError: () => {
-          toast.error('Failed to generate tags');
+          toast.error(translate('assets.tags.generateFailed'));
         },
       },
     );
@@ -144,7 +146,7 @@ const AddTagDialog = (props: AddTagDialogProps) => {
           refetch();
         },
         onError: () => {
-          toast.error('Failed to add tag');
+          toast.error(translate('assets.tags.addFailed'));
         },
       },
     );
@@ -154,12 +156,12 @@ const AddTagDialog = (props: AddTagDialogProps) => {
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button variant="ghost" className="h-8">
-          <Plus /> Add tag
+          <Plus /> {t('assets.tags.addTag')}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add tags</DialogTitle>
+          <DialogTitle>{t('assets.tags.title')}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="relative flex flex-wrap gap-2 items-center border rounded-md p-2 min-h-10 bg-transparent">
@@ -194,7 +196,7 @@ const AddTagDialog = (props: AddTagDialogProps) => {
             <button
               type="button"
               className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Auto-Generate"
+              title={t('assets.tags.autoGenerate')}
               onClick={handleGenerateTags}
               disabled={isGenerating}
             >
@@ -207,7 +209,7 @@ const AddTagDialog = (props: AddTagDialogProps) => {
           </div>
           <div className="flex flex-row items-center gap-2">
             <p className="text-xs text-gray-500">
-              Type tags and press ',' to add.
+              {t('assets.tags.hint')}
             </p>
           </div>
         </div>
@@ -215,10 +217,10 @@ const AddTagDialog = (props: AddTagDialogProps) => {
           <div /> {/* Spacer to keep buttons right-aligned */}
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setIsOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button type="submit" onClick={() => handleSave()}>
-              Save
+              {t('common.save')}
             </Button>
           </div>
         </DialogFooter>

@@ -12,15 +12,17 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { t as translate, useT } from '@/lib/i18n-dictionary';
 import { getSchemaCapabilities } from './capabilities';
 import { AppsTabContent } from './components/apps-tab-content';
 import { ConnectIntegrationSheet } from './components/connect-integration-sheet';
 import { ConnectedTabContent } from './components/connected-tab-content';
 import { IntegrationDetailSheet } from './components/integration-detail-sheet';
+import { categoryLabel, localizeSchema } from './schema-i18n';
 
-const TABS: { value: string; label: string }[] = [
-  { value: 'applications', label: 'Applications' },
-  { value: 'connected', label: 'Connected' },
+const TABS: { value: string; labelKey: string }[] = [
+  { value: 'applications', labelKey: 'integrations.tabs.applications' },
+  { value: 'connected', labelKey: 'integrations.tabs.connected' },
 ];
 
 export interface SchemaOneOfItem {
@@ -42,6 +44,7 @@ interface SchemaResponse {
 }
 
 export default function Integrations() {
+  const t = useT();
   const [selectedSchema, setSelectedSchema] = useState<SchemaOneOfItem | null>(
     null,
   );
@@ -91,22 +94,24 @@ export default function Integrations() {
     useIntegrationsControllerDeleteIntegration({
       mutation: {
         onSuccess: () => {
-          toast.success('Integration disconnected');
+          toast.success(translate('integrations.toast.disconnected'));
           queryClient.invalidateQueries({
             queryKey: getIntegrationsControllerGetManyIntegrationsQueryKey(),
           });
         },
         onError: () => {
-          toast.error('Failed to disconnect integration');
+          toast.error(translate('integrations.toast.disconnectFailed'));
         },
       },
     });
 
   const rawSchema = schemasData as SchemaResponse | undefined;
-  const appSchemas = [...(rawSchema?.schema?.oneOf ?? [])].sort(
-    (a, b) =>
-      (b.isAvailable === false ? 0 : 1) - (a.isAvailable === false ? 0 : 1),
-  );
+  const appSchemas = (rawSchema?.schema?.oneOf ?? [])
+    .map((schema) => localizeSchema(t, schema))
+    .sort(
+      (a, b) =>
+        (b.isAvailable === false ? 0 : 1) - (a.isAvailable === false ? 0 : 1),
+    );
 
   // The category filter is a capability filter: a multi-capability app (e.g.
   // GitHub) shows up under every capability it supports.
@@ -150,12 +155,7 @@ export default function Integrations() {
     detailIntegration &&
     appSchemas.find((s) => s.$id === detailIntegration.appType);
 
-  const formatCategory = (category: string): string => {
-    return category
-      .replace(/_/g, ' ')
-      .toLowerCase()
-      .replace(/\b\w/g, (char) => char.toUpperCase());
-  };
+  const formatCategory = (category: string) => categoryLabel(t, category);
 
   const handleCardClick = (appSchema: SchemaOneOfItem) => {
     if (appSchema.isAvailable === false) return;
@@ -173,8 +173,8 @@ export default function Integrations() {
   return (
     <Page
       permission="integration.read"
-      title="Integrations"
-      description="Connect third-party applications to your workspace"
+      title={t('integrations.page.title')}
+      description={t('integrations.page.description')}
     >
       <Tabs
         value={activeTab}
@@ -188,7 +188,7 @@ export default function Integrations() {
               value={tab.value}
               className="hover:cursor-pointer"
             >
-              {tab.label}
+              {t(tab.labelKey)}
             </TabsTrigger>
           ))}
         </TabsList>

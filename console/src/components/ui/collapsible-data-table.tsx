@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import {
   flexRender,
@@ -78,7 +79,7 @@ export function CollapsibleDataTable<TData, TValue>({
   onFilterChange,
   onRowClick,
   rowClassName,
-  filterPlaceholder = 'Filter...',
+  filterPlaceholder,
   showPagination = true,
   page,
   pageSize,
@@ -88,12 +89,13 @@ export function CollapsibleDataTable<TData, TValue>({
   sortBy,
   sortOrder,
   onSortChange,
-  emptyMessage = 'No data',
+  emptyMessage,
   filterComponents,
   isShowHeader = true,
   isShowBorder = true,
   collapsibleElement,
 }: DataTableProps<TData, TValue>) {
+  const t = useT();
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
 
@@ -154,7 +156,7 @@ export function CollapsibleDataTable<TData, TValue>({
       {filterColumnKey && (
         <div className="flex items-center gap-4 py-1">
           <Input
-            placeholder={filterPlaceholder}
+            placeholder={filterPlaceholder ?? t('components.dataTable.filter')}
             className="max-w-sm"
             value={searchValue}
             onChange={(e) => {
@@ -263,7 +265,7 @@ export function CollapsibleDataTable<TData, TValue>({
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  {emptyMessage}
+                  {emptyMessage ?? t('common.noData')}
                 </TableCell>
               </TableRow>
             </TableBody>

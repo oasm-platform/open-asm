@@ -29,21 +29,26 @@ import { authClient } from '@/utils/authClient';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2Icon, UserPlus } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { type TFunction, useT } from '@/lib/i18n-dictionary';
 
-const formSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  email: z.string().min(1, 'Email is required').email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+const createFormSchema = (t: TFunction) =>
+  z.object({
+  name: z.string().min(1, t('admin.addUser.nameRequired')),
+  email: z.string().min(1, t('admin.addUser.emailRequired'))
+      .email(t('admin.addUser.invalidEmail')),
+  password: z.string().min(8, t('admin.addUser.passwordMin')),
   role: z.enum(['user', 'admin']),
 });
 
-type FormValues = z.infer<typeof formSchema>;
+type FormValues = z.infer<ReturnType<typeof createFormSchema>>;
 
 export function AddUserDialog() {
+  const t = useT();
+  const formSchema = useMemo(() => createFormSchema(t), [t]);
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
 
@@ -66,7 +71,7 @@ export function AddUserDialog() {
         role: values.role,
       }),
     onSuccess: () => {
-      toast.success('User created successfully.');
+      toast.success(t('admin.addUser.created'));
       setOpen(false);
       form.reset();
       return queryClient.invalidateQueries({
@@ -74,7 +79,7 @@ export function AddUserDialog() {
       });
     },
     onError: () => {
-      toast.error('Failed to create user.');
+      toast.error(t('admin.addUser.createFailed'));
     },
   });
 
@@ -94,14 +99,14 @@ export function AddUserDialog() {
       <DialogTrigger asChild>
         <Button variant="outline" className="gap-2">
           <UserPlus className="shrink-0" />
-          <span>Add</span>
+          <span>{t('common.add')}</span>
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add User</DialogTitle>
+          <DialogTitle>{t('admin.addUser.title')}</DialogTitle>
           <DialogDescription>
-            Create a new user account. They will be able to sign in immediately.
+            {t('admin.addUser.description')}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -115,7 +120,7 @@ export function AddUserDialog() {
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Name</FormLabel>
+                  <FormLabel>{t('admin.addUser.name')}</FormLabel>
                   <FormControl>
                     <Input
                       placeholder="Jane Smith"
@@ -132,7 +137,7 @@ export function AddUserDialog() {
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel>{t('admin.addUser.email')}</FormLabel>
                   <FormControl>
                     <Input
                       type="email"
@@ -150,11 +155,11 @@ export function AddUserDialog() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
+                  <FormLabel>{t('admin.addUser.password')}</FormLabel>
                   <FormControl>
                     <Input
                       type="password"
-                      placeholder="Min. 8 characters"
+                      placeholder={t('admin.addUser.passwordPlaceholder')}
                       {...field}
                       disabled={isPending}
                     />
@@ -168,7 +173,7 @@ export function AddUserDialog() {
               name="role"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Role</FormLabel>
+                  <FormLabel>{t('admin.addUser.role')}</FormLabel>
                   <Select
                     onValueChange={field.onChange}
                     defaultValue={field.value}
@@ -176,12 +181,16 @@ export function AddUserDialog() {
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a role" />
+                        <SelectValue placeholder={t('admin.addUser.rolePlaceholder')} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="user">User</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="user">
+                        {t('admin.addUser.roleUser')}
+                      </SelectItem>
+                      <SelectItem value="admin">
+                        {t('admin.addUser.roleAdmin')}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -196,7 +205,7 @@ export function AddUserDialog() {
             onClick={() => handleOpenChange(false)}
             disabled={isPending}
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             type="submit"
@@ -205,7 +214,7 @@ export function AddUserDialog() {
             className="gap-1.5"
           >
             {isPending && <Loader2Icon className="h-4 w-4 animate-spin" />}
-            Create User
+            {t('admin.addUser.submit')}
           </Button>
         </DialogFooter>
       </DialogContent>

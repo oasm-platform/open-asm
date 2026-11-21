@@ -24,6 +24,7 @@ import { useBugReportUrl } from '@/hooks/use-bug-report-url';
 import { usePermission } from '@/hooks/usePermission';
 import { useRunWorkflow } from '@/hooks/use-run-workflow';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
+import { t, useT } from '@/lib/i18n-dictionary';
 import type {
   JobListItemDto,
   WorkflowStepStatusDto,
@@ -40,7 +41,8 @@ import {
 } from '@/services/apis/gen/queries';
 import type { BugReport } from '@/utils/bug-report-url';
 import { useQueryClient } from '@tanstack/react-query';
-import dayjs from 'dayjs';
+import { differenceInSeconds } from 'date-fns';
+import { formatDate as formatLocalDate } from '@/lib/date-locale';
 import { toast } from 'sonner';
 import {
   ArrowRight,
@@ -66,33 +68,26 @@ const NO_STEPS: WorkflowStepStatusDto[] = [];
 
 const formatEta = (seconds?: number | null): string | null => {
   if (seconds == null) return null;
-  if (seconds < 60) return `~${seconds}s left`;
+  if (seconds < 60) return t('jobsRegistry.run.etaLeft', { time: `${seconds}s` });
   const minutes = Math.round(seconds / 60);
-  return minutes < 60
-    ? `~${minutes}m left`
-    : `~${Math.floor(minutes / 60)}h ${minutes % 60}m left`;
+  return t('jobsRegistry.run.etaLeft', {
+    time:
+      minutes < 60
+        ? `${minutes}m`
+        : `${Math.floor(minutes / 60)}h ${minutes % 60}m`,
+  });
 };
 
 const formatDate = (value?: string) =>
-  value && dayjs(value).isValid()
-    ? dayjs(value).format('YYYY-MM-DD HH:mm:ss')
-    : '—';
+formatLocalDate(value, 'yyyy-MM-dd HH:mm:ss');
 
 /** Elapsed time between pickup and completion; only meaningful once completed. */
 const formatDuration = (job: JobListItemDto): string | null => {
-  const pickJobAt = dayjs(job.pickJobAt);
-  const completedAt = dayjs(job.completedAt);
+  if (job.status !== JobStatus.completed) return null;
 
-  if (
-    job.status !== JobStatus.completed ||
-    !pickJobAt.isValid() ||
-    !completedAt.isValid()
-  ) {
-    return null;
-  }
-
-  const totalSeconds = completedAt.diff(pickJobAt, 'second');
-  if (totalSeconds < 0) return null;
+  // NaN when either date is missing or invalid
+  const totalSeconds = differenceInSeconds(new Date(job.completedAt ?? NaN), new Date(job.pickJobAt ?? NaN));
+  if (!(totalSeconds >= 0)) return null;
 
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -157,6 +152,7 @@ const JobDetailPanel = memo(function JobDetailPanel({
 }: {
   job: JobListItemDto;
 }) {
+  const t = useT();
   const duration = formatDuration(job);
   const hasConfig = !!job.config && Object.keys(job.config).length > 0;
   const bugReportUrl = useBugReportUrl(
@@ -166,25 +162,25 @@ const JobDetailPanel = memo(function JobDetailPanel({
   return (
     <div className="space-y-5 border-l-2 border-primary/40 bg-muted/30 px-4 py-4">
       <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-4">
-        <Field label="Job ID">
+        <Field label={t('jobsRegistry.run.jobId')}>
           <span className="font-mono text-xs">{job.id}</span>
         </Field>
-        <Field label="Status">
+        <Field label={t('common.status')}>
           <JobStatusBadge status={job.status as JobStatus} />
         </Field>
-        <Field label="Category">
+        <Field label={t('jobsRegistry.run.category')}>
           <span className="capitalize">{job.category.replace(/_/g, ' ')}</span>
         </Field>
-        <Field label="Priority">{job.priority ?? '—'}</Field>
-        <Field label="Worker">
+        <Field label={t('jobsRegistry.run.priority')}>{job.priority ?? '—'}</Field>
+        <Field label={t('jobsRegistry.run.worker')}>
           <span className="font-mono text-xs">{job.workerId || '—'}</span>
         </Field>
-        <Field label="Retries">{job.retryCount ?? 0}</Field>
-        <Field label="Created">{formatDate(job.createdAt)}</Field>
-        <Field label="Picked up">{formatDate(job.pickJobAt)}</Field>
-        <Field label="Completed">{formatDate(job.completedAt)}</Field>
-        <Field label="Duration">{duration ?? '—'}</Field>
-        <Field label="Asset">
+        <Field label={t('jobsRegistry.run.retries')}>{job.retryCount ?? 0}</Field>
+        <Field label={t('jobsRegistry.run.created')}>{formatDate(job.createdAt)}</Field>
+        <Field label={t('jobsRegistry.run.pickedUp')}>{formatDate(job.pickJobAt)}</Field>
+        <Field label={t('jobsRegistry.run.completed')}>{formatDate(job.completedAt)}</Field>
+        <Field label={t('jobsRegistry.run.duration')}>{duration ?? '—'}</Field>
+        <Field label={t('jobsRegistry.run.asset')}>
           {job.asset?.id ? (
             <Link
               to="/assets/services/$id"
@@ -197,7 +193,7 @@ const JobDetailPanel = memo(function JobDetailPanel({
             (job.asset?.value ?? '—')
           )}
         </Field>
-        <Field label="Asset service">
+        <Field label={t('jobsRegistry.run.assetService')}>
           {job.assetServiceId ? (
             <Link
               to="/assets/services/$id"
@@ -212,11 +208,11 @@ const JobDetailPanel = memo(function JobDetailPanel({
         </Field>
       </div>
 
-      {job.command && <CodeBlock language="command" value={job.command} />}
+      {job.command && <CodeBlock language={t('jobsRegistry.run.command')} value={job.command} />}
 
       {hasConfig && (
         <CodeBlock
-          language="config (secrets masked)"
+          language={t('jobsRegistry.run.configMasked')}
           value={JSON.stringify(job.config, null, 2)}
         />
       )}
@@ -226,7 +222,7 @@ const JobDetailPanel = memo(function JobDetailPanel({
           <div className="flex items-center justify-between gap-2">
             <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-destructive">
               <TriangleAlert className="h-3.5 w-3.5" />
-              Error logs ({job.errorLogs.length})
+              {t('jobsRegistry.run.errorLogs', { n: job.errorLogs.length })}
             </span>
             {bugReportUrl && (
               <Button asChild size="sm" variant="outline">
@@ -236,7 +232,7 @@ const JobDetailPanel = memo(function JobDetailPanel({
                   rel="noreferrer noopener"
                 >
                   <Bug />
-                  Report bug
+                  {t('jobsRegistry.run.reportBug')}
                 </OpenLink>
               </Button>
             )}
@@ -263,6 +259,7 @@ const JobDetailPanel = memo(function JobDetailPanel({
 });
 
 export default function Runs() {
+  const t = useT();
   const { id: jobHistoryId } = useParams({ strict: false });
   const queryClient = useQueryClient();
 
@@ -277,8 +274,8 @@ export default function Runs() {
     useJobsRegistryControllerRetryJobHistory({
       mutation: {
         onSuccess: (result) => {
-          toast.success('Retry started', {
-            description: `New run ${result.jobHistoryId.slice(0, 8)}`,
+          toast.success(t('jobsRegistry.run.retryStarted'), {
+            description: t('jobsRegistry.run.newRun', { id: result.jobHistoryId.slice(0, 8) }),
           });
           queryClient.invalidateQueries({
             queryKey: getJobsRegistryControllerGetJobHistoryDetailQueryKey(
@@ -436,7 +433,7 @@ export default function Runs() {
               </span>
             </Link>
           ) : (
-            <span className="text-muted-foreground">No tool assigned</span>
+            <span className="text-muted-foreground">{t('jobsRegistry.run.noTool')}</span>
           )}
         </div>
       ),
@@ -474,7 +471,7 @@ export default function Runs() {
                   className="flex h-8 w-8 items-center justify-center p-0"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <span className="sr-only">Open menu</span>
+                  <span className="sr-only">{t('jobsRegistry.run.openMenu')}</span>
                   <MoreHorizontal className="h-4 w-4" />
                 </button>
               </DropdownMenuTrigger>
@@ -484,21 +481,21 @@ export default function Runs() {
               >
                 {canCancel && (
                   <ConfirmDialog
-                    title="Cancel Job"
-                    description="Are you sure you want to cancel this job?"
+                    title={t('jobsRegistry.run.cancelJobTitle')}
+                    description={t('jobsRegistry.run.cancelJobDescription')}
                     onConfirm={() =>
                       cancelJobMutate({ id: row.original.id }, { onSuccess: refresh })
                     }
                     trigger={
                       <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                        Cancel
+                        {t('common.cancel')}
                       </DropdownMenuItem>
                     }
                   />
                 )}
                 <ConfirmDialog
-                  title="Delete Job"
-                  description="Are you sure you want to delete this job?"
+                  title={t('jobsRegistry.run.deleteJobTitle')}
+                  description={t('jobsRegistry.run.deleteJobDescription')}
                   onConfirm={() =>
                     deleteJobMutate({ id: row.original.id }, { onSuccess: refresh })
                   }
@@ -507,7 +504,7 @@ export default function Runs() {
                       variant="destructive"
                       onSelect={(e) => e.preventDefault()}
                     >
-                      Delete
+                      {t('common.delete')}
                     </DropdownMenuItem>
                   }
                 />
@@ -518,7 +515,7 @@ export default function Runs() {
       },
     },
     ],
-    [cancelJobMutate, deleteJobMutate, refresh],
+    [cancelJobMutate, deleteJobMutate, refresh, t],
   );
 
   return (
@@ -528,15 +525,15 @@ export default function Runs() {
       title={
         jobHistoryDetail?.jobHistoryName ||
         jobHistoryDetail?.workflowName ||
-        'Job History Detail'
+        t('jobsRegistry.run.title')
       }
       action={
         <div className="flex flex-wrap items-center gap-2">
           {activeJobsCount > 0 && hasPermission('job.write') && (
             <ConfirmDialog
-              title="Cancel this run?"
-              description={`Stops the ${activeJobsCount} job(s) still pending or running and prevents the workflow from starting any further step. Jobs that already finished keep their result.`}
-              confirmText="Cancel run"
+              title={t('jobsRegistry.run.cancelRunTitle')}
+              description={t('jobsRegistry.run.cancelRunDescription', { count: activeJobsCount })}
+              confirmText={t('jobsRegistry.run.cancelRun')}
               disabled={isCancellingRun}
               onConfirm={() =>
                 cancelRunMutate(
@@ -547,7 +544,7 @@ export default function Runs() {
               trigger={
                 <Button variant="outline" disabled={isCancellingRun}>
                   <Ban className="h-4 w-4" />
-                  Cancel run
+                  {t('jobsRegistry.run.cancelRun')}
                 </Button>
               }
             />
@@ -559,7 +556,7 @@ export default function Runs() {
               onClick={() => retryRunMutate({ id: jobHistoryId || '' })}
             >
               <RotateCcw className="mr-1 h-4 w-4" aria-hidden />
-              Retry run
+              {t('jobsRegistry.run.retryRun')}
             </Button>
           )}
         </div>
@@ -571,7 +568,10 @@ export default function Runs() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-sm">
                 <span className="font-medium">
-                  {jobHistoryDetail.stepsDone}/{jobHistoryDetail.stepsTotal} steps
+                  {t('jobsRegistry.run.steps', {
+                    done: jobHistoryDetail.stepsDone,
+                    total: jobHistoryDetail.stepsTotal,
+                  })}
                 </span>
                 <span className="text-muted-foreground">
                   {jobHistoryDetail.progress}%
@@ -584,13 +584,13 @@ export default function Runs() {
               </div>
               <span className="text-xs text-muted-foreground">
                 {activeJobsCount > 0
-                  ? `${activeJobsCount} active job(s)`
-                  : 'Run finished'}
+                  ? t('jobsRegistry.run.activeJobs', { count: activeJobsCount })
+                  : t('jobsRegistry.run.finished')}
               </span>
             </div>
             <Progress
               value={jobHistoryDetail.progress}
-              aria-label="Run progress"
+              aria-label={t('jobsRegistry.list.runProgress')}
             />
             {jobHistoryDetail.failureReason && (
               <p className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive">
@@ -606,14 +606,14 @@ export default function Runs() {
         <Card className="mb-6 py-2">
           <CardContent className="px-2 py-2 md:px-4">
             <div className="mb-3 flex items-center justify-between gap-2">
-              <CardTitle>Workflow</CardTitle>
+              <CardTitle>{t('jobsRegistry.run.workflow')}</CardTitle>
               <WorkflowFileSheet
                 open={isCodeOpen}
                 onOpenChange={setCodeOpen}
                 yaml={runWorkflow?.yaml ?? ''}
                 isLoading={isLoadingWorkflow}
-                description="The workflow this run was created from."
-                emptyMessage="This run has no workflow attached."
+                description={t('jobsRegistry.run.workflowFileDescription')}
+                emptyMessage={t('jobsRegistry.run.noWorkflow')}
               />
             </div>
             <RunWorkflowGraph
@@ -627,7 +627,7 @@ export default function Runs() {
         !!jobHistoryDetail?.tools?.length && (
           <Card className="mb-6 py-2">
             <CardContent className="px-2 py-2 md:px-4">
-              <CardTitle className="mb-3">Tools</CardTitle>
+              <CardTitle className="mb-3">{t('jobsRegistry.run.tools')}</CardTitle>
               <div className="flex flex-wrap items-center gap-4">
                 {jobHistoryDetail.tools.map((tool, index) => (
                   <div key={tool.id} className="flex items-center gap-2">
@@ -668,7 +668,7 @@ export default function Runs() {
         pageSize={paginatedJobsData?.limit ?? tableParams.pageSize}
         totalItems={paginatedJobsData?.total ?? 0}
         emptyMessage={
-          jobsError ? 'Failed to load jobs. Please try again.' : 'No jobs found'
+          jobsError ? t('jobsRegistry.run.loadJobsFailed') : t('jobsRegistry.list.empty')
         }
         onPageChange={tableHandlers.setPage}
         onPageSizeChange={tableHandlers.setPageSize}

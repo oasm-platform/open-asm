@@ -34,24 +34,27 @@ import { Archive, ArchiveRestore, Loader2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { useMemo } from 'react';
+import { type TFunction, useT } from '@/lib/i18n-dictionary';
 
-const generalSchema = z.object({
-  name: z.string().trim().min(1, 'Name is required'),
-  description: z.string().trim(),
-});
+const createGeneralSchema = (t: TFunction) =>
+  z.object({
+    name: z.string().trim().min(1, t('admin.workspaceEdit.nameRequired')),
+    description: z.string().trim(),
+  });
+
+type GeneralValues = z.infer<ReturnType<typeof createGeneralSchema>>;
 
 const DISCOVERY_SETTINGS = [
   {
     key: 'isAssetsDiscovery',
-    title: 'Asset discovery',
-    description:
-      'Automatically scan and detect internet-facing assets (domains, IPs) in workspace networks',
+    titleKey: 'admin.workspaceEdit.discovery.assets.title',
+    descriptionKey: 'admin.workspaceEdit.discovery.assets.description',
   },
   {
     key: 'isAutoEnableAssetAfterDiscovered',
-    title: 'Auto enable assets',
-    description:
-      'Newly discovered assets become active immediately without manual review',
+    titleKey: 'admin.workspaceEdit.discovery.autoEnable.title',
+    descriptionKey: 'admin.workspaceEdit.discovery.autoEnable.description',
   },
 ] as const;
 
@@ -61,6 +64,7 @@ const errorMessage = (error: unknown, fallback: string) =>
 
 /** Update the workspace, then refresh its page and the workspaces table. */
 function useUpdateWorkspace(workspaceId: string) {
+  const t = useT();
   const queryClient = useQueryClient();
   const { mutate, isPending } = useAdminWorkspacesControllerUpdateWorkspace();
 
@@ -86,7 +90,7 @@ function useUpdateWorkspace(workspaceId: string) {
           ]);
         },
         onError: (error) => {
-          toast.error(errorMessage(error, 'Failed to update workspace.'));
+          toast.error(errorMessage(error, t('admin.workspaceEdit.updateFailed')));
         },
       },
     );
@@ -95,8 +99,10 @@ function useUpdateWorkspace(workspaceId: string) {
 }
 
 function GeneralForm({ workspace }: { workspace: AdminWorkspaceDto }) {
+  const t = useT();
+  const generalSchema = useMemo(() => createGeneralSchema(t), [t]);
   const { update, isPending } = useUpdateWorkspace(workspace.id);
-  const form = useForm<z.infer<typeof generalSchema>>({
+  const form = useForm<GeneralValues>({
     resolver: zodResolver(generalSchema),
     defaultValues: {
       name: workspace.name,
@@ -107,9 +113,9 @@ function GeneralForm({ workspace }: { workspace: AdminWorkspaceDto }) {
   return (
     <Card className="gap-4">
       <CardHeader>
-        <CardTitle>General</CardTitle>
+        <CardTitle>{t('admin.workspaceEdit.general.title')}</CardTitle>
         <CardDescription>
-          The name and description members see for this workspace.
+          {t('admin.workspaceEdit.general.description')}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -117,7 +123,7 @@ function GeneralForm({ workspace }: { workspace: AdminWorkspaceDto }) {
           <form
             onSubmit={form.handleSubmit((values) =>
               update(values, {
-                success: 'Workspace updated.',
+                success: t('admin.workspaceEdit.updated'),
                 onSuccess: () => form.reset(values),
               }),
             )}
@@ -128,7 +134,7 @@ function GeneralForm({ workspace }: { workspace: AdminWorkspaceDto }) {
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Name</FormLabel>
+                  <FormLabel>{t('admin.workspaceEdit.name')}</FormLabel>
                   <FormControl>
                     <Input {...field} disabled={isPending} />
                   </FormControl>
@@ -141,11 +147,11 @@ function GeneralForm({ workspace }: { workspace: AdminWorkspaceDto }) {
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description</FormLabel>
+                  <FormLabel>{t('admin.workspaceEdit.description')}</FormLabel>
                   <FormControl>
                     <Textarea
                       rows={3}
-                      placeholder="Optional"
+                      placeholder={t('admin.workspaceEdit.optional')}
                       {...field}
                       disabled={isPending}
                     />
@@ -162,7 +168,7 @@ function GeneralForm({ workspace }: { workspace: AdminWorkspaceDto }) {
                 onClick={() => form.reset()}
                 disabled={isPending || !form.formState.isDirty}
               >
-                Discard
+                {t('admin.workspaceEdit.discard')}
               </Button>
               <Button
                 type="submit"
@@ -171,7 +177,7 @@ function GeneralForm({ workspace }: { workspace: AdminWorkspaceDto }) {
                 className="gap-1.5"
               >
                 {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                Save changes
+                {t('admin.workspaceEdit.saveChanges')}
               </Button>
             </div>
           </form>
@@ -183,14 +189,15 @@ function GeneralForm({ workspace }: { workspace: AdminWorkspaceDto }) {
 
 /** Same behaviour as the workspace's own settings: each switch saves at once. */
 function DiscoverySettings({ workspace }: { workspace: AdminWorkspaceDto }) {
+  const t = useT();
   const { update, isPending } = useUpdateWorkspace(workspace.id);
 
   return (
     <Card className="gap-4">
       <CardHeader>
-        <CardTitle>Asset discovery</CardTitle>
+        <CardTitle>{t('admin.workspaceEdit.discovery.title')}</CardTitle>
         <CardDescription>
-          How this workspace finds and enables new assets.
+          {t('admin.workspaceEdit.discovery.description')}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -203,9 +210,9 @@ function DiscoverySettings({ workspace }: { workspace: AdminWorkspaceDto }) {
               htmlFor={setting.key}
               className="flex flex-col items-start gap-1 cursor-pointer"
             >
-              <span className="font-medium">{setting.title}</span>
+              <span className="font-medium">{t(setting.titleKey)}</span>
               <span className="text-sm font-normal text-muted-foreground">
-                {setting.description}
+                {t(setting.descriptionKey)}
               </span>
             </Label>
             <Switch
@@ -216,7 +223,12 @@ function DiscoverySettings({ workspace }: { workspace: AdminWorkspaceDto }) {
                 update(
                   { [setting.key]: checked },
                   {
-                    success: `${setting.title} ${checked ? 'enabled' : 'disabled'}.`,
+                    success: t(
+                      checked
+                        ? 'admin.workspaceEdit.discovery.enabled'
+                        : 'admin.workspaceEdit.discovery.disabled',
+                      { setting: t(setting.titleKey) },
+                    ),
                   },
                 )
               }
@@ -229,13 +241,14 @@ function DiscoverySettings({ workspace }: { workspace: AdminWorkspaceDto }) {
 }
 
 function ArchiveSection({ workspace }: { workspace: AdminWorkspaceDto }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const isArchived = !!workspace.archivedAt;
   const { mutate, isPending } = useAdminWorkspacesControllerSetArchived({
     mutation: {
       onSuccess: () => {
         toast.success(
-          isArchived ? 'Workspace restored.' : 'Workspace archived.',
+          isArchived ? t('admin.workspaceEdit.archive.restored') : t('admin.workspaceEdit.archive.archived'),
         );
         return Promise.all([
           queryClient.invalidateQueries({
@@ -249,7 +262,7 @@ function ArchiveSection({ workspace }: { workspace: AdminWorkspaceDto }) {
         ]);
       },
       onError: (error) => {
-        toast.error(errorMessage(error, 'Failed to change workspace status.'));
+        toast.error(errorMessage(error, t('admin.workspaceEdit.archive.failed')));
       },
     },
   });
@@ -257,35 +270,39 @@ function ArchiveSection({ workspace }: { workspace: AdminWorkspaceDto }) {
   return (
     <Card className="gap-4 border-destructive/40">
       <CardHeader>
-        <CardTitle className="text-destructive">Danger zone</CardTitle>
+        <CardTitle className="text-destructive">{t('admin.workspaceEdit.archive.dangerZone')}</CardTitle>
         <CardDescription>
           {isArchived
-            ? 'This workspace is archived and hidden from its members.'
-            : 'Archiving deactivates the workspace. Its data is kept.'}
+            ? t('admin.workspaceEdit.archive.archivedDescription')
+            : t('admin.workspaceEdit.archive.description')}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap items-center justify-between gap-4">
         <div className="text-sm">
           <p className="font-medium">
-            {isArchived ? 'Restore workspace' : 'Archive workspace'}
+            {isArchived
+              ? t('admin.workspaceEdit.archive.restoreWorkspace')
+              : t('admin.workspaceEdit.archive.archiveWorkspace')}
           </p>
           <p className="text-xs text-muted-foreground">
             {isArchived
-              ? 'Members see it in their workspace list again.'
-              : "Members no longer see it in their workspace list. Scheduled scans aren't stopped."}
+              ? t('admin.workspaceEdit.archive.restoreHint')
+              : t('admin.workspaceEdit.archive.archiveHint')}
           </p>
         </div>
         <ConfirmDialog
-          title={isArchived ? 'Restore workspace' : 'Archive workspace'}
+          title={isArchived
+              ? t('admin.workspaceEdit.archive.restoreWorkspace')
+              : t('admin.workspaceEdit.archive.archiveWorkspace')}
           description={
             isArchived
-              ? `Restore "${workspace.name}"? Members will see it again.`
-              : `Archive "${workspace.name}"? Members will no longer see it in their workspace list.`
+              ? t('admin.workspaceEdit.archive.confirmRestore', { name: workspace.name })
+              : t('admin.workspaceEdit.archive.confirmArchive', { name: workspace.name })
           }
           onConfirm={() =>
             mutate({ id: workspace.id, data: { isArchived: !isArchived } })
           }
-          confirmText={isArchived ? 'Restore' : 'Archive'}
+          confirmText={isArchived ? t('admin.workspaceEdit.archive.restore') : t('admin.workspaceEdit.archive.archive')}
           trigger={
             <Button
               variant={isArchived ? 'outline' : 'destructive'}
@@ -300,7 +317,9 @@ function ArchiveSection({ workspace }: { workspace: AdminWorkspaceDto }) {
               ) : (
                 <Archive className="h-3.5 w-3.5" />
               )}
-              {isArchived ? 'Restore workspace' : 'Archive workspace'}
+              {isArchived
+              ? t('admin.workspaceEdit.archive.restoreWorkspace')
+              : t('admin.workspaceEdit.archive.archiveWorkspace')}
             </Button>
           }
         />

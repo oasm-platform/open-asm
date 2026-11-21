@@ -9,6 +9,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
+import { useT } from '@/lib/i18n-dictionary';
 
 /**
  * Edit permission group page. Opens on its own route
@@ -19,6 +20,7 @@ export default function EditPermissionGroupPage({
 }: {
   permissionId: string;
 }) {
+  const t = useT();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const {
@@ -38,7 +40,7 @@ export default function EditPermissionGroupPage({
     useWorkspacesControllerUpdatePermissionGroup({
       mutation: {
         onSuccess: () => {
-          toast.success('Permission group updated');
+          toast.success(t('settings.groupForm.updated'));
           queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] });
           navigate({
             to: '/settings/$tab',
@@ -46,7 +48,7 @@ export default function EditPermissionGroupPage({
             search: { tab: 'permissions' },
           });
         },
-        onError: () => toast.error('Failed to update permission group'),
+        onError: () => toast.error(t('settings.groupForm.updateFailed')),
       },
     });
 
@@ -62,8 +64,7 @@ export default function EditPermissionGroupPage({
       <Card>
         <CardContent className="py-10">
           <p className="text-center text-muted-foreground">
-            No workspace selected. Please select a workspace to manage its
-            members.
+            {t('settings.members.noWorkspace')}
           </p>
         </CardContent>
       </Card>
@@ -74,7 +75,7 @@ export default function EditPermissionGroupPage({
     return (
       <div className="mx-auto w-full sm:w-3/4 xl:w-1/2">
         <p className="text-sm text-muted-foreground">
-          Loading permission group...
+          {t('settings.groupForm.loadingGroup')}
         </p>
       </div>
     );
@@ -86,14 +87,14 @@ export default function EditPermissionGroupPage({
     return (
       <div className="mx-auto w-full sm:w-3/4 xl:w-1/2">
         <p className="text-sm text-muted-foreground">
-          Permission group not found.
+          {t('settings.groupForm.notFound')}
         </p>
         <button
           type="button"
           className="text-sm text-primary underline"
           onClick={goBack}
         >
-          Back to members
+          {t('settings.groupForm.backToMembers')}
         </button>
       </div>
     );
@@ -103,9 +104,9 @@ export default function EditPermissionGroupPage({
     <PermissionGroupForm
       catalog={catalog ?? []}
       groups={groups ?? []}
-      title="Edit permission group"
-      description="A group bundles permission keys. Members are assigned whole groups."
-      submitText="Save"
+      title={t('settings.groupForm.editTitle')}
+      description={t('settings.groupForm.description')}
+      submitText={t('common.save')}
       initialName={group.name}
       initialPermissions={group.permissions}
       isPending={isPending}

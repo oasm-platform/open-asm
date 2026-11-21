@@ -1,4 +1,5 @@
 import { NewBadge as BaseNewBadge } from '@/components/common/new-badge';
+import { useT } from '@/lib/i18n-dictionary';
 
 /**
  * Marks a row found by the latest finished scan of its kind on its target,
@@ -7,15 +8,16 @@ import { NewBadge as BaseNewBadge } from '@/components/common/new-badge';
  * Renders nothing otherwise, so a cell can always include it.
  */
 export function NewBadge({ isNew, count }: { isNew?: boolean; count?: number }) {
+  const t = useT();
   if (isNew) {
-    return <BaseNewBadge title="Found by the latest finished scan" />;
+    return <BaseNewBadge title={t('assets.newBadge.title')} />;
   }
   if (count && count > 0) {
     return (
       <BaseNewBadge
-        title={`${count} of its services were found by the latest finished scan`}
+        title={t('assets.newBadge.partialTitle', { count })}
       >
-        {count} new
+        {t('assets.newBadge.count', { count })}
       </BaseNewBadge>
     );
   }

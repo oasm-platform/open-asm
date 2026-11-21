@@ -16,6 +16,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { t as translate, useT } from '@/lib/i18n-dictionary';
 import {
   Tooltip,
   TooltipContent,
@@ -34,9 +35,12 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
-const formSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-});
+// Built per render so the validation message follows the current language.
+const makeFormSchema = () =>
+  z.object({
+    name: z.string().min(1, translate('internalNetworks.edit.nameRequired')),
+  });
+type FormValues = z.infer<ReturnType<typeof makeFormSchema>>;
 
 interface EditInternalNetworkDialogProps {
   internalNetwork: GetManyInternalNetworksResponseDtoDataItem;
@@ -47,8 +51,9 @@ export function EditInternalNetworkDialog({
   internalNetwork,
   onSuccess,
 }: EditInternalNetworkDialogProps) {
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  const t = useT();
+  const form = useForm<FormValues>({
+    resolver: zodResolver(makeFormSchema()),
     defaultValues: {
       name: internalNetwork.name as string,
     },
@@ -57,8 +62,6 @@ export function EditInternalNetworkDialog({
   const { mutate } = useInternalNetworksControllerUpdateInternalNetworkById();
 
   const queryClient = useQueryClient();
-
-  type FormValues = z.infer<typeof formSchema>;
 
   function handleSubmit(data: FormValues) {
     mutate(
@@ -69,12 +72,12 @@ export function EditInternalNetworkDialog({
       {
         onSuccess: () => {
           setOpen(false);
-          toast.success('Internal network updated successfully');
+          toast.success(translate('internalNetworks.edit.success'));
           queryClient.invalidateQueries({ queryKey: ['internalNetworks'] });
           onSuccess?.();
         },
         onError: () => {
-          toast.error('Failed to update internal network');
+          toast.error(translate('internalNetworks.edit.failed'));
         },
       },
     );
@@ -94,20 +97,20 @@ export function EditInternalNetworkDialog({
               onClick={() => setOpen(true)}
             >
               <Edit className="h-10 w-10" />
-              <span className="sr-only">Edit</span>
+              <span className="sr-only">{t('common.edit')}</span>
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Edit internal network</p>
+            <p>{t('internalNetworks.edit.title')}</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit internal network</DialogTitle>
+            <DialogTitle>{t('internalNetworks.edit.title')}</DialogTitle>
             <DialogDescription>
-              Update the name of your internal network.
+              {t('internalNetworks.edit.description')}
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -120,16 +123,16 @@ export function EditInternalNetworkDialog({
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Name</FormLabel>
+                    <FormLabel>{t('common.name')}</FormLabel>
                     <FormControl>
-                      <Input placeholder="Internal network name" {...field} />
+                      <Input placeholder={t('internalNetworks.edit.namePlaceholder')} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
               <DialogFooter>
-                <Button type="submit">Save</Button>
+                <Button type="submit">{t('common.save')}</Button>
               </DialogFooter>
             </form>
           </Form>

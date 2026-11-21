@@ -1,0 +1,9 @@
+{
+  "WORKSPACE_CREATED": "已创建工作区 {name}",
+  "VULNERABILITY_ANALYSIS_COMPLETED": "{name} 的漏洞分析已完成",
+  "ASSET_NEW_DETECT": "在 {targetValue} 上发现新资产：{hosts, plural, =0 {} other {# 个主机}}{ports, plural, =0 {} other { # 个端口}}{services, plural, =0 {} other { # 个服务}}{tech, plural, =0 {} other { # 项技术}}",
+  "SCAN_INCOMPLETE": "{targetValue} 的扫描未完成。{details}",
+  "NEW_VULNERABILITY_FOUND": "在 {assetValue} 上发现 {count} 个新漏洞",
+  "WORKSPACE_INVITATION": "{action, select, created {您已被邀请加入工作区 {workspaceName}} accepted {{userName} 已接受加入工作区 {workspaceName} 的邀请} declined {{userName} 已拒绝加入工作区 {workspaceName} 的邀请} other {工作区邀请}}",
+  "NEW_URL_FOUND": "在 {targetValue} 上发现 {count} 个新 URL"
+}

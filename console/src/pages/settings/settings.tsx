@@ -2,6 +2,7 @@ import { usePermission } from '@/hooks/usePermission';
 import { useSession } from '@/utils/authClient';
 import { useNavigate, useParams } from '@tanstack/react-router';
 import { useEffect, useMemo, type JSX } from 'react';
+import { t, useT } from '@/lib/i18n-dictionary';
 import {
   Building2,
   FileCode,
@@ -55,81 +56,118 @@ interface SettingsProps {
   defaultTab?: string;
 }
 
-// Settings tab groups with content and component - exported for SettingsLayout
+// Settings tab groups with content and component - exported for SettingsLayout.
+// Labels are getters so they read the active language on every access.
 export const settingsTabGroups: SettingsTabGroup[] = [
   {
-    name: 'Workspace',
+    get name() {
+      return t('settings.groups.workspace');
+    },
     tabs: [
       {
         id: 'general',
-        label: 'General',
+        get label() {
+          return t('settings.tabs.general.label');
+        },
         path: '/settings/general',
         icon: <Building2 />,
         content: {
-          title: 'Workspace settings',
-          description: 'Manage your workspace settings',
+          get title() {
+            return t('settings.tabs.general.title');
+          },
+          get description() {
+            return t('settings.tabs.general.description');
+          },
         },
         component: <WorkspaceSettings />,
         permission: 'workspace.read',
       },
       {
         id: 'apikeys',
-        label: 'API keys',
+        get label() {
+          return t('settings.tabs.apikeys.label');
+        },
         path: '/settings/apikeys',
         icon: <KeyRound />,
         content: {
-          title: 'Workspace API key',
-          description:
-            'Use this key to authenticate requests to the OASM API from scripts, CI pipelines and integrations.',
+          get title() {
+            return t('settings.tabs.apikeys.title');
+          },
+          get description() {
+            return t('settings.tabs.apikeys.description');
+          },
         },
         component: <ApiKeysSettings />,
         permission: 'workspace.apikey',
       },
       {
         id: 'members',
-        label: 'Members',
+        get label() {
+          return t('settings.tabs.members.label');
+        },
         path: '/settings/members',
         icon: <Users />,
         content: {
-          title: 'Members',
-          description: 'Manage members, invitations and permission groups',
+          get title() {
+            return t('settings.tabs.members.title');
+          },
+          get description() {
+            return t('settings.tabs.members.description');
+          },
         },
         component: <MembersSettings />,
         permission: 'member.read',
       },
       {
         id: 'audit',
-        label: 'Audit log',
+        get label() {
+          return t('settings.tabs.audit.label');
+        },
         path: '/settings/audit',
         icon: <ScrollText />,
         content: {
-          title: 'Audit log',
-          description: 'View and export workspace activity',
+          get title() {
+            return t('settings.tabs.audit.title');
+          },
+          get description() {
+            return t('settings.tabs.audit.description');
+          },
         },
         component: <AuditLogSettings />,
         permission: 'audit.read',
       },
       {
         id: 'files',
-        label: 'Files',
+        get label() {
+          return t('settings.tabs.files.label');
+        },
         path: '/settings/files',
         icon: <FolderOpen />,
         content: {
-          title: 'Files',
-          description:
-            'Files saved by agents in this workspace, shared with members or by link',
+          get title() {
+            return t('settings.tabs.files.title');
+          },
+          get description() {
+            return t('settings.tabs.files.description');
+          },
         },
         component: <Files />,
         permission: 'artifact.read',
       },
       {
         id: 'templates',
-        label: 'Templates',
+        get label() {
+          return t('settings.tabs.templates.label');
+        },
         path: '/settings/templates',
         icon: <FileCode />,
         content: {
-          title: 'Templates',
-          description: 'Custom nuclei templates for this workspace',
+          get title() {
+            return t('settings.tabs.templates.title');
+          },
+          get description() {
+            return t('settings.tabs.templates.description');
+          },
           action: <TemplatesHeaderActions />,
         },
         component: <Templates />,
@@ -137,13 +175,18 @@ export const settingsTabGroups: SettingsTabGroup[] = [
       },
       {
         id: 'vulnerability-management',
-        label: 'Vulnerability management',
+        get label() {
+          return t('settings.tabs.vulnerabilityManagement.label');
+        },
         path: '/settings/vulnerability-management',
         icon: <ShieldAlert />,
         content: {
-          title: 'Vulnerability management',
-          description:
-            'SLA per severity, auto-close, risk acceptance and the rules that open issues',
+          get title() {
+            return t('settings.tabs.vulnerabilityManagement.title');
+          },
+          get description() {
+            return t('settings.tabs.vulnerabilityManagement.description');
+          },
         },
         component: <VulnerabilityManagementSettings />,
         permission: 'vulnerability.read',
@@ -152,27 +195,41 @@ export const settingsTabGroups: SettingsTabGroup[] = [
   },
   // Group: Account Settings
   {
-    name: 'Account Settings',
+    get name() {
+      return t('settings.groups.account');
+    },
     tabs: [
       {
         id: 'preferences',
-        label: 'Preferences',
+        get label() {
+          return t('settings.tabs.preferences.label');
+        },
         path: '/settings/preferences',
         icon: <SlidersHorizontal />,
         content: {
-          title: 'Preferences',
-          description: 'Manage your account preferences',
+          get title() {
+            return t('settings.tabs.preferences.title');
+          },
+          get description() {
+            return t('settings.tabs.preferences.description');
+          },
         },
         component: <Preferences />,
       },
       {
         id: 'security',
-        label: 'Security',
+        get label() {
+          return t('settings.tabs.security.label');
+        },
         path: '/settings/security',
         icon: <ShieldCheck />,
         content: {
-          title: 'Security',
-          description: 'Manage your account security settings',
+          get title() {
+            return t('settings.tabs.security.title');
+          },
+          get description() {
+            return t('settings.tabs.security.description');
+          },
         },
         component: <SecuritySettings />,
       },
@@ -180,16 +237,24 @@ export const settingsTabGroups: SettingsTabGroup[] = [
   },
   // // Group: Integration
   {
-    name: 'Integration',
+    get name() {
+      return t('settings.groups.integration');
+    },
     tabs: [
       {
         id: 'mcp',
-        label: 'MCP Connect',
+        get label() {
+          return t('settings.tabs.mcp.label');
+        },
         path: '/settings/mcp',
         icon: <Plug />,
         content: {
-          title: 'MCP Connect',
-          description: 'Connect to OASM server via MCP protocol',
+          get title() {
+            return t('settings.tabs.mcp.title');
+          },
+          get description() {
+            return t('settings.tabs.mcp.description');
+          },
         },
         component: <McpConnect />,
         permission: 'workspace.apikey',
@@ -233,6 +298,7 @@ const Settings = ({ defaultTab = 'general' }: SettingsProps) => {
   const navigate = useNavigate();
   const { data } = useSession();
   const { hasPermission, isLoading } = usePermission();
+  const tr = useT();
 
   const visibleTabs = useMemo(
     () =>
@@ -242,7 +308,9 @@ const Settings = ({ defaultTab = 'general' }: SettingsProps) => {
       }).flatMap((group) =>
         group.tabs.map((t) => ({ ...t, group: group.name })),
       ),
-    [data?.user.role, hasPermission],
+    // tr: re-read the getter labels after a language switch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data?.user.role, hasPermission, tr],
   );
 
   useEffect(() => {

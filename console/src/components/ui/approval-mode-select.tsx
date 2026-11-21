@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import {
   PromptInputActionMenu,
   PromptInputActionMenuContent,
@@ -14,37 +15,38 @@ import { memo } from 'react';
 
 const OPTIONS: Array<{
   id: ApprovalMode;
-  label: string;
-  description: string;
+  labelKey: string;
+  descriptionKey: string;
   icon: typeof ZapIcon;
 }> = [
   {
     id: 'auto',
-    label: 'Auto',
-    description: 'Run every command without asking',
+    labelKey: 'components.approvalMode.auto',
+    descriptionKey: 'components.approvalMode.autoDescription',
     icon: ZapIcon,
   },
   {
     id: 'manual',
-    label: 'Manual',
-    description: 'Approve each new command',
+    labelKey: 'components.approvalMode.manual',
+    descriptionKey: 'components.approvalMode.manualDescription',
     icon: HandIcon,
   },
 ];
 
 export const ApprovalModeSelect = memo(function ApprovalModeSelect() {
+  const t = useT();
   const mode = useApprovalMode();
   const active = OPTIONS.find((o) => o.id === mode) ?? OPTIONS[1];
   const ActiveIcon = active.icon;
 
   return (
     <PromptInputActionMenu>
-      <PromptInputActionMenuTrigger tooltip={`Approval: ${active.label}`}>
+      <PromptInputActionMenuTrigger tooltip={t('components.approvalMode.tooltip', { mode: t(active.labelKey) })}>
         <ActiveIcon size={16} />
-        <span className="ml-1 text-xs">{active.label}</span>
+        <span className="ml-1 text-xs">{t(active.labelKey)}</span>
       </PromptInputActionMenuTrigger>
       <PromptInputActionMenuContent>
-        {OPTIONS.map(({ id, label, description, icon: Icon }) => (
+        {OPTIONS.map(({ id, labelKey, descriptionKey, icon: Icon }) => (
           <PromptInputActionMenuItem
             key={id}
             className="flex items-center gap-2 cursor-pointer"
@@ -52,8 +54,10 @@ export const ApprovalModeSelect = memo(function ApprovalModeSelect() {
           >
             <Icon className="size-4" />
             <div className="flex-1">
-              <div className="font-medium">{label}</div>
-              <div className="text-xs text-muted-foreground">{description}</div>
+              <div className="font-medium">{t(labelKey)}</div>
+              <div className="text-xs text-muted-foreground">
+                {t(descriptionKey)}
+              </div>
             </div>
             {mode === id && <CheckIcon className="size-4 text-green-500" />}
           </PromptInputActionMenuItem>

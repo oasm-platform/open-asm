@@ -1,12 +1,11 @@
+import { fromNow } from '@/lib/date-locale';
 import { type ColumnDef } from '@tanstack/react-table';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
-dayjs.extend(relativeTime);
 
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import { DataTableError } from '@/components/ui/data-table-error-boundary';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
+import { useT } from '@/lib/i18n-dictionary';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import type { GetManyInternalNetworksResponseDtoDataItem } from '@/services/apis/gen/queries';
 import { useInternalNetworksControllerGetManyInternalNetworks } from '@/services/apis/gen/queries';
@@ -14,6 +13,7 @@ import { Network } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 
 export function ListInternalNetworks() {
+  const t = useT();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -54,26 +54,26 @@ export function ListInternalNetworks() {
   const columns: ColumnDef<GetManyInternalNetworksResponseDtoDataItem>[] = [
     {
       accessorKey: 'name',
-      header: 'Name',
+      header: t('common.name'),
       cell: ({ row }) => (
         <div className="font-medium">{row.getValue('name')}</div>
       ),
     },
     {
       accessorKey: 'agents',
-      header: 'Worker agents',
+      header: t('internalNetworks.list.workerAgents'),
       cell: ({ row }) => (
         <div className="font-medium">{row.getValue('agents')}</div>
       ),
     },
     {
       accessorKey: 'createdAt',
-      header: 'Created',
+      header: t('internalNetworks.list.created'),
       cell: ({ row }) => {
         const value: string = row.getValue('createdAt');
         return (
           <div className="text-gray-400 font-semibold">
-            {dayjs(value).fromNow()}
+            {fromNow(value)}
           </div>
         );
       },
@@ -83,7 +83,7 @@ export function ListInternalNetworks() {
   if (!data && !isLoading)
     return (
       <DataTableError
-        message="Failed to load internal networks."
+        message={t('internalNetworks.list.loadFailed')}
         onRetry={refetch}
       />
     );
@@ -114,7 +114,7 @@ export function ListInternalNetworks() {
           onClick={() => navigate({ to: '/internal-networks/create' })}
         >
           <Network className="shrink-0" />
-          <span>Create network</span>
+          <span>{t('internalNetworks.list.create')}</span>
         </Button>,
       ]}
       totalItems={total}

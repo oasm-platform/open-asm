@@ -1,3 +1,4 @@
+import { t } from '@/lib/i18n-dictionary';
 import {
   useToolsControllerGetInstalledTools,
   useToolsControllerGetManyTools,
@@ -72,14 +73,14 @@ export function useInstallPipelineTool() {
       try {
         await mutateAsync({ data: { toolId: tool.id } });
       } catch (error) {
-        toast.error(apiErrorMessage(error, `Failed to install ${name}`));
+        toast.error(apiErrorMessage(error, t('projects.tools.installFailed', { name })));
         throw error;
       }
       await queryClient.invalidateQueries({
         predicate: (query) =>
           String(query.queryKey[0] ?? '').startsWith('/api/tools'),
       });
-      toast.success(`${name} installed`);
+      toast.success(t('projects.tools.installed', { name }));
     },
     [mutateAsync, queryClient],
   );

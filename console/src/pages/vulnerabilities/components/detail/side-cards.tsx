@@ -1,6 +1,10 @@
 import { Badge } from '@/components/ui/badge';
 import { DetectionStatusBadge } from '@/components/vulnerabilities/lifecycle-badges';
-import { DISMISS_REASON_LABELS } from '@/components/vulnerabilities/lifecycle';
+import {
+  DISMISS_REASON_LABELS,
+  labelOf,
+} from '@/components/vulnerabilities/lifecycle';
+import { useT } from '@/lib/i18n-dictionary';
 import type {
   VulnerabilityDetailDto,
   VulnerabilitySourceDetailDto,
@@ -49,19 +53,20 @@ export function firstRunId(
 }
 
 function Triage({ data }: { data: VulnerabilityDetailDto }) {
+  const t = useT();
   const d = data.dismissal;
   if (d) {
     return (
       <span className="flex flex-col items-end">
         <span>
-          {DISMISS_REASON_LABELS[d.reason] ?? d.reason}
+          {labelOf(DISMISS_REASON_LABELS, d.reason)}
           {d.reason === 'risk_accepted' && d.expiresAt
-            ? ` until ${fmt(d.expiresAt)}`
+            ? t('vulnerabilities.hero.until', { date: fmt(d.expiresAt) })
             : ''}
         </span>
         {d.user && (
           <span className="text-xs text-muted-foreground">
-            by {d.user.name}
+            {t('vulnerabilities.side.byName', { name: d.user.name })}
           </span>
         )}
       </span>
@@ -70,15 +75,22 @@ function Triage({ data }: { data: VulnerabilityDetailDto }) {
   if (data.fixClaimedAt && data.detectionStatus !== 'fixed') {
     return (
       <span className="flex flex-col items-end">
-        <span>Fix claimed {fmt(data.fixClaimedAt)}</span>
+        <span>
+          {t('vulnerabilities.side.fixClaimedOn', { date: fmt(data.fixClaimedAt) })}
+        </span>
         <span className="text-xs text-muted-foreground">
-          {data.fixClaimedByUser ? `by ${data.fixClaimedByUser.name} · ` : ''}
-          awaiting scan
+          {data.fixClaimedByUser
+            ? t('vulnerabilities.side.awaitingScanBy', {
+                name: data.fixClaimedByUser.name,
+              })
+            : t('vulnerabilities.side.awaitingScan')}
         </span>
       </span>
     );
   }
-  return <span className="text-muted-foreground">Untriaged</span>;
+  return <span className="text-muted-foreground">
+      {t('vulnerabilities.side.untriaged')}
+    </span>;
 }
 
 /** Detection state, counts, first/last sighting, last fix and triage. */
@@ -89,30 +101,32 @@ export function LifecycleCard({
   data: VulnerabilityDetailDto;
   events?: VulnerabilityTimelineEventDto[];
 }) {
+  const t = useT();
   return (
-    <SideCard title="Lifecycle" testId="lifecycle-card">
-      <Row label="Status">
+    <SideCard title={t('vulnerabilities.side.lifecycle')} testId="lifecycle-card">
+      <Row label={t('vulnerabilities.side.status')}>
         <DetectionStatusBadge status={data.detectionStatus} />
       </Row>
-      <Row label="Detected">
-        {data.timesDetected} time{data.timesDetected === 1 ? '' : 's'}
-        {data.resurfacedCount > 0 && ` · resurfaced ${data.resurfacedCount}`}
+      <Row label={t('vulnerabilities.side.detected')}>
+        {t('vulnerabilities.side.times', { count: data.timesDetected })}
+        {data.resurfacedCount > 0 &&
+          t('vulnerabilities.side.resurfacedN', { n: data.resurfacedCount })}
       </Row>
-      <Row label="First seen">
+      <Row label={t('vulnerabilities.side.firstSeen')}>
         {fmt(data.firstDetectedDate)}
         <RunLink id={firstRunId(data, events)} className="text-xs" />
       </Row>
-      <Row label="Last seen">
+      <Row label={t('vulnerabilities.side.lastSeen')}>
         {fmt(data.lastSeenDate)}
         <RunLink id={data.lastSeenJobHistoryId} className="text-xs" />
       </Row>
       {data.fixedAt && (
-        <Row label="Last fixed">
+        <Row label={t('vulnerabilities.side.lastFixed')}>
           {fmt(data.fixedAt)}
           <RunLink id={data.fixedByJobHistoryId} className="text-xs" />
         </Row>
       )}
-      <Row label="Triage">
+      <Row label={t('vulnerabilities.side.triage')}>
         <Triage data={data} />
       </Row>
     </SideCard>
@@ -152,6 +166,7 @@ function SourceRow({
   /** Logo of the finding's own tool, for a source row that carries none. */
   fallbackLogoUrl?: string | null;
 }) {
+  const t = useT();
   if (source.kind === 'ai_agent') {
     return (
       <li className="flex items-center gap-3" data-source-kind="ai_agent">
@@ -161,20 +176,26 @@ function SourceRow({
         <span className="flex min-w-0 flex-col gap-0.5">
           <span className="flex flex-wrap items-center gap-1.5">
             <span className="font-medium">
-              AI · {source.agentName ?? 'agent'}
+              {t('vulnerabilities.side.aiAgent', {
+                name: source.agentName ?? t('vulnerabilities.side.agent'),
+              })}
             </span>
             {aiVerified && (
               <Badge
                 variant="outline"
                 className="h-5 rounded-full border-violet-500/30 text-violet-700 dark:text-violet-300"
               >
-                AI verified
+                {t('vulnerabilities.source.aiVerified')}
               </Badge>
             )}
           </span>
           <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
             {fmt(source.createdAt)}
-            {source.createdBy && <span>· run by {source.createdBy.name}</span>}
+            {source.createdBy && (
+              <span>
+                {t('vulnerabilities.side.runBy', { name: source.createdBy.name })}
+              </span>
+            )}
             <ConversationLink id={source.agentConversationId} />
           </span>
         </span>
@@ -185,7 +206,9 @@ function SourceRow({
     return (
       <li className="flex items-center gap-1.5" data-source-kind="user">
         <User className="size-3.5" />
-        Added by {source.createdBy?.name ?? 'a member'} ·{' '}
+        {t('vulnerabilities.side.addedBy', {
+          name: source.createdBy?.name ?? t('vulnerabilities.side.aMember'),
+        })}{' '}
         {fmt(source.createdAt)}
       </li>
     );
@@ -194,7 +217,7 @@ function SourceRow({
     <li className="flex items-center gap-3" data-source-kind="tool">
       <ToolLink toolId={source.tool?.id} className="shrink-0">
         <ToolLogo
-          name={source.tool?.name ?? 'Scanner'}
+          name={source.tool?.name ?? t('vulnerabilities.discoveredBy.tool')}
           logoUrl={source.tool?.logoUrl ?? fallbackLogoUrl}
           size={32}
           className="shrink-0 rounded-md"
@@ -207,10 +230,12 @@ function SourceRow({
             toolId={source.tool?.id}
             className="font-medium capitalize"
           >
-            {source.tool?.name ?? 'Scanner'}
+            {source.tool?.name ?? t('vulnerabilities.discoveredBy.tool')}
           </ToolLink>
           {source.agentConversationId && (
-            <span className="text-xs text-muted-foreground">run by AI</span>
+            <span className="text-xs text-muted-foreground">
+              {t('vulnerabilities.side.runByAi')}
+            </span>
           )}
         </span>
         <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
@@ -227,6 +252,7 @@ function SourceRow({
 
 /** One entry per way the finding was found: scanner runs, AI agents, people. */
 export function SourcesList({ data }: { data: VulnerabilityDetailDto }) {
+  const t = useT();
   const sources = data.sources ?? [];
   const aiVerified =
     data.discoveredBy === 'tool' || data.discoveredBy === 'manual';
@@ -245,7 +271,9 @@ export function SourcesList({ data }: { data: VulnerabilityDetailDto }) {
             <span className="font-medium capitalize">{data.tool.name}</span>
           </ToolLink>
         ) : (
-          <p className="text-muted-foreground">No sources recorded.</p>
+          <p className="text-muted-foreground">
+            {t('vulnerabilities.side.noSources')}
+          </p>
         )
       ) : (
         <ul className="flex flex-wrap gap-x-8 gap-y-3">
@@ -269,6 +297,7 @@ export function SourcesList({ data }: { data: VulnerabilityDetailDto }) {
 
 /** Tags, identifiers and the CVSS vector broken into its metrics. */
 export function ClassificationCard({ data }: { data: VulnerabilityDetailDto }) {
+  const t = useT();
   const navigate = useNavigate();
   const parsed = data.cvssMetric ? parseCVSS(data.cvssMetric) : null;
   const hasIds = !!(
@@ -280,7 +309,7 @@ export function ClassificationCard({ data }: { data: VulnerabilityDetailDto }) {
   );
   if (!data.tags?.length && !hasIds && !parsed && !data.vprScore) return null;
   return (
-    <SideCard title="Classification" testId="classification-card">
+    <SideCard title={t('vulnerabilities.side.classification')} testId="classification-card">
       {!!data.tags?.length && (
         <div className="flex flex-wrap gap-1">
           {data.tags.map((tag) => (
@@ -298,7 +327,7 @@ export function ClassificationCard({ data }: { data: VulnerabilityDetailDto }) {
         </div>
       )}
       <IdGroup label="CVE" ids={data.cveId} />
-      <IdGroup label="Weaknesses" ids={data.cweId} href={cweHref} />
+      <IdGroup label={t('vulnerabilities.side.weaknesses')} ids={data.cweId} href={cweHref} />
       <IdGroup label="BID" ids={data.bidId} />
       <IdGroup label="CEA" ids={data.ceaId} />
       <IdGroup label="IAVA" ids={data.iava} />

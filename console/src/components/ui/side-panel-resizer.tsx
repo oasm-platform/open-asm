@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import {
   useCallback,
@@ -134,6 +135,7 @@ export function SidePanelResizer({
   label,
   className,
 }: SidePanelResizerProps) {
+  const t = useT();
   // While dragging, the width goes straight onto the panel's style: a React
   // render of the whole page per pointer move is what makes a drag lag.
   // It is written in the move itself, not a frame later: browsers already
@@ -218,7 +220,7 @@ export function SidePanelResizer({
       aria-valuemax={total ? Math.max(limits.panelMin, total - limits.restMin) : undefined}
       aria-valuenow={width ?? undefined}
       tabIndex={0}
-      title="Drag to resize, double-click to reset"
+      title={t('components.resizer.hint')}
       className={cn(
         'group relative z-10 -mx-1 w-2 shrink-0 cursor-col-resize touch-none outline-none',
         className,

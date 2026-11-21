@@ -13,6 +13,7 @@ import {
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useT } from '@/lib/i18n-dictionary';
 import { PermissionGroupForm } from './permission-group-form';
 
 interface PermissionGroupFormSheetProps {
@@ -33,6 +34,7 @@ export function PermissionGroupFormSheet({
   groupId,
   onClose,
 }: PermissionGroupFormSheetProps) {
+  const t = useT();
   const queryClient = useQueryClient();
   const {
     state: { selectedWorkspaceId },
@@ -50,7 +52,7 @@ export function PermissionGroupFormSheet({
     useWorkspacesControllerCreatePermissionGroup({
       mutation: {
         onSuccess: () => {
-          toast.success('Permission group created');
+          toast.success(t('settings.groupForm.created'));
           queryClient.invalidateQueries({
             queryKey: ['/api/workspaces/permissions'],
           });
@@ -59,14 +61,14 @@ export function PermissionGroupFormSheet({
           });
           onClose();
         },
-        onError: () => toast.error('Failed to create permission group'),
+        onError: () => toast.error(t('settings.groupForm.createFailed')),
       },
     });
   const { mutate: updateGroup, isPending: isUpdating } =
     useWorkspacesControllerUpdatePermissionGroup({
       mutation: {
         onSuccess: () => {
-          toast.success('Permission group updated');
+          toast.success(t('settings.groupForm.updated'));
           queryClient.invalidateQueries({
             queryKey: ['/api/workspaces/permissions'],
           });
@@ -75,7 +77,7 @@ export function PermissionGroupFormSheet({
           });
           onClose();
         },
-        onError: () => toast.error('Failed to update permission group'),
+        onError: () => toast.error(t('settings.groupForm.updateFailed')),
       },
     });
 
@@ -87,9 +89,7 @@ export function PermissionGroupFormSheet({
       <SheetContent className="w-full overflow-y-auto px-4 pb-4 sm:max-w-lg">
         <SheetHeader>
           <SheetTitle className="sr-only">
-            {mode === 'create'
-              ? 'Create permission group'
-              : 'Edit permission group'}
+            {mode === 'create' ? t('settings.groupForm.createTitle') : t('settings.groupForm.editTitle')}
           </SheetTitle>
         </SheetHeader>
         <PermissionGroupForm
@@ -101,10 +101,12 @@ export function PermissionGroupFormSheet({
           catalog={catalog ?? []}
           groups={groups ?? []}
           title={
-            mode === 'create' ? 'Create permission group' : 'Edit permission group'
+            mode === 'create' ? t('settings.groupForm.createTitle') : t('settings.groupForm.editTitle')
           }
-          description="A group bundles permission keys. Members are assigned whole groups."
-          submitText={mode === 'create' ? 'Create group' : 'Save'}
+          description={t('settings.groupForm.description')}
+          submitText={
+            mode === 'create' ? t('settings.members.groups.create') : t('common.save')
+          }
           initialName={editingGroup?.name}
           initialPermissions={editingGroup?.permissions}
           isPending={isCreating || isUpdating}

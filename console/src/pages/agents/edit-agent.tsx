@@ -6,10 +6,12 @@ import { useNavigate, useParams } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { AgentForm, type AgentFormData } from './components/agent-form';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import { useT } from '@/lib/i18n-dictionary';
 
 export default function EditAgentPage() {
   const { id } = useParams({ strict: false });
   const navigate = useNavigate();
+  const t = useT();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -48,11 +50,11 @@ export default function EditAgentPage() {
       {
         onSuccess: () => {
           invalidate();
-          toast.success('Provider updated successfully');
+          toast.success(t('agents.provider.updated'));
           navigate({ to: `/agents/${id}` });
         },
         onError: (error) => {
-          toast.error('Failed to update provider');
+          toast.error(t('agents.provider.updateFailed'));
           console.error('Error updating provider:', error);
         },
       },
@@ -70,29 +72,28 @@ export default function EditAgentPage() {
   if (!agent) {
     return (
       <div className="text-center py-12">
-        <h2 className="text-xl font-semibold">Provider not found</h2>
+        <h2 className="text-xl font-semibold">{t('agents.provider.notFound')}</h2>
         <p className="text-muted-foreground mt-2">
-          The provider you&apos;re looking for doesn&apos;t exist or you
-          don&apos;t have permission to view it.
+          {t('agents.provider.notFoundDescription')}
         </p>
         <button
           className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded"
           onClick={() => window.history.back()}
         >
-          Go back
+          {t('agents.provider.goBack')}
         </button>
       </div>
     );
   }
 
   return (
-    <Page title="Edit Provider" permission="agent.write">
+    <Page title={t('agents.provider.editPageTitle')} permission="agent.write">
       <div className="max-w-4xl mx-auto py-6">
         <div className="bg-card rounded-lg border p-6">
           <div className="mb-6">
-            <h2 className="text-2xl font-bold">Edit AI Provider</h2>
+            <h2 className="text-2xl font-bold">{t('agents.provider.editTitle')}</h2>
             <p className="text-muted-foreground mt-2">
-              Update the provider configuration.
+              {t('agents.provider.editDescription')}
             </p>
           </div>
 
@@ -104,7 +105,7 @@ export default function EditAgentPage() {
               model: agent.model ?? '',
               apiUrl: agent.apiUrl,
             }}
-            submitButtonText="Update Provider"
+            submitButtonText={t('agents.provider.updateButton')}
             isEdit
           />
         </div>

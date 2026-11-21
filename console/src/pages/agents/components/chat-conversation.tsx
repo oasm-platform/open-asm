@@ -32,6 +32,7 @@ import {
   ReasoningContent,
   ReasoningTrigger,
 } from '@/components/ai-elements/reasoning';
+import { useT } from '@/lib/i18n-dictionary';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -119,12 +120,13 @@ export const ChatConversation = ({
   goal,
   showTodoAboveInput = true,
   emptyState,
-  placeholder = 'Ask anything about security…',
+  placeholder,
   selectedToolCallId,
   remoteExecuteEvents,
   pageContextLabel,
   onRemovePageContext,
 }: ChatConversationProps) => {
+  const t = useT();
   const isLoadingMoreRef = useRef(false);
   const onLoadMoreRef = useRef(onLoadMore);
   const hasMoreRef = useRef(hasMoreMessages);
@@ -287,8 +289,8 @@ export const ChatConversation = ({
                       <ShieldAlert className="size-8" />
                     </div>
                   }
-                  title="Security AI ready"
-                  description="Ask anything about vulnerabilities, secure coding, and best practices."
+                  title={t('agents.chat.readyTitle')}
+                  description={t('agents.chat.readyDescription')}
                   className="py-24"
                 />
               </motion.div>
@@ -418,7 +420,11 @@ export const ChatConversation = ({
               showSettingsButton={false}
               pageContextLabel={pageContextLabel}
               onRemovePageContext={onRemovePageContext}
-              placeholder={isStreaming ? 'Waiting for response…' : placeholder}
+              placeholder={
+                isStreaming
+                  ? t('agents.chat.waiting')
+                  : (placeholder ?? t('agents.chat.placeholder'))
+              }
               // Same rounder box and round send button as the landing input
               className="[&_[data-slot=input-group]]:rounded-2xl [&_[data-slot=input-group]]:bg-card [&_[data-slot=input-group]]:shadow-sm [&_[data-slot=input-group]]:dark:bg-card [&_button[type=submit]]:rounded-full"
             />

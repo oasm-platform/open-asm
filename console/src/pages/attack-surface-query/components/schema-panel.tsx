@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import {
   useAttackSurfaceQueryControllerSchema,
@@ -11,6 +12,7 @@ import {
 } from '@/services/apis/gen/queries';
 
 function ResourceItem({ resource, defaultOpen }: { resource: SchemaResourceDto; defaultOpen: boolean }) {
+  const t = useT();
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="border-b last:border-b-0">
@@ -23,7 +25,7 @@ function ResourceItem({ resource, defaultOpen }: { resource: SchemaResourceDto; 
         <span className="font-mono font-medium">{resource.name}</span>
         {!resource.root && (
           <Badge variant="outline" className="ml-auto text-[10px]">
-            relation only
+            {t('asq.schema.relationOnly')}
           </Badge>
         )}
       </button>
@@ -38,15 +40,15 @@ function ResourceItem({ resource, defaultOpen }: { resource: SchemaResourceDto; 
                   {field.type}
                   {field.enumValues?.length ? ` (${field.enumValues.join(' | ')})` : ''}
                   {field.ops.length ? ` · ${field.ops.join(', ')}` : ''}
-                  {field.sortable ? ' · sortable' : ''}
-                  {field.groupable ? ' · groupable' : ''}
+                  {field.sortable ? ` · ${t('asq.schema.sortable')}` : ''}
+                  {field.groupable ? ` · ${t('asq.schema.groupable')}` : ''}
                 </span>
               </li>
             ))}
           </ul>
           {resource.one.length > 0 && (
             <div>
-              <div className="font-medium">Related row (select "name.field")</div>
+              <div className="font-medium">{t('asq.schema.relatedRow')}</div>
               {resource.one.map((rel) => (
                 <div key={rel.name} className="font-mono">
                   {rel.name} → {rel.resource}
@@ -56,7 +58,7 @@ function ResourceItem({ resource, defaultOpen }: { resource: SchemaResourceDto; 
           )}
           {resource.many.length > 0 && (
             <div>
-              <div className="font-medium">Lists (include, or test in where)</div>
+              <div className="font-medium">{t('asq.schema.lists')}</div>
               {resource.many.map((rel) => (
                 <div key={rel.name} className="font-mono">
                   {rel.name} → {rel.resource}
@@ -72,6 +74,7 @@ function ResourceItem({ resource, defaultOpen }: { resource: SchemaResourceDto; 
 
 /** The resources, fields and operators the member may query. */
 export function SchemaPanel() {
+  const t = useT();
   const { data, isLoading, isError } = useAttackSurfaceQueryControllerSchema();
   const [filter, setFilter] = useState('');
   const resources = (data?.resources ?? []).filter(
@@ -82,11 +85,11 @@ export function SchemaPanel() {
   );
   return (
     <div className="flex h-full flex-col gap-2">
-      <Input placeholder="Filter resources or fields" value={filter} onChange={(e) => setFilter(e.target.value)} />
+      <Input placeholder={t('asq.schema.filterPlaceholder')} value={filter} onChange={(e) => setFilter(e.target.value)} />
       <div className="min-h-0 flex-1 overflow-auto rounded-md border">
         {isLoading &&
           Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="m-2 h-6" />)}
-        {isError && <p className="p-3 text-sm text-destructive">Could not load the schema.</p>}
+        {isError && <p className="p-3 text-sm text-destructive">{t('asq.schema.loadFailed')}</p>}
         {resources.map((resource) => (
           <ResourceItem key={resource.name} resource={resource} defaultOpen={Boolean(filter)} />
         ))}

@@ -1,3 +1,4 @@
+import { fromNow } from '@/lib/date-locale';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ReactFlow,
@@ -16,8 +17,6 @@ import {
 import '@xyflow/react/dist/style.css';
 import { Clock, Focus, Lock, LockOpen, RefreshCw } from 'lucide-react';
 import { useReducedMotion } from 'framer-motion';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import { useTheme } from '@/components/ui/theme-provider';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -25,6 +24,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import NoData from '@/components/ui/no-data';
 import { toast } from 'sonner';
+import { t as translate, useT } from '@/lib/i18n-dictionary';
 import { TargetFilter } from '@/pages/vulnerabilities/components/target-filter';
 import {
   assetsControllerGetAssetServiceGraph,
@@ -54,7 +54,6 @@ import { GraphNodeSearch } from './graph-node-search';
 import AssetDetailSheet from './asset-detail-sheet';
 import GraphDetailSheet from './graph-detail-sheet';
 
-dayjs.extend(relativeTime);
 
 const nodeTypes = {
   target: GraphNodeComponent,
@@ -70,9 +69,9 @@ const nodeTypes = {
 type LayoutMode = 'cluster' | 'hierarchy' | 'organic';
 
 const LAYOUT_MODES: Array<{ value: LayoutMode; label: string; title: string }> = [
-  { value: 'cluster', label: 'Clusters', title: 'Group domains and IPs around each target' },
-  { value: 'hierarchy', label: 'Hierarchy', title: 'Target → Domain → IP lanes, left to right' },
-  { value: 'organic', label: 'Organic', title: 'Force-directed layout' },
+  { value: 'cluster', label: 'assets.graph.layout.cluster', title: 'assets.graph.layout.clusterTitle' },
+  { value: 'hierarchy', label: 'assets.graph.layout.hierarchy', title: 'assets.graph.layout.hierarchyTitle' },
+  { value: 'organic', label: 'assets.graph.layout.organic', title: 'assets.graph.layout.organicTitle' },
 ];
 
 /** Positions are node centers, so badges of different sizes line up. */
@@ -88,13 +87,14 @@ interface AssetGraphProps {
   targetId?: string;
 }
 
+/** Dictionary keys, resolved at render. */
 const EDGE_TYPE_LABELS: Record<string, string> = {
-  belongs_to: 'Belongs to',
-  resolves_to: 'Resolves to',
-  runs_on: 'Runs on',
-  uses: 'Uses',
-  has_tls: 'Has TLS',
-  returns: 'Returns',
+  belongs_to: 'assets.graph.edge.belongsTo',
+  resolves_to: 'assets.graph.edge.resolvesTo',
+  runs_on: 'assets.graph.edge.runsOn',
+  uses: 'assets.graph.edge.uses',
+  has_tls: 'assets.graph.edge.hasTls',
+  returns: 'assets.graph.edge.returns',
 };
 
 /**
@@ -167,6 +167,7 @@ function buildRfEdges(
 }
 
 function AssetGraphInner({ targetId }: AssetGraphProps) {
+  const t = useT();
   const { fitView } = useReactFlow();
   const { resolvedTheme } = useTheme();
   const reducedMotion = useReducedMotion() === true;
@@ -208,7 +209,7 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
     try {
       const data = await assetsControllerGetAssetServiceGraph(assetId);
       if (data.nodes.length === 0) {
-        toast.info('No services found for this domain');
+        toast.info(translate('assets.graph.noServices'));
         return;
       }
       if (!pendingExpansionsRef.current.has(assetId)) return;
@@ -220,7 +221,7 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
         return next;
       });
     } catch {
-      toast.error('Failed to load services for this domain');
+      toast.error(translate('assets.graph.loadServicesFailed'));
     }
   }, []);
 
@@ -727,8 +728,8 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
     const rawType = (edge.data as Record<string, unknown> | undefined)
       ?.type as string | undefined;
     if (!rawType) return null;
-    return EDGE_TYPE_LABELS[rawType] ?? rawType;
-  }, [hoveredEdgeId, edges]);
+    return EDGE_TYPE_LABELS[rawType] ? t(EDGE_TYPE_LABELS[rawType]) : rawType;
+  }, [hoveredEdgeId, edges, t]);
 
   // ── Freshness chip: relative time of the most recent scan among service
   // nodes. Hidden when no service carries lastScannedAt.
@@ -743,8 +744,8 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
       if (Number.isFinite(ts) && (latest === null || ts > latest)) latest = ts;
     }
     if (latest === null) return null;
-    return `Last scanned ${dayjs(latest).fromNow()}`;
-  }, [graphData]);
+    return t('assets.graph.lastScanned', { time: fromNow(latest) });
+  }, [graphData, t]);
 
   const fPressed = useKeyPress('f');
   const fPrevRef = useRef(false);
@@ -848,9 +849,9 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
     return (
       <Alert variant="destructive">
         <AlertDescription className="flex items-center gap-2">
-          Failed to load asset graph.
+          {t('assets.graph.loadFailed')}
           <Button variant="outline" size="sm" onClick={() => void refetch()}>
-            Retry
+            {t('common.retry')}
           </Button>
         </AlertDescription>
       </Alert>
@@ -858,7 +859,7 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
   }
 
   if (!graphData || graphData.nodes.length === 0) {
-    return <NoData message="No assets found" />;
+    return <NoData message={t('assets.graph.noAssets')} />;
   }
 
   return (
@@ -873,7 +874,7 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
         <GraphNodeSearch nodes={nodes} onSelect={handleNodeSearchSelect} />
         <div
           role="radiogroup"
-          aria-label="Graph layout"
+          aria-label={t('assets.graph.layoutAria')}
           className="flex items-center rounded-md border border-dashed p-0.5"
         >
           {LAYOUT_MODES.map((m) => (
@@ -884,10 +885,10 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
               className="h-7 px-2.5"
               role="radio"
               aria-checked={layoutMode === m.value}
-              title={m.title}
+              title={t(m.title)}
               onClick={() => changeLayoutMode(m.value)}
             >
-              {m.label}
+              {t(m.label)}
             </Button>
           ))}
         </div>
@@ -898,7 +899,7 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
           onClick={() => setShowLegend((v) => !v)}
           aria-pressed={showLegend}
         >
-          Legend
+          {t('assets.graph.legendButton')}
         </Button>
         <Button
           variant="outline"
@@ -908,8 +909,8 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
           aria-pressed={layoutLocked}
           title={
             layoutLocked
-              ? 'Layout positions are frozen on refresh'
-              : 'Freeze node positions on refresh'
+              ? t('assets.graph.lockedTitle')
+              : t('assets.graph.lockTitle')
           }
         >
           {layoutLocked ? (
@@ -917,7 +918,7 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
           ) : (
             <LockOpen className="mr-1.5 size-3.5" />
           )}
-          {layoutLocked ? 'Locked' : 'Lock'}
+          {layoutLocked ? t('assets.graph.locked') : t('assets.graph.lock')}
         </Button>
         <Button
           variant="outline"
@@ -926,7 +927,7 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
           onClick={() => fitView({ duration: 500 })}
         >
           <Focus className="mr-1.5 size-3.5" />
-          Reset View
+          {t('assets.graph.resetView')}
         </Button>
         <Button
           variant="outline"
@@ -935,13 +936,13 @@ function AssetGraphInner({ targetId }: AssetGraphProps) {
           onClick={() => void refetch()}
         >
           <RefreshCw className="mr-1.5 size-3.5" />
-          Refresh
+          {t('common.refresh')}
         </Button>
       </div>
       <div
         className="relative h-[calc(100vh-8rem)] w-full rounded-md border"
         role="application"
-        aria-label="Asset graph canvas"
+        aria-label={t('assets.graph.canvasAria')}
       >
         {isFetching && !isLoading && (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-background/60">

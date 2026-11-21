@@ -1,0 +1,12 @@
+{
+  "notifications.title": "Notificaciones",
+  "notifications.unread.one": "{count} notificación sin leer",
+  "notifications.unread.other": "{count} notificaciones sin leer",
+  "notifications.markAllRead": "Marcar todas como leídas",
+  "userMenu.language": "Idioma",
+  "userMenu.settings": "Configuración",
+  "userMenu.admin": "Administración",
+  "userMenu.docs": "Documentación",
+  "userMenu.reportIssue": "Informar de un problema",
+  "userMenu.logout": "Cerrar sesión"
+}

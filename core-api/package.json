@@ -151,7 +151,7 @@
       "^@/(.*)$": "<rootDir>/$1"
     },
     "transformIgnorePatterns": [
-      "node_modules/(?!(?:\\.pnpm/[^/]+/node_modules/)?(better-auth|@react-pdf|react|react-dom|@nestjs|@standard-schema|file-type|load-esm|uid|ai|@ai-sdk|@workflow|eventsource-parser)/)"
+      "node_modules/(?!(?:\\.pnpm/[^/]+/node_modules/)?(better-auth|@react-pdf|react|react-dom|@nestjs|@standard-schema|file-type|load-esm|uid|ai|@ai-sdk|@workflow|eventsource-parser|intl-messageformat|@formatjs)/)"
     ]
   }
 }

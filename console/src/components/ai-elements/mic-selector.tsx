@@ -26,6 +26,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useT, t } from '@/lib/i18n-dictionary';
 
 const deviceIdRegex = /\(([\da-fA-F]{4}:[\da-fA-F]{4})\)$/;
 
@@ -70,7 +71,7 @@ export const useAudioDevices = () => {
       const message =
         caughtError instanceof Error
           ? caughtError.message
-          : "Failed to get audio devices";
+          : t('agents.ai.mic.failed');
 
       setError(message);
       console.error("Error getting audio devices:", message);
@@ -107,7 +108,7 @@ export const useAudioDevices = () => {
       const message =
         caughtError instanceof Error
           ? caughtError.message
-          : "Failed to get audio devices";
+          : t('agents.ai.mic.failed');
 
       setError(message);
       console.error("Error getting audio devices:", message);
@@ -275,9 +276,12 @@ export type MicSelectorInputProps = ComponentProps<typeof CommandInput> & {
   onValueChange?: (value: string) => void;
 };
 
-export const MicSelectorInput = ({ ...props }: MicSelectorInputProps) => (
-  <CommandInput placeholder="Search microphones..." {...props} />
-);
+export const MicSelectorInput = ({ ...props }: MicSelectorInputProps) => {
+  const t = useT();
+  return (
+    <CommandInput placeholder={t('agents.ai.mic.search')} {...props} />
+  );
+};
 
 export type MicSelectorListProps = Omit<
   ComponentProps<typeof CommandList>,
@@ -298,9 +302,12 @@ export const MicSelectorList = ({
 export type MicSelectorEmptyProps = ComponentProps<typeof CommandEmpty>;
 
 export const MicSelectorEmpty = ({
-  children = "No microphone found.",
+  children = t('agents.ai.mic.none'),
   ...props
-}: MicSelectorEmptyProps) => <CommandEmpty {...props}>{children}</CommandEmpty>;
+}: MicSelectorEmptyProps) => {
+  useT(); // re-render on language change
+  return <CommandEmpty {...props}>{children}</CommandEmpty>;
+};
 
 export type MicSelectorItemProps = ComponentProps<typeof CommandItem>;
 
@@ -354,13 +361,14 @@ export const MicSelectorValue = ({
   className,
   ...props
 }: MicSelectorValueProps) => {
+  const t = useT();
   const { data, value } = useContext(MicSelectorContext);
   const currentDevice = data.find((d) => d.deviceId === value);
 
   if (!currentDevice) {
     return (
       <span className={cn("flex-1 text-left", className)} {...props}>
-        Select microphone...
+        {t('agents.ai.mic.select')}
       </span>
     );
   }

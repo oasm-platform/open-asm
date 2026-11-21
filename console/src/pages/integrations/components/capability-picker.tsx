@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import type { CapabilityMeta } from '../capabilities';
@@ -19,6 +20,7 @@ export function CapabilityPicker({
   onChange,
   disabled,
 }: CapabilityPickerProps) {
+  const t = useT();
   const toggle = (capability: string, checked: boolean) => {
     if (checked) {
       if (!value.includes(capability)) onChange([...value, capability]);
@@ -30,9 +32,9 @@ export function CapabilityPicker({
   return (
     <div className="space-y-2 rounded-lg border p-3">
       <div className="space-y-1">
-        <Label className="text-sm font-medium">Capabilities</Label>
+        <Label className="text-sm font-medium">{t('integrations.capabilities.label')}</Label>
         <p className="text-xs text-muted-foreground">
-          One connection, several uses. Enable what this integration should do.
+          {t('integrations.capabilities.hint')}
         </p>
       </div>
       {Object.entries(capabilities).map(([capability, meta]) => {

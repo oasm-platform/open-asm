@@ -5,13 +5,18 @@ import {
   SeverityBadge,
   SlaDue,
 } from '@/components/vulnerabilities/lifecycle-badges';
+import { useT } from '@/lib/i18n-dictionary';
 import type { IssueDetailDto, IssueLinkDto } from '@/services/apis/gen/queries';
 import { Link } from '@tanstack/react-router';
 import { format } from 'date-fns';
 import { Plus, ShieldAlert, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { DetailSection, SideCard } from './detail-blocks';
-import { LINK_RESOURCE_LABELS, type LinkResourceType } from '../issue-utils';
+import {
+  LINK_RESOURCE_LABELS,
+  LINK_RESOURCE_SINGULAR,
+  type LinkResourceType,
+} from '../issue-utils';
 
 const ORDER: LinkResourceType[] = [
   'vulnerability',
@@ -22,6 +27,7 @@ const ORDER: LinkResourceType[] = [
 ];
 
 function LinkTitle({ link }: { link: IssueLinkDto }) {
+  const t = useT();
   const { resource } = link;
   if (resource.missing) {
     return (
@@ -29,7 +35,11 @@ function LinkTitle({ link }: { link: IssueLinkDto }) {
         className="text-muted-foreground line-through"
         title={link.resourceId}
       >
-        Deleted {link.resourceType.replace('_', ' ')}
+        {t('issues.links.deleted', {
+          type:
+            LINK_RESOURCE_SINGULAR[link.resourceType] ??
+            link.resourceType.replace('_', ' '),
+        })}
       </span>
     );
   }
@@ -71,7 +81,7 @@ function LinkTitle({ link }: { link: IssueLinkDto }) {
           params={{ id: link.resourceId }}
           className="font-medium hover:underline"
         >
-          Run {link.resourceId.slice(0, 8)}
+          {t('issues.links.run', { id: link.resourceId.slice(0, 8) })}
         </Link>
       );
     default:
@@ -118,6 +128,7 @@ export function IssueLinksPanel({
   onRemove: (link: IssueLinkDto) => void;
   removingId?: string | null;
 }) {
+  const t = useT();
   const groups = ORDER.map((type) => ({
     type,
     links: issue.links.filter((link) => link.resourceType === type),
@@ -125,19 +136,18 @@ export function IssueLinksPanel({
 
   return (
     <SideCard
-      title={`Links (${issue.links.length})`}
+      title={t('issues.links.title', { n: issue.links.length })}
       testId="issue-links"
       action={
         <Button variant="ghost" size="sm" className="h-7" onClick={onAdd}>
           <Plus className="size-4" />
-          Link
+          {t('issues.links.link')}
         </Button>
       }
     >
       {groups.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          Nothing linked yet. Link vulnerabilities, assets, targets, projects or
-          runs.
+          {t('issues.links.empty')}
         </p>
       ) : (
         groups.map((group) => (
@@ -162,7 +172,7 @@ export function IssueLinksPanel({
                     variant="ghost"
                     size="icon"
                     className="size-6 shrink-0"
-                    aria-label="Remove link"
+                    aria-label={t('issues.links.remove')}
                     disabled={removingId === link.id}
                     onClick={() => onRemove(link)}
                   >
@@ -192,6 +202,7 @@ export function RemediationSection({
   onAdd: () => void;
   removingId?: string | null;
 }) {
+  const t = useT();
   const links = issue.links.filter((l) => l.resourceType === 'vulnerability');
   const done =
     issue.progress?.done ??
@@ -200,29 +211,37 @@ export function RemediationSection({
 
   return (
     <DetailSection
-      title={`Vulnerabilities (${done}/${total} fixed)`}
+      title={t('issues.links.remediationTitle', { done, total })}
       icon={<ShieldAlert />}
       testId="remediation-section"
       action={
         <Button variant="outline" size="sm" onClick={onAdd}>
           <Plus className="size-4" />
-          Add vulnerability
+          {t('issues.links.addVulnerability')}
         </Button>
       }
     >
       {links.length === 0 ? (
         <p className="py-4 text-center text-sm text-muted-foreground">
-          No vulnerabilities linked.
+          {t('issues.links.noVulnerabilities')}
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
               <tr className="border-b">
-                <th className="py-2 pr-3 font-medium">Vulnerability</th>
-                <th className="py-2 pr-3 font-medium">Asset</th>
-                <th className="py-2 pr-3 font-medium">Status</th>
-                <th className="py-2 pr-3 font-medium">Due</th>
+                <th className="py-2 pr-3 font-medium">
+                  {t('issues.links.colVulnerability')}
+                </th>
+                <th className="py-2 pr-3 font-medium">
+                  {t('issues.links.colAsset')}
+                </th>
+                <th className="py-2 pr-3 font-medium">
+                  {t('issues.links.colStatus')}
+                </th>
+                <th className="py-2 pr-3 font-medium">
+                  {t('issues.links.colDue')}
+                </th>
                 <th className="py-2" />
               </tr>
             </thead>
@@ -248,7 +267,7 @@ export function RemediationSection({
                             variant="outline"
                             className="text-muted-foreground"
                           >
-                            Dismissed
+                            {t('issues.links.dismissed')}
                           </Badge>
                         )}
                       </span>
@@ -265,7 +284,9 @@ export function RemediationSection({
                         variant="ghost"
                         size="icon"
                         className="size-7"
-                        aria-label={`Unlink ${r.name ?? link.resourceId}`}
+                        aria-label={t('issues.links.unlink', {
+                          name: r.name ?? link.resourceId,
+                        })}
                         disabled={removingId === link.id}
                         onClick={() => onRemove(link)}
                       >

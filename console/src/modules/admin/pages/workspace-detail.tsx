@@ -20,23 +20,27 @@ import {
 } from '../components/detail-layout';
 import { ListUsers } from '../components/list-users';
 import { WorkspaceEdit } from '../components/workspace-edit';
+import { useT } from '@/lib/i18n-dictionary';
 
 const TABS = [
-  { id: 'info', label: 'Info' },
-  { id: 'members', label: 'Members' },
-  { id: 'edit', label: 'Edit' },
+  { id: 'info', labelKey: 'admin.detail.tabs.info' },
+  { id: 'members', labelKey: 'admin.detail.tabs.members' },
+  { id: 'edit', labelKey: 'common.edit' },
 ];
 
 export default function WorkspaceDetail() {
+  const t = useT();
   const { id } = useParams({ from: '/admin/workspaces/$id' });
   const { data: workspace, isLoading } =
     useAdminWorkspacesControllerGetWorkspace(id);
 
   if (isLoading) return <DetailSkeleton />;
-  if (!workspace) return <DetailNotFound entity="Workspace" />;
+  if (!workspace) return <DetailNotFound entity={t('admin.detail.entity.workspace')} />;
 
   return (
-    <Page documentTitle={workspace.name ? `${workspace.name} · Admin` : undefined}>
+    <Page documentTitle={workspace.name
+          ? t('admin.detail.documentTitle', { name: workspace.name })
+          : undefined}>
       <div className="mb-4 space-y-4">
         <DetailHero
           media={
@@ -45,27 +49,27 @@ export default function WorkspaceDetail() {
             </div>
           }
           title={workspace.name}
-          subtitle={workspace.description || 'No description'}
+          subtitle={workspace.description || t('admin.detail.noDescription')}
           badges={
             <>
               {workspace.archivedAt ? (
                 <Badge variant="outline" className="gap-1">
                   <Archive />
-                  Archived
+                  {t('admin.detail.status.archived')}
                 </Badge>
               ) : (
                 <Badge variant="secondary" className="gap-1">
                   <CircleCheck />
-                  Active
+                  {t('admin.detail.status.active')}
                 </Badge>
               )}
               <Badge variant="secondary" className="gap-1">
                 <Crosshair />
-                {workspace.targetCount} targets
+                {t('admin.detail.targetCount', { count: workspace.targetCount })}
               </Badge>
               <Badge variant="secondary" className="gap-1">
                 <Users />
-                {workspace.memberCount} members
+                {t('admin.detail.memberCount', { count: workspace.memberCount })}
               </Badge>
             </>
           }
@@ -83,17 +87,17 @@ export default function WorkspaceDetail() {
                 value={tab.id}
                 className="hover:cursor-pointer"
               >
-                {tab.label}
+                {t(tab.labelKey)}
               </TabsTrigger>
             ))}
           </TabsList>
 
           <TabsContent value="info">
             <DetailFields>
-              <DetailField label="Workspace ID">
+              <DetailField label={t('admin.detail.workspaceId')}>
                 <span className="font-mono">{workspace.id}</span>
               </DetailField>
-              <DetailField label="Owner">
+              <DetailField label={t('admin.detail.owner')}>
                 {workspace.owner ? (
                   <Link
                     to="/admin/users/$id"
@@ -106,22 +110,24 @@ export default function WorkspaceDetail() {
                   '—'
                 )}
               </DetailField>
-              <DetailField label="Asset discovery">
-                {workspace.isAssetsDiscovery ? 'Enabled' : 'Disabled'}
+              <DetailField label={t('admin.detail.assetDiscovery')}>
+                {workspace.isAssetsDiscovery
+                  ? t('common.enabled')
+                  : t('common.disabled')}
               </DetailField>
-              <DetailField label="Auto-enable discovered assets">
+              <DetailField label={t('admin.detail.autoEnableAssets')}>
                 {workspace.isAutoEnableAssetAfterDiscovered
-                  ? 'Enabled'
-                  : 'Disabled'}
+                  ? t('common.enabled')
+                  : t('common.disabled')}
               </DetailField>
-              <DetailField label="Created">
+              <DetailField label={t('admin.detail.created')}>
                 {formatDetailDate(workspace.createdAt)}
               </DetailField>
-              <DetailField label="Last updated">
+              <DetailField label={t('admin.detail.lastUpdated')}>
                 {formatDetailDate(workspace.updatedAt)}
               </DetailField>
               {workspace.archivedAt && (
-                <DetailField label="Archived">
+                <DetailField label={t('admin.detail.status.archived')}>
                   {formatDetailDate(workspace.archivedAt)}
                 </DetailField>
               )}

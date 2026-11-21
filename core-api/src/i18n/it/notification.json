@@ -1,0 +1,9 @@
+{
+  "WORKSPACE_CREATED": "Workspace {name} creato",
+  "VULNERABILITY_ANALYSIS_COMPLETED": "Analisi della vulnerabilità completata per {name}",
+  "ASSET_NEW_DETECT": "Nuovi asset rilevati per {targetValue}: {hosts, plural, =0 {} other {# host}}{ports, plural, =0 {} one { # porta} other { # porte}}{services, plural, =0 {} one { # servizio} other { # servizi}}{tech, plural, =0 {} one { # tecnologia} other { # tecnologie}}",
+  "SCAN_INCOMPLETE": "La scansione di {targetValue} non è terminata. {details}",
+  "NEW_VULNERABILITY_FOUND": "{count, plural, one {# nuova vulnerabilità trovata} other {# nuove vulnerabilità trovate}} su {assetValue}",
+  "WORKSPACE_INVITATION": "{action, select, created {Sei stato invitato nel workspace {workspaceName}} accepted {{userName} ha accettato il tuo invito al workspace {workspaceName}} declined {{userName} ha rifiutato il tuo invito al workspace {workspaceName}} other {Invito al workspace}}",
+  "NEW_URL_FOUND": "{count, plural, one {# nuovo URL trovato} other {# nuovi URL trovati}} su {targetValue}"
+}

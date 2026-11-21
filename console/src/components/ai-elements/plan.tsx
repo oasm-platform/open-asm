@@ -21,6 +21,7 @@ import type { ComponentProps } from "react";
 import { createContext, useContext, useMemo } from "react";
 
 import { Shimmer } from "./shimmer";
+import { useT } from '@/lib/i18n-dictionary';
 
 interface PlanContextValue {
   isStreaming: boolean;
@@ -131,17 +132,20 @@ export const PlanFooter = (props: PlanFooterProps) => (
 
 export type PlanTriggerProps = ComponentProps<typeof CollapsibleTrigger>;
 
-export const PlanTrigger = ({ className, ...props }: PlanTriggerProps) => (
-  <CollapsibleTrigger asChild>
-    <Button
-      className={cn("size-8", className)}
-      data-slot="plan-trigger"
-      size="icon"
-      variant="ghost"
-      {...props}
-    >
-      <ChevronsUpDownIcon className="size-4" />
-      <span className="sr-only">Toggle plan</span>
-    </Button>
-  </CollapsibleTrigger>
-);
+export const PlanTrigger = ({ className, ...props }: PlanTriggerProps) => {
+  const t = useT();
+  return (
+    <CollapsibleTrigger asChild>
+      <Button
+        className={cn("size-8", className)}
+        data-slot="plan-trigger"
+        size="icon"
+        variant="ghost"
+        {...props}
+      >
+        <ChevronsUpDownIcon className="size-4" />
+        <span className="sr-only">{t('agents.ai.togglePlan')}</span>
+      </Button>
+    </CollapsibleTrigger>
+  );
+};

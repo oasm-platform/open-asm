@@ -280,6 +280,11 @@ export function formatNextRun(date: Date, timezone: string): string {
 }
 
 export const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const WEEKDAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+/** Translated short name of a weekday, 0 = Mon .. 6 = Sun (WEEKDAY_LABELS order). */
+export const weekdayLabel = (index: number) =>
+  t(`components.cron.weekday.${WEEKDAY_KEYS[index]}`);
 
 function formatTime12(hour: number, minute: number): string {
   const period = hour < 12 ? 'AM' : 'PM';
@@ -308,20 +313,25 @@ export function formatCronLabel(
     const days = [...state.daysOfWeek]
       .sort((a, b) => a - b)
       // WEEKDAY_LABELS is 0-indexed while days are 1=Mon .. 7=Sun.
-      .map((d) => WEEKDAY_LABELS[d - 1])
+      .map((d) => weekdayLabel(d - 1))
       .join(', ');
-    return `Every week on ${days} at ${time}`;
+    return t('components.cron.everyWeek', { days, time });
   }
   if (state.frequency === 'monthly') {
     if (state.daysOfMonth.length === 0) {
       // The day shift pushed every selected day outside 1..31 (e.g. a local
       // day 1 that lands on the previous month); only the time is stable.
-      return `Every month at ${time}`;
+      return t('components.cron.everyMonth', { time });
     }
     const days = [...state.daysOfMonth]
       .sort((a, b) => a - b)
       .join(', ');
-    return `Every month on day${state.daysOfMonth.length > 1 ? 's' : ''} ${days} at ${time}`;
+    return t('components.cron.everyMonthOn', {
+      count: state.daysOfMonth.length,
+      days,
+      time,
+    });
   }
-  return `Every day at ${time}`;
-}
+  return t('components.cron.everyDay', { time });
+}import { t } from '@/lib/i18n-dictionary';
+

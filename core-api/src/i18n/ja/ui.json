@@ -1,0 +1,11 @@
+{
+  "notifications.title": "通知",
+  "notifications.unread.other": "未読の通知 {count} 件",
+  "notifications.markAllRead": "すべて既読にする",
+  "userMenu.language": "言語",
+  "userMenu.settings": "設定",
+  "userMenu.admin": "管理",
+  "userMenu.docs": "ドキュメント",
+  "userMenu.reportIssue": "問題を報告",
+  "userMenu.logout": "ログアウト"
+}

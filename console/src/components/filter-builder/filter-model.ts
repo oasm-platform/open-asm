@@ -1,3 +1,4 @@
+import { t } from '@/lib/i18n-dictionary';
 import { z } from 'zod';
 
 export type FilterOp = 'eq' | 'neq' | 'contains' | 'notContains' | 'in' | 'notIn' | 'inSubnet' | 'gt' | 'gte' | 'lt' | 'lte';
@@ -16,10 +17,13 @@ export interface FilterFieldConfig {
 }
 export type Path = [number] | [number, number];
 
+// Symbols show as is; words are dictionary keys. Read through opLabel().
 export const OP_LABELS: Record<FilterOp, string> = {
-  eq: '=', neq: '!=', contains: 'contains', notContains: 'does not contain',
-  in: 'in', notIn: 'not in', inSubnet: 'in subnet', gt: '>', gte: '>=', lt: '<', lte: '<=',
+  eq: '=', neq: '!=', contains: 'components.filter.op.contains', notContains: 'components.filter.op.notContains',
+  in: 'components.filter.op.in', notIn: 'components.filter.op.notIn', inSubnet: 'components.filter.op.inSubnet',
+  gt: '>', gte: '>=', lt: '<', lte: '<=',
 };
+export const opLabel = (op: FilterOp) => (OP_LABELS[op].includes('.') ? t(OP_LABELS[op]) : OP_LABELS[op]);
 export const LIST_OPS: ReadonlySet<FilterOp> = new Set<FilterOp>(['in', 'notIn', 'inSubnet']);
 // Mirrors core-api common/utils/filter-tree.ts FILTER_LIMITS.
 export const FILTER_LIMITS = { conditions: 20, values: 50, length: 255 } as const;
@@ -129,12 +133,12 @@ export function toggleLogic(f: Filter, groupIndex?: number): Filter {
 
 export function conditionError(c: FilterCondition, fields: FilterFieldConfig[]): string | null {
   const field = fieldOf(c.field, fields);
-  if (!field) return 'Unknown field';
-  if (!field.operators.includes(c.op)) return 'Operator not supported';
+  if (!field) return t('components.filter.error.unknownField');
+  if (!field.operators.includes(c.op)) return t('components.filter.error.opNotSupported');
   const values = Array.isArray(c.value) ? c.value : [c.value];
-  if (values.length === 0 || values.some((v) => v.trim() === '')) return 'Value is required';
-  if (values.length > FILTER_LIMITS.values) return `At most ${FILTER_LIMITS.values} values`;
-  if (values.some((v) => v.length > FILTER_LIMITS.length)) return `Values must be at most ${FILTER_LIMITS.length} characters`;
+  if (values.length === 0 || values.some((v) => v.trim() === '')) return t('components.filter.error.valueRequired');
+  if (values.length > FILTER_LIMITS.values) return t('components.filter.error.maxValues', { max: FILTER_LIMITS.values });
+  if (values.some((v) => v.length > FILTER_LIMITS.length)) return t('components.filter.error.maxLength', { max: FILTER_LIMITS.length });
   for (const v of values) {
     const err = field.validate?.(v, c.op);
     if (err) return err;
@@ -144,7 +148,7 @@ export function conditionError(c: FilterCondition, fields: FilterFieldConfig[]):
 
 export function filterError(f: Filter, fields: FilterFieldConfig[]): string | null {
   const all = conditionsOf(f);
-  if (all.length > FILTER_LIMITS.conditions) return `At most ${FILTER_LIMITS.conditions} conditions`;
+  if (all.length > FILTER_LIMITS.conditions) return t('components.filter.error.maxConditions', { max: FILTER_LIMITS.conditions });
   for (const c of all) {
     const err = conditionError(c, fields);
     if (err) return err;
@@ -156,7 +160,7 @@ const quote = (v: string) => JSON.stringify(v);
 export function conditionToText(c: FilterCondition, fields: FilterFieldConfig[]): string {
   const label = fieldOf(c.field, fields)?.label ?? c.field;
   const value = Array.isArray(c.value) ? `[${c.value.map(quote).join(', ')}]` : quote(c.value);
-  return `${label} ${OP_LABELS[c.op]} ${value}`;
+  return `${label} ${opLabel(c.op)} ${value}`;
 }
 
 export function filterToText(f: Filter, fields: FilterFieldConfig[]): string {

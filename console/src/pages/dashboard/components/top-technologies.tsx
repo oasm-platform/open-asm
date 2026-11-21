@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { TopTechnologiesSkeleton } from './dashboard-skeleton';
@@ -6,6 +7,7 @@ import { ChevronRight, Layers, Boxes } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 
 const TopTechnologies = () => {
+  const t = useT();
   const navigate = useNavigate();
   const {
     state: { selectedWorkspaceId },
@@ -24,11 +26,11 @@ const TopTechnologies = () => {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2">
             <Layers className="h-5 w-5 text-primary" />
-            Top technologies
+            {t('dashboard.technologies.title')}
           </CardTitle>
         </CardHeader>
         <CardContent className="flex h-full items-center justify-center text-sm text-destructive">
-          Couldn&apos;t load data
+          {t('dashboard.tls.loadFailed')}
         </CardContent>
       </Card>
     );
@@ -44,13 +46,13 @@ const TopTechnologies = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Layers className="h-5 w-5 text-primary" />
-          Top technologies
+          {t('dashboard.technologies.title')}
         </CardTitle>
       </CardHeader>
       <CardContent className="min-h-0 flex-1">
         {data.technologies.length === 0 ? (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            No technologies detected
+            {t('dashboard.technologies.empty')}
           </div>
         ) : (
           <div className="min-h-0 h-full space-y-1 overflow-y-auto pr-1">

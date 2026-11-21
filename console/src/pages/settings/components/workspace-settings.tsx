@@ -26,21 +26,26 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { WorkspaceConfigs } from './workspace-configs';
 import { Trash2 } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
+import { useT, type TFunction } from '@/lib/i18n-dictionary';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
-const formSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  description: z.union([z.string(), z.undefined()]),
-});
+const makeFormSchema = (t: TFunction) =>
+  z.object({
+    name: z.string().min(1, t('settings.workspace.nameRequired')),
+    description: z.union([z.string(), z.undefined()]),
+  });
+type FormValues = z.infer<ReturnType<typeof makeFormSchema>>;
 
 /**
  * Workspace settings component displaying workspace info, edit form, and danger zone.
  */
 export default function WorkspaceSettings() {
+  const t = useT();
+  const formSchema = useMemo(() => makeFormSchema(t), [t]);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { selectedWorkspace, workspaces, refetch } = useWorkspaceSelector();
@@ -48,7 +53,7 @@ export default function WorkspaceSettings() {
 
   const currentWorkspace = workspaces.find((ws) => ws.id === selectedWorkspace);
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: '',
@@ -75,7 +80,7 @@ export default function WorkspaceSettings() {
   const { mutate: deleteWorkspace, isPending: isDeleting } =
     useWorkspacesControllerDeleteWorkspace();
 
-  function handleUpdate(data: z.infer<typeof formSchema>) {
+  function handleUpdate(data: FormValues) {
     if (!currentWorkspace) return;
 
     updateWorkspace(
@@ -85,12 +90,12 @@ export default function WorkspaceSettings() {
       },
       {
         onSuccess: () => {
-          toast.success('Workspace updated successfully');
+          toast.success(t('settings.workspace.updated'));
           queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] });
           refetch();
         },
         onError: () => {
-          toast.error('Failed to update workspace');
+          toast.error(t('settings.workspace.updateFailed'));
         },
       },
     );
@@ -105,12 +110,12 @@ export default function WorkspaceSettings() {
       },
       {
         onSuccess: () => {
-          toast.success('Workspace deleted successfully');
+          toast.success(t('settings.workspace.deleted'));
           queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] });
           navigate({ to: '/' });
         },
         onError: () => {
-          toast.error('Failed to delete workspace');
+          toast.error(t('settings.workspace.deleteFailed'));
         },
       },
     );
@@ -121,7 +126,7 @@ export default function WorkspaceSettings() {
       <div className="space-y-4">
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">
-            Loading permissions...
+            {t('settings.workspace.loadingPermissions')}
           </CardContent>
         </Card>
       </div>
@@ -134,8 +139,7 @@ export default function WorkspaceSettings() {
         <Card>
           <CardContent className="py-10">
             <p className="text-center text-muted-foreground">
-              No workspace selected. Please select a workspace to manage its
-              settings.
+              {t('settings.workspace.noWorkspace')}
             </p>
           </CardContent>
         </Card>
@@ -149,7 +153,7 @@ export default function WorkspaceSettings() {
       {hasPermission('workspace.write') && (
         <Card>
         <CardHeader>
-          <CardTitle>Information</CardTitle>
+          <CardTitle>{t('settings.workspace.information')}</CardTitle>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -162,7 +166,7 @@ export default function WorkspaceSettings() {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Name</FormLabel>
+                    <FormLabel>{t('common.name')}</FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
@@ -175,7 +179,7 @@ export default function WorkspaceSettings() {
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Description</FormLabel>
+                    <FormLabel>{t('common.description')}</FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
@@ -185,7 +189,7 @@ export default function WorkspaceSettings() {
               />
               <div className="flex justify-end">
                 <Button type="submit" disabled={isUpdating}>
-                  {isUpdating ? 'Saving...' : 'Save'}
+                  {isUpdating ? t('settings.members.saving') : t('common.save')}
                 </Button>
               </div>
             </form>
@@ -198,7 +202,7 @@ export default function WorkspaceSettings() {
       {hasPermission('workspace.config') && (
         <Card>
           <CardHeader>
-            <CardTitle>Configs</CardTitle>
+            <CardTitle>{t('settings.workspace.configs')}</CardTitle>
           </CardHeader>
           <CardContent>
             <WorkspaceConfigs />
@@ -210,30 +214,32 @@ export default function WorkspaceSettings() {
       {hasPermission('workspace.delete') && (
         <Card className="border-[0.5px] border-destructive">
           <CardHeader>
-            <CardTitle className="text-destructive">Danger Zone</CardTitle>
+            <CardTitle className="text-destructive">{t('settings.workspace.danger.title')}</CardTitle>
           <CardDescription>
-            Irreversible actions for this workspace
+            {t('settings.workspace.danger.description')}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between text-destructive">
             <div>
-              <p className="font-medium">Delete Workspace</p>
+              <p className="font-medium">{t('settings.workspace.danger.deleteTitle')}</p>
               <p className="text-sm text-muted-foreground">
-                Permanently delete this workspace and all its data
+                {t('settings.workspace.danger.deleteDescription')}
               </p>
             </div>
             <ConfirmDialog
-              title="Delete workspace"
-              description={`Are you sure you want to delete "${currentWorkspace.name}"? All related data including assets, vulnerabilities, scan results, and settings will be permanently deleted and cannot be recovered.`}
+              title={t('settings.workspace.delete.title')}
+              description={t('settings.workspace.delete.description', {
+                name: currentWorkspace.name,
+              })}
               onConfirm={handleDelete}
-              confirmText="Delete"
+              confirmText={t('common.delete')}
               typeToConfirm="delete"
               disabled={isDeleting}
               trigger={
                 <Button variant="outline" disabled={isDeleting}>
                   <Trash2 className="mr-2 h-4 w-4" />
-                  {isDeleting ? 'Deleting...' : 'Delete'}
+                  {isDeleting ? t('settings.workspace.deleting') : t('common.delete')}
                 </Button>
               }
             />

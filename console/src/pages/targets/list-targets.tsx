@@ -1,9 +1,6 @@
+import { formatDate, fromNow } from '@/lib/date-locale';
+import { type TFunction, useT } from '@/lib/i18n-dictionary';
 import { type ColumnDef } from '@tanstack/react-table';
-import dayjs from 'dayjs';
-import duration from 'dayjs/plugin/duration';
-import relativeTime from 'dayjs/plugin/relativeTime';
-dayjs.extend(duration);
-dayjs.extend(relativeTime);
 
 import { DataTable } from '@/components/ui/data-table';
 import { DataTableError } from '@/components/ui/data-table-error-boundary';
@@ -44,6 +41,7 @@ interface TargetSourceCellProps {
 
 /** Source icon: tooltip on hover, navigates to the integration on click. */
 function TargetSourceCell({ icon, source }: TargetSourceCellProps) {
+  const t = useT();
   const navigate = useNavigate();
   // ponytail: appType parsed from icon path; cleaner would be exposing the raw source id in TargetSourceDto
   const tool = icon.split('/').pop()?.replace(/.svg$/, '') ?? '';
@@ -65,7 +63,7 @@ function TargetSourceCell({ icon, source }: TargetSourceCellProps) {
           </LogoFrame>
         </span>
       </TooltipTrigger>
-      <TooltipContent>Sync from {source}</TooltipContent>
+      <TooltipContent>{t('targets.list.syncFrom', { source })}</TooltipContent>
     </Tooltip>
   );
 }
@@ -98,10 +96,10 @@ function ProjectDots({ projects }: { projects: GetManyTargetResponseDto['project
   );
 }
 
-const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
+const getTargetColumns = (t: TFunction): ColumnDef<GetManyTargetResponseDto>[] => [
   {
     accessorKey: 'value',
-    header: 'Target',
+    header: t('targets.list.columns.target'),
     cell: ({ row }) => (
       <div className="flex items-center gap-2">
         <TargetLogo url={row.original.logo} />
@@ -115,7 +113,7 @@ const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
         )}
         {row.original.internalNetworkId && (
           <Badge variant="secondary" className="text-xs">
-            Internal
+            {t('targets.list.internal')}
           </Badge>
         )}
         <ProjectDots projects={row.original.projects} />
@@ -124,29 +122,29 @@ const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
   },
   {
     accessorKey: 'type',
-    header: 'Type',
+    header: t('targets.list.columns.type'),
     enableSorting: false,
     cell: ({ row }) => <TargetTypeBadge type={row.original.type} />,
   },
   {
     accessorKey: 'totalAssetServices',
-    header: 'Surface',
+    header: t('targets.list.columns.surface'),
     cell: ({ row }) => {
       // A Git organization has no services; its size is its repositories.
       if (row.original.type === TargetType.GIT_ORG) {
         return (
           <div className="text-muted-foreground font-medium">
-            {row.original.totalAssets} repositories
+            {t('targets.list.repositories', { count: row.original.totalAssets })}
           </div>
         );
       }
       return (
         <div className="flex flex-col text-sm">
           <span className="font-medium">
-            {row.original.totalAssetServices} services
+            {t('targets.list.services', { count: row.original.totalAssetServices })}
           </span>
           <span className="text-muted-foreground">
-            {row.original.totalAssets} assets
+            {t('targets.list.assets', { count: row.original.totalAssets })}
           </span>
         </div>
       );
@@ -154,12 +152,12 @@ const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
   },
   {
     id: 'vulnerabilities',
-    header: 'Open vulnerabilities',
+    header: t('targets.list.columns.openVulnerabilities'),
     enableSorting: false,
     cell: ({ row }) => {
       const counts = row.original.openVulnerabilities;
       if (!totalOf(counts)) {
-        return <span className="text-sm text-muted-foreground">None</span>;
+        return <span className="text-sm text-muted-foreground">{t('targets.list.none')}</span>;
       }
       return (
         <div className="flex w-44 flex-col gap-1.5">
@@ -174,7 +172,7 @@ const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
   },
   {
     accessorKey: 'status',
-    header: 'Scan status',
+    header: t('targets.list.columns.scanStatus'),
     enableSorting: false,
     cell: ({ row }) => {
       const value: JobStatus = row.getValue('status');
@@ -199,20 +197,20 @@ const targetColumns: ColumnDef<GetManyTargetResponseDto>[] = [
   },
   {
     accessorKey: 'lastDiscoveredAt',
-    header: 'Last / next scan',
+    header: t('targets.list.columns.lastNextScan'),
     cell: ({ row }) => {
       const { lastDiscoveredAt, nextScanAt, scanSchedule } = row.original;
       return (
         <div className="flex flex-col text-sm">
-          <span className="font-medium" title={dayjs(lastDiscoveredAt).format('YYYY-MM-DD HH:mm')}>
-            {dayjs(lastDiscoveredAt).fromNow()}
+          <span className="font-medium" title={formatDate(lastDiscoveredAt, 'yyyy-MM-dd HH:mm')}>
+            {fromNow(lastDiscoveredAt)}
           </span>
           <span className="text-muted-foreground">
             {nextScanAt
-              ? `next ${dayjs(nextScanAt).fromNow()}`
+              ? t('targets.list.next', { time: fromNow(nextScanAt) })
               : isScheduled(scanSchedule)
                 ? scheduleLabel(scanSchedule)
-                : 'manual'}
+                : t('targets.list.manual')}
           </span>
         </div>
       );
@@ -227,6 +225,8 @@ const isView = (value: unknown): value is TargetView =>
   VIEWS.includes(value as TargetView);
 
 export function ListTargets() {
+  const t = useT();
+  const targetColumns = useMemo(() => getTargetColumns(t), [t]);
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -356,7 +356,7 @@ export function ListTargets() {
 
   if (!data && !isLoading)
     return (
-      <DataTableError message="Failed to load targets." onRetry={refetch} />
+      <DataTableError message={t('targets.list.loadFailed')} onRetry={refetch} />
     );
 
   const handleRowClick = (target: GetManyTargetResponseDto) => {

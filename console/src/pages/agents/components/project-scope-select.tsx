@@ -12,6 +12,7 @@ import {
   useProjectsControllerGetMany,
   type ConversationProjectDto,
 } from '@/services/apis/gen/queries';
+import { useT } from '@/lib/i18n-dictionary';
 
 const NO_PROJECT = 'none';
 
@@ -41,6 +42,7 @@ export function ProjectScopeSelect({
   onChange,
   className,
 }: ProjectScopeSelectProps) {
+  const t = useT();
   const { data } = useProjectsControllerGetMany(
     { page: 1, limit: 100, sortBy: 'name', sortOrder: 'ASC', status: 'active' },
     { query: { enabled: !!onChange } },
@@ -54,7 +56,7 @@ export function ProjectScopeSelect({
           'flex items-center gap-1.5 text-xs text-muted-foreground',
           className,
         )}
-        title="The agent only reads and acts inside this project"
+        title={t('agents.project.scopeHint')}
       >
         <FolderKanban className="size-3.5" />
         <ProjectDot color={value.hexColor} />
@@ -83,7 +85,7 @@ export function ProjectScopeSelect({
     >
       <SelectTrigger
         size="sm"
-        aria-label="Project"
+        aria-label={t('agents.project.label')}
         className={cn(
           'w-auto max-w-64 data-[size=sm]:h-7 gap-1.5 border-none bg-transparent px-2 text-xs text-muted-foreground shadow-none hover:bg-accent dark:bg-transparent',
           className,
@@ -93,7 +95,9 @@ export function ProjectScopeSelect({
         <SelectValue />
       </SelectTrigger>
       <SelectContent align="start">
-        <SelectItem value={NO_PROJECT}>Whole workspace</SelectItem>
+        <SelectItem value={NO_PROJECT}>
+          {t('agents.project.wholeWorkspace')}
+        </SelectItem>
         {projects.map((p) => (
           <SelectItem key={p.id} value={p.id}>
             <ProjectDot color={p.hexColor} />

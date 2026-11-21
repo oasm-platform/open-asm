@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 
@@ -8,7 +9,8 @@ interface NewBadgeProps {
     title?: string;
 }
 
-export function NewBadge({ className = "", children = "New", title }: NewBadgeProps) {
+export function NewBadge({ className = "", children, title }: NewBadgeProps) {
+    const t = useT();
     return (
         <Badge
             variant="default"
@@ -20,7 +22,7 @@ export function NewBadge({ className = "", children = "New", title }: NewBadgePr
                 untrimmed box sits it high), and drop the tracking the last
                 letter adds on its right. */}
             <span className="-mr-[0.05em] [text-box:trim-both_cap_alphabetic]">
-                {children}
+                {children ?? t('components.newBadge')}
             </span>
         </Badge>
     );

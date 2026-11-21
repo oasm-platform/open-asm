@@ -8,6 +8,7 @@ import {
 } from '@/services/apis/gen/queries';
 import { LayoutGrid } from 'lucide-react';
 import ToolsList from '../tools-list';
+import { useT } from '@/lib/i18n-dictionary';
 
 interface MarketplaceProps {
   installed?: boolean;
@@ -22,6 +23,7 @@ const Marketplace = ({
   search,
   category,
 }: MarketplaceProps) => {
+  const t = useT();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -72,13 +74,13 @@ const Marketplace = ({
         icon={<LayoutGrid className="w-6 h-6" />}
         emptyMessage={
           hasFilters
-            ? 'No tools match your filters'
+            ? t('tools.list.noMatch')
             : installed
-              ? 'No installed tools found'
-              : 'No tools found'
+              ? t('tools.list.noInstalled')
+              : t('tools.list.empty')
         }
         emptyDescription={
-          hasFilters ? 'Try a different search term or category.' : undefined
+          hasFilters ? t('tools.list.noMatchDescription') : undefined
         }
       />
     </div>

@@ -15,7 +15,7 @@ import {
   useRootControllerGetMetadata,
   type GetVersionDto,
 } from '@/services/apis/gen/queries';
-import dayjs from 'dayjs';
+import { formatDate as formatLocalDate } from '@/lib/date-locale';
 import {
   Bug,
   ChevronDown,
@@ -27,32 +27,36 @@ import {
   Scale,
 } from 'lucide-react';
 import { useState } from 'react';
+import { type TFunction, useT } from '@/lib/i18n-dictionary';
 
-const getLinks = (repoUrl: string) => [
+const getLinks = (t: TFunction, repoUrl: string) => [
   {
     icon: FolderGit2,
-    title: 'Source code',
-    description: `${repoUrl.replace(/^https?:\/\/(www\.)?github\.com\//, '')} on GitHub`,
+    title: t('admin.about.links.source'),
+    description: t('admin.about.links.sourceDescription', {
+      repo: repoUrl.replace(/^https?:\/\/(www\.)?github\.com\//, ''),
+    }),
     href: repoUrl,
   },
   {
     icon: Bug,
-    title: 'Report an issue',
-    description: 'Bugs and feature requests',
+    title: t('admin.about.links.reportIssue'),
+    description: t('admin.about.links.reportIssueDescription'),
     href: `${repoUrl}/issues`,
   },
   {
     icon: Scale,
-    title: 'License',
+    title: t('admin.about.links.license'),
     description: 'AGPL-3.0',
     href: `${repoUrl}/blob/main/LICENSE`,
   },
 ];
 
 const formatDate = (value: string | null) =>
-  value ? dayjs(value).format('MMM D, YYYY') : null;
+  value ? formatLocalDate(value, 'MMM d, yyyy') : null;
 
 export default function GetAboutProject() {
+  const t = useT();
   const { data, isLoading, isError } = useRootControllerGetLatestVersion();
   const { data: metadata } = useRootControllerGetMetadata();
   const repoUrl = metadata?.gitRepoUrl;
@@ -70,8 +74,7 @@ export default function GetAboutProject() {
             <div className="min-w-0 space-y-0.5">
               <h3 className="text-lg font-semibold tracking-tight">OpenASM</h3>
               <p className="text-sm text-muted-foreground">
-                Open-source platform for cybersecurity Attack Surface
-                Management.
+                {t('admin.about.tagline')}
               </p>
             </div>
           </div>
@@ -98,7 +101,7 @@ export default function GetAboutProject() {
       {repoUrl && (
         <Card className="py-0">
           <ul className="divide-y">
-            {getLinks(repoUrl).map(
+            {getLinks(t, repoUrl).map(
               ({ icon: Icon, title, description, href }) => (
                 <li key={href}>
                   <OpenLink
@@ -133,28 +136,36 @@ function VersionStatus({
   data?: GetVersionDto;
   repoUrl?: string;
 }) {
+  const t = useT();
   const released = formatDate(data?.releaseDate ?? null);
   const status = !data
     ? {
         icon: CircleAlert,
         tone: 'text-muted-foreground',
-        badge: <Badge variant="soft">Unknown</Badge>,
-        message: 'Could not check for updates.',
+        badge: <Badge variant="soft">{t('admin.about.unknown')}</Badge>,
+        message: t('admin.about.checkFailed'),
       }
     : data.isLatest
       ? {
           icon: CircleCheck,
           tone: 'text-success',
-          badge: <Badge variant="success">Up to date</Badge>,
-          message: 'You are running the latest version.',
+          badge: <Badge variant="success">{t('admin.about.upToDate')}</Badge>,
+          message: t('admin.about.latest'),
         }
       : {
           icon: CircleArrowUp,
           tone: 'text-[color:var(--warning)]',
-          badge: <Badge variant="warning">Update available</Badge>,
-          message: `Version ${data.latestVersion ?? 'N/A'} is available${
-            released ? `, released ${released}` : ''
-          }.`,
+          badge: <Badge variant="warning">
+              {t('admin.about.updateAvailable')}
+            </Badge>,
+          message: released
+            ? t('admin.about.newVersionReleased', {
+                version: data.latestVersion ?? t('admin.about.notAvailable'),
+                date: released,
+              })
+            : t('admin.about.newVersion', {
+                version: data.latestVersion ?? t('admin.about.notAvailable'),
+              }),
         };
   const Icon = status.icon;
 
@@ -164,7 +175,9 @@ function VersionStatus({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium">
-            Version {data?.currentVersion ?? 'N/A'}
+            {t('admin.about.currentVersion', {
+              version: data?.currentVersion ?? t('admin.about.notAvailable'),
+            })}
           </span>
           {status.badge}
         </div>
@@ -177,7 +190,7 @@ function VersionStatus({
             target="_blank"
             rel="noreferrer noopener"
           >
-            View release
+            {t('admin.about.viewRelease')}
             <ExternalLink />
           </OpenLink>
         </Button>
@@ -195,6 +208,7 @@ function ReleaseNotes({
   releaseDate: string | null;
   notes: string;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
 
   return (
@@ -203,7 +217,9 @@ function ReleaseNotes({
         <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-6 py-4 text-left">
           <div>
             <p className="text-sm font-medium">
-              Release notes{version && ` — v${version}`}
+              {version
+                ? t('admin.about.releaseNotesVersion', { version })
+                : t('admin.about.releaseNotes')}
             </p>
             {releaseDate && (
               <p className="text-xs text-muted-foreground">{releaseDate}</p>

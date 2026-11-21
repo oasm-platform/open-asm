@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import {
   EFFORT_LABELS,
+  effortLabel,
   type ReasoningEffort,
 } from '@/components/ui/reasoning-effort-select';
 import { setDefaultApprovalMode } from '@/hooks/use-approval-mode';
@@ -46,6 +47,7 @@ import { defaultFilter } from 'cmdk';
 import { Check, ChevronsUpDown, Loader2 } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
+import { useT } from '@/lib/i18n-dictionary';
 
 type ModelRef = AgentModelRefDto;
 type Effort = AgentModelRefDto['reasoningEffort'];
@@ -53,17 +55,26 @@ type Effort = AgentModelRefDto['reasoningEffort'];
 /** Radix Select cannot hold an empty value, so "not set" gets a token. */
 const UNSET = 'unset';
 
-const EFFORT_OPTIONS: Array<{ value: NonNullable<Effort>; label: string }> = [
-  { value: AgentModelRefDtoReasoningEffort.low, label: 'Low' },
-  { value: AgentModelRefDtoReasoningEffort.medium, label: 'Medium' },
-  { value: AgentModelRefDtoReasoningEffort.high, label: 'High' },
+const EFFORT_OPTIONS: Array<{ value: NonNullable<Effort>; labelKey: string }> = [
+  {
+    value: AgentModelRefDtoReasoningEffort.low,
+    labelKey: 'agents.models.effort.low',
+  },
+  {
+    value: AgentModelRefDtoReasoningEffort.medium,
+    labelKey: 'agents.models.effort.medium',
+  },
+  {
+    value: AgentModelRefDtoReasoningEffort.high,
+    labelKey: 'agents.models.effort.high',
+  },
 ];
 
 const DEFAULT_EFFORTS = Object.keys(EFFORT_LABELS) as ReasoningEffort[];
 
 const APPROVAL_OPTIONS = [
-  { value: 'manual', label: 'Manual' },
-  { value: 'auto', label: 'Auto' },
+  { value: 'manual', labelKey: 'agents.models.approval.manual' },
+  { value: 'auto', labelKey: 'agents.models.approval.auto' },
 ] as const;
 
 /**
@@ -105,7 +116,7 @@ export function ModelPicker({
   value,
   connections,
   unsetLabel,
-  placeholder = 'Select model',
+  placeholder,
   onChange,
 }: {
   label: string;
@@ -117,6 +128,7 @@ export function ModelPicker({
   placeholder?: string;
   onChange: (picked: { llmConfigId: string; model: string } | null) => void;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
 
   // Model lists load only once the picker opens
@@ -158,22 +170,25 @@ export function ModelPicker({
             />
           )}
           <span className="truncate">
-            {value?.model ?? unsetLabel ?? placeholder}
+            {value?.model ??
+              unsetLabel ??
+              placeholder ??
+              t('agents.models.selectModel')}
           </span>
           <ChevronsUpDown className="size-3.5 shrink-0 opacity-60" />
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-0">
         <Command filter={filterByKeywords}>
-          <CommandInput placeholder="Search models..." />
+          <CommandInput placeholder={t('agents.llm.searchModels')} />
           <CommandList>
             {loading ? (
               <div className="flex items-center gap-2 px-3 py-6 text-sm text-muted-foreground">
                 <Loader2 className="size-4 animate-spin" />
-                Loading models...
+                {t('agents.models.loadingModels')}
               </div>
             ) : (
-              <CommandEmpty>No models found</CommandEmpty>
+              <CommandEmpty>{t('agents.models.noModels')}</CommandEmpty>
             )}
             {unsetLabel && (
               <CommandGroup>
@@ -246,6 +261,7 @@ function SettingRow({
 }
 
 export function ModelsManager() {
+  const t = useT();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -291,16 +307,16 @@ export function ModelsManager() {
             void queryClient.invalidateQueries({
               queryKey: getAgentsControllerGetConnectedProvidersQueryKey(),
             });
-            toast.success('Models updated');
+            toast.success(t('agents.models.updated'));
           },
-          onError: () => toast.error('Failed to update models'),
+          onError: () => toast.error(t('agents.models.updateFailed')),
           onSettled: () => {
             saving.current = false;
           },
         },
       );
     },
-    [config, upsert, queryClient],
+    [config, upsert, queryClient, t],
   );
 
   // New chat defaults: a partial upsert, so it never touches modelsConfig
@@ -319,9 +335,9 @@ export function ModelsManager() {
             saved,
           );
           setDefaultApprovalMode(saved.defaultApprovalMode);
-          toast.success('Defaults updated');
+          toast.success(t('agents.models.defaultsUpdated'));
         },
-        onError: () => toast.error('Failed to update defaults'),
+        onError: () => toast.error(t('agents.models.defaultsFailed')),
       },
     );
   };
@@ -352,7 +368,7 @@ export function ModelsManager() {
     return (
       <div className="rounded-xl border border-dashed p-6 text-center">
         <p className="text-sm text-muted-foreground">
-          Couldn&apos;t load the model settings.
+          {t('agents.models.loadFailed')}
         </p>
         <Button
           size="sm"
@@ -360,7 +376,7 @@ export function ModelsManager() {
           className="mt-3"
           onClick={() => void refetch()}
         >
-          Retry
+          {t('agents.settings.retry')}
         </Button>
       </div>
     );
@@ -370,7 +386,7 @@ export function ModelsManager() {
     return (
       <div className="rounded-xl border border-dashed p-6 text-center">
         <p className="text-sm text-muted-foreground">
-          Connect an LLM provider to choose the models the agent uses.
+          {t('agents.models.noProvider')}
         </p>
         <Button
           size="sm"
@@ -378,7 +394,7 @@ export function ModelsManager() {
           className="mt-3"
           onClick={() => openSettings('provider')}
         >
-          Connect a provider
+          {t('agents.models.connectProvider')}
         </Button>
       </div>
     );
@@ -387,43 +403,43 @@ export function ModelsManager() {
   return (
     <div className="divide-y rounded-xl border bg-card/50 px-4">
       <SettingRow
-        title="Default Model"
-        description="Primary model for new conversations"
+        title={t('agents.models.default.title')}
+        description={t('agents.models.default.description')}
       >
         <ModelPicker
-          label="Default model"
+          label={t('agents.models.default.label')}
           value={models.default}
           connections={connections}
           // Runs then use the oldest connection, listed first
-          placeholder="Not set (uses the first connection)"
+          placeholder={t('agents.models.default.placeholder')}
           onChange={(picked) =>
             save({ ...models, default: nextRef(models.default, picked) })
           }
         />
       </SettingRow>
       <SettingRow
-        title="Small Model"
-        description="Lightweight model for title generation, conversation summaries and reports"
+        title={t('agents.models.small.title')}
+        description={t('agents.models.small.description')}
       >
         <ModelPicker
-          label="Small model"
+          label={t('agents.models.small.label')}
           value={models.small}
           connections={connections}
-          unsetLabel="Use default model"
+          unsetLabel={t('agents.models.small.unset')}
           onChange={(picked) =>
             save({ ...models, small: nextRef(models.small, picked) })
           }
         />
       </SettingRow>
       <SettingRow
-        title="Subagent Model"
-        description="Default model and reasoning effort for subagents. Leave unset to inherit the calling agent's model."
+        title={t('agents.models.subagent.title')}
+        description={t('agents.models.subagent.description')}
       >
         <ModelPicker
-          label="Subagent model"
+          label={t('agents.models.subagent.label')}
           value={subagent}
           connections={connections}
-          unsetLabel="Inherit from agent"
+          unsetLabel={t('agents.models.subagent.unset')}
           onChange={(picked) => setSubagent(nextRef(subagent, picked))}
         />
         <Select
@@ -441,26 +457,26 @@ export function ModelsManager() {
         >
           <SelectTrigger
             size="sm"
-            aria-label="Subagent reasoning effort"
+            aria-label={t('agents.models.subagent.effortLabel')}
             className="border-0 bg-transparent shadow-none"
           >
             <SelectValue />
           </SelectTrigger>
           <SelectContent align="end">
             <SelectItem value={UNSET}>
-              Not Set (Use Provider Default)
+              {t('agents.models.notSetProvider')}
             </SelectItem>
             {EFFORT_OPTIONS.map((option) => (
               <SelectItem key={option.value} value={option.value}>
-                {option.label}
+                {t(option.labelKey)}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
       </SettingRow>
       <SettingRow
-        title="Default Reasoning Effort"
-        description="Effort a new chat starts with when none is picked in the chat. A model without the level runs at its provider default."
+        title={t('agents.models.effortDefault.title')}
+        description={t('agents.models.effortDefault.description')}
       >
         <Select
           value={config.defaultReasoningEffort ?? UNSET}
@@ -473,26 +489,26 @@ export function ModelsManager() {
         >
           <SelectTrigger
             size="sm"
-            aria-label="Default reasoning effort"
+            aria-label={t('agents.models.effortDefault.label')}
             className="border-0 bg-transparent shadow-none"
           >
             <SelectValue />
           </SelectTrigger>
           <SelectContent align="end">
             <SelectItem value={UNSET}>
-              Not Set (Use Provider Default)
+              {t('agents.models.notSetProvider')}
             </SelectItem>
             {DEFAULT_EFFORTS.map((effort) => (
               <SelectItem key={effort} value={effort}>
-                {EFFORT_LABELS[effort]}
+                {effortLabel(effort)}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
       </SettingRow>
       <SettingRow
-        title="Default Approval Mode"
-        description="How commands run when a new chat starts. Manual asks before each new command; Auto runs them all."
+        title={t('agents.models.approvalDefault.title')}
+        description={t('agents.models.approvalDefault.description')}
       >
         <Select
           value={config.defaultApprovalMode ?? UNSET}
@@ -507,18 +523,18 @@ export function ModelsManager() {
         >
           <SelectTrigger
             size="sm"
-            aria-label="Default approval mode"
+            aria-label={t('agents.models.approvalDefault.label')}
             className="border-0 bg-transparent shadow-none"
           >
             <SelectValue />
           </SelectTrigger>
           <SelectContent align="end">
             <SelectItem value={UNSET}>
-              Not Set (Use Last Choice)
+              {t('agents.models.notSetLast')}
             </SelectItem>
             {APPROVAL_OPTIONS.map((option) => (
               <SelectItem key={option.value} value={option.value}>
-                {option.label}
+                {t(option.labelKey)}
               </SelectItem>
             ))}
           </SelectContent>

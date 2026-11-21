@@ -1,0 +1,12 @@
+{
+  "NOT_EMPTY": "{property} 不能为空",
+  "IS_STRING": "{property} 必须是字符串",
+  "IS_EMAIL": "{property} 必须是有效的电子邮件地址",
+  "MIN_LENGTH": "{property} 太短（至少 {constraints.0} 个字符）",
+  "MAX_LENGTH": "{property} 太长（最多 {constraints.0} 个字符）",
+  "IS_UUID": "{property} 必须是有效的 ID",
+  "IS_ARRAY": "{property} 必须是列表",
+  "ARRAY_NOT_EMPTY": "{property} 不能为空",
+  "MATCHES": "{property} 格式无效",
+  "PERMISSION_KEY": "权限键无效。请使用 \"*\" 或 \"domain.action\"（例如 target.read）"
+}

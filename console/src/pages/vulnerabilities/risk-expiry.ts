@@ -1,3 +1,4 @@
+import { t } from '@/lib/i18n-dictionary';
 import { addDays, parse, startOfDay } from 'date-fns';
 
 /** Used until the workspace settings load. */
@@ -14,12 +15,12 @@ export function validateRiskExpiry(
   maxDays: number,
   today: Date = new Date(),
 ): string | null {
-  if (!value) return 'Pick the date the acceptance ends';
+  if (!value) return t('vulnerabilities.riskExpiry.required');
   const date = parse(value, DATE_FORMAT, today);
-  if (Number.isNaN(date.getTime())) return 'Pick a valid date';
+  if (Number.isNaN(date.getTime())) return t('vulnerabilities.riskExpiry.invalid');
   const day = startOfDay(date);
-  if (day <= startOfDay(today)) return 'The date must be in the future';
+  if (day <= startOfDay(today)) return t('vulnerabilities.riskExpiry.future');
   if (day > startOfDay(addDays(today, maxDays)))
-    return `A risk acceptance may last at most ${maxDays} days`;
+    return t('vulnerabilities.riskExpiry.max', { days: maxDays });
   return null;
 }

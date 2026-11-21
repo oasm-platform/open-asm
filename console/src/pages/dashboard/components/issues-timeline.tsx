@@ -1,5 +1,7 @@
 'use client';
 
+import { useT } from '@/lib/i18n-dictionary';
+
 import clsx from 'clsx';
 import { format } from 'date-fns';
 import { Bug } from 'lucide-react';
@@ -17,13 +19,13 @@ import { useStatisticControllerGetIssuesTimeline } from '@/services/apis/gen/que
 import { FastScanDialog } from '../../vulnerabilities/components/fast-scan-dialog';
 import { IssuesTimelineSkeleton } from './dashboard-skeleton';
 
-const chartConfig = {
-  vuls: {
-    label: 'Open vulnerabilities',
-  },
-} satisfies ChartConfig;
-
 export default function IssuesTimeline() {
+  const t = useT();
+  const chartConfig = {
+    vuls: {
+      label: t('dashboard.timeline.series'),
+    },
+  } satisfies ChartConfig;
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -38,7 +40,7 @@ export default function IssuesTimeline() {
   const chartData =
     data?.data?.map((item) => ({
       ...item,
-      date: item.createdAt ? format(new Date(item.createdAt), 'MMM dd') : 'N/A',
+      date: item.createdAt ? format(new Date(item.createdAt), 'MMM dd') : t('dashboard.timeline.notAvailable'),
     })) || [];
 
   // The series always has today's point, so "no data" means nothing was
@@ -52,7 +54,7 @@ export default function IssuesTimeline() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Bug className="h-5 w-5 text-primary" />
-          Vulnerability trend
+          {t('dashboard.timeline.title')}
         </CardTitle>
       </CardHeader>
 
@@ -60,7 +62,7 @@ export default function IssuesTimeline() {
         {!hasData && !isLoading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center z-20 gap-3 bg-background/50 backdrop-blur-sm">
             <p className="text-sm text-muted-foreground">
-              No open vulnerabilities in the last 3 months
+              {t('dashboard.timeline.empty')}
             </p>
             <FastScanDialog />
           </div>

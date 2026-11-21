@@ -14,16 +14,17 @@ import { Loader2, MoreHorizontal, Pencil, Star, Trash2 } from 'lucide-react';
 import { useNavigate, useParams } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import { useT } from '@/lib/i18n-dictionary';
 
 const providerLabels: Record<string, string> = {
   openai: 'OpenAI',
   anthropic: 'Anthropic',
-  custom: 'Custom',
 };
 
 export function AgentDetail() {
   const { id } = useParams({ strict: false });
   const navigate = useNavigate();
+  const t = useT();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -33,6 +34,10 @@ export function AgentDetail() {
   });
 
   const agent = providers.find((a) => a.configId === id);
+  const providerLabel = (providerId: string) =>
+    providerId === 'custom'
+      ? t('agents.form.custom')
+      : (providerLabels[providerId] ?? providerId);
   const isDeleting = deleteConfig.isPending;
   const isSettingPreferred = setPreferredConfig.isPending;
 
@@ -41,11 +46,11 @@ export function AgentDetail() {
       { id: id || '' },
       {
         onSuccess: () => {
-          toast.success('Provider deleted successfully');
+          toast.success(t('agents.provider.deleted'));
           navigate({ to: '/aistudio' });
         },
         onError: (error) => {
-          toast.error('Failed to delete provider');
+          toast.error(t('agents.provider.deleteFailed'));
           console.error('Error deleting provider:', error);
         },
       },
@@ -57,10 +62,10 @@ export function AgentDetail() {
       { id: id || '' },
       {
         onSuccess: () => {
-          toast.success('Preferred provider updated');
+          toast.success(t('agents.provider.preferredUpdated'));
         },
         onError: (error) => {
-          toast.error('Failed to set preferred provider');
+          toast.error(t('agents.provider.preferredFailed'));
           console.error('Error setting preferred:', error);
         },
       },
@@ -82,13 +87,12 @@ export function AgentDetail() {
   if (!agent) {
     return (
       <div className="text-center py-12">
-        <h2 className="text-xl font-semibold">Provider not found</h2>
+        <h2 className="text-xl font-semibold">{t('agents.provider.notFound')}</h2>
         <p className="text-muted-foreground mt-2">
-          The provider you&apos;re looking for doesn&apos;t exist or you
-          don&apos;t have permission to view it.
+          {t('agents.provider.notFoundDescription')}
         </p>
         <Button className="mt-4" onClick={() => window.history.back()}>
-          Go back
+          {t('agents.provider.goBack')}
         </Button>
       </div>
     );
@@ -111,7 +115,7 @@ export function AgentDetail() {
               ) : (
                 <Star className="mr-2 h-4 w-4" />
               )}
-              Set Preferred
+              {t('agents.provider.setPreferred')}
             </Button>
           )}
           <DropdownMenu>
@@ -123,11 +127,11 @@ export function AgentDetail() {
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={handleEdit}>
                 <Pencil className="mr-2 h-4 w-4" />
-                <span>Edit</span>
+                <span>{t('common.edit')}</span>
               </DropdownMenuItem>
               <ConfirmDialog
-                title="Delete Provider"
-                description={`Are you sure you want to delete this ${providerLabels[agent.providerId] ?? agent.providerId} configuration? This action cannot be undone.`}
+                title={t('agents.provider.deleteTitle')}
+                description={t('agents.provider.deleteDescription', { provider: providerLabel(agent.providerId) })}
                 onConfirm={handleDelete}
                 trigger={
                   <DropdownMenuItem
@@ -140,11 +144,11 @@ export function AgentDetail() {
                     ) : (
                       <Trash2 className="mr-2 h-4 w-4 text-red-600" />
                     )}
-                    <span className="text-red-600">Delete</span>
+                    <span className="text-red-600">{t('common.delete')}</span>
                   </DropdownMenuItem>
                 }
-                confirmText="Delete"
-                cancelText="Cancel"
+                confirmText={t('common.delete')}
+                cancelText={t('common.cancel')}
                 disabled={isDeleting}
               />
             </DropdownMenuContent>
@@ -157,11 +161,11 @@ export function AgentDetail() {
           <div className="flex items-center gap-4 mb-6">
             <div>
               <h1 className="text-2xl font-bold">
-                {providerLabels[agent.providerId] ?? agent.providerId}
+                {providerLabel(agent.providerId)}
               </h1>
               <div className="flex items-center gap-2 mt-1">
                 <Badge variant={agent.isPreferred ? 'default' : 'secondary'}>
-                  {agent.isPreferred ? 'Preferred' : 'Active'}
+                  {agent.isPreferred ? t('agents.provider.preferred') : t('agents.provider.active')}
                 </Badge>
                 <span className="text-muted-foreground text-sm">
                   {agent.model}
@@ -174,28 +178,28 @@ export function AgentDetail() {
             <div className="space-y-4">
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground">
-                  Provider Type
+                  {t('agents.provider.type')}
                 </h3>
                 <p className="mt-1">
-                  {providerLabels[agent.providerId] ?? agent.providerId}
+                  {providerLabel(agent.providerId)}
                 </p>
               </div>
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground">
-                  Model
+                  {t('agents.provider.model')}
                 </h3>
                 <p className="mt-1">{agent.model}</p>
               </div>
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground">
-                  API Key
+                  {t('agents.provider.apiKey')}
                 </h3>
                 <p className="mt-1 font-mono">{agent.apiKeyMasked}</p>
               </div>
               {agent.apiUrl && (
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground">
-                    API Endpoint
+                    {t('agents.provider.apiEndpoint')}
                   </h3>
                   <p className="mt-1 font-mono text-sm">{agent.apiUrl}</p>
                 </div>
@@ -204,30 +208,30 @@ export function AgentDetail() {
             <div className="space-y-4">
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground">
-                  Connected
+                  {t('agents.provider.connectedAt')}
                 </h3>
                 <p className="mt-1">
                   {agent.createdAt
                     ? format(new Date(agent.createdAt), 'MMM dd, yyyy HH:mm')
-                    : 'N/A'}
+                    : t('agents.provider.notAvailable')}
                 </p>
               </div>
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground">
-                  Last Updated
+                  {t('agents.provider.lastUpdated')}
                 </h3>
                 <p className="mt-1">
                   {agent.updatedAt
                     ? format(new Date(agent.updatedAt), 'MMM dd, yyyy HH:mm')
-                    : 'N/A'}
+                    : t('agents.provider.notAvailable')}
                 </p>
               </div>
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground">
-                  Status
+                  {t('common.status')}
                 </h3>
                 <p className="mt-1">
-                  {agent.isPreferred ? 'Preferred Provider' : 'Active'}
+                  {agent.isPreferred ? t('agents.provider.preferredProvider') : t('agents.provider.active')}
                 </p>
               </div>
             </div>

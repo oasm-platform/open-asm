@@ -53,6 +53,7 @@ import { TemplateTabs } from './template-tabs';
 import { nucleiSchema } from '../nuclei-schema';
 import { readApiError, toastStorageFull } from '../template-errors';
 import { readTemplateMeta } from '../template-meta';
+import { useT } from '@/lib/i18n-dictionary';
 
 // Server-side cap on template size (TemplatesService).
 const MAX_TEMPLATE_BYTES = 256 * 1024;
@@ -74,6 +75,7 @@ function nameFromContent(content: string): string {
 }
 
 function TemplatePane({ tab }: { tab: TemplateTab }) {
+  const t = useT();
   const { hasPermission } = usePermission();
   const { resolvedTheme } = useTheme();
   const navigate = useNavigate();
@@ -140,7 +142,7 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
       } else if (status === 400 && message) {
         setYamlError(message);
       } else if (status === 413) {
-        toast.error('Template is too large (256 KB maximum)');
+        toast.error(t('templates.editor.tooLarge'));
       } else {
         handleServerError(error);
       }
@@ -158,7 +160,7 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
       update(tab.id, formatted);
       setYamlError(null);
     } catch {
-      toast.error('Fix the YAML errors before formatting');
+      toast.error(t('templates.editor.fixYaml'));
     }
   };
 
@@ -181,26 +183,26 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
   );
 
   const owner =
-    data?.artifact.createdBy?.name ?? 'another member';
+    data?.artifact.createdBy?.name ?? t('templates.editor.anotherMember');
   const status = tab.readOnly
-    ? `Shared by ${owner} · read-only`
+    ? t('templates.editor.sharedBy', { owner })
     : readOnly
-      ? 'Read-only'
+      ? t('templates.editor.readOnly')
       : saving
-        ? 'Saving…'
+        ? t('templates.editor.saving')
         : dirty
-          ? 'Unsaved changes'
-          : 'Saved';
+          ? t('templates.editor.unsaved')
+          : t('templates.editor.saved');
   // Esc then Tab leaves the editor; CodeMirror keeps Tab for indentation.
   const extensions = useMemo(
     () => [
       // YAML language plus Nuclei-schema autocomplete, hover docs and lint.
       yamlSchema(nucleiSchema),
       EditorView.contentAttributes.of({
-        'aria-label': `${tab.name} YAML. Press Escape then Tab to leave the editor.`,
+        'aria-label': t('templates.editor.ariaLabel', { name: tab.name }),
       }),
     ],
-    [tab.name],
+    [tab.name, t],
   );
 
   // Parsed off the typing path: a 256 KB template would lag every keystroke.
@@ -248,7 +250,7 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
             file={tab.artifactId ? data?.artifact : undefined}
             align="end"
             trigger={
-              <Button size="sm" variant="outline" aria-label="More actions">
+              <Button size="sm" variant="outline" aria-label={t('templates.editor.moreActions')}>
                 <MoreHorizontal />
               </Button>
             }
@@ -257,10 +259,10 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
             {isMobile && (
               <>
                 <DropdownMenuItem disabled={formatDisabled} onSelect={() => void format()}>
-                  Format
+                  {t('templates.editor.format')}
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled={!canSave} onSelect={() => void save()}>
-                  {saving ? 'Saving…' : 'Save'}
+                  {saving ? t('templates.editor.saving') : t('templates.editor.save')}
                 </DropdownMenuItem>
               </>
             )}
@@ -273,7 +275,7 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
                 onClick={() => void format()}
                 disabled={formatDisabled}
               >
-                Format
+                {t('templates.editor.format')}
               </Button>
               <Button
                 size="sm"
@@ -281,7 +283,7 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
                 onClick={() => void save()}
                 disabled={!canSave}
               >
-                {saving ? 'Saving…' : 'Save'}
+                {saving ? t('templates.editor.saving') : t('templates.editor.save')}
               </Button>
             </>
           )}
@@ -308,9 +310,9 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
       )}
       {loadFailed ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
-          <p>Could not load this template.</p>
+          <p>{t('templates.editor.loadError')}</p>
           <Button size="sm" variant="outline" onClick={() => void refetch()}>
-            Retry
+            {t('common.retry')}
           </Button>
         </div>
       ) : loading ? (
@@ -348,16 +350,18 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
             >
               <CircleAlert className="size-3.5 shrink-0" />
               <span className="truncate">
-                {meta.error.line ? `YAML error on line ${meta.error.line}` : 'YAML error'}
+                {meta.error.line
+                  ? t('templates.editor.yamlErrorLine', { line: meta.error.line })
+                  : t('templates.editor.yamlError')}
               </span>
             </span>
           ) : (
             <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-              <CircleCheck className="size-3.5" /> Valid YAML
+              <CircleCheck className="size-3.5" /> {t('templates.editor.validYaml')}
             </span>
           )}
           <span className="whitespace-nowrap">
-            Ln {cursor.line}, Col {cursor.col}
+            {t('templates.editor.cursor', { line: cursor.line, col: cursor.col })}
           </span>
           <span
             className={cn('whitespace-nowrap', bytes > MAX_TEMPLATE_BYTES && 'text-destructive')}
@@ -376,11 +380,12 @@ function TemplatePane({ tab }: { tab: TemplateTab }) {
 }
 
 export function TemplateEditor({ onShowList }: { onShowList?: () => void } = {}) {
+  const t = useT();
   const { tabs, activeId, activate, close, discardDirty } = useTemplateTabs();
   const queryClient = useQueryClient();
   const { isMobile } = useSidebar();
   const [closing, setClosing] = useState<TemplateTab | null>(null);
-  const active = tabs.find((t) => t.id === activeId);
+  const active = tabs.find((tab) => tab.id === activeId);
   const anyDirty = tabs.some(isDirty);
 
   const blocker = useBlocker({
@@ -405,14 +410,14 @@ export function TemplateEditor({ onShowList }: { onShowList?: () => void } = {})
         onClose={requestClose}
         leading={
           isMobile ? (
-            <SidebarTrigger className="m-1" aria-label="Browse templates" />
+            <SidebarTrigger className="m-1" aria-label={t('templates.editor.browse')} />
           ) : onShowList ? (
             <Button
               size="icon"
               variant="ghost"
               className="m-1 size-7"
-              aria-label="Show template list"
-              title="Show template list"
+              aria-label={t('templates.editor.showList')}
+              title={t('templates.editor.showList')}
               onClick={onShowList}
             >
               <PanelLeftOpen />
@@ -428,9 +433,9 @@ export function TemplateEditor({ onShowList }: { onShowList?: () => void } = {})
       <ConfirmDialog
         open={blocker.status === 'blocked'}
         onOpenChange={(o) => !o && blocker.reset?.()}
-        title="Discard unsaved changes?"
-        description="You have unsaved template changes. Leave this page anyway?"
-        confirmText="Discard"
+        title={t('templates.editor.discardTitle')}
+        description={t('templates.editor.discardLeave')}
+        confirmText={t('templates.editor.discard')}
         onConfirm={() => {
           discardDirty();
           blocker.proceed?.();
@@ -439,9 +444,11 @@ export function TemplateEditor({ onShowList }: { onShowList?: () => void } = {})
       <ConfirmDialog
         open={!!closing}
         onOpenChange={(o) => !o && setClosing(null)}
-        title="Discard unsaved changes?"
-        description={`${closing?.name ?? 'This template'} has changes that are not saved.`}
-        confirmText="Discard"
+        title={t('templates.editor.discardTitle')}
+        description={t('templates.editor.discardTab', {
+          name: closing?.name ?? t('templates.editor.thisTemplate'),
+        })}
+        confirmText={t('templates.editor.discard')}
         onConfirm={() => closing && close(closing.id)}
       />
     </div>
@@ -450,6 +457,7 @@ export function TemplateEditor({ onShowList }: { onShowList?: () => void } = {})
 
 /** No open tab: every way to start a template, plus a drop target for YAML files. */
 function EmptyState() {
+  const t = useT();
   const { hasPermission } = usePermission();
   const { openNew } = useTemplateTabs();
   const { isMobile, setOpenMobile } = useSidebar();
@@ -478,29 +486,29 @@ function EmptyState() {
       }}
     >
       <p className="font-medium text-foreground">
-        {canWrite ? 'Start a template' : 'Select a template to view it'}
+        {canWrite ? t('templates.editor.start') : t('templates.editor.selectToView')}
       </p>
       {canWrite && (
         <div className="flex flex-wrap justify-center gap-2">
           <Button variant="outline" className={tile} onClick={openNew}>
             <FilePlus className="size-5" />
-            Blank
+            {t('templates.editor.blank')}
           </Button>
           <AiGenButton className={tile}>
             <Sparkles className="size-5" />
-            AI gen
+            {t('templates.aiGen.label')}
           </AiGenButton>
           <Button variant="outline" className={tile} onClick={pick}>
             <Upload className="size-5" />
-            Upload YAML
+            {t('templates.editor.uploadYaml')}
           </Button>
           {input}
         </div>
       )}
-      {canWrite && <p className="text-xs">Or drop .yaml files here</p>}
+      {canWrite && <p className="text-xs">{t('templates.editor.dropHint')}</p>}
       {isMobile && (
         <Button size="sm" variant="outline" onClick={() => setOpenMobile(true)}>
-          Browse templates
+          {t('templates.editor.browse')}
         </Button>
       )}
     </div>

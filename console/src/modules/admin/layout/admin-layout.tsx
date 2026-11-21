@@ -1,6 +1,7 @@
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { Briefcase, Info, KeyRound, Mail, Palette, User } from 'lucide-react';
 import type { JSX, ReactNode } from 'react';
+import { type TFunction, useT } from '@/lib/i18n-dictionary';
 import { HeaderBar } from '@/components/common/layout/header-bar';
 import { AppSidebar, type NavGroup } from '@/components/common/layout/menu-bar';
 
@@ -8,46 +9,46 @@ interface AdminLayoutProps {
   children: ReactNode;
 }
 
-const adminMenu: NavGroup[] = [
+const adminMenu = (t: TFunction): NavGroup[] => [
   {
-    title: 'Platform',
+    title: t('admin.nav.platform'),
     url: '#',
     roles: ['admin'],
     items: [
       {
-        title: 'Users',
+        title: t('admin.nav.users'),
         icon: <User />,
         url: '/admin/users',
       },
       {
-        title: 'Workspaces',
+        title: t('admin.nav.workspaces'),
         icon: <Briefcase />,
         url: '/admin/workspaces',
       },
     ],
   },
   {
-    title: 'System',
+    title: t('admin.nav.system'),
     url: '#',
     roles: ['admin'],
     items: [
       {
-        title: 'Brand name and logo',
+        title: t('admin.nav.brand'),
         icon: <Palette />,
         url: '/admin/brand',
       },
       {
-        title: 'Authentication',
+        title: t('admin.nav.authentication'),
         icon: <KeyRound />,
         url: '/admin/authentication',
       },
       {
-        title: 'Mail server',
+        title: t('admin.nav.mailServer'),
         icon: <Mail />,
         url: '/admin/mail-server',
       },
       {
-        title: 'About',
+        title: t('admin.nav.about'),
         icon: <Info />,
         url: '/admin/about',
       },
@@ -58,12 +59,13 @@ const adminMenu: NavGroup[] = [
 export default function AdminLayout({
   children,
 }: AdminLayoutProps): JSX.Element {
+  const t = useT();
   return (
     <SidebarProvider>
       <AppSidebar
-        groups={adminMenu}
+        groups={adminMenu(t)}
         primary={false}
-        title="Admin"
+        title={t('admin.nav.title')}
         showSwitchWorkspace={false}
       />
       <SidebarInset>

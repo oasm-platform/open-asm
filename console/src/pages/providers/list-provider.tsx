@@ -1,5 +1,8 @@
 import { type ColumnDef } from '@tanstack/react-table';
 import { useNavigate } from '@tanstack/react-router';
+import { useMemo } from 'react';
+
+import { type TFunction, useT } from '@/lib/i18n-dictionary';
 
 import { DataTable } from '@/components/ui/data-table';
 import { useProvidersControllerGetManyProviders } from '@/services/apis/gen/queries';
@@ -9,17 +12,17 @@ import { OpenLink } from '@/components/ui/open-link';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import type { ToolProvider } from '@/services/apis/gen/queries';
 
-const providerColumns: ColumnDef<ToolProvider>[] = [
+const getProviderColumns = (t: TFunction): ColumnDef<ToolProvider>[] => [
   {
     accessorKey: 'name',
-    header: 'Name',
+    header: t('common.name'),
     cell: ({ row }) => (
       <div className="font-medium">{row.getValue('name')}</div>
     ),
   },
   {
     accessorKey: 'code',
-    header: 'Code',
+    header: t('providers.list.code'),
     cell: ({ row }) => {
       const value: string = row.getValue('code');
       return <div className="text-gray-500">{value}</div>;
@@ -27,7 +30,7 @@ const providerColumns: ColumnDef<ToolProvider>[] = [
   },
   {
     accessorKey: 'company',
-    header: 'Company',
+    header: t('providers.form.company'),
     cell: ({ row }) => {
       const value: string = row.getValue('company');
       return <div>{value || '-'}</div>;
@@ -35,14 +38,14 @@ const providerColumns: ColumnDef<ToolProvider>[] = [
   },
   {
     accessorKey: 'websiteUrl',
-    header: 'Website',
+    header: t('providers.list.website'),
     cell: ({ row }) => {
       const value: string = row.getValue('websiteUrl');
       return (
         <div className="text-blue-500 hover:underline">
           {value ? (
             <OpenLink href={value} target="_blank" rel="noopener noreferrer">
-              Visit
+              {t('providers.list.visit')}
             </OpenLink>
           ) : (
             '-'
@@ -53,7 +56,7 @@ const providerColumns: ColumnDef<ToolProvider>[] = [
   },
   {
     accessorKey: 'isActive',
-    header: 'Status',
+    header: t('common.status'),
     cell: ({ row }) => {
       const value: boolean = row.getValue('isActive');
       return (
@@ -62,7 +65,7 @@ const providerColumns: ColumnDef<ToolProvider>[] = [
             variant={value ? 'default' : 'destructive'}
             className="text-xs font-medium"
           >
-            {value ? 'Active' : 'Inactive'}
+            {value ? t('providers.list.active') : t('providers.list.inactive')}
           </Badge>
         </div>
       );
@@ -71,6 +74,8 @@ const providerColumns: ColumnDef<ToolProvider>[] = [
 ];
 
 export function ListProviders() {
+  const t = useT();
+  const providerColumns = useMemo(() => getProviderColumns(t), [t]);
   const navigate = useNavigate();
   const {
     tableParams: { page, pageSize, sortBy, sortOrder, filter },

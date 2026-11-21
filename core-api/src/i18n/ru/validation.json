@@ -1,0 +1,12 @@
+{
+  "NOT_EMPTY": "{property} не может быть пустым",
+  "IS_STRING": "{property} должно быть строкой",
+  "IS_EMAIL": "{property} должно быть адресом электронной почты",
+  "MIN_LENGTH": "{property} слишком короткое (минимум {constraints.0} симв.)",
+  "MAX_LENGTH": "{property} слишком длинное (максимум {constraints.0} симв.)",
+  "IS_UUID": "{property} должно быть корректным идентификатором",
+  "IS_ARRAY": "{property} должно быть списком",
+  "ARRAY_NOT_EMPTY": "{property} не может быть пустым",
+  "MATCHES": "{property} имеет неверный формат",
+  "PERMISSION_KEY": "Неверный ключ разрешения. Используйте \"*\" или \"domain.action\" (например, target.read)"
+}

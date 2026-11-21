@@ -1,5 +1,8 @@
+import { differenceInSeconds } from 'date-fns';
+import { formatDate } from '@/lib/date-locale';
 import { DataTable } from '@/components/ui/data-table';
 import JobStatusBadge from '@/components/ui/job-status';
+import { t, useT } from '@/lib/i18n-dictionary';
 import {
   JobRunType,
   VulnerabilityProvenance,
@@ -10,7 +13,6 @@ import {
 import type { ColumnDef } from '@tanstack/react-table';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import type { ProjectDetailSearch } from '@/routes/_authed/projects/$id/$tab';
-import dayjs from 'dayjs';
 import { CalendarDays, Clock } from 'lucide-react';
 import { useState } from 'react';
 import { FilterSelect } from '../components/filter-select';
@@ -20,8 +22,8 @@ const PAGE_SIZE = 20;
 
 /** "4m 14s", as on the jobs registry's run page. */
 function formatDuration(run: ProjectRunDto): string {
-  if (!run.isCompleted) return 'Running';
-  const total = Math.max(0, dayjs(run.updatedAt).diff(dayjs(run.createdAt), 'second'));
+  if (!run.isCompleted) return t('projects.runs.running');
+  const total = Math.max(0, differenceInSeconds(new Date(run.updatedAt), new Date(run.createdAt)));
   const hours = Math.floor(total / 3600);
   const minutes = Math.floor((total % 3600) / 60);
   const parts: string[] = [];
@@ -38,6 +40,7 @@ export function RunsTab({
   projectId: string;
   workflows: ProjectWorkflow[];
 }) {
+  const t = useT();
   const navigate = useNavigate();
   const search = useSearch({ strict: false }) as ProjectDetailSearch;
   const [page, setPage] = useState(1);
@@ -58,7 +61,7 @@ export function RunsTab({
   const columns: ColumnDef<ProjectRunDto>[] = [
     {
       accessorKey: 'workflowName',
-      header: 'Run',
+      header: t('projects.detail.run'),
       cell: ({ row }) => (
         <span className="flex items-center gap-2">
           <JobStatusBadge status={row.original.status} />
@@ -71,7 +74,7 @@ export function RunsTab({
     },
     {
       id: 'trigger',
-      header: 'Triggered by',
+      header: t('projects.runs.triggeredBy'),
       cell: ({ row }) => (
         <span className="flex flex-col">
           {runTriggerLabel(row.original.jobRunType, row.original.triggerEvent)}
@@ -82,8 +85,10 @@ export function RunsTab({
               className="text-xs text-muted-foreground hover:underline"
               onClick={(e) => e.stopPropagation()}
             >
-              after {workflowLabel({ name: row.original.causedByWorkflowName ?? '' })} #
-              {row.original.causedByRunId.slice(0, 6)}
+              {t('projects.runs.after', {
+                workflow: workflowLabel({ name: row.original.causedByWorkflowName ?? '' }),
+                run: row.original.causedByRunId.slice(0, 6),
+              })}
             </Link>
           )}
         </span>
@@ -91,26 +96,29 @@ export function RunsTab({
     },
     {
       accessorKey: 'scopeSize',
-      header: 'Scope',
+      header: t('projects.create.steps.scope'),
       cell: ({ row }) => (
         <span className="tabular-nums">{assetCount(row.original.scopeSize)}</span>
       ),
     },
     {
       id: 'steps',
-      header: 'Steps',
+      header: t('projects.runs.steps'),
       cell: ({ row }) => (
         <span className="tabular-nums">
           {row.original.stepsDone}/{row.original.stepsTotal}
           {row.original.stepsFailed > 0 && (
-            <span className="text-destructive"> · {row.original.stepsFailed} failed</span>
+            <span className="text-destructive">
+              {' · '}
+              {t('projects.runs.failed', { n: row.original.stepsFailed })}
+            </span>
           )}
         </span>
       ),
     },
     {
       id: 'found',
-      header: 'Found',
+      header: t('projects.runs.found'),
       cell: ({ row }) =>
         row.original.newVulnerabilities + row.original.recurringVulnerabilities ===
         0 ? (
@@ -125,12 +133,12 @@ export function RunsTab({
                 className="text-primary hover:underline"
                 onClick={(e) => e.stopPropagation()}
               >
-                +{row.original.newVulnerabilities} new
+                {t('projects.list.newBadge', { n: row.original.newVulnerabilities })}
               </Link>
             )}
             {row.original.recurringVulnerabilities > 0 && (
               <span className="text-muted-foreground">
-                {row.original.recurringVulnerabilities} recurring
+                {t('projects.overview.recurring', { n: row.original.recurringVulnerabilities })}
               </span>
             )}
           </span>
@@ -138,17 +146,17 @@ export function RunsTab({
     },
     {
       accessorKey: 'createdAt',
-      header: 'Started',
+      header: t('projects.runs.started'),
       cell: ({ row }) => (
         <span className="flex items-center gap-2 tabular-nums text-muted-foreground">
           <CalendarDays className="size-4" />
-          {dayjs(row.original.createdAt).format('YYYY-MM-DD HH:mm:ss')}
+          {formatDate(row.original.createdAt, 'yyyy-MM-dd HH:mm:ss')}
         </span>
       ),
     },
     {
       id: 'duration',
-      header: 'Duration',
+      header: t('projects.runs.duration'),
       cell: ({ row }) => (
         <span className="flex items-center gap-2 tabular-nums text-muted-foreground">
           <Clock className="size-4" />
@@ -161,17 +169,17 @@ export function RunsTab({
   const filters = [
     <FilterSelect
       key="trigger"
-      label="Triggered by"
+      label={t('projects.runs.triggeredBy')}
       value={runType}
       onValueChange={(value) => {
         setRunType(value as JobRunType | 'all');
         setPage(1);
       }}
       options={[
-        { value: 'all', label: 'All triggers' },
-        { value: JobRunType.manual, label: 'Manual', dot: 'bg-blue-500' },
-        { value: JobRunType.scheduled, label: 'Schedule', dot: 'bg-purple-500' },
-        { value: JobRunType.event, label: 'Event', dot: 'bg-orange-500' },
+        { value: 'all', label: t('projects.runs.allTriggers') },
+        { value: JobRunType.manual, label: t('projects.runTrigger.manual'), dot: 'bg-blue-500' },
+        { value: JobRunType.scheduled, label: t('projects.runTrigger.schedule'), dot: 'bg-purple-500' },
+        { value: JobRunType.event, label: t('projects.runTrigger.event'), dot: 'bg-orange-500' },
       ]}
     />,
   ];
@@ -179,7 +187,7 @@ export function RunsTab({
     filters.unshift(
       <FilterSelect
         key="workflow"
-        label="Workflow"
+        label={t('projects.schedule.colWorkflow')}
         value={search.workflow ?? 'all'}
         onValueChange={(value) => {
           setPage(1);
@@ -191,7 +199,7 @@ export function RunsTab({
           });
         }}
         options={[
-          { value: 'all', label: 'All workflows' },
+          { value: 'all', label: t('projects.runs.allWorkflows') },
           ...workflows.map((binding) => ({
             value: binding.id,
             label: workflowLabel(binding.workflow),
@@ -217,7 +225,7 @@ export function RunsTab({
       }}
       filterComponents={filters}
       onRowClick={(row) => navigate({ to: '/jobs/runs/$id', params: { id: row.id } })}
-      emptyMessage="No runs yet"
+      emptyMessage={t('projects.runs.empty')}
     />
   );
 }

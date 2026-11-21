@@ -9,16 +9,20 @@ import {
 import { useNavigate } from '@tanstack/react-router';
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
+import { useMemo } from 'react';
+import { type TFunction, useT } from '@/lib/i18n-dictionary';
 
-const workspaceColumns: ColumnDef<AdminWorkspaceDto>[] = [
+const buildWorkspaceColumns = (
+  t: TFunction,
+): ColumnDef<AdminWorkspaceDto>[] => [
   {
     accessorKey: 'name',
-    header: 'Name',
+    header: t('common.name'),
     enableSorting: true,
   },
   {
     id: 'owner',
-    header: 'Owner',
+    header: t('admin.workspaces.col.owner'),
     cell: ({ row }) => {
       const owner = row.original.owner;
       if (!owner) return <span className="text-muted-foreground">—</span>;
@@ -42,25 +46,29 @@ const workspaceColumns: ColumnDef<AdminWorkspaceDto>[] = [
   },
   {
     accessorKey: 'targetCount',
-    header: 'Targets',
+    header: t('admin.workspaces.col.targets'),
   },
   {
     accessorKey: 'memberCount',
-    header: 'Members',
+    header: t('admin.workspaces.col.members'),
   },
   {
     accessorKey: 'archivedAt',
-    header: 'Status',
+    header: t('common.status'),
     cell: ({ row }) =>
       row.original.archivedAt ? (
-        <Badge variant="outline">Archived</Badge>
+        <Badge variant="outline">
+          {t('admin.detail.status.archived')}
+        </Badge>
       ) : (
-        <Badge variant="secondary">Active</Badge>
+        <Badge variant="secondary">
+          {t('admin.detail.status.active')}
+        </Badge>
       ),
   },
   {
     accessorKey: 'createdAt',
-    header: 'Created',
+    header: t('admin.workspaces.col.created'),
     enableSorting: true,
     cell: ({ row }) => format(new Date(row.original.createdAt), 'PP'),
   },
@@ -72,6 +80,8 @@ export function ListWorkspaces() {
     tableHandlers: { setPage, setPageSize, setParams, setFilter },
   } = useServerDataTable();
   const navigate = useNavigate();
+  const t = useT();
+  const workspaceColumns = useMemo(() => buildWorkspaceColumns(t), [t]);
 
   const { data, isLoading } = useAdminWorkspacesControllerGetWorkspaces({
     page,
@@ -99,7 +109,7 @@ export function ListWorkspaces() {
       filterValue={filter}
       onFilterChange={setFilter}
       totalItems={data?.total}
-      emptyMessage="No workspaces found"
+      emptyMessage={t('admin.workspaces.empty')}
       onRowClick={(workspace) =>
         navigate({ to: '/admin/workspaces/$id', params: { id: workspace.id } })
       }

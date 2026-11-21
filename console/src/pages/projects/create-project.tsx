@@ -26,6 +26,7 @@ import {
   StepperTrigger,
 } from '@/components/reui/stepper';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import {
   useAssetsControllerGetHostAssets,
@@ -62,10 +63,10 @@ import {
 import { apiErrorMessage, pipelineSteps, toToolInputs } from './project-utils';
 
 const STEPS = [
-  { title: 'Info', icon: <FileTextIcon className="size-4" /> },
-  { title: 'Scope', icon: <ScanSearchIcon className="size-4" /> },
-  { title: 'Pipeline', icon: <WorkflowIcon className="size-4" /> },
-  { title: 'Triggers', icon: <ZapIcon className="size-4" /> },
+  { titleKey: 'projects.create.steps.info', icon: <FileTextIcon className="size-4" /> },
+  { titleKey: 'projects.create.steps.scope', icon: <ScanSearchIcon className="size-4" /> },
+  { titleKey: 'projects.create.steps.pipeline', icon: <WorkflowIcon className="size-4" /> },
+  { titleKey: 'projects.create.steps.triggers', icon: <ZapIcon className="size-4" /> },
 ];
 
 /** Host row as returned by the host-assets query (/api/assets/host). */
@@ -76,6 +77,7 @@ interface HostAssetRow {
 }
 
 export function CreateProject() {
+  const t = useT();
   const navigate = useNavigate();
 
   const [step, setStep] = useState(0);
@@ -154,7 +156,7 @@ export function CreateProject() {
           });
         },
         onError: (error) => {
-          toast.error(apiErrorMessage(error, 'Failed to create project'));
+          toast.error(apiErrorMessage(error, t('projects.create.failed')));
         },
       },
     );
@@ -191,7 +193,7 @@ export function CreateProject() {
                 return next;
               });
             }}
-            aria-label="Select all"
+            aria-label={t('projects.create.selectAll')}
           />
         );
       },
@@ -199,21 +201,21 @@ export function CreateProject() {
         <Checkbox
           checked={hostIds.has(row.original.id)}
           onCheckedChange={() => setHostIds((prev) => toggleId(prev, row.original.id))}
-          aria-label="Select row"
+          aria-label={t('projects.create.selectRow')}
         />
       ),
       enableSorting: false,
       enableHiding: false,
     },
-    { accessorKey: 'host', header: 'Host' },
-    { accessorKey: 'assetCount', header: 'Services' },
+    { accessorKey: 'host', header: t('projects.create.host') },
+    { accessorKey: 'assetCount', header: t('projects.create.services') },
   ];
 
   return (
     <Page
-      title="Create project"
+      title={t('projects.create.title')}
       headerClassName="mx-auto w-full max-w-4xl"
-      description="Choose the assets to keep scanned, the pipeline that scans them, and when it runs"
+      description={t('projects.create.description')}
       permission="project.write"
     >
       <div className="h-full overflow-y-auto">
@@ -230,7 +232,7 @@ export function CreateProject() {
               <StepperNav className="gap-3">
                 {STEPS.map((stepItem, i) => (
                   <StepperItem
-                    key={stepItem.title}
+                    key={stepItem.titleKey}
                     step={i + 1}
                     className="relative flex-1 items-start"
                   >
@@ -240,10 +242,10 @@ export function CreateProject() {
                       </StepperIndicator>
                       <div className="flex flex-col items-start gap-1">
                         <div className="text-muted-foreground text-[10px] font-semibold uppercase">
-                          Step {i + 1}
+                          {t('projects.create.stepN', { n: i + 1 })}
                         </div>
                         <StepperTitle className="group-data-[state=inactive]/step:text-muted-foreground text-start text-base font-semibold">
-                          {stepItem.title}
+                          {t(stepItem.titleKey)}
                         </StepperTitle>
                       </div>
                     </StepperTrigger>
@@ -260,21 +262,21 @@ export function CreateProject() {
               {step === 0 && (
                 <div className="flex max-w-md flex-col gap-5">
                   <div className="flex flex-col gap-2">
-                    <Label htmlFor="project-name">Name</Label>
+                    <Label htmlFor="project-name">{t('common.name')}</Label>
                     <Input
                       id="project-name"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="e.g. Production hosts"
+                      placeholder={t('projects.create.namePlaceholder')}
                     />
                   </div>
                   <div className="flex flex-col gap-2">
-                    <Label htmlFor="project-description">Description</Label>
+                    <Label htmlFor="project-description">{t('common.description')}</Label>
                     <Textarea
                       id="project-description"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      placeholder="What this project covers"
+                      placeholder={t('projects.create.descriptionPlaceholder')}
                       rows={3}
                     />
                   </div>
@@ -284,9 +286,9 @@ export function CreateProject() {
               {step === 1 && (
                 <Tabs defaultValue="rules">
                   <TabsList>
-                    <TabsTrigger value="rules">By rules</TabsTrigger>
+                    <TabsTrigger value="rules">{t('projects.create.byRules')}</TabsTrigger>
                     <TabsTrigger value="hosts" badge={hostIds.size || undefined}>
-                      Pick by hand
+                      {t('projects.create.pickByHand')}
                     </TabsTrigger>
                   </TabsList>
                   <TabsContent value="rules" className="pt-3">
@@ -323,7 +325,7 @@ export function CreateProject() {
                           {} as Record<string, boolean>,
                         ),
                       }}
-                      emptyMessage="No hosts found"
+                      emptyMessage={t('projects.create.noHosts')}
                     />
                   </TabsContent>
                 </Tabs>
@@ -335,27 +337,27 @@ export function CreateProject() {
                   onValueChange={(value) => setPipelineSource(value as 'template' | 'tools')}
                 >
                   <TabsList>
-                    <TabsTrigger value="template">From a template</TabsTrigger>
-                    <TabsTrigger value="tools">Pick tools</TabsTrigger>
+                    <TabsTrigger value="template">{t('projects.create.fromTemplate')}</TabsTrigger>
+                    <TabsTrigger value="tools">{t('projects.create.pickTools')}</TabsTrigger>
                   </TabsList>
                   <TabsContent value="template" className="flex flex-col gap-2 pt-3">
-                    {(templatesQuery.data ?? []).map((t) => (
+                    {(templatesQuery.data ?? []).map((tpl) => (
                       <button
-                        key={t.filePath}
+                        key={tpl.filePath}
                         type="button"
-                        onClick={() => setTemplate(t.filePath)}
-                        aria-pressed={template === t.filePath}
+                        onClick={() => setTemplate(tpl.filePath)}
+                        aria-pressed={template === tpl.filePath}
                         className={cn(
                           'flex flex-col gap-2 rounded-md border p-3 text-left hover:bg-accent/50',
-                          template === t.filePath && 'border-primary bg-primary/5',
+                          template === tpl.filePath && 'border-primary bg-primary/5',
                         )}
                       >
-                        <span className="text-sm font-medium">{t.name}</span>
+                        <span className="text-sm font-medium">{tpl.name}</span>
                         <PipelineSteps
                           steps={pipelineSteps({
-                            name: t.name,
+                            name: tpl.name,
                             jobs: Object.fromEntries(
-                              t.jobs.map((job) => [job.id, { run: job.run, needs: job.needs }]),
+                              tpl.jobs.map((job) => [job.id, { run: job.run, needs: job.needs }]),
                             ),
                           })}
                         />
@@ -369,7 +371,7 @@ export function CreateProject() {
                         role="status"
                       >
                         <LoaderCircleIcon className="size-4 animate-spin" />
-                        Loading installed tools...
+                        {t('projects.create.loadingTools')}
                       </div>
                     ) : tools.length === 0 && installableTools.length === 0 ? (
                       <NoInstalledToolsState />
@@ -393,7 +395,7 @@ export function CreateProject() {
                       checked={runNow}
                       onCheckedChange={(value) => setRunNow(value === true)}
                     />
-                    Run once right after creating
+                    {t('projects.create.runNow')}
                   </label>
                 </div>
               )}
@@ -401,7 +403,7 @@ export function CreateProject() {
 
             <div className="flex items-center justify-between border-t pt-4">
               <Button variant="outline" onClick={() => navigate({ to: '/projects' })}>
-                Cancel
+                {t('common.cancel')}
               </Button>
               <div className="flex items-center gap-2">
                 <Button
@@ -409,10 +411,14 @@ export function CreateProject() {
                   disabled={step === 0}
                   onClick={() => setStep((prev) => prev - 1)}
                 >
-                  Back
+                  {t('common.back')}
                 </Button>
                 <Button disabled={!canNext || isPending} onClick={handleNext}>
-                  {isLastStep ? (isPending ? 'Creating...' : 'Create') : 'Next'}
+                  {isLastStep
+                    ? isPending
+                      ? t('projects.create.creating')
+                      : t('common.create')
+                    : t('common.next')}
                 </Button>
               </div>
             </div>

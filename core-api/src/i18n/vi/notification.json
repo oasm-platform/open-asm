@@ -1,0 +1,9 @@
+{
+  "WORKSPACE_CREATED": "Đã tạo workspace {name}",
+  "VULNERABILITY_ANALYSIS_COMPLETED": "Đã hoàn tất phân tích lỗ hổng cho {name}",
+  "ASSET_NEW_DETECT": "Phát hiện tài sản mới cho {targetValue}: {hosts, plural, =0 {} other {# máy chủ}}{ports, plural, =0 {} other { # cổng}}{services, plural, =0 {} other { # dịch vụ}}{tech, plural, =0 {} other { # công nghệ}}",
+  "SCAN_INCOMPLETE": "Quá trình quét {targetValue} chưa hoàn tất. {details}",
+  "NEW_VULNERABILITY_FOUND": "Phát hiện {count} lỗ hổng mới trên {assetValue}",
+  "WORKSPACE_INVITATION": "{action, select, created {Bạn được mời vào workspace {workspaceName}} accepted {{userName} đã chấp nhận lời mời vào workspace {workspaceName}} declined {{userName} đã từ chối lời mời vào workspace {workspaceName}} other {Lời mời tham gia workspace}}",
+  "NEW_URL_FOUND": "Phát hiện {count} URL mới trên {targetValue}"
+}

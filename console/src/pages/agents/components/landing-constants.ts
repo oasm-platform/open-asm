@@ -7,6 +7,7 @@ import {
   Telescope,
   type LucideIcon,
 } from 'lucide-react';
+import type { TFunction } from '@/lib/i18n-dictionary';
 
 export const CONVERSATION_STARTERS = [
   'How can I help secure your application today?',
@@ -144,3 +145,29 @@ export const AGENT_PROMPT_GROUPS: PromptGroup[] = [
     ],
   },
 ];
+
+/**
+ * Translated copies for display. The English constants above stay the
+ * source of ids and order; keys follow `agents.starters.<mode>.<i>` and
+ * `agents.promptGroups.<id>.label|prompts.<i>`.
+ */
+export function translateStarters(
+  starters: string[],
+  mode: 'ask' | 'agent',
+  t: TFunction,
+): string[] {
+  return starters.map((_, i) => t(`agents.starters.${mode}.${i}`));
+}
+
+export function translatePromptGroups(
+  groups: PromptGroup[],
+  t: TFunction,
+): PromptGroup[] {
+  return groups.map((group) => ({
+    ...group,
+    label: t(`agents.promptGroups.${group.id}.label`),
+    prompts: group.prompts.map((_, i) =>
+      t(`agents.promptGroups.${group.id}.prompts.${i}`),
+    ),
+  }));
+}

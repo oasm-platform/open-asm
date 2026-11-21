@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { useLocation, useMatches } from '@tanstack/react-router';
 import { useMemo } from 'react';
 
@@ -26,6 +27,8 @@ export function useCurrentPage(): CurrentPage | null {
   });
   const pathname = useLocation({ select: (location) => location.pathname });
   const override = usePageTitleOverride();
+  // Route names are translated: a language switch renames the page.
+  const t = useT();
 
   return useMemo(() => {
     if (fullPath === null) return null;
@@ -37,12 +40,13 @@ export function useCurrentPage(): CurrentPage | null {
     );
     // A page names its item; the open tab is added here, so it follows
     // tab switches without each page doing it
-    const tab = route.endsWith('/:tab') ? tabLabel(params.tab) : null;
+    const tab = route.endsWith('/:tab') ? tabLabel(params.tab, route) : null;
     const title = !override
       ? routeLabel(route, params)
       : tab && !override.endsWith(tab)
         ? `${override} · ${tab}`
         : override;
     return { route, path: pathname, params, title };
-  }, [fullPath, paramsJson, pathname, override]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fullPath, paramsJson, pathname, override, t]);
 }

@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useT } from '@/lib/i18n-dictionary';
 import type {
   IssueDetailDto,
   UpdateIssueDto,
@@ -40,6 +41,7 @@ function TagsEditor({
   tags: string[];
   onSave: (tags: string[]) => void;
 }) {
+  const t = useT();
   const joined = tags.join(', ');
   const [value, setValue] = useState(joined);
   useEffect(() => setValue(joined), [joined]);
@@ -48,7 +50,7 @@ function TagsEditor({
       new Set(
         value
           .split(',')
-          .map((t) => t.trim())
+          .map((tag) => tag.trim())
           .filter(Boolean),
       ),
     );
@@ -66,9 +68,9 @@ function TagsEditor({
         </div>
       )}
       <Input
-        aria-label="Tags"
+        aria-label={t('issues.props.tags')}
         className="h-8"
-        placeholder="Add tags, comma separated"
+        placeholder={t('issues.props.tagsPlaceholder')}
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onBlur={commit}
@@ -89,22 +91,23 @@ export function IssueProperties({
   onUpdate: (data: UpdateIssueDto) => void;
   disabled?: boolean;
 }) {
+  const t = useT();
   const due = dueState(issue.dueAt, issue.status);
 
   return (
-    <SideCard title="Properties" testId="issue-properties">
+    <SideCard title={t('issues.props.title')} testId="issue-properties">
       {issue.resolution && (
-        <Row label="Resolution">
+        <Row label={t('issues.props.resolution')}>
           {ISSUE_RESOLUTION_LABELS[issue.resolution]}
         </Row>
       )}
-      <Row label="Priority">
+      <Row label={t('issues.props.priority')}>
         <Select
           value={issue.priority}
           disabled={disabled}
           onValueChange={(v) => onUpdate({ priority: v as IssuePriority })}
         >
-          <SelectTrigger aria-label="Priority" className="h-8">
+          <SelectTrigger aria-label={t('issues.props.priority')} className="h-8">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -116,20 +119,20 @@ export function IssueProperties({
           </SelectContent>
         </Select>
       </Row>
-      <Row label="Assignee">
+      <Row label={t('issues.props.assignee')}>
         <MemberSelect
-          ariaLabel="Assignee"
+          ariaLabel={t('issues.props.assignee')}
           className="h-8"
           value={issue.assignee?.id ?? null}
           disabled={disabled}
           onChange={(assigneeId) => onUpdate({ assigneeId })}
         />
       </Row>
-      <Row label="Due">
+      <Row label={t('issues.props.due')}>
         <div className="flex flex-col gap-0.5">
           <Input
             type="date"
-            aria-label="Due date"
+            aria-label={t('issues.props.dueDate')}
             className="h-8"
             disabled={disabled}
             value={isoToDateInput(issue.dueAt)}
@@ -139,24 +142,24 @@ export function IssueProperties({
           />
           {issue.dueAt && due === 'overdue' && (
             <span className="text-xs font-medium text-red-600 dark:text-red-400">
-              {daysOverdue(issue.dueAt)} days overdue
+              {t('issues.props.daysOverdue', { n: daysOverdue(issue.dueAt) })}
             </span>
           )}
           {due === 'soon' && (
             <span className="text-xs text-amber-600 dark:text-amber-400">
-              Due soon
+              {t('issues.props.dueSoon')}
             </span>
           )}
         </div>
       </Row>
       {issue.groupKey && (
-        <Row label="Group key">
+        <Row label={t('issues.props.groupKey')}>
           <code className="break-all rounded bg-muted px-1 py-0.5 text-xs">
             {issue.groupKey}
           </code>
         </Row>
       )}
-      <Row label="Tags">
+      <Row label={t('issues.props.tags')}>
         <TagsEditor tags={issue.tags} onSave={(tags) => onUpdate({ tags })} />
       </Row>
     </SideCard>

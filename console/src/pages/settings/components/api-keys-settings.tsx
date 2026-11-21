@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useT } from '@/lib/i18n-dictionary';
 
 const MASKED_KEY = '•'.repeat(32);
 
@@ -29,6 +30,7 @@ const MASKED_KEY = '•'.repeat(32);
  * API Keys settings component displaying workspace API key with reveal, copy and rotate functionality.
  */
 export default function ApiKeysSettings() {
+  const t = useT();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -50,11 +52,11 @@ export default function ApiKeysSettings() {
     useWorkspacesControllerRotateApiKey({
       mutation: {
         onSuccess: () => {
-          toast.success('API key rotated successfully');
+          toast.success(t('settings.apiKey.rotated'));
           refetch();
         },
         onError: () => {
-          toast.error('Failed to rotate API key');
+          toast.error(t('settings.apiKey.rotateFailed'));
         },
       },
     });
@@ -71,10 +73,10 @@ export default function ApiKeysSettings() {
     try {
       await navigator.clipboard.writeText(apiKey);
       setCopied(true);
-      toast.success('Copied to clipboard');
+      toast.success(t('settings.apiKey.copied'));
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error('Failed to copy to clipboard');
+      toast.error(t('settings.apiKey.copyFailed'));
     }
   };
 
@@ -84,8 +86,7 @@ export default function ApiKeysSettings() {
         <Card>
           <CardContent className="py-10">
             <p className="text-center text-muted-foreground">
-              No workspace selected. Please select a workspace to manage its API
-              keys.
+              {t('settings.apiKey.noWorkspace')}
             </p>
           </CardContent>
         </Card>
@@ -98,7 +99,7 @@ export default function ApiKeysSettings() {
       <Card>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <span className="text-sm font-medium">Secret key</span>
+            <span className="text-sm font-medium">{t('settings.apiKey.secretKey')}</span>
             {isLoading ? (
               <Skeleton className="h-10 w-full" />
             ) : (
@@ -109,7 +110,7 @@ export default function ApiKeysSettings() {
                   } ${apiKey ? '' : 'text-muted-foreground'}`}
                 >
                   {!apiKey
-                    ? 'No API key available'
+                    ? t('settings.apiKey.none')
                     : revealed
                       ? apiKey
                       : MASKED_KEY}
@@ -121,7 +122,7 @@ export default function ApiKeysSettings() {
                       size="icon-sm"
                       onClick={() => setRevealed((v) => !v)}
                       disabled={!apiKey}
-                      aria-label={revealed ? 'Hide API key' : 'Show API key'}
+                      aria-label={revealed ? t('settings.apiKey.hide') : t('settings.apiKey.show')}
                     >
                       {revealed ? (
                         <EyeOff className="h-4 w-4" />
@@ -130,7 +131,9 @@ export default function ApiKeysSettings() {
                       )}
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>{revealed ? 'Hide' : 'Show'}</TooltipContent>
+                  <TooltipContent>
+                    {revealed ? t('settings.apiKey.hideShort') : t('settings.apiKey.showShort')}
+                  </TooltipContent>
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -139,7 +142,7 @@ export default function ApiKeysSettings() {
                       size="icon-sm"
                       onClick={handleCopy}
                       disabled={!apiKey}
-                      aria-label="Copy API key"
+                      aria-label={t('settings.apiKey.copy')}
                     >
                       {copied ? (
                         <Check className="h-4 w-4 text-green-600" />
@@ -148,13 +151,15 @@ export default function ApiKeysSettings() {
                       )}
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>{copied ? 'Copied!' : 'Copy'}</TooltipContent>
+                  <TooltipContent>
+                    {copied ? t('settings.mcp.copiedShort') : t('common.copy')}
+                  </TooltipContent>
                 </Tooltip>
                 <div className="mx-1 h-5 w-px bg-border" />
                 <ConfirmDialog
-                  title="Rotate API Key"
-                  description="This will invalidate the current API key. Are you sure you want to continue?"
-                  confirmText="Rotate"
+                  title={t('settings.apiKey.rotate.title')}
+                  description={t('settings.apiKey.rotate.description')}
+                  confirmText={t('settings.apiKey.rotate.confirm')}
                   onConfirm={handleRotate}
                   disabled={isRotating || !apiKey}
                   typeToConfirm="rotate"
@@ -168,7 +173,7 @@ export default function ApiKeysSettings() {
                       <RefreshCw
                         className={`h-4 w-4 ${isRotating ? 'animate-spin' : ''}`}
                       />
-                      {isRotating ? 'Rotating...' : 'Rotate'}
+                      {isRotating ? t('settings.apiKey.rotating') : t('settings.apiKey.rotate.confirm')}
                     </Button>
                   }
                 />
@@ -178,9 +183,7 @@ export default function ApiKeysSettings() {
           <div className="flex items-start gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-500" />
             <p className="text-muted-foreground">
-              Keep your API key secure. Do not share it publicly or commit it to
-              version control. Rotating the key immediately invalidates the
-              current one.
+              {t('settings.apiKey.warning')}
             </p>
           </div>
         </CardContent>

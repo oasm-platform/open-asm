@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TlsStatisticsSkeleton } from './dashboard-skeleton';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
@@ -6,6 +7,7 @@ import { format } from 'date-fns';
 import { useNavigate } from '@tanstack/react-router';
 
 const TlsStatistics = () => {
+  const t = useT();
   const navigate = useNavigate();
   const {
     state: { selectedWorkspaceId },
@@ -36,9 +38,9 @@ const TlsStatistics = () => {
     return (
       <Card className="h-full">
         <CardHeader>
-          <CardTitle>Certificates</CardTitle>
+          <CardTitle>{t('dashboard.tls.title')}</CardTitle>
         </CardHeader>
-        <CardContent className="text-destructive">Couldn&apos;t load data</CardContent>
+        <CardContent className="text-destructive">{t('dashboard.tls.loadFailed')}</CardContent>
       </Card>
     );
   }
@@ -52,10 +54,10 @@ const TlsStatistics = () => {
   // Expiry buckets split every certificate once; "new" overlaps them, so it
   // is shown beside the bar rather than as a segment of it.
   const items = [
-    { label: 'Expired', value: data.alreadyExpired, color: 'bg-red-400', endDate: today },
-    { label: 'Expires within a month', value: data.expireInAMonth, color: 'bg-orange-300', startDate: today, endDate: oneMonthLater },
-    { label: 'Expires in 1–3 months', value: data.expireIn3Months, color: 'bg-yellow-300', startDate: oneMonthLater, endDate: threeMonthsLater },
-    { label: 'Valid for 3+ months', value: data.wontExpireAnytimeSoon, color: 'bg-green-300', startDate: threeMonthsLater },
+    { label: t('dashboard.tls.expired'), value: data.alreadyExpired, color: 'bg-red-400', endDate: today },
+    { label: t('dashboard.tls.expiresMonth'), value: data.expireInAMonth, color: 'bg-orange-300', startDate: today, endDate: oneMonthLater },
+    { label: t('dashboard.tls.expires3Months'), value: data.expireIn3Months, color: 'bg-yellow-300', startDate: oneMonthLater, endDate: threeMonthsLater },
+    { label: t('dashboard.tls.valid'), value: data.wontExpireAnytimeSoon, color: 'bg-green-300', startDate: threeMonthsLater },
   ];
 
   const total = items.reduce((sum, item) => sum + item.value, 0);
@@ -63,10 +65,10 @@ const TlsStatistics = () => {
   return (
     <Card className="h-full">
       <CardHeader className="flex flex-row items-baseline justify-between space-y-0">
-        <CardTitle>Certificates</CardTitle>
+        <CardTitle>{t('dashboard.tls.title')}</CardTitle>
         {data.newCertificatesDiscovered > 0 && (
           <span className="text-xs text-muted-foreground">
-            {data.newCertificatesDiscovered} new in the last 30 days
+            {t('dashboard.tls.newCertificates', { count: data.newCertificatesDiscovered })}
           </span>
         )}
       </CardHeader>

@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +22,7 @@ interface RepositoryListProps {
  * picker the "link repository as target" flow will build on.
  */
 export function RepositoryList({ integrationId }: RepositoryListProps) {
+  const t = useT();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search.trim(), 300);
 
@@ -48,12 +50,12 @@ export function RepositoryList({ integrationId }: RepositoryListProps) {
 
   return (
     <div className="space-y-3 rounded-lg border p-3">
-      <Label className="text-sm font-medium">Repositories</Label>
+      <Label className="text-sm font-medium">{t('integrations.repos.title')}</Label>
       <div className="relative">
         <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          aria-label="Search repositories"
-          placeholder="Search repositories..."
+          aria-label={t('integrations.repos.searchLabel')}
+          placeholder={t('integrations.repos.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="h-9 pl-8 text-xs"
@@ -70,13 +72,12 @@ export function RepositoryList({ integrationId }: RepositoryListProps) {
 
       {isError && (
         <p className="text-sm text-destructive">
-          Could not load repositories. Check the token and its permissions with
-          the Test button above.
+          {t('integrations.repos.loadError')}
         </p>
       )}
 
       {!isLoading && !isError && repositories.length === 0 && (
-        <p className="text-sm text-muted-foreground">No repositories found.</p>
+        <p className="text-sm text-muted-foreground">{t('integrations.repos.empty')}</p>
       )}
 
       {repositories.length > 0 && (
@@ -95,15 +96,17 @@ export function RepositoryList({ integrationId }: RepositoryListProps) {
                 )}
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
-                {repo.archived && <Badge variant="outline">Archived</Badge>}
+                {repo.archived && <Badge variant="outline">{t('integrations.repos.archived')}</Badge>}
                 <Badge variant="secondary">
-                  {repo.private ? 'Private' : 'Public'}
+                  {repo.private
+                    ? t('integrations.repos.private')
+                    : t('integrations.repos.public')}
                 </Badge>
                 <OpenLink
                   href={repo.url}
                   target="_blank"
                   rel="noreferrer noopener"
-                  aria-label={`Open ${repo.fullName}`}
+                  aria-label={t('integrations.repos.open', { name: repo.fullName })}
                   className="text-muted-foreground hover:text-foreground"
                 >
                   <ExternalLink className="size-4" />
@@ -124,7 +127,7 @@ export function RepositoryList({ integrationId }: RepositoryListProps) {
           disabled={isFetchingNextPage}
         >
           {isFetchingNextPage && <Loader2 className="mr-2 size-4 animate-spin" />}
-          Load more
+          {t('integrations.repos.loadMore')}
         </Button>
       )}
     </div>

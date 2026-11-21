@@ -58,6 +58,7 @@ import {
 import { SidePanelSection } from './side-panel-layout';
 import { SubagentTranscript } from './subagent-transcript';
 import { isSubagentActive, SUBAGENT_STATUS } from './subagents-panel';
+import { useT } from '@/lib/i18n-dictionary';
 
 const STEP_STATUS: Record<string, { icon: typeof CheckCircle2; className: string }> =
   {
@@ -73,6 +74,19 @@ const OUTCOME_CLASS: Record<string, string> = {
   blocked: 'bg-destructive/10 text-destructive',
 };
 
+/** Dictionary keys of the known outcomes and note kinds; others show raw */
+const OUTCOME_LABEL: Record<string, string> = {
+  done: 'agents.workflow.outcome.done',
+  partial: 'agents.workflow.outcome.partial',
+  blocked: 'agents.workflow.outcome.blocked',
+};
+
+const NOTE_KIND_LABEL: Record<string, string> = {
+  fact: 'agents.workflow.note.fact',
+  decision: 'agents.workflow.note.decision',
+  issue: 'agents.workflow.note.issue',
+};
+
 const EDGE_KIND = Object.fromEntries(WORKFLOW_EDGE_KINDS.map((k) => [k.kind, k]));
 
 const reducedMotion = () =>
@@ -82,6 +96,7 @@ const reducedMotion = () =>
 const handleClass = '!size-1.5 !min-h-0 !min-w-0 !border-0 !bg-muted-foreground/40';
 
 const RootNode = memo(function RootNode({ data }: NodeProps) {
+  const t = useT();
   const { goal, count } = data as unknown as RootNodeData;
   return (
     <div
@@ -91,13 +106,13 @@ const RootNode = memo(function RootNode({ data }: NodeProps) {
     >
       <div className="flex items-center gap-1.5 font-medium">
         <Flag className="size-3.5 shrink-0 text-muted-foreground" />
-        Goal
+        {t('agents.workflow.goal')}
         <span className="ml-auto tabular-nums font-normal text-muted-foreground">
-          {count} agent{count === 1 ? '' : 's'}
+          {t('agents.workflow.agentCount', { count })}
         </span>
       </div>
       <p className="line-clamp-2 text-muted-foreground">
-        {goal ?? 'Main agent'}
+        {goal ?? t('agents.workflow.mainAgent')}
       </p>
       <Handle type="source" position={Position.Bottom} className={handleClass} />
     </div>
@@ -105,6 +120,7 @@ const RootNode = memo(function RootNode({ data }: NodeProps) {
 });
 
 const StepNode = memo(function StepNode({ data }: NodeProps) {
+  const t = useT();
   const { step, index, count } = data as unknown as StepNodeData;
   const status = STEP_STATUS[step.status] ?? STEP_STATUS.pending;
   const Icon = status.icon;
@@ -122,7 +138,7 @@ const StepNode = memo(function StepNode({ data }: NodeProps) {
         </span>
       </div>
       <span className="tabular-nums text-muted-foreground">
-        {count} agent{count === 1 ? '' : 's'}
+        {t('agents.workflow.agentCount', { count })}
       </span>
       <Handle type="source" position={Position.Bottom} className={handleClass} />
     </div>
@@ -130,6 +146,7 @@ const StepNode = memo(function StepNode({ data }: NodeProps) {
 });
 
 const AgentNode = memo(function AgentNode({ data }: NodeProps) {
+  const t = useT();
   const { node, selected } = data as unknown as AgentNodeData;
   const status = SUBAGENT_STATUS[node.status];
   const Icon = status.icon;
@@ -154,18 +171,19 @@ const AgentNode = memo(function AgentNode({ data }: NodeProps) {
               OUTCOME_CLASS[node.outcome],
             )}
           >
-            {node.outcome}
+            {OUTCOME_LABEL[node.outcome] ? t(OUTCOME_LABEL[node.outcome]) : node.outcome}
           </span>
         )}
       </div>
       <p className="line-clamp-2 text-muted-foreground">
-        {waiting ? `Waiting for ${node.waitingOn.length} agent(s) · ` : ''}
+        {waiting
+          ? t('agents.workflow.waitingFor', { n: node.waitingOn.length })
+          : ''}
         {node.objective}
       </p>
       {node.findings.length > 0 && (
         <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400">
-          {node.findings.length} candidate finding
-          {node.findings.length === 1 ? '' : 's'}
+          {t('agents.workflow.findings', { count: node.findings.length })}
         </span>
       )}
       <Handle type="source" position={Position.Bottom} className={handleClass} />
@@ -225,6 +243,7 @@ function FlowEdge({
 const edgeTypes: EdgeTypes = { flow: FlowEdge };
 
 function EdgeLegend() {
+  const t = useT();
   return (
     <ul className="flex flex-wrap gap-x-3 gap-y-1 px-2 text-xs text-muted-foreground">
       {WORKFLOW_EDGE_KINDS.map((k) => (
@@ -240,7 +259,7 @@ function EdgeLegend() {
               strokeDasharray={k.dashed ? '4 3' : undefined}
             />
           </svg>
-          {k.label}
+          {t(k.labelKey)}
         </li>
       ))}
     </ul>
@@ -254,6 +273,7 @@ const NOTE_ICON: Record<string, typeof Lightbulb> = {
 };
 
 function NoteRow({ note }: { note: WorkflowNoteDto }) {
+  const t = useT();
   const Icon = NOTE_ICON[note.kind] ?? BookOpen;
   return (
     <li className="flex items-start gap-2.5 rounded-lg px-2 py-1 text-sm">
@@ -262,7 +282,9 @@ function NoteRow({ note }: { note: WorkflowNoteDto }) {
           'mt-0.5 size-4 shrink-0 text-muted-foreground',
           note.kind === 'issue' && 'text-amber-500',
         )}
-        aria-label={note.kind}
+        aria-label={
+          NOTE_KIND_LABEL[note.kind] ? t(NOTE_KIND_LABEL[note.kind]) : note.kind
+        }
       />
       <div className="min-w-0 flex-1">
         <p className="break-words">
@@ -286,6 +308,7 @@ function NodeDetail({
   subagent?: SubagentResponseDto;
   conversationId: string;
 }) {
+  const t = useT();
   const cancel = useAgentsControllerCancelConversationSubagent();
   const active = subagent ? isSubagentActive(subagent) : false;
   const name = (id: string) => {
@@ -293,9 +316,12 @@ function NodeDetail({
     return n ? `@${n.name}` : id.slice(0, 8);
   };
   const links = [
-    { label: 'Waits for', ids: node.after },
-    { label: 'Derived from', ids: node.derivedFrom },
-    { label: 'Follows up', ids: node.continuesFrom ? [node.continuesFrom] : [] },
+    { label: t('agents.workflow.waitsFor'), ids: node.after },
+    { label: t('agents.workflow.derivedFrom'), ids: node.derivedFrom },
+    {
+      label: t('agents.workflow.followsUp'),
+      ids: node.continuesFrom ? [node.continuesFrom] : [],
+    },
   ].filter((l) => l.ids.length > 0);
   return (
     <SidePanelSection
@@ -312,7 +338,7 @@ function NodeDetail({
             }
           >
             <Square className="size-3" />
-            Stop
+            {t('agents.workflow.stop')}
           </Button>
         ) : undefined
       }
@@ -320,7 +346,10 @@ function NodeDetail({
       <div className="space-y-2 px-2 text-sm">
         {links.map((l) => (
           <p key={l.label} className="text-xs text-muted-foreground">
-            {l.label}: {l.ids.map(name).join(', ')}
+            {t('agents.workflow.link', {
+              label: l.label,
+              agents: l.ids.map(name).join(', '),
+            })}
           </p>
         ))}
         {node.summary && <p>{node.summary}</p>}
@@ -454,6 +483,7 @@ export function AgentWorkflowPanel({
   subagents,
   planVersion,
 }: AgentWorkflowPanelProps) {
+  const t = useT();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const { data, isLoading, refetch } = useAgentsControllerGetConversationWorkflow(
@@ -511,7 +541,7 @@ export function AgentWorkflowPanel({
           onClick={() => setExpanded(true)}
         >
           <Maximize2 className="size-3" />
-          Expand
+          {t('agents.workflow.expand')}
         </Button>
       </div>
       <div
@@ -525,7 +555,7 @@ export function AgentWorkflowPanel({
       {detail}
 
       <SidePanelSection
-        title="Notebook"
+        title={t('agents.workflow.notebook')}
         meta={data.notes.length > 0 ? data.notes.length : undefined}
       >
         {data.notes.length > 0 ? (
@@ -536,7 +566,7 @@ export function AgentWorkflowPanel({
           </ul>
         ) : (
           <p className="px-2 text-sm text-muted-foreground">
-            Facts, decisions and open questions the agents share show up here.
+            {t('agents.workflow.notebookEmpty')}
           </p>
         )}
       </SidePanelSection>
@@ -544,9 +574,9 @@ export function AgentWorkflowPanel({
       <Dialog open={expanded} onOpenChange={setExpanded}>
         <DialogContent className="flex h-[85vh] max-w-[95vw] flex-col gap-3 sm:max-w-[95vw]">
           <DialogHeader>
-            <DialogTitle>Workflow</DialogTitle>
+            <DialogTitle>{t('agents.workflow.title')}</DialogTitle>
             <DialogDescription className="line-clamp-1">
-              {data.goal ?? 'How the subagents of this conversation connect'}
+              {data.goal ?? t('agents.workflow.description')}
             </DialogDescription>
           </DialogHeader>
           <EdgeLegend />

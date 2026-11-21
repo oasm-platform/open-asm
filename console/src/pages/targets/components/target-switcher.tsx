@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { Check, ChevronsUpDown, Loader2 } from 'lucide-react';
 import { useNavigate, useParams } from '@tanstack/react-router';
@@ -26,6 +27,7 @@ export function TargetSwitcher({
   currentTargetValue,
   currentTargetLogo,
 }: TargetSwitcherProps) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { tab } = useParams({ from: '/_authed/targets/$id/$tab' });
@@ -44,7 +46,7 @@ export function TargetSwitcher({
     const list: GetManyTargetResponseDto[] = data?.data ?? [];
     if (!deferredSearch) return list;
     const query = deferredSearch.toLowerCase();
-    return list.filter((t) => t.value.toLowerCase().includes(query));
+    return list.filter((target) => target.value.toLowerCase().includes(query));
   }, [data, deferredSearch]);
 
   const handleSelect = useCallback(
@@ -73,7 +75,7 @@ export function TargetSwitcher({
       <PopoverTrigger asChild>
         <button
           className="flex items-center gap-2 rounded-md px-1 py-0.5 hover:bg-accent transition-colors"
-          aria-label="Switch target"
+          aria-label={t('targets.switcher.switch')}
         >
           <TargetLogo url={currentTargetLogo} className="size-7" />
           <span className="truncate max-w-[300px]">{currentTargetValue}</span>
@@ -83,7 +85,7 @@ export function TargetSwitcher({
       <PopoverContent className="w-[320px] p-0" align="start" sideOffset={4}>
         <Command shouldFilter={false}>
           <CommandInput
-            placeholder="Search targets..."
+            placeholder={t('targets.switcher.search')}
             value={searchQuery}
             onValueChange={setSearchQuery}
           />
@@ -91,7 +93,7 @@ export function TargetSwitcher({
             {isLoading ? (
               <CommandEmpty className="py-6 flex items-center justify-center gap-2 text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Loading...
+                {t('common.loading')}
               </CommandEmpty>
             ) : targets.length > 0 ? (
               targets.map((target) => (
@@ -110,7 +112,7 @@ export function TargetSwitcher({
               ))
             ) : (
               <CommandEmpty>
-                {searchQuery ? 'No targets found' : 'No targets available'}
+                {searchQuery ? t('targets.switcher.noneFound') : t('targets.switcher.noneAvailable')}
               </CommandEmpty>
             )}
           </CommandList>

@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -16,7 +17,8 @@ interface FolderBreadcrumbProps {
 }
 
 export function FolderBreadcrumb({ path, onNavigate }: FolderBreadcrumbProps) {
-  const crumbs = [{ id: null, name: 'My files' }, ...path];
+  const t = useT();
+  const crumbs = [{ id: null, name: t('files.breadcrumb.myFiles') }, ...path];
 
   return (
     <Breadcrumb>

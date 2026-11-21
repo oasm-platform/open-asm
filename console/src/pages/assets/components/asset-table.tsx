@@ -1,5 +1,6 @@
 import { DataTable } from '@/components/ui/data-table';
 import { DataTableError } from '@/components/ui/data-table-error-boundary';
+import { useT } from '@/lib/i18n-dictionary';
 import { useScreenshotQueryOptions } from '@/hooks/use-screenshot-query-options';
 import { useAssetsControllerGetAssetsInWorkspace } from '@/services/apis/gen/queries';
 import { useState } from 'react';
@@ -14,6 +15,7 @@ export function AssetTable({
   filter: Partial<AssetContextType['queryParams']> &
     Partial<Record<'ipAddresses' | 'ports' | 'hosts' | 'techs' | 'statusCodes' | 'tlsHosts' | 'urls', string[]>>;
 }) {
+  const t = useT();
   const [isOpen, setIsOpen] = useState(false);
   const [rowID, setRowID] = useState('');
   const [page, setPage] = useState(1);
@@ -38,7 +40,7 @@ export function AssetTable({
   const total = data?.total ?? 0;
 
   if (!data && !isLoading)
-    return <DataTableError message="Failed to load assets." onRetry={refetch} />;
+    return <DataTableError message={t('assets.errors.assets')} onRetry={refetch} />;
   return (
     <>
       <DataTable

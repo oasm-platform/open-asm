@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
+import { useT } from '@/lib/i18n-dictionary';
 import type { PermissionCatalogResourceDto } from '@/services/apis/gen/queries';
 
 interface PermissionGroupFormProps {
@@ -44,6 +45,7 @@ export function PermissionGroupForm({
   onSave,
   onCancel,
 }: PermissionGroupFormProps) {
+  const t = useT();
   const [name, setName] = useState(initialName);
   const [selectedKeys, setSelectedKeys] = useState<string[]>(initialPermissions);
 
@@ -80,20 +82,20 @@ export function PermissionGroupForm({
   const formContent = (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="group-name">Name</Label>
+        <Label htmlFor="group-name">{t('common.name')}</Label>
         <Input
           id="group-name"
-          placeholder="Viewer"
+          placeholder={t('settings.groupForm.namePlaceholder')}
           value={name}
           onChange={(event) => setName(event.target.value)}
         />
       </div>
 
       <div className="space-y-2">
-        <Label>Permissions</Label>
+        <Label>{t('settings.members.tabs.permissions')}</Label>
         {catalog.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Loading permission catalog...
+            {t('settings.groupForm.loadingCatalog')}
           </p>
         ) : (
           <div className="space-y-3">
@@ -158,12 +160,12 @@ export function PermissionGroupForm({
         <div className="flex flex-wrap gap-1">
           {selectedKeys.map((key) => (
             <Badge key={key} variant="secondary">
-              {key === '*' ? 'All permissions' : key}
+              {key === '*' ? t('settings.members.groups.allPermissions') : key}
               <button
                 type="button"
                 className="ml-1.5 text-muted-foreground hover:text-foreground"
                 onClick={() => toggleKey(key)}
-                aria-label={`Remove ${key}`}
+                aria-label={t('settings.groupForm.removeKey', { key })}
               >
                 ×
               </button>
@@ -196,13 +198,13 @@ export function PermissionGroupForm({
 
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={onCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button
           disabled={!canSave || isPending}
           onClick={() => onSave(name.trim(), selectedKeys)}
         >
-          {isPending ? 'Saving...' : submitText}
+          {isPending ? t('settings.members.saving') : submitText}
         </Button>
       </div>
     </div>

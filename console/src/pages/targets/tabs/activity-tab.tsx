@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -20,12 +21,12 @@ const CHANGES_PER_PAGE = 30;
 const LIST_CARD = 'h-[40rem] gap-4';
 const LIST_CONTENT = 'flex min-h-0 flex-1 flex-col overflow-y-auto';
 
-const CHANGE_FILTERS: Array<{ value?: TargetChangeKind; label: string }> = [
-  { label: 'All' },
-  { value: TargetChangeKind.asset, label: 'Assets' },
-  { value: TargetChangeKind.service, label: 'Services' },
-  { value: TargetChangeKind.vulnerability, label: 'Vulnerabilities' },
-  { value: TargetChangeKind.fixed, label: 'Fixed' },
+const CHANGE_FILTERS: Array<{ value?: TargetChangeKind; labelKey: string }> = [
+  { labelKey: 'targets.activity.filters.all' },
+  { value: TargetChangeKind.asset, labelKey: 'targets.activity.filters.assets' },
+  { value: TargetChangeKind.service, labelKey: 'targets.activity.filters.services' },
+  { value: TargetChangeKind.vulnerability, labelKey: 'targets.activity.filters.vulnerabilities' },
+  { value: TargetChangeKind.fixed, labelKey: 'targets.activity.filters.fixed' },
 ];
 
 /** Paging of a list API, for `useInfiniteQuery`. */
@@ -83,6 +84,7 @@ function RowsSkeleton({ rows, className }: { rows: number; className: string }) 
 
 /** Every run that scanned the target, and what appeared on it. */
 export function TargetActivityTab({ targetId }: { targetId: string }) {
+  const t = useT();
   const [activeOnly, setActiveOnly] = useState(false);
   const [kind, setKind] = useState<TargetChangeKind | undefined>();
 
@@ -117,7 +119,7 @@ export function TargetActivityTab({ targetId }: { targetId: string }) {
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
           <CardTitle className="flex items-center gap-2">
             <Radar className="size-5 text-primary" />
-            Runs
+            {t('targets.activity.runs')}
             {runs.data && (
               <span className="text-sm font-normal text-muted-foreground">
                 {runs.data.pages[0]?.total ?? 0}
@@ -131,7 +133,7 @@ export function TargetActivityTab({ targetId }: { targetId: string }) {
               onCheckedChange={setActiveOnly}
             />
             <Label htmlFor="runs-active-only" className="font-normal">
-              Running only
+              {t('targets.activity.runningOnly')}
             </Label>
           </div>
         </CardHeader>
@@ -140,7 +142,7 @@ export function TargetActivityTab({ targetId }: { targetId: string }) {
             <RowsSkeleton rows={6} className="h-12" />
           ) : runRows.length === 0 ? (
             <p className="py-4 text-sm text-muted-foreground">
-              {activeOnly ? 'Nothing is running.' : 'No run has scanned this target yet.'}
+              {activeOnly ? t('targets.activity.nothingRunning') : t('targets.activity.noRuns')}
             </p>
           ) : (
             <>
@@ -161,7 +163,7 @@ export function TargetActivityTab({ targetId }: { targetId: string }) {
         <CardHeader className="flex flex-col gap-3 space-y-0">
           <CardTitle className="flex items-center gap-2">
             <Activity className="size-5 text-primary" />
-            Changes
+            {t('targets.activity.changes')}
             {changes.data && (
               <span className="text-sm font-normal text-muted-foreground">
                 {changes.data.pages[0]?.total ?? 0}
@@ -171,7 +173,7 @@ export function TargetActivityTab({ targetId }: { targetId: string }) {
           <div className="flex flex-wrap gap-1.5">
             {CHANGE_FILTERS.map((filter) => (
               <Button
-                key={filter.label}
+                key={filter.labelKey}
                 size="sm"
                 variant="outline"
                 className={cn(
@@ -180,7 +182,7 @@ export function TargetActivityTab({ targetId }: { targetId: string }) {
                 )}
                 onClick={() => setKind(filter.value)}
               >
-                {filter.label}
+                {t(filter.labelKey)}
               </Button>
             ))}
           </div>
@@ -189,7 +191,7 @@ export function TargetActivityTab({ targetId }: { targetId: string }) {
           {changes.isLoading ? (
             <RowsSkeleton rows={10} className="h-6" />
           ) : changeRows.length === 0 ? (
-            <p className="py-4 text-sm text-muted-foreground">Nothing yet.</p>
+            <p className="py-4 text-sm text-muted-foreground">{t('targets.activity.nothingYet')}</p>
           ) : (
             <>
               {changeRows.map((change) => (

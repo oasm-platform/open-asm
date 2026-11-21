@@ -18,7 +18,8 @@ import {
 } from '@/services/apis/gen/queries';
 import { formatCategory } from '@/pages/tools/components/format-category';
 import { ChevronRight, Download } from 'lucide-react';
-import { useState, type JSX, type ReactNode } from 'react';
+import { Fragment, useState, type JSX, type ReactNode } from 'react';
+import { useT } from '@/lib/i18n-dictionary';
 
 interface SchemaProperty {
   title?: unknown;
@@ -66,6 +67,15 @@ function listSchemaInputs(
     .sort((a, b) => Number(b.required) - Number(a.required));
 }
 
+/** Fills `{name}` slots of a translated sentence with elements. */
+function richText(template: string, parts: Record<string, ReactNode>) {
+  return template
+    .split(/\{(\w+)\}/)
+    .map((chunk, i) =>
+      i % 2 ? <Fragment key={i}>{parts[chunk] ?? `{${chunk}}`}</Fragment> : chunk,
+    );
+}
+
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="space-y-1.5 py-4">
@@ -95,6 +105,7 @@ export function ToolInstallConfirmDialog({
   onConfirm,
   trigger,
 }: ToolInstallConfirmDialogProps) {
+  const t = useT();
   const [open, setOpen] = useState(false);
 
   const isConnector = tool.type === ToolsControllerGetManyToolsType.connector;
@@ -159,37 +170,39 @@ export function ToolInstallConfirmDialog({
             </LogoFrame>
           </div>
           <div className="space-y-1">
-            <DialogTitle>Install {displayName}</DialogTitle>
+            <DialogTitle>{t('tools.installConfirm.title', { name: displayName })}</DialogTitle>
             <DialogDescription>
-              Review what this tool receives before you confirm.
+              {t('tools.installConfirm.description')}
             </DialogDescription>
           </div>
         </DialogHeader>
 
         <div className="min-h-0 divide-y overflow-y-auto rounded-xl bg-muted/50 px-4">
           {workspaceName && (
-            <Section title="Workspace">
+            <Section title={t('tools.installConfirm.workspace')}>
               <p className="text-sm text-muted-foreground">
-                {toolName} will be installed into workspace{' '}
-                <span className="font-medium text-foreground">
-                  {workspaceName}
-                </span>
-                .
+                {richText(t('tools.installConfirm.workspaceText'), {
+                  tool: toolName,
+                  workspace: (
+                    <span className="font-medium text-foreground">
+                      {workspaceName}
+                    </span>
+                  ),
+                })}
               </p>
             </Section>
           )}
 
           {about && (
-            <Section title="About">
+            <Section title={t('tools.installConfirm.about')}>
               <p className="text-sm text-muted-foreground">{about}</p>
             </Section>
           )}
 
           {inputGroups.length > 0 && (
-            <Section title="Data shared with this tool">
+            <Section title={t('tools.installConfirm.dataShared')}>
               <p className="text-sm text-muted-foreground">
-                Each time it runs, {toolName} receives the following inputs
-                from OASM.
+                {richText(t('tools.installConfirm.dataSharedText'), { tool: toolName })}
               </p>
               {inputGroups.map((group) => (
                 <div key={group.category} className="mt-3">
@@ -212,7 +225,9 @@ export function ToolInstallConfirmDialog({
                           )}
                           <Badge variant="outline">{input.type}</Badge>
                           {input.required && (
-                            <Badge variant="secondary">Required</Badge>
+                            <Badge variant="secondary">
+                              {t('tools.installConfirm.required')}
+                            </Badge>
                           )}
                         </div>
                         {input.description && (
@@ -228,9 +243,9 @@ export function ToolInstallConfirmDialog({
             </Section>
           )}
 
-          <Section title="You are always in control">
+          <Section title={t('tools.installConfirm.control')}>
             <p className="text-sm text-muted-foreground">
-              You can uninstall {toolName} from its tool page at any time.
+              {richText(t('tools.installConfirm.controlText'), { tool: toolName })}
             </p>
           </Section>
         </div>
@@ -241,7 +256,7 @@ export function ToolInstallConfirmDialog({
           onClick={handleConfirm}
         >
           <Download className="size-[18px]" />
-          Install
+          {t('tools.installConfirm.install')}
         </Button>
       </DialogContent>
     </Dialog>

@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Button } from '@/components/ui/button';
 import { useAiChat } from '@/hooks/useAiChat';
 import { Sparkles } from 'lucide-react';
@@ -28,6 +29,7 @@ interface AskAiButtonProps
 
 export function AskAiButton({ query, onAsk, ...props }: AskAiButtonProps) {
   const askAi = useAskAi();
+  const t = useT();
   return (
     <Button
       type="button"
@@ -38,7 +40,7 @@ export function AskAiButton({ query, onAsk, ...props }: AskAiButtonProps) {
       {...props}
     >
       <Sparkles className="size-4" aria-hidden />
-      Ask AI
+      {t('components.askAi.label')}
     </Button>
   );
 }

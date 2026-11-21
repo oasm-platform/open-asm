@@ -20,6 +20,7 @@ import { memo, useEffect, useState } from 'react';
 import { SIDE_PANEL_INDENT, SIDE_PANEL_ROW } from './side-panel-layout';
 import { SubagentTranscript } from './subagent-transcript';
 import { formatDuration } from './turn-stats-panel';
+import { useT } from '@/lib/i18n-dictionary';
 
 /** How often the run time of running subagents ticks (local clock only). */
 export const SUBAGENTS_TICK_MS = 1_000;
@@ -29,26 +30,35 @@ export const isSubagentActive = (s: SubagentResponseDto) =>
   s.status === SubagentResponseDtoStatus.in_progress;
 
 export interface SubagentStatusView {
-  label: string;
+  /** Dictionary key of the status name */
+  labelKey: string;
   icon: typeof Clock;
   className: string;
 }
 
 export const SUBAGENT_STATUS: Record<SubagentResponseDto['status'], SubagentStatusView> = {
-  pending: { label: 'Queued', icon: Clock, className: 'text-muted-foreground' },
+  pending: {
+    labelKey: 'agents.subagents.status.pending',
+    icon: Clock,
+    className: 'text-muted-foreground',
+  },
   in_progress: {
-    label: 'Running',
+    labelKey: 'agents.subagents.status.running',
     icon: Loader2,
     className: 'text-sky-500 animate-spin',
   },
   completed: {
-    label: 'Done',
+    labelKey: 'agents.subagents.status.done',
     icon: CheckCircle2,
     className: 'text-emerald-500',
   },
-  failed: { label: 'Failed', icon: XCircle, className: 'text-destructive' },
+  failed: {
+    labelKey: 'agents.subagents.status.failed',
+    icon: XCircle,
+    className: 'text-destructive',
+  },
   cancelled: {
-    label: 'Cancelled',
+    labelKey: 'agents.subagents.status.cancelled',
     icon: XCircle,
     className: 'text-muted-foreground',
   },
@@ -74,6 +84,7 @@ function SubagentRow({
   /** Side panel row: text-sm name and a size-4 icon, like the other tabs */
   embedded: boolean;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const status = SUBAGENT_STATUS[subagent.status];
   const Icon = status.icon;
@@ -96,7 +107,7 @@ function SubagentRow({
             embedded ? 'size-4' : 'size-3.5',
             status.className,
           )}
-          aria-label={status.label}
+          aria-label={t(status.labelKey)}
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -104,7 +115,7 @@ function SubagentRow({
               @{subagent.name}
             </span>
             <span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">
-              {time === null ? status.label : formatDuration(time)}
+              {time === null ? t(status.labelKey) : formatDuration(time)}
             </span>
             {conversationId && (
               <ChevronDown
@@ -160,6 +171,7 @@ export const SubagentsPanel = memo(function SubagentsPanel({
   collapsible = true,
   className,
 }: SubagentsPanelProps) {
+  const t = useT();
   const [open, setOpen] = useState(true);
   const [now, setNow] = useState(() => Date.now());
   const running = subagents.filter(isSubagentActive).length;
@@ -205,7 +217,7 @@ export const SubagentsPanel = memo(function SubagentsPanel({
         <Collapsible open={open} onOpenChange={setOpen}>
           <CollapsibleTrigger className="flex w-full items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground cursor-pointer">
             <Network className="size-4 text-muted-foreground" />
-            <span>Subagents</span>
+            <span>{t('agents.subagents.title')}</span>
             <ChevronDown
               className={cn(
                 'size-3.5 text-muted-foreground transition-transform',
@@ -220,7 +232,11 @@ export const SubagentsPanel = memo(function SubagentsPanel({
                   : 'bg-muted text-muted-foreground',
               )}
             >
-              {running > 0 ? `${running} running` : `${subagents.length} done`}
+              {running > 0
+                ? t('agents.subagents.runningCount', { count: running })
+                : t('agents.subagents.doneCount', {
+                    count: subagents.length,
+                  })}
             </span>
           </CollapsibleTrigger>
           <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">

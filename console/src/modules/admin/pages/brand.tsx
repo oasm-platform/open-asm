@@ -1,11 +1,13 @@
 import Page from '@/components/common/page';
 import BrandNameAndLogoSettings from '../components/brand-name-and-logo';
+import { useT } from '@/lib/i18n-dictionary';
 
 export default function Brand() {
+  const t = useT();
   return (
     <Page
-      title="Brand name and logo"
-      description="Shown in the sidebar, on the login screen and in the browser tab"
+      title={t('admin.brand.title')}
+      description={t('admin.brand.description')}
     >
       <div className="w-full max-w-3xl">
         <BrandNameAndLogoSettings />

@@ -43,6 +43,7 @@ import { isAxiosError } from 'axios';
 import { Bot, Info, Loader2, Minus, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
+import { useT } from '@/lib/i18n-dictionary';
 
 type Mode = CreateAgentDefinitionDtoMode;
 type Scope = CreateAgentDefinitionDtoScope;
@@ -56,10 +57,11 @@ const MODES: Array<{ value: Mode; label: string }> = [
   { value: CreateAgentDefinitionDtoMode.all, label: 'all' },
 ];
 
+/** Dictionary keys of the scope badges */
 const SCOPE_LABELS: Record<AgentDefinitionResponseDto['scope'], string> = {
-  builtin: 'Built in',
-  user: 'Personal',
-  workspace: 'Workspace',
+  builtin: 'agents.agentForm.scope.builtin',
+  user: 'agents.agentForm.scope.personal',
+  workspace: 'agents.agentForm.scope.workspaceLabel',
 };
 
 interface FormState {
@@ -155,6 +157,7 @@ function NumberStepper({
   integer?: boolean;
   disabled?: boolean;
 }) {
+  const t = useT();
   const clamp = (n: number) => {
     const bounded = Math.min(max, Math.max(min, n));
     return integer ? Math.round(bounded) : Math.round(bounded * 100) / 100;
@@ -167,7 +170,7 @@ function NumberStepper({
         variant="ghost"
         size="icon-sm"
         className="rounded-none"
-        aria-label={`Decrease ${label}`}
+        aria-label={t('agents.agentForm.decrease', { label })}
         disabled={disabled || value === undefined || value <= min}
         onClick={() => bump(-step)}
       >
@@ -192,7 +195,7 @@ function NumberStepper({
         variant="ghost"
         size="icon-sm"
         className="rounded-none"
-        aria-label={`Increase ${label}`}
+        aria-label={t('agents.agentForm.increase', { label })}
         disabled={disabled || (value !== undefined && value >= max)}
         onClick={() => bump(step)}
       >
@@ -212,6 +215,7 @@ function AgentFormSheet({
   /** Unset: create a new agent */
   agent: AgentDefinitionResponseDto | null;
 }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [form, setForm] = useState<FormState>(emptyForm);
   const readOnly = !!agent && !agent.canEdit;
@@ -249,26 +253,26 @@ function AgentFormSheet({
 
   const create = useAgentsControllerCreateAgentDefinition({
     mutation: {
-      onSuccess: () => done('Agent created'),
-      onError: (e) => toast.error(errorMessage(e, 'Failed to create agent')),
+      onSuccess: () => done(t('agents.agentForm.created')),
+      onError: (e) => toast.error(errorMessage(e, t('agents.agentForm.createFailed'))),
     },
   });
   const update = useAgentsControllerUpdateAgentDefinition({
     mutation: {
-      onSuccess: () => done('Agent updated'),
-      onError: (e) => toast.error(errorMessage(e, 'Failed to update agent')),
+      onSuccess: () => done(t('agents.agentForm.updated')),
+      onError: (e) => toast.error(errorMessage(e, t('agents.agentForm.updateFailed'))),
     },
   });
   const remove = useAgentsControllerDeleteAgentDefinition({
     mutation: {
-      onSuccess: () => done('Agent deleted'),
-      onError: (e) => toast.error(errorMessage(e, 'Failed to delete agent')),
+      onSuccess: () => done(t('agents.agentForm.deleted')),
+      onError: (e) => toast.error(errorMessage(e, t('agents.agentForm.deleteFailed'))),
     },
   });
 
   const nameError =
     form.name && !NAME_PATTERN.test(form.name)
-      ? 'Lowercase letters, numbers and single dashes only'
+      ? t('agents.agentForm.nameError')
       : undefined;
   const isPending = create.isPending || update.isPending;
 
@@ -299,7 +303,7 @@ function AgentFormSheet({
     }
   };
 
-  const heading = agent ? (agent.title ?? `@${agent.name}`) : 'New Agent';
+  const heading = agent ? (agent.title ?? `@${agent.name}`) : t('agents.agentForm.newAgent');
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -309,11 +313,11 @@ function AgentFormSheet({
           <SheetDescription>
             {readOnly
               ? agent?.isBuiltin
-                ? 'Built-in agent (read only)'
-                : 'Shared by another workspace member (read only)'
+                ? t('agents.agentForm.builtinReadOnly')
+                : t('agents.agentForm.sharedReadOnly')
               : agent
-                ? 'Edit the agent persona'
-                : 'Configure a new assistant persona'}
+                ? t('agents.agentForm.editDescription')
+                : t('agents.agentForm.newDescription')}
           </SheetDescription>
         </SheetHeader>
 
@@ -329,16 +333,16 @@ function AgentFormSheet({
             className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-6 py-5"
           >
             <section className="space-y-4">
-              <h3 className="text-sm font-semibold">Identity &amp; Role</h3>
+              <h3 className="text-sm font-semibold">{t('agents.agentForm.identity')}</h3>
               <FieldRow
-                label="Agent Name"
-                help="Slug used to mention the agent as @name. Personal agents are only visible to you; workspace agents are shared with every member."
+                label={t('agents.agentForm.agentName')}
+                help={t('agents.agentForm.agentNameHelp')}
               >
                 <div className="flex items-start gap-2">
                   <div className="flex min-w-0 flex-1 items-center gap-1">
                     <span className="text-sm text-muted-foreground">@</span>
                     <Input
-                      aria-label="Agent name"
+                      aria-label={t('agents.agentForm.agentNameLabel')}
                       value={form.name}
                       maxLength={64}
                       onChange={(e) =>
@@ -352,15 +356,15 @@ function AgentFormSheet({
                     onValueChange={(v) => set('scope', v as Scope)}
                     disabled={readOnly}
                   >
-                    <SelectTrigger className="h-8 w-28" aria-label="Scope">
+                    <SelectTrigger className="h-8 w-28" aria-label={t('agents.agentForm.scope')}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value={CreateAgentDefinitionDtoScope.user}>
-                        user
+                        {t('agents.agentForm.scope.user')}
                       </SelectItem>
                       <SelectItem value={CreateAgentDefinitionDtoScope.workspace}>
-                        workspace
+                        {t('agents.agentForm.scope.workspace')}
                       </SelectItem>
                     </SelectContent>
                   </Select>
@@ -369,36 +373,36 @@ function AgentFormSheet({
                   <p className="mt-1 text-xs text-destructive">{nameError}</p>
                 )}
               </FieldRow>
-              <FieldRow label="Display Name">
+              <FieldRow label={t('agents.agentForm.displayName')}>
                 <Input
-                  aria-label="Display name"
+                  aria-label={t('agents.agentForm.displayNameLabel')}
                   value={form.title}
                   maxLength={100}
-                  placeholder="Optional"
+                  placeholder={t('agents.agentForm.optional')}
                   onChange={(e) => set('title', e.target.value)}
                   className="h-8"
                 />
               </FieldRow>
               <div className="space-y-1.5">
-                <Label htmlFor="agent-description">Description</Label>
+                <Label htmlFor="agent-description">
+                  {t('agents.agentForm.description')}
+                </Label>
                 <Textarea
                   id="agent-description"
                   value={form.description}
                   maxLength={2000}
-                  placeholder="What does this agent do?"
+                  placeholder={t('agents.agentForm.descriptionPlaceholder')}
                   onChange={(e) => set('description', e.target.value)}
                   className="min-h-20"
                 />
               </div>
               <div className="space-y-1.5">
                 <Label className="flex items-center gap-1.5">
-                  Mode
-                  <HelpTip>
-                    primary: runs as the main agent. subagent: only delegated
-                    to by another agent. all: both.
-                  </HelpTip>
+                  {t('agents.agentForm.mode')}
+                  <HelpTip>{t('agents.agentForm.modeHelp')}</HelpTip>
                 </Label>
-                <div className="flex gap-1.5" role="radiogroup" aria-label="Mode">
+                <div className="flex gap-1.5" role="radiogroup"
+                  aria-label={t('agents.agentForm.mode')}>
                   {MODES.map((m) => (
                     <Button
                       key={m.value}
@@ -418,41 +422,41 @@ function AgentFormSheet({
             </section>
 
             <section className="space-y-4 border-t pt-5">
-              <h3 className="text-sm font-semibold">Model &amp; Parameters</h3>
-              <FieldRow label="Override Model">
+              <h3 className="text-sm font-semibold">{t('agents.agentForm.modelParams')}</h3>
+              <FieldRow label={t('agents.agentForm.overrideModel')}>
                 {readOnly ? (
                   <span className="text-sm text-muted-foreground">
-                    {form.metadata.model?.model ?? 'Default'}
+                    {form.metadata.model?.model ?? t('agents.agentForm.default')}
                   </span>
                 ) : (
                   <ModelPicker
-                    label="Override model"
+                    label={t('agents.agentForm.overrideModelLabel')}
                     value={form.metadata.model}
                     connections={connections}
-                    unsetLabel="Not selected"
+                    unsetLabel={t('agents.agentForm.notSelected')}
                     onChange={(picked) => setMeta('model', picked ?? undefined)}
                   />
                 )}
               </FieldRow>
               <FieldRow
-                label="Thinking Variant"
-                help="Provider reasoning variant, e.g. low / medium / high. Empty uses the default."
+                label={t('agents.agentForm.thinkingVariant')}
+                help={t('agents.agentForm.thinkingVariantHelp')}
               >
                 <Input
-                  aria-label="Thinking variant"
+                  aria-label={t('agents.agentForm.thinkingVariantLabel')}
                   value={form.metadata.variant ?? ''}
                   maxLength={50}
-                  placeholder="default"
+                  placeholder={t('agents.agentForm.thinkingVariantPlaceholder')}
                   onChange={(e) => setMeta('variant', e.target.value || undefined)}
                   className="h-8"
                 />
               </FieldRow>
               <FieldRow
-                label="Temperature"
-                help="Randomness of the answers (0-2). Empty uses the model default."
+                label={t('agents.agentForm.temperature')}
+                help={t('agents.agentForm.temperatureHelp')}
               >
                 <NumberStepper
-                  label="Temperature"
+                  label={t('agents.agentForm.temperature')}
                   value={form.metadata.temperature}
                   onChange={(v) => setMeta('temperature', v)}
                   step={0.1}
@@ -462,11 +466,11 @@ function AgentFormSheet({
                 />
               </FieldRow>
               <FieldRow
-                label="Top P"
-                help="Nucleus sampling (0-1). Empty uses the model default."
+                label={t('agents.agentForm.topP')}
+                help={t('agents.agentForm.topPHelp')}
               >
                 <NumberStepper
-                  label="Top P"
+                  label={t('agents.agentForm.topP')}
                   value={form.metadata.topP}
                   onChange={(v) => setMeta('topP', v)}
                   step={0.05}
@@ -476,11 +480,11 @@ function AgentFormSheet({
                 />
               </FieldRow>
               <FieldRow
-                label="Max steps"
-                help="Max tool call steps per run. Empty uses your agent settings."
+                label={t('agents.agentForm.maxSteps')}
+                help={t('agents.agentForm.maxStepsHelp')}
               >
                 <NumberStepper
-                  label="Max steps"
+                  label={t('agents.agentForm.maxSteps')}
                   value={form.metadata.maxSteps}
                   onChange={(v) => setMeta('maxSteps', v)}
                   step={1}
@@ -493,12 +497,12 @@ function AgentFormSheet({
             </section>
 
             <section className="space-y-3 border-t pt-5">
-              <h3 className="text-sm font-semibold">System Prompt</h3>
+              <h3 className="text-sm font-semibold">{t('agents.agentForm.systemPrompt')}</h3>
               <Textarea
-                aria-label="System prompt"
+                aria-label={t('agents.agentForm.systemPromptLabel')}
                 value={form.systemPrompt}
                 maxLength={20000}
-                placeholder="You are an expert coding assistant..."
+                placeholder={t('agents.agentForm.systemPromptPlaceholder')}
                 onChange={(e) => set('systemPrompt', e.target.value)}
                 className="min-h-48 font-mono text-sm"
               />
@@ -509,10 +513,12 @@ function AgentFormSheet({
             <div>
               {agent?.canEdit && (
                 <ConfirmDialog
-                  title="Delete Agent"
-                  description={`Delete "@${agent.name}"? This action cannot be undone.`}
+                  title={t('agents.agentForm.deleteTitle')}
+                  description={t('agents.agentForm.deleteDescription', {
+                    name: agent.name,
+                  })}
                   onConfirm={() => remove.mutate({ id: agent.id })}
-                  confirmText="Delete"
+                  confirmText={t('common.delete')}
                   trigger={
                     <Button
                       type="button"
@@ -522,7 +528,7 @@ function AgentFormSheet({
                       className="text-muted-foreground hover:text-destructive"
                     >
                       <Trash2 className="size-4" />
-                      Delete
+                      {t('common.delete')}
                     </Button>
                   }
                 />
@@ -535,7 +541,7 @@ function AgentFormSheet({
                 size="sm"
                 onClick={() => onOpenChange(false)}
               >
-                {readOnly ? 'Close' : 'Cancel'}
+                {readOnly ? t('agents.agentForm.close') : t('common.cancel')}
               </Button>
               {!readOnly && (
                 <Button
@@ -544,7 +550,7 @@ function AgentFormSheet({
                   disabled={isPending || !form.name || !!nameError}
                 >
                   {isPending && <Loader2 className="size-3 animate-spin" />}
-                  {agent ? 'Save Changes' : 'Create Agent'}
+                  {agent ? t('agents.agentForm.saveChanges') : t('agents.agentForm.create')}
                 </Button>
               )}
             </div>
@@ -556,9 +562,10 @@ function AgentFormSheet({
 }
 
 function CountChip({ label, count }: { label: string; count: number }) {
+  const t = useT();
   return (
     <span className="rounded border px-1.5 py-0.5 text-[11px] text-muted-foreground">
-      {label} {count}
+      {t('agents.agentForm.countChip', { label, count })}
     </span>
   );
 }
@@ -570,6 +577,7 @@ function AgentCard({
   agent: AgentDefinitionResponseDto;
   onOpen: () => void;
 }) {
+  const t = useT();
   const { metadata } = agent;
   return (
     <button
@@ -589,21 +597,28 @@ function AgentCard({
           variant={agent.isBuiltin ? 'secondary' : 'outline'}
           className="shrink-0 text-[10px]"
         >
-          {SCOPE_LABELS[agent.scope]}
+          {t(SCOPE_LABELS[agent.scope])}
         </Badge>
       </div>
       <p className="line-clamp-2 min-h-8 text-xs text-muted-foreground">
-        {agent.description || 'No description'}
+        {agent.description || t('agents.agentForm.noDescription')}
       </p>
       <div className="flex gap-1.5">
-        <CountChip label="Skill" count={metadata.skills?.length ?? 0} />
-        <CountChip label="Tool" count={metadata.tools?.length ?? 0} />
+        <CountChip
+          label={t('agents.agentForm.skill')}
+          count={metadata.skills?.length ?? 0}
+        />
+        <CountChip
+          label={t('agents.agentForm.tool')}
+          count={metadata.tools?.length ?? 0}
+        />
       </div>
     </button>
   );
 }
 
 export function AgentsManager() {
+  const t = useT();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -635,11 +650,13 @@ export function AgentsManager() {
           className="gap-1.5"
         >
           <Plus className="size-3.5" />
-          New Agent
+          {t('agents.agentForm.newAgent')}
         </Button>
       </SettingsHeaderActions>
       <p className="text-sm text-muted-foreground">
-        {isLoading ? 'Loading agents...' : `Total ${agents.length} items`}
+        {isLoading
+          ? t('agents.agentForm.loading')
+          : t('agents.agentForm.total', { count: agents.length })}
       </p>
 
       <AgentFormSheet open={open} onOpenChange={setOpen} agent={selected} />
@@ -655,9 +672,9 @@ export function AgentsManager() {
         </div>
       ) : isError ? (
         <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-          Failed to load agents.{' '}
+          {t('agents.agentForm.loadFailed')}{' '}
           <Button variant="link" size="sm" onClick={() => void refetch()}>
-            Retry
+            {t('agents.settings.retry')}
           </Button>
         </div>
       ) : (

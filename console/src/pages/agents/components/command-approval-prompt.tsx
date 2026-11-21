@@ -5,6 +5,7 @@ import type {
 import { cn } from '@/lib/utils';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { useEffect, useRef, useState } from 'react';
+import { useT } from '@/lib/i18n-dictionary';
 
 interface CommandApprovalPromptProps {
   approval: PendingApproval;
@@ -40,6 +41,7 @@ function formatValue(value: unknown): string {
 
 /** One argument; long values show a preview until expanded. */
 function ParamValue({ value }: { value: unknown }) {
+  const t = useT();
   const text = formatValue(value);
   const [expanded, setExpanded] = useState(false);
   const long = text.length > VALUE_PREVIEW_LENGTH;
@@ -53,8 +55,10 @@ function ParamValue({ value }: { value: unknown }) {
           className="ml-1 font-sans text-primary underline-offset-2 hover:underline"
         >
           {expanded
-            ? 'Show less'
-            : `Show all (${text.length.toLocaleString()} characters)`}
+            ? t('agents.approval.showLess')
+            : t('agents.approval.showAll', {
+                count: text.length.toLocaleString(),
+              })}
         </button>
       )}
     </dd>
@@ -73,6 +77,7 @@ export function CommandApprovalPrompt({
   isSubmitting,
   onDecide,
 }: CommandApprovalPromptProps) {
+  const t = useT();
   const isPlan = approval.kind === 'plan';
   const isCommand =
     !isPlan && (!approval.tool || approval.tool === COMMAND_TOOL);
@@ -80,10 +85,10 @@ export function CommandApprovalPrompt({
     approval.toolMetadata?.title ?? humanize(approval.tool ?? '');
   const annotations = approval.toolMetadata?.annotations;
   const toolHints = [
-    annotations?.readOnlyHint === true ? 'Read-only' : null,
-    annotations?.destructiveHint === true ? 'May be destructive' : null,
-    annotations?.idempotentHint === true ? 'Idempotent' : null,
-    annotations?.openWorldHint === true ? 'Uses external services' : null,
+    annotations?.readOnlyHint === true ? t('agents.approval.hint.readOnly') : null,
+    annotations?.destructiveHint === true ? t('agents.approval.hint.destructive') : null,
+    annotations?.idempotentHint === true ? t('agents.approval.hint.idempotent') : null,
+    annotations?.openWorldHint === true ? t('agents.approval.hint.openWorld') : null,
   ].filter((hint): hint is string => hint !== null);
   const input =
     approval.input && typeof approval.input === 'object'
@@ -131,34 +136,34 @@ export function CommandApprovalPrompt({
     isPlan
       ? [
           {
-            label: 'Yes, run it automatically',
-            hint: 'Switches to Auto: commands run without asking',
+            label: t('agents.approval.runAuto'),
+            hint: t('agents.approval.runAutoHint'),
             run: () => decide('approved', { mode: 'auto' }),
           },
           {
-            label: 'Yes, but approve each command',
-            hint: 'Switches to Manual: asks before each new command',
+            label: t('agents.approval.runManual'),
+            hint: t('agents.approval.runManualHint'),
             run: () => decide('approved', { mode: 'manual' }),
           },
-          { label: 'No', run: () => decide('rejected') },
+          { label: t('agents.approval.no'), run: () => decide('rejected') },
         ]
       : [
-          { label: 'Yes', run: () => decide('approved') },
+          { label: t('agents.approval.yes'), run: () => decide('approved') },
           // Not for shell commands: "any input" would be any command
           ...(isCommand
             ? []
             : [
                 {
-                  label: `Yes, allow ${toolTitle} in this conversation`,
-                  hint: 'Later calls of this tool run without asking, whatever their input',
+                  label: t('agents.approval.allowTool', { tool: toolTitle }),
+                  hint: t('agents.approval.allowToolHint'),
                   run: () => decide('approved', { allowTool: true }),
                 },
               ]),
           {
-            label: 'Yes, allow all requests in this conversation',
+            label: t('agents.approval.allowAll'),
             run: () => decide('approved', { allowConversation: true }),
           },
-          { label: 'No', run: () => decide('rejected') },
+          { label: t('agents.approval.no'), run: () => decide('rejected') },
         ];
   // The feedback input comes right after the options
   const feedbackIndex = options.length;
@@ -229,7 +234,11 @@ export function CommandApprovalPrompt({
         ref={promptRef}
         role="alertdialog"
         aria-modal="true"
-        aria-label={isPlan ? 'Plan approval' : 'Permission request'}
+        aria-label={
+          isPlan
+            ? t('agents.approval.planLabel')
+            : t('agents.approval.permissionLabel')
+        }
         aria-labelledby={undefined}
         tabIndex={-1}
         onKeyDown={handleKeyDown}
@@ -248,15 +257,15 @@ export function CommandApprovalPrompt({
         <DialogPrimitive.Title asChild>
           <h3 className="text-base font-semibold">
             {isPlan
-              ? 'Run this plan?'
+              ? t('agents.approval.runPlan')
               : isCommand
-                ? 'Run this command?'
-                : `Allow ${toolTitle}?`}
+                ? t('agents.approval.runCommand')
+                : t('agents.approval.allowToolTitle', { tool: toolTitle })}
           </h3>
         </DialogPrimitive.Title>
         {queueSize > 1 && (
           <span className="ml-auto text-xs text-muted-foreground">
-            +{queueSize - 1} more waiting
+            {t('agents.approval.moreWaiting', { count: queueSize - 1 })}
           </span>
         )}
       </div>
@@ -270,7 +279,11 @@ export function CommandApprovalPrompt({
       {!isPlan && approval.toolMetadata?.source === 'mcp' && (
         <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
           {approval.toolMetadata.server && (
-            <span>MCP server: {approval.toolMetadata.server}</span>
+            <span>
+              {t('agents.approval.mcpServer', {
+                server: approval.toolMetadata.server,
+              })}
+            </span>
           )}
           {toolHints.map((hint) => (
             <span key={hint}>{hint}</span>
@@ -348,8 +361,8 @@ export function CommandApprovalPrompt({
           onFocus={() => setSelected(feedbackIndex)}
           placeholder={
             isPlan
-              ? 'Tell the agent how to change the plan'
-              : 'Tell the agent what to do instead'
+              ? t('agents.approval.planFeedback')
+              : t('agents.approval.feedback')
           }
           className={cn(
             'rounded-lg border bg-transparent px-3 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground',
@@ -359,7 +372,7 @@ export function CommandApprovalPrompt({
       </div>
 
       <p className="mt-2.5 text-xs text-muted-foreground">
-        Press a number, or ↑↓ and Enter · Esc to cancel
+        {t('agents.approval.keyboardHint')}
       </p>
       </DialogPrimitive.Content>
     </DialogPrimitive.Root>

@@ -598,7 +598,7 @@ describe('IntegrationDetailSheet', () => {
       expect(screen.getByText('arn:aws:iam::123:role/x')).toBeInTheDocument();
     });
     // Enum label, not the raw wire value.
-    expect(screen.getByText('Assume Role')).toBeInTheDocument();
+    expect(screen.getByText('Assume role')).toBeInTheDocument();
     expect(screen.queryByText('assumeRole')).not.toBeInTheDocument();
     expect(screen.getByText('AKIA123')).toBeInTheDocument();
     // Not in assumeRole's visible set: hidden values never render.
@@ -631,7 +631,7 @@ describe('IntegrationDetailSheet', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Access Key')).toBeInTheDocument();
+      expect(screen.getByText('Access key')).toBeInTheDocument();
     });
     expect(screen.getByText('AKIA123')).toBeInTheDocument();
     // roleArn is in the stored config but not visible for accessKey.
@@ -708,7 +708,7 @@ describe('IntegrationDetailSheet', () => {
     await user.click(
       await screen.findByRole('combobox', { name: 'Connection method' }),
     );
-    await user.click(await screen.findByRole('option', { name: 'Sso' }));
+    await user.click(await screen.findByRole('option', { name: 'SSO' }));
 
     expect(screen.getByLabelText(/start url/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/account id/i)).toBeInTheDocument();
@@ -731,7 +731,7 @@ describe('IntegrationDetailSheet', () => {
     await user.click(
       await screen.findByRole('combobox', { name: 'Connection method' }),
     );
-    await user.click(await screen.findByRole('option', { name: 'Assume Role' }));
+    await user.click(await screen.findByRole('option', { name: 'Assume role' }));
 
     const roleArn = screen.getByLabelText(/role arn/i);
     expect(roleArn.tagName).toBe('INPUT');
@@ -770,9 +770,9 @@ describe('IntegrationDetailSheet', () => {
     });
     await user.click(combo);
 
-    expect(screen.queryByRole('option', { name: 'Sso' })).toBeNull();
+    expect(screen.queryByRole('option', { name: 'SSO' })).toBeNull();
     expect(
-      screen.getByRole('option', { name: 'Assume Role' }),
+      screen.getByRole('option', { name: 'Assume role' }),
     ).toBeInTheDocument();
   });
 
@@ -808,7 +808,7 @@ describe('IntegrationDetailSheet', () => {
       await screen.findByRole('combobox', { name: 'Connection method' }),
     );
 
-    expect(screen.getByRole('option', { name: 'Sso' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'SSO' })).toBeInTheDocument();
   });
 
   it('drops stale method-scoped config on save but preserves hidden sso creds', async () => {

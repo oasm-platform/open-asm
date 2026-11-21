@@ -1,4 +1,5 @@
 import UAParser from 'ua-parser-js';
+import { t } from '@/lib/i18n-dictionary';
 
 export interface ParsedUserAgent {
   /** Browser, or the HTTP client for non-browser callers (API keys, workers, scripts). */
@@ -23,7 +24,7 @@ export function parseUserAgent(raw: string): ParsedUserAgent {
       client: raw.trim().split(/\s/)[0]?.replace('/', ' '),
       isBrowser: false,
       os: join(os.name, os.version),
-      deviceType: 'API client',
+      deviceType: t('settings.audit.device.apiClient'),
     };
   }
 
@@ -32,7 +33,14 @@ export function parseUserAgent(raw: string): ParsedUserAgent {
     isBrowser: true,
     os: join(os.name, os.version),
     // ua-parser-js leaves device.type undefined for desktops.
-    deviceType: device.type ? capitalize(device.type) : 'Desktop',
+    deviceType:
+      device.type === 'mobile'
+        ? t('settings.audit.device.mobile')
+        : device.type === 'tablet'
+          ? t('settings.audit.device.tablet')
+          : device.type
+            ? capitalize(device.type)
+            : t('settings.audit.device.desktop'),
     device: join(device.vendor, device.model),
   };
 }

@@ -9,6 +9,7 @@ import {
   useTemplatesControllerCreate,
 } from '@/services/apis/gen/queries';
 import { readApiError, toastStorageFull } from '../template-errors';
+import { useT } from '@/lib/i18n-dictionary';
 
 const YAML_FILE = /\.ya?ml$/i;
 
@@ -17,6 +18,7 @@ const YAML_FILE = /\.ya?ml$/i;
  * hidden file input behind `pick()`; render it next to the trigger.
  */
 export function useTemplateUpload() {
+  const t = useT();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -29,7 +31,7 @@ export function useTemplateUpload() {
     // Sequential: concurrent creates would race for the workspace quota.
     for (const file of files) {
       if (!YAML_FILE.test(file.name)) {
-        toast.error(`${file.name}: only .yaml or .yml files can be uploaded`);
+        toast.error(t('templates.upload.yamlOnly', { file: file.name }));
         continue;
       }
       try {
@@ -46,13 +48,13 @@ export function useTemplateUpload() {
           // Quota errors repeat for every remaining file; stop after the first.
           break;
         } else if ((status === 400 || status === 413) && message) {
-          toast.error(`${file.name}: ${message}`);
+          toast.error(t('templates.upload.fileError', { file: file.name, message }));
         } else {
           handleServerError(error);
         }
       }
     }
-    if (done) toast.success(`Uploaded ${done} template${done > 1 ? 's' : ''}`);
+    if (done) toast.success(t('templates.upload.done', { count: done }));
     await queryClient.invalidateQueries({
       queryKey: getTemplatesControllerGetManyQueryKey(),
     });
@@ -65,7 +67,7 @@ export function useTemplateUpload() {
       accept=".yaml,.yml"
       multiple
       hidden
-      aria-label="Upload templates"
+      aria-label={t('templates.upload.ariaLabel')}
       onChange={(e) => {
         void upload(e.target.files);
         e.target.value = '';

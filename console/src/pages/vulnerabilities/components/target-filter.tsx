@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -17,6 +18,7 @@ interface TargetFilterProps {
 }
 
 export function TargetFilter({ value, onValueChange }: TargetFilterProps) {
+  const t = useT();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
   const debouncedSearch = useDebounce(search, 500);
@@ -33,7 +35,7 @@ export function TargetFilter({ value, onValueChange }: TargetFilterProps) {
   const targets = useMemo(() => data?.data ?? [], [data?.data]);
 
   const selectedTarget = useMemo(
-    () => targets.find((t) => t.id === value),
+    () => targets.find((x) => x.id === value),
     [targets, value],
   );
 
@@ -52,7 +54,7 @@ export function TargetFilter({ value, onValueChange }: TargetFilterProps) {
           {selectedTarget ? (
             <span className="truncate max-w-[100px]">{selectedTarget.value}</span>
           ) : (
-            'Target'
+            t('vulnerabilities.targetFilter.label')
           )}
           {hasSelection ? (
             <X
@@ -72,7 +74,7 @@ export function TargetFilter({ value, onValueChange }: TargetFilterProps) {
           <div className="relative">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
-              placeholder="Search targets..."
+              placeholder={t('vulnerabilities.targetFilter.search')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="h-8 text-xs pl-7"
@@ -81,11 +83,11 @@ export function TargetFilter({ value, onValueChange }: TargetFilterProps) {
           <div className="max-h-48 overflow-y-auto">
             {isLoading ? (
               <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                Loading...
+                {t('common.loading')}
               </div>
             ) : targets.length === 0 ? (
               <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                No targets found
+                {t('vulnerabilities.targetFilter.empty')}
               </div>
             ) : (
               targets.map((target) => (
@@ -120,7 +122,7 @@ export function TargetFilter({ value, onValueChange }: TargetFilterProps) {
                   setSearch('');
                 }}
               >
-                Clear filter
+                {t('vulnerabilities.targetFilter.clear')}
               </Button>
             </div>
           )}

@@ -1,0 +1,12 @@
+{
+  "NOT_EMPTY": "{property} should not be empty",
+  "IS_STRING": "{property} must be a string",
+  "IS_EMAIL": "{property} must be an email",
+  "MIN_LENGTH": "{property} is too short (minimum {constraints.0} characters)",
+  "MAX_LENGTH": "{property} is too long (maximum {constraints.0} characters)",
+  "IS_UUID": "{property} must be a valid id",
+  "IS_ARRAY": "{property} must be a list",
+  "ARRAY_NOT_EMPTY": "{property} should not be empty",
+  "MATCHES": "{property} has an invalid format",
+  "PERMISSION_KEY": "Invalid permission key. Use \"*\" or \"domain.action\" (e.g. target.read)"
+}

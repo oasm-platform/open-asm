@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/tooltip';
 import { ToolConnectorConfigSheet } from '@/components/tools/tool-connector-config-sheet';
 import { ToolInstallConfirmDialog } from '@/components/tools/tool-install-confirm-dialog';
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import { formatCategory } from '@/pages/tools/components/format-category';
 import {
@@ -95,8 +96,6 @@ interface ToolPipelineBuilderProps {
   /** Tools not installed yet; each can be installed from the picker. */
   installableTools?: Tool[];
 }
-
-const BLOCKED_MESSAGE = 'This tool needs configuration — add it first, then configure from the panel.';
 
 /**
  * Backend readiness flags. The generated `Tool` type declares
@@ -179,6 +178,7 @@ const ToolProfileSelect = memo(function ToolProfileSelect({
   disabled?: boolean;
   onProfilesLoaded?: (toolId: string, ids: string[]) => void;
 }) {
+  const t = useT();
   const { data: profiles, isLoading } =
     useToolConfigProfilesControllerList(toolId);
 
@@ -199,7 +199,9 @@ const ToolProfileSelect = memo(function ToolProfileSelect({
   }, [isLoading, profiles, toolId, onProfilesLoaded]);
 
   if (isLoading) {
-    return <p className="text-xs text-muted-foreground">Loading profiles...</p>;
+    return (
+      <p className="text-xs text-muted-foreground">{t('projects.pipelineBuilder.loadingProfiles')}</p>
+    );
   }
 
   const profileIds = profileList.map((p) => p.id);
@@ -208,7 +210,7 @@ const ToolProfileSelect = memo(function ToolProfileSelect({
   if (profileList.length === 0 && !orphan) {
     return (
       <p className="text-xs text-muted-foreground">
-        No profiles — configure inline
+        {t('projects.pipelineBuilder.noProfiles')}
       </p>
     );
   }
@@ -226,23 +228,27 @@ const ToolProfileSelect = memo(function ToolProfileSelect({
       <SelectTrigger
         size="sm"
         className="w-full"
-        title={orphan ? `Linked profile ${value} was deleted` : undefined}
+        title={orphan ? t('projects.pipelineBuilder.linkedDeletedTitle', { id: value ?? '' }) : undefined}
       >
         <SelectValue
-          placeholder={orphan ? `Deleted profile (${shortId})` : 'Select a profile'}
+          placeholder={
+            orphan
+              ? t('projects.pipelineBuilder.deletedProfile', { id: shortId })
+              : t('projects.pipelineBuilder.selectProfile')
+          }
         />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="__none__">No profile (use defaults)</SelectItem>
+        <SelectItem value="__none__">{t('projects.pipelineBuilder.noProfile')}</SelectItem>
         {orphan && value && (
           <SelectItem value={value} disabled>
-            Deleted profile ({shortId})
+            {t('projects.pipelineBuilder.deletedProfile', { id: shortId })}
           </SelectItem>
         )}
         {profileList.map((p) => (
           <SelectItem key={p.id} value={p.id}>
             {p.name}
-            {p.isDefault ? ' (default)' : ''}
+            {p.isDefault ? t('projects.pipelineBuilder.defaultSuffix') : ''}
           </SelectItem>
         ))}
       </SelectContent>
@@ -255,7 +261,7 @@ const ToolProfileSelect = memo(function ToolProfileSelect({
         <Tooltip>
           <TooltipTrigger asChild>{select}</TooltipTrigger>
           <TooltipContent>
-            <p>Linked profile {shortId} was deleted.</p>
+            <p>{t('projects.pipelineBuilder.linkedDeletedTooltip', { id: shortId })}</p>
           </TooltipContent>
         </Tooltip>
       ) : (
@@ -264,7 +270,7 @@ const ToolProfileSelect = memo(function ToolProfileSelect({
       {orphan && (
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs text-destructive">
-            Linked profile was deleted.
+            {t('projects.pipelineBuilder.linkedDeleted')}
           </p>
           <Button
             variant="ghost"
@@ -273,7 +279,7 @@ const ToolProfileSelect = memo(function ToolProfileSelect({
             disabled={disabled}
             onClick={() => onChange(undefined)}
           >
-            Clear
+            {t('projects.pipelineBuilder.clear')}
           </Button>
         </div>
       )}
@@ -301,6 +307,7 @@ const PipelineToolLogo = memo(
     { tool, added, disabled, onClick, ...rest },
     ref,
   ) {
+    const t = useT();
     return (
       <button
         ref={ref}
@@ -314,7 +321,9 @@ const PipelineToolLogo = memo(
       onClick={() => onClick(tool)}
       aria-pressed={added}
       aria-label={
-        added ? `Configure ${tool.name}` : `Add ${tool.name} to pipeline`
+        added
+          ? t('projects.pipelineBuilder.configureAria', { name: tool.name })
+          : t('projects.pipelineBuilder.addAria', { name: tool.name })
       }
     >
       <div className="relative">
@@ -364,6 +373,7 @@ function InstallableToolLogo({
   disabled?: boolean;
   onInstalled: (toolId: string) => void;
 }) {
+  const t = useT();
   const install = useInstallPipelineTool();
   const [installing, setInstalling] = useState(false);
 
@@ -387,7 +397,7 @@ function InstallableToolLogo({
             (disabled || installing) && 'cursor-not-allowed opacity-50',
           )}
           disabled={disabled || installing}
-          aria-label={`Install ${tool.name}`}
+          aria-label={t('projects.pipelineBuilder.installAria', { name: tool.name })}
         >
           <div className="relative">
             <div className="grayscale opacity-40 transition-all duration-300 group-hover:grayscale-0 group-hover:opacity-100">
@@ -435,6 +445,7 @@ function InstallableToolsSection({
   disabled?: boolean;
   onInstalled: (toolId: string) => void;
 }) {
+  const t = useT();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search.trim(), 300);
   const { results, isFetching } = useInstallableToolSearch(
@@ -452,8 +463,8 @@ function InstallableToolsSection({
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search tools to install..."
-            aria-label="Search tools to install"
+            placeholder={t('projects.pipelineBuilder.searchInstallable')}
+            aria-label={t('projects.pipelineBuilder.searchInstallableAria')}
             className="pl-8"
             disabled={disabled}
           />
@@ -462,7 +473,7 @@ function InstallableToolsSection({
           )}
         </div>
         <span className="text-xs text-muted-foreground">
-          Not installed · click to install in this workspace
+          {t('projects.pipelineBuilder.notInstalledHint')}
         </span>
       </div>
       {shown.length > 0 ? (
@@ -479,7 +490,7 @@ function InstallableToolsSection({
       ) : (
         !isFetching && (
           <p className="text-xs text-muted-foreground">
-            No tools to install match &quot;{debouncedSearch}&quot;
+            {t('projects.pipelineBuilder.noInstallableMatch', { search: debouncedSearch })}
           </p>
         )
       )}
@@ -519,6 +530,7 @@ const SelectedToolPanel = memo(function SelectedToolPanel({
   onOpenSheet: (toolId: string) => void;
   onProfilesLoaded: (toolId: string, ids: string[]) => void;
 }) {
+  const t = useT();
   const orphan = isProfileOrphan(entry, knownProfileIds);
   const custom = hasInlineConfig(entry);
   const linked = !!entry.configProfileId && !orphan;
@@ -538,19 +550,19 @@ const SelectedToolPanel = memo(function SelectedToolPanel({
           size="icon"
           className="size-6 shrink-0"
           onClick={onClose}
-          aria-label={`Close ${toolLabel} panel`}
+          aria-label={t('projects.pipelineBuilder.closePanelAria', { name: toolLabel })}
         >
           <X className="size-3.5" />
         </Button>
       </div>
       <div className="flex flex-wrap gap-1.5">
         {orphan ? (
-          <Badge variant="destructive">Profile deleted</Badge>
+          <Badge variant="destructive">{t('projects.pipelineBuilder.profileDeleted')}</Badge>
         ) : (
-          linked && <Badge variant="outline">Profile linked</Badge>
+          linked && <Badge variant="outline">{t('projects.pipelineBuilder.profileLinked')}</Badge>
         )}
-        {custom && <Badge variant="secondary">Custom</Badge>}
-        {usesDefault && <Badge variant="soft">Using default</Badge>}
+        {custom && <Badge variant="secondary">{t('projects.pipelineBuilder.custom')}</Badge>}
+        {usesDefault && <Badge variant="soft">{t('projects.pipelineBuilder.usingDefault')}</Badge>}
 
       </div>
       <Select
@@ -560,14 +572,14 @@ const SelectedToolPanel = memo(function SelectedToolPanel({
         }
         disabled={disabled}
       >
-        <SelectTrigger aria-label="Step" className="h-8">
+        <SelectTrigger aria-label={t('projects.pipelineBuilder.step')} className="h-8">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           {Array.from({ length: stageCount }, (_, i) => i + 1).map((stage) => (
             <SelectItem key={stage} value={String(stage)}>
-              Step {stage}
-              {stage === 1 ? ' (starts the run)' : ''}
+              {t('projects.create.stepN', { n: stage })}
+              {stage === 1 ? t('projects.pipelineBuilder.startsRun') : ''}
             </SelectItem>
           ))}
         </SelectContent>
@@ -580,7 +592,7 @@ const SelectedToolPanel = memo(function SelectedToolPanel({
           }
           disabled={disabled}
         >
-          <SelectTrigger aria-label="Category" className="h-8">
+          <SelectTrigger aria-label={t('projects.pipelineBuilder.category')} className="h-8">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -594,9 +606,13 @@ const SelectedToolPanel = memo(function SelectedToolPanel({
       )}
       {accepted.length > 0 && (
         <p className="text-xs text-muted-foreground">
-          Takes {describeKinds(entry.input ?? accepted)}
+          {t('projects.pipelineBuilder.takes', {
+            kinds: describeKinds(entry.input ?? accepted),
+          })}
           {produces.length > 0 &&
-            ` · finds ${describeKinds(produces).replace(/, else /g, ', ')}`}
+            ` · ${t('projects.pipelineBuilder.finds', {
+              kinds: produces.map((kind) => KIND_LABEL[kind]).join(', '),
+            })}`}
         </p>
       )}
       {accepted.length > 1 && (
@@ -610,7 +626,7 @@ const SelectedToolPanel = memo(function SelectedToolPanel({
           }
           disabled={disabled}
         >
-          <SelectTrigger aria-label="Input" className="h-8">
+          <SelectTrigger aria-label={t('projects.pipelineBuilder.input')} className="h-8">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -619,7 +635,7 @@ const SelectedToolPanel = memo(function SelectedToolPanel({
             </SelectItem>
             {accepted.map((kind) => (
               <SelectItem key={kind} value={kind}>
-                Only {KIND_LABEL[kind]}
+                {t('projects.pipelineBuilder.onlyKind', { kind: KIND_LABEL[kind] })}
               </SelectItem>
             ))}
           </SelectContent>
@@ -647,7 +663,7 @@ const SelectedToolPanel = memo(function SelectedToolPanel({
           onClick={() => onOpenSheet(tool.id)}
         >
           <Pencil className="mr-1 size-3" />
-          Inline config
+          {t('projects.pipelineBuilder.inlineConfig')}
         </Button>
       </div>
       <div className="flex items-center justify-end border-t pt-2">
@@ -659,7 +675,7 @@ const SelectedToolPanel = memo(function SelectedToolPanel({
           onClick={() => onRemove(tool.id)}
         >
           <Trash2 className="mr-1 size-3.5" />
-          Remove
+          {t('common.remove')}
         </Button>
       </div>
     </div>
@@ -690,6 +706,7 @@ const PendingToolPanel = memo(function PendingToolPanel({
   ) => void;
   onProfilesLoaded: (toolId: string, ids: string[]) => void;
 }) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
@@ -701,7 +718,7 @@ const PendingToolPanel = memo(function PendingToolPanel({
           size="icon"
           className="size-6 shrink-0"
           onClick={onClose}
-          aria-label={`Close ${tool.name} panel`}
+          aria-label={t('projects.pipelineBuilder.closePanelAria', { name: tool.name })}
         >
           <X className="size-3.5" />
         </Button>
@@ -721,7 +738,7 @@ const PendingToolPanel = memo(function PendingToolPanel({
           onClick={() => onOpenSheet(tool.id)}
         >
           <Pencil className="mr-1 size-3" />
-          Inline config
+          {t('projects.pipelineBuilder.inlineConfig')}
         </Button>
       </div>
       <Button
@@ -735,7 +752,7 @@ const PendingToolPanel = memo(function PendingToolPanel({
           // profile / inline config) need an explicit configuration choice.
           // Built-in, provider, and already-ready connectors add directly.
           if (!isPipelineToolReady(tool, cfg as PipelineToolEntry | undefined) && !hasProfileId && !hasInline) {
-            toast.info('Set a config profile or inline config first.');
+            toast.info(t('projects.pipelineBuilder.configFirst'));
             return;
           }
           onAdd(
@@ -745,7 +762,7 @@ const PendingToolPanel = memo(function PendingToolPanel({
           );
         }}
       >
-        Add to pipeline
+        {t('projects.pipelineBuilder.addToPipeline')}
       </Button>
     </div>
   );
@@ -767,6 +784,7 @@ const MissingToolPopover = memo(function MissingToolPopover({
   onToggle: (toolId: string) => void;
   onRemove: (id: string) => void;
 }) {
+  const t = useT();
   return (
     <Popover
       open={open}
@@ -779,7 +797,7 @@ const MissingToolPopover = memo(function MissingToolPopover({
           disabled={disabled}
           onClick={() => !disabled && onToggle(toolId)}
           aria-pressed
-          aria-label={`Configure ${toolId}`}
+          aria-label={t('projects.pipelineBuilder.configureAria', { name: toolId })}
         >
           <div className="relative">
             <span className="flex size-10 items-center justify-center rounded-full border-2 border-[var(--color-primary)]/40 text-sm font-semibold uppercase group-hover:border-[var(--color-primary)]">
@@ -797,8 +815,7 @@ const MissingToolPopover = memo(function MissingToolPopover({
       <PopoverContent side="bottom" align="center" className="w-72">
         <div className="flex flex-col gap-3">
           <p className="text-xs text-muted-foreground">
-            This tool is no longer installed — it stays in the pipeline until
-            removed.
+            {t('projects.pipelineBuilder.missingTool')}
           </p>
           <div className="flex items-center justify-end border-t pt-2">
             <Button
@@ -809,7 +826,7 @@ const MissingToolPopover = memo(function MissingToolPopover({
               onClick={() => onRemove(toolId)}
             >
               <Trash2 className="mr-1 size-3.5" />
-              Remove
+              {t('common.remove')}
             </Button>
           </div>
         </div>
@@ -834,12 +851,13 @@ function PipelineStages({
   value: PipelineToolEntry[];
   tools: Tool[];
 }) {
+  const t = useT();
   const names = new Map(tools.map((tool) => [tool.id, tool.name]));
   const stages = [...new Set(value.map(stageOf))].sort((a, b) => a - b);
   return (
     <ol
       className="flex flex-wrap items-center gap-2 text-xs"
-      aria-label="Pipeline order"
+      aria-label={t('projects.pipelineBuilder.order')}
     >
       {stages.map((stage, index) => (
         <li key={stage} className="flex items-center gap-2">
@@ -848,7 +866,7 @@ function PipelineStages({
             <span className="font-medium text-muted-foreground">{index + 1}</span>
             {value
               .filter((entry) => stageOf(entry) === stage)
-              .map((entry) => names.get(entry.toolId) ?? 'unknown')
+              .map((entry) => names.get(entry.toolId) ?? t('projects.pipelineBuilder.unknownTool'))
               .join(', ')}
           </span>
         </li>
@@ -862,9 +880,10 @@ function ToolPipelineBuilderComponent({
   value,
   onChange,
   disabled = false,
-  emptyMessage = 'No scanning tools installed',
+  emptyMessage,
   installableTools = [],
 }: ToolPipelineBuilderProps) {
+  const t = useT();
   const [search, setSearch] = useState('');
   // Only one selected-tool panel open at a time (tool id).
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -1064,7 +1083,7 @@ function ToolPipelineBuilderComponent({
         <Tooltip key={tool.id}>
           <TooltipTrigger asChild>{button}</TooltipTrigger>
           <TooltipContent>
-            <p>{BLOCKED_MESSAGE}</p>
+            <p>{t('projects.pipelineBuilder.blocked')}</p>
           </TooltipContent>
         </Tooltip>
       );
@@ -1084,22 +1103,22 @@ function ToolPipelineBuilderComponent({
                 setSearch(e.target.value);
                 setActiveId(null);
               }}
-              placeholder="Search installed tools..."
+              placeholder={t('projects.pipelineBuilder.searchInstalled')}
               className="pl-8"
               disabled={disabled}
             />
           </div>
           <span className="text-xs text-muted-foreground">
-            {value.length} selected
-            {value.length > 0 && stageCount <= 2 ? ' · runs in parallel' : ''}
+            {t('projects.runDialog.selected', { n: value.length })}
+            {value.length > 0 && stageCount <= 2 ? t('projects.pipelineBuilder.parallel') : ''}
           </span>
         </div>
 
         {tools.length === 0 && (
           <p className="text-sm text-muted-foreground">
             {installableTools.length > 0
-              ? 'No tools installed yet. Install one below to add it.'
-              : emptyMessage}
+              ? t('projects.pipelineBuilder.noInstalledYet')
+              : (emptyMessage ?? t('projects.pipelineBuilder.noScanningTools'))}
           </p>
         )}
         <div className="flex flex-wrap gap-5">
@@ -1206,12 +1225,12 @@ function ToolPipelineBuilderComponent({
         {stageCount > 2 && <PipelineStages value={value} tools={tools} />}
         {tools.length > 0 && filteredTools.length === 0 && (
           <p className="text-sm text-muted-foreground">
-            No tools match &quot;{search.trim()}&quot;
+            {t('projects.pipelineBuilder.noMatch', { search: search.trim() })}
           </p>
         )}
         {!allValid && value.length > 0 && (
           <p className="text-xs text-muted-foreground">
-            Some tools still need configuration before they can run.
+            {t('projects.pipelineBuilder.needsConfig')}
           </p>
         )}
       </div>
