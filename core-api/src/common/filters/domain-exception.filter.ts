@@ -10,7 +10,9 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { BaseExceptionFilter } from '@nestjs/core';
+import { I18nContext } from 'nestjs-i18n';
 import { QueryFailedError } from 'typeorm';
+import { translateErrorMessage } from '@/common/errors/error-i18n';
 
 type HttpExceptionClass = new (
   message: string,
@@ -49,13 +51,48 @@ export function toHttpException(error: DomainError | QueryFailedError): Error {
 }
 
 /**
- * Answers domain errors and client-caused database errors on HTTP routes.
- * Registered in `configureApp`, so it covers HTTP only: the gRPC
+ * The same exception with its message in the request's language (the
+ * `errors` namespace), so the console can show it as is.
+ */
+export function localizeHttpException(
+  error: HttpException,
+  i18n: I18nContext | undefined,
+): HttpException {
+  const body = error.getResponse();
+  const message =
+    typeof body === 'string'
+      ? body
+      : (body as { message?: unknown } | null)?.message;
+  if (typeof message !== 'string') return error;
+  const translated = translateErrorMessage(message, i18n);
+  if (translated === message) return error;
+  return new HttpException(
+    typeof body === 'string' ? translated : { ...body, message: translated },
+    error.getStatus(),
+    { cause: error },
+  );
+}
+
+/**
+ * Answers domain errors, client-caused database errors and Nest HTTP
+ * exceptions on HTTP routes, with the message translated. Registered in
+ * `configureApp` before `I18nValidationExceptionFilter`, which Nest tries
+ * first, so validation errors keep their own handling. The gRPC
  * microservice keeps Nest's RPC handling.
  */
-@Catch(DomainError, QueryFailedError)
+@Catch(DomainError, QueryFailedError, HttpException)
 export class DomainExceptionFilter extends BaseExceptionFilter {
-  catch(exception: DomainError | QueryFailedError, host: ArgumentsHost): void {
-    super.catch(toHttpException(exception), host);
+  catch(
+    exception: DomainError | QueryFailedError | HttpException,
+    host: ArgumentsHost,
+  ): void {
+    const error =
+      exception instanceof HttpException ? exception : toHttpException(exception);
+    super.catch(
+      error instanceof HttpException && host.getType() === 'http'
+        ? localizeHttpException(error, I18nContext.current(host))
+        : error,
+      host,
+    );
   }
 }

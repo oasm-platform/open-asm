@@ -40,6 +40,9 @@ export class I18nDictionaryController {
       string,
       Record<string, Record<string, string>>
     >;
-    return { lang, dictionaries: all[lang] ?? {} };
+    // `errors` is translated server-side (DomainExceptionFilter); the console never reads it
+    const dictionaries = { ...all[lang] };
+    delete dictionaries.errors;
+    return { lang, dictionaries };
   }
 }
