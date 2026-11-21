@@ -1,5 +1,6 @@
-import { CATALOG, fieldOps } from '../catalog/catalog';
-import type { FieldDef } from '../catalog/catalog.types';
+import { assertCatalog, buildCatalog, CATALOG, fieldOps, OP_VALUE_SHAPE } from '../catalog/catalog';
+import type { FieldDef, ResourceDef } from '../catalog/catalog.types';
+import { RESOURCES, targetsResource } from '../catalog/resources';
 import type { QueryScope } from '../domain/query.types';
 import { parseBatch, validateBatch } from '../domain/query-validator';
 import { planQuery, type QueryPlan } from './planner';
@@ -90,6 +91,60 @@ describe('planQuery', () => {
     expectScopedFirst(p.root.sql);
   });
 
+  it('compiles nested groups and negations with their own parentheses', () => {
+    const p = plan({
+      from: 'services',
+      select: ['port'],
+      where: {
+        logic: 'or',
+        items: [
+          { field: 'port', op: 'eq', value: '22' },
+          { not: { logic: 'and', items: [{ field: 'port', op: 'gte', value: '1024' }, { field: 'lastSeen', op: 'isNull' }] } },
+        ],
+      },
+    });
+    expect(p.root.sql).toContain(
+      '((("r".port) = ANY(CAST(:asq_q0_w0 AS int8[]))) OR NOT (((("r".port) >= CAST(:asq_q0_w1 AS int8)) AND (("r"."lastSeenAt") IS NULL))))',
+    );
+    expectScopedFirst(p.root.sql);
+  });
+
+  it('compiles the new operators to parameterized tests', () => {
+    const sql = (from: string, cond: Record<string, unknown>) => {
+      const p = plan({ from, where: { logic: 'and', items: [cond] } });
+      return { sql: whereOf(p.root.sql), params: Object.values(p.root.params) };
+    };
+    expect(sql('services', { field: 'port', op: 'between', value: ['1', '1024'] }).sql).toContain(
+      '("r".port) >= CAST(:asq_q0_w0 AS int8) AND ("r".port) <= CAST(:asq_q0_w1 AS int8)',
+    );
+    const starts = sql('hosts', { field: 'value', op: 'startsWith', value: 'a_b%' });
+    expect(starts.sql).toContain('("r".value) ILIKE :asq_q0_w0');
+    expect(starts.params).toContain('a\\_b\\%%');
+    expect(sql('hosts', { field: 'value', op: 'endsWith', value: '.io' }).params).toContain('%.io');
+    expect(sql('ips', { field: 'ip', op: 'notInSubnet', value: ['10.0.0.0/8'] }).sql).toMatch(/NOT \(.*<<= ANY\(CAST\(:asq_q0_w0 AS inet\[\]\)\)/);
+    expect(sql('vulnerabilities', { field: 'cve', op: 'containsAll', value: ['CVE-1'] }).sql).toMatch(/@> CAST\(:asq_q0_w0 AS text\[\]\)/);
+    expect(sql('services', { field: 'lastSeen', op: 'isNotNull' }).sql).toContain('(("r"."lastSeenAt") IS NOT NULL)');
+  });
+
+  it('compiles relation tests to scoped (NOT) EXISTS and COUNT subqueries', () => {
+    const rel = (test: Record<string, unknown>) =>
+      whereOf(plan({ from: 'hosts', select: ['value'], where: { logic: 'and', items: [{ relation: 'services', ...test }] } }).root.sql);
+    const port22 = { logic: 'and', items: [{ field: 'port', op: 'eq', value: '22' }] };
+    const scoped = '"r_x0"."assetId" = "r".id AND "r_x0"."workspaceId" = :asq_q0_p0';
+    expect(rel({ where: port22 })).toContain(`(EXISTS (SELECT 1 FROM "asset_services" "r_x0" WHERE ${scoped} AND ((("r_x0".port)`);
+    expect(rel({ quantifier: 'none', where: port22 })).toContain(`(NOT EXISTS (SELECT 1 FROM "asset_services" "r_x0" WHERE ${scoped} AND (`);
+    expect(rel({ quantifier: 'every', where: port22 })).toContain(`(NOT EXISTS (SELECT 1 FROM "asset_services" "r_x0" WHERE ${scoped} AND NOT ((`);
+    expect(rel({ count: { op: 'gte', value: '5' } })).toContain(
+      `((SELECT COUNT(*) FROM "asset_services" "r_x0" WHERE ${scoped}) >= CAST(:asq_q0_w0 AS int8))`,
+    );
+  });
+
+  it('joins the parent chain of a relation test and keeps the child base predicate', () => {
+    const p = plan({ from: 'services', select: ['port'], where: { logic: 'and', items: [{ relation: 'host.vulnerabilities', quantifier: 'some' }] } });
+    expect(p.root.sql).toMatch(/INNER JOIN "assets" "r__host"/);
+    expect(p.root.sql).toMatch(/"r_x0"\."assetId" = "r__host"\.id AND "r_x0"\."workspaceId" = :asq_q0_p0 AND \("r_x0"\."reviewStatus" = 'approved'\)/);
+  });
+
   it('adds the project scope and the base predicate as their own terms', () => {
     const p = plan({ from: 'vulnerabilities', select: ['name'] }, { projectId: '22222222-2222-4222-8222-222222222222' });
     const where = whereOf(p.root.sql);
@@ -152,6 +207,50 @@ describe('planQuery', () => {
     expectScopedFirst(p.root.sql);
   });
 
+  it('compiles conditional aggregates, sum and having', () => {
+    const p = plan({
+      from: 'vulnerabilities',
+      groupBy: ['host.value'],
+      aggregate: {
+        total: { fn: 'count' },
+        critical: { fn: 'count', where: { logic: 'and', items: [{ field: 'severity', op: 'eq', value: 'critical' }] } },
+        score: { fn: 'sum', field: 'cvssScore' },
+      },
+      having: { logic: 'and', items: [{ field: 'critical', op: 'gt', value: '0' }, { not: { field: 'host.value', op: 'eq', value: 'a.io' } }] },
+      orderBy: [{ field: 'critical', dir: 'desc' }],
+    });
+    expect(p.root.sql).toContain('COUNT(*)::int8 AS "a0"');
+    expect(p.root.sql).toContain('(COUNT(*) FILTER (WHERE ((("r".severity) = ANY(CAST(:asq_q0_a1w0 AS text[]))))))::int8 AS "a1"');
+    expect(p.root.sql).toContain('SUM(("r"."cvssScore"))::float8 AS "a2"');
+    expect(p.root.sql).toMatch(/\nHAVING \(\(COALESCE\(\(COUNT\(\*\) FILTER \(WHERE .*\)\)::int8 > CAST\(:asq_q0_p\d+ AS int8\), false\)\) AND NOT \(\(COALESCE\(\("r__host"\)?.*= ANY\(CAST\(:asq_q0_p\d+ AS text\[\]\)\), false\)\)\)\)\nORDER BY "a1" DESC NULLS LAST/);
+    expect(p.shape.columns.map((c) => c.type)).toEqual(['text', 'int', 'int', 'float']);
+    expectScopedFirst(p.root.sql);
+  });
+
+  it('fills every bucket of the window, in the requested time zone', () => {
+    const p = plan(
+      { from: 'hosts', groupBy: [{ field: 'firstSeen', bucket: 'day' }], aggregate: { n: { fn: 'count' }, last: { fn: 'max', field: 'firstSeen' } }, fill: true },
+      {},
+      { since: 'now-7d' },
+    );
+    expect(p.root.sql).toMatch(/^SELECT asq_s\.g AS "g0", COALESCE\(asq_f\."a0", 0\) AS "a0", asq_f\."a1" AS "a1"\nFROM generate_series\(date_trunc\('day', CAST\(:asq_q0_p\d+ AS timestamptz\), 'UTC'\), CAST\(:asq_q0_p\d+ AS timestamptz\), interval '1 day', 'UTC'\) AS asq_s\(g\)\nLEFT JOIN \(/);
+    expect(p.root.sql).toMatch(/\) asq_f ON asq_f\."g0" = asq_s\.g\nORDER BY "g0" ASC NULLS LAST\nLIMIT/);
+    expect(p.limit).toBe(9);
+    expectScopedFirst(p.root.sql);
+
+    const batch = validateBatch(
+      CATALOG,
+      parseBatch({ window: { since: 'now-7d' }, options: { timezone: 'Asia/Ho_Chi_Minh' }, queries: { q: { from: 'hosts', groupBy: [{ field: 'firstSeen', bucket: 'day' }], aggregate: { n: { fn: 'count' } }, fill: true } } }),
+      SCOPE,
+      NOW,
+    );
+    const zoned = planQuery(CATALOG, batch.queries[0], { workspaceId: WS }, undefined, 0);
+    expect(zoned.root.sql).toMatch(/date_trunc\('day', \("r"\."createdAt"\)::timestamptz, CAST\(:asq_q0_p\d+ AS text\)\)/);
+    expect(zoned.root.sql).toMatch(/interval '1 day', CAST\(:asq_q0_p\d+ AS text\)\) AS asq_s\(g\)/);
+    expect(Object.values(zoned.root.params)).toContain('Asia/Ho_Chi_Minh');
+    expect(zoned.root.sql).not.toContain('Asia/');
+  });
+
   it('builds includes as scoped LATERAL fetches by parent key, without ROW_NUMBER', () => {
     const p = plan({ from: 'services', select: ['port'], include: { urls: { select: ['url'], limit: 3 }, technologies: {} } });
     expect(p.root.sql).toMatch(/\("r"\."latestHttpResponseId"\) AS "k1"|"r"\."latestHttpResponseId" AS "k1"/);
@@ -164,6 +263,62 @@ describe('planQuery', () => {
     expect(urls.params.asq_q0_p0).toBe(WS);
     const tech = p.includes[1].build(['b0b0b0b0-0000-4000-8000-000000000000']);
     expect(tech.sql).toMatch(/"i1"\."httpResponseId" = asq_p\.k/);
+  });
+});
+
+describe('planQuery with a predicate-scoped resource', () => {
+  // A table without a workspaceId column, scoped through its target.
+  const runs: ResourceDef = {
+    name: 'runs',
+    table: 'jobs',
+    description: 'Runs',
+    permission: 'target.read',
+    root: true,
+    projectScope: null,
+    scopePredicate: 'EXISTS (SELECT 1 FROM "targets" asq_rt WHERE asq_rt.id = {a}."targetId" AND asq_rt."workspaceId" = {ws})',
+    fields: {
+      id: { sql: '{a}.id', type: 'uuid', description: 'Row id' },
+      status: { sql: '{a}.status', type: 'text', description: 'Status' },
+      createdAt: { sql: '{a}."createdAt"', type: 'timestamp', description: 'Created', sortable: 'indexed' },
+    },
+    one: { target: { resource: 'targets', description: 'Target', on: '{b}.id = {a}."targetId"', join: 'inner' } },
+    many: {},
+    defaultSelect: ['status'],
+    defaultOrder: [{ field: 'createdAt', dir: 'desc' }],
+    defaultTimeField: 'createdAt',
+  };
+  const targets: ResourceDef = {
+    ...targetsResource,
+    many: { ...targetsResource.many, runs: { resource: 'runs', description: 'Runs', childKey: '"targetId"', parentKey: '{a}.id', indexedOrder: [] } },
+  };
+  const catalog = buildCatalog([...RESOURCES.map((r) => (r.name === 'targets' ? targets : r)), runs]);
+  const scopedRun = (alias: string) =>
+    `(EXISTS (SELECT 1 FROM "targets" asq_rt WHERE asq_rt.id = ${alias}."targetId" AND asq_rt."workspaceId" = :asq_q0_p0))`;
+  const planOn = (query: Record<string, unknown>) => {
+    const batch = validateBatch(catalog, parseBatch({ queries: { q: query } }), SCOPE, NOW);
+    return planQuery(catalog, batch.queries[0], { workspaceId: WS }, undefined, 0);
+  };
+
+  it('passes the boot check', () => {
+    expect(() => assertCatalog(catalog)).not.toThrow();
+  });
+
+  it('scopes the root with its predicate, first', () => {
+    const p = planOn({ from: 'runs', select: ['status', 'target.value'] });
+    expect(whereOf(p.root.sql).startsWith(scopedRun('"r"'))).toBe(true);
+    // The joined target has a column, but its parent does not: it gets the parameter.
+    expect(p.root.sql).toMatch(/INNER JOIN "targets" "r__target" ON \("r__target"\.id = "r"\."targetId"\) AND "r__target"\."workspaceId" = :asq_q0_p0/);
+  });
+
+  it('scopes a relation test and an include on it with its predicate', () => {
+    const p = planOn({
+      from: 'targets',
+      select: ['value'],
+      where: { logic: 'and', items: [{ relation: 'runs', where: { logic: 'and', items: [{ field: 'status', op: 'eq', value: 'failed' }] } }] },
+      include: { runs: {} },
+    });
+    expect(p.root.sql).toContain(`"r_x0"."targetId" = "r".id AND ${scopedRun('"r_x0"')}`);
+    expect(p.includes[0].build(['66666666-6666-4666-8666-666666666666']).sql).toContain(`AND ${scopedRun('"i0"')}`);
   });
 });
 
@@ -193,7 +348,9 @@ describe('planQuery property: every statement is workspace-scoped', () => {
   for (const res of roots) {
     for (const [name, field] of Object.entries(res.fields)) {
       for (const op of fieldOps(field)) {
-        const value = op === 'inSubnet' ? ['10.0.0.0/8'] : ['in', 'notIn'].includes(op) ? [sample(field)] : sample(field);
+        const shape = OP_VALUE_SHAPE[op];
+        const one = op === 'inSubnet' || op === 'notInSubnet' ? '10.0.0.0/8' : sample(field);
+        const value = shape === 'none' ? undefined : shape === 'list' ? [one] : shape === 'pair' ? [one, one] : one;
         cases.push([
           `${res.name}.${name} ${op}`,
           {
@@ -201,7 +358,7 @@ describe('planQuery property: every statement is workspace-scoped', () => {
             where: {
               logic: 'or',
               items: [
-                { field: name, op, value },
+                { not: { field: name, op, ...(value === undefined ? {} : { value }) } },
                 { logic: 'or', conditions: [{ field: 'id', op: 'eq', value: '44444444-4444-4444-8444-444444444444' }] },
               ],
             },
@@ -217,12 +374,28 @@ describe('planQuery property: every statement is workspace-scoped', () => {
         `${res.name} where ${relation}.${fieldName}`,
         { from: res.name, where: { logic: 'or', items: [{ field: `${relation}.${fieldName}`, op: 'eq', value: sample(field) }] } },
       ]);
+      const childWhere = { logic: 'or', items: [{ field: fieldName, op: 'eq', value: sample(field) }] };
+      for (const test of [
+        { quantifier: 'some', where: childWhere },
+        { quantifier: 'none', where: childWhere },
+        { quantifier: 'every', where: childWhere },
+        { count: { op: 'gte', value: '2' }, where: childWhere },
+      ]) {
+        cases.push([
+          `${res.name} ${JSON.stringify(test.quantifier ?? 'count')} ${relation}`,
+          { from: res.name, where: { logic: 'or', items: [{ relation, ...test }, { field: 'id', op: 'eq', value: '44444444-4444-4444-8444-444444444444' }] } },
+        ]);
+      }
     }
   }
 
   it.each(cases)('%s', (_label, query) => {
     const p = plan(query, { projectId: CATALOG[query.from as string].projectScope ? '55555555-5555-4555-8555-555555555555' : undefined });
     expectScopedFirst(p.root.sql);
+    // Every sub-select re-applies the workspace scope on its own row.
+    for (const [, alias] of p.root.sql.matchAll(/FROM "[a-z_]+" "(r_x\d+)"/g)) {
+      expect(p.root.sql).toContain(`"${alias}"."workspaceId" = :asq_q0_p0`);
+    }
     for (const value of Object.values(p.root.params)) {
       if (typeof value === 'string' && value.length > 3) expect(p.root.sql).not.toContain(value);
     }

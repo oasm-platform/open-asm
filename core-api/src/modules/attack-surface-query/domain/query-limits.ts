@@ -26,6 +26,8 @@ export interface AsqLimits {
   /** Strings longer than this are cut. */
   maxStringLength: number;
   allowHeavy: boolean;
+  /** Conditions (relation tests count), nesting depth, values per list. */
+  filter: { conditions: number; depth: number; values: number };
 }
 
 const HTTP: AsqLimits = {
@@ -38,7 +40,7 @@ const HTTP: AsqLimits = {
   defaultIncludeLimit: 10,
   maxIncludeLimit: 50,
   groupBy: 3,
-  aggregates: 5,
+  aggregates: 8,
   orderBy: 3,
   costBudget: 1000,
   maxPlannerCost: 200_000,
@@ -48,6 +50,7 @@ const HTTP: AsqLimits = {
   maxResponseBytes: 5 * 1024 * 1024,
   maxStringLength: 2000,
   allowHeavy: true,
+  filter: { conditions: 50, depth: 4, values: 200 },
 };
 
 const AGENT: AsqLimits = {
@@ -69,6 +72,7 @@ const AGENT: AsqLimits = {
   maxResponseBytes: 64 * 1024,
   maxStringLength: 512,
   allowHeavy: false,
+  filter: { conditions: 20, depth: 4, values: 50 },
 };
 
 /** Report mode: async job, long timeouts, large result sets (HTTP only). */

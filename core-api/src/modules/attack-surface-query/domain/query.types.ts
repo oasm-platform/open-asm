@@ -1,8 +1,7 @@
-import type { FilterTree } from '@/common/utils/filter-tree';
-
-import type { ManyRelationDef, ResourceDef } from '../catalog/catalog.types';
+import type { FieldType, ManyRelationDef, ResourceDef } from '../catalog/catalog.types';
 import type { ResolvedPath } from '../catalog/paths';
 import type { QueryMode } from './query.schema';
+import type { WhereNode } from './where';
 
 export type AsqCaller = 'http' | 'agent' | 'mcp';
 
@@ -21,7 +20,7 @@ export interface QueryScope {
 }
 
 export type Bucket = 'hour' | 'day' | 'week' | 'month';
-export type AggregateFn = 'count' | 'countDistinct' | 'min' | 'max' | 'avg';
+export type AggregateFn = 'count' | 'countDistinct' | 'sum' | 'min' | 'max' | 'avg';
 export type SortDir = 'asc' | 'desc';
 
 export interface NormalizedOrder {
@@ -41,8 +40,7 @@ export interface NormalizedInclude {
   def: ManyRelationDef;
   resource: ResourceDef;
   select: ResolvedPath[];
-  where?: FilterTree;
-  wherePaths: ReadonlyMap<string, ResolvedPath>;
+  where?: WhereNode;
   orderBy: NormalizedOrder[];
   /** Rows per parent. */
   limit: number;
@@ -59,7 +57,19 @@ export interface NormalizedAggregate {
   alias: string;
   fn: AggregateFn;
   path?: ResolvedPath;
+  /** Rows the aggregate reads (`FILTER (WHERE …)`). */
+  where?: WhereNode;
 }
+
+/** What a `having` condition tests: a group key or an aggregate, by index. */
+export type HavingRef = { kind: 'group' | 'aggregate'; index: number };
+
+export type HavingNode =
+  | { kind: 'cond'; ref: HavingRef; op: HavingOp; values: string[]; type: FieldType }
+  | { kind: 'group'; logic: 'and' | 'or'; items: HavingNode[] }
+  | { kind: 'not'; item: HavingNode };
+
+export type HavingOp = 'eq' | 'neq' | 'in' | 'notIn' | 'gt' | 'gte' | 'lt' | 'lte';
 
 export interface NormalizedWindow {
   path: ResolvedPath;
@@ -74,13 +84,16 @@ export interface NormalizedQuery {
   mode: 'list' | 'aggregate';
   select: ResolvedPath[];
   include: NormalizedInclude[];
-  /** Filter tree with timestamp values resolved to ISO strings. */
-  where?: FilterTree;
-  /** Paths named in `where`, by path. */
-  wherePaths: ReadonlyMap<string, ResolvedPath>;
+  /** Resolved filter, timestamp values as ISO strings. */
+  where?: WhereNode;
   window?: NormalizedWindow;
   groupBy: NormalizedGroup[];
   aggregate: NormalizedAggregate[];
+  having?: HavingNode;
+  /** Emit every bucket of the window (aggregate mode, one time group). */
+  fill: boolean;
+  /** IANA zone the time buckets are cut in. */
+  timezone: string;
   orderBy: NormalizedOrder[];
   limit: number;
   cursor?: string;
