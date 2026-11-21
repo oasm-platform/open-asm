@@ -31,6 +31,7 @@ import { AwsSsoConnect } from './aws-sso-connect';
 import { CapabilityPicker } from './capability-picker';
 import { IntegrationLogo } from './integration-logo';
 import { SchemaField, isPropertyVisible, type SchemaProperty } from './schema-field';
+import { groupLabel } from '../schema-i18n';
 
 /** Schema fields the AWS SSO wizard collects itself (not the raw form). */
 const AWS_SSO_WIZARD_FIELDS = ['region', 'startUrl', 'accountId', 'roleName'];
@@ -403,13 +404,11 @@ export function ConnectIntegrationSheet({
           })}
 
           {Object.entries(propertyGroups).map(([groupKey, fields]) => {
-            const groupLabel =
-              groupKey.charAt(0).toUpperCase() + groupKey.slice(1);
 
             return (
               <div key={groupKey} className="space-y-3">
                 <Label className="text-sm font-semibold">
-                  {groupLabel}
+                  {groupLabel(t, groupKey)}
                 </Label>
                 <div className="grid grid-cols-2 gap-3">
                   {fields.map(([key, prop]) => {

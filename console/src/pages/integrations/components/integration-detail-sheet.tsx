@@ -46,6 +46,7 @@ import { getEffectiveRequired } from './connect-integration-sheet';
 import { IntegrationLogo } from './integration-logo';
 import { RepositoryList } from './repository-list';
 import { SchemaField, isPropertyVisible, type SchemaProperty } from './schema-field';
+import { groupLabel } from '../schema-i18n';
 import { TelegramConnect } from './telegram-connect';
 
 const SOURCE_CODE_CAPABILITY = 'SOURCE_CODE';
@@ -499,13 +500,11 @@ export function IntegrationDetailSheet({
 
           {/* Grouped properties */}
           {Object.entries(propertyGroups).map(([groupKey, fields]) => {
-            const groupLabel =
-              groupKey.charAt(0).toUpperCase() + groupKey.slice(1);
 
             return (
               <div key={groupKey} className="space-y-3">
                 <Label className="text-sm font-semibold">
-                  {groupLabel}
+                  {groupLabel(t, groupKey)}
                 </Label>
                 <div className="grid grid-cols-2 gap-3">
                   {fields.map(([key, prop]) => {

@@ -18,6 +18,7 @@ import { AppsTabContent } from './components/apps-tab-content';
 import { ConnectIntegrationSheet } from './components/connect-integration-sheet';
 import { ConnectedTabContent } from './components/connected-tab-content';
 import { IntegrationDetailSheet } from './components/integration-detail-sheet';
+import { categoryLabel, localizeSchema } from './schema-i18n';
 
 const TABS: { value: string; labelKey: string }[] = [
   { value: 'applications', labelKey: 'integrations.tabs.applications' },
@@ -105,10 +106,12 @@ export default function Integrations() {
     });
 
   const rawSchema = schemasData as SchemaResponse | undefined;
-  const appSchemas = [...(rawSchema?.schema?.oneOf ?? [])].sort(
-    (a, b) =>
-      (b.isAvailable === false ? 0 : 1) - (a.isAvailable === false ? 0 : 1),
-  );
+  const appSchemas = (rawSchema?.schema?.oneOf ?? [])
+    .map((schema) => localizeSchema(t, schema))
+    .sort(
+      (a, b) =>
+        (b.isAvailable === false ? 0 : 1) - (a.isAvailable === false ? 0 : 1),
+    );
 
   // The category filter is a capability filter: a multi-capability app (e.g.
   // GitHub) shows up under every capability it supports.
@@ -152,12 +155,7 @@ export default function Integrations() {
     detailIntegration &&
     appSchemas.find((s) => s.$id === detailIntegration.appType);
 
-  const formatCategory = (category: string): string => {
-    return category
-      .replace(/_/g, ' ')
-      .toLowerCase()
-      .replace(/\b\w/g, (char) => char.toUpperCase());
-  };
+  const formatCategory = (category: string) => categoryLabel(t, category);
 
   const handleCardClick = (appSchema: SchemaOneOfItem) => {
     if (appSchema.isAvailable === false) return;

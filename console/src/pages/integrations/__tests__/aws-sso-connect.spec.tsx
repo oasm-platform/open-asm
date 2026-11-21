@@ -369,7 +369,7 @@ describe('AwsSsoConnect', () => {
       <ConnectIntegrationSheet schema={awsSchema} open onOpenChange={vi.fn()} />,
     );
 
-    await pickOption(user, 'Connection method', 'Sso');
+    await pickOption(user, 'Connection method', 'SSO');
 
     expect(
       await screen.findByRole('button', { name: /start authorization/i }),

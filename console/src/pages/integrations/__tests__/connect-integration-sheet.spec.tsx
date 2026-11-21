@@ -427,7 +427,7 @@ describe('ConnectIntegrationSheet', () => {
     const combo = await screen.findByRole('combobox', {
       name: 'Connection method',
     });
-    expect(combo).toHaveTextContent('Access Key');
+    expect(combo).toHaveTextContent('Access key');
     // The default method is accessKey, so its two fields are shown…
     expect(screen.getByLabelText(/access key id/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/secret access key/i)).toBeInTheDocument();
@@ -462,7 +462,7 @@ describe('ConnectIntegrationSheet', () => {
     expect(screen.queryByText('External ID')).not.toBeInTheDocument();
     expect(screen.queryByText('Start URL')).not.toBeInTheDocument();
 
-    await selectConnectionMethod(user, 'Assume Role');
+    await selectConnectionMethod(user, 'Assume role');
     expect(screen.queryByText('Web identity token')).not.toBeInTheDocument();
     expect(screen.queryByText('Start URL')).not.toBeInTheDocument();
   });
@@ -471,7 +471,7 @@ describe('ConnectIntegrationSheet', () => {
     const { user } = renderWithProviders(
       <ConnectIntegrationSheet schema={awsSchema} open onOpenChange={vi.fn()} />,
     );
-    await selectConnectionMethod(user, 'Assume Role');
+    await selectConnectionMethod(user, 'Assume role');
 
     expect(screen.getByLabelText(/access key id/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/secret access key/i)).toBeInTheDocument();
@@ -490,10 +490,10 @@ describe('ConnectIntegrationSheet', () => {
     await screen.findByRole('combobox', { name: 'Connection method' });
 
     // roleArn's visibleWhen.equals is an ARRAY: assumeRole, crossAccountRole, workloadIdentity.
-    await selectConnectionMethod(user, 'Assume Role');
+    await selectConnectionMethod(user, 'Assume role');
     expect(screen.getByLabelText(/role arn/i)).toBeInTheDocument();
 
-    await selectConnectionMethod(user, 'Workload Identity');
+    await selectConnectionMethod(user, 'Workload identity');
     expect(screen.getByLabelText(/role arn/i)).toBeInTheDocument();
     expect(
       screen.getByLabelText(/web identity token/i),
@@ -507,7 +507,7 @@ describe('ConnectIntegrationSheet', () => {
     const { user } = renderWithProviders(
       <ConnectIntegrationSheet schema={awsSchema} open onOpenChange={vi.fn()} />,
     );
-    await selectConnectionMethod(user, 'Assume Role');
+    await selectConnectionMethod(user, 'Assume role');
 
     const roleArn = screen.getByLabelText(/role arn/i);
     expect(roleArn.tagName).toBe('INPUT');
@@ -522,16 +522,16 @@ describe('ConnectIntegrationSheet', () => {
     const { user } = renderWithProviders(
       <ConnectIntegrationSheet schema={awsSchema} open onOpenChange={vi.fn()} />,
     );
-    await selectConnectionMethod(user, 'Sso');
+    await selectConnectionMethod(user, 'SSO');
 
     expect(
       screen.getByRole('combobox', { name: 'Connection method' }),
-    ).toHaveTextContent('Sso');
+    ).toHaveTextContent('SSO');
     expect(
       await screen.findByRole('button', { name: /start authorization/i }),
     ).toBeInTheDocument();
 
-    await selectConnectionMethod(user, 'Access Key');
+    await selectConnectionMethod(user, 'Access key');
     expect(screen.getByLabelText(/access key id/i)).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /start authorization/i }),
@@ -542,7 +542,7 @@ describe('ConnectIntegrationSheet', () => {
     const { user } = renderWithProviders(
       <ConnectIntegrationSheet schema={awsSchema} open onOpenChange={vi.fn()} />,
     );
-    await selectConnectionMethod(user, 'Sso');
+    await selectConnectionMethod(user, 'SSO');
 
     // The SSO wizard owns the region/startUrl/accountId/roleName fields.
     expect(
@@ -634,7 +634,7 @@ describe('ConnectIntegrationSheet', () => {
     await user.type(screen.getByLabelText(/secret access key/i), 'stale-secret');
 
     // …then switch methods; those values are now hidden and must not ship.
-    await selectConnectionMethod(user, 'Workload Identity');
+    await selectConnectionMethod(user, 'Workload identity');
     await user.type(screen.getByLabelText(/role arn/i), 'arn:aws:iam::1:role/x');
     await user.type(
       screen.getByLabelText(/web identity token/i),

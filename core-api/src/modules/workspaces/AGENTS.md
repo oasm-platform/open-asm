@@ -42,6 +42,8 @@ Tenants: workspaces, their members, permission groups and invitations. It also o
 | `GET invitations/:token` | `@Public()` preview |
 | `GET/PATCH/DELETE :id`, `PATCH :id/archived` | `workspace.read` / `workspace.write` / `workspace.delete` with `workspaceParam: 'id'` |
 
+`GET configs` returns each config's English `@ApiProperty` `title`/`description`. The console settings card (`console/src/pages/settings/components/workspace-configs.tsx`) maps known keys to `admin.workspaceEdit.discovery.*` translations; a new config shows its English title until it gets a key there.
+
 Events (via `@PublishEvent`): `workspace.created`, `workspace.updated` (update and archive), `workspace.config.updated`, `workspace.api_key.rotated`, `member.invited`, `member.invitation.cancelled`. Workspace delete, member update/remove and permission group CRUD do not publish. They write audit rows with `AuditService.recordInTx` in the same transaction.
 
 Service methods other modules call: `getMembershipWithPermissions` (guard, events, storage, agent tools), `getWorkspaceByIdAndOwner` (targets, internal-networks, agents skills), `getWorkspaceConfigValue`, `getWorkspacesByIds` (loads `owner`), `getMemberOfWorkspaceByJobId`.
