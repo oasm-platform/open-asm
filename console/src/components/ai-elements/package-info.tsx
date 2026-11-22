@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { ArrowRightIcon, MinusIcon, PackageIcon, PlusIcon } from "lucide-react";
 import type { HTMLAttributes } from "react";
 import { createContext, useContext, useMemo } from "react";
+import { useT } from '@/lib/i18n-dictionary';
 
 type ChangeType = "major" | "minor" | "patch" | "added" | "removed";
 
@@ -204,14 +205,17 @@ export const PackageInfoDependencies = ({
   className,
   children,
   ...props
-}: PackageInfoDependenciesProps) => (
-  <div className={cn("space-y-2", className)} {...props}>
-    <span className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-      Dependencies
-    </span>
-    <div className="space-y-1">{children}</div>
-  </div>
-);
+}: PackageInfoDependenciesProps) => {
+  const t = useT();
+  return (
+    <div className={cn("space-y-2", className)} {...props}>
+      <span className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+        {t('agents.ai.dependencies')}
+      </span>
+      <div className="space-y-1">{children}</div>
+    </div>
+  );
+};
 
 export type PackageInfoDependencyProps = HTMLAttributes<HTMLDivElement> & {
   name: string;

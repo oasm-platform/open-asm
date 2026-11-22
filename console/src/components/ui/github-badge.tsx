@@ -1,9 +1,11 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import { useRootControllerGetMetadata } from '@/services/apis/gen/queries';
 import { buttonVariants } from './button-variants';
 import { OpenLink } from './open-link';
 
 export function GithubBadge() {
+  const t = useT();
   const { data: metadata } = useRootControllerGetMetadata();
   if (!metadata?.gitRepoUrl) return null;
 
@@ -16,7 +18,7 @@ export function GithubBadge() {
         buttonVariants({ variant: 'ghost', size: 'default' }),
         'gap-2 flex',
       )}
-      title="Open GitHub repository"
+      title={t('shell.github.open')}
     >
       <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
         <title>GitHub</title>

@@ -2,7 +2,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   DETECTION_STATUS_LABELS,
   DISMISS_REASON_LABELS,
+  labelOf,
 } from '@/components/vulnerabilities/lifecycle';
+import { t, useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import type {
   DismissReason,
@@ -41,7 +43,7 @@ interface EventView {
 
 const str = (v: unknown) => (typeof v === 'string' && v ? v : undefined);
 const statusLabel = (s?: string | null) =>
-  s ? (DETECTION_STATUS_LABELS[s] ?? s) : '?';
+  s ? labelOf(DETECTION_STATUS_LABELS, s) : '?';
 
 const TONES = {
   primary: 'bg-primary/10 text-primary',
@@ -61,15 +63,15 @@ export function describeEvent(e: VulnerabilityTimelineEventDto): EventView {
     str(v) ? <q className="italic">{str(v)}</q> : undefined;
   switch (e.type) {
     case 'detected':
-      return { icon: Radar, tone: TONES.primary, title: 'First detected' };
+      return { icon: Radar, tone: TONES.primary, title: t('vulnerabilities.tl.firstDetected') };
     case 'status_changed': {
       const to = e.toStatus ?? '';
       const title = `${statusLabel(e.fromStatus)} → ${statusLabel(to)}`;
       const reason =
         data.reason === 'not_detected_by_covering_scan'
-          ? `No longer reported by a covering scan${data.fixClaimVerified ? ' · fix claim verified' : ''}`
+          ? `${t('vulnerabilities.tl.noLongerReported')}${data.fixClaimVerified ? t('vulnerabilities.tl.fixClaimVerified') : ''}`
           : data.reason === 'detected_by_scan'
-            ? 'Reported again by a scan'
+            ? t('vulnerabilities.tl.reportedAgain')
             : undefined;
       if (to === 'fixed')
         return { icon: CheckCircle2, tone: TONES.green, title, detail: reason };
@@ -83,12 +85,12 @@ export function describeEvent(e: VulnerabilityTimelineEventDto): EventView {
       return {
         icon: Wrench,
         tone: TONES.green,
-        title: 'Marked fixed',
+        title: t('vulnerabilities.tl.markedFixed'),
         detail:
           quote(data.note) ??
           (data.verification === 'not_verifiable_by_scan'
-            ? 'No scan covers it; it stays open until closed by hand'
-            : 'The next covering scan verifies it'),
+            ? t('vulnerabilities.tl.noScanCovers')
+            : t('vulnerabilities.tl.nextScanVerifies')),
       };
     case 'dismissed': {
       const reason = str(data.reason) as DismissReason | undefined;
@@ -96,55 +98,59 @@ export function describeEvent(e: VulnerabilityTimelineEventDto): EventView {
       return {
         icon: reason === 'risk_accepted' ? ShieldCheck : BellOff,
         tone: TONES.amber,
-        title: `Dismissed · ${reason ? (DISMISS_REASON_LABELS[reason] ?? reason) : 'unknown reason'}${until ? ` until ${format(new Date(until), 'dd MMM yyyy')}` : ''}`,
+        title: `${t('vulnerabilities.tl.dismissed', {
+          reason: reason
+            ? labelOf(DISMISS_REASON_LABELS, reason)
+            : t('vulnerabilities.tl.unknownReason'),
+        })}${until ? t('vulnerabilities.hero.until', { date: format(new Date(until), 'dd MMM yyyy') }) : ''}`,
         detail: quote(data.comment),
       };
     }
     case 'reopened':
-      return { icon: BellRing, tone: TONES.primary, title: 'Reopened' };
+      return { icon: BellRing, tone: TONES.primary, title: t('vulnerabilities.tl.reopened') };
     case 'risk_expired':
       return {
         icon: Hourglass,
         tone: TONES.amber,
-        title: 'Risk acceptance expired',
+        title: t('vulnerabilities.tl.riskExpired'),
         detail: quote(data.comment),
       };
     case 'proposed':
       return {
         icon: Sparkles,
         tone: TONES.amber,
-        title: `Proposed by AI${str(data.agentName) ? ` · ${str(data.agentName)}` : ''}`,
+        title: `${t('vulnerabilities.tl.proposedByAi')}${str(data.agentName) ? ` · ${str(data.agentName)}` : ''}`,
         detail: <ConversationLink id={str(data.agentConversationId)} />,
       };
     case 'approved':
       return {
         icon: CheckCheck,
         tone: TONES.green,
-        title: `Approved${str(data.severity) ? ` as ${str(data.severity)}` : ''}${str(data.proposedSeverity) ? ` (proposed ${str(data.proposedSeverity)})` : ''}`,
+        title: `${t('vulnerabilities.tl.approved')}${str(data.severity) ? t('vulnerabilities.tl.approvedAs', { severity: str(data.severity)! }) : ''}${str(data.proposedSeverity) ? t('vulnerabilities.tl.proposedSeverity', { severity: str(data.proposedSeverity)! }) : ''}`,
         detail: quote(data.note),
       };
     case 'rejected':
       return {
         icon: XCircle,
         tone: TONES.red,
-        title: 'Rejected',
+        title: t('vulnerabilities.tl.rejected'),
         detail: quote(data.note),
       };
     case 'merged':
       return {
         icon: GitMerge,
         tone: TONES.violet,
-        title: `Merged AI proposal${str(data.proposalName) ? ` "${str(data.proposalName)}"` : ''}`,
+        title: `${t('vulnerabilities.tl.mergedProposal')}${str(data.proposalName) ? ` "${str(data.proposalName)}"` : ''}`,
         detail:
           typeof data.movedSources === 'number'
-            ? `${data.movedSources} source(s) moved here`
+            ? t('vulnerabilities.tl.sourcesMoved', { n: data.movedSources })
             : undefined,
       };
     case 'verified_by_ai':
       return {
         icon: BadgeCheck,
         tone: TONES.violet,
-        title: `Verified by AI${str(data.agentName) ? ` · ${str(data.agentName)}` : ''}`,
+        title: `${t('vulnerabilities.tl.verifiedByAi')}${str(data.agentName) ? ` · ${str(data.agentName)}` : ''}`,
         detail: <ConversationLink id={str(data.agentConversationId)} />,
       };
     case 'issue_linked': {
@@ -152,7 +158,7 @@ export function describeEvent(e: VulnerabilityTimelineEventDto): EventView {
       return {
         icon: ClipboardList,
         tone: TONES.primary,
-        title: `Linked to issue${typeof no === 'number' || typeof no === 'string' ? ` #${no}` : ''}`,
+        title: `${t('vulnerabilities.tl.linkedToIssue')}${typeof no === 'number' || typeof no === 'string' ? ` #${no}` : ''}`,
       };
     }
     default:
@@ -168,6 +174,7 @@ export function VulnerabilityTimeline({
   events?: VulnerabilityTimelineEventDto[];
   isLoading?: boolean;
 }) {
+  const tr = useT();
   if (isLoading) {
     return (
       <div className="flex flex-col gap-4" data-testid="timeline-loading">
@@ -187,12 +194,12 @@ export function VulnerabilityTimeline({
     return (
       <div className="py-10 text-center text-sm text-muted-foreground">
         <History className="mx-auto mb-2 size-6" />
-        No events yet.
+        {tr('vulnerabilities.tl.noEvents')}
       </div>
     );
   }
   return (
-    <ol className="relative flex flex-col gap-4" aria-label="Timeline">
+    <ol className="relative flex flex-col gap-4" aria-label={tr('vulnerabilities.tl.aria')}>
       {events.map((e, i) => {
         const view = describeEvent(e);
         const Icon = view.icon;
@@ -224,7 +231,7 @@ export function VulnerabilityTimeline({
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                <span>{e.actor?.name ?? 'System'}</span>
+                <span>{e.actor?.name ?? tr('vulnerabilities.tl.system')}</span>
                 {e.jobHistoryId && (
                   <>
                     <span aria-hidden>·</span>

@@ -13,6 +13,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useT } from '@/lib/i18n-dictionary';
 
 type SearchProvider = AgentSearchProviderInputDtoProvider;
 
@@ -28,6 +29,7 @@ const OPTIONS: Array<{ value: Choice; label: string }> = [
 ];
 
 export function WebSearchManager() {
+  const t = useT();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -85,10 +87,12 @@ export function WebSearchManager() {
           );
           reset();
           toast.success(
-            choice === OFF ? 'Web search turned off' : 'Web search updated',
+            choice === OFF
+              ? t('agents.webSearch.turnedOff')
+              : t('agents.webSearch.updated'),
           );
         },
-        onError: () => toast.error('Failed to update web search'),
+        onError: () => toast.error(t('agents.webSearch.updateFailed')),
       },
     );
   };
@@ -112,7 +116,7 @@ export function WebSearchManager() {
     return (
       <div className="rounded-xl border border-dashed p-6 text-center">
         <p className="text-sm text-muted-foreground">
-          Failed to load web search settings.
+          {t('agents.webSearch.loadFailed')}
         </p>
         <Button
           size="sm"
@@ -120,7 +124,7 @@ export function WebSearchManager() {
           className="mt-3"
           onClick={() => void refetch()}
         >
-          Retry
+          {t('agents.settings.retry')}
         </Button>
       </div>
     );
@@ -129,12 +133,11 @@ export function WebSearchManager() {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">
-        Pick the provider the agent searches the web with. With no provider,
-        web search is off.
+        {t('agents.webSearch.description')}
       </p>
 
       <RadioGroup
-        aria-label="Search provider"
+        aria-label={t('agents.webSearch.providerLabel')}
         value={choice}
         disabled={upsert.isPending}
         onValueChange={(value) => {
@@ -153,10 +156,14 @@ export function WebSearchManager() {
               id={`web-search-${option.value}`}
               value={option.value}
             />
-            <span className="text-sm font-medium">{option.label}</span>
+            <span className="text-sm font-medium">
+              {option.value === OFF ? t('agents.webSearch.off') : option.label}
+            </span>
             {option.value === savedChoice && (
               <span className="ml-auto text-xs text-muted-foreground">
-                {option.value === OFF ? 'Current' : 'In use'}
+                {option.value === OFF
+                  ? t('agents.webSearch.current')
+                  : t('agents.webSearch.inUse')}
               </span>
             )}
           </label>
@@ -169,7 +176,7 @@ export function WebSearchManager() {
             htmlFor="web-search-api-key"
             className="text-sm font-medium text-foreground"
           >
-            {label} API Key{' '}
+            {t('agents.webSearch.apiKey', { provider: label ?? '' })}{' '}
             {!hasSavedKey && <span className="text-destructive">*</span>}
           </label>
           <Input
@@ -183,8 +190,8 @@ export function WebSearchManager() {
           />
           <p className="text-xs text-muted-foreground">
             {hasSavedKey
-              ? 'Leave blank to keep the saved key.'
-              : 'Required. Your API key is stored securely and never shared.'}
+              ? t('agents.webSearch.keepKey')
+              : t('agents.connect.apiKeyRequiredHint')}
           </p>
         </div>
       )}
@@ -197,7 +204,7 @@ export function WebSearchManager() {
             disabled={upsert.isPending}
             onClick={reset}
           >
-            Discard
+            {t('agents.settings.discard')}
           </Button>
         )}
         <Button
@@ -207,7 +214,7 @@ export function WebSearchManager() {
           onClick={save}
         >
           {upsert.isPending && <Loader2 className="animate-spin" />}
-          Save
+          {t('common.save')}
         </Button>
       </SettingsHeaderActions>
     </div>

@@ -3,6 +3,7 @@ import type {
   VulnerabilityDismissalInfoDto,
   VulnerabilitySourceSummaryDto,
 } from '@/services/apis/gen/queries';
+import { t } from '@/lib/i18n-dictionary';
 import { differenceInCalendarDays, formatDistanceToNowStrict } from 'date-fns';
 
 /** Detection states that count as open (when not dismissed). */
@@ -11,32 +12,39 @@ export const OPEN_DETECTION_STATUSES = ['new', 'active', 'resurfaced'] as const;
 export const isOpenDetection = (status?: string | null) =>
   !!status && (OPEN_DETECTION_STATUSES as readonly string[]).includes(status);
 
+/** The label maps hold i18n keys; read them through `labelOf`. */
 export const DISMISS_REASON_LABELS: Record<DismissReason, string> = {
-  false_positive: 'False positive',
-  used_in_test: 'Used in tests',
-  wont_fix: "Won't fix",
-  risk_accepted: 'Risk accepted',
+  false_positive: 'vulnerabilities.dismissReason.falsePositive',
+  used_in_test: 'vulnerabilities.dismissReason.usedInTest',
+  wont_fix: 'vulnerabilities.dismissReason.wontFix',
+  risk_accepted: 'vulnerabilities.dismissReason.riskAccepted',
 };
 
 export const DETECTION_STATUS_LABELS: Record<string, string> = {
-  new: 'New',
-  active: 'Active',
-  fixed: 'Fixed',
-  resurfaced: 'Resurfaced',
+  new: 'vulnerabilities.detection.new',
+  active: 'vulnerabilities.detection.active',
+  fixed: 'vulnerabilities.detection.fixed',
+  resurfaced: 'vulnerabilities.detection.resurfaced',
 };
 
 export const REVIEW_STATUS_LABELS: Record<string, string> = {
-  pending_review: 'Pending review',
-  approved: 'Approved',
-  rejected: 'Rejected',
+  pending_review: 'vulnerabilities.review.pendingReview',
+  approved: 'vulnerabilities.review.approved',
+  rejected: 'vulnerabilities.review.rejected',
 };
 
 export const DISCOVERED_BY_LABELS: Record<string, string> = {
-  tool: 'Scanner',
-  ai: 'AI',
-  ai_tool: 'AI + tool',
-  manual: 'Manual',
+  tool: 'vulnerabilities.discoveredBy.tool',
+  ai: 'vulnerabilities.discoveredBy.ai',
+  ai_tool: 'vulnerabilities.discoveredBy.aiTool',
+  manual: 'vulnerabilities.discoveredBy.manual',
 };
+
+/** Translated label of `value` in one of the maps above; unknown values show as-is. */
+export function labelOf(map: Record<string, string>, value: string): string {
+  const key = map[value];
+  return key ? t(key) : value;
+}
 
 /** A risk acceptance still in force pauses the SLA. */
 export function isRiskAccepted(
@@ -86,10 +94,17 @@ export function sourceSummaryLabel({
   if (discoveredBy === 'ai' || discoveredBy === 'ai_tool') {
     const agent = agents.length ? ` · ${agents.join(', ')}` : '';
     const withTools = tools.length ? ` + ${tools.join(', ')}` : '';
-    const approved = reviewStatus === 'approved' ? ' · approved' : '';
+    const approved =
+      reviewStatus === 'approved' ? ` · ${t('vulnerabilities.source.approved')}` : '';
     return `AI${agent}${withTools}${approved}`;
   }
-  if (discoveredBy === 'manual') return toolText ? `Manual · ${toolText}` : 'Manual';
-  if (hasAgent) return toolText ? `${toolText} · AI verified` : 'AI verified';
+  if (discoveredBy === 'manual')
+    return toolText
+      ? t('vulnerabilities.source.manualWith', { tools: toolText })
+      : t('vulnerabilities.source.manual');
+  if (hasAgent)
+    return toolText
+      ? t('vulnerabilities.source.aiVerifiedWith', { tools: toolText })
+      : t('vulnerabilities.source.aiVerified');
   return toolText || '—';
 }

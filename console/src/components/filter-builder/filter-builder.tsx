@@ -1,10 +1,11 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { useState } from 'react';
 import { Group, Plus, Trash2, Ungroup } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import {
-  addCondition, conditionError, filterError, groupWithPrevious, isGroup, OP_LABELS, removeCondition,
+  addCondition, conditionError, filterError, groupWithPrevious, isGroup, opLabel, removeCondition,
   toggleLogic, ungroup, updateCondition, type Filter, type FilterCondition, type FilterFieldConfig,
   type FilterLogic, type Path,
 } from './filter-model';
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export function FilterBuilder({ fields, value, onApply, onCancel, flat = false, className }: Props) {
+  const t = useT();
   const [draft, setDraft] = useState<Filter>(() =>
     value?.items.length ? value : addCondition({ logic: 'and', items: [] }, fields),
   );
@@ -28,14 +30,14 @@ export function FilterBuilder({ fields, value, onApply, onCancel, flat = false, 
   const usedFields = new Set(draft.items.flatMap((i) => (isGroup(i) ? [] : [i.field])));
   const addable = flat ? fields.filter((f) => !usedFields.has(f.key)) : fields;
   const trimmed = (): Filter => {
-    const t = (c: FilterCondition): FilterCondition => ({ ...c, value: Array.isArray(c.value) ? c.value.map((s) => s.trim()) : c.value.trim() });
-    return { ...draft, items: draft.items.map((i) => (isGroup(i) ? { ...i, conditions: i.conditions.map(t) } : t(i))) };
+    const trim = (c: FilterCondition): FilterCondition => ({ ...c, value: Array.isArray(c.value) ? c.value.map((s) => s.trim()) : c.value.trim() });
+    return { ...draft, items: draft.items.map((i) => (isGroup(i) ? { ...i, conditions: i.conditions.map(trim) } : trim(i))) };
   };
 
   // Render helpers, not components: a component declared here would remount every render and drop input focus.
   const renderLogic = (logic: FilterLogic, groupIndex?: number) => (
     <Button type="button" variant="outline" size="sm" className="h-6 w-fit px-2 text-xs"
-      aria-label={`Toggle ${logic.toUpperCase()}`} onClick={() => setDraft(toggleLogic(draft, groupIndex))}>
+      aria-label={t('components.filter.toggleLogic', { logic: logic.toUpperCase() })} onClick={() => setDraft(toggleLogic(draft, groupIndex))}>
       {logic.toUpperCase()}
     </Button>
   );
@@ -51,7 +53,7 @@ export function FilterBuilder({ fields, value, onApply, onCancel, flat = false, 
       <div className="flex flex-col gap-2 rounded-md border p-2 dark:bg-card-surface md:flex-row md:items-start md:rounded-none md:border-0 md:p-0 md:dark:bg-transparent">
         <div className="flex min-w-0 items-start gap-2 md:contents">
           <Select value={c.field} onValueChange={(v) => update({ field: v })}>
-            <SelectTrigger aria-label="Field" className="h-9 w-full min-w-0 flex-1 md:w-36 md:flex-none"><SelectValue /></SelectTrigger>
+            <SelectTrigger aria-label={t('components.filter.field')} className="h-9 w-full min-w-0 flex-1 md:w-36 md:flex-none"><SelectValue /></SelectTrigger>
             <SelectContent>
               {fields.map((f) => (
                 <SelectItem key={f.key} value={f.key} disabled={flat && f.key !== c.field && usedFields.has(f.key)}>{f.label}</SelectItem>
@@ -59,12 +61,12 @@ export function FilterBuilder({ fields, value, onApply, onCancel, flat = false, 
             </SelectContent>
           </Select>
           <Select value={c.op} onValueChange={(v) => update({ op: v as FilterCondition['op'] })}>
-            <SelectTrigger aria-label="Operator" className="h-9 w-full min-w-0 flex-1 md:w-36 md:flex-none"><SelectValue /></SelectTrigger>
-            <SelectContent>{field.operators.map((op) => <SelectItem key={op} value={op}>{OP_LABELS[op]}</SelectItem>)}</SelectContent>
+            <SelectTrigger aria-label={t('components.filter.operator')} className="h-9 w-full min-w-0 flex-1 md:w-36 md:flex-none"><SelectValue /></SelectTrigger>
+            <SelectContent>{field.operators.map((op) => <SelectItem key={op} value={op}>{opLabel(op)}</SelectItem>)}</SelectContent>
           </Select>
           <div className="flex shrink-0 md:order-1">
             {extra}
-            <Button type="button" variant="ghost" size="icon" aria-label="Remove filter"
+            <Button type="button" variant="ghost" size="icon" aria-label={t('components.filter.remove')}
               onClick={() => setDraft(removeCondition(draft, path))}>
               <Trash2 className="size-4" />
             </Button>
@@ -96,7 +98,7 @@ export function FilterBuilder({ fields, value, onApply, onCancel, flat = false, 
                   <div key={j} className="flex flex-col gap-2">
                     {j > 0 && renderLogic(item.logic, i)}
                     {renderRow(c, [i, j],
-                      <Button type="button" variant="ghost" size="icon" aria-label="Ungroup"
+                      <Button type="button" variant="ghost" size="icon" aria-label={t('components.filter.ungroup')}
                         onClick={() => setDraft(ungroup(draft, i, j))}><Ungroup className="size-4" /></Button>,
                     )}
                   </div>
@@ -104,7 +106,7 @@ export function FilterBuilder({ fields, value, onApply, onCancel, flat = false, 
               </div>
             ) : (
               renderRow(item, [i], !flat &&
-                <Button type="button" variant="ghost" size="icon" aria-label="Group with row above"
+                <Button type="button" variant="ghost" size="icon" aria-label={t('components.filter.groupWithAbove')}
                   disabled={i === 0} onClick={() => setDraft(groupWithPrevious(draft, i))}><Group className="size-4" /></Button>,
               )
             )}
@@ -114,12 +116,12 @@ export function FilterBuilder({ fields, value, onApply, onCancel, flat = false, 
       <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
         <Button type="button" variant="ghost" size="sm" disabled={addable.length === 0}
           onClick={() => setDraft(addCondition(draft, addable))}>
-          <Plus className="size-4" /> Add filter
+          <Plus className="size-4" /> {t('components.filter.add')}
         </Button>
         <div className="flex gap-2">
-          <Button type="button" variant="ghost" size="sm" onClick={() => onApply(undefined)}>Clear all</Button>
-          <Button type="button" variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
-          <Button type="submit" size="sm" disabled={!!error}>Apply</Button>
+          <Button type="button" variant="ghost" size="sm" onClick={() => onApply(undefined)}>{t('components.filter.clearAll')}</Button>
+          <Button type="button" variant="ghost" size="sm" onClick={onCancel}>{t('common.cancel')}</Button>
+          <Button type="submit" size="sm" disabled={!!error}>{t('components.filter.apply')}</Button>
         </div>
       </div>
     </form>

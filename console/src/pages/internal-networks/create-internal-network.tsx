@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { t as translate, useT } from '@/lib/i18n-dictionary';
 import { useInternalNetworksControllerCreateInternalNetwork } from '@/services/apis/gen/queries';
 import { Loader2Icon } from 'lucide-react';
 import { useForm } from 'react-hook-form';
@@ -20,6 +21,7 @@ type FormData = {
 };
 
 const CreateInternalNetwork = () => {
+  const t = useT();
   const navigate = useNavigate();
   const { mutate, isPending } =
     useInternalNetworksControllerCreateInternalNetwork();
@@ -40,12 +42,12 @@ const CreateInternalNetwork = () => {
       },
       {
         onSuccess: () => {
-          toast.success('Internal network created successfully');
+          toast.success(translate('internalNetworks.create.success'));
           navigate({ to: '/internal-networks' });
           reset();
         },
         onError: () => {
-          toast.error('Failed to create internal network');
+          toast.error(translate('internalNetworks.create.failed'));
         },
       },
     );
@@ -59,9 +61,9 @@ const CreateInternalNetwork = () => {
     <div className="h-[50vh] w-full flex flex-col justify-center items-center">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Create Internal Network</CardTitle>
+          <CardTitle>{t('internalNetworks.create.title')}</CardTitle>
           <CardDescription>
-            Create a new internal network for your workspace.
+            {t('internalNetworks.create.description')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -72,10 +74,10 @@ const CreateInternalNetwork = () => {
             <div>
               <Input
                 {...register('name', {
-                  required: 'Network name is required',
+                  required: t('internalNetworks.create.nameRequired'),
                 })}
                 autoFocus
-                placeholder="Network Name"
+                placeholder={t('internalNetworks.create.namePlaceholder')}
               />
               {errors.name && (
                 <p className="text-red-600 text-sm mt-1">
@@ -90,11 +92,11 @@ const CreateInternalNetwork = () => {
                 onClick={handleCancel}
                 disabled={isPending}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button type="submit" disabled={isPending}>
                 {isPending && <Loader2Icon className="animate-spin mr-2" />}
-                Create
+                {t('common.create')}
               </Button>
             </div>
           </form>

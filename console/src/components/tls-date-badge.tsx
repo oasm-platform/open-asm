@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge';
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import { Lock } from 'lucide-react';
 
@@ -7,6 +8,7 @@ interface TlsDateBadgeProps {
 }
 
 export const TlsDateBadge = ({ date }: TlsDateBadgeProps) => {
+    const t = useT();
     const daysLeft = Math.ceil(
         (new Date(date).getTime() - new Date().getTime()) /
         (1000 * 60 * 60 * 24),
@@ -18,7 +20,7 @@ export const TlsDateBadge = ({ date }: TlsDateBadgeProps) => {
                 variant="destructive"
                 className="h-5 text-xs"
             >
-                Expired
+                {t('assets.tls.expired')}
             </Badge>
         );
     }
@@ -38,7 +40,7 @@ export const TlsDateBadge = ({ date }: TlsDateBadgeProps) => {
             )}
         >
             <Lock size={14} color={color} className="mr-1" />
-            SSL {daysLeft}d
+            {t('assets.tls.sslDaysLeft', { days: daysLeft })}
         </Badge>
     );
 };

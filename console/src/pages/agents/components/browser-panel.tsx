@@ -4,6 +4,7 @@ import { Loader2, LocateFixed } from 'lucide-react';
 import { useMemo } from 'react';
 import { SidePanelSection } from './side-panel-layout';
 import type { ToolCallEntry } from './tool-call-history-panel';
+import { useT } from '@/lib/i18n-dictionary';
 
 /**
  * The page after a browser command, as the run streams it
@@ -115,10 +116,11 @@ function openingBrowserCommand(
 const shortSessionId = (id: string): string => id.slice(0, 10);
 
 function RunningLabel() {
+  const t = useT();
   return (
     <span className="flex items-center gap-1.5 text-sky-600 dark:text-sky-400">
       <Loader2 className="size-3 animate-spin" />
-      Running
+      {t('agents.browser.running')}
     </span>
   );
 }
@@ -135,11 +137,12 @@ function BrowserView({
   latest: boolean;
   onSelectToolCall?: (toolCallId: string) => void;
 }) {
+  const t = useT();
   const src = useMemo(
     () => `data:image/jpeg;base64,${shot.image}`,
     [shot.image],
   );
-  const agent = shot.subagent?.name ?? 'Main agent';
+  const agent = shot.subagent?.name ?? t('agents.browser.mainAgent');
 
   return (
     <SidePanelSection
@@ -170,8 +173,8 @@ function BrowserView({
             variant="ghost"
             size="icon-sm"
             className="shrink-0 text-muted-foreground hover:cursor-pointer"
-            aria-label="Show in chat"
-            title="Show in chat"
+            aria-label={t('agents.browser.showInChat')}
+            title={t('agents.browser.showInChat')}
             onClick={() => onSelectToolCall(shot.toolCallId)}
           >
             <LocateFixed />
@@ -187,7 +190,10 @@ function BrowserView({
         <img
           key={shot.toolCallId}
           src={src}
-          alt={`Browser page of ${agent} after ${shot.command}`}
+          alt={t('agents.browser.screenshotAlt', {
+            agent,
+            command: shot.command,
+          })}
           className="block h-auto w-full animate-in fade-in-0 duration-200"
         />
       </div>
@@ -210,13 +216,17 @@ export function BrowserPanel({
   /** Scrolls the chat to the command that took the screenshot */
   onSelectToolCall?: (toolCallId: string) => void;
 }) {
+  const t = useT();
   const opening = openingBrowserCommand(toolCalls, screenshots);
   const latestAt = Math.max(...screenshots.map((s) => s.receivedAt ?? 0));
 
   return (
     <div className="space-y-6">
       {opening && (
-        <SidePanelSection title="Main agent" meta={<RunningLabel />}>
+        <SidePanelSection
+          title={t('agents.browser.mainAgent')}
+          meta={<RunningLabel />}
+        >
           <code
             className="block truncate px-2 font-mono text-xs text-muted-foreground"
             title={opening}

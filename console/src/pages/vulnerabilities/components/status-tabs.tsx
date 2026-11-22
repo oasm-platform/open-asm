@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { VulnerabilityStatus } from '@/services/apis/gen/queries';
 import { STATUS_TABS } from '../vulnerability-status';
@@ -10,6 +11,7 @@ interface StatusTabsProps {
 
 /** Status tabs of the vulnerability list, each with its count when known. */
 export function VulnerabilityStatusTabs({ value, onValueChange, counts }: StatusTabsProps) {
+  const t = useT();
   return (
     <Tabs
       value={value}
@@ -17,7 +19,7 @@ export function VulnerabilityStatusTabs({ value, onValueChange, counts }: Status
     >
       <div className="w-full overflow-x-auto scrollbar-hide">
         <TabsList
-          aria-label="Vulnerability status"
+          aria-label={t('vulnerabilities.statusTabs.aria')}
           className="flex w-max flex-nowrap rounded-none bg-transparent p-0"
         >
           {STATUS_TABS.map((tab) => (
@@ -27,7 +29,7 @@ export function VulnerabilityStatusTabs({ value, onValueChange, counts }: Status
               className="h-9 flex-none"
               badge={counts[tab.value]}
             >
-              {tab.label}
+              {t(tab.labelKey)}
             </TabsTrigger>
           ))}
         </TabsList>

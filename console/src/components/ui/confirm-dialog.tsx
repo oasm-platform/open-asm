@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -36,11 +37,12 @@ export const ConfirmDialog = ({
   trigger,
   open: controlledOpen,
   onOpenChange,
-  confirmText = 'Confirm',
+  confirmText,
   disabled = false,
-  cancelText = 'Cancel',
+  cancelText,
   typeToConfirm,
 }: ConfirmDialogProps) => {
+  const t = useT();
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen ?? internalOpen;
   const setOpen = (next: boolean) => {
@@ -117,7 +119,7 @@ export const ConfirmDialog = ({
         {showInput && (
           <div className="space-y-4 py-4">
             <p className="text-sm text-muted-foreground">
-              Please type "{confirmTextRequired}" to confirm this action.
+              {t('components.confirmDialog.typeToConfirm', { text: confirmTextRequired })}
             </p>
             <Input
               value={inputValue}
@@ -129,14 +131,14 @@ export const ConfirmDialog = ({
         )}
         <DialogFooter>
           <Button variant="outline" onClick={handleCancel} disabled={disabled}>
-            {cancelText}
+            {cancelText ?? t('common.cancel')}
           </Button>
           <Button
             onClick={handleConfirm}
             disabled={!isConfirmEnabled}
             autoFocus={!showInput}
           >
-            {confirmText}
+            {confirmText ?? t('common.confirm')}
           </Button>
         </DialogFooter>
       </DialogContent>

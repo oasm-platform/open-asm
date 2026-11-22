@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -74,6 +75,7 @@ function errorMessage(error: unknown, fallback: string) {
 }
 
 export function CommentThread({ subject }: { subject: CommentSubject }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const { data: session } = useSession();
   const currentUserId = session?.user?.id;
@@ -131,7 +133,7 @@ export function CommentThread({ subject }: { subject: CommentSubject }) {
         setReplyTo(null);
         void invalidate();
       },
-      onError: onError('Failed to post the comment'),
+      onError: onError(t('components.comments.postFailed')),
     };
     if (subject.type === 'issue') {
       createIssueComment.mutate({ issueId: subject.id, data }, callbacks);
@@ -153,7 +155,7 @@ export function CommentThread({ subject }: { subject: CommentSubject }) {
           setEditingId(null);
           void invalidate();
         },
-        onError: onError('Failed to update the comment'),
+        onError: onError(t('components.comments.updateFailed')),
       },
     );
   };
@@ -167,7 +169,7 @@ export function CommentThread({ subject }: { subject: CommentSubject }) {
           setDeleting(null);
           void invalidate();
         },
-        onError: onError('Failed to delete the comment'),
+        onError: onError(t('components.comments.deleteFailed')),
       },
     );
   };
@@ -175,7 +177,7 @@ export function CommentThread({ subject }: { subject: CommentSubject }) {
   return (
     <div className="flex flex-col gap-4" data-testid="comment-thread">
       {query.isLoading ? (
-        <div className="flex flex-col gap-3" aria-label="Loading comments">
+        <div className="flex flex-col gap-3" aria-label={t('components.comments.loading')}>
           {[0, 1, 2].map((i) => (
             <div key={i} className="flex gap-3">
               <Skeleton className="size-7 rounded-full" />
@@ -187,11 +189,11 @@ export function CommentThread({ subject }: { subject: CommentSubject }) {
           ))}
         </div>
       ) : query.isError ? (
-        <p className="text-sm text-destructive">Failed to load comments.</p>
+        <p className="text-sm text-destructive">{t('components.comments.loadFailed')}</p>
       ) : comments.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-8 text-sm text-muted-foreground">
           <MessageSquare className="size-5" />
-          No activity yet. Start the conversation below.
+          {t('components.comments.empty')}
         </div>
       ) : (
         <ol className="flex flex-col gap-3">
@@ -237,18 +239,18 @@ export function CommentThread({ subject }: { subject: CommentSubject }) {
                 <div className="min-w-0 flex-1 rounded-lg border bg-card px-3 py-2">
                   <div className="flex flex-wrap items-center gap-x-2 text-xs">
                     <span className="font-medium text-foreground">
-                      {comment.author?.name ?? 'Unknown user'}
+                      {comment.author?.name ?? t('components.comments.unknownUser')}
                     </span>
                     <span className="text-muted-foreground">
                       {timeAgo(comment.createdAt)}
-                      {edited ? ' · edited' : ''}
+                      {edited ? ` · ${t('components.comments.edited')}` : ''}
                     </span>
                     <div className="ml-auto flex items-center gap-0.5">
                       <Button
                         variant="ghost"
                         size="icon"
                         className="size-6"
-                        aria-label="Reply"
+                        aria-label={t('components.comments.reply')}
                         onClick={() => setReplyTo(comment)}
                       >
                         <Reply className="size-3.5" />
@@ -258,7 +260,7 @@ export function CommentThread({ subject }: { subject: CommentSubject }) {
                           variant="ghost"
                           size="icon"
                           className="size-6"
-                          aria-label="Edit comment"
+                          aria-label={t('components.comments.edit')}
                           onClick={() => {
                             setEditingId(comment.id);
                             setEditDraft(comment.content);
@@ -272,7 +274,7 @@ export function CommentThread({ subject }: { subject: CommentSubject }) {
                           variant="ghost"
                           size="icon"
                           className="size-6"
-                          aria-label="Delete comment"
+                          aria-label={t('components.comments.delete')}
                           onClick={() => setDeleting(comment)}
                         >
                           <Trash2 className="size-3.5" />
@@ -283,11 +285,11 @@ export function CommentThread({ subject }: { subject: CommentSubject }) {
                   {comment.repComment && (
                     <div className="mt-1 border-l-2 pl-2 text-xs text-muted-foreground">
                       {comment.repComment.deleted ? (
-                        <em>Original comment deleted</em>
+                        <em>{t('components.comments.originalDeleted')}</em>
                       ) : (
                         <>
                           <span className="font-medium">
-                            {comment.repComment.author?.name ?? 'Unknown'}:
+                            {comment.repComment.author?.name ?? t('common.unknown')}:
                           </span>{' '}
                           {comment.repComment.snippet}
                         </>
@@ -297,7 +299,7 @@ export function CommentThread({ subject }: { subject: CommentSubject }) {
                   {isEditing ? (
                     <div className="mt-2 flex flex-col gap-2">
                       <Textarea
-                        aria-label="Edit comment text"
+                        aria-label={t('components.comments.editText')}
                         value={editDraft}
                         onChange={(e) => setEditDraft(e.target.value)}
                         rows={3}
@@ -308,14 +310,14 @@ export function CommentThread({ subject }: { subject: CommentSubject }) {
                           size="sm"
                           onClick={() => setEditingId(null)}
                         >
-                          Cancel
+                          {t('common.cancel')}
                         </Button>
                         <Button
                           size="sm"
                           disabled={!editDraft.trim() || updateComment.isPending}
                           onClick={() => saveEdit(comment.id)}
                         >
-                          Save
+                          {t('common.save')}
                         </Button>
                       </div>
                     </div>
@@ -339,7 +341,7 @@ export function CommentThread({ subject }: { subject: CommentSubject }) {
           disabled={query.isFetchingNextPage}
           onClick={() => void query.fetchNextPage()}
         >
-          Load more
+          {t('components.comments.loadMore')}
         </Button>
       )}
 
@@ -348,9 +350,9 @@ export function CommentThread({ subject }: { subject: CommentSubject }) {
           <div className="flex items-center gap-2 rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
             <Reply className="size-3.5 shrink-0" />
             <span className="min-w-0 flex-1 truncate">
-              Replying to{' '}
+              {t('components.comments.replyingTo')}{' '}
               <span className="font-medium">
-                {replyTo.author?.name ?? 'comment'}
+                {replyTo.author?.name ?? t('components.comments.commentFallback')}
               </span>
               : {replyTo.content}
             </span>
@@ -358,7 +360,7 @@ export function CommentThread({ subject }: { subject: CommentSubject }) {
               variant="ghost"
               size="icon"
               className="size-5"
-              aria-label="Cancel reply"
+              aria-label={t('components.comments.cancelReply')}
               onClick={() => setReplyTo(null)}
             >
               <X className="size-3" />
@@ -366,8 +368,8 @@ export function CommentThread({ subject }: { subject: CommentSubject }) {
           </div>
         )}
         <Textarea
-          aria-label="Comment"
-          placeholder="Write a comment…"
+          aria-label={t('components.comments.comment')}
+          placeholder={t('components.comments.placeholder')}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
@@ -381,7 +383,7 @@ export function CommentThread({ subject }: { subject: CommentSubject }) {
             disabled={!draft.trim() || creating}
             onClick={submit}
           >
-            Comment
+            {t('components.comments.comment')}
           </Button>
         </div>
       </div>
@@ -389,9 +391,9 @@ export function CommentThread({ subject }: { subject: CommentSubject }) {
       <ConfirmDialog
         open={Boolean(deleting)}
         onOpenChange={(open) => !open && setDeleting(null)}
-        title="Delete comment?"
-        description="The comment is removed from the thread."
-        confirmText="Delete"
+        title={t('components.comments.deleteTitle')}
+        description={t('components.comments.deleteDescription')}
+        confirmText={t('common.delete')}
         disabled={deleteComment.isPending}
         onConfirm={confirmDelete}
       />

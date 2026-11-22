@@ -1,4 +1,5 @@
 import { OpenLink } from '@/components/ui/open-link';
+import { useT } from '@/lib/i18n-dictionary';
 import type { HttpResponseDTO } from '@/services/apis/gen/queries';
 import { Globe } from 'lucide-react';
 import { useState } from 'react';
@@ -10,6 +11,7 @@ export default function AssetValue({
   httpResponse: HttpResponseDTO | undefined;
   value: string;
 }) {
+  const t = useT();
   const [isImageError, setIsImageError] = useState(false);
   return httpResponse?.failed ? (
     <span className="text-gray-500 font-bold line-through">{value}</span>
@@ -24,7 +26,7 @@ export default function AssetValue({
         <img
           src={httpResponse?.favicon_url}
           className="rounded-full w-5 h-5"
-          alt="favicon"
+          alt={t('assets.favicon')}
           onError={() => setIsImageError(true)}
         />
       ) : (

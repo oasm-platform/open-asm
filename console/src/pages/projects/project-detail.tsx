@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useT } from '@/lib/i18n-dictionary';
 import {
   useProjectsControllerDelete,
   useProjectsControllerGetById,
@@ -44,6 +45,7 @@ export default function ProjectDetail() {
     tab?: string;
   };
   const tab: ProjectTab = isProjectTab(rawTab) ? rawTab : 'overview';
+  const t = useT();
   const navigate = useNavigate();
   const invalidate = useInvalidateProjects();
 
@@ -61,12 +63,12 @@ export default function ProjectDetail() {
     return (
       <Page permission="project.read">
         <div className="py-12 text-center">
-          <h2 className="text-xl font-semibold">Project not found</h2>
+          <h2 className="text-xl font-semibold">{t('projects.detail.notFound')}</h2>
           <p className="mt-2 text-muted-foreground">
-            It may have been deleted, or you don't have access to it.
+            {t('projects.detail.notFoundHint')}
           </p>
           <Button className="mt-4" onClick={() => navigate({ to: '/projects' })}>
-            Back to projects
+            {t('projects.detail.backToProjects')}
           </Button>
         </div>
       </Page>
@@ -92,12 +94,12 @@ export default function ProjectDetail() {
       { id },
       {
         onSuccess: () => {
-          toast.success('Project deleted');
+          toast.success(t('projects.detail.deleted'));
           void navigate({ to: '/projects' });
           void invalidate(id);
         },
         onError: (error) =>
-          toast.error(apiErrorMessage(error, 'Failed to delete the project')),
+          toast.error(apiErrorMessage(error, t('projects.detail.deleteFailed'))),
       },
     );
 
@@ -134,7 +136,7 @@ export default function ProjectDetail() {
       title={
         <span className="flex min-w-0 items-center gap-2.5">
           <h1 className="truncate">{project.name}</h1>
-          {archived && <Badge variant="secondary">Archived</Badge>}
+          {archived && <Badge variant="secondary">{t('projects.archived')}</Badge>}
         </span>
       }
       header={
@@ -143,12 +145,12 @@ export default function ProjectDetail() {
             <DropdownMenuTrigger asChild>
               <Button disabled={archived || workflows.length === 0}>
                 <Play className="size-4" />
-                Run
+                {t('projects.detail.run')}
                 <ChevronDown className="size-3.5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Run on the whole scope</DropdownMenuLabel>
+              <DropdownMenuLabel>{t('projects.detail.runWholeScope')}</DropdownMenuLabel>
               {workflows.map((binding) => (
                 <DropdownMenuItem key={binding.id} onSelect={() => openRun(binding.id)}>
                   {workflowLabel(binding.workflow)}
@@ -163,14 +165,14 @@ export default function ProjectDetail() {
         <Tabs value={tab} onValueChange={goTab}>
           <div className="w-full overflow-x-auto scrollbar-hide">
             <TabsList className="flex w-max flex-nowrap rounded-none bg-transparent p-0">
-              {PROJECT_TABS.map((t) => (
+              {PROJECT_TABS.map((item) => (
                 <TabsTrigger
-                  key={t.value}
-                  value={t.value}
+                  key={item.value}
+                  value={item.value}
                   className="h-9 flex-none hover:cursor-pointer"
-                  badge={counts[t.value]}
+                  badge={counts[item.value]}
                 >
-                  {t.label}
+                  {item.label}
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -179,8 +181,7 @@ export default function ProjectDetail() {
 
         {archived && (
           <p className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
-            This project is archived: schedules and event triggers are off and
-            it is read-only. Reopen it from the Settings tab to make changes.
+            {t('projects.detail.archivedNotice')}
           </p>
         )}
 
@@ -198,8 +199,8 @@ export default function ProjectDetail() {
       <ConfirmDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
-        title="Delete project"
-        description={`Delete "${project.name}"? Its workflows, their run history and its AI Studio chats go with it. Vulnerabilities stay in the workspace.`}
+        title={t('projects.detail.deleteTitle')}
+        description={t('projects.detail.deleteDescription', { name: project.name })}
         onConfirm={handleDelete}
         typeToConfirm="delete"
         disabled={remove.isPending}

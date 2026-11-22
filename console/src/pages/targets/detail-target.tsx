@@ -1,3 +1,5 @@
+import { fromNow } from '@/lib/date-locale';
+import { useT } from '@/lib/i18n-dictionary';
 import Page from '@/components/common/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,7 +10,6 @@ import {
   useTargetsControllerGetTargetById,
 } from '@/services/apis/gen/queries';
 import { getRouteApi, useNavigate, useParams } from '@tanstack/react-router';
-import dayjs from 'dayjs';
 import { CalendarClock, Loader2 } from 'lucide-react';
 import { useEffect } from 'react';
 import AssetProvider from '../assets/context/asset-context';
@@ -34,6 +35,7 @@ const routeApi = getRouteApi('/_authed/targets/$id/$tab');
 
 export function DetailTarget() {
   const { id, tab } = useParams({ from: '/_authed/targets/$id/$tab' });
+  const t = useT();
   const search = routeApi.useSearch();
   const navigate = useNavigate({ from: '/targets/$id/$tab' });
 
@@ -75,13 +77,12 @@ export function DetailTarget() {
   if (error || !target) {
     return (
       <div className="text-center py-12">
-        <h2 className="text-xl font-semibold">Target not found</h2>
+        <h2 className="text-xl font-semibold">{t('targets.detail.notFound')}</h2>
         <p className="text-muted-foreground mt-2">
-          The target you're looking for doesn't exist or you don't have
-          permission to view it.
+          {t('targets.detail.notFoundDescription')}
         </p>
         <Button className="mt-4" onClick={() => window.history.back()}>
-          Go back
+          {t('targets.detail.goBack')}
         </Button>
       </div>
     );
@@ -155,15 +156,15 @@ export function DetailTarget() {
             variant="outline"
             className="cursor-pointer gap-1.5 font-normal"
             onClick={() => goTab('settings')}
-            title="Scan schedule"
+            title={t('targets.detail.scanSchedule')}
           >
             <CalendarClock className="size-3.5" />
             {isScheduled(target.scanSchedule)
               ? scheduleLabel(target.scanSchedule)
-              : 'Manual'}
+              : t('targets.detail.manual')}
           </Badge>
           <p className="text-sm text-muted-foreground hidden md:block">
-            Discovered {dayjs(target.lastDiscoveredAt).fromNow()}
+            {t('targets.detail.discovered', { time: fromNow(target.lastDiscoveredAt) })}
           </p>
         </div>
       }
@@ -175,13 +176,13 @@ export function DetailTarget() {
         <Tabs value={tab} onValueChange={goTab}>
           <div className="w-full overflow-x-auto scrollbar-hide">
             <TabsList className="flex w-max flex-nowrap rounded-none bg-transparent p-0">
-              {TARGET_TABS.map((t) => (
+              {TARGET_TABS.map((item) => (
                 <TabsTrigger
-                  key={t.value}
-                  value={t.value}
+                  key={item.value}
+                  value={item.value}
                   className="h-9 flex-none hover:cursor-pointer"
                 >
-                  {t.label}
+                  {t(item.labelKey)}
                 </TabsTrigger>
               ))}
             </TabsList>

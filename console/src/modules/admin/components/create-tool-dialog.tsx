@@ -29,13 +29,17 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import * as z from 'zod';
+import { type TFunction, useT } from '@/lib/i18n-dictionary';
 
-const formSchema = z.object({
-    name: z.string().min(1, 'Name is required'),
-    description: z.string().min(1, 'Description is required'),
+const createFormSchema = (t: TFunction) =>
+  z.object({
+    name: z.string().min(1, t('admin.createTool.nameRequired')),
+    description: z.string().min(1, t('admin.createTool.descriptionRequired')),
     category: z.nativeEnum(ToolCategory),
-    version: z.string().min(1, 'Version is required'),
+    version: z.string().min(1, t('admin.createTool.versionRequired')),
 });
+
+type FormValues = z.infer<ReturnType<typeof createFormSchema>>;
 
 interface CreateToolDialogProps {
     providerId: string;
@@ -43,8 +47,10 @@ interface CreateToolDialogProps {
 }
 
 export function CreateToolDialog({ providerId, children }: CreateToolDialogProps) {
+    const t = useT();
+    const formSchema = React.useMemo(() => createFormSchema(t), [t]);
     const [open, setOpen] = React.useState(false);
-    const form = useForm<z.infer<typeof formSchema>>({
+    const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
             name: '',
@@ -56,7 +62,7 @@ export function CreateToolDialog({ providerId, children }: CreateToolDialogProps
 
     const { mutate: createTool, isPending } = useAdminControllerCreateTool();
 
-    const onSubmit = (values: z.infer<typeof formSchema>) => {
+    const onSubmit = (values: FormValues) => {
         createTool(
             {
                 data: {
@@ -74,7 +80,7 @@ export function CreateToolDialog({ providerId, children }: CreateToolDialogProps
                     form.reset();
                 },
                 onError: () => {
-                    toast("Failed to create tool");
+                    toast(t('admin.createTool.failed'));
                 },
             },
         );
@@ -83,11 +89,11 @@ export function CreateToolDialog({ providerId, children }: CreateToolDialogProps
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                {children || <Button variant="default">Open Create Tool Dialog</Button>}
+                {children || <Button variant="default">{t('admin.createTool.open')}</Button>}
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                    <DialogTitle>Create Tool</DialogTitle>
+                    <DialogTitle>{t('admin.createTool.title')}</DialogTitle>
                 </DialogHeader>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -96,9 +102,9 @@ export function CreateToolDialog({ providerId, children }: CreateToolDialogProps
                             name="name"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Name</FormLabel>
+                                    <FormLabel>{t('admin.createTool.name')}</FormLabel>
                                     <FormControl>
-                                        <Input placeholder="Tool name" {...field} />
+                                        <Input placeholder={t('admin.createTool.namePlaceholder')} {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -110,9 +116,9 @@ export function CreateToolDialog({ providerId, children }: CreateToolDialogProps
                             name="description"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Description</FormLabel>
+                                    <FormLabel>{t('admin.createTool.description')}</FormLabel>
                                     <FormControl>
-                                        <Textarea placeholder="Tool description" {...field} />
+                                        <Textarea placeholder={t('admin.createTool.descriptionPlaceholder')} {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -124,11 +130,11 @@ export function CreateToolDialog({ providerId, children }: CreateToolDialogProps
                             name="category"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Category</FormLabel>
+                                    <FormLabel>{t('admin.createTool.category')}</FormLabel>
                                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                                         <FormControl>
                                             <SelectTrigger className="w-full">
-                                                <SelectValue placeholder="Select a category" />
+                                                <SelectValue placeholder={t('admin.createTool.categoryPlaceholder')} />
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
@@ -149,9 +155,9 @@ export function CreateToolDialog({ providerId, children }: CreateToolDialogProps
                             name="version"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Version</FormLabel>
+                                    <FormLabel>{t('admin.createTool.version')}</FormLabel>
                                     <FormControl>
-                                        <Input placeholder="Tool version" {...field} />
+                                        <Input placeholder={t('admin.createTool.versionPlaceholder')} {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -165,10 +171,10 @@ export function CreateToolDialog({ providerId, children }: CreateToolDialogProps
                                 onClick={() => setOpen(false)}
                                 disabled={isPending}
                             >
-                                Cancel
+                                {t('common.cancel')}
                             </Button>
                             <Button type="submit" disabled={isPending}>
-                                {isPending ? 'Creating...' : 'Create'}
+                                {isPending ? t('admin.createTool.creating') : t('common.create')}
                             </Button>
                         </div>
                     </form>

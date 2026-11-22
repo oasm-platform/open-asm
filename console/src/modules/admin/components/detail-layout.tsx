@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import type { ReactNode } from 'react';
+import { useT } from '@/lib/i18n-dictionary';
 
 export const formatDetailDate = (value?: string | null) =>
   value ? format(new Date(value), 'PPP') : '—';
@@ -110,15 +111,17 @@ export function DetailSkeleton() {
 }
 
 export function DetailNotFound({ entity }: { entity: string }) {
+  const t = useT();
   return (
     <div className="text-center py-12">
-      <h2 className="text-xl font-semibold">{entity} not found</h2>
+      <h2 className="text-xl font-semibold">{t('admin.detail.notFound.title', { entity })}</h2>
       <p className="text-muted-foreground mt-2">
-        The {entity.toLowerCase()} you're looking for doesn't exist or has been
-        removed.
+        {t('admin.detail.notFound.description', {
+          entity: entity.toLowerCase(),
+        })}
       </p>
       <Button className="mt-4" onClick={() => window.history.back()}>
-        Go back
+        {t('admin.detail.goBack')}
       </Button>
     </div>
   );

@@ -10,8 +10,16 @@ import {
   type SwaggerPropertyMetadataValue,
   type UpdateWorkspaceConfigsDto,
 } from '@/services/apis/gen/queries';
+import { useT } from '@/lib/i18n-dictionary';
+
+// The API sends English schema titles; known configs get translated labels.
+const CONFIG_LABEL_KEYS: Record<string, string> = {
+  isAssetsDiscovery: 'admin.workspaceEdit.discovery.assets',
+  isAutoEnableAssetAfterDiscovered: 'admin.workspaceEdit.discovery.autoEnable',
+};
 
 export function WorkspaceConfigs() {
+  const t = useT();
   const { selectedWorkspace, refetch: refetchWorkspaces } =
     useWorkspaceSelector();
   const {
@@ -85,10 +93,16 @@ export function WorkspaceConfigs() {
               htmlFor={key}
               className="flex flex-col items-start cursor-pointer"
             >
-              <span className="font-bold">{config?.title || key}</span>
+              <span className="font-bold">
+                {CONFIG_LABEL_KEYS[key]
+                  ? t(`${CONFIG_LABEL_KEYS[key]}.title`)
+                  : config?.title || key}
+              </span>
               {config?.description && (
                 <span className="text-gray-500 text-sm">
-                  {String(config.description)}
+                  {CONFIG_LABEL_KEYS[key]
+                    ? t(`${CONFIG_LABEL_KEYS[key]}.description`)
+                    : String(config.description)}
                 </span>
               )}
             </Label>

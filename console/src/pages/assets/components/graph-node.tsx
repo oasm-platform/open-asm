@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { useT } from '@/lib/i18n-dictionary';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { FileText, Flag, Globe, type LucideIcon } from 'lucide-react';
@@ -128,6 +129,7 @@ function PillBadge({
  * from the composite ID prefix (`id.split('|')[0]`).
  */
 function GraphNodeComponentImpl({ data, id, selected }: NodeProps) {
+  const t = useT();
   const nodeData = data as unknown as GraphNodeData;
   const reducedMotion = useReducedMotion() === true;
   const label = nodeData.label ?? id;
@@ -220,7 +222,7 @@ function GraphNodeComponentImpl({ data, id, selected }: NodeProps) {
     }
   };
 
-  const ariaLabel = `${type} node: ${label}${alert ? ', alert' : ''}${stale ? ', stale scan data' : ''}`;
+  const ariaLabel = `${t('assets.graph.node.aria', { type, label })}${alert ? t('assets.graph.node.ariaAlert') : ''}${stale ? t('assets.graph.node.ariaStale') : ''}`;
 
   return (
     <motion.div
@@ -260,13 +262,13 @@ function GraphNodeComponentImpl({ data, id, selected }: NodeProps) {
         {alert && (
           <span
             className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-red-500 ring-2 ring-background"
-            aria-label="alert"
+            aria-label={t('assets.graph.node.alert')}
           />
         )}
         {stale && (
           <span
             className="absolute -bottom-0.5 -right-0.5 size-2 rounded-full bg-orange-500 ring-2 ring-background"
-            aria-label="stale scan data"
+            aria-label={t('assets.graph.node.stale')}
           />
         )}
       </div>

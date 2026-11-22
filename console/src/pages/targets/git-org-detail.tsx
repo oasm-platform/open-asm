@@ -1,3 +1,5 @@
+import { fromNow } from '@/lib/date-locale';
+import { useT } from '@/lib/i18n-dictionary';
 import Page from '@/components/common/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,7 +16,6 @@ import {
 } from '@/services/apis/gen/queries';
 import { useNavigate } from '@tanstack/react-router';
 import type { AxiosError } from 'axios';
-import dayjs from 'dayjs';
 import {
   ExternalLink,
   GitBranch,
@@ -30,8 +31,8 @@ import { TargetSwitcher } from './components/target-switcher';
 import SettingTarget from './setting-target';
 
 const TABS = [
-  { value: 'repositories', label: 'Repositories' },
-  { value: 'vulnerabilities', label: 'Vulnerabilities' },
+  { value: 'repositories', labelKey: 'targets.tabs.repositories' },
+  { value: 'vulnerabilities', labelKey: 'targets.tabs.vulnerabilities' },
 ];
 
 const PAGE_SIZE = 50;
@@ -49,19 +50,20 @@ export function GitOrgDetail({
   tab: string | undefined;
   refetch: () => void;
 }) {
+  const t = useT();
   const navigate = useNavigate({ from: '/targets/$id/$tab' });
-  const activeTab = TABS.some((t) => t.value === tab) ? tab! : 'repositories';
+  const activeTab = TABS.some((item) => item.value === tab) ? tab! : 'repositories';
 
   const { mutate: syncNow, isPending: isSyncing } =
     useTargetsControllerReScanTarget({
       mutation: {
         onSuccess: () => {
-          toast.success('Repository sync started');
+          toast.success(t('targets.gitOrg.syncStarted'));
           refetch();
         },
         onError: (error) => {
           const err = error as AxiosError<{ message?: string }>;
-          toast.error(err.response?.data?.message ?? 'Failed to start sync');
+          toast.error(err.response?.data?.message ?? t('targets.gitOrg.syncFailed'));
         },
       },
     });
@@ -82,15 +84,15 @@ export function GitOrgDetail({
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Badge variant="secondary">
-              {target.totalAssets ?? 0} repositories
+              {t('targets.gitOrg.repositoryCount', { count: target.totalAssets ?? 0 })}
             </Badge>
             {!target.integrationId && (
-              <Badge variant="destructive">Integration disconnected</Badge>
+              <Badge variant="destructive">{t('targets.gitOrg.disconnected')}</Badge>
             )}
           </div>
           <div className="flex items-center gap-3">
             <p className="hidden text-muted-foreground md:block">
-              Synced {dayjs(target.lastDiscoveredAt).fromNow()}
+              {t('targets.gitOrg.synced', { time: fromNow(target.lastDiscoveredAt) })}
             </p>
             <Button
               variant="outline"
@@ -100,7 +102,7 @@ export function GitOrgDetail({
               onClick={() => syncNow({ id: target.id })}
             >
               <RefreshCw className={`size-4 ${isSyncing ? 'animate-spin' : ''}`} />
-              Sync now
+              {t('targets.gitOrg.syncNow')}
             </Button>
             <SettingTarget target={target} refetch={refetch} />
           </div>
@@ -115,9 +117,9 @@ export function GitOrgDetail({
         className="w-full gap-4"
       >
         <TabsList>
-          {TABS.map((t) => (
-            <TabsTrigger key={t.value} value={t.value} className="hover:cursor-pointer">
-              {t.label}
+          {TABS.map((item) => (
+            <TabsTrigger key={item.value} value={item.value} className="hover:cursor-pointer">
+              {t(item.labelKey)}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -141,6 +143,7 @@ export function GitOrgDetail({
 }
 
 function RepositoriesTable({ targetId }: { targetId: string }) {
+  const t = useT();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search.trim(), 300);
 
@@ -164,8 +167,8 @@ function RepositoriesTable({ targetId }: { targetId: string }) {
       <div className="relative max-w-xs">
         <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          aria-label="Search repositories"
-          placeholder="Search repositories..."
+          aria-label={t('targets.gitOrg.search')}
+          placeholder={t('targets.gitOrg.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="h-9 pl-8 text-xs"
@@ -183,8 +186,8 @@ function RepositoriesTable({ targetId }: { targetId: string }) {
       {!isLoading && repositories.length === 0 && (
         <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
           {debouncedSearch
-            ? 'No repository matches this search.'
-            : 'No repositories yet — the first sync may still be running.'}
+            ? t('targets.gitOrg.noMatch')
+            : t('targets.gitOrg.empty')}
         </div>
       )}
 
@@ -205,26 +208,26 @@ function RepositoriesTable({ targetId }: { targetId: string }) {
                     </span>
                   )}
                   {repo.pushedAt && (
-                    <span>Updated {dayjs(repo.pushedAt).fromNow()}</span>
+                    <span>{t('targets.gitOrg.updated', { time: fromNow(repo.pushedAt) })}</span>
                   )}
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
                 {!repo.isEnabled && (
-                  <Badge variant="outline" title="Not scanned">
-                    Skipped
+                  <Badge variant="outline" title={t('targets.gitOrg.notScanned')}>
+                    {t('targets.gitOrg.skipped')}
                   </Badge>
                 )}
-                {repo.archived && <Badge variant="outline">Archived</Badge>}
-                {repo.fork && <Badge variant="outline">Fork</Badge>}
+                {repo.archived && <Badge variant="outline">{t('targets.gitOrg.archived')}</Badge>}
+                {repo.fork && <Badge variant="outline">{t('targets.gitOrg.fork')}</Badge>}
                 <Badge variant="secondary">
-                  {repo.private ? 'Private' : 'Public'}
+                  {repo.private ? t('targets.gitOrg.private') : t('targets.gitOrg.public')}
                 </Badge>
                 <OpenLink
                   href={repo.url}
                   target="_blank"
                   rel="noreferrer noopener"
-                  aria-label={`Open ${repo.fullName}`}
+                  aria-label={t('targets.gitOrg.open', { name: repo.fullName })}
                   className="text-muted-foreground hover:text-foreground"
                 >
                   <ExternalLink className="size-4" />
@@ -244,7 +247,7 @@ function RepositoriesTable({ targetId }: { targetId: string }) {
           disabled={isFetchingNextPage}
         >
           {isFetchingNextPage && <Loader2 className="mr-2 size-4 animate-spin" />}
-          Load more
+          {t('targets.gitOrg.loadMore')}
         </Button>
       )}
     </div>

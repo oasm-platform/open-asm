@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Button } from '@/components/ui/button';
 import { useConnectWorkerState } from '@/hooks/useConnectWorkerState';
 import { Plug } from 'lucide-react';
@@ -12,6 +13,7 @@ export function ConnectWorkerTrigger({
   networkId,
   children,
 }: ConnectWorkerTriggerProps) {
+  const t = useT();
   const { openDialog } = useConnectWorkerState();
 
   return (
@@ -21,7 +23,7 @@ export function ConnectWorkerTrigger({
       onClick={() => openDialog(networkId)}
     >
       <Plug className="shrink-0" />
-      {children ?? 'Connect'}
+      {children ?? t('components.aiChat.connect')}
     </Button>
   );
 }

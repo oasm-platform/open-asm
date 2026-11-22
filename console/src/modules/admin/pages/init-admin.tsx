@@ -16,26 +16,32 @@ import {
 } from '@/services/apis/gen/queries';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2Icon } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from '@tanstack/react-router';
 import { z } from 'zod';
 import { useQueryClient } from '@tanstack/react-query';
+import { type TFunction, useT } from '@/lib/i18n-dictionary';
 
-const formSchema = z
+const createFormSchema = (t: TFunction) =>
+  z
   .object({
-    email: z.string().email('Invalid email address'),
-    password: z.string().min(8, 'Password must be at least 8 characters'),
+    email: z.string().email(t('admin.initAdmin.invalidEmail')),
+    password: z.string().min(8, t('admin.initAdmin.passwordMin')),
     confirmPassword: z
       .string()
-      .min(8, 'Confirm password must be at least 8 characters'),
+      .min(8, t('admin.initAdmin.confirmPasswordMin')),
   })
   .refine((data) => data.password === data.confirmPassword, {
-    message: 'Passwords do not match.',
+    message: t('admin.initAdmin.passwordMismatch'),
     path: ['confirmPassword'],
   });
 
+type FormValues = z.infer<ReturnType<typeof createFormSchema>>;
+
 export default function InitAdmin() {
+  const tr = useT();
+  const formSchema = useMemo(() => createFormSchema(tr), [tr]);
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -50,7 +56,7 @@ export default function InitAdmin() {
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: FormValues) {
     setLoading(true);
     mutate(
       { data: values as CreateFirstAdminDto },
@@ -62,7 +68,7 @@ export default function InitAdmin() {
           await navigate({ to: '/login' });
         },
         onError: () => {
-          form.setError('email', { message: 'Invalid email or password' });
+          form.setError('email', { message: tr('admin.initAdmin.invalidCredentials') });
         },
         onSettled: () => {
           setLoading(false);
@@ -77,10 +83,10 @@ export default function InitAdmin() {
         <div className="w-full max-w-sm space-y-8">
           <div className="space-y-2 text-center lg:text-left">
             <h1 className="text-balance text-2xl font-semibold tracking-tight">
-              Create your first admin
+              {tr('admin.initAdmin.title')}
             </h1>
             <p className="text-pretty text-sm text-muted-foreground">
-              Set up the workspace administrator account.
+              {tr('admin.initAdmin.subtitle')}
             </p>
           </div>
           <Form {...form}>
@@ -90,7 +96,7 @@ export default function InitAdmin() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>{tr('admin.initAdmin.email')}</FormLabel>
                     <FormControl>
                       <Input placeholder="email@example.com" {...field} />
                     </FormControl>
@@ -103,7 +109,7 @@ export default function InitAdmin() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>{tr('admin.initAdmin.password')}</FormLabel>
                     <FormControl>
                       <Input
                         type="password"
@@ -120,7 +126,7 @@ export default function InitAdmin() {
                 name="confirmPassword"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Confirm password</FormLabel>
+                    <FormLabel>{tr('admin.initAdmin.confirmPassword')}</FormLabel>
                     <FormControl>
                       <Input
                         type="password"
@@ -139,7 +145,7 @@ export default function InitAdmin() {
                 size="lg"
               >
                 {loading && <Loader2Icon className="animate-spin" />}
-                Create account
+                {tr('admin.initAdmin.submit')}
               </Button>
             </form>
           </Form>

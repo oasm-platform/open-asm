@@ -20,6 +20,7 @@ import type { AxiosError } from 'axios';
 import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useT } from '@/lib/i18n-dictionary';
 
 /** One entry per line or comma; blanks dropped. The server validates each. */
 const parseAllowedIps = (text: string) =>
@@ -33,6 +34,7 @@ const parseAllowedIps = (text: string) =>
  * IP. The server refuses a list that leaves out the admin saving it.
  */
 export default function AdminAccessSettings() {
+  const t = useT();
   const queryClient = useQueryClient();
   const { data: settings, isLoading } = useSystemConfigsControllerGetSettings();
   const { mutate, isPending } = useSystemConfigsControllerUpdateSettings();
@@ -49,8 +51,8 @@ export default function AdminAccessSettings() {
         onSuccess: () => {
           toast.success(
             allowedIps.length
-              ? 'Admin access limited to the listed IPs.'
-              : 'Admin access allowed from every IP.',
+              ? t('admin.adminAccess.savedLimited')
+              : t('admin.adminAccess.savedAll'),
           );
           setDraft(null);
           return queryClient.invalidateQueries({
@@ -60,7 +62,7 @@ export default function AdminAccessSettings() {
         onError: (error) => {
           toast.error(
             (error as AxiosError<{ message?: string | string[] }>).response
-              ?.data?.message?.toString() ?? 'Failed to update admin access.',
+              ?.data?.message?.toString() ?? t('admin.adminAccess.saveFailed'),
           );
         },
       },
@@ -70,13 +72,13 @@ export default function AdminAccessSettings() {
   return (
     <Card className="gap-4">
       <CardHeader>
-        <CardTitle>Admin access</CardTitle>
+        <CardTitle>{t('admin.adminAccess.title')}</CardTitle>
         <CardDescription>
-          Where the admin console and admin APIs can be used from.
+          {t('admin.adminAccess.description')}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
-        <Label htmlFor="admin-allowed-ips">Allowed IP addresses</Label>
+        <Label htmlFor="admin-allowed-ips">{t('admin.adminAccess.allowedIps')}</Label>
         {isLoading ? (
           <Skeleton className="h-24 w-full" />
         ) : (
@@ -90,14 +92,13 @@ export default function AdminAccessSettings() {
           />
         )}
         <p className="text-sm text-muted-foreground">
-          One IP address or CIDR range per line. Leave empty to allow every IP.
-          Your current IP must be in the list.
+          {t('admin.adminAccess.hint')}
         </p>
       </CardContent>
       <CardFooter className="justify-end">
         <Button onClick={save} disabled={isLoading || isPending || draft === null}>
           {isPending && <Loader2 className="animate-spin" />}
-          Save
+          {t('common.save')}
         </Button>
       </CardFooter>
     </Card>

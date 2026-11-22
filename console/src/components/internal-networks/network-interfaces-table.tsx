@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useT } from '@/lib/i18n-dictionary';
 import {
   Table,
   TableBody,
@@ -41,6 +42,7 @@ interface NetworkInterfacesTableProps {
 export function NetworkInterfacesTable({
   networkId,
 }: NetworkInterfacesTableProps) {
+  const t = useT();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data } = useInternalNetworksControllerGetManyNetworkInterfaces(
@@ -112,14 +114,14 @@ export function NetworkInterfacesTable({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Network Interfaces</CardTitle>
+        <CardTitle>{t('internalNetworks.interfaces.title')}</CardTitle>
         <Button
           onClick={handleStartDiscovery}
           disabled={isPending || !hasSelectableItems}
           variant={'outline'}
           size="sm"
         >
-          <TargetIcon /> {isPending ? 'Starting...' : 'Start discovery'}
+          <TargetIcon /> {isPending ? t('internalNetworks.interfaces.starting') : t('internalNetworks.interfaces.startDiscovery')}
         </Button>
       </CardHeader>
       <CardContent>
@@ -127,12 +129,12 @@ export function NetworkInterfacesTable({
           <TableHeader>
             <TableRow>
               <TableHead className="w-10"></TableHead>
-              <TableHead>Interface Name</TableHead>
-              <TableHead>IP Address</TableHead>
+              <TableHead>{t('internalNetworks.interfaces.interfaceName')}</TableHead>
+              <TableHead>{t('internalNetworks.interfaces.ipAddress')}</TableHead>
               <TableHead>CIDR</TableHead>
-              <TableHead>Gateway IP</TableHead>
-              <TableHead>Gateway MAC</TableHead>
-              <TableHead>Created At</TableHead>
+              <TableHead>{t('internalNetworks.interfaces.gatewayIp')}</TableHead>
+              <TableHead>{t('internalNetworks.interfaces.gatewayMac')}</TableHead>
+              <TableHead>{t('internalNetworks.detail.createdAt')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

@@ -27,6 +27,7 @@ import {
   ToolCallHistoryPanel,
 } from './tool-call-history-panel';
 import { TurnStatsPanel } from './turn-stats-panel';
+import { useT } from '@/lib/i18n-dictionary';
 
 export const SIDE_PANEL_TABS = [
   'plan',
@@ -133,6 +134,7 @@ export function ChatSidePanel({
   browserScreenshots = NO_SCREENSHOTS,
   className,
 }: ChatSidePanelProps) {
+  const t = useT();
   const has = useMemo(
     () =>
       sidePanelContent({
@@ -176,55 +178,55 @@ export function ChatSidePanel({
         <TabsList className="no-scrollbar h-full min-w-0 justify-start gap-4 overflow-x-auto xl:gap-6">
           <TabsTrigger
             value="plan"
-            title="Plan"
+            title={t('agents.sidePanel.tabs.plan')}
             badge={todos?.length ? `${completed}/${todos.length}` : undefined}
           >
             <ListChecks />
-            <TabLabel>Plan</TabLabel>
+            <TabLabel>{t('agents.sidePanel.tabs.plan')}</TabLabel>
           </TabsTrigger>
-          <TabsTrigger value="workflow" title="Workflow">
+          <TabsTrigger value="workflow" title={t('agents.sidePanel.tabs.workflow')}>
             <Workflow />
-            <TabLabel>Workflow</TabLabel>
+            <TabLabel>{t('agents.sidePanel.tabs.workflow')}</TabLabel>
           </TabsTrigger>
           <TabsTrigger
             value="subagents"
-            title="Subagents"
+            title={t('agents.sidePanel.tabs.subagents')}
             badge={
               subagents.length > 0 ? (running > 0 ? running : subagents.length) : undefined
             }
             badgeClassName={running > 0 ? RUNNING_BADGE : undefined}
           >
             <Network />
-            <TabLabel>Subagents</TabLabel>
+            <TabLabel>{t('agents.sidePanel.tabs.subagents')}</TabLabel>
           </TabsTrigger>
           <TabsTrigger
             value="browser"
-            title="Browser"
+            title={t('agents.sidePanel.tabs.browser')}
             badge={browserScreenshots.length > 1 ? browserScreenshots.length : undefined}
           >
             <Globe />
-            <TabLabel>Browser</TabLabel>
+            <TabLabel>{t('agents.sidePanel.tabs.browser')}</TabLabel>
           </TabsTrigger>
           <TabsTrigger
             value="tools"
-            title="Tool calls"
+            title={t('agents.sidePanel.tabs.tools')}
             badge={toolCalls.length > 0 ? `${toolCallsDone}/${toolCalls.length}` : undefined}
             badgeClassName={toolCallsRunning > 0 ? RUNNING_BADGE : undefined}
           >
             <Wrench />
-            <TabLabel>Tool calls</TabLabel>
+            <TabLabel>{t('agents.sidePanel.tabs.tools')}</TabLabel>
           </TabsTrigger>
-          <TabsTrigger value="stats" title="Stats">
+          <TabsTrigger value="stats" title={t('agents.sidePanel.tabs.stats')}>
             <BarChart3 />
-            <TabLabel>Stats</TabLabel>
+            <TabLabel>{t('agents.sidePanel.tabs.stats')}</TabLabel>
           </TabsTrigger>
         </TabsList>
         <Button
           variant="ghost"
           size="icon-sm"
           className="ml-auto shrink-0 text-muted-foreground hover:cursor-pointer"
-          aria-label="Close side panel"
-          title="Close side panel"
+          aria-label={t('agents.sidePanel.close')}
+          title={t('agents.sidePanel.close')}
           onClick={onClose}
         >
           <PanelRightClose />
@@ -239,8 +241,8 @@ export function ChatSidePanel({
         ) : (
           <EmptyTab
             icon={ListChecks}
-            title="No plan yet"
-            description="The agent writes its plan here when a task takes several steps."
+            title={t('agents.sidePanel.empty.planTitle')}
+            description={t('agents.sidePanel.empty.planDescription')}
           />
         )}
       </TabsContent>
@@ -254,8 +256,8 @@ export function ChatSidePanel({
         ) : (
           <EmptyTab
             icon={Workflow}
-            title="No workflow yet"
-            description="When the agent delegates work, each subagent shows up here under the plan step it serves, linked to the agents it builds on."
+            title={t('agents.sidePanel.empty.workflowTitle')}
+            description={t('agents.sidePanel.empty.workflowDescription')}
           />
         )}
       </TabsContent>
@@ -269,8 +271,8 @@ export function ChatSidePanel({
         ) : (
           <EmptyTab
             icon={Network}
-            title="No subagents"
-            description="Background agents started in this conversation show up here."
+            title={t('agents.sidePanel.empty.subagentsTitle')}
+            description={t('agents.sidePanel.empty.subagentsDescription')}
           />
         )}
       </TabsContent>
@@ -284,8 +286,8 @@ export function ChatSidePanel({
         ) : (
           <EmptyTab
             icon={Globe}
-            title="No live view yet"
-            description="While the agent drives the browser, the page after each command shows up here."
+            title={t('agents.sidePanel.empty.browserTitle')}
+            description={t('agents.sidePanel.empty.browserDescription')}
           />
         )}
       </TabsContent>
@@ -306,8 +308,8 @@ export function ChatSidePanel({
         ) : (
           <EmptyTab
             icon={Wrench}
-            title="No tool calls yet"
-            description="Tools the agent runs show up here. Pick one to jump to it in the chat."
+            title={t('agents.sidePanel.empty.toolsTitle')}
+            description={t('agents.sidePanel.empty.toolsDescription')}
           />
         )}
       </TabsContent>
@@ -317,8 +319,8 @@ export function ChatSidePanel({
         ) : (
           <EmptyTab
             icon={BarChart3}
-            title="No stats yet"
-            description="Context usage and turn stats appear after the first answer."
+            title={t('agents.sidePanel.empty.statsTitle')}
+            description={t('agents.sidePanel.empty.statsDescription')}
           />
         )}
       </TabsContent>

@@ -20,21 +20,23 @@ import {
 } from '../components/detail-layout';
 import { UserEdit } from '../components/user-edit';
 import { UserInfo } from '../components/user-info';
+import { useT } from '@/lib/i18n-dictionary';
 
 const TABS = [
-  { id: 'info', label: 'Info' },
-  { id: 'edit', label: 'Edit' },
+  { id: 'info', labelKey: 'admin.detail.tabs.info' },
+  { id: 'edit', labelKey: 'common.edit' },
 ];
 
 export default function UserDetail() {
+  const t = useT();
   const { id } = useParams({ from: '/admin/users/$id' });
   const { data: user, isLoading } = useAdminUsersControllerGetUser(id);
 
   if (isLoading) return <DetailSkeleton />;
-  if (!user) return <DetailNotFound entity="User" />;
+  if (!user) return <DetailNotFound entity={t('admin.detail.entity.user')} />;
 
   return (
-    <Page documentTitle={user.name ? `${user.name} · Admin` : undefined}>
+    <Page documentTitle={user.name ? t('admin.detail.documentTitle', { name: user.name }) : undefined}>
       <div className="mb-4 space-y-4">
         <DetailHero
           media={
@@ -56,22 +58,24 @@ export default function UserDetail() {
               {user.pendingApproval ? (
                 <Badge variant="outline" className="gap-1">
                   <Clock />
-                  Pending approval
+                  {t('admin.detail.status.pendingApproval')}
                 </Badge>
               ) : user.banned ? (
                 <Badge variant="destructive" className="gap-1">
                   <Ban />
-                  Banned
+                  {t('admin.detail.status.banned')}
                 </Badge>
               ) : (
                 <Badge variant="secondary" className="gap-1">
                   <CircleCheck />
-                  Active
+                  {t('admin.detail.status.active')}
                 </Badge>
               )}
               <Badge variant="secondary" className="gap-1">
                 {user.emailVerified ? <MailCheck /> : <MailWarning />}
-                {user.emailVerified ? 'Email verified' : 'Email unverified'}
+                {user.emailVerified
+                  ? t('admin.detail.emailVerified')
+                  : t('admin.detail.emailUnverified')}
               </Badge>
             </>
           }
@@ -89,7 +93,7 @@ export default function UserDetail() {
                 value={tab.id}
                 className="hover:cursor-pointer"
               >
-                {tab.label}
+                {t(tab.labelKey)}
               </TabsTrigger>
             ))}
           </TabsList>

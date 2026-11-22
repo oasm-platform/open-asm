@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { StatCard } from '@/components/common/stat-card';
 import { useTargetsControllerGetTargetsSummary } from '@/services/apis/gen/queries';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
@@ -21,6 +22,7 @@ export function TargetsSummary({
   view: TargetView;
   onViewChange: (view: TargetView) => void;
 }) {
+  const t = useT();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -36,42 +38,42 @@ export function TargetsSummary({
   return (
     <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
       <StatCard
-        label="Targets"
+        label={t('targets.summary.targets')}
         value={data?.total}
         icon={Crosshair}
-        hint="In this workspace"
+        hint={t('targets.summary.inWorkspace')}
         active={view === 'all'}
         onClick={() => onViewChange('all')}
       />
       <StatCard
-        label="Scanning"
+        label={t('targets.summary.scanning')}
         value={data?.scanning}
         icon={Radar}
-        hint="With jobs running"
+        hint={t('targets.summary.withJobs')}
         active={view === 'scanning'}
         onClick={() => toggle('scanning')}
       />
       <StatCard
-        label="With critical"
+        label={t('targets.summary.withCritical')}
         value={data?.withCritical}
         icon={ShieldAlert}
-        hint="Open critical vulnerability"
+        hint={t('targets.summary.openCritical')}
         active={view === 'critical'}
         onClick={() => toggle('critical')}
       />
       <StatCard
-        label="Stale"
+        label={t('targets.summary.stale')}
         value={data?.stale}
         icon={History}
-        hint={`Not discovered in ${STALE_DAYS} days`}
+        hint={t('targets.summary.notDiscovered', { days: STALE_DAYS })}
         active={view === 'stale'}
         onClick={() => toggle('stale')}
       />
       <StatCard
-        label="Scheduled"
+        label={t('targets.summary.scheduled')}
         value={data?.scheduled}
         icon={CalendarClock}
-        hint="Rescanned automatically"
+        hint={t('targets.summary.rescanned')}
       />
     </div>
   );

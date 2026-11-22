@@ -12,25 +12,34 @@ import { Input } from '@/components/ui/input';
 import { authClient } from '@/utils/authClient';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { EyeIcon, EyeOffIcon, Loader2Icon } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useT, type TFunction } from '@/lib/i18n-dictionary';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
-const formSchema = z
-  .object({
-    currentPassword: z.string().min(1, 'Current password is required'),
-    newPassword: z.string().min(8, 'Password must be at least 8 characters'),
-    confirmPassword: z
-      .string()
-      .min(8, 'Confirm password must be at least 8 characters'),
-  })
-  .refine((data) => data.newPassword === data.confirmPassword, {
-    message: 'Passwords do not match.',
-    path: ['confirmPassword'],
-  });
+const makeFormSchema = (t: TFunction) =>
+  z
+    .object({
+      currentPassword: z
+        .string()
+        .min(1, t('settings.password.errors.currentRequired')),
+      newPassword: z
+        .string()
+        .min(8, t('settings.password.errors.newMin')),
+      confirmPassword: z
+        .string()
+        .min(8, t('settings.password.errors.confirmMin')),
+    })
+    .refine((data) => data.newPassword === data.confirmPassword, {
+      message: t('settings.password.errors.mismatch'),
+      path: ['confirmPassword'],
+    });
+type FormValues = z.infer<ReturnType<typeof makeFormSchema>>;
 
 export default function ChangePassword() {
+  const t = useT();
+  const formSchema = useMemo(() => makeFormSchema(t), [t]);
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -54,22 +63,22 @@ export default function ChangePassword() {
     }));
   };
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: FormValues) {
     setLoading(true);
     try {
       const res = await authClient.changePassword(values);
       if (!res.data) {
         form.setError('currentPassword', {
-          message: 'Current password is incorrect',
+          message: t('settings.password.errors.incorrect'),
         });
       } else {
-        toast.success('Password changed successfully');
+        toast.success(t('settings.password.changed'));
         form.reset();
         setShowPasswords({ current: false, new: false, confirm: false });
       }
     } catch {
       form.setError('currentPassword', {
-        message: 'Failed to change password',
+        message: t('settings.password.errors.failed'),
       });
     } finally {
       setLoading(false);
@@ -78,7 +87,7 @@ export default function ChangePassword() {
 
   return (
     <Card className="p-4">
-      <CardTitle>Change Password</CardTitle>
+      <CardTitle>{t('settings.password.title')}</CardTitle>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <FormField
@@ -86,12 +95,12 @@ export default function ChangePassword() {
             name="currentPassword"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Current Password</FormLabel>
+                <FormLabel>{t('settings.password.current')}</FormLabel>
                 <FormControl>
                   <div className="relative">
                     <Input
                       type={showPasswords.current ? 'text' : 'password'}
-                      placeholder="Enter current password"
+                      placeholder={t('settings.password.currentPlaceholder')}
                       {...field}
                       disabled={loading}
                       className="pr-10"
@@ -122,12 +131,12 @@ export default function ChangePassword() {
             name="newPassword"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>New Password</FormLabel>
+                <FormLabel>{t('settings.password.new')}</FormLabel>
                 <FormControl>
                   <div className="relative">
                     <Input
                       type={showPasswords.new ? 'text' : 'password'}
-                      placeholder="Enter new password"
+                      placeholder={t('settings.password.newPlaceholder')}
                       {...field}
                       disabled={loading}
                       className="pr-10"
@@ -158,12 +167,12 @@ export default function ChangePassword() {
             name="confirmPassword"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Confirm new password</FormLabel>
+                <FormLabel>{t('settings.password.confirm')}</FormLabel>
                 <FormControl>
                   <div className="relative">
                     <Input
                       type={showPasswords.confirm ? 'text' : 'password'}
-                      placeholder="Confirm new password"
+                      placeholder={t('settings.password.confirm')}
                       {...field}
                       disabled={loading}
                       className="pr-10"
@@ -196,7 +205,7 @@ export default function ChangePassword() {
               size="sm"
             >
               {loading && <Loader2Icon className="w-4 h-4 mr-2 animate-spin" />}
-              Change password
+              {t('settings.password.submit')}
             </Button>
           </div>
         </form>

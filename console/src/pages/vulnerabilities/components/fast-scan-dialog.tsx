@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable } from '@/components/ui/data-table';
@@ -32,6 +33,7 @@ interface FastScanDialogProps {
 }
 
 export function FastScanDialog({ target, disabled }: FastScanDialogProps) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const { mutate: scan, isPending } = useVulnerabilitiesControllerScan();
@@ -48,7 +50,7 @@ export function FastScanDialog({ target, disabled }: FastScanDialogProps) {
       { data: { targetIds } },
       {
         onSuccess: () => {
-          toast.success('Scan started successfully');
+          toast.success(t('vulnerabilities.fastScan.toastStarted'));
           handleOpenChange(false);
         },
       },
@@ -61,24 +63,24 @@ export function FastScanDialog({ target, disabled }: FastScanDialogProps) {
         disabled={disabled}
         variant="secondary"
         className="hover:cursor-pointer text-sm h-9"
-        title="Start a vulnerability scan"
+        title={t('vulnerabilities.fastScan.buttonTitle')}
         onClick={() => setOpen(true)}
       >
         <Bug className="h-4 w-4" />
-        Fast scan
+        {t('vulnerabilities.fastScan.button')}
       </Button>
       <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-auto">
         <DialogHeader>
-          <DialogTitle>Scan vulnerabilities</DialogTitle>
+          <DialogTitle>{t('vulnerabilities.fastScan.title')}</DialogTitle>
           <DialogDescription>
             {target
-              ? 'Run a vulnerability scan on this target.'
-              : 'Choose the targets to scan. Only targets that finished discovery are listed.'}
+              ? t('vulnerabilities.fastScan.descTarget')
+              : t('vulnerabilities.fastScan.descPick')}
           </DialogDescription>
         </DialogHeader>
         {target ? (
           <div className="space-y-2">
-            <Label htmlFor="fast-scan-target">Target</Label>
+            <Label htmlFor="fast-scan-target">{t('vulnerabilities.fastScan.target')}</Label>
             <Input id="fast-scan-target" value={target.value} readOnly />
           </div>
         ) : (
@@ -86,17 +88,19 @@ export function FastScanDialog({ target, disabled }: FastScanDialogProps) {
         )}
         <DialogFooter className="items-center sm:justify-between">
           <div className="text-sm text-muted-foreground">
-            {!target && `${selected.size} selected`}
+            {!target && t('vulnerabilities.fastScan.selected', { n: selected.size })}
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => handleOpenChange(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               onClick={handleRun}
               disabled={targetIds.length === 0 || isPending}
             >
-              {isPending ? 'Starting...' : 'Run'}
+              {isPending
+                ? t('vulnerabilities.fastScan.starting')
+                : t('vulnerabilities.fastScan.run')}
             </Button>
           </div>
         </DialogFooter>
@@ -118,6 +122,7 @@ export function TargetPicker({
   onSelectedChange,
   type,
 }: TargetPickerProps) {
+  const t = useT();
   const [filter, setFilter] = useState('');
   const {
     tableParams: { page, pageSize, sortBy, sortOrder },
@@ -151,13 +156,13 @@ export function TargetPicker({
     {
       id: 'select',
       header: () => {
-        const all = targets.length > 0 && targets.every((t) => selected.has(t.id));
-        const some = targets.some((t) => selected.has(t.id));
+        const all = targets.length > 0 && targets.every((x) => selected.has(x.id));
+        const some = targets.some((x) => selected.has(x.id));
         return (
           <Checkbox
             checked={all || (some && 'indeterminate')}
             onCheckedChange={(value) => toggle(targets, !!value)}
-            aria-label="Select all"
+            aria-label={t('vulnerabilities.fastScan.selectAll')}
           />
         );
       },
@@ -166,16 +171,16 @@ export function TargetPicker({
           checked={selected.has(row.original.id)}
           onCheckedChange={(value) => toggle([row.original], !!value)}
           onClick={(e) => e.stopPropagation()}
-          aria-label="Select row"
+          aria-label={t('vulnerabilities.fastScan.selectRow')}
         />
       ),
       enableSorting: false,
       enableHiding: false,
     },
-    { accessorKey: 'value', header: 'Target' },
+    { accessorKey: 'value', header: t('vulnerabilities.fastScan.colTarget') },
     {
       accessorKey: 'type',
-      header: 'Type',
+      header: t('vulnerabilities.fastScan.colType'),
       enableSorting: false,
       cell: ({ row }) => <TargetTypeBadge type={row.original.type} />,
     },
@@ -195,11 +200,11 @@ export function TargetPicker({
       filterValue={filter}
       onFilterChange={setFilter}
       filterColumnKey="value"
-      filterPlaceholder="Search targets"
+      filterPlaceholder={t('vulnerabilities.fastScan.search')}
       onPageChange={setPage}
       onPageSizeChange={setPageSize}
       onRowClick={(row) => toggle([row], !selected.has(row.id))}
-      emptyMessage="No discovered targets"
+      emptyMessage={t('vulnerabilities.fastScan.empty')}
     />
   );
 }

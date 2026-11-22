@@ -69,13 +69,46 @@ describe('DomainExceptionFilter', () => {
       .spyOn(BaseExceptionFilter.prototype, 'catch')
       .mockImplementation(() => undefined);
     const filter = new DomainExceptionFilter({} as HttpServer);
-    const host = {} as ArgumentsHost;
+    const host = { getType: () => 'rpc' } as ArgumentsHost;
 
     filter.catch(new NotFoundError('Gone'), host);
 
     const [exception, passedHost] = base.mock.calls[0];
     expect((exception as HttpException).getStatus()).toBe(404);
     expect(passedHost).toBe(host);
+    base.mockRestore();
+  });
+
+  it('translates an HTTP exception message for the request language', () => {
+    const base = jest
+      .spyOn(BaseExceptionFilter.prototype, 'catch')
+      .mockImplementation(() => undefined);
+    const i18nContext = {
+      lang: 'vi',
+      service: {
+        getTranslations: () => ({
+          en: { errors: { workspaceNotFound: 'Workspace not found' } },
+        }),
+      },
+      t: (key: string) => (key === 'errors.workspaceNotFound' ? 'Không tìm thấy' : key),
+    };
+    const host = {
+      getType: () => 'http',
+      switchToHttp: () => ({ getRequest: () => ({ i18nContext }) }),
+    } as unknown as ArgumentsHost;
+
+    new DomainExceptionFilter({} as HttpServer).catch(
+      new NotFoundError('Workspace not found'),
+      host,
+    );
+
+    const [exception] = base.mock.calls[0] as [HttpException];
+    expect(exception.getStatus()).toBe(404);
+    expect(exception.getResponse()).toMatchObject({
+      message: 'Không tìm thấy',
+      error: 'Not Found',
+      statusCode: 404,
+    });
     base.mockRestore();
   });
 });

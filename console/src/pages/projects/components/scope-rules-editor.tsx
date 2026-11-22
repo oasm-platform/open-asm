@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import useDebounce from '@/hooks/use-debounce';
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import {
   ProjectScopeRuleMode,
@@ -27,10 +28,10 @@ export interface EditableScopeRule extends ScopeRuleInputDto {
 }
 
 const TYPE_LABEL: Record<ProjectScopeRuleType, string> = {
-  target: 'Target',
-  hostname: 'Hostname',
-  cidr: 'CIDR',
-  asset: 'Asset',
+  target: 'projects.scope.type.target',
+  hostname: 'projects.scope.type.hostname',
+  cidr: 'projects.scope.type.cidr',
+  asset: 'projects.scope.type.asset',
 };
 
 const PLACEHOLDER: Partial<Record<ProjectScopeRuleType, string>> = {
@@ -61,6 +62,7 @@ export function ScopeRulesEditor({
   projectId?: string;
   disabled?: boolean;
 }) {
+  const t = useT();
   const targets = useTargetsControllerGetTargetsInWorkspace({
     page: 1,
     limit: 100,
@@ -99,8 +101,7 @@ export function ScopeRulesEditor({
     <div className="flex flex-col gap-3">
       {rules.length === 0 && (
         <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-          No rules. Add one to keep the project in sync with a target, a
-          hostname pattern or an address range.
+          {t('projects.scopeEditor.noRules')}
         </p>
       )}
       {rules.map((rule, index) => {
@@ -116,7 +117,7 @@ export function ScopeRulesEditor({
               onValueChange={(mode) => patch(index, { mode: mode as ProjectScopeRuleMode })}
             >
               <SelectTrigger
-                aria-label="Include or exclude"
+                aria-label={t('projects.scopeEditor.modeLabel')}
                 className={cn(
                   'h-8 text-xs',
                   rule.mode === ProjectScopeRuleMode.exclude && 'text-destructive',
@@ -125,8 +126,12 @@ export function ScopeRulesEditor({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={ProjectScopeRuleMode.include}>Include</SelectItem>
-                <SelectItem value={ProjectScopeRuleMode.exclude}>Exclude</SelectItem>
+                <SelectItem value={ProjectScopeRuleMode.include}>
+                  {t('projects.scopeEditor.include')}
+                </SelectItem>
+                <SelectItem value={ProjectScopeRuleMode.exclude}>
+                  {t('projects.scopeEditor.exclude')}
+                </SelectItem>
               </SelectContent>
             </Select>
             <Select
@@ -136,7 +141,7 @@ export function ScopeRulesEditor({
                 patch(index, { type: type as ProjectScopeRuleType, value: '', label: undefined })
               }
             >
-              <SelectTrigger aria-label="Rule type" className="hidden h-8 text-xs sm:flex">
+              <SelectTrigger aria-label={t('projects.scopeEditor.typeLabel')} className="hidden h-8 text-xs sm:flex">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -148,11 +153,13 @@ export function ScopeRulesEditor({
                   ] as ProjectScopeRuleType[]
                 ).map((type) => (
                   <SelectItem key={type} value={type}>
-                    {TYPE_LABEL[type]}
+                    {t(TYPE_LABEL[type])}
                   </SelectItem>
                 ))}
                 {rule.type === ProjectScopeRuleType.asset && (
-                  <SelectItem value={ProjectScopeRuleType.asset}>Asset</SelectItem>
+                  <SelectItem value={ProjectScopeRuleType.asset}>
+                    {t('projects.scope.type.asset')}
+                  </SelectItem>
                 )}
               </SelectContent>
             </Select>
@@ -162,8 +169,11 @@ export function ScopeRulesEditor({
                 disabled={disabled}
                 onValueChange={(value) => patch(index, { value })}
               >
-                <SelectTrigger aria-label="Target" className="h-8 min-w-0 text-xs">
-                  <SelectValue placeholder="Pick a target" />
+                <SelectTrigger
+                  aria-label={t('projects.scope.type.target')}
+                  className="h-8 min-w-0 text-xs"
+                >
+                  <SelectValue placeholder={t('projects.scopeEditor.pickTarget')} />
                 </SelectTrigger>
                 <SelectContent>
                   {(targets.data?.data ?? []).map((target) => (
@@ -183,7 +193,7 @@ export function ScopeRulesEditor({
                 disabled={disabled}
                 onChange={(e) => patch(index, { value: e.target.value })}
                 placeholder={PLACEHOLDER[rule.type]}
-                aria-label={TYPE_LABEL[rule.type]}
+                aria-label={t(TYPE_LABEL[rule.type])}
                 className="h-8"
               />
             )}
@@ -199,7 +209,7 @@ export function ScopeRulesEditor({
               size="icon"
               className="size-7"
               disabled={disabled}
-              aria-label="Remove rule"
+              aria-label={t('projects.scopeEditor.removeRule')}
               onClick={() => onChange(rules.filter((_, i) => i !== index))}
             >
               <X className="size-3.5" />
@@ -224,16 +234,16 @@ export function ScopeRulesEditor({
           }
         >
           <Plus className="size-3.5" />
-          Add rule
+          {t('projects.scopeEditor.addRule')}
         </Button>
         <span className="text-sm">
           <span className="font-semibold tabular-nums">
             {preview.data?.total ?? 0}
           </span>{' '}
-          <span className="text-muted-foreground">assets in scope</span>
+          <span className="text-muted-foreground">{t('projects.scopeEditor.assetsInScope')}</span>
           {preview.isError && (
             <span className="ml-2 text-xs text-destructive">
-              A rule is not valid yet
+              {t('projects.scopeEditor.invalid')}
             </span>
           )}
         </span>
@@ -244,7 +254,7 @@ export function ScopeRulesEditor({
           disabled={disabled}
           onCheckedChange={(value) => onAutoAddAssetsChange(value === true)}
         />
-        Add assets found later when they match a rule
+        {t('projects.scopeEditor.autoAdd')}
       </label>
     </div>
   );

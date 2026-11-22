@@ -8,11 +8,13 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { Trash2Icon } from 'lucide-react';
 import { toast } from 'sonner';
+import { useT } from '@/lib/i18n-dictionary';
 
 interface DeleteWorkspaceProps {
   workspace: Workspace;
 }
 const DeleteWorkspace = (props: DeleteWorkspaceProps) => {
+  const t = useT();
   const queryClient = useQueryClient();
 
   const { workspace } = props;
@@ -25,22 +27,22 @@ const DeleteWorkspace = (props: DeleteWorkspaceProps) => {
       },
       {
         onSuccess: () => {
-          toast.success('Workspace deleted');
+          toast.success(t('settings.workspace.deletedShort'));
           queryClient.invalidateQueries({ queryKey: ['/api/workspaces'] });
           refetch();
         },
         onError: () => {
-          toast.error('Failed to delete workspace');
+          toast.error(t('settings.workspace.deleteFailed'));
         },
       },
     );
   };
   return (
     <ConfirmDialog
-      title="Delete workspace"
-      description={`Are you sure you want to delete workspace "${workspace.name}"? All related data including assets, vulnerabilities, scan results, and settings will be permanently deleted and cannot be recovered.`}
+      title={t('settings.workspace.delete.title')}
+      description={t('settings.workspace.delete.descriptionNamed', { name: workspace.name })}
       onConfirm={handleDelete}
-      confirmText={'Delete'}
+      confirmText={t('common.delete')}
       typeToConfirm={'delete'}
       trigger={
         <Button

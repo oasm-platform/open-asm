@@ -1,10 +1,18 @@
 import { createAuthClient } from 'better-auth/react';
-import { adminClient } from 'better-auth/client/plugins';
+import {
+  adminClient,
+  inferAdditionalFields,
+} from 'better-auth/client/plugins';
 import type { User as BetterAuthUser } from 'better-auth';
 
 export const authClient = createAuthClient({
   baseURL: window.location.origin,
-  plugins: [adminClient()],
+  plugins: [
+    adminClient(),
+    inferAdditionalFields({
+      user: { language: { type: 'string', required: false } },
+    }),
+  ],
   fetchOptions: {},
   // sessionOptions is supported at runtime by better-auth's session refresh
   // manager (see node_modules/better-auth/dist/client/session-refresh.mjs) but
@@ -32,6 +40,7 @@ export const refetchSession = (): Promise<void> =>
 
 export type User = BetterAuthUser & {
   role: string;
+  language?: string;
   banned?: boolean | null;
   banReason?: string | null;
   banExpires?: Date | null;

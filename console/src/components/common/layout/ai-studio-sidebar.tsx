@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Link,
@@ -55,7 +56,6 @@ import {
 } from './sidebar-styles';
 
 const CONVERSATION_PATH_PREFIX = '/aistudio/conversations/';
-const UNTITLED = 'New conversation';
 
 interface ConversationItemProps {
   conversation: { id: string; title?: string | null; running?: boolean };
@@ -73,8 +73,11 @@ function ConversationItem({
   onRename,
   onDelete,
 }: ConversationItemProps) {
+  const t = useT();
   const { isMobile } = useSidebar();
-  const title = stripPageContextFromTitle(conversation.title ?? '') || UNTITLED;
+  const title =
+    stripPageContextFromTitle(conversation.title ?? '') ||
+    t('components.aiChat.newConversation');
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(title);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -103,7 +106,7 @@ function ConversationItem({
         <div className="flex h-9 items-center px-1">
           <SidebarInput
             ref={inputRef}
-            aria-label="Conversation title"
+            aria-label={t('shell.aiStudio.conversationTitle')}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onBlur={commitRename}
@@ -136,7 +139,7 @@ function ConversationItem({
         // mouse focus: the row just clicked keeps focus but should still spin.
         <span
           role="status"
-          aria-label="Running"
+          aria-label={t('shell.aiStudio.running')}
           className="pointer-events-none absolute inset-e-1 top-2 hidden size-5 items-center justify-center text-muted-foreground transition-opacity group-hover/menu-item:opacity-0 group-has-[:focus-visible]/menu-item:opacity-0 group-data-[collapsible=icon]:hidden md:flex"
         >
           <Loader2 className="size-3.5 animate-spin" />
@@ -145,7 +148,7 @@ function ConversationItem({
       <DropdownMenu modal={false} open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenuTrigger asChild>
           <SidebarMenuAction
-            aria-label="Conversation actions"
+            aria-label={t('shell.aiStudio.conversationActions')}
             showOnHover={!running}
             className={cn(
               'text-muted-foreground transition-opacity hover:cursor-pointer peer-data-[size=default]/menu-button:top-2',
@@ -163,17 +166,17 @@ function ConversationItem({
         >
           <DropdownMenuItem onSelect={startRename}>
             <Pencil />
-            Rename
+            {t('shell.aiStudio.rename')}
           </DropdownMenuItem>
           <ConfirmDialog
-            title="Delete conversation"
-            description={`Are you sure you want to delete "${title}"? This action cannot be undone.`}
+            title={t('shell.aiStudio.deleteTitle')}
+            description={t('shell.aiStudio.deleteDescription', { title })}
             onConfirm={onDelete}
-            confirmText="Delete"
+            confirmText={t('common.delete')}
             trigger={
               <DropdownMenuItem variant="destructive">
                 <Trash2 />
-                Delete
+                {t('common.delete')}
               </DropdownMenuItem>
             }
           />
@@ -184,6 +187,7 @@ function ConversationItem({
 }
 
 export function AiStudioSidebar() {
+  const t = useT();
   const { pathname } = useLocation();
   // Set when a new chat was opened from a project (sidebar or project page)
   const { projectId: activeProjectId } = useSearch({ strict: false });
@@ -298,12 +302,14 @@ export function AiStudioSidebar() {
               <SidebarMenuButton
                 asChild
                 isActive={isLandingPage && !activeProjectId}
-                tooltip="New Chat"
+                tooltip={t('shell.aiStudio.newChat')}
                 className={sidebarItemClassName}
               >
                 <Link to="/aistudio" onClick={() => setOpenMobile(false)}>
                   <SquarePen />
-                  <span className="truncate">New Chat</span>
+                  <span className="truncate">
+                    {t('shell.aiStudio.newChat')}
+                  </span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -311,12 +317,14 @@ export function AiStudioSidebar() {
               <SidebarMenuButton
                 asChild
                 isActive={pathname === '/aistudio/usage'}
-                tooltip="Usage"
+                tooltip={t('shell.aiStudio.usage')}
                 className={sidebarItemClassName}
               >
                 <Link to="/aistudio/usage" onClick={() => setOpenMobile(false)}>
                   <BarChart3 />
-                  <span className="truncate">Usage</span>
+                  <span className="truncate">
+                    {t('shell.aiStudio.usage')}
+                  </span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -324,7 +332,7 @@ export function AiStudioSidebar() {
               <SidebarMenuButton
                 asChild
                 isActive={pathname === '/aistudio/connectors'}
-                tooltip="Connectors"
+                tooltip={t('shell.aiStudio.connectors')}
                 className={sidebarItemClassName}
               >
                 <Link
@@ -332,13 +340,15 @@ export function AiStudioSidebar() {
                   onClick={() => setOpenMobile(false)}
                 >
                   <Plug />
-                  <span className="truncate">Connectors</span>
+                  <span className="truncate">
+                    {t('shell.aiStudio.connectors')}
+                  </span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton
-                tooltip="Settings"
+                tooltip={t('shell.settings.title')}
                 className={sidebarItemClassName}
                 onClick={() => {
                   setOpenMobile(false);
@@ -346,7 +356,9 @@ export function AiStudioSidebar() {
                 }}
               >
                 <Settings />
-                <span className="truncate">Settings</span>
+                <span className="truncate">
+                  {t('shell.settings.title')}
+                </span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -357,7 +369,7 @@ export function AiStudioSidebar() {
         <SidebarGroup className="p-0 group-data-[collapsible=icon]:hidden">
           <SidebarGroupContent>
             <SidebarGroupLabel className={sidebarGroupLabelClassName}>
-              Projects
+              {t('shell.nav.projects')}
             </SidebarGroupLabel>
             <SidebarMenu className={sidebarMenuClassName}>
               {projects.map((project) => (
@@ -388,14 +400,14 @@ export function AiStudioSidebar() {
         <SidebarGroupContent>
           <div className="flex items-center justify-between pr-1">
             <SidebarGroupLabel className={sidebarGroupLabelClassName}>
-              Chats
+              {t('shell.aiStudio.chats')}
             </SidebarGroupLabel>
             {conversations.length > 0 && (
               <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    aria-label="Chats actions"
+                    aria-label={t('shell.aiStudio.chatsActions')}
                     className="flex size-5 items-center justify-center rounded-md text-muted-foreground hover:cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
                   >
                     <MoreHorizontal className="size-4" />
@@ -403,15 +415,15 @@ export function AiStudioSidebar() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="bottom" align="end">
                   <ConfirmDialog
-                    title="Delete all conversations"
-                    description="Are you sure you want to delete all conversations? This action cannot be undone."
+                    title={t('shell.aiStudio.deleteAllTitle')}
+                    description={t('shell.aiStudio.deleteAllDescription')}
                     onConfirm={handleDeleteAll}
-                    confirmText="Delete all"
+                    confirmText={t('shell.aiStudio.deleteAll')}
                     disabled={deleteAllConversations.isPending}
                     trigger={
                       <DropdownMenuItem variant="destructive">
                         <Trash2 />
-                        Delete all
+                        {t('shell.aiStudio.deleteAll')}
                       </DropdownMenuItem>
                     }
                   />
@@ -427,7 +439,7 @@ export function AiStudioSidebar() {
             )}
             {!isLoading && conversations.length === 0 && (
               <p className="px-2.5 py-1 text-xs text-muted-foreground">
-                No conversations yet
+                {t('components.aiChat.noConversations')}
               </p>
             )}
             {conversations.map((conv) => (
@@ -452,7 +464,7 @@ export function AiStudioSidebar() {
                   {isFetchingNextPage ? (
                     <Loader2 className="animate-spin" />
                   ) : (
-                    'Load more'
+                    t('shell.aiStudio.loadMore')
                   )}
                 </SidebarMenuButton>
               </SidebarMenuItem>

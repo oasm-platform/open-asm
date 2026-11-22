@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import {
@@ -31,15 +32,15 @@ export interface ToolCallState {
 
 const statusConfig: Record<
   ToolCallState['status'],
-  { label: string; icon: typeof CheckCircleIcon; color: string }
+  { labelKey: string; icon: typeof CheckCircleIcon; color: string }
 > = {
-  pending: { label: 'Pending', icon: CircleIcon, color: 'text-muted-foreground' },
-  executing: { label: 'Running', icon: ClockIcon, color: 'text-blue-500' },
-  completed: { label: 'Done', icon: CheckCircleIcon, color: 'text-green-500' },
-  error: { label: 'Error', icon: XCircleIcon, color: 'text-red-500' },
-  rejected: { label: 'Rejected', icon: BanIcon, color: 'text-amber-500' },
+  pending: { labelKey: 'components.toolCall.status.pending', icon: CircleIcon, color: 'text-muted-foreground' },
+  executing: { labelKey: 'components.toolCall.status.running', icon: ClockIcon, color: 'text-blue-500' },
+  completed: { labelKey: 'components.toolCall.status.done', icon: CheckCircleIcon, color: 'text-green-500' },
+  error: { labelKey: 'common.error', icon: XCircleIcon, color: 'text-red-500' },
+  rejected: { labelKey: 'components.toolCall.status.rejected', icon: BanIcon, color: 'text-amber-500' },
   'needs-plan': {
-    label: 'Needs plan',
+    labelKey: 'components.toolCall.status.needsPlan',
     icon: ListChecksIcon,
     color: 'text-amber-500',
   },
@@ -65,16 +66,17 @@ function planSteps(toolCall: ToolCallState): string[] {
 }
 
 const planStatusLabel: Record<ToolCallState['status'], string> = {
-  pending: 'Planning',
-  executing: 'Planning',
-  completed: 'Plan ready',
-  error: 'Error',
-  rejected: 'Not approved',
-  'needs-plan': 'Needs plan',
+  pending: 'components.toolCall.plan.planning',
+  executing: 'components.toolCall.plan.planning',
+  completed: 'components.toolCall.plan.ready',
+  error: 'common.error',
+  rejected: 'components.toolCall.plan.notApproved',
+  'needs-plan': 'components.toolCall.status.needsPlan',
 };
 
 /** A plan rendered in the chat, so the user sees it as soon as it is made. */
 function PlanCallDisplay({ toolCall }: { toolCall: ToolCallState }) {
+  const t = useT();
   const steps = planSteps(toolCall);
   // e.g. refused because another plan is still running
   const notSet =
@@ -95,10 +97,10 @@ function PlanCallDisplay({ toolCall }: { toolCall: ToolCallState }) {
     >
       <div className="flex items-center gap-2">
         <ListChecksIcon className="size-4 text-muted-foreground shrink-0" />
-        <span className="font-medium">Plan</span>
+        <span className="font-medium">{t('components.toolCall.plan.title')}</span>
         {steps.length > 0 && (
           <span className="text-xs text-muted-foreground">
-            {steps.length} {steps.length === 1 ? 'step' : 'steps'}
+            {t('components.toolCall.plan.steps', { count: steps.length })}
           </span>
         )}
         <Badge
@@ -109,7 +111,7 @@ function PlanCallDisplay({ toolCall }: { toolCall: ToolCallState }) {
           )}
         >
           <StatusIcon className={cn('size-3', config.color)} />
-          {notSet ? 'Not set' : planStatusLabel[status]}
+          {t(notSet ? 'components.toolCall.plan.notSet' : planStatusLabel[status])}
         </Badge>
       </div>
       {steps.length > 0 && (
@@ -214,6 +216,7 @@ export function ToolCallLabel({
   toolCall: ToolCallState;
   className?: string;
 }) {
+  const t = useT();
   const config = statusConfig[toolCall.status];
   const detail = toolCallDetail(toolCall);
   const { icon: Icon, className: iconClassName } = labelIcon[toolCall.status];
@@ -221,7 +224,7 @@ export function ToolCallLabel({
   return (
     <div
       className={cn('flex min-w-0 items-center text-sm', className)}
-      title={config.label}
+      title={t(config.labelKey)}
     >
       <Icon
         aria-hidden="true"
@@ -244,7 +247,7 @@ export function ToolCallLabel({
           {detail}
         </span>
       )}
-      <span className="sr-only"> ({config.label})</span>
+      <span className="sr-only"> ({t(config.labelKey)})</span>
     </div>
   );
 }

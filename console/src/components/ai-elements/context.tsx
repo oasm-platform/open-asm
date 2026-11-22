@@ -12,6 +12,7 @@ import type { LanguageModelUsage } from "ai";
 import type { ComponentProps } from "react";
 import { createContext, useContext, useMemo } from "react";
 import { getUsage } from "tokenlens";
+import { useT } from '@/lib/i18n-dictionary';
 
 const PERCENT_MAX = 100;
 const ICON_RADIUS = 10;
@@ -62,6 +63,7 @@ export const Context = ({
 };
 
 const ContextIcon = () => {
+  const t = useT();
   const { usedTokens, maxTokens } = useContextValue();
   const circumference = 2 * Math.PI * ICON_RADIUS;
   const usedPercent = usedTokens / maxTokens;
@@ -69,7 +71,7 @@ const ContextIcon = () => {
 
   return (
     <svg
-      aria-label="Model context usage"
+      aria-label={t('agents.ai.context.label')}
       height="20"
       role="img"
       style={{ color: "currentcolor" }}
@@ -196,6 +198,7 @@ export const ContextContentFooter = ({
   className,
   ...props
 }: ContextContentFooterProps) => {
+  const t = useT();
   const { modelId, usage } = useContextValue();
   const costUSD = modelId
     ? getUsage({
@@ -221,7 +224,7 @@ export const ContextContentFooter = ({
     >
       {children ?? (
         <>
-          <span className="text-muted-foreground">Total cost</span>
+          <span className="text-muted-foreground">{t('agents.ai.context.totalCost')}</span>
           <span>{totalCost}</span>
         </>
       )}
@@ -255,6 +258,7 @@ export const ContextInputUsage = ({
   children,
   ...props
 }: ContextInputUsageProps) => {
+  const t = useT();
   const { usage, modelId } = useContextValue();
   const inputTokens = usage?.inputTokens ?? 0;
 
@@ -282,7 +286,7 @@ export const ContextInputUsage = ({
       className={cn("flex items-center justify-between text-xs", className)}
       {...props}
     >
-      <span className="text-muted-foreground">Input</span>
+      <span className="text-muted-foreground">{t('agents.ai.context.input')}</span>
       <TokensWithCost costText={inputCostText} tokens={inputTokens} />
     </div>
   );
@@ -295,6 +299,7 @@ export const ContextOutputUsage = ({
   children,
   ...props
 }: ContextOutputUsageProps) => {
+  const t = useT();
   const { usage, modelId } = useContextValue();
   const outputTokens = usage?.outputTokens ?? 0;
 
@@ -322,7 +327,7 @@ export const ContextOutputUsage = ({
       className={cn("flex items-center justify-between text-xs", className)}
       {...props}
     >
-      <span className="text-muted-foreground">Output</span>
+      <span className="text-muted-foreground">{t('agents.ai.context.output')}</span>
       <TokensWithCost costText={outputCostText} tokens={outputTokens} />
     </div>
   );
@@ -335,6 +340,7 @@ export const ContextReasoningUsage = ({
   children,
   ...props
 }: ContextReasoningUsageProps) => {
+  const t = useT();
   const { usage, modelId } = useContextValue();
   const reasoningTokens = usage?.reasoningTokens ?? 0;
 
@@ -362,7 +368,7 @@ export const ContextReasoningUsage = ({
       className={cn("flex items-center justify-between text-xs", className)}
       {...props}
     >
-      <span className="text-muted-foreground">Reasoning</span>
+      <span className="text-muted-foreground">{t('agents.ai.context.reasoning')}</span>
       <TokensWithCost costText={reasoningCostText} tokens={reasoningTokens} />
     </div>
   );
@@ -375,6 +381,7 @@ export const ContextCacheUsage = ({
   children,
   ...props
 }: ContextCacheUsageProps) => {
+  const t = useT();
   const { usage, modelId } = useContextValue();
   const cacheTokens = usage?.cachedInputTokens ?? 0;
 
@@ -402,7 +409,7 @@ export const ContextCacheUsage = ({
       className={cn("flex items-center justify-between text-xs", className)}
       {...props}
     >
-      <span className="text-muted-foreground">Cache</span>
+      <span className="text-muted-foreground">{t('agents.ai.context.cache')}</span>
       <TokensWithCost costText={cacheCostText} tokens={cacheTokens} />
     </div>
   );

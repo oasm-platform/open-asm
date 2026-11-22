@@ -12,6 +12,7 @@ import type { LucideIcon } from "lucide-react";
 import { BrainIcon, ChevronDownIcon, DotIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { createContext, memo, useContext, useMemo } from "react";
+import { t } from '@/lib/i18n-dictionary';
 
 interface ChainOfThoughtContextValue {
   isOpen: boolean;
@@ -87,7 +88,7 @@ export const ChainOfThoughtHeader = memo(
         >
           <BrainIcon className="size-4" />
           <span className="flex-1 text-left">
-            {children ?? "Chain of Thought"}
+            {children ?? t('agents.ai.chainOfThought')}
           </span>
           <ChevronDownIcon
             className={cn(

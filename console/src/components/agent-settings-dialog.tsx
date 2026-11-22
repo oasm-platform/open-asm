@@ -37,11 +37,13 @@ import {
   useAgentSettingsDialog,
   type AgentSettingsTab,
 } from '@/hooks/useAgentSettingsDialog';
+import { useT } from '@/lib/i18n-dictionary';
 
 interface TabConfig {
   value: AgentSettingsTab;
-  label: string;
-  description: string;
+  /** Dictionary keys of the tab name and its one-line summary */
+  labelKey: string;
+  descriptionKey: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   component: ComponentType;
 }
@@ -49,62 +51,60 @@ interface TabConfig {
 const tabs: TabConfig[] = [
   {
     value: 'provider',
-    label: 'Providers',
-    description: 'Manage your AI models and API connections',
+    labelKey: 'agents.settings.tabs.provider.label',
+    descriptionKey: 'agents.settings.tabs.provider.description',
     icon: KeyRound,
     component: LlmConnect,
   },
   {
     value: 'models',
-    label: 'Models',
-    description: 'Choose the models the agent uses',
+    labelKey: 'agents.settings.tabs.models.label',
+    descriptionKey: 'agents.settings.tabs.models.description',
     icon: Cpu,
     component: ModelsManager,
   },
   {
     value: 'agents',
-    label: 'Agents',
-    description:
-      'Built-in agents and custom agents you can mention with @name',
+    labelKey: 'agents.settings.tabs.agents.label',
+    descriptionKey: 'agents.settings.tabs.agents.description',
     icon: Bot,
     component: AgentsManager,
   },
   {
     value: 'web-search',
-    label: 'Web Search',
-    description: 'Search provider the agent uses to browse the web',
+    labelKey: 'agents.settings.tabs.webSearch.label',
+    descriptionKey: 'agents.settings.tabs.webSearch.description',
     icon: Globe,
     component: WebSearchManager,
   },
   {
     value: 'instruction',
-    label: 'Instruction',
-    description: 'Custom instructions added to the agent system prompt',
+    labelKey: 'agents.settings.tabs.instruction.label',
+    descriptionKey: 'agents.settings.tabs.instruction.description',
     icon: ScrollText,
     component: InstructionManager,
   },
   {
     value: 'skills',
-    label: 'Skills',
-    description: 'Specialized instructions the agent can use to perform tasks',
+    labelKey: 'agents.settings.tabs.skills.label',
+    descriptionKey: 'agents.settings.tabs.skills.description',
     icon: BookOpen,
     component: SkillsManager,
   },
   {
     value: 'memory',
-    label: 'Memory',
-    description: 'Long-term memory content used by the AI agent',
+    labelKey: 'agents.settings.tabs.memory.label',
+    descriptionKey: 'agents.settings.tabs.memory.description',
     icon: Brain,
     component: MemoryManager,
   },
 ];
 
-const GROUP_LABEL = 'Agent settings';
-
 const triggerClassName =
   'data-[state=active]:bg-sidebar-accent data-[state=active]:text-sidebar-accent-foreground text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 h-10 w-full flex-none justify-start gap-3 rounded-lg px-3 text-sm font-medium border-0 shadow-none';
 
 export function AgentSettingsDialog() {
+  const t = useT();
   const {
     state: { isOpen, tab: activeTab },
     open,
@@ -119,7 +119,9 @@ export function AgentSettingsDialog() {
         showCloseButton={false}
         className="w-full max-w-none h-dvh rounded-none sm:rounded-none border-0 md:w-[calc(100%-2rem)] md:max-w-6xl md:h-[85vh] md:rounded-xl md:border flex flex-col gap-0 p-0 sm:p-0 overflow-hidden"
       >
-        <DialogTitle className="sr-only">Agent Settings</DialogTitle>
+        <DialogTitle className="sr-only">
+          {t('agents.settings.title')}
+        </DialogTitle>
 
         <Tabs
           value={activeTab}
@@ -130,7 +132,7 @@ export function AgentSettingsDialog() {
           {/* Desktop: vertical side nav */}
           <div className="hidden md:flex md:flex-col w-64 shrink-0 border-r px-2.5 py-5 overflow-y-auto">
             <p className="px-3 pb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              {GROUP_LABEL}
+              {t('agents.settings.group')}
             </p>
             <TabsList
               // The selected item is a filled row, not an underline
@@ -146,7 +148,7 @@ export function AgentSettingsDialog() {
                     className={triggerClassName}
                   >
                     <Icon className="size-4.5 shrink-0" />
-                    {tab.label}
+                    {t(tab.labelKey)}
                   </TabsTrigger>
                 );
               })}
@@ -157,10 +159,10 @@ export function AgentSettingsDialog() {
             <div className="flex shrink-0 items-center justify-between gap-4 border-b px-4 py-3 md:px-6 md:py-4">
               <div className="min-w-0 flex-1">
                 <h2 className="text-lg font-semibold tracking-tight">
-                  {active.label}
+                  {t(active.labelKey)}
                 </h2>
                 <p className="truncate text-xs text-muted-foreground">
-                  {active.description}
+                  {t(active.descriptionKey)}
                 </p>
               </div>
               <div
@@ -169,30 +171,30 @@ export function AgentSettingsDialog() {
               />
               <DialogClose className="shrink-0 rounded-xs opacity-70 transition-opacity hover:opacity-100 hover:cursor-pointer focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden">
                 <X className="size-4" />
-                <span className="sr-only">Close</span>
+                <span className="sr-only">{t('agents.settings.close')}</span>
               </DialogClose>
             </div>
 
             {/* Mobile: section picker dropdown */}
             <div className="shrink-0 border-b px-4 py-3 md:hidden">
               <Select value={activeTab} onValueChange={(value) => open(value)}>
-                <SelectTrigger className="w-full h-10" aria-label="Settings section">
+                <SelectTrigger className="w-full h-10" aria-label={t('agents.settings.section')}>
                   <SelectValue>
                     <ActiveIcon />
-                    {GROUP_LABEL} · {active.label}
+                    {t('agents.settings.group')} · {t(active.labelKey)}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
                     <SelectLabel className="text-sm font-semibold text-foreground">
-                      {GROUP_LABEL}
+                      {t('agents.settings.group')}
                     </SelectLabel>
                     {tabs.map((tab) => {
                       const Icon = tab.icon;
                       return (
                         <SelectItem key={tab.value} value={tab.value} className="h-9">
                           <Icon />
-                          {tab.label}
+                          {t(tab.labelKey)}
                         </SelectItem>
                       );
                     })}

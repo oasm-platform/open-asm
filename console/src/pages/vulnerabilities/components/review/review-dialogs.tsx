@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { SeverityBadge } from '@/components/vulnerabilities/lifecycle-badges';
+import { t as tPlain, useT } from '@/lib/i18n-dictionary';
 import {
   Severity,
   useVulnerabilitiesControllerApproveProposal,
@@ -46,7 +47,7 @@ const SEVERITIES = [
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const errorText = (error: unknown) =>
-  error instanceof Error ? error.message : 'An unexpected error occurred.';
+  error instanceof Error ? error.message : tPlain('vulnerabilities.unexpectedError');
 
 /** Approve: optional severity override and note. */
 export function ApproveDialog({
@@ -60,6 +61,7 @@ export function ApproveDialog({
   trigger: ReactNode;
   onDone?: () => void;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(severity);
   const [note, setNote] = useState('');
@@ -84,13 +86,15 @@ export function ApproveDialog({
       },
       {
         onSuccess: () => {
-          toast.success('Proposal approved', {
-            description: 'It is now a new finding in the list.',
+          toast.success(t('vulnerabilities.review.approvedToast'), {
+            description: t('vulnerabilities.review.approvedDesc'),
           });
           setOpen(false);
           onDone?.();
         },
-        onError: (error) => toast.error('Failed to approve', { description: errorText(error) }),
+        onError: (error) => toast.error(t('vulnerabilities.review.failedApprove'), {
+            description: errorText(error),
+          }),
       },
     );
 
@@ -99,14 +103,16 @@ export function ApproveDialog({
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Approve proposal</DialogTitle>
+          <DialogTitle>{t('vulnerabilities.review.approveTitle')}</DialogTitle>
           <DialogDescription>
-            The finding joins the list as New and its SLA starts now.
+            {t('vulnerabilities.review.approveDesc')}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="approve-severity">Severity</Label>
+            <Label htmlFor="approve-severity">
+              {t('vulnerabilities.review.severity')}
+            </Label>
             <Select value={value} onValueChange={setValue}>
               <SelectTrigger id="approve-severity" className="w-full">
                 <SelectValue />
@@ -114,9 +120,11 @@ export function ApproveDialog({
               <SelectContent>
                 {SEVERITIES.map((s) => (
                   <SelectItem key={s} value={s}>
-                    <span className="capitalize">{s}</span>
+                    <span className="capitalize">{t(`vulnerabilities.severity.${s}`)}</span>
                     {s === severity && (
-                      <span className="text-xs text-muted-foreground"> (proposed)</span>
+                      <span className="text-xs text-muted-foreground">
+                        {t('vulnerabilities.review.proposed')}
+                      </span>
                     )}
                   </SelectItem>
                 ))}
@@ -124,7 +132,9 @@ export function ApproveDialog({
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="approve-note">Note (optional)</Label>
+            <Label htmlFor="approve-note">
+              {t('vulnerabilities.review.noteOptional')}
+            </Label>
             <Textarea
               id="approve-note"
               value={note}
@@ -136,11 +146,11 @@ export function ApproveDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)} disabled={approve.isPending}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={submit} disabled={approve.isPending}>
             {approve.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Approve
+            {t('vulnerabilities.review.approve')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -158,6 +168,7 @@ export function RejectDialog({
   trigger: ReactNode;
   onDone?: () => void;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState('');
   const [touched, setTouched] = useState(false);
@@ -179,11 +190,13 @@ export function RejectDialog({
       { id, data: { note: note.trim() } },
       {
         onSuccess: () => {
-          toast.success('Proposal rejected');
+          toast.success(t('vulnerabilities.review.rejectedToast'));
           setOpen(false);
           onDone?.();
         },
-        onError: (error) => toast.error('Failed to reject', { description: errorText(error) }),
+        onError: (error) => toast.error(t('vulnerabilities.review.failedReject'), {
+            description: errorText(error),
+          }),
       },
     );
   };
@@ -193,35 +206,35 @@ export function RejectDialog({
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Reject proposal</DialogTitle>
+          <DialogTitle>{t('vulnerabilities.review.rejectTitle')}</DialogTitle>
           <DialogDescription>
-            The rejected record is kept so the agent does not propose the same finding again.
+            {t('vulnerabilities.review.rejectDesc')}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
-          <Label htmlFor="reject-note">Reason</Label>
+          <Label htmlFor="reject-note">{t('vulnerabilities.review.reason')}</Label>
           <Textarea
             id="reject-note"
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={3}
             className="resize-none"
-            placeholder="Why this is not a real finding"
+            placeholder={t('vulnerabilities.review.rejectPlaceholder')}
             aria-invalid={touched && missing}
           />
           {touched && missing && (
             <p className="text-sm text-destructive" role="alert">
-              A reason is required.
+              {t('vulnerabilities.review.reasonRequired')}
             </p>
           )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)} disabled={reject.isPending}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button variant="destructive" onClick={submit} disabled={reject.isPending}>
             {reject.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Reject
+            {t('vulnerabilities.review.reject')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -244,6 +257,7 @@ export function BulkReviewDialog({
   trigger: ReactNode;
   onDone?: () => void;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState('');
   const [touched, setTouched] = useState(false);
@@ -252,7 +266,6 @@ export function BulkReviewDialog({
   const isReject = action === 'reject';
   const isPending = approve.isPending || reject.isPending;
   const missing = isReject && !note.trim();
-  const count = `${ids.length} proposal${ids.length === 1 ? '' : 's'}`;
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
@@ -265,20 +278,26 @@ export function BulkReviewDialog({
   const onSuccess = (res: BulkReviewResultDto) => {
     const done = res.reviewed.length;
     const skipped = res.skipped.length;
-    const verb = isReject ? 'rejected' : 'approved';
-    const message = `${done} proposal${done === 1 ? '' : 's'} ${verb}`;
+    const message = isReject
+      ? t('vulnerabilities.review.bulkRejected', { count: done })
+      : t('vulnerabilities.review.bulkApproved', { count: done });
     const description = skipped
-      ? `${skipped} skipped: ${res.skipped[0].reason}${skipped > 1 ? ' (and others)' : ''}`
+      ? `${t('vulnerabilities.review.skipped', { n: skipped, reason: res.skipped[0].reason })}${skipped > 1 ? t('vulnerabilities.review.andOthers') : ''}`
       : isReject
         ? undefined
-        : 'They are now new findings in the list.';
+        : t('vulnerabilities.review.bulkApprovedDesc');
     if (done === 0) toast.warning(message, { description });
     else toast.success(message, { description });
     setOpen(false);
     onDone?.();
   };
   const onError = (error: unknown) =>
-    toast.error(`Failed to ${action}`, { description: errorText(error) });
+    toast.error(
+      isReject
+        ? t('vulnerabilities.review.failedReject')
+        : t('vulnerabilities.review.failedApprove'),
+      { description: errorText(error) },
+    );
 
   const submit = () => {
     setTouched(true);
@@ -300,17 +319,21 @@ export function BulkReviewDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {isReject ? 'Reject' : 'Approve'} {count}
+            {isReject
+              ? t('vulnerabilities.review.bulkReject', { count: ids.length })
+              : t('vulnerabilities.review.bulkApprove', { count: ids.length })}
           </DialogTitle>
           <DialogDescription>
             {isReject
-              ? 'The rejected records are kept so the agent does not propose the same findings again.'
-              : 'Each finding joins the list as New with its proposed severity, and its SLA starts now.'}
+              ? t('vulnerabilities.review.bulkRejectDesc')
+              : t('vulnerabilities.review.bulkApproveDesc')}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
           <Label htmlFor="bulk-review-note">
-            {isReject ? 'Reason' : 'Note (optional)'}
+            {isReject
+              ? t('vulnerabilities.review.reason')
+              : t('vulnerabilities.review.noteOptional')}
           </Label>
           <Textarea
             id="bulk-review-note"
@@ -318,18 +341,20 @@ export function BulkReviewDialog({
             onChange={(e) => setNote(e.target.value)}
             rows={3}
             className="resize-none"
-            placeholder={isReject ? 'Why these are not real findings' : undefined}
+            placeholder={
+              isReject ? t('vulnerabilities.review.bulkRejectPlaceholder') : undefined
+            }
             aria-invalid={touched && missing}
           />
           {touched && missing && (
             <p className="text-sm text-destructive" role="alert">
-              A reason is required.
+              {t('vulnerabilities.review.reasonRequired')}
             </p>
           )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)} disabled={isPending}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             variant={isReject ? 'destructive' : 'default'}
@@ -337,7 +362,9 @@ export function BulkReviewDialog({
             disabled={isPending}
           >
             {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isReject ? 'Reject' : 'Approve'}
+            {isReject
+              ? t('vulnerabilities.review.reject')
+              : t('vulnerabilities.review.approve')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -347,6 +374,7 @@ export function BulkReviewDialog({
 
 /** Merges the proposal into an approved finding and opens that finding. */
 export function useMergeProposal(id: string, onDone?: () => void) {
+  const t = useT();
   const navigate = useNavigate();
   const merge = useVulnerabilitiesControllerMergeProposal();
   const run = (targetVulnerabilityId: string) =>
@@ -354,8 +382,10 @@ export function useMergeProposal(id: string, onDone?: () => void) {
       { id, data: { targetVulnerabilityId } },
       {
         onSuccess: (res) => {
-          toast.success('Proposal merged', {
-            description: `${res?.movedSources ?? 0} source(s) moved to the existing finding.`,
+          toast.success(t('vulnerabilities.review.mergedToast'), {
+            description: t('vulnerabilities.review.mergedDesc', {
+              n: res?.movedSources ?? 0,
+            }),
           });
           onDone?.();
           navigate({
@@ -363,7 +393,9 @@ export function useMergeProposal(id: string, onDone?: () => void) {
             params: { id: res?.targetVulnerabilityId ?? targetVulnerabilityId },
           });
         },
-        onError: (error) => toast.error('Failed to merge', { description: errorText(error) }),
+        onError: (error) => toast.error(t('vulnerabilities.review.failedMerge'), {
+            description: errorText(error),
+          }),
       },
     );
   return { merge: run, isPending: merge.isPending };
@@ -383,6 +415,7 @@ export function MergeDialog({
   trigger: ReactNode;
   onDone?: () => void;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [choice, setChoice] = useState('');
   const [otherId, setOtherId] = useState('');
@@ -404,9 +437,9 @@ export function MergeDialog({
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Merge into an existing finding</DialogTitle>
+          <DialogTitle>{t('vulnerabilities.review.mergeTitle')}</DialogTitle>
           <DialogDescription>
-            The agent's evidence and tools become sources of that finding; the proposal is deleted.
+            {t('vulnerabilities.review.mergeDesc')}
           </DialogDescription>
         </DialogHeader>
         <RadioGroup value={choice} onValueChange={setChoice} className="space-y-2">
@@ -428,12 +461,12 @@ export function MergeDialog({
             <RadioGroupItem value={OTHER} id="merge-other" className="mt-2.5" />
             <div className="flex-1 space-y-1">
               <Label htmlFor="merge-other-id" className="font-normal">
-                Another finding (id)
+                {t('vulnerabilities.review.anotherFinding')}
               </Label>
               <Input
                 id="merge-other-id"
                 value={otherId}
-                placeholder="Vulnerability id"
+                placeholder={t('vulnerabilities.review.vulnId')}
                 onFocus={() => setChoice(OTHER)}
                 onChange={(e) => setOtherId(e.target.value)}
               />
@@ -442,11 +475,11 @@ export function MergeDialog({
         </RadioGroup>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)} disabled={isPending}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={() => merge(targetId)} disabled={!valid || isPending}>
             {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Merge
+            {t('vulnerabilities.review.merge')}
           </Button>
         </DialogFooter>
       </DialogContent>

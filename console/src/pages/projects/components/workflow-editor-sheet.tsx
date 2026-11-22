@@ -17,6 +17,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import {
   useProjectsControllerCreateWorkflow,
@@ -68,6 +69,7 @@ export function WorkflowEditorSheet({
   /** Edit this workflow; create a new one when absent. */
   binding?: ProjectWorkflow;
 }) {
+  const t = useT();
   const invalidate = useInvalidateProjects();
   const editing = !!binding;
   const toolsQuery = usePipelineTools({ enabled: open });
@@ -140,7 +142,7 @@ export function WorkflowEditorSheet({
     onOpenChange(false);
   };
   const failed = (error: unknown) =>
-    toast.error(apiErrorMessage(error, 'Failed to save the workflow'));
+    toast.error(apiErrorMessage(error, t('projects.workflowEditor.saveFailed')));
 
   const save = () => {
     const trimmed = name.trim() || undefined;
@@ -155,7 +157,7 @@ export function WorkflowEditorSheet({
             on: onInputOf(triggers),
           },
         },
-        { onSuccess: () => done('Workflow saved'), onError: failed },
+        { onSuccess: () => done(t('projects.workflowEditor.saved')), onError: failed },
       );
       return;
     }
@@ -170,14 +172,14 @@ export function WorkflowEditorSheet({
           on: onInputOf(triggers),
         },
       },
-      { onSuccess: () => done('Workflow added'), onError: failed },
+      { onSuccess: () => done(t('projects.workflowEditor.added')), onError: failed },
     );
   };
 
   const builder = toolsQuery.isLoading ? (
     <p className="flex items-center gap-2 text-sm text-muted-foreground">
       <LoaderCircle className="size-4 animate-spin" />
-      Loading installed tools...
+      {t('projects.create.loadingTools')}
     </p>
   ) : tools.length === 0 && installableTools.length === 0 ? (
     <NoInstalledToolsState />
@@ -194,21 +196,19 @@ export function WorkflowEditorSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-3xl">
         <SheetHeader>
-          <SheetTitle>{editing ? 'Edit workflow' : 'Add workflow'}</SheetTitle>
+          <SheetTitle>{editing ? t('projects.workflowEditor.editTitle') : t('projects.workflows.add')}</SheetTitle>
           <SheetDescription>
-            Tools of one step run together; the next step starts when they are
-            done. The workflow runs on this project's assets only, when started
-            or on its own as set below.
+            {t('projects.workflowEditor.description')}
           </SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-5 px-4">
           <div className="flex max-w-md flex-col gap-2">
-            <Label htmlFor="workflow-name">Name</Label>
+            <Label htmlFor="workflow-name">{t('common.name')}</Label>
             <Input
               id="workflow-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={editing ? undefined : 'e.g. Recon and vulnerability scan'}
+              placeholder={editing ? undefined : t('projects.workflowEditor.namePlaceholder')}
             />
           </div>
           {editing ? (
@@ -216,28 +216,28 @@ export function WorkflowEditorSheet({
           ) : (
             <Tabs value={source} onValueChange={(value) => setSource(value as Source)}>
               <TabsList>
-                <TabsTrigger value="template">From a template</TabsTrigger>
-                <TabsTrigger value="tools">Pick tools</TabsTrigger>
-                <TabsTrigger value="copy">Copy from a project</TabsTrigger>
+                <TabsTrigger value="template">{t('projects.create.fromTemplate')}</TabsTrigger>
+                <TabsTrigger value="tools">{t('projects.create.pickTools')}</TabsTrigger>
+                <TabsTrigger value="copy">{t('projects.workflowEditor.copyFromProject')}</TabsTrigger>
               </TabsList>
               <TabsContent value="template" className="flex flex-col gap-2 pt-3">
-                {(templatesQuery.data ?? []).map((t) => (
+                {(templatesQuery.data ?? []).map((tpl) => (
                   <button
-                    key={t.filePath}
+                    key={tpl.filePath}
                     type="button"
-                    onClick={() => setTemplate(t.filePath)}
-                    aria-pressed={template === t.filePath}
+                    onClick={() => setTemplate(tpl.filePath)}
+                    aria-pressed={template === tpl.filePath}
                     className={cn(
                       'flex flex-col gap-2 rounded-md border p-3 text-left hover:bg-accent/50',
-                      template === t.filePath && 'border-primary bg-primary/5',
+                      template === tpl.filePath && 'border-primary bg-primary/5',
                     )}
                   >
-                    <span className="text-sm font-medium">{t.name}</span>
+                    <span className="text-sm font-medium">{tpl.name}</span>
                     <PipelineSteps
                       steps={pipelineSteps({
-                        name: t.name,
+                        name: tpl.name,
                         jobs: Object.fromEntries(
-                          t.jobs.map((job) => [job.id, { run: job.run, needs: job.needs }]),
+                          tpl.jobs.map((job) => [job.id, { run: job.run, needs: job.needs }]),
                         ),
                       })}
                     />
@@ -255,8 +255,8 @@ export function WorkflowEditorSheet({
                     setCopyBinding(undefined);
                   }}
                 >
-                  <SelectTrigger aria-label="Project to copy from">
-                    <SelectValue placeholder="Pick a project" />
+                  <SelectTrigger aria-label={t('projects.workflowEditor.copyProjectLabel')}>
+                    <SelectValue placeholder={t('projects.workflowEditor.pickProject')} />
                   </SelectTrigger>
                   <SelectContent>
                     {(projectsQuery.data?.data ?? [])
@@ -286,7 +286,7 @@ export function WorkflowEditorSheet({
                   </button>
                 ))}
                 <p className="text-xs text-muted-foreground">
-                  The copy is independent: editing it does not change the original.
+                  {t('projects.workflowEditor.copyHint')}
                 </p>
               </TabsContent>
             </Tabs>
@@ -301,11 +301,11 @@ export function WorkflowEditorSheet({
         </div>
         <SheetFooter className="flex-row justify-end gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button disabled={!canSave || pending} onClick={save}>
             {pending && <LoaderCircle className="size-4 animate-spin" />}
-            {editing ? 'Save' : 'Add workflow'}
+            {editing ? t('common.save') : t('projects.workflows.add')}
           </Button>
         </SheetFooter>
       </SheetContent>

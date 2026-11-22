@@ -1,3 +1,4 @@
+import { formatDate } from '@/lib/date-locale';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SeverityBadge } from '@/components/ui/severity-badge';
@@ -8,6 +9,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import {
   TimelineSighting,
@@ -15,7 +17,6 @@ import {
 } from '@/services/apis/gen/queries';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import type { ProjectDetailSearch } from '@/routes/_authed/projects/$id/$tab';
-import dayjs from 'dayjs';
 import { ExternalLink } from 'lucide-react';
 import { ProvenanceBadge } from '../../vulnerabilities/components/provenance-badge';
 import { VulnerabilitiesView } from '../../vulnerabilities/vulnerabilities-view';
@@ -33,6 +34,7 @@ export function TimelineSheet({
   vulnerabilityId?: string;
   onClose: () => void;
 }) {
+  const t = useT();
   const { data, isLoading } = useProjectsControllerGetVulnerabilityTimeline(
     projectId,
     vulnerabilityId ?? '',
@@ -45,11 +47,11 @@ export function TimelineSheet({
     <Sheet open={!!vulnerabilityId} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="w-full sm:max-w-lg">
         <SheetHeader>
-          <SheetTitle className="pr-6">{vuln?.name ?? 'Vulnerability'}</SheetTitle>
+          <SheetTitle className="pr-6">{vuln?.name ?? t('projects.timeline.vulnerability')}</SheetTitle>
           <SheetDescription>{vuln?.assetValue}</SheetDescription>
         </SheetHeader>
         {isLoading || !data || !vuln ? (
-          <p className="px-4 text-sm text-muted-foreground">Loading...</p>
+          <p className="px-4 text-sm text-muted-foreground">{t('common.loading')}</p>
         ) : (
           <div className="flex flex-col gap-4 overflow-y-auto px-4 pb-4">
             <div className="flex flex-wrap items-center gap-2">
@@ -58,10 +60,12 @@ export function TimelineSheet({
               {vuln.toolName && <Badge variant="outline">{vuln.toolName}</Badge>}
             </div>
             <p className="text-sm text-muted-foreground">
-              Seen in {vuln.timesSeen} run{vuln.timesSeen === 1 ? '' : 's'} of
-              this project
+              {t('projects.timeline.seenIn', { count: vuln.timesSeen })}
               {missed > 0
-                ? `; the last ${missed} scan${missed === 1 ? '' : 's'} of this asset with ${vuln.toolName ?? 'the same tool'} did not report it, so it may be fixed.`
+                ? t('projects.timeline.missed', {
+                    count: missed,
+                    tool: vuln.toolName ?? t('projects.timeline.sameTool'),
+                  })
                 : '.'}
             </p>
             <ol className="flex flex-col gap-0 border-l pl-4">
@@ -88,15 +92,15 @@ export function TimelineSheet({
                       {workflowLabel({ name: run.workflowName })}
                     </span>
                     <span className="ml-auto text-xs tabular-nums text-muted-foreground">
-                      {dayjs(run.createdAt).format('YYYY-MM-DD HH:mm')}
+                      {formatDate(run.createdAt, 'yyyy-MM-dd HH:mm')}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {run.sighting === TimelineSighting.seen
-                      ? 'Reported'
+                      ? t('projects.timeline.reported')
                       : run.sighting === TimelineSighting.missed
-                        ? 'Scanned, not reported'
-                        : 'Scanned; sighting not recorded'}
+                        ? t('projects.timeline.notReported')
+                        : t('projects.timeline.notRecorded')}
                   </p>
                 </li>
               ))}
@@ -104,7 +108,7 @@ export function TimelineSheet({
             <Button variant="outline" asChild>
               <Link to="/vulnerabilities/$id" params={{ id: vuln.id }}>
                 <ExternalLink className="size-4" />
-                Open vulnerability
+                {t('projects.timeline.open')}
               </Link>
             </Button>
           </div>

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { SIDE_PANEL_ROW, SidePanelSection } from './side-panel-layout';
+import { useT } from '@/lib/i18n-dictionary';
 
 export interface AgentTodoItem {
   id: string;
@@ -41,26 +42,27 @@ const STATUS_CONFIG = {
   pending: {
     icon: Circle,
     className: 'text-muted-foreground/40',
-    label: 'Pending',
+    labelKey: 'agents.todo.status.pending',
   },
   in_progress: {
     icon: Loader2,
     className: 'text-blue-500',
-    label: 'In Progress',
+    labelKey: 'agents.todo.status.inProgress',
   },
   completed: {
     icon: CheckCircle2,
     className: 'text-green-500',
-    label: 'Completed',
+    labelKey: 'agents.todo.status.completed',
   },
   failed: {
     icon: XCircle,
     className: 'text-red-500',
-    label: 'Failed',
+    labelKey: 'agents.todo.status.failed',
   },
 } as const;
 
 function TodoStatusIcon({ status }: { status: AgentTodoItem['status'] }) {
+  const t = useT();
   const config = STATUS_CONFIG[status];
   const Icon = config.icon;
   return (
@@ -73,7 +75,7 @@ function TodoStatusIcon({ status }: { status: AgentTodoItem['status'] }) {
           status === 'in_progress' && 'animate-spin',
         )}
       />
-      <span className="sr-only">{config.label}</span>
+      <span className="sr-only">{t(config.labelKey)}</span>
     </>
   );
 }
@@ -93,6 +95,7 @@ function PinnedGoal({
   expanded: boolean;
   embedded?: boolean;
 }) {
+  const t = useT();
   const Icon = finished ? CheckCircle2 : Target;
   return (
     <div
@@ -115,7 +118,7 @@ function PinnedGoal({
       <div className="min-w-0 flex-1">
         {!embedded && (
           <span className="block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            {finished ? 'Goal · done' : 'Goal'}
+            {finished ? t('agents.todo.goalDone') : t('agents.todo.goal')}
           </span>
         )}
         <p
@@ -138,6 +141,7 @@ export function AgentTodoPanel({
   collapsible = true,
   className,
 }: AgentTodoPanelProps) {
+  const t = useT();
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   const hasTodos = !!todos && todos.length > 0;
@@ -147,7 +151,7 @@ export function AgentTodoPanel({
     if (!goal) return null;
     if (!collapsible) {
       return (
-        <SidePanelSection title="Goal" className={className}>
+        <SidePanelSection title={t('agents.todo.goal')} className={className}>
           <PinnedGoal goal={goal} finished={false} expanded embedded />
         </SidePanelSection>
       );
@@ -229,13 +233,18 @@ export function AgentTodoPanel({
     return (
       <div className={cn('space-y-5', className)}>
         {goal && (
-          <SidePanelSection title={finished ? 'Goal · done' : 'Goal'}>
+          <SidePanelSection
+            title={finished ? t('agents.todo.goalDone') : t('agents.todo.goal')}
+          >
             <PinnedGoal goal={goal} finished={finished} expanded embedded />
           </SidePanelSection>
         )}
         <SidePanelSection
-          title="Steps"
-          meta={`${counts.completed}/${todos.length} done`}
+          title={t('agents.todo.steps')}
+          meta={t('agents.todo.stepsDone', {
+            completed: counts.completed,
+            total: todos.length,
+          })}
         >
           {progressBar}
           {list}
@@ -267,12 +276,14 @@ export function AgentTodoPanel({
             />
             {currentTask && !isOpen ? (
               <span className="truncate text-muted-foreground font-normal">
-                <span className="text-foreground font-medium">Todo</span> —{' '}
+                <span className="text-foreground font-medium">
+                  {t('agents.todo.title')}
+                </span> —{' '}
                 {currentTask.content}
               </span>
             ) : (
               <span className="flex items-center gap-1.5">
-                <span>Todo</span>
+                <span>{t('agents.todo.title')}</span>
                 <span className="text-muted-foreground/60 tabular-nums">
                   {counts.completed}/{todos.length}
                 </span>
@@ -284,17 +295,17 @@ export function AgentTodoPanel({
               (counts.in_progress > 0 ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400">
                   <Loader2 className="size-3 animate-spin" />
-                  {activeCount} left
+                  {t('agents.todo.left', { count: activeCount })}
                 </span>
               ) : (
                 <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                  {activeCount} left
+                  {t('agents.todo.left', { count: activeCount })}
                 </span>
               ))}
             {counts.completed > 0 && counts.completed === todos.length && (
               <span className="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-600 dark:text-green-400">
                 <CheckCircle2 className="size-3" />
-                Done
+                {t('agents.todo.done')}
               </span>
             )}
           </span>

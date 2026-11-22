@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useT } from '@/lib/i18n-dictionary';
 import { TargetPicker } from '@/pages/vulnerabilities/components/fast-scan-dialog';
 import {
   TargetType,
@@ -25,6 +26,7 @@ interface DiscoverUrlsDialogProps {
 }
 
 export function DiscoverUrlsDialog({ target, disabled }: DiscoverUrlsDialogProps) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const { mutate: discover, isPending } = useAssetsControllerDiscoverUrls();
@@ -54,24 +56,24 @@ export function DiscoverUrlsDialog({ target, disabled }: DiscoverUrlsDialogProps
         disabled={disabled}
         variant="secondary"
         className="hover:cursor-pointer text-sm h-9 shrink-0"
-        title="Discover URLs from public archives"
+        title={t('assets.discoverUrls.buttonTitle')}
         onClick={() => setOpen(true)}
       >
         <Link2 className="h-4 w-4" />
-        Discover URLs
+        {t('assets.discoverUrls.title')}
       </Button>
       <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-auto">
         <DialogHeader>
-          <DialogTitle>Discover URLs</DialogTitle>
+          <DialogTitle>{t('assets.discoverUrls.title')}</DialogTitle>
           <DialogDescription>
             {target
-              ? 'Collect historical URLs of this target from the Wayback Machine, Common Crawl, OTX and urlscan.'
-              : 'Choose the domain targets to collect historical URLs for. Only targets that finished discovery are listed.'}
+              ? t('assets.discoverUrls.descriptionTarget')
+              : t('assets.discoverUrls.descriptionPick')}
           </DialogDescription>
         </DialogHeader>
         {target ? (
           <div className="space-y-2">
-            <Label htmlFor="discover-urls-target">Target</Label>
+            <Label htmlFor="discover-urls-target">{t('assets.discoverUrls.target')}</Label>
             <Input id="discover-urls-target" value={target.value} readOnly />
           </div>
         ) : (
@@ -83,17 +85,17 @@ export function DiscoverUrlsDialog({ target, disabled }: DiscoverUrlsDialogProps
         )}
         <DialogFooter className="items-center sm:justify-between">
           <div className="text-sm text-muted-foreground">
-            {!target && `${selected.size} selected`}
+            {!target && t('assets.discoverUrls.selected', { count: selected.size })}
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => handleOpenChange(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               onClick={handleRun}
               disabled={targetIds.length === 0 || isPending}
             >
-              {isPending ? 'Starting...' : 'Run'}
+              {isPending ? t('assets.discoverUrls.starting') : t('assets.discoverUrls.run')}
             </Button>
           </div>
         </DialogFooter>

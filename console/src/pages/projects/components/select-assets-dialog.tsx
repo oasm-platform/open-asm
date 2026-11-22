@@ -11,6 +11,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
+import { useT } from '@/lib/i18n-dictionary';
 import {
   useProjectsControllerAddAssets,
   useProjectsControllerGetAssetCandidates,
@@ -38,18 +39,12 @@ interface SelectAssetsDialogProps {
   onAssetsAdded?: () => void;
 }
 
-const defaultTrigger = (
-  <Button variant="outline">
-    <PlusIcon className="h-4 w-4" />
-    Add
-  </Button>
-);
-
 export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
   projectId,
   trigger,
   onAssetsAdded,
 }) => {
+  const t = useT();
   const invalidate = useInvalidateProjects();
   const [open, setOpen] = useState(false);
 
@@ -137,7 +132,7 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
                   });
                 }
               }}
-              aria-label="Select all"
+              aria-label={t('projects.create.selectAll')}
             />
           );
         },
@@ -159,7 +154,7 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
                   return newSet;
                 });
               }}
-              aria-label="Select row"
+              aria-label={t('projects.create.selectRow')}
             />
           );
         },
@@ -168,16 +163,16 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
       },
       {
         accessorKey: 'value',
-        header: 'Host Value',
+        header: t('projects.selectAssets.hostValue'),
       },
       {
         accessorKey: 'createdAt',
-        header: 'Created At',
+        header: t('projects.selectAssets.createdAt'),
         cell: ({ row }) =>
           new Date(row.original.createdAt).toLocaleDateString(),
       },
     ],
-    [selectedAssets, assetsNotInProjectQuery.data],
+    [selectedAssets, assetsNotInProjectQuery.data, t],
   );
 
   const handleRowClick = useCallback(
@@ -208,12 +203,19 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{trigger || defaultTrigger}</DialogTrigger>
+      <DialogTrigger asChild>
+        {trigger || (
+          <Button variant="outline">
+            <PlusIcon className="h-4 w-4" />
+            {t('common.add')}
+          </Button>
+        )}
+      </DialogTrigger>
       <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-auto">
         <DialogHeader>
-          <DialogTitle>Select hosts to add</DialogTitle>
+          <DialogTitle>{t('projects.selectAssets.title')}</DialogTitle>
           <DialogDescription>
-            Choose hosts not currently in this project to add
+            {t('projects.selectAssets.description')}
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">
@@ -240,8 +242,10 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
         </div>
         <DialogFooter className="flex sm:justify-between">
           <div className="text-sm text-muted-foreground">
-            {selectedAssets.size} of {assetsNotInProjectQuery.data?.total || 0}{' '}
-            selected
+            {t('projects.selectAssets.selected', {
+              n: selectedAssets.size,
+              total: assetsNotInProjectQuery.data?.total || 0,
+            })}
           </div>
           <Button
             type="submit"
@@ -249,8 +253,8 @@ export const SelectAssetsDialog: React.FC<SelectAssetsDialogProps> = ({
             disabled={selectedAssets.size === 0 || addAssetsMutation.isPending}
           >
             {addAssetsMutation.isPending
-              ? 'Adding...'
-              : `Add ${selectedAssets.size} Hosts`}
+              ? t('projects.selectAssets.adding')
+              : t('projects.selectAssets.addHosts', { n: selectedAssets.size })}
           </Button>
         </DialogFooter>
       </DialogContent>

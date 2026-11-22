@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import {
   flexRender,
@@ -92,7 +93,7 @@ export function DataTable<TData, TValue>({
   onFilterChange,
   onRowClick,
   rowClassName,
-  filterPlaceholder = 'Search',
+  filterPlaceholder,
   showPagination = true,
   page,
   pageSize,
@@ -102,7 +103,7 @@ export function DataTable<TData, TValue>({
   sortBy,
   sortOrder,
   onSortChange,
-  emptyMessage = 'No data',
+  emptyMessage,
   toolbarComponents = [],
   filterComponents,
   isShowHeader = true,
@@ -116,6 +117,7 @@ export function DataTable<TData, TValue>({
   minRows,
   error,
 }: DataTableProps<TData, TValue>) {
+  const t = useT();
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
   const [internalRowSelection, setInternalRowSelection] = React.useState<
@@ -227,7 +229,7 @@ export function DataTable<TData, TValue>({
               // flex-1 on the <input> flexes its height (to ~28px) instead of its width.
               <div className="w-full md:min-w-48 md:flex-1 md:max-w-xs xl:max-w-sm">
                 <Input
-                  placeholder={filterPlaceholder}
+                  placeholder={filterPlaceholder ?? t('common.search')}
                   value={searchValue}
                   onChange={(e) => {
                     setSearchValue(e.target.value);
@@ -271,7 +273,7 @@ export function DataTable<TData, TValue>({
                             onCheckedChange={(value) =>
                               table.toggleAllPageRowsSelected(!!value)
                             }
-                            aria-label="Select all"
+                            aria-label={t('components.dataTable.selectAll')}
                           />
                           {selectionHeader(selectedCount, table)}
                         </div>
@@ -294,7 +296,7 @@ export function DataTable<TData, TValue>({
                           onCheckedChange={(value) =>
                             table.toggleAllPageRowsSelected(!!value)
                           }
-                          aria-label="Select all"
+                          aria-label={t('components.dataTable.selectAll')}
                         />
                       </TableHead>
                     )}
@@ -362,7 +364,7 @@ export function DataTable<TData, TValue>({
                         onCheckedChange={(value) =>
                           row.toggleSelected(!!value)
                         }
-                        aria-label="Select row"
+                        aria-label={t('components.dataTable.selectRow')}
                       />
                     </TableCell>
                   )}
@@ -384,7 +386,7 @@ export function DataTable<TData, TValue>({
                   }
                   className="h-24 text-center text-muted-foreground"
                 >
-                  {error ?? emptyMessage}
+                  {error ?? emptyMessage ?? t('common.noData')}
                 </TableCell>
               </TableRow>
             )}

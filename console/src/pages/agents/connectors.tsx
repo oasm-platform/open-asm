@@ -2,12 +2,14 @@ import Page from '@/components/common/page';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import ToolCard from '@/pages/tools/components/tool-card';
 import { useToolsControllerGetManyTools } from '@/services/apis/gen/queries';
+import { useT } from '@/lib/i18n-dictionary';
 
 /**
  * The tools the agent can use (built-in tools + agent connectors). A card
  * opens the tool detail page.
  */
 export default function AgentConnectorsPage() {
+  const t = useT();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -20,8 +22,8 @@ export default function AgentConnectorsPage() {
 
   return (
     <Page
-      title="Connectors"
-      description="Tools the agent can use in this workspace"
+      title={t('agents.connectors.title')}
+      description={t('agents.connectors.description')}
       // max-md:pt-10 clears the sidebar trigger floating at the top-left
       className="mx-auto w-full max-w-5xl max-md:pt-10"
       permission="agent.read"
@@ -39,7 +41,7 @@ export default function AgentConnectorsPage() {
         ) : tools.length === 0 ? (
           <div className="rounded-xl border border-dashed p-6 text-center">
             <p className="text-sm text-muted-foreground">
-              No tools available to the agent yet.
+              {t('agents.connectors.empty')}
             </p>
           </div>
         ) : (

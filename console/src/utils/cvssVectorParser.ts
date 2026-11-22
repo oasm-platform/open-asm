@@ -1,3 +1,5 @@
+import { t } from '@/lib/i18n-dictionary';
+
 export type CVSSVersion = '2.0' | '3.0' | '3.1' | '4.0';
 
 export type MetricValue = {
@@ -17,9 +19,9 @@ export type CVSSResult = {
 // ===============================
 
 const LEVELS = Object.freeze({
-  N: 'None',
-  L: 'Low',
-  H: 'High',
+  N: 'components.cvss.none',
+  L: 'components.cvss.low',
+  H: 'components.cvss.high',
 } as const);
 
 // Key → semantic name
@@ -45,30 +47,30 @@ const METRIC_NAMES: Record<string, string> = {
   SA: 'sysAvailability',
 };
 
-// Value dictionary
+// Value dictionary (dictionary keys, translated in parseCVSS)
 const CVSS_DICTIONARY: Record<string, Record<string, string>> = {
   AV: {
-    N: 'Network',
-    A: 'Adjacent',
-    L: 'Local',
-    P: 'Physical',
+    N: 'components.cvss.network',
+    A: 'components.cvss.adjacent',
+    L: 'components.cvss.local',
+    P: 'components.cvss.physical',
   },
   AC: {
-    L: 'Low',
-    H: 'High',
+    L: 'components.cvss.low',
+    H: 'components.cvss.high',
   },
   AT: {
-    N: 'None',
-    P: 'Present',
+    N: 'components.cvss.none',
+    P: 'components.cvss.present',
   },
   PR: LEVELS,
   UI: {
-    N: 'None',
-    R: 'Required',
+    N: 'components.cvss.none',
+    R: 'components.cvss.required',
   },
   S: {
-    U: 'Unchanged',
-    C: 'Changed',
+    U: 'components.cvss.unchanged',
+    C: 'components.cvss.changed',
   },
 
   // v3
@@ -122,7 +124,7 @@ export function parseCVSS(vector: string): CVSSResult | null {
     raw[key] = value;
 
     // Human readable value
-    const readable = CVSS_DICTIONARY[key]?.[value] ?? 'Unknown';
+    const readable = t(CVSS_DICTIONARY[key]?.[value] ?? 'common.unknown');
 
     // Detailed
     detailed[key] = {

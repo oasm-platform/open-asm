@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
 import { useLLMConfigs } from '@/hooks/use-llm-configs';
+import { useT } from '@/lib/i18n-dictionary';
 import {
   VulnerabilityAnalyzeStatus,
   useVulnerabilitiesControllerAnalyzeVulnerability,
@@ -20,6 +21,7 @@ interface AnalyzeStatusButtonProps {
 const statusConfig: Record<
   string,
   {
+    /** i18n key */
     label: string;
     className: string;
     icon: ReactNode;
@@ -28,28 +30,28 @@ const statusConfig: Record<
   }
 > = {
   [VulnerabilityAnalyzeStatus.not_analyzed]: {
-    label: 'Analyze',
+    label: 'vulnerabilities.analyze.analyze',
     className: 'border-slate-500/30 text-slate-600 dark:text-slate-400',
     icon: <Play size={10} />,
     variant: 'outline',
     disabled: false,
   },
   [VulnerabilityAnalyzeStatus.running]: {
-    label: 'Running',
+    label: 'vulnerabilities.analyze.running',
     className: 'border-purple-500 text-purple-600 dark:text-purple-500',
     icon: <Loader2 size={10} className="animate-spin" />,
     variant: 'outline',
     disabled: true,
   },
   [VulnerabilityAnalyzeStatus.done]: {
-    label: 'Analyzed',
+    label: 'vulnerabilities.analyze.done',
     className: 'text-green-600 dark:text-green-400',
     icon: <CheckCircle2 size={12} />,
     variant: 'outline',
     disabled: false,
   },
   [VulnerabilityAnalyzeStatus.failed]: {
-    label: 'Retry',
+    label: 'vulnerabilities.analyze.retry',
     className: 'border-red-500/30 text-red-600 dark:text-red-400',
     icon: <RefreshCw size={10} />,
     variant: 'outline',
@@ -64,6 +66,7 @@ export function AnalyzeStatusButton({
   onAnalyze,
   onView,
 }: AnalyzeStatusButtonProps) {
+  const t = useT();
   const { hasProviderConnected, isLoading: llmLoading } = useLLMConfigs();
   const { open: openAgentSettings } = useAgentSettingsDialog();
   const { mutate: analyzeVulnerability } =
@@ -104,7 +107,7 @@ export function AnalyzeStatusButton({
         className={`flex items-center gap-1.5 h-7 text-xs px-2 ${config.className} ${className || ''}`}
       >
         {config.icon}
-        {config.label}
+        {t(config.label)}
       </div>
     ) : (
       <Button
@@ -114,7 +117,7 @@ export function AnalyzeStatusButton({
         onClick={handleClick}
       >
         {config.icon}
-        {config.label}
+        {t(config.label)}
       </Button>
     );
 

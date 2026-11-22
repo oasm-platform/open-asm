@@ -1,0 +1,11 @@
+{
+  "notifications.title": "Thông báo",
+  "notifications.unread.other": "{count} thông báo chưa đọc",
+  "notifications.markAllRead": "Đánh dấu tất cả là đã đọc",
+  "userMenu.language": "Ngôn ngữ",
+  "userMenu.settings": "Cài đặt",
+  "userMenu.admin": "Quản trị",
+  "userMenu.docs": "Tài liệu",
+  "userMenu.reportIssue": "Báo lỗi",
+  "userMenu.logout": "Đăng xuất"
+}

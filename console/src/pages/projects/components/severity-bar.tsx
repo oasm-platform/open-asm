@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import type { SeverityCountsDto } from '@/services/apis/gen/queries';
 import { memo } from 'react';
@@ -11,6 +12,7 @@ export const SeverityBar = memo(function SeverityBar({
   counts?: SeverityCountsDto | null;
   className?: string;
 }) {
+  const t = useT();
   const total = totalOf(counts);
   return (
     <div
@@ -19,7 +21,7 @@ export const SeverityBar = memo(function SeverityBar({
       aria-label={
         total
           ? SEVERITIES.map((s) => `${counts?.[s.key] ?? 0} ${s.label.toLowerCase()}`).join(', ')
-          : 'No open vulnerabilities'
+          : t('projects.severity.noOpen')
       }
     >
       {total > 0 &&
@@ -40,14 +42,19 @@ export const SeverityBar = memo(function SeverityBar({
 export const SeverityCounts = memo(function SeverityCounts({
   counts,
   className,
-  empty = 'No open vulnerabilities',
+  empty,
 }: {
   counts?: SeverityCountsDto | null;
   className?: string;
   empty?: string;
 }) {
+  const t = useT();
   if (!totalOf(counts)) {
-    return <span className="text-sm text-muted-foreground">{empty}</span>;
+    return (
+      <span className="text-sm text-muted-foreground">
+        {empty ?? t('projects.severity.noOpen')}
+      </span>
+    );
   }
   return (
     <div className={cn('flex flex-wrap items-center gap-x-3 gap-y-1', className)}>
@@ -85,10 +92,11 @@ export const SeverityBreakdown = memo(function SeverityBreakdown({
   /** Names each severity beside its count, for use away from a number card */
   showLabels?: boolean;
 }) {
+  const t = useT();
   return (
     <ul
       className={cn('flex flex-wrap items-center gap-x-3 gap-y-1 text-sm', className)}
-      aria-label="Open vulnerabilities by severity"
+      aria-label={t('projects.severity.bySeverity')}
     >
       {SEVERITIES.map((s) => {
         const count = counts?.[s.key] ?? 0;

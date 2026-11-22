@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Plus, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 
@@ -249,6 +250,7 @@ function PanelConversation({ conversationId, isNew }: PanelConversationProps) {
 
 /** Shown instead of the chat until the workspace has an LLM provider */
 function ConnectProvider() {
+  const t = useT();
   const { open: openSettings } = useAgentSettingsDialog();
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
@@ -258,15 +260,14 @@ function ConnectProvider() {
           <Sparkles className="size-7 text-muted-foreground" />
         </div>
         <div className="space-y-1.5">
-          <h2 className="font-semibold">Connect an AI Provider</h2>
+          <h2 className="font-semibold">{t('components.aiChat.connectTitle')}</h2>
           <p className="text-sm text-muted-foreground">
-            To start chatting with the AI security agent, connect an LLM
-            provider first.
+            {t('components.aiChat.connectDescription')}
           </p>
         </div>
         <Button variant="outline" onClick={() => openSettings('provider')}>
           <Plus className="size-4" />
-          Connect
+          {t('components.aiChat.connect')}
         </Button>
       </div>
     </div>
@@ -279,6 +280,7 @@ function ConnectProvider() {
  * full screen.
  */
 export function AiChatPanel({ rowRef }: AiChatPanelProps) {
+  const t = useT();
   const panelRef = useRef<HTMLElement>(null);
   const panelWidth = useSidePanelWidth(rowRef, {
     storageKey: WIDTH_STORAGE_KEY,
@@ -332,8 +334,10 @@ export function AiChatPanel({ rowRef }: AiChatPanelProps) {
           className="w-full gap-0 p-0 sm:max-w-none [&>button]:hidden"
         >
           <SheetHeader className="sr-only">
-            <SheetTitle>AI chat</SheetTitle>
-            <SheetDescription>Chat with the AI security agent.</SheetDescription>
+            <SheetTitle>{t('components.aiChat.title')}</SheetTitle>
+            <SheetDescription>
+              {t('components.aiChat.description')}
+            </SheetDescription>
           </SheetHeader>
           {content}
         </SheetContent>
@@ -351,7 +355,7 @@ export function AiChatPanel({ rowRef }: AiChatPanelProps) {
         onResize={panelWidth.setWidth}
         onCommit={panelWidth.save}
         limits={PANEL_LIMITS}
-        label="Resize AI chat"
+        label={t('components.aiChat.resize')}
         className="block"
       />
       {/* A sibling of the page in the layout row: the page shrinks beside
@@ -359,7 +363,7 @@ export function AiChatPanel({ rowRef }: AiChatPanelProps) {
           page scrolls the document. */}
       <aside
         ref={panelRef}
-        aria-label="AI chat"
+        aria-label={t('components.aiChat.title')}
         className={cn(
           'sticky top-0 flex h-svh shrink-0 flex-col bg-background animate-in fade-in-0 slide-in-from-right-4 duration-300',
           panelWidth.width === null && 'w-[min(28rem,40vw)]',

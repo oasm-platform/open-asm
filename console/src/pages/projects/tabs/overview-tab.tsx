@@ -1,3 +1,4 @@
+import { formatDate, fromNow } from '@/lib/date-locale';
 import { StatCard } from '@/components/common/stat-card';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +15,7 @@ import {
   getLocalTimezone,
   getNextRun,
 } from '@/lib/cron-schedule';
+import { t, useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import type { ProjectDetailSearch } from '@/routes/_authed/projects/$id/$tab';
 import {
@@ -30,8 +32,6 @@ import {
   type WeeklyNewVulnerabilitiesDto,
 } from '@/services/apis/gen/queries';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import {
   Activity,
   Bug,
@@ -53,7 +53,6 @@ import {
   workflowLabel,
 } from '../project-utils';
 
-dayjs.extend(relativeTime);
 
 /** Rows of "To fix" (as many as the API's recent activity). */
 const LIST_LIMIT = 15;
@@ -62,41 +61,42 @@ const LIST_LIMIT = 15;
 const LIST_CARD = 'h-[30rem]';
 const LIST_CONTENT = 'flex min-h-0 flex-1 flex-col divide-y overflow-y-auto';
 
+/** Dictionary keys, resolved at render. */
 const AUDIT_LABELS: Record<string, string> = {
-  'project.created': 'Project created',
-  'project.archived': 'Project archived',
-  'project.unarchived': 'Project reopened',
+  'project.created': 'projects.overview.audit.created',
+  'project.archived': 'projects.overview.audit.archived',
+  'project.unarchived': 'projects.overview.audit.reopened',
 };
 
 /** How assets joined or left, after their count. */
 const ASSET_CHANGES: Partial<Record<ProjectChange, string>> = {
-  [ProjectChange.assetsadded]: 'picked by hand',
-  [ProjectChange.assetsdiscovered]: 'discovered, matching the scope rules',
-  [ProjectChange.assetsremoved]: 'removed',
-  [ProjectChange.scope]: 'with a scope rule change',
+  [ProjectChange.assetsadded]: 'projects.overview.assetChange.added',
+  [ProjectChange.assetsdiscovered]: 'projects.overview.assetChange.discovered',
+  [ProjectChange.assetsremoved]: 'projects.overview.assetChange.removed',
+  [ProjectChange.scope]: 'projects.overview.assetChange.scope',
 };
 
 /** "+3 assets", "−1 asset" or "+3 / −1 assets". */
 function assetDelta(added = 0, removed = 0): string {
-  if (added && removed) return `+${added} / −${removed} assets`;
+  if (added && removed) return t('projects.overview.assetDelta', { added, removed });
   return added ? `+${assetCount(added)}` : `−${assetCount(removed)}`;
 }
 
 const DISMISS_REASONS: Record<DismissReason, string> = {
-  [DismissReason.false_positive]: 'false positive',
-  [DismissReason.used_in_test]: 'used in tests',
-  [DismissReason.wont_fix]: "won't fix",
-  [DismissReason.risk_accepted]: 'risk accepted',
+  [DismissReason.false_positive]: 'projects.overview.dismiss.falsePositive',
+  [DismissReason.used_in_test]: 'projects.overview.dismiss.usedInTest',
+  [DismissReason.wont_fix]: 'projects.overview.dismiss.wontFix',
+  [DismissReason.risk_accepted]: 'projects.overview.dismiss.riskAccepted',
 };
 
 const WORKFLOW_CHANGES: Partial<Record<ProjectChange, string>> = {
-  [ProjectChange.workflowadded]: 'added',
-  [ProjectChange.workflowupdated]: 'edited',
-  [ProjectChange.workflowremoved]: 'removed',
+  [ProjectChange.workflowadded]: 'projects.overview.workflowChange.added',
+  [ProjectChange.workflowupdated]: 'projects.overview.workflowChange.edited',
+  [ProjectChange.workflowremoved]: 'projects.overview.workflowChange.removed',
 };
 
 const vulnerabilityCount = (n: number) =>
-  `${n} vulnerabilit${n === 1 ? 'y' : 'ies'}`;
+  t('projects.overview.vulnerabilityCount', { count: n });
 
 /**
  * New vulnerabilities per week, stacked by severity (critical at the base).
@@ -110,6 +110,7 @@ export const WeeklyChart = memo(function WeeklyChart({
 }: {
   weeks: WeeklyNewVulnerabilitiesDto[];
 }) {
+  const t = useT();
   const totals = weeks.map((week) => totalOf(week));
   const max = Math.max(1, ...totals);
   const ticks = [max, Math.round(max / 2), 0].filter(
@@ -149,7 +150,10 @@ export const WeeklyChart = memo(function WeeklyChart({
                     <button
                       type="button"
                       className="relative flex h-40 w-full flex-col-reverse items-center justify-start rounded-sm hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      aria-label={`Week of ${dayjs(week.week).format('DD MMM')}: ${totals[i]} new`}
+                      aria-label={t('projects.overview.weekAria', {
+                        date: formatDate(week.week, 'dd MMM'),
+                        n: totals[i],
+                      })}
                     >
                       <span
                         className="flex w-3/5 max-w-8 flex-col-reverse gap-[2px] overflow-hidden rounded-t-[4px]"
@@ -170,8 +174,10 @@ export const WeeklyChart = memo(function WeeklyChart({
                   </TooltipTrigger>
                   <TooltipContent side="top">
                     <p className="font-medium">
-                      Week of {dayjs(week.week).format('DD MMM YYYY')} ·{' '}
-                      {totals[i]} new
+                      {t('projects.overview.weekTooltip', {
+                        date: formatDate(week.week, 'dd MMM yyyy'),
+                        n: totals[i],
+                      })}
                     </p>
                     {SEVERITIES.map((s) => (
                       <p
@@ -185,7 +191,7 @@ export const WeeklyChart = memo(function WeeklyChart({
                   </TooltipContent>
                 </Tooltip>
                 <span className="text-[11px] tabular-nums text-muted-foreground">
-                  {dayjs(week.week).format('DD/MM')}
+                  {formatDate(week.week, 'dd/MM')}
                 </span>
               </div>
             ))}
@@ -193,10 +199,10 @@ export const WeeklyChart = memo(function WeeklyChart({
         </div>
       </TooltipProvider>
       <table className="sr-only">
-        <caption>New vulnerabilities per week by severity</caption>
+        <caption>{t('projects.overview.chartCaption')}</caption>
         <thead>
           <tr>
-            <th>Week</th>
+            <th>{t('projects.overview.week')}</th>
             {SEVERITIES.map((s) => (
               <th key={s.key}>{s.label}</th>
             ))}
@@ -219,8 +225,9 @@ export const WeeklyChart = memo(function WeeklyChart({
 
 /** " by Name" after a change someone made. */
 function By({ name }: { name?: string }) {
+  const t = useT();
   return name ? (
-    <span className="text-muted-foreground"> by {name}</span>
+    <span className="text-muted-foreground"> {t('projects.overview.by', { name })}</span>
   ) : null;
 }
 
@@ -251,17 +258,18 @@ function ActivityItem({
   item: ProjectActivityDto;
   projectId: string;
 }) {
+  const t = useT();
   if (item.kind === ProjectActivityDtoKind.dismissed) {
     return (
       <span>
         <TabLink projectId={projectId} tab="vulnerabilities">
           {vulnerabilityCount(item.count ?? 0)}
         </TabLink>{' '}
-        dismissed
+        {t('projects.overview.dismissed')}
         {item.reason && (
           <span className="text-muted-foreground">
             {' '}
-            · {DISMISS_REASONS[item.reason]}
+            · {t(DISMISS_REASONS[item.reason])}
           </span>
         )}
         <By name={item.actorName} />
@@ -273,11 +281,11 @@ function ActivityItem({
     if (workflowChange) {
       return (
         <span>
-          Workflow{' '}
+          {t('projects.schedule.workflowFallback')}{' '}
           <TabLink projectId={projectId} tab="workflows">
             {workflowLabel({ name: item.workflowName })}
           </TabLink>{' '}
-          {workflowChange}
+          {t(workflowChange)}
           <By name={item.actorName} />
         </span>
       );
@@ -289,18 +297,18 @@ function ActivityItem({
           <TabLink projectId={projectId} tab="assets">
             {assetDelta(item.added, item.removed)}
           </TabLink>{' '}
-          {assetChange}
+          {t(assetChange)}
           <By name={item.actorName} />
         </span>
       );
     }
     return (
       <span>
-        {AUDIT_LABELS[item.ref] ?? item.ref}
+        {AUDIT_LABELS[item.ref] ? t(AUDIT_LABELS[item.ref]) : item.ref}
         {item.ref === 'project.created' && item.added ? (
           <>
             {' '}
-            with{' '}
+            {t('projects.overview.with')}{' '}
             <TabLink projectId={projectId} tab="assets">
               {assetCount(item.added)}
             </TabLink>
@@ -333,12 +341,12 @@ function ActivityItem({
           search={{ run: item.ref, provenance: VulnerabilityProvenance.new }}
           className="text-primary hover:underline"
         >
-          +{item.newVulnerabilities} new
+          {t('projects.list.newBadge', { n: item.newVulnerabilities ?? 0 })}
         </Link>
       )}
       {(item.recurringVulnerabilities ?? 0) > 0 && (
         <span className="text-muted-foreground">
-          {item.recurringVulnerabilities} recurring
+          {t('projects.overview.recurring', { n: item.recurringVulnerabilities ?? 0 })}
         </span>
       )}
     </span>
@@ -352,6 +360,7 @@ export function OverviewTab({
   projectId: string;
   project: Project;
 }) {
+  const t = useT();
   const navigate = useNavigate();
   const search = useSearch({ strict: false }) as ProjectDetailSearch;
   // The same sheet, and URL, as a row of the Vulnerabilities tab.
@@ -428,17 +437,17 @@ export function OverviewTab({
     <div className="flex flex-col gap-4">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="Assets"
+          label={t('projects.tabs.assets')}
           value={String(overview.totalAssets)}
           icon={Waypoints}
           onClick={() => goTab('assets')}
         >
           <span className="text-sm text-muted-foreground">
-            +{overview.newAssets} in the last 7 days
+            {t('projects.overview.newAssets', { n: overview.newAssets })}
           </span>
         </StatCard>
         <StatCard
-          label="Open vulnerabilities"
+          label={t('projects.overview.openVulnerabilities')}
           value={String(open)}
           icon={Bug}
           onClick={() => goTab('vulnerabilities')}
@@ -446,7 +455,7 @@ export function OverviewTab({
           <SeverityBreakdown counts={overview.openVulnerabilities} />
         </StatCard>
         <StatCard
-          label="New in 7 days"
+          label={t('projects.overview.newIn7Days')}
           value={`+${overview.newVulnerabilities}`}
           icon={TrendingUp}
           onClick={() =>
@@ -457,21 +466,22 @@ export function OverviewTab({
         >
           <span className="truncate text-sm text-muted-foreground">
             {freshRuns.length
-              ? `from ${[
-                  ...new Set(
-                    freshRuns.map((run) =>
-                      workflowLabel({ name: run.workflowName }),
+              ? t('projects.overview.fromRuns', {
+                  workflows: [
+                    ...new Set(
+                      freshRuns.map((run) =>
+                        workflowLabel({ name: run.workflowName }),
+                      ),
                     ),
-                  ),
-                ].join(
-                  ', ',
-                )} · ${freshRuns.length} run${freshRuns.length === 1 ? '' : 's'}`
-              : 'No new findings'}
+                  ].join(', '),
+                  count: freshRuns.length,
+                })
+              : t('projects.overview.noNewFindings')}
           </span>
         </StatCard>
         <StatCard
-          label="Next run"
-          value={next ? dayjs(next.at).fromNow() : '—'}
+          label={t('projects.list.nextRun')}
+          value={next ? fromNow(next.at) : '—'}
           icon={CalendarClock}
           onClick={() => goTab('schedule')}
         >
@@ -482,8 +492,8 @@ export function OverviewTab({
             {next
               ? `${next.workflow} · ${formatCronLabel(next.cron, timezone) ?? next.cron}`
               : onEvents
-                ? 'On events'
-                : 'Only when run by hand'}
+                ? t('projects.overview.onEvents')
+                : t('projects.overview.onlyByHand')}
           </span>
         </StatCard>
       </div>
@@ -492,7 +502,7 @@ export function OverviewTab({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ChartColumnStacked className="size-5 text-primary" />
-            New vulnerabilities per week
+            {t('projects.overview.weeklyTitle')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -505,7 +515,7 @@ export function OverviewTab({
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="flex items-center gap-2">
               <ShieldAlert className="size-5 text-primary" />
-              To fix
+              {t('projects.overview.toFix')}
             </CardTitle>
             <Button
               variant="link"
@@ -513,13 +523,13 @@ export function OverviewTab({
               className="h-auto p-0"
               onClick={() => goTab('vulnerabilities')}
             >
-              See all
+              {t('projects.overview.seeAll')}
             </Button>
           </CardHeader>
           <CardContent className={LIST_CONTENT}>
             {(todo?.data ?? []).length === 0 ? (
               <p className="py-4 text-sm text-muted-foreground">
-                No open vulnerabilities found by this project.
+                {t('projects.overview.noOpen')}
               </p>
             ) : (
               (todo?.data ?? []).map((vuln) => (
@@ -549,12 +559,14 @@ export function OverviewTab({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Activity className="size-5 text-primary" />
-              Recent activity
+              {t('projects.overview.recentActivity')}
             </CardTitle>
           </CardHeader>
           <CardContent className={LIST_CONTENT}>
             {overview.activity.length === 0 ? (
-              <p className="py-4 text-sm text-muted-foreground">Nothing yet.</p>
+              <p className="py-4 text-sm text-muted-foreground">
+                {t('projects.overview.nothingYet')}
+              </p>
             ) : (
               overview.activity.map((item) => (
                 // Baseline: a detail that wraps keeps its first line level
@@ -565,9 +577,9 @@ export function OverviewTab({
                 >
                   <span
                     className="truncate whitespace-nowrap tabular-nums text-muted-foreground"
-                    title={dayjs(item.at).format('YYYY-MM-DD HH:mm')}
+                    title={formatDate(item.at, 'yyyy-MM-dd HH:mm')}
                   >
-                    {dayjs(item.at).fromNow()}
+                    {fromNow(item.at)}
                   </span>
                   <ActivityItem item={item} projectId={projectId} />
                 </div>

@@ -1,8 +1,9 @@
 import { cn } from '@/lib/utils';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import type { PromptGroup } from './landing-constants';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useT } from '@/lib/i18n-dictionary';
+import { translatePromptGroups, type PromptGroup } from './landing-constants';
 
 interface PromptGroupsProps {
   /** The topic groups to show (differs between Ask and Agent mode). */
@@ -28,12 +29,17 @@ interface PromptGroupsProps {
  * outside goes back to the chips, as does picking a prompt when closeOnSelect.
  */
 export function PromptGroups({
-  groups,
+  groups: sourceGroups,
   onSelect,
   onPreview,
   closeOnSelect = true,
   className,
 }: PromptGroupsProps) {
+  const t = useT();
+  const groups = useMemo(
+    () => translatePromptGroups(sourceGroups, t),
+    [sourceGroups, t],
+  );
   const [activeId, setActiveId] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const reduceMotion = useReducedMotion();
@@ -97,7 +103,7 @@ export function PromptGroups({
               </span>
               <button
                 type="button"
-                aria-label="Close"
+                aria-label={t('agents.promptGroups.close')}
                 onClick={() => setActiveId(null)}
                 className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground cursor-pointer"
               >
@@ -107,7 +113,7 @@ export function PromptGroups({
             {/* Cleared on leaving the list, not each item, so crossing the
                 gaps between items doesn't flash the default placeholder */}
             <ul
-              aria-label={`${active.label} prompts`}
+              aria-label={t('agents.promptGroups.listLabel', { group: active.label })}
               onMouseLeave={() => onPreview?.(null)}
               className="max-h-[min(20rem,40vh)] overflow-y-auto px-2 pb-2"
             >

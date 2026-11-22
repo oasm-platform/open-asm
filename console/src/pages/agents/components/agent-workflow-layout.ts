@@ -27,16 +27,22 @@ export type WorkflowEdgeKind =
 
 export const WORKFLOW_EDGE_KINDS: Array<{
   kind: WorkflowEdgeKind;
-  label: string;
+  /** Dictionary key of the legend label */
+  labelKey: string;
   color: string;
   dashed?: boolean;
 }> = [
-  { kind: 'plan', label: 'Plan', color: '#94a3b8' },
-  { kind: 'handoff', label: 'Feeds next step', color: '#ec4899' },
-  { kind: 'dispatch', label: 'Dispatched', color: '#10b981' },
-  { kind: 'after', label: 'Waits for', color: '#0ea5e9' },
-  { kind: 'derived', label: 'Derived from', color: '#8b5cf6' },
-  { kind: 'continue', label: 'Follow-up', color: '#f59e0b', dashed: true },
+  { kind: 'plan', labelKey: 'agents.workflow.edge.plan', color: '#94a3b8' },
+  { kind: 'handoff', labelKey: 'agents.workflow.edge.handoff', color: '#ec4899' },
+  { kind: 'dispatch', labelKey: 'agents.workflow.edge.dispatch', color: '#10b981' },
+  { kind: 'after', labelKey: 'agents.workflow.edge.after', color: '#0ea5e9' },
+  { kind: 'derived', labelKey: 'agents.workflow.edge.derived', color: '#8b5cf6' },
+  {
+    kind: 'continue',
+    labelKey: 'agents.workflow.edge.continue',
+    color: '#f59e0b',
+    dashed: true,
+  },
 ];
 
 export type WorkflowEdgeData = {

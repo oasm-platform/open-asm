@@ -11,8 +11,10 @@ import {
   ageLabel,
   DISMISS_REASON_LABELS,
   isRiskAccepted,
+  labelOf,
 } from '@/components/vulnerabilities/lifecycle';
 import { usePermission } from '@/hooks/usePermission';
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import {
   useIssuesControllerGetById,
@@ -55,6 +57,7 @@ function SeverityPill({ severity }: { severity?: string | null }) {
 
 /** Dismissal, risk acceptance or fix claim — whatever a person decided. */
 function TriageChip({ data }: { data: VulnerabilityDetailDto }) {
+  const t = useT();
   const d = data.dismissal;
   if (d) {
     const risk = d.reason === 'risk_accepted';
@@ -66,8 +69,10 @@ function TriageChip({ data }: { data: VulnerabilityDetailDto }) {
           risk && 'border-amber-500/40 text-amber-700 dark:text-amber-300',
         )}
       >
-        {DISMISS_REASON_LABELS[d.reason] ?? d.reason}
-        {risk && d.expiresAt ? ` until ${fmt(d.expiresAt)}` : ''}
+        {labelOf(DISMISS_REASON_LABELS, d.reason)}
+        {risk && d.expiresAt
+          ? t('vulnerabilities.hero.until', { date: fmt(d.expiresAt) })
+          : ''}
       </Badge>
     );
   }
@@ -77,7 +82,7 @@ function TriageChip({ data }: { data: VulnerabilityDetailDto }) {
         variant="outline"
         className="h-6 rounded-md border-primary/40 text-primary"
       >
-        Fix claimed · awaiting scan
+        {t('vulnerabilities.hero.fixClaimed')}
       </Badge>
     );
   }
@@ -116,18 +121,20 @@ function Metric({
 }
 
 function SlaMetric({ data }: { data: VulnerabilityDetailDto }) {
+  const t = useT();
   const { data: settings, isLoading } =
     useVulnerabilitiesControllerGetSettings();
   const severity: SeverityKey = severityOf(data.severity).key;
   const policyDays = settings?.slaDays?.[severity] ?? null;
   const paused = isRiskAccepted(data.dismissal);
-  const label = `SLA · ${severity.charAt(0).toUpperCase()}${severity.slice(1)}${
-    policyDays ? ` ${policyDays} days` : ''
-  }`;
+  const severityName = t(`vulnerabilities.severity.${severity}`);
+  const label = policyDays
+    ? t('vulnerabilities.hero.slaLabelDays', { severity: severityName, days: policyDays })
+    : t('vulnerabilities.hero.slaLabel', { severity: severityName });
 
   if (isLoading) {
     return (
-      <Metric label="SLA" testId="sla-card">
+      <Metric label={t('vulnerabilities.hero.sla')} testId="sla-card">
         <Skeleton className="h-6 w-24" />
       </Metric>
     );
@@ -137,9 +144,11 @@ function SlaMetric({ data }: { data: VulnerabilityDetailDto }) {
       <Metric
         label={label}
         testId="sla-card"
-        sub={`Fixed ${fmt(data.fixedAt)}`}
+        sub={t('vulnerabilities.hero.fixedOn', { date: fmt(data.fixedAt) })}
       >
-        <span className="text-emerald-600 dark:text-emerald-400">Closed</span>
+        <span className="text-emerald-600 dark:text-emerald-400">
+          {t('vulnerabilities.hero.closed')}
+        </span>
       </Metric>
     );
   }
@@ -148,7 +157,7 @@ function SlaMetric({ data }: { data: VulnerabilityDetailDto }) {
       <Metric
         label={label}
         testId="sla-card"
-        sub="No SLA applies to this severity."
+        sub={t('vulnerabilities.hero.noSla')}
       >
         <span className="text-muted-foreground">—</span>
       </Metric>
@@ -171,7 +180,7 @@ function SlaMetric({ data }: { data: VulnerabilityDetailDto }) {
         <div className="flex flex-col gap-1.5">
           <Progress
             value={percent}
-            aria-label="SLA time used"
+            aria-label={t('vulnerabilities.hero.slaUsed')}
             className={cn(
               'h-1.5',
               paused && 'opacity-50',
@@ -186,12 +195,12 @@ function SlaMetric({ data }: { data: VulnerabilityDetailDto }) {
           />
           <span>
             {paused
-              ? 'Paused while the risk is accepted'
-              : `Due ${fmt(data.dueAt)}`}
+              ? t('vulnerabilities.hero.pausedRisk')
+              : t('vulnerabilities.hero.due', { date: fmt(data.dueAt) })}
             {data.resurfacedCount > 0 &&
             settings?.slaRestartOnResurface &&
             !paused
-              ? ' · restarted on resurface'
+              ? t('vulnerabilities.hero.restarted')
               : ''}
           </span>
         </div>
@@ -215,6 +224,7 @@ function IssueMetric({
   data: VulnerabilityDetailDto;
   onCreated?: () => void;
 }) {
+  const t = useT();
   const { hasPermission } = usePermission();
   const issueId = data.openIssue?.id ?? '';
   const { data: issue, isLoading } = useIssuesControllerGetById(issueId, {
@@ -224,9 +234,9 @@ function IssueMetric({
   if (!data.openIssue) {
     return (
       <Metric
-        label="Issue"
+        label={t('vulnerabilities.hero.issue')}
         testId="issue-card"
-        sub="No open issue tracks this finding."
+        sub={t('vulnerabilities.hero.noIssue')}
       >
         {hasPermission('workspace.write') ? (
           <CreateIssueDialog
@@ -235,7 +245,7 @@ function IssueMetric({
             trigger={
               <Button variant="outline" size="sm" className="h-7">
                 <ClipboardList className="mr-1 size-3.5" />
-                Create issue
+                {t('vulnerabilities.hero.createIssue')}
               </Button>
             }
           />
@@ -248,7 +258,7 @@ function IssueMetric({
 
   return (
     <Metric
-      label="Issue"
+      label={t('vulnerabilities.hero.issue')}
       testId="issue-card"
       sub={
         isLoading ? (
@@ -280,6 +290,7 @@ export function DetailHero({
   data: VulnerabilityDetailDto;
   onChange?: () => void;
 }) {
+  const t = useT();
   const severity = severityOf(data.severity);
   const location =
     data.affectedUrl ||
@@ -344,7 +355,9 @@ export function DetailHero({
                 )}
                 <span className="inline-flex items-center gap-1.5">
                   <CalendarClock className="size-3.5 shrink-0" />
-                  First seen {ageLabel(data.firstDetectedDate)} ago
+                  {t('vulnerabilities.hero.firstSeen', {
+                    age: ageLabel(data.firstDetectedDate),
+                  })}
                 </span>
               </div>
               <SourcesList data={data} />
@@ -354,7 +367,7 @@ export function DetailHero({
       </div>
       <div className="grid grid-cols-2 border-t md:grid-cols-5 [&>*]:border-border max-md:[&>*:nth-child(odd)]:border-r max-md:[&>*:nth-child(n+3)]:border-t md:[&>*:not(:first-child)]:border-l">
         <Metric
-          label="CVSS"
+          label={t('vulnerabilities.hero.cvss')}
           sub={
             data.cvssMetric ? (
               <span className="block break-words font-mono">
@@ -371,7 +384,7 @@ export function DetailHero({
                 ))}
               </span>
             ) : (
-              'No vector reported'
+              t('vulnerabilities.hero.noVector')
             )
           }
         >
@@ -387,9 +400,11 @@ export function DetailHero({
           )}
         </Metric>
         <Metric
-          label="EPSS"
+          label={t('vulnerabilities.hero.epss')}
           sub={
-            data.epssScore ? 'Chance of exploitation in 30 days' : 'Not scored'
+            data.epssScore
+              ? t('vulnerabilities.hero.epssHint')
+              : t('vulnerabilities.hero.notScored')
           }
         >
           {data.epssScore ? (
@@ -400,16 +415,16 @@ export function DetailHero({
         </Metric>
         <SlaMetric data={data} />
         <Metric
-          label="Detected"
-          sub={`Last seen ${fmt(data.lastSeenDate)}${
+          label={t('vulnerabilities.hero.detected')}
+          sub={`${t('vulnerabilities.hero.lastSeen', { date: fmt(data.lastSeenDate) })}${
             data.resurfacedCount > 0
-              ? ` · resurfaced ${data.resurfacedCount}×`
+              ? t('vulnerabilities.hero.resurfacedTimes', { n: data.resurfacedCount })
               : ''
           }`}
         >
           ×{data.timesDetected}
           <span className="text-sm font-normal text-muted-foreground">
-            {data.timesDetected === 1 ? 'scan' : 'scans'}
+            {t('vulnerabilities.hero.scans', { count: data.timesDetected })}
           </span>
         </Metric>
         <IssueMetric data={data} onCreated={onChange} />

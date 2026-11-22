@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import useDebounce from '@/hooks/use-debounce';
+import { t as tPlain, useT } from '@/lib/i18n-dictionary';
 import {
   getIssuesControllerGetManyQueryOptions,
   useIssuesControllerGetMany,
@@ -53,12 +54,12 @@ import {
 export const ISSUE_TABS = ['mine', 'open', 'overdue', 'resolved', 'all'] as const;
 export type IssueTab = (typeof ISSUE_TABS)[number];
 
-const TAB_LABELS: Record<IssueTab, string> = {
-  mine: 'Mine',
-  open: 'Open',
-  overdue: 'Overdue',
-  resolved: 'Resolved',
-  all: 'All',
+const TAB_LABEL_KEYS: Record<IssueTab, string> = {
+  mine: 'issues.tab.mine',
+  open: 'issues.tab.open',
+  overdue: 'issues.tab.overdue',
+  resolved: 'issues.tab.resolved',
+  all: 'issues.tab.all',
 };
 
 /** Base filter of each tab; the toolbar filters narrow it further. */
@@ -94,18 +95,18 @@ const ALL = '__all__';
 
 function linkSummary(issue: IssueListItemDto) {
   if (issue.type === 'vulnerability_remediation' && issue.progress) {
-    const n = issue.progress.total;
-    return `${n} ${n === 1 ? 'vulnerability' : 'vulnerabilities'}`;
+    return tPlain('issues.list.vulnerabilities', { count: issue.progress.total });
   }
-  if (!issue.linkCount) return 'No links';
-  return `${issue.linkCount} linked ${issue.linkCount === 1 ? 'resource' : 'resources'}`;
+  if (!issue.linkCount) return tPlain('issues.list.noLinks');
+  return tPlain('issues.list.linked', { count: issue.linkCount });
 }
 
-const columns: ColumnDef<IssueListItemDto>[] = [
+/** Built at render so headers follow the active language. */
+const buildColumns = (): ColumnDef<IssueListItemDto>[] => [
   {
     id: 'no',
     accessorKey: 'no',
-    header: 'No',
+    header: tPlain('issues.col.no'),
     cell: ({ row }) => (
       <span className="font-mono text-xs text-muted-foreground">
         {formatIssueNo(row.original.no)}
@@ -114,7 +115,7 @@ const columns: ColumnDef<IssueListItemDto>[] = [
   },
   {
     id: 'title',
-    header: 'Title',
+    header: tPlain('issues.col.title'),
     enableSorting: false,
     cell: ({ row }) => (
       <div className="flex min-w-48 max-w-md flex-col">
@@ -127,49 +128,49 @@ const columns: ColumnDef<IssueListItemDto>[] = [
   },
   {
     id: 'type',
-    header: 'Type',
+    header: tPlain('issues.col.type'),
     enableSorting: false,
     cell: ({ row }) => <IssueTypeChip type={row.original.type} />,
   },
   {
     id: 'status',
-    header: 'Status',
+    header: tPlain('issues.col.status'),
     enableSorting: false,
     cell: ({ row }) => <IssueStatusBadge status={row.original.status} />,
   },
   {
     id: 'priority',
     accessorKey: 'priority',
-    header: 'P',
+    header: tPlain('issues.col.priority'),
     cell: ({ row }) => <PriorityBadge priority={row.original.priority} />,
   },
   {
     id: 'assignee',
-    header: 'Assignee',
+    header: tPlain('issues.col.assignee'),
     enableSorting: false,
     cell: ({ row }) => <AssigneeCell user={row.original.assignee} />,
   },
   {
     id: 'dueAt',
     accessorKey: 'dueAt',
-    header: 'Due',
+    header: tPlain('issues.col.due'),
     cell: ({ row }) => (
       <DueLabel dueAt={row.original.dueAt} status={row.original.status} />
     ),
   },
   {
     id: 'progress',
-    header: 'Progress',
+    header: tPlain('issues.col.progress'),
     enableSorting: false,
     cell: ({ row }) => <ProgressCell progress={row.original.progress} />,
   },
   {
     id: 'source',
-    header: 'Source',
+    header: tPlain('issues.col.source'),
     enableSorting: false,
     cell: ({ row }) => (
       <span className="text-xs text-muted-foreground">
-        {row.original.ruleId ? 'Rule' : 'Manual'}
+        {row.original.ruleId ? tPlain('issues.col.rule') : tPlain('issues.col.manual')}
       </span>
     ),
   },
@@ -190,6 +191,9 @@ function useTabCounts(): Partial<Record<IssueTab, number>> {
 }
 
 export default function Issues() {
+  const t = useT();
+  // `t` changes identity with the language, rebuilding the translated headers.
+  const columns = useMemo(() => buildColumns(), [t]); // eslint-disable-line react-hooks/exhaustive-deps
   const navigate = useNavigate();
   const search = useSearch({ strict: false }) as IssuesSearch;
   const tab: IssueTab = ISSUE_TABS.includes(search.tab as IssueTab)
@@ -259,11 +263,11 @@ export default function Issues() {
         update({ type: v === ALL ? undefined : (v as IssueType) })
       }
     >
-      <SelectTrigger aria-label="Type filter" className="h-9 w-48">
+      <SelectTrigger aria-label={t('issues.list.typeFilter')} className="h-9 w-48">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value={ALL}>All types</SelectItem>
+        <SelectItem value={ALL}>{t('issues.list.allTypes')}</SelectItem>
         {Object.entries(ISSUE_TYPE_LABELS).map(([value, label]) => (
           <SelectItem key={value} value={value}>
             {label}
@@ -278,11 +282,11 @@ export default function Issues() {
         update({ status: v === ALL ? undefined : (v as IssueStatus) })
       }
     >
-      <SelectTrigger aria-label="Status filter" className="h-9 w-36">
+      <SelectTrigger aria-label={t('issues.list.statusFilter')} className="h-9 w-36">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value={ALL}>Any status</SelectItem>
+        <SelectItem value={ALL}>{t('issues.list.anyStatus')}</SelectItem>
         {Object.entries(ISSUE_STATUS_LABELS).map(([value, label]) => (
           <SelectItem key={value} value={value}>
             {label}
@@ -297,11 +301,11 @@ export default function Issues() {
         update({ priority: v === ALL ? undefined : (v as IssuePriority) })
       }
     >
-      <SelectTrigger aria-label="Priority filter" className="h-9 w-36">
+      <SelectTrigger aria-label={t('issues.list.priorityFilter')} className="h-9 w-36">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value={ALL}>Any priority</SelectItem>
+        <SelectItem value={ALL}>{t('issues.list.anyPriority')}</SelectItem>
         {Object.entries(ISSUE_PRIORITY_HINT).map(([value, label]) => (
           <SelectItem key={value} value={value}>
             {label}
@@ -311,28 +315,28 @@ export default function Issues() {
     </Select>,
     <MemberSelect
       key="assignee"
-      ariaLabel="Assignee filter"
+      ariaLabel={t('issues.list.assigneeFilter')}
       className="h-9 w-44"
       value={search.assigneeId ?? null}
-      noneLabel="Any assignee"
-      placeholder="Any assignee"
+      noneLabel={t('issues.list.anyAssignee')}
+      placeholder={t('issues.list.anyAssignee')}
       onChange={(v) => update({ assigneeId: v ?? undefined })}
     />,
   ];
 
   return (
     <Page
-      title="Issues"
-      description="Remediation work and follow-ups across the workspace"
+      title={t('issues.page.title')}
+      description={t('issues.page.description')}
       action={
         <>
           <Button variant="outline" onClick={() => setRulesOpen(true)}>
             <Workflow className="size-4" />
-            Rules
+            {t('issues.list.rules')}
           </Button>
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="size-4" />
-            New issue
+            {t('issues.list.newIssue')}
           </Button>
         </>
       }
@@ -343,9 +347,9 @@ export default function Issues() {
           onValueChange={(v) => update({ tab: v as IssueTab, status: undefined })}
         >
           <TabsList>
-            {ISSUE_TABS.map((t) => (
-              <TabsTrigger key={t} value={t} badge={counts[t]}>
-                {TAB_LABELS[t]}
+            {ISSUE_TABS.map((key) => (
+              <TabsTrigger key={key} value={key} badge={counts[key]}>
+                {t(TAB_LABEL_KEYS[key])}
               </TabsTrigger>
             ))}
           </TabsList>
@@ -358,8 +362,8 @@ export default function Issues() {
               <div className="relative w-full max-w-xs">
                 <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
                 <Input
-                  aria-label="Search issues"
-                  placeholder="Search title or #number…"
+                  aria-label={t('issues.list.searchAria')}
+                  placeholder={t('issues.list.searchPlaceholder')}
                   className="h-9 pl-8"
                   value={searchText}
                   onChange={(e) => setSearchText(e.target.value)}
@@ -382,9 +386,9 @@ export default function Issues() {
             update({ sortBy: col, sortOrder: order }, false)
           }
           emptyMessage={
-            tab === 'mine' ? 'Nothing assigned to you' : 'No issues found'
+            tab === 'mine' ? t('issues.list.emptyMine') : t('issues.list.empty')
           }
-          error={isError ? 'Failed to load issues' : undefined}
+          error={isError ? t('issues.list.loadFailed') : undefined}
           rowClassName="cursor-pointer hover:bg-muted/50"
           onRowClick={(row) =>
             void navigate({ to: '/issues/$id', params: { id: row.id } })
@@ -397,9 +401,9 @@ export default function Issues() {
       <Dialog open={rulesOpen} onOpenChange={setRulesOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Issue rules</DialogTitle>
+            <DialogTitle>{t('issues.rules.dialogTitle')}</DialogTitle>
             <DialogDescription>
-              Also available under Settings → Vulnerability management.
+              {t('issues.rules.dialogDesc')}
             </DialogDescription>
           </DialogHeader>
           <IssueRulesSection />

@@ -24,22 +24,27 @@ import {
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { Edit } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useT, type TFunction } from '@/lib/i18n-dictionary';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
-const formSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  description: z.string().optional(),
-});
+const makeFormSchema = (t: TFunction) =>
+  z.object({
+    name: z.string().min(1, t('settings.workspace.nameRequired')),
+    description: z.string().optional(),
+  });
+type FormValues = z.infer<ReturnType<typeof makeFormSchema>>;
 
 interface EditWorkspaceDialogProps {
   workspace: Workspace;
 }
 
 export function EditWorkspaceDialog({ workspace }: EditWorkspaceDialogProps) {
-  const form = useForm<z.infer<typeof formSchema>>({
+  const t = useT();
+  const formSchema = useMemo(() => makeFormSchema(t), [t]);
+  const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: workspace.name,
@@ -51,7 +56,7 @@ export function EditWorkspaceDialog({ workspace }: EditWorkspaceDialogProps) {
 
   const queryClient = useQueryClient();
 
-  function handleSubmit(data: z.infer<typeof formSchema>) {
+  function handleSubmit(data: FormValues) {
     mutate(
       {
         id: workspace.id,
@@ -60,11 +65,11 @@ export function EditWorkspaceDialog({ workspace }: EditWorkspaceDialogProps) {
       {
         onSuccess: () => {
           setOpen(false);
-          toast.success('Workspace updated successfully');
+          toast.success(t('settings.workspace.updated'));
           queryClient.invalidateQueries({ queryKey: ['workspaces'] });
         },
         onError: () => {
-          toast.error('Failed to update workspace');
+          toast.error(t('settings.workspace.updateFailed'));
         },
       },
     );
@@ -81,14 +86,14 @@ export function EditWorkspaceDialog({ workspace }: EditWorkspaceDialogProps) {
         onClick={() => setOpen(true)}
       >
         <Edit className="h-4 w-4" />
-        <span className="sr-only">Edit</span>
+        <span className="sr-only">{t('common.edit')}</span>
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-106.25">
           <DialogHeader>
-            <DialogTitle>Edit Workspace</DialogTitle>
+            <DialogTitle>{t('settings.workspace.edit.title')}</DialogTitle>
             <DialogDescription>
-              Update the name and description of your workspace.
+              {t('settings.workspace.edit.description')}
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -101,9 +106,9 @@ export function EditWorkspaceDialog({ workspace }: EditWorkspaceDialogProps) {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Name</FormLabel>
+                    <FormLabel>{t('common.name')}</FormLabel>
                     <FormControl>
-                      <Input placeholder="Workspace name" {...field} />
+                      <Input placeholder={t('settings.workspace.namePlaceholder')} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -114,10 +119,10 @@ export function EditWorkspaceDialog({ workspace }: EditWorkspaceDialogProps) {
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Description</FormLabel>
+                    <FormLabel>{t('common.description')}</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Workspace description"
+                        placeholder={t('settings.workspace.descriptionPlaceholder')}
                         className="resize-none"
                         {...field}
                       />
@@ -127,7 +132,7 @@ export function EditWorkspaceDialog({ workspace }: EditWorkspaceDialogProps) {
                 )}
               />
               <DialogFooter>
-                <Button type="submit">Save Changes</Button>
+                <Button type="submit">{t('settings.workspace.saveChanges')}</Button>
               </DialogFooter>
             </form>
           </Form>

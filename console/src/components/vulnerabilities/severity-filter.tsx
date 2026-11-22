@@ -12,6 +12,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import { VulnerabilitiesControllerGetVulnerabilitiesSeverityItem } from '@/services/apis/gen/queries';
 import { ChevronDown, Filter } from 'lucide-react';
@@ -20,31 +21,31 @@ import { ChevronDown, Filter } from 'lucide-react';
 const SEVERITY_OPTIONS = [
   {
     value: VulnerabilitiesControllerGetVulnerabilitiesSeverityItem.critical,
-    label: 'Critical',
+    labelKey: 'vulnerabilities.severity.critical',
     color: 'text-red-500',
     bgColor: 'bg-red-500',
   },
   {
     value: VulnerabilitiesControllerGetVulnerabilitiesSeverityItem.high,
-    label: 'High',
+    labelKey: 'vulnerabilities.severity.high',
     color: 'text-orange-500',
     bgColor: 'bg-orange-500',
   },
   {
     value: VulnerabilitiesControllerGetVulnerabilitiesSeverityItem.medium,
-    label: 'Medium',
+    labelKey: 'vulnerabilities.severity.medium',
     color: 'text-yellow-500',
     bgColor: 'bg-yellow-500',
   },
   {
     value: VulnerabilitiesControllerGetVulnerabilitiesSeverityItem.low,
-    label: 'Low',
+    labelKey: 'vulnerabilities.severity.low',
     color: 'text-blue-500',
     bgColor: 'bg-blue-500',
   },
   {
     value: VulnerabilitiesControllerGetVulnerabilitiesSeverityItem.info,
-    label: 'Info',
+    labelKey: 'vulnerabilities.severity.info',
     color: 'text-gray-500',
     bgColor: 'bg-gray-500',
   },
@@ -64,6 +65,7 @@ interface SeverityFilterProps {
  * Supports selecting multiple severity levels simultaneously.
  */
 export function SeverityFilter({ value, onValueChange }: SeverityFilterProps) {
+  const t = useT();
   const toggleSeverity = (
     severity: VulnerabilitiesControllerGetVulnerabilitiesSeverityItem,
   ) => {
@@ -88,7 +90,7 @@ export function SeverityFilter({ value, onValueChange }: SeverityFilterProps) {
           )}
         >
           <Filter className="mr-2 h-3.5 w-3.5" />
-          Severity
+          {t('vulnerabilities.severity.label')}
           {hasSelection && (
             <>
               <span className="mx-1.5">·</span>
@@ -130,7 +132,7 @@ export function SeverityFilter({ value, onValueChange }: SeverityFilterProps) {
                     aria-hidden="true"
                   />
                   <span className={cn('text-sm', option.color)}>
-                    {option.label}
+                    {t(option.labelKey)}
                   </span>
                 </div>
               </div>
@@ -145,7 +147,7 @@ export function SeverityFilter({ value, onValueChange }: SeverityFilterProps) {
               className="w-full h-7 text-xs text-muted-foreground hover:text-foreground"
               onClick={() => onValueChange([])}
             >
-              Clear filters
+              {t('vulnerabilities.severity.clear')}
             </Button>
           </div>
         )}

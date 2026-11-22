@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -33,10 +34,11 @@ export function AppsTabContent({
   onCardClick,
   formatCategory,
 }: AppsTabContentProps) {
+  const t = useT();
   if (appSchemas.length === 0) {
     return (
       <div className="flex items-center justify-center h-48 text-muted-foreground">
-        No applications available
+        {t('integrations.apps.empty')}
       </div>
     );
   }
@@ -47,7 +49,7 @@ export function AppsTabContent({
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
-            placeholder="Search applications..."
+            placeholder={t('integrations.apps.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             className="h-9 pl-8 text-xs"
@@ -60,10 +62,10 @@ export function AppsTabContent({
           }
         >
           <SelectTrigger className="border-dashed text-xs py-0 focus:ring-0 focus:ring-offset-0 focus:outline-none w-[150px]">
-            <SelectValue placeholder="Category" />
+            <SelectValue placeholder={t('integrations.apps.category')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="ALL">All categories</SelectItem>
+            <SelectItem value="ALL">{t('integrations.apps.allCategories')}</SelectItem>
             {categories.map((cat) => (
               <SelectItem key={cat} value={cat}>
                 {formatCategory(cat)}

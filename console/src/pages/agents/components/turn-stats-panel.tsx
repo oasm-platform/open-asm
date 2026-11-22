@@ -9,6 +9,7 @@ import type { ConversationMetadataDto } from '@/services/apis/gen/queries';
 import { BarChart3, ChevronDown, Cpu } from 'lucide-react';
 import { memo, useState } from 'react';
 import { SIDE_PANEL_ROW, SidePanelSection } from './side-panel-layout';
+import { t, useT } from '@/lib/i18n-dictionary';
 
 const compact = new Intl.NumberFormat('en-US', {
   notation: 'compact',
@@ -31,7 +32,7 @@ export function formatDuration(ms: number | null | undefined): string {
 }
 
 export function formatCost(usd: number | null | undefined): string {
-  if (usd === null || usd === undefined) return 'n/a';
+  if (usd === null || usd === undefined) return t('agents.usage.notAvailable');
   if (usd === 0) return '$0';
   return usd < 0.01 ? `$${usd.toFixed(4)}` : `$${usd.toFixed(2)}`;
 }
@@ -39,10 +40,11 @@ export function formatCost(usd: number | null | undefined): string {
 const formatRate = (v: number | null | undefined) =>
   v === null || v === undefined ? '—' : `~${Math.round(v)} tok/s`;
 
+/** Dictionary keys of where the context window size came from */
 const WINDOW_SOURCE_LABEL: Record<string, string> = {
-  manual: 'set in model settings',
-  catalog: 'from models.dev',
-  default: 'default (model unknown)',
+  manual: 'agents.stats.source.manual',
+  catalog: 'agents.stats.source.catalog',
+  default: 'agents.stats.source.default',
 };
 
 function Row({
@@ -83,6 +85,7 @@ export const TurnStatsPanel = memo(function TurnStatsPanel({
   collapsible = true,
   className,
 }: TurnStatsPanelProps) {
+  const t = useT();
   const [open, setOpen] = useState(true);
   if (!metadata?.model && !metadata?.lastTurn) return null;
 
@@ -91,37 +94,37 @@ export const TurnStatsPanel = memo(function TurnStatsPanel({
   const percent = contextWindow > 0 ? Math.min(100, (used / contextWindow) * 100) : 0;
   const turn = metadata.lastTurn;
   const totals = metadata.totals;
-  const sourceLabel =
-    WINDOW_SOURCE_LABEL[metadata.contextWindowSource ?? ''] ?? '';
+  const sourceKey = WINDOW_SOURCE_LABEL[metadata.contextWindowSource ?? ''];
+  const sourceLabel = sourceKey ? t(sourceKey) : '';
   const estimated =
     metadata.catalogEstimated || metadata.contextWindowSource === 'default';
   const turnRows = turn && (
     <>
-      <Row label="Response" value={formatRate(turn.responseTokPerSec)} />
-      <Row label="Whole turn" value={formatRate(turn.turnTokPerSec)} />
-      <Row label="Model time" value={formatDuration(turn.modelTimeMs)} />
-      <Row label="Tool time" value={formatDuration(turn.toolTimeMs)} />
+      <Row label={t('agents.stats.response')} value={formatRate(turn.responseTokPerSec)} />
+      <Row label={t('agents.stats.wholeTurn')} value={formatRate(turn.turnTokPerSec)} />
+      <Row label={t('agents.stats.modelTime')} value={formatDuration(turn.modelTimeMs)} />
+      <Row label={t('agents.stats.toolTime')} value={formatDuration(turn.toolTimeMs)} />
       {turn.subagentWaitMs > 0 && (
         <Row
-          label="Subagent wait"
+          label={t('agents.stats.subagentWait')}
           value={formatDuration(turn.subagentWaitMs)}
         />
       )}
-      <Row label="Average TTFT" value={formatDuration(turn.avgTtftMs)} />
-      <Row label="Steps" value={String(turn.steps)} />
+      <Row label={t('agents.stats.avgTtft')} value={formatDuration(turn.avgTtftMs)} />
+      <Row label={t('agents.stats.steps')} value={String(turn.steps)} />
       <Row
-        label="Tokens"
+        label={t('agents.stats.tokens')}
         value={`${formatTokens(turn.inputTokens)} ↑ · ${formatTokens(turn.outputTokens)} ↓`}
       />
       <Row
-        label="Cache"
+        label={t('agents.stats.cache')}
         value={`${Math.round(turn.cachePercent)}%`}
         className={turn.cachePercent >= 50 ? 'text-emerald-500' : undefined}
       />
-      <Row label="Cost" value={formatCost(turn.costUsd)} />
+      <Row label={t('agents.stats.cost')} value={formatCost(turn.costUsd)} />
       {totals && totals.turns > 1 && (
         <Row
-          label={`Total (${totals.turns} turns)`}
+          label={t('agents.stats.total', { count: totals.turns })}
           value={`${totals.costComplete ? '' : '≥ '}${formatCost(totals.costUsd)}`}
         />
       )}
@@ -134,11 +137,11 @@ export const TurnStatsPanel = memo(function TurnStatsPanel({
       <div className={cn('space-y-5', className)}>
         {metadata.model && (
           <SidePanelSection
-            title="Context"
+            title={t('agents.stats.context')}
             meta={
               contextWindow > 0 && (
                 <span className={cn(percent >= 80 && 'text-amber-500')}>
-                  {Math.round(percent)}% used
+                  {t('agents.stats.percentUsed', { percent: Math.round(percent) })}
                 </span>
               )
             }
@@ -154,12 +157,14 @@ export const TurnStatsPanel = memo(function TurnStatsPanel({
               <Progress
                 value={percent}
                 className="h-1.5"
-                aria-label="Context window used"
+                aria-label={t('agents.stats.contextUsed')}
               />
               <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                 <span className="tabular-nums">
-                  {formatTokens(used)} / {estimated ? '~' : ''}
-                  {formatTokens(contextWindow)} context
+                  {t('agents.stats.contextTokens', {
+                    used: formatTokens(used),
+                    window: `${estimated ? '~' : ''}${formatTokens(contextWindow)}`,
+                  })}
                 </span>
                 {sourceLabel && <span className="truncate">{sourceLabel}</span>}
               </div>
@@ -168,7 +173,7 @@ export const TurnStatsPanel = memo(function TurnStatsPanel({
         )}
         {turn && (
           <SidePanelSection
-            title="Turn stats"
+            title={t('agents.stats.turnStats')}
             meta={formatRate(turn.responseTokPerSec)}
           >
             {/* Each Row padded as a side panel row */}
@@ -210,12 +215,14 @@ export const TurnStatsPanel = memo(function TurnStatsPanel({
           <Progress
             value={percent}
             className="h-1.5"
-            aria-label="Context window used"
+            aria-label={t('agents.stats.contextUsed')}
           />
           <div className="flex items-center justify-between gap-2 text-muted-foreground">
             <span className="tabular-nums">
-              {formatTokens(used)} / {estimated ? '~' : ''}
-              {formatTokens(contextWindow)} context
+              {t('agents.stats.contextTokens', {
+                used: formatTokens(used),
+                window: `${estimated ? '~' : ''}${formatTokens(contextWindow)}`,
+              })}
             </span>
             {sourceLabel && <span className="truncate">{sourceLabel}</span>}
           </div>
@@ -230,7 +237,7 @@ export const TurnStatsPanel = memo(function TurnStatsPanel({
         >
           <CollapsibleTrigger className="flex w-full items-center gap-2 py-1 text-sm font-medium text-foreground cursor-pointer">
             <BarChart3 className="size-4 text-muted-foreground" />
-            <span>Turn stats</span>
+            <span>{t('agents.stats.turnStats')}</span>
             <ChevronDown
               className={cn(
                 'size-3.5 text-muted-foreground transition-transform',

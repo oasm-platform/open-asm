@@ -12,6 +12,7 @@
     },
     "typeCheck": true,
     "deleteOutDir": true,
+    "watchAssets": true,
     "assets": [
       "**/*.json",
       "**/*.yaml",

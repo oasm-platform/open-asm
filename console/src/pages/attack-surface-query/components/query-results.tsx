@@ -14,6 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useT } from '@/lib/i18n-dictionary';
 
 import { cellText, columnsOf, flattenRow } from '../asq-utils';
 
@@ -43,9 +44,10 @@ interface QueryResultsProps {
 }
 
 function ResultTable({ rows }: { rows: Record<string, unknown>[] }) {
+  const t = useT();
   const flat = useMemo(() => rows.map((row) => flattenRow(row)), [rows]);
   const columns = useMemo(() => columnsOf(flat), [flat]);
-  if (rows.length === 0) return <NoData message="No rows" />;
+  if (rows.length === 0) return <NoData message={t('asq.results.noRows')} />;
   return (
     <div className="max-h-[60vh] overflow-auto rounded-md border">
       <Table>
@@ -87,6 +89,7 @@ function QueryResult({
   loadingMore: boolean;
   onLoadMore: (name: string, cursor: string) => void;
 }) {
+  const t = useT();
   const [view, setView] = useState<'table' | 'json'>('table');
   if ('error' in outcome) {
     return (
@@ -109,19 +112,18 @@ function QueryResult({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span>{outcome.rows.length} rows</span>
+        <span>{t('asq.results.rows', { count: outcome.rows.length })}</span>
         {outcome.total !== undefined && (
           <span>
-            of {outcome.total}
-            {outcome.totalCapped ? '+' : ''}
+            {t('asq.results.ofTotal', { total: `${outcome.total}${outcome.totalCapped ? '+' : ''}` })}
           </span>
         )}
-        {meta?.tookMs !== undefined && <span>· {meta.tookMs} ms</span>}
-        {meta?.cost !== undefined && <span>· cost {meta.cost}</span>}
-        {outcome.truncated && <Badge variant="outline">truncated</Badge>}
+        {meta?.tookMs !== undefined && <span>· {t('asq.tookMs', { ms: meta.tookMs })}</span>}
+        {meta?.cost !== undefined && <span>· {t('asq.results.cost', { cost: meta.cost })}</span>}
+        {outcome.truncated && <Badge variant="outline">{t('asq.results.truncated')}</Badge>}
         <div className="ml-auto flex gap-1">
           <Button size="sm" variant={view === 'table' ? 'secondary' : 'ghost'} onClick={() => setView('table')}>
-            Table
+            {t('asq.results.table')}
           </Button>
           <Button size="sm" variant={view === 'json' ? 'secondary' : 'ghost'} onClick={() => setView('json')}>
             JSON
@@ -135,7 +137,7 @@ function QueryResult({
       )}
       {outcome.nextCursor && (
         <Button size="sm" variant="outline" disabled={loadingMore} onClick={() => onLoadMore(name, outcome.nextCursor!)}>
-          {loadingMore ? 'Loading…' : 'Load more'}
+          {loadingMore ? t('asq.results.loading') : t('asq.results.loadMore')}
         </Button>
       )}
     </div>

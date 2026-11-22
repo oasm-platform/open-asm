@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Check, Copy, Eye, EyeOff } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -36,6 +37,7 @@ export function CodeBlock({
   className,
   ...props
 }: CodeBlockProps) {
+  const t = useT();
   const [isCopied, setIsCopied] = useState(false);
   const [isRevealed, setIsRevealed] = useState(false);
 
@@ -69,10 +71,16 @@ export function CodeBlock({
               type="button"
               onClick={() => setIsRevealed((revealed) => !revealed)}
               aria-label={
-                isRevealed ? 'Hide sensitive values' : 'Show sensitive values'
+                isRevealed
+                  ? t('components.codeBlock.hideSensitive')
+                  : t('components.codeBlock.showSensitive')
               }
               aria-pressed={isRevealed}
-              title={isRevealed ? 'Hide' : 'Show'}
+              title={
+                isRevealed
+                  ? t('components.codeBlock.hide')
+                  : t('components.codeBlock.show')
+              }
               className="flex items-center rounded-md bg-transparent px-2 py-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               {isRevealed ? (
@@ -89,12 +97,14 @@ export function CodeBlock({
             {isCopied ? (
               <>
                 <Check className="w-3.5 h-3.5 text-green-500" />
-                <span className="text-green-500">Copied!</span>
+                <span className="text-green-500">
+                  {t('components.codeBlock.copied')}
+                </span>
               </>
             ) : (
               <>
                 <Copy className="w-3.5 h-3.5" />
-                <span>Copy</span>
+                <span>{t('common.copy')}</span>
               </>
             )}
           </button>

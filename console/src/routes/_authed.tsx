@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import ProtectedLayout from '@/components/common/layout/protect-layout';
 import { removeBootSplash } from '@/lib/boot-splash';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
+import { useAccountLanguage } from '@/lib/account-language';
 import { useSession } from '@/utils/authClient';
 
 export const Route = createFileRoute('/_authed')({
@@ -21,6 +22,7 @@ function AuthedLayout() {
   // Read the live session: useRouteContext is stale because beforeLoad does
   // not re-run when the session ends.
   const { data: liveSession } = useSession();
+  useAccountLanguage(liveSession?.user.language ?? undefined);
   const {
     workspaces,
     isLoading: isWorkspaceLoading,

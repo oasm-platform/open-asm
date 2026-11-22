@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
+import { useT } from '@/lib/i18n-dictionary';
 import {
   DismissReason,
   useVulnerabilitiesControllerBulkDismissVulnerabilities,
@@ -31,23 +32,23 @@ import { toast } from 'sonner';
 const DISMISS_REASONS = [
   {
     value: DismissReason.false_positive,
-    label: 'False positive',
-    description: 'This alert is not valid',
+    labelKey: 'vulnerabilities.dismissReason.falsePositive',
+    descriptionKey: 'vulnerabilities.dismiss.falsePositiveDesc',
   },
   {
     value: DismissReason.used_in_test,
-    label: 'Used in tests',
-    description: 'This alert is not in production code',
+    labelKey: 'vulnerabilities.dismissReason.usedInTest',
+    descriptionKey: 'vulnerabilities.dismiss.usedInTestDesc',
   },
   {
     value: DismissReason.wont_fix,
-    label: "Won't fix",
-    description: 'This alert is not relevant',
+    labelKey: 'vulnerabilities.dismissReason.wontFix',
+    descriptionKey: 'vulnerabilities.dismiss.wontFixDesc',
   },
   {
     value: DismissReason.risk_accepted,
-    label: 'Risk accepted',
-    description: 'Accepted until a date; the finding reopens afterwards',
+    labelKey: 'vulnerabilities.dismissReason.riskAccepted',
+    descriptionKey: 'vulnerabilities.dismiss.riskAcceptedDesc',
   },
 ] as const;
 
@@ -75,6 +76,7 @@ export function DismissAlertDialog({
   onDismissSuccess,
   mode = 'dismiss',
 }: DismissAlertDialogProps) {
+  const t = useT();
   const initialReason: DismissReason | '' =
     mode === 'accept-risk' ? DismissReason.risk_accepted : '';
   const [open, setOpen] = useState(false);
@@ -129,25 +131,30 @@ export function DismissAlertDialog({
       {
         onSuccess: () => {
           const what = isBulk
-            ? `${vulnerabilityIds.length} vulnerabilities`
+            ? t('vulnerabilities.dismiss.whatMany', { n: vulnerabilityIds.length })
             : vulnerabilityName
-              ? `"${vulnerabilityName}"`
-              : 'The vulnerability';
-          toast.success(isRisk ? 'Risk accepted' : 'Dismissed', {
-            description: isRisk
-              ? `${what} accepted until ${expiry}.`
-              : `${what} dismissed.`,
-          });
+              ? t('vulnerabilities.dismiss.whatNamed', { name: vulnerabilityName })
+              : t('vulnerabilities.dismiss.whatOne');
+          toast.success(
+            isRisk
+              ? t('vulnerabilities.dismiss.toastRisk')
+              : t('vulnerabilities.dismiss.toastDismissed'),
+            {
+              description: isRisk
+                ? t('vulnerabilities.dismiss.acceptedUntil', { what, date: expiry })
+                : t('vulnerabilities.dismiss.dismissedDesc', { what }),
+            },
+          );
           setOpen(false);
           reset();
           onDismissSuccess?.();
         },
         onError: (error) => {
-          toast.error('Failed to dismiss', {
+          toast.error(t('vulnerabilities.dismiss.failed'), {
             description:
               error instanceof Error
                 ? error.message
-                : 'An unexpected error occurred.',
+                : t('vulnerabilities.unexpectedError'),
           });
         },
       },
@@ -163,12 +170,14 @@ export function DismissAlertDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {mode === 'accept-risk' ? 'Accept risk' : 'Dismiss'}
+            {mode === 'accept-risk'
+              ? t('vulnerabilities.dismiss.titleRisk')
+              : t('vulnerabilities.dismiss.title')}
           </DialogTitle>
           <DialogDescription>
             {mode === 'accept-risk'
-              ? `Accept the risk until a date, at most ${maxDays} days ahead. The finding reopens afterwards and its SLA is paused meanwhile.`
-              : 'Select a reason to dismiss.'}
+              ? t('vulnerabilities.dismiss.descRisk', { days: maxDays })
+              : t('vulnerabilities.dismiss.desc')}
           </DialogDescription>
         </DialogHeader>
 
@@ -191,10 +200,10 @@ export function DismissAlertDialog({
                       htmlFor={`reason-${option.value}`}
                       className="cursor-pointer font-medium"
                     >
-                      {option.label}
+                      {t(option.labelKey)}
                     </Label>
                     <p className="text-sm text-muted-foreground">
-                      {option.description}
+                      {t(option.descriptionKey)}
                     </p>
                   </div>
                 </div>
@@ -204,7 +213,9 @@ export function DismissAlertDialog({
 
           {isRisk && (
             <div className="space-y-2">
-              <Label htmlFor="risk-expiry">Accepted until</Label>
+              <Label htmlFor="risk-expiry">
+                {t('vulnerabilities.dismiss.acceptedUntilLabel')}
+              </Label>
               <Input
                 id="risk-expiry"
                 type="date"
@@ -220,20 +231,24 @@ export function DismissAlertDialog({
                 </p>
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  At most {maxDays} days from today.
+                  {t('vulnerabilities.dismiss.maxDays', { days: maxDays })}
                 </p>
               )}
             </div>
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="dismiss-comment">Comment</Label>
+            <Label htmlFor="dismiss-comment">
+              {t('vulnerabilities.dismiss.comment')}
+            </Label>
             <Textarea
               id="dismiss-comment"
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               placeholder={
-                isRisk ? 'Why the risk is acceptable' : 'Add a comment'
+                isRisk
+                  ? t('vulnerabilities.dismiss.commentRisk')
+                  : t('vulnerabilities.dismiss.commentPlaceholder')
               }
               className="resize-none"
               rows={3}
@@ -247,13 +262,15 @@ export function DismissAlertDialog({
             onClick={() => setOpen(false)}
             disabled={bulkDismissMutation.isPending}
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={handleDismiss} disabled={isSubmitDisabled}>
             {bulkDismissMutation.isPending && (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}
-            {isRisk ? 'Accept risk' : 'Dismiss'}
+            {isRisk
+              ? t('vulnerabilities.dismiss.titleRisk')
+              : t('vulnerabilities.dismiss.title')}
           </Button>
         </DialogFooter>
       </DialogContent>

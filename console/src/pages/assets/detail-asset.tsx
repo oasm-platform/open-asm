@@ -1,3 +1,4 @@
+import { formatDate, fromNow } from '@/lib/date-locale';
 import Page from '@/components/common/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,13 +10,12 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import {
   useAssetsControllerGetAssetById,
   type TechnologyDetailDTO,
 } from '@/services/apis/gen/queries';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import {
   Check,
   Copy,
@@ -32,7 +32,6 @@ import { useScreenshotQueryOptions } from '@/hooks/use-screenshot-query-options'
 import { TechnologyTooltip } from './components/technology-tooltip';
 import { asTlsInfo } from './tls-info';
 
-dayjs.extend(relativeTime);
 
 /** Shared label style so every field label in the page reads the same. */
 const fieldLabel =
@@ -64,6 +63,7 @@ function CopyButton({ text }: { text: string }) {
 }
 
 export default function DetailAsset() {
+  const t = useT();
   const { id } = useParams({ strict: false });
 
   const screenshotOptions = useScreenshotQueryOptions();
@@ -90,13 +90,12 @@ export default function DetailAsset() {
     return (
       <Page permission="asset.read">
         <div className="text-center py-12">
-          <h2 className="text-xl font-semibold">Asset not found</h2>
+          <h2 className="text-xl font-semibold">{t('assets.detail.notFound')}</h2>
           <p className="text-muted-foreground mt-2">
-            The asset you're looking for doesn't exist or you don't have
-            permission to view it.
+            {t('assets.detail.notFoundDescription')}
           </p>
           <Button className="mt-4" onClick={() => window.history.back()}>
-            Go back
+            {t('assets.detail.goBack')}
           </Button>
         </div>
       </Page>
@@ -120,8 +119,8 @@ export default function DetailAsset() {
     ? new Date(tls.not_before as unknown as Date)
     : undefined;
   const certAgeDisplay = certAgeStartDate
-    ? dayjs(certAgeStartDate).fromNow()
-    : 'N/A';
+    ? fromNow(certAgeStartDate)
+    : t('assets.detail.notAvailable');
 
   const techs = (
     (httpResponses?.techList as unknown as TechnologyDetailDTO[] | undefined) ??
@@ -155,7 +154,11 @@ export default function DetailAsset() {
       {daysLeft !== undefined && (
         <Badge variant="outline" className={cn('gap-1 shrink-0', sslTone)}>
           <Lock className="size-3" />
-          {daysLeft < 0 ? 'Expired' : daysLeft < 30 ? 'Expiring Soon' : 'Valid'}
+          {daysLeft < 0
+            ? t('assets.tls.expired')
+            : daysLeft < 30
+              ? t('assets.detail.expiringSoon')
+              : t('assets.detail.valid')}
         </Badge>
       )}
     </div>
@@ -184,19 +187,19 @@ export default function DetailAsset() {
       permission="asset.read"
     >
       <div className="space-y-6">
-        <Card className="gap-0 overflow-hidden py-0" aria-label="Asset detail">
+        <Card className="gap-0 overflow-hidden py-0" aria-label={t('assets.detail.ariaLabel')}>
 
           <section>
             <CardHeader className="px-6 pt-6 pb-0">
-              <CardTitle>General</CardTitle>
+              <CardTitle>{t('assets.detail.general')}</CardTitle>
               <CardDescription>
-                Domain overview and page info.
+                {t('assets.detail.generalDescription')}
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-x-6 gap-y-4 px-6 pt-4 pb-6 md:grid-cols-[1fr_auto]">
               <div className="space-y-4">
                 <div>
-                  <span className={fieldLabel}>Domain</span>
+                  <span className={fieldLabel}>{t('assets.detail.domain')}</span>
                   <div className="flex items-center gap-1">
                     <span className="font-mono text-sm break-all">
                       {value}
@@ -206,7 +209,7 @@ export default function DetailAsset() {
                 </div>
                 {httpResponses?.title && (
                   <div>
-                    <span className={fieldLabel}>Page Title</span>
+                    <span className={fieldLabel}>{t('assets.detail.pageTitle')}</span>
                     <p className="text-sm break-words">{httpResponses.title}</p>
                   </div>
                 )}
@@ -220,15 +223,15 @@ export default function DetailAsset() {
               <Separator />
               <section>
                 <CardHeader className="px-6 pt-6 pb-0">
-                  <CardTitle>Network</CardTitle>
+                  <CardTitle>{t('assets.detail.network')}</CardTitle>
                   <CardDescription>
-                    Resolved addresses and TLS endpoint.
+                    {t('assets.detail.networkDescription')}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-x-6 gap-y-4 px-6 pt-4 pb-6 md:grid-cols-2">
                   {ipAddresses && ipAddresses.length > 0 && (
                     <div className="md:col-span-2">
-                      <span className={fieldLabel}>IP Addresses</span>
+                      <span className={fieldLabel}>{t('assets.detail.ipAddresses')}</span>
                       <div className="flex flex-col gap-1">
                         {ipAddresses.map((ip) => (
                           <div key={ip} className="flex items-center gap-2">
@@ -241,7 +244,7 @@ export default function DetailAsset() {
                   )}
                   {tls?.host && (
                     <div>
-                      <span className={fieldLabel}>Host</span>
+                      <span className={fieldLabel}>{t('assets.detail.host')}</span>
                       <span className="font-mono text-sm break-all">
                         {tls.host}
                       </span>
@@ -249,7 +252,7 @@ export default function DetailAsset() {
                   )}
                   {tls?.port && (
                     <div>
-                      <span className={fieldLabel}>Port</span>
+                      <span className={fieldLabel}>{t('assets.detail.port')}</span>
                       <span className="font-mono text-sm">{tls.port}</span>
                     </div>
                   )}
@@ -263,43 +266,43 @@ export default function DetailAsset() {
               <Separator />
               <section>
                 <CardHeader className="px-6 pt-6 pb-0">
-                  <CardTitle>SSL/TLS Certificate</CardTitle>
+                  <CardTitle>{t('assets.detail.certificate')}</CardTitle>
                   <CardDescription>
-                    Issuer, validity period and alternate names.
+                    {t('assets.detail.certificateDescription')}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-x-6 gap-y-4 px-6 pt-4 pb-6 md:grid-cols-2">
                   {tls.issuer_org?.[0] && (
                     <div>
-                      <span className={fieldLabel}>Issuer</span>
+                      <span className={fieldLabel}>{t('assets.detail.issuer')}</span>
                       <p className="text-sm">{tls.issuer_org[0]}</p>
                     </div>
                   )}
                   {tls.subject_cn && (
                     <div>
-                      <span className={fieldLabel}>Common Name</span>
+                      <span className={fieldLabel}>{t('assets.detail.commonName')}</span>
                       <p className="text-sm break-words">{tls.subject_cn}</p>
                     </div>
                   )}
                   {certAgeStartDate && (
                     <div>
-                      <span className={fieldLabel}>Certificate Age</span>
+                      <span className={fieldLabel}>{t('assets.detail.certificateAge')}</span>
                       <p className="text-sm">
                         {certAgeDisplay} (
-                        {dayjs(tls.not_before).format('DD MMM, YYYY')})
+                        {formatDate(tls.not_before, 'dd MMM, yyyy')})
                       </p>
                     </div>
                   )}
                   {daysLeft !== undefined && (
                     <div>
-                      <span className={fieldLabel}>Expires On</span>
+                      <span className={fieldLabel}>{t('assets.detail.expiresOn')}</span>
                       <p className="text-sm">
-                        {dayjs(tls.not_after).format('DD MMM, YYYY')}{' '}
+                        {formatDate(tls.not_after, 'dd MMM, yyyy')}{' '}
                         <span className={cn(sslTone)}>
                           (
                           {daysLeft < 0
-                            ? Math.abs(daysLeft) + ' days ago'
-                            : daysLeft + ' days left'}
+                            ? t('assets.detail.daysAgo', { count: Math.abs(daysLeft) })
+                            : t('assets.detail.daysLeft', { count: daysLeft })}
                           )
                         </span>
                       </p>
@@ -307,7 +310,7 @@ export default function DetailAsset() {
                   )}
                   {tls.subject_an && tls.subject_an.length > 1 && (
                     <div className="md:col-span-2">
-                      <span className={fieldLabel}>Alternate Names</span>
+                      <span className={fieldLabel}>{t('assets.detail.alternateNames')}</span>
                       <div className="flex flex-wrap gap-1.5">
                         {tls.subject_an.slice(0, 3).map((name) => (
                           <Badge
@@ -336,9 +339,9 @@ export default function DetailAsset() {
               <Separator />
               <section>
                 <CardHeader className="px-6 pt-6 pb-0">
-                  <CardTitle>Technologies</CardTitle>
+                  <CardTitle>{t('assets.detail.technologies')}</CardTitle>
                   <CardDescription>
-                    Detected stack on this asset.
+                    {t('assets.detail.technologiesDescription')}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="px-6 pt-4 pb-6">
@@ -357,8 +360,8 @@ export default function DetailAsset() {
               <Separator />
               <section>
                 <CardHeader className="px-6 pt-6 pb-0">
-                  <CardTitle>HTTP Response</CardTitle>
-                  <CardDescription>Raw response header.</CardDescription>
+                  <CardTitle>{t('assets.detail.httpResponse')}</CardTitle>
+                  <CardDescription>{t('assets.detail.httpResponseDescription')}</CardDescription>
                 </CardHeader>
                 <CardContent className="px-6 pt-4 pb-6">
                   <div className="relative">

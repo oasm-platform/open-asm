@@ -1,5 +1,6 @@
 import type { WorkflowStepStatusDto } from '@/services/apis/gen/queries';
 import type { Edge, EdgeMarker, Node } from '@xyflow/react';
+import { t } from '@/lib/i18n-dictionary';
 import { formatCategory } from '@/pages/tools/components/format-category';
 
 /**
@@ -90,14 +91,14 @@ export function describeStep(step: WorkflowStepStatusDto): string {
     step.name || step.id || step.run,
     step.category ? `${step.run} (${formatCategory(step.category)})` : step.run,
     stepDisplayStatus(step),
-    `${step.jobs} job${step.jobs === 1 ? '' : 's'}`,
+    t('jobsRegistry.graph.jobCount', { count: step.jobs }),
   ];
   const needs = step.needs ?? [];
-  if (needs.length > 0) parts.push(`waits for ${needs.join(', ')}`);
+  if (needs.length > 0) parts.push(t('jobsRegistry.graph.waitsFor', { needs: needs.join(', ') }));
   if (step.failed && step.failed > 0) {
-    parts.push(`${step.failed} job${step.failed === 1 ? '' : 's'} failed`);
+    parts.push(t('jobsRegistry.graph.failedCount', { count: step.failed }));
   }
-  if (step.reason) parts.push(`reason: ${step.reason}`);
+  if (step.reason) parts.push(t('jobsRegistry.graph.reason', { reason: step.reason }));
   return parts.join(', ');
 }
 
@@ -213,10 +214,10 @@ export function buildWorkflowGraphLayout(
       selectable: false,
       ariaLabel:
         trigger === 'scheduled'
-          ? 'Started by a schedule'
+          ? t('jobsRegistry.graph.startedBySchedule')
           : trigger === 'event'
-            ? 'Started by new assets'
-            : 'Started manually',
+            ? t('jobsRegistry.graph.startedByAssets')
+            : t('jobsRegistry.graph.startedManually'),
       data: { trigger, startedAt } satisfies TriggerNodeData,
       style: { width: TRIGGER_WIDTH, height: NODE_HEIGHT },
       measured: { width: TRIGGER_WIDTH, height: NODE_HEIGHT },

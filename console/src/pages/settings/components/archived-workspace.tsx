@@ -6,17 +6,19 @@ import { Tooltip, TooltipContent, TooltipProvider } from "@radix-ui/react-toolti
 import { useQueryClient } from "@tanstack/react-query";
 import { Archive, ArchiveX } from "lucide-react";
 import { toast } from "sonner";
+import { useT } from "@/lib/i18n-dictionary";
 
 
 interface ArchivedWorkspaceProps {
     workspace: Workspace;
 }
 const ArchivedWorkspace = (props: ArchivedWorkspaceProps) => {
+    const t = useT();
     const queryClient = useQueryClient();
 
     const { workspace } = props;
     const { archivedAt } = workspace;
-    const label = archivedAt ? "Unarchive" : "Archive";
+    const label = archivedAt ? t('settings.workspace.archive.unarchive') : t('settings.workspace.archive.archive');
     const { mutate } = useWorkspacesControllerMakeArchived()
     const handleArchive = () => {
         // Handle archive action
@@ -27,11 +29,11 @@ const ArchivedWorkspace = (props: ArchivedWorkspaceProps) => {
             },
         }, {
             onSuccess: () => {
-                toast.success("Workspace archived successfully")
+                toast.success(t('settings.workspace.archive.success'))
                 queryClient.invalidateQueries({ queryKey: ["workspaces"] });
             },
             onError: () => {
-                toast.error("Failed to archive workspace")
+                toast.error(t('settings.workspace.archive.failed'))
             }
         })
     };
@@ -41,8 +43,8 @@ const ArchivedWorkspace = (props: ArchivedWorkspaceProps) => {
                 <TooltipTrigger asChild>
                     <div>
                         <ConfirmDialog
-                            title="Archive Workspace"
-                            description={`Are you sure you want to archive "${workspace.name}"?`}
+                            title={t('settings.workspace.archive.title')}
+                            description={t('settings.workspace.archive.description', { name: workspace.name })}
                             onConfirm={handleArchive}
                             confirmText={label}
                             trigger={
@@ -59,7 +61,11 @@ const ArchivedWorkspace = (props: ArchivedWorkspaceProps) => {
                     </div>
                 </TooltipTrigger>
                 <TooltipContent>
-                    <p>{label} workspace</p>
+                    <p>
+                        {archivedAt
+                            ? t('settings.workspace.archive.unarchiveTooltip')
+                            : t('settings.workspace.archive.archiveTooltip')}
+                    </p>
                 </TooltipContent>
             </Tooltip>
         </TooltipProvider>

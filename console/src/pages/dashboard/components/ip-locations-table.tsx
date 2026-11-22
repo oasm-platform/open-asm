@@ -1,3 +1,4 @@
+import { countryName, useT } from '@/lib/i18n-dictionary';
 import type { IpLocationData } from '@/hooks/useIpLocationData';
 import { useMemo } from 'react';
 
@@ -14,6 +15,7 @@ export default function IpLocationsTable({
   selectedCountry,
   onCountrySelect,
 }: IpLocationsTableProps) {
+  const t = useT();
   const sortedData = useMemo(() => {
     return [...data].sort((a, b) => b.ipCount - a.ipCount);
   }, [data]);
@@ -49,7 +51,9 @@ export default function IpLocationsTable({
                 }}
               >
                 <td className="px-4 py-3">
-                  <span className="font-medium">{item.country}</span>
+                  <span className="font-medium">
+                    {countryName(item.countryCode, item.country)}
+                  </span>
                 </td>
                 <td className="px-4 py-3 text-right">
                   <span className="text-sm text-muted-foreground font-medium">
@@ -61,7 +65,7 @@ export default function IpLocationsTable({
           </tbody>
           <tfoot>
             <tr className="border-t font-medium">
-              <td className="px-4 py-3">Total</td>
+              <td className="px-4 py-3">{t('dashboard.locations.total')}</td>
               <td className="px-4 py-3 text-right">
                 <span className="text-sm text-muted-foreground font-medium">
                   {formatCount(totalIps)}

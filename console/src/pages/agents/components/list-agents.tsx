@@ -12,6 +12,7 @@ import { useServerDataTable } from '@/hooks/useServerDataTable';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { format } from 'date-fns';
 import { useMemo } from 'react';
+import { useT, type TFunction } from '@/lib/i18n-dictionary';
 
 const providerLabels: Record<string, string> = {
   openai: 'OpenAI',
@@ -25,13 +26,18 @@ const providerColors: Record<string, 'default' | 'secondary' | 'outline'> = {
   custom: 'outline',
 };
 
-const agentColumns: ColumnDef<LLMConfigWithProviderDto>[] = [
+const getAgentColumns = (
+  t: TFunction,
+): ColumnDef<LLMConfigWithProviderDto>[] => [
   {
     accessorKey: 'providerId',
-    header: 'Provider',
+    header: t('agents.provider.provider'),
     cell: ({ row }) => {
       const value: string = row.getValue('providerId');
-      const label = providerLabels[value] ?? value;
+      const label =
+        value === 'custom'
+          ? t('agents.form.custom')
+          : (providerLabels[value] ?? value);
       return (
         <Badge variant={providerColors[value] ?? 'outline'}>{label}</Badge>
       );
@@ -39,29 +45,31 @@ const agentColumns: ColumnDef<LLMConfigWithProviderDto>[] = [
   },
   {
     accessorKey: 'model',
-    header: 'Model',
+    header: t('agents.provider.model'),
     cell: ({ row }) => (
       <div className="font-medium">{row.getValue('model')}</div>
     ),
   },
   {
     accessorKey: 'isPreferred',
-    header: 'Status',
+    header: t('common.status'),
     cell: ({ row }) => {
       if (!row.original.isConnected) {
-        return <Badge variant="outline">Disconnected</Badge>;
+        return <Badge variant="outline">{t('agents.provider.disconnected')}</Badge>;
       }
       const isPreferred: boolean = row.getValue('isPreferred');
       return (
         <Badge variant={isPreferred ? 'default' : 'secondary'}>
-          {isPreferred ? 'Preferred' : 'Active'}
+          {isPreferred
+            ? t('agents.provider.preferred')
+            : t('agents.provider.active')}
         </Badge>
       );
     },
   },
   {
     accessorKey: 'createdAt',
-    header: 'Connected',
+    header: t('agents.provider.connectedAt'),
     cell: ({ row }) => {
       const value: string = row.getValue('createdAt');
       if (!value) return <div className="text-muted-foreground text-sm">-</div>;
@@ -76,6 +84,8 @@ const agentColumns: ColumnDef<LLMConfigWithProviderDto>[] = [
 
 export function ListAgents() {
   const navigate = useNavigate();
+  const t = useT();
+  const agentColumns = useMemo(() => getAgentColumns(t), [t]);
   const {
     tableParams: { page, pageSize, sortBy, sortOrder },
     tableHandlers: { setPage, setPageSize, setParams },

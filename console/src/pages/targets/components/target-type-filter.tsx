@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 /**
  * TargetTypeFilter Component
  *
@@ -37,6 +38,7 @@ interface TargetTypeFilterProps {
  * Renders a select dropdown for filtering targets by type.
  */
 export function TargetTypeFilter({ value, onValueChange }: TargetTypeFilterProps) {
+  const t = useT();
   const currentValue = value ?? ALL_VALUE;
 
   const handleChange = (val: string) => {
@@ -46,14 +48,14 @@ export function TargetTypeFilter({ value, onValueChange }: TargetTypeFilterProps
   return (
     <Select value={currentValue} onValueChange={handleChange}>
       <SelectTrigger className="border-dashed text-xs py-0 focus:ring-0 focus:ring-offset-0 focus:outline-none">
-        <SelectValue placeholder="Type" />
+        <SelectValue placeholder={t('targets.filters.type')} />
       </SelectTrigger>
       <SelectContent>
         {TYPE_OPTIONS.map((option) => (
           <SelectItem key={option.value} value={option.value}>
             <div className="flex items-center gap-2">
               <span className={`size-2 rounded-full ${option.color}`} />
-              {option.label}
+              {option.value === ALL_VALUE ? t('targets.filters.allTypes') : option.label}
             </div>
           </SelectItem>
         ))}

@@ -31,6 +31,7 @@ import {
   type ArtifactDto,
 } from '@/services/apis/gen/queries';
 import { useTemplateTabs } from '../hooks/use-template-tabs';
+import { useT } from '@/lib/i18n-dictionary';
 
 const NAME_PATTERN = /\.ya?ml$/i;
 
@@ -47,6 +48,7 @@ type Props = {
 
 /** Rename, share, download and delete for one template, with their dialogs. */
 export function TemplateActionsMenu({ file, trigger, children, side, align }: Props) {
+  const t = useT();
   const { hasPermission } = usePermission();
   const queryClient = useQueryClient();
   const { tabs, rename: renameTab, close } = useTemplateTabs();
@@ -80,16 +82,22 @@ export function TemplateActionsMenu({ file, trigger, children, side, align }: Pr
           {children && file && <DropdownMenuSeparator />}
           {file && manage && (
             <>
-              <DropdownMenuItem onSelect={() => setDialog('rename')}>Rename</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setDialog('share')}>Share</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setDialog('rename')}>
+                {t('templates.actions.rename')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setDialog('share')}>
+                {t('templates.actions.share')}
+              </DropdownMenuItem>
             </>
           )}
           {file && (
-            <DropdownMenuItem onSelect={() => void download(file.id)}>Download</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void download(file.id)}>
+              {t('common.download')}
+            </DropdownMenuItem>
           )}
           {file && manage && (
             <DropdownMenuItem variant="destructive" onSelect={() => setDialog('delete')}>
-              Delete
+              {t('common.delete')}
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>
@@ -105,7 +113,7 @@ export function TemplateActionsMenu({ file, trigger, children, side, align }: Pr
               { id: file.id, data: { name } },
               {
                 onSuccess: () => {
-                  toast.success('Template renamed');
+                  toast.success(t('templates.actions.renamed'));
                   renameTab(file.id, name);
                   setDialog(null);
                   refresh();
@@ -120,16 +128,16 @@ export function TemplateActionsMenu({ file, trigger, children, side, align }: Pr
         <ConfirmDialog
           open
           onOpenChange={(o) => !o && setDialog(null)}
-          title="Delete template"
-          description={`Delete "${file.name}"? This cannot be undone.`}
-          confirmText="Delete"
+          title={t('templates.actions.deleteTitle')}
+          description={t('templates.actions.deleteConfirm', { name: file.name })}
+          confirmText={t('common.delete')}
           onConfirm={() =>
             remove.mutate(
               { id: file.id },
               {
                 onSuccess: () => {
-                  toast.success('Template deleted');
-                  tabs.filter((t) => t.artifactId === file.id).forEach((t) => close(t.id));
+                  toast.success(t('templates.actions.deleted'));
+                  tabs.filter((tab) => tab.artifactId === file.id).forEach((tab) => close(tab.id));
                   refresh();
                 },
                 onError: handleServerError,
@@ -160,13 +168,14 @@ function RenameDialog({
   onClose: () => void;
   onSubmit: (name: string) => void;
 }) {
+  const t = useT();
   const [name, setName] = useState(file.name);
   const [error, setError] = useState<string>();
 
   const submit = () => {
     const trimmed = name.trim();
     if (!NAME_PATTERN.test(trimmed)) {
-      setError('Name must end in .yaml or .yml');
+      setError(t('templates.actions.nameExtension'));
       return;
     }
     onSubmit(trimmed);
@@ -176,7 +185,7 @@ function RenameDialog({
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Rename template</DialogTitle>
+          <DialogTitle>{t('templates.actions.renameTitle')}</DialogTitle>
         </DialogHeader>
         <form
           onSubmit={(e) => {
@@ -185,7 +194,7 @@ function RenameDialog({
           }}
           className="grid gap-2"
         >
-          <Label htmlFor="template-name">Template name</Label>
+          <Label htmlFor="template-name">{t('templates.actions.templateName')}</Label>
           <Input
             id="template-name"
             value={name}
@@ -199,10 +208,10 @@ function RenameDialog({
         </form>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={submit} disabled={pending}>
-            Rename
+            {t('templates.actions.rename')}
           </Button>
         </DialogFooter>
       </DialogContent>

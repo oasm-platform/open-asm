@@ -8,6 +8,7 @@ import { Link } from '@tanstack/react-router';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Box } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useT } from '@/lib/i18n-dictionary';
 
 /** Logos shown at once; the window rotates through every agent tool. */
 const VISIBLE_LOGOS = 5;
@@ -44,6 +45,7 @@ export function AgentToolsTray({
   onWorkerChange,
   className,
 }: AgentToolsTrayProps) {
+  const t = useT();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -83,7 +85,7 @@ export function AgentToolsTray({
       {first && (
         <Link
           to="/aistudio/connectors"
-          aria-label="Agent tools"
+          aria-label={t('agents.toolsTray.label')}
           className="relative flex min-w-0 items-center overflow-hidden rounded-md p-1 pr-2 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
         >
           {/* popLayout: the outgoing view leaves the flow at once, so the
@@ -103,7 +105,7 @@ export function AgentToolsTray({
                 className="flex items-center gap-1.5 px-1 text-sm"
               >
                 <Box className="size-4 text-sky-500" />
-                Connectors
+                {t('agents.toolsTray.connectors')}
               </motion.span>
             ) : (
               <motion.span

@@ -45,6 +45,7 @@ import {
   type AuditEventsControllerGetAuditEventsParams,
 } from '@/services/apis/gen/queries';
 import { axiosInstance } from '@/services/apis/axios-client';
+import { t, useT } from '@/lib/i18n-dictionary';
 import { AUDIT_FILTER_FIELDS, auditFilterParams } from '../audit-filter-fields';
 import { parseUserAgent } from '../user-agent';
 
@@ -60,16 +61,16 @@ const OUTCOME_VARIANT: Record<AuditOutcome, BadgeVariant> = {
 
 function formatRelativeTime(iso: string): string {
   const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (seconds < 60) return 'just now';
+  if (seconds < 60) return t('settings.audit.time.justNow');
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60) return t('settings.audit.time.minutesAgo', { count: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return t('settings.audit.time.hoursAgo', { count: hours });
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
+  if (days < 30) return t('settings.audit.time.daysAgo', { count: days });
   const months = Math.floor(days / 30);
-  if (months < 12) return `${months}mo ago`;
-  return `${Math.floor(months / 12)}y ago`;
+  if (months < 12) return t('settings.audit.time.monthsAgo', { count: months });
+  return t('settings.audit.time.yearsAgo', { count: Math.floor(months / 12) });
 }
 
 function formatAbsoluteTime(iso: string): string {
@@ -83,8 +84,10 @@ function formatValue(value: unknown): string {
   return String(value);
 }
 
-function capitalize(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
+function outcomeLabel(outcome: AuditOutcome): string {
+  if (outcome === 'success') return t('settings.audit.outcome.success');
+  if (outcome === 'failure') return t('settings.audit.outcome.failure');
+  return t('settings.audit.outcome.denied');
 }
 
 function isForbiddenError(error: unknown): boolean {
@@ -113,7 +116,7 @@ async function extractExportErrorMessage(err: unknown): Promise<string> {
       // Not JSON — fall through to the generic message.
     }
   }
-  return err instanceof Error ? err.message : 'Please try again';
+  return err instanceof Error ? err.message : t('settings.audit.export.retry');
 }
 
 /**
@@ -139,16 +142,17 @@ async function fetchAuditExportBlob(
 
 function actorDisplayName(event: AuditEventResponseDto): string {
   if (event.actorName) return event.actorName;
-  if (event.actorType === 'user') return 'Deleted user';
+  if (event.actorType === 'user') return t('settings.audit.deletedUser');
   return event.actorType.replace(/_/g, ' ');
 }
 
 function LoadError({ onRetry }: { onRetry: () => void }) {
+  const t = useT();
   return (
     <div className="flex flex-col items-center justify-center gap-3 text-sm">
-      <p>Failed to load</p>
+      <p>{t('settings.audit.loadFailed')}</p>
       <Button size="sm" variant="outline" onClick={onRetry}>
-        Retry
+        {t('common.retry')}
       </Button>
     </div>
   );
@@ -173,12 +177,16 @@ function ActorAvatar({ event }: { event: AuditEventResponseDto }) {
 }
 
 function UserAgentDetails({ userAgent }: { userAgent: string }) {
+  const t = useT();
   const ua = parseUserAgent(userAgent);
   const rows: Array<[string, string | undefined]> = [
-    [ua.isBrowser ? 'Browser' : 'Client', ua.client],
-    ['Operating system', ua.os],
-    ['Device type', ua.deviceType],
-    ['Device', ua.device],
+    [
+      ua.isBrowser ? t('settings.audit.ua.browser') : t('settings.audit.ua.client'),
+      ua.client,
+    ],
+    [t('settings.audit.ua.os'), ua.os],
+    [t('settings.audit.ua.deviceType'), ua.deviceType],
+    [t('settings.audit.ua.device'), ua.device],
   ];
   return (
     <div className="mt-1 space-y-2 rounded-md border bg-muted/30 px-3 py-2">
@@ -186,7 +194,7 @@ function UserAgentDetails({ userAgent }: { userAgent: string }) {
         {rows.map(([label, value]) => (
           <div key={label} className="contents">
             <dt className="text-muted-foreground">{label}</dt>
-            <dd className="min-w-0 break-words">{value ?? 'Unknown'}</dd>
+            <dd className="min-w-0 break-words">{value ?? t('common.unknown')}</dd>
           </div>
         ))}
       </dl>
@@ -204,6 +212,7 @@ interface AuditEventSheetProps {
 }
 
 function AuditEventSheet({ event, label, onClose }: AuditEventSheetProps) {
+  const t = useT();
   const [showRaw, setShowRaw] = useState(false);
 
   return (
@@ -225,14 +234,14 @@ function AuditEventSheet({ event, label, onClose }: AuditEventSheetProps) {
         <div className="mt-4 space-y-4">
           <div className="flex items-center gap-2">
             <Badge variant={OUTCOME_VARIANT[event.outcome]}>
-              {capitalize(event.outcome)}
+              {outcomeLabel(event.outcome)}
             </Badge>
             <span className="text-sm text-muted-foreground">{event.action}</span>
           </div>
 
           <div className="space-y-3 text-sm">
             <div>
-              <p className="text-muted-foreground">Actor</p>
+              <p className="text-muted-foreground">{t('settings.audit.filter.actor')}</p>
               <p>
                 {actorDisplayName(event)}
                 {event.actorEmail ? (
@@ -246,7 +255,7 @@ function AuditEventSheet({ event, label, onClose }: AuditEventSheetProps) {
               </p>
             </div>
             <div>
-              <p className="text-muted-foreground">Resource</p>
+              <p className="text-muted-foreground">{t('settings.audit.detail.resource')}</p>
               <p>
                 {event.resourceType}
                 {event.resourceId ? (
@@ -257,11 +266,11 @@ function AuditEventSheet({ event, label, onClose }: AuditEventSheetProps) {
               </p>
             </div>
             <div>
-              <p className="text-muted-foreground">Source IP</p>
+              <p className="text-muted-foreground">{t('settings.audit.detail.sourceIp')}</p>
               <p className="font-mono">{event.sourceIp ?? '—'}</p>
             </div>
             <div>
-              <p className="text-muted-foreground">User agent</p>
+              <p className="text-muted-foreground">{t('settings.audit.detail.userAgent')}</p>
               {event.userAgent ? (
                 <UserAgentDetails userAgent={event.userAgent} />
               ) : (
@@ -269,18 +278,18 @@ function AuditEventSheet({ event, label, onClose }: AuditEventSheetProps) {
               )}
             </div>
             <div>
-              <p className="text-muted-foreground">Request ID</p>
+              <p className="text-muted-foreground">{t('settings.audit.detail.requestId')}</p>
               <p className="font-mono">{event.requestId ?? '—'}</p>
             </div>
             <div>
-              <p className="text-muted-foreground">Correlation ID</p>
+              <p className="text-muted-foreground">{t('settings.audit.detail.correlationId')}</p>
               <p className="font-mono">{event.correlationId ?? '—'}</p>
             </div>
           </div>
 
           {Object.keys(event.changes).length > 0 && (
             <div>
-              <p className="mb-2 text-sm font-medium">Changes</p>
+              <p className="mb-2 text-sm font-medium">{t('settings.audit.detail.changes')}</p>
               <div className="space-y-2">
                 {Object.entries(event.changes).map(([key, change]) => {
                   const diff =
@@ -311,7 +320,7 @@ function AuditEventSheet({ event, label, onClose }: AuditEventSheetProps) {
 
           {Object.keys(event.metadata).length > 0 && (
             <div>
-              <p className="mb-2 text-sm font-medium">Metadata</p>
+              <p className="mb-2 text-sm font-medium">{t('settings.audit.detail.metadata')}</p>
               <div className="space-y-1.5">
                 {Object.entries(event.metadata).map(([key, value]) => (
                   <div key={key} className="text-sm">
@@ -330,7 +339,7 @@ function AuditEventSheet({ event, label, onClose }: AuditEventSheetProps) {
               size="sm"
               onClick={() => setShowRaw((prev) => !prev)}
             >
-              {showRaw ? 'Hide raw JSON' : 'View raw JSON'}
+              {showRaw ? t('settings.audit.detail.hideRaw') : t('settings.audit.detail.viewRaw')}
             </Button>
             {showRaw && (
               <pre className="mt-3 max-h-72 overflow-auto rounded-md bg-muted p-3 text-xs">
@@ -358,6 +367,7 @@ function EventSkeleton() {
 }
 
 export default function AuditLogSettings() {
+  const t = useT();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -495,11 +505,9 @@ export default function AuditLogSettings() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      toast.success(
-        rowCount === 1 ? 'Exported 1 event' : `Exported ${rowCount} events`,
-      );
+      toast.success(t('settings.audit.export.success', { count: rowCount }));
     } catch (err) {
-      toast.error('Export failed', {
+      toast.error(t('settings.audit.export.failed'), {
         description: await extractExportErrorMessage(err),
       });
     } finally {
@@ -512,7 +520,7 @@ export default function AuditLogSettings() {
       <Card>
         <CardContent className="py-10">
           <p className="text-center text-muted-foreground">
-            No workspace selected. Select a workspace to view its audit log.
+            {t('settings.audit.noWorkspace')}
           </p>
         </CardContent>
       </Card>
@@ -566,7 +574,7 @@ export default function AuditLogSettings() {
               <button
                 type="button"
                 className="font-semibold hover:underline"
-                title="Filter by this actor"
+                title={t('settings.audit.filterByActor')}
                 onClick={filterClick('actorId', event.actorId)}
               >
                 {name}
@@ -578,14 +586,14 @@ export default function AuditLogSettings() {
             <button
               type="button"
               className="break-all text-left font-medium text-primary hover:underline"
-              title="Filter by this action"
+              title={t('settings.audit.filterByAction')}
               onClick={filterClick('action', event.action)}
             >
               {event.action}
             </button>
             {event.outcome !== 'success' && (
               <Badge variant={OUTCOME_VARIANT[event.outcome]}>
-                {capitalize(event.outcome)}
+                {outcomeLabel(event.outcome)}
               </Badge>
             )}
           </p>
@@ -599,7 +607,7 @@ export default function AuditLogSettings() {
             )}
           </p>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-            <span className="font-mono">{event.sourceIp ?? 'Unknown source'}</span>
+            <span className="font-mono">{event.sourceIp ?? t('settings.audit.unknownSource')}</span>
             <span aria-hidden className="h-3 w-px bg-border" />
             <Tooltip>
               <TooltipTrigger asChild>
@@ -625,7 +633,7 @@ export default function AuditLogSettings() {
           flat
         />
         <DatePickerWithRange
-          label="Date"
+          label={t('settings.audit.date')}
           value={dateRange}
           onChange={setDateRange}
           className="w-full md:w-60"
@@ -643,14 +651,14 @@ export default function AuditLogSettings() {
           ) : (
             <Download className="h-4 w-4" />
           )}
-          {isExporting ? 'Exporting…' : 'Export CSV'}
+          {isExporting ? t('settings.audit.export.exporting') : t('settings.audit.export.csv')}
         </Button>
       </div>
 
       {/* Dark mode: the card fill, as plain outlines are off there */}
       <div ref={listRef} className="scroll-mt-4 overflow-hidden rounded-md border dark:bg-card-surface">
         <div className="border-b bg-muted/40 px-4 py-3 text-sm font-semibold">
-          Recent events
+          {t('settings.audit.recentEvents')}
         </div>
         {error ? (
           <div className="py-10">
@@ -664,7 +672,7 @@ export default function AuditLogSettings() {
           </ul>
         ) : events.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted-foreground">
-            No audit events found.
+            {t('settings.audit.empty')}
           </p>
         ) : (
           <ul className="divide-y">{events.map(renderEvent)}</ul>
@@ -679,7 +687,7 @@ export default function AuditLogSettings() {
           disabled={cursors.length === 1 || isLoading}
           onClick={() => goToPage(cursors.slice(0, -1))}
         >
-          Newer
+          {t('settings.audit.newer')}
         </Button>
         <Button
           type="button"
@@ -688,15 +696,15 @@ export default function AuditLogSettings() {
           disabled={!nextCursor || isLoading}
           onClick={() => nextCursor && goToPage([...cursors, nextCursor])}
         >
-          Older
+          {t('settings.audit.older')}
         </Button>
       </div>
 
       <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
         <Lightbulb className="size-3.5 shrink-0" />
         <span>
-          <span className="font-semibold">Tip:</span> click an actor or action to
-          filter by it.
+          <span className="font-semibold">{t('settings.audit.tip.label')}</span>{' '}
+          {t('settings.audit.tip.text')}
         </span>
       </p>
 

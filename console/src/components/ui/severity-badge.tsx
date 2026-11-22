@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Badge } from './badge';
 
 interface SeverityBadgeProps {
@@ -48,13 +49,16 @@ export function SeverityBadge({
   severity,
   variant = 'outline',
 }: SeverityBadgeProps) {
+  const t = useT();
   const normalizedSeverity = severity.toLowerCase();
   const {
     color,
     text,
     border = '',
   } = severityColors[normalizedSeverity] || severityColors['info'];
-  const label = severity.charAt(0).toUpperCase() + severity.slice(1);
+  const label = severityColors[normalizedSeverity]
+    ? t(`components.severity.${normalizedSeverity}`)
+    : severity.charAt(0).toUpperCase() + severity.slice(1);
 
   if (variant === 'text') {
     return <span className={`${text} font-medium`}>{label}</span>;

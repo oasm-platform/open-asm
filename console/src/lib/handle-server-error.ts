@@ -1,3 +1,4 @@
+import { t } from '@/lib/i18n-dictionary';
 import { AxiosError } from 'axios';
 import { toast } from 'sonner';
 
@@ -6,7 +7,7 @@ export function handleServerError(error: unknown) {
     console.log('Server Error:', error);
   }
 
-  let errMsg = 'Something went wrong!';
+  let errMsg = t('shell.toast.serverError');
 
   if (error instanceof AxiosError) {
     const data = error.response?.data;

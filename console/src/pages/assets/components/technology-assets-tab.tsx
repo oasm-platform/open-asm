@@ -1,5 +1,6 @@
 import { CollapsibleDataTable } from '@/components/ui/collapsible-data-table';
 import { DataTableError } from '@/components/ui/data-table-error-boundary';
+import { useT } from '@/lib/i18n-dictionary';
 import { TabsContent } from '@/components/ui/tabs';
 import { useAssetsControllerGetTechnologyAssets } from '@/services/apis/gen/queries';
 import { useAsset } from '../context/asset-context';
@@ -7,6 +8,7 @@ import { AssetTable } from './asset-table';
 import { technologyAssetsColumn } from './technology-assets-column';
 
 export default function TechnologyAssetsTab() {
+  const t = useT();
   const {
     tableHandlers: { setPage, setPageSize, setParams },
     tableParams: { page, pageSize, sortBy, sortOrder },
@@ -31,7 +33,7 @@ export default function TechnologyAssetsTab() {
   if (!data && !isLoading)
     return (
       <DataTableError
-        message="Failed to load technology assets."
+        message={t('assets.errors.technology')}
         onRetry={refetch}
       />
     );

@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import Page from '@/components/common/page';
 import { useIpLocationData } from '@/hooks/useIpLocationData';
 import { useWorkspaceSelector } from '@/hooks/useWorkspaceSelector';
@@ -19,6 +20,7 @@ import VulnerabilityActivity from './components/vulnerability-activity';
 import VulnerabilityLifecycle from './components/vulnerability-lifecycle';
 
 export default function Dashboard() {
+  const t = useT();
   const { workspaces, isLoading: workspacesLoading } = useWorkspaceSelector();
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
 
@@ -30,18 +32,18 @@ export default function Dashboard() {
     isLoading: locationsLoading,
   });
 
-  if (workspacesLoading) return <Page title="Dashboard" description="Workspace security overview" />;
+  if (workspacesLoading) return <Page title={t('dashboard.page.title')} description={t('dashboard.page.description')} />;
 
   if (workspaces.length === 0) {
     return (
-      <Page title="Dashboard" description="Workspace security overview">
+      <Page title={t('dashboard.page.title')} description={t('dashboard.page.description')}>
         <CreateWorkspace />
       </Page>
     );
   }
 
   return (
-    <Page title="Dashboard" description="Workspace security overview">
+    <Page title={t('dashboard.page.title')} description={t('dashboard.page.description')}>
       {/* Columns follow the dashboard's own width, not the viewport's: the
           app sidebar and the AI chat panel take their share first. */}
       <div className="@container/dashboard space-y-4">

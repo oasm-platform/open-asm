@@ -33,6 +33,7 @@ import {
   ThinkingLabel,
   TypingDots,
 } from './chat-helpers';
+import { useT } from '@/lib/i18n-dictionary';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -137,6 +138,7 @@ function ToolCallGroup({
   remoteExecuteEvents?: Map<string, RemoteExecuteStreamEvent[]>;
   selectedToolCallId?: string | null;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [revealed, setRevealed] = useState<string | null>(null);
   // Expand during render (not in an effect) so the selected call is already
@@ -157,7 +159,7 @@ function ToolCallGroup({
       <CollapsibleTrigger className="flex max-w-full min-w-0 items-center gap-2 rounded-md text-left text-muted-foreground transition-colors hover:text-foreground cursor-pointer">
         <ToolCallLabel toolCall={toToolCallState(latest)} />
         <span className="shrink-0 rounded-full bg-muted px-1.5 py-px text-[11px] font-medium tabular-nums">
-          {tools.length} tool calls
+          {t('agents.message.toolCalls', { count: tools.length })}
         </span>
         <ChevronRightIcon
           className={cn(

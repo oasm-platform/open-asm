@@ -1,0 +1,11 @@
+{
+  "notifications.title": "通知",
+  "notifications.unread.other": "{count} 条未读通知",
+  "notifications.markAllRead": "全部标为已读",
+  "userMenu.language": "语言",
+  "userMenu.settings": "设置",
+  "userMenu.admin": "管理",
+  "userMenu.docs": "文档",
+  "userMenu.reportIssue": "报告问题",
+  "userMenu.logout": "退出登录"
+}

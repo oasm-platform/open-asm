@@ -1,0 +1,14 @@
+{
+  "notifications.title": "Уведомления",
+  "notifications.unread.one": "{count} непрочитанное уведомление",
+  "notifications.unread.few": "{count} непрочитанных уведомления",
+  "notifications.unread.many": "{count} непрочитанных уведомлений",
+  "notifications.unread.other": "{count} непрочитанного уведомления",
+  "notifications.markAllRead": "Отметить все как прочитанные",
+  "userMenu.language": "Язык",
+  "userMenu.settings": "Настройки",
+  "userMenu.admin": "Администрирование",
+  "userMenu.docs": "Документация",
+  "userMenu.reportIssue": "Сообщить о проблеме",
+  "userMenu.logout": "Выйти"
+}

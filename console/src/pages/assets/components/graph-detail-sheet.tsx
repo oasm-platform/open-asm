@@ -7,6 +7,7 @@ import {
   SheetDescription,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import { Maximize2 } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
@@ -45,29 +46,33 @@ function NodeTypeBadge({ type }: { type: string }) {
   // 'domain' is the display label for asset nodes; keep the asset color.
   const nodeType = (type === 'domain' ? 'asset' : type) as NodeType;
   const color = NODE_TYPE_COLORS[nodeType] ?? '#6b7280';
+  const t = useT();
+  const typeKey = `assets.graph.nodeType.${type}`;
+  const typeLabel = t(typeKey);
   return (
     <Badge
       variant="outline"
       className="text-xs font-medium"
       style={{ borderColor: color, color }}
     >
-      {type}
+      {typeLabel === typeKey ? type : typeLabel}
     </Badge>
   );
 }
 
 function AssetMetadata({ metadata }: { metadata: Record<string, unknown> }) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-3">
-      <MetaRow label="IP Addresses" value={renderIpAddresses(metadata.ipAddresses)} />
-      <MetaRow label="DNS Records" value={renderDnsRecords(metadata.dnsRecords)} />
-      <MetaRow label="Target ID" value={metadata.targetId as string} />
+      <MetaRow label={t('assets.graph.detail.ipAddresses')} value={renderIpAddresses(metadata.ipAddresses)} />
+      <MetaRow label={t('assets.graph.detail.dnsRecords')} value={renderDnsRecords(metadata.dnsRecords)} />
+      <MetaRow label={t('assets.graph.detail.targetID')} value={metadata.targetId as string} />
       <MetaRow
-        label="Enabled"
+        label={t('assets.graph.detail.enabled')}
         value={
           metadata.isEnabled !== undefined ? (
             <Badge variant={metadata.isEnabled ? 'success' : 'destructive'}>
-              {metadata.isEnabled ? 'Yes' : 'No'}
+              {metadata.isEnabled ? t('common.yes') : t('common.no')}
             </Badge>
           ) : undefined
         }
@@ -77,31 +82,34 @@ function AssetMetadata({ metadata }: { metadata: Record<string, unknown> }) {
 }
 
 function IpMetadata({ metadata }: { metadata: Record<string, unknown> }) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-3">
-      <MetaRow label="IP" value={metadata.ip as string} />
+      <MetaRow label={t('assets.graph.detail.ip')} value={metadata.ip as string} />
     </div>
   );
 }
 
 function ServiceMetadata({ metadata }: { metadata: Record<string, unknown> }) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-3">
-      <MetaRow label="Value" value={metadata.value as string} />
-      <MetaRow label="Port" value={metadata.port as number} />
-      <MetaRow label="Asset ID" value={metadata.assetId as string} />
+      <MetaRow label={t('assets.graph.detail.value')} value={metadata.value as string} />
+      <MetaRow label={t('assets.graph.detail.port')} value={metadata.port as number} />
+      <MetaRow label={t('assets.graph.detail.assetID')} value={metadata.assetId as string} />
     </div>
   );
 }
 
 function TechnologyMetadata({ metadata }: { metadata: Record<string, unknown> }) {
+  const t = useT();
   const categories = metadata.categoryNames as string[] | undefined;
   return (
     <div className="flex flex-col gap-3">
-      <MetaRow label="Description" value={metadata.description as string} />
+      <MetaRow label={t('common.description')} value={metadata.description as string} />
       {categories && categories.length > 0 && (
         <div className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">Categories</span>
+          <span className="text-xs text-muted-foreground">{t('assets.graph.detail.categories')}</span>
           <div className="flex flex-wrap gap-1">
             {categories.map((cat) => (
               <Badge key={cat} variant="secondary" className="text-xs">
@@ -113,10 +121,10 @@ function TechnologyMetadata({ metadata }: { metadata: Record<string, unknown> })
       )}
       {typeof metadata.iconUrl === 'string' && metadata.iconUrl && (
         <div className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">Icon</span>
+          <span className="text-xs text-muted-foreground">{t('assets.graph.detail.icon')}</span>
           <img
             src={metadata.iconUrl}
-            alt="Technology icon"
+            alt={t('assets.graph.detail.technologyIcon')}
             className="h-6 w-6 rounded"
           />
         </div>
@@ -126,32 +134,35 @@ function TechnologyMetadata({ metadata }: { metadata: Record<string, unknown> })
 }
 
 function TlsMetadata({ metadata }: { metadata: Record<string, unknown> }) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-3">
-      <MetaRow label="Host" value={metadata.host as string} />
-      <MetaRow label="SNI" value={metadata.sni as string} />
-      <MetaRow label="Subject DN" value={metadata.subjectDn as string} />
-      <MetaRow label="Issuer DN" value={metadata.issuerDn as string} />
-      <MetaRow label="Not Before" value={metadata.notBefore as string} />
-      <MetaRow label="Not After" value={metadata.notAfter as string} />
-      <MetaRow label="TLS Version" value={metadata.tlsVersion as string} />
-      <MetaRow label="Cipher" value={metadata.cipher as string} />
+      <MetaRow label={t('assets.graph.detail.host')} value={metadata.host as string} />
+      <MetaRow label={t('assets.graph.detail.sni')} value={metadata.sni as string} />
+      <MetaRow label={t('assets.graph.detail.subjectDN')} value={metadata.subjectDn as string} />
+      <MetaRow label={t('assets.graph.detail.issuerDN')} value={metadata.issuerDn as string} />
+      <MetaRow label={t('assets.graph.detail.notBefore')} value={metadata.notBefore as string} />
+      <MetaRow label={t('assets.graph.detail.notAfter')} value={metadata.notAfter as string} />
+      <MetaRow label={t('assets.graph.detail.tlsVersion')} value={metadata.tlsVersion as string} />
+      <MetaRow label={t('assets.graph.detail.cipher')} value={metadata.cipher as string} />
     </div>
   );
 }
 
 function StatusCodeMetadata({ metadata }: { metadata: Record<string, unknown> }) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-3">
-      <MetaRow label="Status Code" value={metadata.statusCode as number} />
+      <MetaRow label={t('assets.graph.detail.statusCode')} value={metadata.statusCode as number} />
     </div>
   );
 }
 
 function TargetMetadata({ metadata }: { metadata: Record<string, unknown> }) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-3">
-      <MetaRow label="ID" value={metadata.id as string} />
+      <MetaRow label={t('assets.graph.detail.id')} value={metadata.id as string} />
     </div>
   );
 }
@@ -210,9 +221,10 @@ function DetailRows({
   rows: Array<{ label: string; value: React.ReactNode }>;
   loading: boolean;
 }) {
+  const t = useT();
   if (loading) {
     return (
-      <div className="text-xs text-muted-foreground">Loading detail...</div>
+      <div className="text-xs text-muted-foreground">{t('assets.graph.detail.loading')}</div>
     );
   }
   return (
@@ -236,6 +248,7 @@ function formatDate(value?: string | null): string {
  * and renders the result inside the sheet.
  */
 function DetailPanel({ node }: { node: GraphNode }) {
+  const t = useT();
   const nodeType = (node.type.split('|')[0] ?? node.id.split('|')[0]) as NodeType;
   const rawId = node.id.split('|')[1] ?? '';
 
@@ -256,31 +269,31 @@ function DetailPanel({ node }: { node: GraphNode }) {
   );
 
   if (nodeType === 'target') {
-    const t = targetDetail as Target | undefined;
+    const target = targetDetail as Target | undefined;
     return (
       <div className="flex flex-col gap-4">
         <Separator />
-        <div className="text-sm font-semibold">API Detail</div>
+        <div className="text-sm font-semibold">{t('assets.graph.detail.apiDetail')}</div>
         <DetailRows
           loading={targetLoading}
           rows={[
-            { label: 'Value', value: t?.value },
-            { label: 'Type', value: t?.type },
-            { label: 'Status', value: t?.status },
-            { label: 'Source', value: t?.source },
-            { label: 'Created', value: formatDate(t?.createdAt) },
-            { label: 'Updated', value: formatDate(t?.updatedAt) },
-            { label: 'Last Discovered', value: formatDate(t?.lastDiscoveredAt) },
+            { label: t('assets.graph.detail.value'), value: target?.value },
+            { label: t('assets.graph.detail.type'), value: target?.type },
+            { label: t('assets.graph.detail.status'), value: target?.status },
+            { label: t('assets.graph.detail.source'), value: target?.source },
+            { label: t('assets.graph.detail.created'), value: formatDate(target?.createdAt) },
+            { label: t('assets.graph.detail.updated'), value: formatDate(target?.updatedAt) },
+            { label: t('assets.graph.detail.lastDiscovered'), value: formatDate(target?.lastDiscoveredAt) },
             {
-              label: 'Total Asset Services',
-              value: t?.totalAssetServices,
+              label: t('assets.graph.detail.totalAssetServices'),
+              value: target?.totalAssetServices,
             },
             {
-              label: 'Scan Schedule',
+              label: t('assets.graph.detail.scanSchedule'),
               value:
-                t?.scanSchedule && typeof t.scanSchedule === 'object'
-                  ? JSON.stringify(t.scanSchedule)
-                  : (t?.scanSchedule as unknown as string),
+                target?.scanSchedule && typeof target.scanSchedule === 'object'
+                  ? JSON.stringify(target.scanSchedule)
+                  : (target?.scanSchedule as unknown as string),
             },
           ]}
         />
@@ -299,25 +312,25 @@ function DetailPanel({ node }: { node: GraphNode }) {
     return (
       <div className="flex flex-col gap-4">
         <Separator />
-        <div className="text-sm font-semibold">API Detail</div>
+        <div className="text-sm font-semibold">{t('assets.graph.detail.apiDetail')}</div>
         <DetailRows
           loading={ipLoading}
           rows={[
-            { label: 'Country', value: geo?.country },
-            { label: 'Country Code', value: geo?.countryCode },
-            { label: 'Region', value: geo?.regionName },
-            { label: 'City', value: geo?.city },
-            { label: 'ISP', value: geo?.isp },
-            { label: 'Organization', value: geo?.org },
-            { label: 'AS', value: geo?.asname ? `${geo?.asname} (${geo?.as})` : geo?.as },
-            { label: 'Coordinates', value: hasValidLocation ? `${geo?.lat}, ${geo?.lon}` : undefined },
-            { label: 'Timezone', value: geo?.timezone },
-            { label: 'Currency', value: geo?.currency },
+            { label: t('assets.graph.detail.country'), value: geo?.country },
+            { label: t('assets.graph.detail.countryCode'), value: geo?.countryCode },
+            { label: t('assets.graph.detail.region'), value: geo?.regionName },
+            { label: t('assets.graph.detail.city'), value: geo?.city },
+            { label: t('assets.graph.detail.isp'), value: geo?.isp },
+            { label: t('assets.graph.detail.organization'), value: geo?.org },
+            { label: t('assets.graph.detail.as'), value: geo?.asname ? `${geo?.asname} (${geo?.as})` : geo?.as },
+            { label: t('assets.graph.detail.coordinates'), value: hasValidLocation ? `${geo?.lat}, ${geo?.lon}` : undefined },
+            { label: t('assets.graph.detail.timezone'), value: geo?.timezone },
+            { label: t('assets.graph.detail.currency'), value: geo?.currency },
           ]}
         />
         {hasValidLocation && geo && (
           <div>
-            <span className="text-xs text-muted-foreground">Location</span>
+            <span className="text-xs text-muted-foreground">{t('assets.graph.detail.location')}</span>
             <div className="mt-1">
               <IpLocationMap geoIp={geo} />
             </div>
@@ -331,6 +344,7 @@ function DetailPanel({ node }: { node: GraphNode }) {
 }
 
 export default function GraphDetailSheet({ open, setOpen, node }: Props) {
+  const t = useT();
   const navigate = useNavigate();
 
   const handleViewFullPage = () => {
@@ -361,9 +375,9 @@ export default function GraphDetailSheet({ open, setOpen, node }: Props) {
           'inset-y-0 right-0 fixed',
         )}
       >
-        <SheetTitle className="sr-only">Node Detail</SheetTitle>
+        <SheetTitle className="sr-only">{t('assets.graph.detail.title')}</SheetTitle>
         <SheetDescription className="sr-only">
-          Details for the selected graph node
+          {t('assets.graph.detail.description')}
         </SheetDescription>
 
         {node && (
@@ -401,7 +415,7 @@ export default function GraphDetailSheet({ open, setOpen, node }: Props) {
               className="w-full flex items-center justify-center gap-2"
             >
               <Maximize2 className="h-4 w-4" />
-              View Full Page
+              {t('assets.sheet.viewFullPage')}
             </Button>
           </div>
         )}

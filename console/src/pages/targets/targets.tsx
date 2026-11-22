@@ -1,11 +1,13 @@
+import { useT } from '@/lib/i18n-dictionary';
 import Page from '@/components/common/page';
 import { ListTargets } from './list-targets';
 
 const Targets = () => {
+  const t = useT();
   return (
     <Page
-      title="Targets"
-      description="Domains, IP ranges and repositories in your scanning scope"
+      title={t('targets.page.title')}
+      description={t('targets.page.description')}
       permission="target.read"
     >
       <ListTargets />

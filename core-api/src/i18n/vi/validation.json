@@ -1,0 +1,12 @@
+{
+  "NOT_EMPTY": "{property} không được để trống",
+  "IS_STRING": "{property} phải là chuỗi",
+  "IS_EMAIL": "{property} phải là email hợp lệ",
+  "MIN_LENGTH": "{property} quá ngắn (tối thiểu {constraints.0} ký tự)",
+  "MAX_LENGTH": "{property} quá dài (tối đa {constraints.0} ký tự)",
+  "IS_UUID": "{property} phải là ID hợp lệ",
+  "IS_ARRAY": "{property} phải là danh sách",
+  "ARRAY_NOT_EMPTY": "{property} không được để trống",
+  "MATCHES": "{property} có định dạng không hợp lệ",
+  "PERMISSION_KEY": "Khóa quyền không hợp lệ. Dùng \"*\" hoặc \"domain.action\" (ví dụ: target.read)"
+}

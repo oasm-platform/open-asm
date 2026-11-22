@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { ChevronRight } from 'lucide-react';
 import { Fragment, memo } from 'react';
 
@@ -7,11 +8,14 @@ export const PipelineSteps = memo(function PipelineSteps({
 }: {
   steps: string[][];
 }) {
+  const t = useT();
   if (steps.length === 0) {
-    return <span className="text-sm text-muted-foreground">No tools</span>;
+    return (
+      <span className="text-sm text-muted-foreground">{t('projects.pipelineSteps.noTools')}</span>
+    );
   }
   return (
-    <div className="flex flex-wrap items-center gap-1.5" aria-label="Pipeline">
+    <div className="flex flex-wrap items-center gap-1.5" aria-label={t('projects.pipeline')}>
       {steps.map((tools, i) => (
         <Fragment key={i}>
           {i > 0 && <ChevronRight className="size-3.5 text-muted-foreground" />}

@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge';
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import { Link } from '@tanstack/react-router';
 import { Clock, PauseCircle } from 'lucide-react';
@@ -6,6 +7,7 @@ import {
   DETECTION_STATUS_LABELS,
   REVIEW_STATUS_LABELS,
   daysUntil,
+  labelOf,
 } from './lifecycle';
 
 export { SeverityBadge } from '@/components/ui/severity-badge';
@@ -35,6 +37,7 @@ export function DetectionStatusBadge({
   status?: string | null;
   className?: string;
 }) {
+  useT(); // re-render on language change
   if (!status) return null;
   return (
     <Badge
@@ -42,7 +45,7 @@ export function DetectionStatusBadge({
       className={cn(chip, DETECTION_STYLES[status], className)}
       data-status={status}
     >
-      {DETECTION_STATUS_LABELS[status] ?? status}
+      {labelOf(DETECTION_STATUS_LABELS, status)}
     </Badge>
   );
 }
@@ -55,6 +58,7 @@ export function ReviewStatusBadge({
   status?: string | null;
   className?: string;
 }) {
+  useT(); // re-render on language change
   if (!status) return null;
   return (
     <Badge
@@ -62,7 +66,7 @@ export function ReviewStatusBadge({
       className={cn(chip, REVIEW_STYLES[status], className)}
       data-status={status}
     >
-      {REVIEW_STATUS_LABELS[status] ?? status}
+      {labelOf(REVIEW_STATUS_LABELS, status)}
     </Badge>
   );
 }
@@ -88,6 +92,7 @@ export function SlaDue({
   paused?: boolean;
   className?: string;
 }) {
+  const t = useT();
   if (paused || (status && PAUSED_STATUSES.has(status))) {
     return (
       <span
@@ -97,7 +102,7 @@ export function SlaDue({
         )}
       >
         <PauseCircle className="size-3" />
-        paused
+        {t('vulnerabilities.sla.paused')}
       </span>
     );
   }
@@ -107,10 +112,10 @@ export function SlaDue({
   const days = daysUntil(dueAt);
   const label =
     days < 0
-      ? `${-days} day${days === -1 ? '' : 's'} overdue`
+      ? t('vulnerabilities.sla.overdue', { count: -days })
       : days === 0
-        ? 'due today'
-        : `due in ${days} day${days === 1 ? '' : 's'}`;
+        ? t('vulnerabilities.sla.dueToday')
+        : t('vulnerabilities.sla.dueIn', { count: days });
   const tone =
     days < 0
       ? 'text-red-600 dark:text-red-400 font-medium'

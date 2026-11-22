@@ -16,6 +16,7 @@ import {
 import type { RemoteExecuteStreamEvent } from '@/hooks/use-remote-execute-stream';
 import { getToolStatus } from './chat-helpers';
 import { SIDE_PANEL_INDENT, SIDE_PANEL_ROW } from './side-panel-layout';
+import { useT } from '@/lib/i18n-dictionary';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -141,6 +142,7 @@ function ToolValue({
   text: string;
   error?: boolean;
 }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const long = text.length > VALUE_PREVIEW_LENGTH;
   return (
@@ -163,8 +165,10 @@ function ToolValue({
           className="text-xs text-primary underline-offset-2 hover:underline cursor-pointer"
         >
           {expanded
-            ? 'Show less'
-            : `Show all (${text.length.toLocaleString()} characters)`}
+            ? t('agents.approval.showLess')
+            : t('agents.approval.showAll', {
+                count: text.length.toLocaleString(),
+              })}
         </button>
       )}
     </div>
@@ -188,6 +192,7 @@ const ToolCallDetail = memo(
     streamEvents?: RemoteExecuteStreamEvent[];
     onSelect?: (toolCallId: string) => void;
   }) {
+    const t = useT();
     const [open, setOpen] = useState(true);
     const isCommand = entry.toolName === COMMAND_TOOL;
     const input = useMemo(
@@ -235,8 +240,8 @@ const ToolCallDetail = memo(
               variant="ghost"
               size="icon-sm"
               className="shrink-0 text-muted-foreground hover:cursor-pointer"
-              aria-label="Show in chat"
-              title="Show in chat"
+              aria-label={t('agents.browser.showInChat')}
+              title={t('agents.browser.showInChat')}
               onClick={() => onSelect(entry.toolCallId)}
             >
               <LocateFixed />
@@ -252,16 +257,16 @@ const ToolCallDetail = memo(
               />
             ) : (
               <>
-                {input && <ToolValue label="Input" text={input} />}
+                {input && <ToolValue label={t('agents.tools.input')} text={input} />}
                 {result ? (
                   <ToolValue
-                    label={failed ? 'Error' : 'Output'}
+                    label={failed ? t('agents.tools.error') : t('agents.tools.output')}
                     text={result}
                     error={failed}
                   />
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    {running ? 'Running…' : 'No output.'}
+                    {running ? t('agents.tools.running') : t('agents.tools.noOutput')}
                   </p>
                 )}
               </>
@@ -298,6 +303,7 @@ export const ToolCallHistoryPanel = memo(function ToolCallHistoryPanel({
   showHeader?: boolean;
   className?: string;
 }) {
+  const t = useT();
   const listRef = useRef<HTMLDivElement>(null);
 
   const toolCalls = useMemo(() => extractToolCalls(messages), [messages]);
@@ -324,7 +330,7 @@ export const ToolCallHistoryPanel = memo(function ToolCallHistoryPanel({
       {showHeader && (
         <div className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-foreground shrink-0">
           <Terminal className="size-4" />
-          <span>Tool Calls</span>
+          <span>{t('agents.tools.title')}</span>
           <span className="text-muted-foreground/60 tabular-nums">
             {completedCount}/{toolCalls.length}
           </span>

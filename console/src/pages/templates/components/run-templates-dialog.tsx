@@ -3,6 +3,8 @@ import { Play } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
+import { t as translate, useT } from '@/lib/i18n-dictionary';
+
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable } from '@/components/ui/data-table';
@@ -56,6 +58,7 @@ export function RunTemplatesDialog({
   disabled,
   variant = 'outline',
 }: RunTemplatesDialogProps) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [templateIds, setTemplateIds] = useState<Set<string>>(new Set());
   const [scope, setScope] = useState<Scope>('targets');
@@ -92,26 +95,25 @@ export function RunTemplatesDialog({
         size="sm"
         variant={variant}
         disabled={disabled}
-        title="Run saved templates against targets, assets or groups"
+        title={t('templates.run.buttonTitle')}
         onClick={() => handleOpenChange(true)}
       >
         <Play className="h-4 w-4" />
-        Run
+        {t('templates.run.run')}
       </Button>
       <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-auto">
         <DialogHeader>
-          <DialogTitle>Run templates</DialogTitle>
+          <DialogTitle>{t('templates.run.title')}</DialogTitle>
           <DialogDescription>
-            Nuclei runs only the selected templates, as last saved. Findings appear in
-            Vulnerabilities.
+            {t('templates.run.description')}
           </DialogDescription>
         </DialogHeader>
         <TemplateChecklist selected={templateIds} onSelectedChange={setTemplateIds} />
         <Tabs value={scope} onValueChange={(v) => setScope(v as Scope)}>
           <TabsList>
-            <TabsTrigger value="targets">Targets</TabsTrigger>
-            <TabsTrigger value="assets">Assets</TabsTrigger>
-            <TabsTrigger value="groups">Groups</TabsTrigger>
+            <TabsTrigger value="targets">{t('templates.run.tabs.targets')}</TabsTrigger>
+            <TabsTrigger value="assets">{t('templates.run.tabs.assets')}</TabsTrigger>
+            <TabsTrigger value="groups">{t('templates.run.tabs.groups')}</TabsTrigger>
           </TabsList>
           <TabsContent value="targets">
             <TargetPicker selected={selected.targets} onSelectedChange={setScopeSelection} />
@@ -125,20 +127,26 @@ export function RunTemplatesDialog({
         </Tabs>
         <DialogFooter className="items-center sm:justify-between">
           <div className="text-sm text-muted-foreground">
-            {templateIds.size} template(s), {ids.length} {scope} selected
+            {t('templates.run.summary', {
+              templates: templateIds.size,
+              count: ids.length,
+              scope: t(`templates.run.scope.${scope}`),
+            })}
             {overLimit && (
-              <span className="ml-2 text-destructive">Select at most {MAX_SELECTED}</span>
+              <span className="ml-2 text-destructive">
+                {t('templates.run.maxSelected', { max: MAX_SELECTED })}
+              </span>
             )}
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               onClick={handleRun}
               disabled={templateIds.size === 0 || ids.length === 0 || overLimit || run.isPending}
             >
-              {run.isPending ? 'Starting…' : 'Run'}
+              {run.isPending ? t('templates.run.starting') : t('templates.run.run')}
             </Button>
           </div>
         </DialogFooter>
@@ -177,7 +185,7 @@ function selectColumn<T extends { id: string }>(
         <Checkbox
           checked={all || (some && 'indeterminate')}
           onCheckedChange={(value) => toggle(rows.map((r) => r.id), !!value)}
-          aria-label="Select all"
+          aria-label={translate('templates.run.selectAll')}
         />
       );
     },
@@ -186,7 +194,7 @@ function selectColumn<T extends { id: string }>(
         checked={selected.has(row.original.id)}
         onCheckedChange={(value) => toggle([row.original.id], !!value)}
         onClick={(e) => e.stopPropagation()}
-        aria-label="Select row"
+        aria-label={translate('templates.run.selectRow')}
       />
     ),
     enableSorting: false,
@@ -201,6 +209,7 @@ function usePickerTable() {
 }
 
 function AssetPicker(props: PickerProps) {
+  const t = useT();
   const { filter, setFilter, tableParams, tableHandlers } = usePickerTable();
   const { page, pageSize, sortBy, sortOrder } = tableParams;
   const { data, isLoading } = useAssetsControllerGetAssetsInWorkspace({
@@ -214,7 +223,7 @@ function AssetPicker(props: PickerProps) {
 
   return (
     <DataTable
-      columns={[selectColumn(rows, props), { accessorKey: 'value', header: 'Asset' }]}
+      columns={[selectColumn(rows, props), { accessorKey: 'value', header: t('templates.run.col.asset') }]}
       data={rows}
       isLoading={isLoading}
       page={page}
@@ -226,18 +235,19 @@ function AssetPicker(props: PickerProps) {
       filterValue={filter}
       onFilterChange={setFilter}
       filterColumnKey="value"
-      filterPlaceholder="Search assets"
+      filterPlaceholder={t('templates.run.searchAssets')}
       onPageChange={tableHandlers.setPage}
       onPageSizeChange={tableHandlers.setPageSize}
       onRowClick={(row) =>
         props.onSelectedChange(toggled(props.selected, [row.id], !props.selected.has(row.id)))
       }
-      emptyMessage="No assets"
+      emptyMessage={t('templates.run.noAssets')}
     />
   );
 }
 
 function GroupPicker(props: PickerProps) {
+  const t = useT();
   const { filter, setFilter, tableParams, tableHandlers } = usePickerTable();
   const { page, pageSize, sortBy, sortOrder } = tableParams;
   const { data, isLoading } = useProjectsControllerGetMany({
@@ -253,8 +263,8 @@ function GroupPicker(props: PickerProps) {
     <DataTable
       columns={[
         selectColumn(rows, props),
-        { accessorKey: 'name', header: 'Project' },
-        { accessorKey: 'assetCount', header: 'Assets', enableSorting: false },
+        { accessorKey: 'name', header: t('templates.run.col.project') },
+        { accessorKey: 'assetCount', header: t('templates.run.col.assets'), enableSorting: false },
       ]}
       data={rows}
       isLoading={isLoading}
@@ -267,18 +277,19 @@ function GroupPicker(props: PickerProps) {
       filterValue={filter}
       onFilterChange={setFilter}
       filterColumnKey="name"
-      filterPlaceholder="Search projects"
+      filterPlaceholder={t('templates.run.searchProjects')}
       onPageChange={tableHandlers.setPage}
       onPageSizeChange={tableHandlers.setPageSize}
       onRowClick={(row) =>
         props.onSelectedChange(toggled(props.selected, [row.id], !props.selected.has(row.id)))
       }
-      emptyMessage="No projects"
+      emptyMessage={t('templates.run.noProjects')}
     />
   );
 }
 
 function TemplateChecklist({ selected, onSelectedChange }: PickerProps) {
+  const t = useT();
   // shortcut: first 100 of each list, same as the sidebar; add search/paging if users outgrow it.
   const mine = useTemplatesControllerGetMany({
     scope: 'mine',
@@ -296,7 +307,7 @@ function TemplateChecklist({ selected, onSelectedChange }: PickerProps) {
 
   return (
     <div className="space-y-2">
-      <Label>Templates</Label>
+      <Label>{t('templates.run.templates')}</Label>
       <ScrollArea className="h-36 rounded-md border dark:bg-card-surface">
         <div className="p-2">
           {rows.map((row) => (

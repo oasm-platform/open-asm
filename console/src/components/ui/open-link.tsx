@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import {
   forwardRef,
   useSyncExternalStore,
@@ -70,6 +71,7 @@ OpenLink.displayName = 'OpenLink';
 
 /** Mount once, at the root route. */
 export function OpenLinkDialog() {
+  const t = useT();
   const href = useSyncExternalStore(subscribe, getSnapshot);
 
   return (
@@ -78,10 +80,10 @@ export function OpenLinkDialog() {
       onOpenChange={(open) => {
         if (!open) setPendingHref(null);
       }}
-      title="Open external link?"
-      description="This link will open outside the console."
-      confirmText="Open"
-      cancelText="Cancel"
+      title={t('components.openLink.title')}
+      description={t('components.openLink.description')}
+      confirmText={t('components.openLink.open')}
+      cancelText={t('common.cancel')}
       onConfirm={() => {
         if (href) window.open(href, '_blank', 'noopener,noreferrer');
       }}

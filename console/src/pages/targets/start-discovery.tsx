@@ -1,3 +1,4 @@
+import { t, useT } from '@/lib/i18n-dictionary';
 import Page from '@/components/common/page';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -60,8 +61,8 @@ type FormValues = {
 const parseTargetsInput = (input: string): string[] => {
   return input
     .split(/[,\n]+/)
-    .map((t) => t.trim())
-    .filter((t) => t.length > 0);
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
 };
 
 /**
@@ -91,12 +92,12 @@ const validateDomains = (input: string): string | true => {
   const targets = parseTargetsInput(input);
 
   if (targets.length === 0) {
-    return 'Please enter at least one domain.';
+    return t('targets.start.domainRequired');
   }
 
   for (const target of targets) {
     if (!domainRegex.test(target)) {
-      return `"${target}" is not a valid domain name.`;
+      return t('targets.start.invalidDomain', { target });
     }
   }
 
@@ -110,12 +111,12 @@ const validateCidr = (input: string): string | true => {
   const targets = parseTargetsInput(input);
 
   if (targets.length === 0) {
-    return 'Please enter at least one CIDR range.';
+    return t('targets.start.cidrRequired');
   }
 
   for (const target of targets) {
     if (!cidrRegex.test(target)) {
-      return `"${target}" is not a valid CIDR range from /24 to /32 (e.g. 203.0.113.0/24, 203.0.113.16/28).`;
+      return t('targets.start.invalidCidr', { target });
     }
   }
 
@@ -129,12 +130,12 @@ const validateIp = (input: string): string | true => {
   const targets = parseTargetsInput(input);
 
   if (targets.length === 0) {
-    return 'Please enter at least one IP address.';
+    return t('targets.start.ipRequired');
   }
 
   for (const target of targets) {
     if (!ipRegex.test(target)) {
-      return `"${target}" is not a valid IP address (e.g. 8.8.8.8).`;
+      return t('targets.start.invalidIp', { target });
     }
   }
 
@@ -142,6 +143,7 @@ const validateIp = (input: string): string | true => {
 };
 
 export default function StartDiscovery() {
+  const t = useT();
   const [targetType, setTargetType] = useState<TargetType>('DOMAIN');
   const {
     register,
@@ -174,7 +176,7 @@ export default function StartDiscovery() {
     if (duplicates.length > 0) {
       setError('value', {
         type: 'manual',
-        message: `Duplicate values detected: ${duplicates.join(', ')}`,
+        message: t('targets.start.duplicates', { values: duplicates.join(', ') }),
       });
       return;
     }
@@ -184,7 +186,7 @@ export default function StartDiscovery() {
 
     // Create unique targets array (deduplicated)
     const uniqueTargets = Array.from(
-      new Set(targets.map((t) => t.toLowerCase())),
+      new Set(targets.map((item) => item.toLowerCase())),
     );
 
     mutate(
@@ -199,7 +201,7 @@ export default function StartDiscovery() {
             response?: { data?: { message?: string } };
           };
           const errorMessage =
-            err?.response?.data?.message || 'Failed to create targets';
+            err?.response?.data?.message || t('targets.start.createFailed');
           setError('value', {
             type: 'manual',
             message: errorMessage,
@@ -208,7 +210,7 @@ export default function StartDiscovery() {
         onSuccess: (res: BulkTargetResultDto) => {
           if (res.totalCreated > 0) {
             toast.success(
-              `Successfully created ${res.totalCreated} target${res.totalCreated > 1 ? 's' : ''}.`,
+              t('targets.start.created', { count: res.totalCreated }),
             );
             reset();
             queryClient.refetchQueries({
@@ -219,7 +221,7 @@ export default function StartDiscovery() {
 
           if (res.totalSkipped > 0) {
             toast.info(
-              `${res.totalSkipped} target${res.totalSkipped > 1 ? 's' : ''} skipped (already exist).`,
+              t('targets.start.skipped', { count: res.totalSkipped }),
             );
           }
         },
@@ -229,8 +231,8 @@ export default function StartDiscovery() {
 
   return (
     <Page
-      title="Start discovery"
-      description="Add a target and scan it to discover its assets"
+      title={t('targets.start.title')}
+      description={t('targets.start.description')}
       headerClassName="mx-auto w-full max-w-4xl"
       permission="target.write"
     >
@@ -239,8 +241,8 @@ export default function StartDiscovery() {
           <div className="mb-6">
             <p className="text-muted-foreground mt-2">
               {targetType === 'GIT_ORG'
-                ? 'Pick GitHub organizations or GitLab groups; their repositories are synced and scanned.'
-                : 'Enter one or more targets to scan, separated by commas or new lines.'}
+                ? t('targets.start.gitOrgHint')
+                : t('targets.start.hint')}
             </p>
           </div>
 
@@ -262,7 +264,7 @@ export default function StartDiscovery() {
                     className={targetTypeColor.DOMAIN}
                   />
                   <span className={`${targetType === 'DOMAIN' ? 'font-bold' : 'font-normal'} ${targetTypeColor.DOMAIN}`}>
-                    Root domain
+                    {t('targets.start.types.domain')}
                   </span>
                 </Label>
                 <Label htmlFor="type-ip" className="flex items-center gap-2 cursor-pointer">
@@ -272,7 +274,7 @@ export default function StartDiscovery() {
                     className={targetTypeColor.IP}
                   />
                   <span className={`${targetType === 'IP' ? 'font-bold' : 'font-normal'} ${targetTypeColor.IP}`}>
-                    IP address
+                    {t('targets.start.types.ip')}
                   </span>
                 </Label>
                 <Label htmlFor="type-cidr" className="flex items-center gap-2 cursor-pointer">
@@ -282,7 +284,7 @@ export default function StartDiscovery() {
                     className={targetTypeColor.CIDR}
                   />
                   <span className={`${targetType === 'CIDR' ? 'font-bold' : 'font-normal'} ${targetTypeColor.CIDR}`}>
-                    CIDR range
+                    {t('targets.start.types.cidr')}
                   </span>
                 </Label>
                 <Label htmlFor="type-git-org" className="flex items-center gap-2 cursor-pointer">
@@ -292,7 +294,7 @@ export default function StartDiscovery() {
                     className={targetTypeColor.GIT_ORG}
                   />
                   <span className={`${targetType === 'GIT_ORG' ? 'font-bold' : 'font-normal'} ${targetTypeColor.GIT_ORG}`}>
-                    Git organization
+                    {t('targets.start.types.gitOrg')}
                   </span>
                 </Label>
               </RadioGroup>
@@ -309,14 +311,14 @@ export default function StartDiscovery() {
                 className={textareaBorderColor[targetType]}
                 placeholder={
                   targetType === 'DOMAIN'
-                    ? 'e.g. example.com, test.com, demo.org'
+                    ? t('targets.start.placeholder.domain')
                     : targetType === 'IP'
-                      ? 'e.g. 8.8.8.8, 1.1.1.1'
-                      : 'e.g. 203.0.113.0/24, 198.51.100.16/28 (/24 to /32)'
+                      ? t('targets.start.placeholder.ip')
+                      : t('targets.start.placeholder.cidr')
                 }
                 autoComplete="off"
                 {...register('value', {
-                  required: 'At least one target is required.',
+                  required: t('targets.start.required'),
                   validate: validateTargets,
                 })}
                 onPaste={(e) => {
@@ -327,8 +329,8 @@ export default function StartDiscovery() {
                   // Parse multiple targets from pasted text (comma or newline separated)
                   const pastedTargets = trimmedText
                     .split(/[,\n]+/)
-                    .map((t) => t.trim())
-                    .filter((t) => t.length > 0)
+                    .map((item) => item.trim())
+                    .filter((item) => item.length > 0)
                     .map((target) => {
                       if (targetType === 'CIDR' || targetType === 'IP') {
                         return target;
@@ -372,11 +374,11 @@ export default function StartDiscovery() {
                 type="button"
                 onClick={() => navigate({ to: '/targets' })}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button disabled={isPending} type="submit" className={targetTypeButton[targetType]}>
                 {isPending && <Loader2Icon className="animate-spin" />}
-                Start Discovery
+                {t('targets.start.submit')}
               </Button>
             </div>
             </>
