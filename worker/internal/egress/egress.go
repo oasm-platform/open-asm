@@ -161,6 +161,9 @@ func (s *Server) dialVetted(ctx context.Context, network, addr string) (net.Conn
 	if err != nil {
 		return nil, err
 	}
+	// dialErr stays nil only when no answer passed policy; a vetted address
+	// that fails to connect (closed/filtered port) is an upstream error, not a denial.
+	var dialErr error
 	for _, a := range addrs {
 		ip, err := netip.ParseAddr(a)
 		if err != nil || !allowedAddr(ip, s.allow) {
@@ -170,6 +173,10 @@ func (s *Server) dialVetted(ctx context.Context, network, addr string) (net.Conn
 		if err == nil {
 			return c, nil
 		}
+		dialErr = err
+	}
+	if dialErr != nil {
+		return nil, dialErr
 	}
 	return nil, &blockedError{target: addr}
 }

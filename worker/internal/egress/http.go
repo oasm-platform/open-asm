@@ -140,6 +140,7 @@ func (p *httpProxy) forward(w *connResponseWriter, r *http.Request) {
 			http.Error(w, "egress denied by policy", http.StatusForbidden)
 			return
 		}
+		p.srv.logWarning("egress upstream error exec=%s method=%s target=%s err=%v", label, r.Method, requestTarget(r), err)
 		http.Error(w, "upstream error", http.StatusBadGateway)
 		return
 	}
@@ -198,6 +199,7 @@ func (p *httpProxy) tunnel(w *connResponseWriter, r *http.Request) {
 			http.Error(w, "egress denied by policy", http.StatusForbidden)
 			return
 		}
+		p.srv.logWarning("egress upstream error exec=%s method=CONNECT target=%s err=%v", label, r.Host, err)
 		http.Error(w, "upstream error", http.StatusBadGateway)
 		return
 	}
