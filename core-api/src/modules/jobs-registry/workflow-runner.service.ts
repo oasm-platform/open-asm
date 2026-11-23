@@ -217,6 +217,7 @@ export class WorkflowRunnerService {
     let completionJob: Job | null = null;
     let dispatched = 0;
     let completed = false;
+    let workspaceIdOfRun = '';
 
     try {
       const jobHistory = await queryRunner.manager
@@ -244,6 +245,7 @@ export class WorkflowRunnerService {
 
       const workflow = jobHistory.workflow;
       const workspaceId = workflow.workspace?.id ?? '';
+      workspaceIdOfRun = workspaceId;
       const context =
         prebuilt ?? (await this.buildRunGraph(workflow, workflow.workspace?.id));
       const scope: WorkflowRunScope = jobHistory.scope ?? {};
@@ -282,22 +284,27 @@ export class WorkflowRunnerService {
           }
 
           try {
-            const jobs = await this.jobsRegistryService.createNewJob({
-              tool,
-              config: step.config,
-              configProfileId: step.configProfileId,
-              category: step.category,
-              input: step.input,
-              // Every step of a run reuses the scope captured at start, so a
-              // subdomain step's newly discovered assets are picked up by the
-              // next step while a project run stays inside its selection.
-              targetIds: scope.targetIds,
-              assetIds: scope.assetIds,
-              workflow,
-              jobHistory,
-              priority: tool.priority,
-              workspaceId,
-            });
+            // On the run's transaction: the step's jobs commit together with
+            // its `dispatched` state, or not at all.
+            const jobs = await this.jobsRegistryService.createNewJob(
+              {
+                tool,
+                config: step.config,
+                configProfileId: step.configProfileId,
+                category: step.category,
+                input: step.input,
+                // Every step of a run reuses the scope captured at start, so a
+                // subdomain step's newly discovered assets are picked up by the
+                // next step while a project run stays inside its selection.
+                targetIds: scope.targetIds,
+                assetIds: scope.assetIds,
+                workflow,
+                jobHistory,
+                priority: tool.priority,
+                workspaceId,
+              },
+              { manager: queryRunner.manager },
+            );
 
             if (jobs.length === 0) {
               state = withStepSkipped(state, step.id, 'no-inputs');
@@ -346,6 +353,11 @@ export class WorkflowRunnerService {
       throw error;
     } finally {
       await queryRunner.release();
+    }
+
+    // Workers hear about new jobs only once they are committed and claimable.
+    if (dispatched > 0) {
+      this.jobsRegistryService.notifyJobsAvailable(workspaceIdOfRun);
     }
 
     // Emitted after the commit so listeners never read uncommitted state.

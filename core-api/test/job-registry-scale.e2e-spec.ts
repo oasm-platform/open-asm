@@ -3,6 +3,7 @@ import { Asset } from '@/modules/assets/entities/assets.entity';
 import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity';
 import { Job } from '@/modules/jobs-registry/entities/job.entity';
 import { JobDispatchService } from '@/modules/jobs-registry/job-dispatch.service';
+import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
 import {
   Target,
   TargetSource,
@@ -108,6 +109,146 @@ describe('Job registry at scale (e2e)', () => {
     await dataSource.getRepository(Job).insert(rows as never);
     return rows as unknown as Job[];
   }
+
+  describe('job creation', () => {
+    const HOSTS = 50_000;
+    const createdTargets: string[] = [];
+
+    afterAll(async () => {
+      for (const id of createdTargets) {
+        await dataSource.getRepository(Target).delete({ id });
+      }
+    });
+
+    /** A domain target with `hosts` enabled assets, inserted in bulk. */
+    async function createTargetWithHosts(hosts: number): Promise<Target> {
+      const domain = `e2e-hosts-${hosts}-${Date.now()}.example.com`;
+      const target = await dataSource.getRepository(Target).save({
+        value: domain,
+        type: TargetType.DOMAIN,
+        source: TargetSource.MANUAL,
+        workspaceId,
+        lastDiscoveredAt: new Date(),
+        reScanCount: 0,
+      });
+      createdTargets.push(target.id);
+      const assets = Array.from({ length: hosts }, (_, i) => ({
+        value: `h${i}.${domain}`,
+        targetId: target.id,
+        isPrimary: i === 0,
+        isEnabled: true,
+      }));
+      for (let i = 0; i < assets.length; i += 1_000) {
+        await dataSource.getRepository(Asset).insert(assets.slice(i, i + 1_000));
+      }
+      return target;
+    }
+
+    function naabu(): Promise<Tool> {
+      return dataSource.getRepository(Tool).findOneByOrFail({ name: 'naabu' });
+    }
+
+    it(`creates one job per host for a step over ${HOSTS} hosts`, async () => {
+      // Given
+      const target = await createTargetWithHosts(HOSTS);
+
+      // When
+      const started = Date.now();
+      const jobs = await app.app.get(JobsRegistryService).createNewJob({
+        tool: await naabu(),
+        targetIds: [target.id],
+        workspaceId,
+        jobName: 'e2e-big-step',
+      });
+      const elapsedMs = Date.now() - started;
+
+      // Then: every host got a job, and every job is in the database
+      expect(jobs).toHaveLength(HOSTS);
+      const stored = await dataSource
+        .getRepository(Job)
+        .count({ where: { asset: { targetId: target.id } } });
+      expect(stored).toBe(HOSTS);
+      // Recorded for the PR description; not a pass/fail threshold.
+      console.info(`createNewJob(${HOSTS} hosts) took ${elapsedMs} ms`);
+    }, 600_000);
+
+    it('writes the same job row the previous save() did', async () => {
+      // Given
+      const target = await createTargetWithHosts(1);
+      const tool = await naabu();
+
+      // When
+      const [job] = await app.app.get(JobsRegistryService).createNewJob({
+        tool,
+        targetIds: [target.id],
+        workspaceId,
+        jobName: 'e2e-row-shape',
+        priority: 2,
+      });
+
+      // Then: the returned entity carries the generated columns, and the row
+      // has every field and relation the dispatch path reads
+      expect(job.createdAt).toBeInstanceOf(Date);
+      const row = await dataSource.getRepository(Job).findOneOrFail({
+        where: { id: job.id },
+        relations: { asset: true, tool: true, jobHistory: true },
+      });
+      expect(row).toMatchObject({
+        status: JobStatus.PENDING,
+        category: 'ports_scanner',
+        // A varchar column: it always reads back as a string.
+        priority: '2',
+        isSaveRawResult: false,
+        isSaveData: true,
+        isPublishEvent: false,
+        retryCount: 0,
+        workerId: null,
+        pickJobAt: null,
+        inputs: null,
+        config: null,
+        configProfileId: null,
+      });
+      expect(row.command).toContain(`h0.${target.value}`);
+      expect(row.asset.targetId).toBe(target.id);
+      expect(row.tool.id).toBe(tool.id);
+      expect(row.jobHistory.id).toBeTruthy();
+    });
+
+    it("leaves no job behind when the caller's transaction rolls back", async () => {
+      // Given: a step created on a transaction that is then rolled back
+      const target = await createTargetWithHosts(3);
+      const tool = await naabu();
+      const history = await dataSource
+        .getRepository(JobHistory)
+        .save({ jobHistoryName: 'e2e-rollback' });
+      const runner = dataSource.createQueryRunner();
+      await runner.connect();
+      await runner.startTransaction();
+
+      // When
+      try {
+        const jobs = await app.app.get(JobsRegistryService).createNewJob(
+          {
+            tool,
+            targetIds: [target.id],
+            workspaceId,
+            jobHistory: history,
+          },
+          { manager: runner.manager },
+        );
+        expect(jobs).toHaveLength(3);
+      } finally {
+        await runner.rollbackTransaction();
+        await runner.release();
+      }
+
+      // Then
+      const stored = await dataSource
+        .getRepository(Job)
+        .count({ where: { jobHistory: { id: history.id } } });
+      expect(stored).toBe(0);
+    });
+  });
 
   describe('claim', () => {
     it('skips a job another transaction holds instead of waiting for it', async () => {

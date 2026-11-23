@@ -85,6 +85,14 @@ export const MAX_JOB_CLAIM_SIZE = 100;
 export const WORKER_CLAIM_CACHE_MS = 5_000;
 
 /**
+ * Jobs per INSERT when a step creates its jobs. One statement for a whole step
+ * overflows Postgres' 65,535 bind parameters (a job row binds ~16) somewhere
+ * past four thousand jobs, and TypeORM's `save()` spends minutes preparing a
+ * step of 50,000 before it fails.
+ */
+export const JOB_INSERT_CHUNK = 1_000;
+
+/**
  * How far back the dashboard timeline looks. The timeline query runs two window
  * functions over every job of the workspace and then keeps only the newest 15
  * groups, so without a bound it scans the whole job history on every dashboard

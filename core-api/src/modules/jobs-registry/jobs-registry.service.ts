@@ -1,5 +1,6 @@
 import { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
+import { JOB_INSERT_CHUNK } from '@/common/constants/app.constants';
 import { BullMQName, EventTriggerType, JobPriority, JobStatus, ToolCategory, WorkerType } from '@/common/enums/enum';
 import bindingCommand from '@/common/utils/binding-command.util';
 import { getManyResponse } from '@/common/utils/get-many-response.util';
@@ -12,7 +13,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
-import { DataSource, DeepPartial, Repository } from 'typeorm';
+import { DataSource, DeepPartial, EntityManager, Repository } from 'typeorm';
+import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { StorageService } from '../storage/storage.service';
 import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
@@ -195,7 +197,16 @@ export class JobsRegistryService {
     category,
     customTemplateIds,
     input,
-  }: CreateJobs): Promise<Job[]> {
+  }: CreateJobs,
+  {
+    manager,
+  }: {
+    /**
+     * Writes the jobs on this transaction instead of committing them on their
+     * own; the caller then owns `notifyJobsAvailable` after its commit.
+     */
+    manager?: EntityManager;
+  } = {}): Promise<Job[]> {
     // A workflow's inline config is author-controlled and never schema-checked:
     // template keys there would run templates the author cannot read, or seed
     // a shared connector cache. Only the explicit customTemplateIds may set them.
@@ -361,11 +372,30 @@ export class JobsRegistryService {
 
     // Step 4: save all jobs
     if (jobsToInsert.length > 0) {
-      await jobRepo.save(jobsToInsert);
-      this.notifyJobsAvailable(workspaceId);
+      if (manager) {
+        // The caller's transaction commits these jobs and announces them. A
+        // savepoint keeps a failed insert from aborting that transaction.
+        await manager.transaction((savepoint) =>
+          this.insertJobs(savepoint.getRepository(Job), jobsToInsert),
+        );
+      } else {
+        await this.insertJobs(jobRepo, jobsToInsert);
+        this.notifyJobsAvailable(workspaceId);
+      }
     }
 
     return jobsToInsert;
+  }
+
+  /** Inserts in chunks: one statement for a big step overflows bind parameters. */
+  private async insertJobs(repo: Repository<Job>, jobs: Job[]): Promise<void> {
+    for (let start = 0; start < jobs.length; start += JOB_INSERT_CHUNK) {
+      // Entities, not partials: their relations are already loaded rows, and
+      // insert() writes just their ids. TypeORM's partial type rejects them.
+      await repo.insert(
+        jobs.slice(start, start + JOB_INSERT_CHUNK) as QueryDeepPartialEntity<Job>[],
+      );
+    }
   }
 
   /**
@@ -672,9 +702,11 @@ export class JobsRegistryService {
   /**
    * Nudge workers that can claim in this workspace to pull now instead of
    * waiting out their idle poll. Fire-and-forget: the jobs are already saved,
-   * and a lost hint only delays pickup by one poll interval.
+   * and a lost hint only delays pickup by one poll interval. Public for
+   * callers that commit jobs on their own transaction (`createNewJob` with a
+   * manager): they call it once the jobs are committed.
    */
-  private notifyJobsAvailable(workspaceId: string | undefined): void {
+  public notifyJobsAvailable(workspaceId: string | undefined): void {
     if (!workspaceId) return;
     this.workerStreamRegistry
       .publishJobsAvailable(workspaceId)
