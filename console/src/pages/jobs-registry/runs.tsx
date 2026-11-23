@@ -66,6 +66,13 @@ import {
 
 const NO_STEPS: WorkflowStepStatusDto[] = [];
 
+/**
+ * Refresh rate of an active run. Each refresh aggregates every job of the
+ * run, so a 50,000-job run polled every second cost the API more than the
+ * scan did.
+ */
+const ACTIVE_RUN_POLL_MS = 3_000;
+
 const formatEta = (seconds?: number | null): string | null => {
   if (seconds == null) return null;
   if (seconds < 60) return t('jobsRegistry.run.etaLeft', { time: `${seconds}s` });
@@ -309,7 +316,8 @@ export default function Runs() {
         // Poll only while any tool in this run is still active.
         // The function form is evaluated lazily by React Query, so it always
         // reads the latest value without re-creating the query config.
-        refetchInterval: () => (hasActiveJobsRef.current ? 1000 : false),
+        refetchInterval: () =>
+          hasActiveJobsRef.current ? ACTIVE_RUN_POLL_MS : false,
       },
     });
 
@@ -356,7 +364,7 @@ export default function Runs() {
     },
     {
       query: {
-        refetchInterval: hasActiveJobs ? 1000 : false,
+        refetchInterval: hasActiveJobs ? ACTIVE_RUN_POLL_MS : false,
       },
     },
   );
