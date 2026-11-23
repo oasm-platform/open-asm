@@ -59,6 +59,7 @@ describe('JobDispatchService', () => {
         orderBy: jest.fn().mockReturnThis(),
         addOrderBy: jest.fn().mockReturnThis(),
         setLock: jest.fn().mockReturnThis(),
+        setOnLocked: jest.fn().mockReturnThis(),
         limit: jest.fn().mockReturnThis(),
         getMany: jest.fn().mockResolvedValue(jobs),
       };
@@ -110,6 +111,20 @@ describe('JobDispatchService', () => {
       expect(queryRunner.manager.update).toHaveBeenCalledTimes(1);
       expect(queryRunner.commitTransaction).toHaveBeenCalled();
       expect(queryRunner.rollbackTransaction).not.toHaveBeenCalled();
+    });
+
+    it('skips rows another claim has locked instead of waiting on them', async () => {
+      // Given
+      const { qb } = givenWorkerAndQueue(buildWorker(), []);
+
+      // When
+      await service.getNextJobs('worker-uuid', 5);
+
+      // Then: FOR UPDATE OF jobs SKIP LOCKED
+      expect(qb.setLock).toHaveBeenCalledWith('pessimistic_write', undefined, [
+        'jobs',
+      ]);
+      expect(qb.setOnLocked).toHaveBeenCalledWith('skip_locked');
     });
 
     it('caps the claim so a worker cannot drain the whole queue', async () => {
