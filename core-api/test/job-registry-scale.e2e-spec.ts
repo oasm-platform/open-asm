@@ -4,6 +4,7 @@ import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity'
 import { Job } from '@/modules/jobs-registry/entities/job.entity';
 import { JobDispatchService } from '@/modules/jobs-registry/job-dispatch.service';
 import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
+import { WorkflowRunnerService } from '@/modules/jobs-registry/workflow-runner.service';
 import {
   Target,
   TargetSource,
@@ -11,6 +12,7 @@ import {
 } from '@/modules/targets/entities/target.entity';
 import { Tool } from '@/modules/tools/entities/tools.entity';
 import { WorkerInstance } from '@/modules/workers/entities/worker.entity';
+import { Workflow } from '@/modules/workflows/entities/workflow.entity';
 import { randomUUID } from 'crypto';
 import type { DataSource } from 'typeorm';
 import { closeTestApp, createTestApp } from './helpers/app';
@@ -248,6 +250,199 @@ describe('Job registry at scale (e2e)', () => {
         .count({ where: { jobHistory: { id: history.id } } });
       expect(stored).toBe(0);
     });
+  });
+
+  describe('run advancement', () => {
+    const STEP_JOBS = 2_000;
+    let workflowId: string | undefined;
+    let stepTargetId: string | undefined;
+    let burstWorkflowId: string | undefined;
+    let burstTargetId: string | undefined;
+
+    afterAll(async () => {
+      if (workflowId) {
+        // Cascades to its runs and their jobs.
+        await dataSource.getRepository(Workflow).delete({ id: workflowId });
+      }
+      if (stepTargetId) {
+        await dataSource.getRepository(Target).delete({ id: stepTargetId });
+      }
+      if (burstWorkflowId) {
+        await dataSource.getRepository(Workflow).delete({ id: burstWorkflowId });
+      }
+      if (burstTargetId) {
+        await dataSource.getRepository(Target).delete({ id: burstTargetId });
+      }
+    });
+
+    it(`advances a ${STEP_JOBS}-job step once it drains, not once per job`, async () => {
+      // Given: a two-step run (naabu → httpx) whose first step has STEP_JOBS jobs
+      const domain = `e2e-advance-${Date.now()}.example.com`;
+      const target = await dataSource.getRepository(Target).save({
+        value: domain,
+        type: TargetType.DOMAIN,
+        source: TargetSource.MANUAL,
+        workspaceId,
+        lastDiscoveredAt: new Date(),
+        reScanCount: 0,
+      });
+      stepTargetId = target.id;
+      const hosts = Array.from({ length: STEP_JOBS }, (_, i) => ({
+        value: `h${i}.${domain}`,
+        targetId: target.id,
+        isPrimary: i === 0,
+        isEnabled: true,
+      }));
+      for (let i = 0; i < hosts.length; i += 1_000) {
+        await dataSource.getRepository(Asset).insert(hosts.slice(i, i + 1_000));
+      }
+      const workflow = await dataSource.getRepository(Workflow).save({
+        name: 'e2e advance',
+        filePath: `e2e-advance-${Date.now()}.yaml`,
+        workspace: { id: workspaceId },
+        content: {
+          name: 'e2e advance',
+          on: { target: [] },
+          jobs: {
+            port_scan: { run: 'naabu' },
+            http_probe: { run: 'httpx', needs: ['port_scan'] },
+          },
+        },
+      } as unknown as Workflow);
+      workflowId = workflow.id;
+      const runner = app.app.get(WorkflowRunnerService);
+      const { jobHistory } = await runner.startRun({
+        workflow,
+        workspaceId,
+        jobName: 'e2e-advance',
+        targetIds: [target.id],
+      });
+      const runId = jobHistory!.id;
+      const jobs = await dataSource.getRepository(Job).find({
+        where: { jobHistory: { id: runId } },
+        relations: { tool: true },
+      });
+      expect(jobs).toHaveLength(STEP_JOBS);
+      const advance = jest.spyOn(
+        runner as unknown as { advance: () => Promise<unknown> },
+        'advance',
+      );
+
+      // When: every job finishes the way JobResultProcessor finishes it —
+      // committed first, then handed to the engine — ten at a time
+      const started = Date.now();
+      let next = 0;
+      await Promise.all(
+        Array.from({ length: 10 }, async () => {
+          while (next < jobs.length) {
+            const job = jobs[next++];
+            await dataSource
+              .getRepository(Job)
+              .update(
+                { id: job.id },
+                { status: JobStatus.COMPLETED, completedAt: new Date() },
+              );
+            await runner.onJobTerminal({ ...job, jobHistory: { id: runId } } as Job);
+          }
+        }),
+      );
+      const elapsedMs = Date.now() - started;
+      const advances = advance.mock.calls.length;
+      advance.mockRestore();
+      // Recorded for the PR description; not a pass/fail threshold.
+      console.info(
+        `${STEP_JOBS} job completions: ${advances} advance(s), ${elapsedMs} ms`,
+      );
+
+      // Then: the run moved on and finished (httpx has no service to probe),
+      // with a handful of advances instead of one per job
+      const run = await dataSource
+        .getRepository(JobHistory)
+        .findOneByOrFail({ id: runId });
+      expect(run.steps).toMatchObject({
+        port_scan: { status: 'done', jobs: STEP_JOBS },
+        http_probe: { status: 'skipped', reason: 'no-inputs' },
+      });
+      expect(run.isCompleted).toBe(true);
+      expect(advances).toBeGreaterThanOrEqual(1);
+      expect(advances).toBeLessThanOrEqual(10);
+    }, 600_000);
+
+    it('survives every job of a step finishing at the same instant', async () => {
+      // Given: a 20-job step whose jobs all commit before any reaches the
+      // engine, so each of them sees the step drained
+      const domain = `e2e-burst-${Date.now()}.example.com`;
+      const target = await dataSource.getRepository(Target).save({
+        value: domain,
+        type: TargetType.DOMAIN,
+        source: TargetSource.MANUAL,
+        workspaceId,
+        lastDiscoveredAt: new Date(),
+        reScanCount: 0,
+      });
+      burstTargetId = target.id;
+      await dataSource.getRepository(Asset).insert(
+        Array.from({ length: 20 }, (_, i) => ({
+          value: `h${i}.${domain}`,
+          targetId: target.id,
+          isPrimary: i === 0,
+          isEnabled: true,
+        })),
+      );
+      const workflow = await dataSource.getRepository(Workflow).save({
+        name: 'e2e burst',
+        filePath: `e2e-burst-${Date.now()}.yaml`,
+        workspace: { id: workspaceId },
+        content: {
+          name: 'e2e burst',
+          on: { target: [] },
+          jobs: {
+            port_scan: { run: 'naabu' },
+            http_probe: { run: 'httpx', needs: ['port_scan'] },
+          },
+        },
+      } as unknown as Workflow);
+      burstWorkflowId = workflow.id;
+      const runner = app.app.get(WorkflowRunnerService);
+      const { jobHistory } = await runner.startRun({
+        workflow,
+        workspaceId,
+        jobName: 'e2e-burst',
+        targetIds: [target.id],
+      });
+      const runId = jobHistory!.id;
+      const jobs = await dataSource.getRepository(Job).find({
+        where: { jobHistory: { id: runId } },
+        relations: { tool: true },
+      });
+      await dataSource
+        .getRepository(Job)
+        .update(
+          { jobHistory: { id: runId } },
+          { status: JobStatus.COMPLETED, completedAt: new Date() },
+        );
+
+      // When: all of them reach the engine together
+      const outcome = await Promise.race([
+        Promise.all(
+          jobs.map((job) =>
+            runner.onJobTerminal({ ...job, jobHistory: { id: runId } } as Job),
+          ),
+        ).then(() => 'done' as const),
+        new Promise<'hung'>((resolve) => setTimeout(() => resolve('hung'), 60_000)),
+      ]);
+
+      // Then: no pool exhaustion, and the run finished exactly once
+      expect(outcome).toBe('done');
+      const run = await dataSource
+        .getRepository(JobHistory)
+        .findOneByOrFail({ id: runId });
+      expect(run.isCompleted).toBe(true);
+      expect(run.steps).toMatchObject({
+        port_scan: { status: 'done', jobs: 20 },
+        http_probe: { status: 'skipped', reason: 'no-inputs' },
+      });
+    }, 120_000);
   });
 
   describe('claim', () => {

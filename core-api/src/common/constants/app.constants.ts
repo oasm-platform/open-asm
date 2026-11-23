@@ -93,6 +93,15 @@ export const WORKER_CLAIM_CACHE_MS = 5_000;
 export const JOB_INSERT_CHUNK = 1_000;
 
 /**
+ * Run advances one core-api instance runs at once (`RunAdvanceGate`). An
+ * advance holds a pooled connection for its transaction and borrows more while
+ * it holds the run's lock, so this must stay well under the pool size: with
+ * the default pool of 10, ten unbounded advances queued on one run's lock left
+ * the lock holder waiting forever for a connection.
+ */
+export const MAX_CONCURRENT_RUN_ADVANCES = 4;
+
+/**
  * How far back the dashboard timeline looks. The timeline query runs two window
  * functions over every job of the workspace and then keeps only the newest 15
  * groups, so without a bound it scans the whole job history on every dashboard

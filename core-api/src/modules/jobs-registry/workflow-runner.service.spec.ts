@@ -1,6 +1,7 @@
 import {
   EventTriggerType,
   JobRunType,
+  JobStatus,
   ToolCategory,
 } from '@/common/enums/enum';
 import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
@@ -53,7 +54,11 @@ function workflow(
 }
 
 interface FakeDb {
-  dataSource: { createQueryRunner: jest.Mock };
+  dataSource: { createQueryRunner: jest.Mock; getRepository: jest.Mock };
+  /** What the drain probe sees: whether the job's step still has active jobs. */
+  setStepActive: (active: boolean) => void;
+  /** The drain probe's query builder, to assert on its filters. */
+  probe: { where: jest.Mock; andWhere: jest.Mock; getRawOne: jest.Mock };
   queryRunner: {
     manager: unknown;
     commitTransaction: jest.Mock;
@@ -118,6 +123,14 @@ function createFakeDb(overrides: Partial<JobHistory> = {}): FakeDb {
 
   let summaries: StepJobSummary[] = [];
   let activeCount = 0;
+  let stepActive = false;
+  const probe = {
+    select: jest.fn(() => probe),
+    where: jest.fn(() => probe),
+    andWhere: jest.fn(() => probe),
+    limit: jest.fn(() => probe),
+    getRawOne: jest.fn(() => Promise.resolve(stepActive ? { one: 1 } : undefined)),
+  };
   let lastJob: Job | null = null;
 
   const historyBuilder: QueryRunnerChain = {
@@ -189,7 +202,14 @@ function createFakeDb(overrides: Partial<JobHistory> = {}): FakeDb {
   };
 
   return {
-    dataSource: { createQueryRunner: jest.fn(() => queryRunner) },
+    dataSource: {
+      createQueryRunner: jest.fn(() => queryRunner),
+      getRepository: jest.fn(() => ({ createQueryBuilder: () => probe })),
+    },
+    setStepActive: (active) => {
+      stepActive = active;
+    },
+    probe,
     queryRunner,
     history,
     setSummaries: (next) => {
@@ -860,6 +880,85 @@ describe('WorkflowRunnerService', () => {
       await service.onJobTerminal({ id: 'job-1' } as Job);
 
       expect(createNewJob).not.toHaveBeenCalled();
+    });
+
+    const finishedNaabuJob = {
+      id: 'job-1',
+      category: 'ports_scanner',
+      tool: { id: 'tool-naabu', name: 'naabu' },
+      jobHistory: { id: 'history-1' },
+    } as unknown as Job;
+
+    it('leaves the run alone while its step still has jobs to run', async () => {
+      // Given: other jobs of the same step are still pending or running
+      await setup(createFakeDb());
+      db.setStepActive(true);
+
+      // When
+      await service.onJobTerminal(finishedNaabuJob);
+
+      // Then: no lock on the run, no aggregate, no dispatch
+      expect(db.dataSource.createQueryRunner).not.toHaveBeenCalled();
+      expect(createNewJob).not.toHaveBeenCalled();
+    });
+
+    it("probes only the job's own step among the run's active jobs", async () => {
+      // Given
+      await setup(createFakeDb());
+      db.setStepActive(true);
+
+      // When
+      await service.onJobTerminal(finishedNaabuJob);
+
+      // Then
+      const filters = [
+        ...db.probe.where.mock.calls,
+        ...db.probe.andWhere.mock.calls,
+      ].map(([, params]: [string, Record<string, unknown>]) => params);
+      expect(filters).toEqual(
+        expect.arrayContaining([
+          { jobHistoryId: 'history-1' },
+          { toolId: 'tool-naabu' },
+          { category: 'ports_scanner' },
+          { active: [JobStatus.PENDING, JobStatus.IN_PROGRESS] },
+        ]),
+      );
+    });
+
+    it("advances the run when the job was its step's last", async () => {
+      // Given
+      await setup(
+        createFakeDb({
+          workflow: workflow([
+            { name: 'Port Scan', run: 'naabu' },
+            { name: 'HTTP Probe', run: 'httpx', needs: ['Port Scan'] },
+          ]),
+          steps: { 'Port Scan': { status: 'dispatched', jobs: 1 } },
+        }),
+      );
+      getToolByNames.mockResolvedValue([
+        tool('naabu', ToolCategory.PORTS_SCANNER),
+        tool('httpx', ToolCategory.HTTP_PROBE),
+      ]);
+      db.setSummaries([
+        {
+          tool: 'naabu',
+          category: 'ports_scanner',
+          total: 1,
+          pending: 0,
+          inProgress: 0,
+          completed: 1,
+          failed: 0,
+          cancelled: 0,
+        },
+      ]);
+      db.setStepActive(false);
+
+      // When
+      await service.onJobTerminal(finishedNaabuJob);
+
+      // Then
+      expect(createNewJob.mock.calls[0][0].tool.name).toBe('httpx');
     });
   });
 

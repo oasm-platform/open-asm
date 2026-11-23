@@ -26,6 +26,8 @@ import { WorkspacesService } from '../workspaces/workspaces.service';
 import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
 import { JobsRegistryService } from './jobs-registry.service';
+import { RunAdvanceGate } from './run-advance-gate';
+import { MAX_CONCURRENT_RUN_ADVANCES } from '@/common/constants/app.constants';
 import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 export interface StartRunInput {
@@ -74,6 +76,8 @@ interface RunGraph {
 @Injectable()
 export class WorkflowRunnerService {
   private readonly logger = new Logger(WorkflowRunnerService.name);
+  /** Every `advance` runs through it; see `RunAdvanceGate`. */
+  private readonly gate = new RunAdvanceGate(MAX_CONCURRENT_RUN_ADVANCES);
 
   constructor(
     private readonly dataSource: DataSource,
@@ -136,7 +140,9 @@ export class WorkflowRunnerService {
       jobRunType: input.jobRunType,
     });
 
-    const { dispatched } = await this.advance(jobHistory.id, context);
+    const { dispatched } = await this.gate.limit(() =>
+      this.advance(jobHistory.id, context),
+    );
     return { jobHistory, dispatched };
   }
 
@@ -191,7 +197,14 @@ export class WorkflowRunnerService {
     if (!jobHistoryId) return;
 
     try {
-      await this.advance(jobHistoryId);
+      // Until its step drains, a finished job changes nothing the engine acts
+      // on: skip the run lock and the aggregate over every job of the run.
+      if (await this.stepStillRunning(jobHistoryId, job)) return;
+      // Jobs finishing together all see the step drained: one pass per run
+      // at a time on this instance, the rest folded into one more pass.
+      await this.gate.coalesce(jobHistoryId, async () => {
+        await this.advance(jobHistoryId);
+      });
     } catch (error) {
       this.logger.error(
         `Failed to advance run ${jobHistoryId} after job ${job?.id}: ${
@@ -201,9 +214,34 @@ export class WorkflowRunnerService {
     }
   }
 
+  /**
+   * Whether the finished job's step (its tool and category in the run) still
+   * has a pending or in-progress job. Runs after the job's terminal status was
+   * committed, so of two last jobs finishing together the later probe always
+   * sees the other one finished: at least one of them advances the run. A job
+   * that does not name its step is treated as drained.
+   */
+  private async stepStillRunning(jobHistoryId: string, job: Job): Promise<boolean> {
+    const toolId = job.tool?.id;
+    if (!toolId || !job.category) return false;
+    const row: unknown = await this.dataSource
+      .getRepository(Job)
+      .createQueryBuilder('job')
+      .select('1', 'one')
+      .where('job."jobHistoryId" = :jobHistoryId', { jobHistoryId })
+      .andWhere('job."toolId" = :toolId', { toolId })
+      .andWhere('job.category = :category', { category: job.category })
+      .andWhere('job.status IN (:...active)', {
+        active: [JobStatus.PENDING, JobStatus.IN_PROGRESS],
+      })
+      .limit(1)
+      .getRawOne();
+    return row !== undefined;
+  }
+
   /** Recomputes the run and dispatches whatever became ready. */
   public async advanceRun(jobHistoryId: string): Promise<void> {
-    await this.advance(jobHistoryId);
+    await this.gate.limit(() => this.advance(jobHistoryId));
   }
 
   private async advance(
