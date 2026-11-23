@@ -126,6 +126,7 @@ type fakeJobsRegistryService struct {
 	jobsRegistry.UnimplementedJobsRegistryServiceServer
 
 	nextFn             func(ctx context.Context, req *jobsRegistry.Worker) (*jobsRegistry.Job, error)
+	nextBatchFn        func(ctx context.Context, req *jobsRegistry.NextBatchRequest) (*jobsRegistry.JobList, error)
 	resultFn           func(ctx context.Context, req *jobsRegistry.JobResultRequest) (*jobsRegistry.JobResponse, error)
 	resultSubdomainsFn func(ctx context.Context, req *jobsRegistry.SubdomainResultRequest) (*jobsRegistry.JobResponse, error)
 	resultHttpProbeFn  func(ctx context.Context, req *jobsRegistry.HttpProbeResultRequest) (*jobsRegistry.JobResponse, error)
@@ -152,6 +153,14 @@ func (f *fakeJobsRegistryService) Next(ctx context.Context, req *jobsRegistry.Wo
 		return f.nextFn(ctx, req)
 	}
 	return nil, status.Error(codes.Unimplemented, "next not configured")
+}
+
+func (f *fakeJobsRegistryService) NextBatch(ctx context.Context, req *jobsRegistry.NextBatchRequest) (*jobsRegistry.JobList, error) {
+	f.recordMetadata(ctx)
+	if f.nextBatchFn != nil {
+		return f.nextBatchFn(ctx, req)
+	}
+	return nil, status.Error(codes.Unimplemented, "next batch not configured")
 }
 
 func (f *fakeJobsRegistryService) Result(ctx context.Context, req *jobsRegistry.JobResultRequest) (*jobsRegistry.JobResponse, error) {
