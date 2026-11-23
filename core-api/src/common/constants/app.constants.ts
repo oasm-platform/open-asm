@@ -102,6 +102,20 @@ export const JOB_INSERT_CHUNK = 1_000;
 export const MAX_CONCURRENT_RUN_ADVANCES = 4;
 
 /**
+ * `JobResultProcessor` jobs one core-api instance runs at once. Each holds a
+ * pooled connection while it syncs a result, so it stays under `DB_POOL_SIZE`
+ * together with the run advances (see `database-config.spec.ts`).
+ */
+export const JOB_RESULT_CONCURRENCY = 20;
+
+/**
+ * Postgres connections per core-api instance. The `pg` default of 10 was the
+ * ceiling for results, claims and HTTP together. Postgres `max_connections`
+ * must cover every instance: instances x DB_POOL_SIZE plus headroom.
+ */
+export const DB_POOL_SIZE = 30;
+
+/**
  * How far back the dashboard timeline looks. The timeline query runs two window
  * functions over every job of the workspace and then keeps only the newest 15
  * groups, so without a bound it scans the whole job history on every dashboard
