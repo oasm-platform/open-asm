@@ -26,6 +26,13 @@ export const MCP_API_KEY_HEADER = 'x-oasm-api-key';
 export const MCP_AUTH_PATH = 'mcp';
 export const WORKER_TOKEN_HEADER = 'worker-token';
 /**
+ * How long `GrpcWorkerTokenGuard` trusts a worker token it checked, per
+ * instance. Every claim and result is a gRPC call, so without it each one cost
+ * a `workers` lookup; with it a deleted worker keeps working here for at most
+ * this long.
+ */
+export const WORKER_TOKEN_CACHE_MS = 10_000;
+/**
  * gRPC metadata a worker sends on RemoteExecuteSubscribe ("1") when it runs
  * agent shell commands inside a per-session sandbox container. A global
  * worker serves agents only with it.
