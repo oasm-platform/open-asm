@@ -618,15 +618,13 @@ export class JobsRegistryService {
         id: jobId,
         status: JobStatus.IN_PROGRESS,
       },
+      // Runs once per result: the run row is enough (`id` for the engine,
+      // `projectId` for provenance). Its workflow, content included, is not.
       relations: {
         asset: {
           target: true,
         },
-        jobHistory: {
-          workflow: {
-            workspace: true,
-          },
-        },
+        jobHistory: true,
         tool: true,
         assetService: true,
       },

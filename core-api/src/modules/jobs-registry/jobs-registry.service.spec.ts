@@ -1021,6 +1021,33 @@ describe('JobsRegistryService', () => {
     });
   });
 
+  describe('findJobForUpdate', () => {
+    it("loads what a result needs without the run's workflow", async () => {
+      // Given
+      mockJobRepository.findOne.mockResolvedValue({ id: 'job-1' });
+
+      // When
+      await service.findJobForUpdate('worker-1', 'job-1');
+
+      // Then: only the job of this worker that is still running, with the
+      // relations the result path reads; no workflow content per result
+      const [options] = mockJobRepository.findOne.mock.calls[0] as [
+        { where: unknown; relations: Record<string, unknown> },
+      ];
+      expect(options.where).toEqual({
+        workerId: 'worker-1',
+        id: 'job-1',
+        status: JobStatus.IN_PROGRESS,
+      });
+      expect(options.relations).toEqual({
+        asset: { target: true },
+        jobHistory: true,
+        tool: true,
+        assetService: true,
+      });
+    });
+  });
+
   describe('createNewJob', () => {
     const mockJobRepo = {
       create: jest
