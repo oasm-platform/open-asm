@@ -1,3 +1,7 @@
+import {
+  LAST_SEEN_WRITE_INTERVAL_MS,
+  WORKER_TIMEOUT,
+} from '@/common/constants/app.constants';
 import { JobStatus, WorkerScope, WorkerType } from '@/common/enums/enum';
 import { ConfigService } from '@nestjs/config';
 
@@ -975,6 +979,67 @@ describe('WorkersService', () => {
         }),
         expect.anything(),
       );
+    });
+  });
+
+  describe('alive', () => {
+    const now = 1_000_000_000;
+
+    beforeEach(() => {
+      jest.spyOn(Date, 'now').mockReturnValue(now);
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('records the heartbeat once lastSeenAt is older than the write interval', async () => {
+      // Given
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 'w-1',
+        token: 'tok',
+        lastSeenAt: new Date(now - LAST_SEEN_WRITE_INTERVAL_MS),
+      });
+
+      // When
+      const worker = await service.alive({ token: 'tok' });
+
+      // Then: one read, one write, and the caller sees the new timestamp
+      expect(mockWorkerInstanceRepository.findOne).toHaveBeenCalledTimes(1);
+      expect(mockWorkerInstanceRepository.update).toHaveBeenCalledWith(
+        { id: 'w-1' },
+        { lastSeenAt: new Date(now) },
+      );
+      expect(worker.lastSeenAt).toEqual(new Date(now));
+    });
+
+    it('skips the write while lastSeenAt is recent', async () => {
+      // Given: the previous heartbeat was written 10 s ago
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 'w-1',
+        token: 'tok',
+        lastSeenAt: new Date(now - 10_000),
+      });
+
+      // When
+      const worker = await service.alive({ token: 'tok' });
+
+      // Then
+      expect(mockWorkerInstanceRepository.update).not.toHaveBeenCalled();
+      expect(worker.id).toBe('w-1');
+    });
+
+    it('rejects an unknown token', async () => {
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue(null);
+
+      await expect(service.alive({ token: 'nope' })).rejects.toThrow('Invalid token');
+      expect(mockWorkerInstanceRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('stays well inside the timeout the sweep uses', () => {
+      // A connected worker must never look stale to the sweep: one missed
+      // heartbeat (10 s) on top of a skipped write still lands under it.
+      expect(LAST_SEEN_WRITE_INTERVAL_MS + 10_000).toBeLessThan(WORKER_TIMEOUT);
     });
   });
 

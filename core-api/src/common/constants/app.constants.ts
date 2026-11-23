@@ -11,6 +11,12 @@ export const APP_NAME = 'Open Attack Surface Management';
 export const DEFAULT_ADMIN_ID = '00bd7b24-2f88-4e2f-84e0-835bf28e7905';
 export const WORKER_TIMEOUT = 60000; // milliseconds
 /**
+ * `WorkersService.alive` writes `workers.lastSeenAt` at most this often. The
+ * Alive stream ticks every 10 s, so every worker cost a write per tick; the
+ * sweep only needs the timestamp to stay under WORKER_TIMEOUT.
+ */
+export const LAST_SEEN_WRITE_INTERVAL_MS = 30_000;
+/**
  * Lifetime of a one-time worker join key, in seconds. A key is consumed by the
  * first successful join; rotating replaces it with a fresh one.
  */

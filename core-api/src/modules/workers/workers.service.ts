@@ -1,4 +1,7 @@
-import { WORKER_TIMEOUT } from '@/common/constants/app.constants';
+import {
+  LAST_SEEN_WRITE_INTERVAL_MS,
+  WORKER_TIMEOUT,
+} from '@/common/constants/app.constants';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import {
   AuditOutcome,
@@ -139,9 +142,15 @@ export class WorkersService {
       throw new UnauthenticatedError('Invalid token');
     }
 
-    await this.repo.update({ token: dto.token }, { lastSeenAt: new Date() });
+    // Every connected worker heartbeats every 10 s; the sweep only needs the
+    // timestamp under WORKER_TIMEOUT, so most heartbeats write nothing.
+    const now = Date.now();
+    if (now - worker.lastSeenAt.getTime() >= LAST_SEEN_WRITE_INTERVAL_MS) {
+      worker.lastSeenAt = new Date(now);
+      await this.repo.update({ id: worker.id }, { lastSeenAt: worker.lastSeenAt });
+    }
 
-    return this.repo.findOne({ where: { token: dto.token } });
+    return worker;
   }
 
   /**

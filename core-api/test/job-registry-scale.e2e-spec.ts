@@ -88,6 +88,9 @@ describe('Job registry at scale (e2e)', () => {
       scope: WorkerScope.WORKSPACE,
       workspaceId,
       runMode: 'cli',
+      // Written from node, like every heartbeat: the column's database default
+      // is in the server's zone and reads back shifted on a non-UTC host.
+      lastSeenAt: new Date(),
     });
   }
 
@@ -527,6 +530,41 @@ describe('Job registry at scale (e2e)', () => {
         JobStatus.IN_PROGRESS,
         JobStatus.IN_PROGRESS,
       ]);
+    });
+  });
+
+  describe('stale-worker sweep', () => {
+    it('requeues exactly the jobs it requeued before', async () => {
+      // Given: one job per case the sweep has to tell apart
+      const alive = await createWorker();
+      const goneWorkerId = randomUUID();
+      const [orphaned, ownedByAlive, unowned, retryable, exhausted, done] =
+        await createPendingJobs(6);
+      const repo = dataSource.getRepository(Job);
+      await repo.update(orphaned.id, { status: JobStatus.IN_PROGRESS, workerId: goneWorkerId });
+      await repo.update(ownedByAlive.id, { status: JobStatus.IN_PROGRESS, workerId: alive.id });
+      await repo.update(unowned.id, { status: JobStatus.IN_PROGRESS });
+      await repo.update(retryable.id, { status: JobStatus.FAILED, retryCount: 1 });
+      await repo.update(exhausted.id, { status: JobStatus.FAILED, retryCount: 4 });
+      await repo.update(done.id, { status: JobStatus.COMPLETED });
+
+      // When
+      await app.app.get(WorkersService).autoCleanupWorkersAndJobs();
+
+      // Then
+      const rows = await repo.find({
+        where: [orphaned, ownedByAlive, unowned, retryable, exhausted, done].map(
+          (job) => ({ id: job.id }),
+        ),
+        select: { id: true, status: true, workerId: true },
+      });
+      const byId = new Map(rows.map((row) => [row.id, row]));
+      expect(byId.get(orphaned.id)).toMatchObject({ status: JobStatus.PENDING, workerId: null });
+      expect(byId.get(ownedByAlive.id)).toMatchObject({ status: JobStatus.IN_PROGRESS });
+      expect(byId.get(unowned.id)).toMatchObject({ status: JobStatus.IN_PROGRESS });
+      expect(byId.get(retryable.id)).toMatchObject({ status: JobStatus.PENDING });
+      expect(byId.get(exhausted.id)).toMatchObject({ status: JobStatus.FAILED });
+      expect(byId.get(done.id)).toMatchObject({ status: JobStatus.COMPLETED });
     });
   });
 
