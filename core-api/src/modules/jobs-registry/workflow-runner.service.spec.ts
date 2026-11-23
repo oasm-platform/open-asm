@@ -110,6 +110,15 @@ interface QueryRunnerChain {
   getCount: jest.Mock;
 }
 
+/** The drain probe's builder; annotated so its self-reference is not `any`. */
+interface ProbeChain {
+  select: jest.Mock;
+  where: jest.Mock;
+  andWhere: jest.Mock;
+  limit: jest.Mock;
+  getRawOne: jest.Mock;
+}
+
 function createFakeDb(overrides: Partial<JobHistory> = {}): FakeDb {
   const history = {
     id: 'history-1',
@@ -124,7 +133,7 @@ function createFakeDb(overrides: Partial<JobHistory> = {}): FakeDb {
   let summaries: StepJobSummary[] = [];
   let activeCount = 0;
   let stepActive = false;
-  const probe = {
+  const probe: ProbeChain = {
     select: jest.fn(() => probe),
     where: jest.fn(() => probe),
     andWhere: jest.fn(() => probe),

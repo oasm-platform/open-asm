@@ -175,7 +175,7 @@ describe('Job registry at scale (e2e)', () => {
         .count({ where: { asset: { targetId: target.id } } });
       expect(stored).toBe(HOSTS);
       // Recorded for the PR description; not a pass/fail threshold.
-      console.info(`createNewJob(${HOSTS} hosts) took ${elapsedMs} ms`);
+      process.stdout.write(`createNewJob(${HOSTS} hosts) took ${elapsedMs} ms\n`);
     }, 600_000);
 
     it('writes the same job row the previous save() did', async () => {
@@ -354,8 +354,8 @@ describe('Job registry at scale (e2e)', () => {
       const advances = advance.mock.calls.length;
       advance.mockRestore();
       // Recorded for the PR description; not a pass/fail threshold.
-      console.info(
-        `${STEP_JOBS} job completions: ${advances} advance(s), ${elapsedMs} ms`,
+      process.stdout.write(
+        `${STEP_JOBS} job completions: ${advances} advance(s), ${elapsedMs} ms\n`,
       );
 
       // Then: the run moved on and finished (httpx has no service to probe),
