@@ -1,17 +1,10 @@
-import {
-  AuditActorType,
-  AuditOutcome,
-  Severity,
-  ToolCategory,
-} from '@/common/enums/enum';
+import { Severity, ToolCategory } from '@/common/enums/enum';
 import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
 import { GrpcWorkerTokenGuard } from '@/common/guards/grpc-worker-token.guard';
 import { Body, Controller, Logger, UseGuards } from '@nestjs/common';
 import type { Metadata } from '@grpc/grpc-js';
 import { GrpcMethod } from '@nestjs/microservices';
 import { plainToInstance } from 'class-transformer';
-import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
-import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
 import { Asset } from '../assets/entities/assets.entity';
 import { DiscoveredUrl } from '../assets/entities/discovered-url.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
@@ -19,7 +12,6 @@ import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity'
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { IntegrationConfigReader } from '../integrations/integration-config.reader';
 import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
-import { getSensitiveFields } from '../tools/validators/tool-config-profiles.crypto';
 import { WorkerInstance } from '../workers/entities/worker.entity';
 import { secretReleaseDenial } from './job-secret-release.policy';
 import { sealJobSecrets } from './job-secret-sealer';
@@ -98,7 +90,6 @@ export class JobsRegistryGrpcController {
     private readonly toolConfigProfilesService: ToolConfigProfilesService,
     private readonly integrationConfig: IntegrationConfigReader,
     private readonly grpcWorkerContext: GrpcWorkerContext,
-    private readonly eventBridge: EventBridgeService,
     private readonly jobDispatch: JobDispatchService,
   ) {}
 
@@ -143,35 +134,6 @@ export class JobsRegistryGrpcController {
     );
 
     return { values: mapped.filter((job) => job !== null) };
-  }
-
-  /**
-   * Audits a dispatch that hands the worker credentials: which fields, never
-   * their values. A job without secrets records nothing.
-   */
-  private async recordSecretRelease(
-    job: GetNextJobResult,
-    worker: WorkerInstance,
-    sensitiveFields: string[],
-    config: Record<string, unknown> | undefined,
-    inputs: Record<string, string>,
-  ): Promise<void> {
-    const fields = sensitiveFields.filter((field) => config?.[field]);
-    if (inputs.token) fields.push('inputs.token');
-    if (fields.length === 0 || !job.workspaceId) return;
-
-    await this.eventBridge.publishSafely(
-      EVENT_CATALOG.job.secrets.released,
-      {
-        workspaceId: job.workspaceId,
-        actor: { type: AuditActorType.System, id: worker.id, name: worker.name },
-        outcome: AuditOutcome.Success,
-        resourceType: 'job',
-        resourceId: job.id,
-        metadata: { workerId: worker.id, fields },
-      },
-      { subject: `workspace:${job.workspaceId}/job:${job.id}` },
-    );
   }
 
   /**
@@ -266,13 +228,6 @@ export class JobsRegistryGrpcController {
         job.tool!.name,
       );
       const inputs = await this.resolveConnectorInputs(job);
-      await this.recordSecretRelease(
-        job,
-        worker,
-        getSensitiveFields(connectorEntry.configSchema),
-        config,
-        inputs,
-      );
 
       const response: Record<string, unknown> = {
         id: job.id,

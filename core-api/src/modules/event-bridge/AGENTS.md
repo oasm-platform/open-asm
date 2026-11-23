@@ -31,7 +31,7 @@ The event bus. Domain events are written as CloudEvents to one Redis Stream (`EV
 
 ## Invariants
 
-- **Only catalog names travel.** `publish` logs and returns null for a name not in `EVENT_CATALOG`; consumers ack unknown types. A new event needs a catalog leaf **and** an `EVENT_POLICY` entry (`Record<EventName, …>` fails the build without it), and `event-catalog.spec.ts` asserts the leaf count (115 today).
+- **Only catalog names travel.** `publish` logs and returns null for a name not in `EVENT_CATALOG`; consumers ack unknown types. A new event needs a catalog leaf **and** an `EVENT_POLICY` entry (`Record<EventName, …>` fails the build without it), and `event-catalog.spec.ts` asserts the leaf count (114 today).
 - **Every entry needs `data.workspaceId` and `data.outcome`.** `parseData` drops anything else, so every lane acks it unread and `/events/stream` does not forward it. The interceptor fills both. Direct `publish` / `publishSafely` callers must set `outcome` themselves (usually `AuditOutcome.Success`) and an `actor` (`AuditActorType.System` for background work).
 - **Redaction happens only in the interceptor** (and again in `AuditSink`). `EventBridgeService.publish` does not redact, so direct callers must keep secrets out of `payload` / `metadata`.
 - Interceptor rules: no session user and no MCP API key header → no event. No workspace (request `workspaceId` or `config.workspaceId(result)`) → skipped, never a sentinel. A throwing extractor skips the publish. A failed handler still publishes, with `outcome: failure` and the route `:id` as `resourceId`. `persist: true` events are awaited with `publish`, the rest use `publishSafely`. The response is never changed by the event path.

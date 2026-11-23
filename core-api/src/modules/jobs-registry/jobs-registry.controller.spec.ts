@@ -16,7 +16,6 @@ import { Reflector } from '@nestjs/core';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
-import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
 import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
 import { IntegrationConfigReader } from '../integrations/integration-config.reader';
 import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
@@ -397,7 +396,8 @@ describe('JobsRegistryController', () => {
       ).toHaveBeenCalledTimes(1);
     });
 
-    it('records which secret fields were released to which worker', async () => {
+    it('hands secrets to the worker without writing an audit event per job', async () => {
+      // Given: a connector job whose config carries a secret
       useNessusConnector();
       mockJobsRegistryService.getNextJob.mockResolvedValue(connectorJob());
       mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({
@@ -405,20 +405,13 @@ describe('JobsRegistryController', () => {
         rate: 5,
       });
 
-      await grpc.next({ id: 'worker-1' }, metadata);
+      // When
+      const job = await grpc.next({ id: 'worker-1' }, metadata);
 
-      expect(eventBridge.publishSafely).toHaveBeenCalledWith(
-        EVENT_CATALOG.job.secrets.released,
-        expect.objectContaining({
-          workspaceId: 'ws-1',
-          resourceType: 'job',
-          resourceId: 'job-9',
-          metadata: { workerId: 'worker-1', fields: ['apiKey'] },
-        }),
-        expect.anything(),
-      );
-      const [, data] = eventBridge.publishSafely.mock.calls[0];
-      expect(JSON.stringify(data)).not.toContain('nessus-key');
+      // Then: the job is dispatched with its config, and nothing is published
+      expect(job.id).toBe('job-9');
+      expect(JSON.stringify(job)).toContain('nessus-key');
+      expect(eventBridge.publishSafely).not.toHaveBeenCalled();
     });
 
     it('seals the config and repository token to a worker that registered a key, sending neither in the clear', async () => {

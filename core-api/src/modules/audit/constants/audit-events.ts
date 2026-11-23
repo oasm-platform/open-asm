@@ -71,8 +71,6 @@ export const AUDIT_ACTION_CATALOG = [
   { action: 'report.deleted', label: 'Deleted report', controller: 'ReportsController', method: 'deleteReport' },
   // jobs (26)
   { action: 'job.cancelled', label: 'Cancelled job', controller: 'JobsRegistryController', method: 'cancelJob' },
-  // Published by the gRPC claim (Next / NextBatch), not by @PublishEvent.
-  { action: 'job.secrets.released', label: 'Released job credentials to a worker', controller: 'JobsRegistryGrpcController', method: 'nextBatch' },
   // workflows (27–29)
   { action: 'workflow.created', label: 'Created workflow', controller: 'WorkflowsController', method: 'createWorkflow' },
   { action: 'workflow.updated', label: 'Updated workflow', controller: 'WorkflowsController', method: 'updateWorkflow' },
