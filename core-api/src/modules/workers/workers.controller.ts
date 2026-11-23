@@ -301,6 +301,7 @@ export class WorkersController {
       token?: string;
       metadata?: { name?: string; os?: string; mode?: number | string };
       encryptionPublicKey?: Buffer;
+      runningJobIds?: string[];
     },
     grpcMetadata: Metadata,
     call: GrpcCall,
@@ -312,13 +313,16 @@ export class WorkersController {
       parseTrustedProxies(process.env.TRUSTED_PROXIES),
     );
 
-    const worker = await this.workersService.join({
-      apiKey: requests.apiKey,
-      token: requests.token,
-      metadata: requests.metadata,
-      encryptionPublicKey: requests.encryptionPublicKey,
-      ipAddress,
-    });
+    const worker = await this.workersService.join(
+      {
+        apiKey: requests.apiKey,
+        token: requests.token,
+        metadata: requests.metadata,
+        encryptionPublicKey: requests.encryptionPublicKey,
+        ipAddress,
+      },
+      { runningJobIds: requests.runningJobIds },
+    );
 
     return {
       workerId: worker.id,

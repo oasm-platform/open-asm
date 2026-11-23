@@ -12,6 +12,7 @@ import {
 } from '@/modules/targets/entities/target.entity';
 import { Tool } from '@/modules/tools/entities/tools.entity';
 import { WorkerInstance } from '@/modules/workers/entities/worker.entity';
+import { WorkersService } from '@/modules/workers/workers.service';
 import { Workflow } from '@/modules/workflows/entities/workflow.entity';
 import { randomUUID } from 'crypto';
 import type { DataSource } from 'typeorm';
@@ -443,6 +444,90 @@ describe('Job registry at scale (e2e)', () => {
         http_probe: { status: 'skipped', reason: 'no-inputs' },
       });
     }, 120_000);
+  });
+
+  describe('worker rejoin', () => {
+    async function inProgressJobsOf(worker: WorkerInstance, count: number) {
+      const jobs = await createPendingJobs(count);
+      await dataSource.getRepository(Job).update(
+        jobs.map((job) => job.id),
+        { status: JobStatus.IN_PROGRESS, workerId: worker.id, pickJobAt: new Date() },
+      );
+      return jobs.map((job) => job.id);
+    }
+
+    async function statusOf(ids: string[]): Promise<Record<string, string>> {
+      const rows = await dataSource
+        .getRepository(Job)
+        .find({ where: ids.map((id) => ({ id })), select: { id: true, status: true } });
+      return Object.fromEntries(rows.map((row) => [row.id, row.status]));
+    }
+
+    it('keeps the jobs a rejoining worker still runs and requeues the rest', async () => {
+      // Given: a worker with three jobs in progress
+      const worker = await createWorker();
+      const [kept, alsoKept, lost] = await inProgressJobsOf(worker, 3);
+
+      // When: it rejoins reporting two of them, plus garbage
+      await app.app.get(WorkersService).join(
+        { apiKey: 'unused', token: worker.token },
+        { runningJobIds: [kept, alsoKept, 'not-a-uuid', randomUUID()] },
+      );
+
+      // Then
+      expect(await statusOf([kept, alsoKept, lost])).toEqual({
+        [kept]: JobStatus.IN_PROGRESS,
+        [alsoKept]: JobStatus.IN_PROGRESS,
+        [lost]: JobStatus.PENDING,
+      });
+    });
+
+    it('requeues every job of a worker that reports none, as before', async () => {
+      // Given
+      const worker = await createWorker();
+      const ids = await inProgressJobsOf(worker, 2);
+
+      // When: an older worker build rejoins
+      await app.app
+        .get(WorkersService)
+        .join({ apiKey: 'unused', token: worker.token });
+
+      // Then
+      expect(Object.values(await statusOf(ids))).toEqual([
+        JobStatus.PENDING,
+        JobStatus.PENDING,
+      ]);
+    });
+
+    it("never touches another worker's jobs", async () => {
+      // Given: two workers, the second one rejoining
+      const owner = await createWorker();
+      const rejoining = await createWorker();
+      const [owned] = await inProgressJobsOf(owner, 1);
+
+      // When
+      await app.app
+        .get(WorkersService)
+        .join({ apiKey: 'unused', token: rejoining.token }, { runningJobIds: [] });
+
+      // Then
+      expect(await statusOf([owned])).toEqual({ [owned]: JobStatus.IN_PROGRESS });
+    });
+
+    it('leaves the jobs with the worker when its alive stream drops', async () => {
+      // Given
+      const worker = await createWorker();
+      const ids = await inProgressJobsOf(worker, 2);
+
+      // When
+      await app.app.get(WorkersService).workerDisconnected(worker.id);
+
+      // Then
+      expect(Object.values(await statusOf(ids))).toEqual([
+        JobStatus.IN_PROGRESS,
+        JobStatus.IN_PROGRESS,
+      ]);
+    });
   });
 
   describe('claim', () => {

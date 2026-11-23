@@ -884,7 +884,9 @@ describe('WorkersService', () => {
 
       await service.workerDisconnected('worker-1');
 
-      expect((mockJobsRegistryService.repo as any).execute).toHaveBeenCalled();
+      // The worker usually keeps running its jobs through a dropped stream
+      // (a core-api restart, a network blip); a dead one is swept instead.
+      expect((mockJobsRegistryService.repo as any).execute).not.toHaveBeenCalled();
       expect(mockEventBridge.publishSafely).toHaveBeenCalledWith(
         EVENT_CATALOG.worker.disconnected,
         expect.objectContaining({
@@ -904,6 +906,52 @@ describe('WorkersService', () => {
       await service.workerDisconnected('worker-1');
 
       expect(mockEventBridge.publishSafely).not.toHaveBeenCalled();
+    });
+
+    it('requeues only the jobs a rejoining worker no longer runs, trusting no malformed id', async () => {
+      // Given: a worker reporting two running jobs, one id malformed
+      (mockConfigService.get as jest.Mock).mockReturnValue(undefined);
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 'w-existing',
+        token: 'tok-existing',
+        workspaceId: 'ws-1',
+      });
+      const running = '6f1c2f3e-8a4b-4c5d-9e6f-7a8b9c0d1e2f';
+
+      // When
+      await service.join(
+        { apiKey: 'api-key-1', token: 'tok-existing' },
+        { runningJobIds: [running, "x' OR 1=1 --"] },
+      );
+
+      // Then: one requeue, scoped to the worker, sparing the valid id only
+      const repo = mockJobsRegistryService.repo as any;
+      expect(repo.execute).toHaveBeenCalledTimes(1);
+      expect(repo.andWhere).toHaveBeenCalledWith(
+        expect.stringContaining('ANY'),
+        { running: [running] },
+      );
+    });
+
+    it('requeues every in-progress job of a worker that reports none', async () => {
+      // Given: an older worker build, which sends no list
+      (mockConfigService.get as jest.Mock).mockReturnValue(undefined);
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 'w-existing',
+        token: 'tok-existing',
+        workspaceId: 'ws-1',
+      });
+
+      // When
+      await service.join({ apiKey: 'api-key-1', token: 'tok-existing' });
+
+      // Then: the previous behaviour, nothing spared
+      const repo = mockJobsRegistryService.repo as any;
+      expect(repo.execute).toHaveBeenCalledTimes(1);
+      expect(repo.andWhere).not.toHaveBeenCalledWith(
+        expect.stringContaining('ANY'),
+        expect.anything(),
+      );
     });
 
     it('publishes worker.rejoined on a token rejoin', async () => {
