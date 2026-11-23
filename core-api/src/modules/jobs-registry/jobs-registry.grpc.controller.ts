@@ -63,6 +63,9 @@ function packStructFields(record: Record<string, unknown>): Record<string, Recor
 
 const VALID_SEVERITIES = new Set<string>(Object.values(Severity));
 
+/** Decrypted job configs of one claim, keyed by what decides them. */
+type ResolvedConfigs = Map<string, Promise<Record<string, unknown> | undefined>>;
+
 /**
  * The gRPC loader is configured with `enums: String`, so the worker delivers
  * severity as the proto enum NAME (e.g. "HIGH"). Normalize it to the domain's
@@ -129,8 +132,11 @@ export class JobsRegistryGrpcController {
       Number(request.limit) || 1,
     );
 
+    // Jobs of one step share their config: resolve (and decrypt) each
+    // distinct one once for this call, never beyond it.
+    const configs: ResolvedConfigs = new Map();
     const mapped = await Promise.all(
-      jobs.map((job) => this.mapJobToGrpcJob(job, worker)),
+      jobs.map((job) => this.mapJobToGrpcJob(job, worker, configs)),
     );
 
     return { values: mapped.filter((job) => job !== null) };
@@ -187,9 +193,37 @@ export class JobsRegistryGrpcController {
    * `NextBatch` so the two paths can never drift apart. Null when the job's
    * secrets may not go to this worker: the job is failed instead.
    */
+  /**
+   * The job's decrypted config, shared with the jobs of the same call that
+   * have the same workspace, tool, profile and stored config. The result is
+   * only read (packed or sealed), so sharing it is safe.
+   */
+  private resolveConfig(
+    job: GetNextJobResult,
+    configs: ResolvedConfigs,
+  ): Promise<Record<string, unknown> | undefined> {
+    const key = JSON.stringify([
+      job.workspaceId,
+      job.tool!.id,
+      job.configProfileId ?? null,
+      job.config ?? null,
+    ]);
+    let resolved = configs.get(key);
+    if (!resolved) {
+      resolved = this.toolConfigProfilesService.resolveConfigForJob(
+        job.workspaceId!,
+        job.tool!.id,
+        { config: job.config ?? undefined, configProfileId: job.configProfileId },
+      );
+      configs.set(key, resolved);
+    }
+    return resolved;
+  }
+
   private async mapJobToGrpcJob(
     job: GetNextJobResult,
     worker: WorkerInstance,
+    configs: ResolvedConfigs = new Map(),
   ): Promise<Record<string, unknown> | null> {
     // Connector path: tool metadata present → look up registry
     const connectorEntry = job.tool
@@ -211,12 +245,7 @@ export class JobsRegistryGrpcController {
 
       let config: Record<string, unknown> | undefined;
       try {
-        config =
-          await this.toolConfigProfilesService.resolveConfigForJob(
-            job.workspaceId!,
-            job.tool!.id,
-            { config: job.config ?? undefined, configProfileId: job.configProfileId },
-          );
+        config = await this.resolveConfig(job, configs);
       } catch {
         // Never log decrypted payload — generic message only
         this.logger.warn('profile decrypt failed');

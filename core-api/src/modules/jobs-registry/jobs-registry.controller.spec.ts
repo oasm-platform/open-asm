@@ -373,6 +373,49 @@ describe('JobsRegistryController', () => {
       );
     });
 
+    it('resolves a config the whole batch shares once, and each different one apart', async () => {
+      // Given: three jobs of one step and one job on another profile
+      useNessusConnector();
+      mockJobsRegistryService.getNextJobs.mockResolvedValue([
+        connectorJob({ id: 'job-1', configProfileId: 'profile-a' }),
+        connectorJob({ id: 'job-2', configProfileId: 'profile-a' }),
+        connectorJob({ id: 'job-3', configProfileId: 'profile-a' }),
+        connectorJob({ id: 'job-4', configProfileId: 'profile-b' }),
+      ]);
+      mockToolConfigProfilesService.resolveConfigForJob.mockImplementation(
+        (_ws: string, _tool: string, { configProfileId }: { configProfileId?: string }) =>
+          Promise.resolve({ apiKey: `key-${configProfileId}` }),
+      );
+
+      // When
+      const { values } = await grpc.nextBatch({ id: 'worker-1', limit: 4 }, metadata);
+
+      // Then: one decrypt per distinct config, every job still gets its own
+      expect(mockToolConfigProfilesService.resolveConfigForJob).toHaveBeenCalledTimes(2);
+      expect(values.map((job) => JSON.stringify(job.config))).toEqual([
+        expect.stringContaining('key-profile-a'),
+        expect.stringContaining('key-profile-a'),
+        expect.stringContaining('key-profile-a'),
+        expect.stringContaining('key-profile-b'),
+      ]);
+    });
+
+    it('resolves the config again on the next claim', async () => {
+      // Given: the same job shape claimed twice
+      useNessusConnector();
+      mockJobsRegistryService.getNextJobs.mockResolvedValue([
+        connectorJob({ id: 'job-1', configProfileId: 'profile-a' }),
+      ]);
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({ apiKey: 'k' });
+
+      // When
+      await grpc.nextBatch({ id: 'worker-1', limit: 1 }, metadata);
+      await grpc.nextBatch({ id: 'worker-1', limit: 1 }, metadata);
+
+      // Then: decrypted values never outlive the call that needed them
+      expect(mockToolConfigProfilesService.resolveConfigForJob).toHaveBeenCalledTimes(2);
+    });
+
     it('fails a claimed job the worker may not receive the secrets of, without decrypting them', async () => {
       useNessusConnector();
       mockJobsRegistryService.getNextJobs.mockResolvedValue([
