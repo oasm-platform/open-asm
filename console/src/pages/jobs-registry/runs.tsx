@@ -600,11 +600,6 @@ export default function Runs() {
               value={jobHistoryDetail.progress}
               aria-label={t('jobsRegistry.list.runProgress')}
             />
-            {jobHistoryDetail.failureReason && (
-              <p className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive">
-                {jobHistoryDetail.failureReason}
-              </p>
-            )}
           </CardContent>
         </Card>
       )}
