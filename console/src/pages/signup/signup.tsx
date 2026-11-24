@@ -14,30 +14,38 @@ import {
   useRootControllerGetMetadata,
 } from '@/services/apis/gen/queries';
 import { authClient } from '@/utils/authClient';
+import { getLanguage } from '@/utils/languageState';
 import { verificationCallbackURL } from '@/utils/verification-url';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { Loader2Icon, UserX } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useT, type TFunction } from '@/lib/i18n-dictionary';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
-const formSchema = z
-  .object({
-    name: z.string().trim().min(1, 'Name is required').max(100, 'Name too long'),
-    email: z.string().email('Invalid email address'),
-    password: z
-      .string()
-      .min(8, 'Password must be at least 8 characters')
-      .max(128, 'Password must be at most 128 characters'),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: 'Passwords do not match.',
-    path: ['confirmPassword'],
-  });
+const makeFormSchema = (t: TFunction) =>
+  z
+    .object({
+      name: z
+        .string()
+        .trim()
+        .min(1, t('auth.errors.nameRequired'))
+        .max(100, t('auth.errors.nameTooLong')),
+      email: z.string().email(t('auth.errors.invalidEmail')),
+      password: z
+        .string()
+        .min(8, t('auth.errors.passwordMin'))
+        .max(128, t('auth.errors.passwordMax')),
+      confirmPassword: z.string(),
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+      message: t('auth.errors.passwordMismatch'),
+      path: ['confirmPassword'],
+    });
+type FormValues = z.infer<ReturnType<typeof makeFormSchema>>;
 
 /**
  * Public sign-up. The route loads fresh metadata before this renders, so the
@@ -46,6 +54,7 @@ const formSchema = z
  * sign-up always ends on /login, never signed in.
  */
 export default function SignUp() {
+  const t = useT();
   const { redirect } = useSearch({ strict: false });
   const { data: metadata, isError } = useRootControllerGetMetadata();
 
@@ -57,19 +66,19 @@ export default function SignUp() {
             <SignUpForm redirect={redirect} />
           ) : metadata ? (
             <SignUpNotice
-              title="Sign-up is turned off"
-              description="New accounts can't be created right now. Contact your administrator to get an account."
+              title={t('auth.signup.disabledTitle')}
+              description={t('auth.signup.disabledDescription')}
               redirect={redirect}
             />
           ) : isError ? (
             <SignUpNotice
-              title="Sign-up is unavailable"
-              description="Unable to reach the server. Please try again later."
+              title={t('auth.signup.unavailableTitle')}
+              description={t('auth.errors.unreachable')}
               redirect={redirect}
             />
           ) : (
             <Loader2Icon
-              aria-label="Loading"
+              aria-label={t('auth.loading')}
               className="mx-auto size-6 animate-spin text-muted-foreground"
             />
           )}
@@ -88,6 +97,7 @@ function SignUpNotice({
   description: string;
   redirect?: string;
 }) {
+  const t = useT();
   return (
     <div className="space-y-6 text-center lg:text-left">
       <UserX className="mx-auto size-10 text-muted-foreground lg:mx-0" />
@@ -101,7 +111,7 @@ function SignUpNotice({
       </div>
       <Button asChild className="w-full">
         <Link to="/login" search={{ redirect }}>
-          Back to sign in
+          {t('auth.signup.backToSignIn')}
         </Link>
       </Button>
     </div>
@@ -109,6 +119,8 @@ function SignUpNotice({
 }
 
 function SignUpForm({ redirect }: { redirect?: string }) {
+  const t = useT();
+  const formSchema = useMemo(() => makeFormSchema(t), [t]);
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -123,7 +135,7 @@ function SignUpForm({ redirect }: { redirect?: string }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: FormValues) {
     setLoading(true);
     try {
       // The account is created inactive and gets no session; the API answers
@@ -132,15 +144,15 @@ function SignUpForm({ redirect }: { redirect?: string }) {
         name: values.name,
         email: values.email,
         password: values.password,
+        language: getLanguage(),
         callbackURL: verificationCallbackURL(redirect),
       });
       setLoading(false);
       if (!res.error) {
         // The toast outlives the page change. `redirect` rides along, so the
         // first sign-in after approval still lands where they started.
-        toast.success('Account created', {
-          description:
-            'Check your inbox to confirm your email. An administrator then approves your account.',
+        toast.success(t('auth.signup.created'), {
+          description: t('auth.signup.createdDescription'),
         });
         await navigate({ to: '/login', search: { redirect }, replace: true });
       } else if (res.error.status === 403) {
@@ -151,13 +163,13 @@ function SignUpForm({ redirect }: { redirect?: string }) {
         });
       } else {
         toast.error(
-          res.error.message || 'Something went wrong. Please try again later.',
+          res.error.message || t('auth.errors.generic'),
           { richColors: true },
         );
       }
     } catch {
       setLoading(false);
-      toast.error('Unable to reach the server. Please try again later.', {
+      toast.error(t('auth.errors.unreachable'), {
         richColors: true,
       });
     }
@@ -167,10 +179,10 @@ function SignUpForm({ redirect }: { redirect?: string }) {
     <>
       <div className="space-y-2 text-center lg:text-left">
         <h1 className="text-balance text-2xl font-semibold tracking-tight">
-          Create an account
+          {t('auth.signup.title')}
         </h1>
         <p className="text-pretty text-sm text-muted-foreground">
-          Sign up to get started.
+          {t('auth.signup.subtitle')}
         </p>
       </div>
       <Form {...form}>
@@ -180,9 +192,9 @@ function SignUpForm({ redirect }: { redirect?: string }) {
             name="name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Name</FormLabel>
+                <FormLabel>{t('auth.fields.name')}</FormLabel>
                 <FormControl>
-                  <Input placeholder="Your name" {...field} />
+                  <Input placeholder={t('auth.fields.namePlaceholder')} {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -193,7 +205,7 @@ function SignUpForm({ redirect }: { redirect?: string }) {
             name="email"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Email</FormLabel>
+                <FormLabel>{t('auth.fields.email')}</FormLabel>
                 <FormControl>
                   <Input placeholder="email@example.com" {...field} />
                 </FormControl>
@@ -206,7 +218,7 @@ function SignUpForm({ redirect }: { redirect?: string }) {
             name="password"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Password</FormLabel>
+                <FormLabel>{t('auth.fields.password')}</FormLabel>
                 <FormControl>
                   <Input type="password" placeholder="••••••••" {...field} />
                 </FormControl>
@@ -219,7 +231,7 @@ function SignUpForm({ redirect }: { redirect?: string }) {
             name="confirmPassword"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Confirm password</FormLabel>
+                <FormLabel>{t('auth.fields.confirmPassword')}</FormLabel>
                 <FormControl>
                   <Input type="password" placeholder="••••••••" {...field} />
                 </FormControl>
@@ -229,18 +241,18 @@ function SignUpForm({ redirect }: { redirect?: string }) {
           />
           <Button disabled={loading} type="submit" className="w-full">
             {loading && <Loader2Icon className="animate-spin" />}
-            Create account
+            {t('auth.signup.submit')}
           </Button>
         </form>
       </Form>
       <p className="text-center text-sm text-muted-foreground">
-        Already have an account?{' '}
+        {t('auth.signup.haveAccount')}{' '}
         <Link
           to="/login"
           search={{ redirect }}
           className="font-medium text-primary underline-offset-4 hover:underline"
         >
-          Sign in
+          {t('auth.login.submit')}
         </Link>
       </p>
     </>

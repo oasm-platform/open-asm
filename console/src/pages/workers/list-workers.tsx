@@ -1,3 +1,4 @@
+import { fromNow } from '@/lib/date-locale';
 import Page from '@/components/common/page';
 import { Badge } from '@/components/ui/badge';
 import { ConnectWorkerTrigger } from '@/components/ui/connect-worker-trigger';
@@ -22,15 +23,13 @@ import type {
   WorkersControllerGetWorkersParams,
 } from '@/services/apis/gen/queries';
 import { useNavigate } from '@tanstack/react-router';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import { Loader2Icon, Search, SearchX, Server } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { isWorkerOnline, WorkerStatus } from './worker-status';
+import { useT } from '@/lib/i18n-dictionary';
 
 // `fromNow()` below needs the plugin; registered here so this file does not
 // silently depend on worker-status.tsx having been loaded first.
-dayjs.extend(relativeTime);
 
 const COMMON_PARAMS = {
   limit: 100,
@@ -48,6 +47,7 @@ const GRID_CLASS =
 type WorkerSurface = 'ALL' | 'INTERNAL' | 'EXTERNAL';
 
 const ListWorkers = () => {
+  const t = useT();
   const navigate = useNavigate();
   const {
     state: { selectedWorkspaceId },
@@ -124,7 +124,7 @@ const ListWorkers = () => {
       {[...Array(4)].map((_, i) => (
         <div
           key={i}
-          className="flex flex-col items-start gap-2 rounded-lg border p-5 animate-pulse"
+          className="flex flex-col items-start gap-2 rounded-lg border p-5 animate-pulse dark:bg-card-surface"
         >
           <div className="flex w-full items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -150,10 +150,10 @@ const ListWorkers = () => {
             <Server className="h-6 w-6 text-muted-foreground" />
           </div>
           <h3 className="m-4 text-lg font-medium text-muted-foreground">
-            No workers available
+            {t('workers.list.emptyGlobal.title')}
           </h3>
           <p className="text-sm text-muted-foreground">
-            There are no global workers at the moment.
+            {t('workers.list.emptyGlobal.description')}
           </p>
         </div>
       );
@@ -165,7 +165,7 @@ const ListWorkers = () => {
           <Loader2Icon className="h-6 w-6 text-muted-foreground animate-spin" />
         </div>
         <h3 className="m-4 text-lg font-medium text-muted-foreground">
-          Pending connect workers...
+          {t('workers.list.pending')}
         </h3>
         <ConnectWorkerTrigger />
       </div>
@@ -178,10 +178,10 @@ const ListWorkers = () => {
         <SearchX className="h-6 w-6 text-muted-foreground" />
       </div>
       <h3 className="m-4 text-lg font-medium text-muted-foreground">
-        No matching workers
+        {t('workers.list.noMatch.title')}
       </h3>
       <p className="text-sm text-muted-foreground">
-        Try a different search or filter.
+        {t('workers.list.noMatch.description')}
       </p>
     </div>
   );
@@ -193,7 +193,8 @@ const ListWorkers = () => {
         // the internal-network badge can sit beside it instead of nested inside
         <div
           key={worker.id}
-          className={`relative flex h-full flex-col items-start gap-2 rounded-lg border p-5 text-left transition-colors hover:bg-accent/70 ${isWorkerOnline(worker) ? '' : 'opacity-50'}`}
+          // Dark mode: the card fill, as outlines are off there (index.css)
+          className={`relative flex h-full flex-col items-start gap-2 rounded-lg border p-5 text-left transition-colors hover:bg-accent/70 dark:bg-card-surface dark:hover:bg-accent/70 ${isWorkerOnline(worker) ? '' : 'opacity-50'}`}
         >
           <button
             type="button"
@@ -228,13 +229,18 @@ const ListWorkers = () => {
           <div className="flex w-full items-center justify-between gap-2 text-sm text-muted-foreground">
             {worker.currentJobsCount > 0 ? (
               <span className="text-green-600">
-                {worker.currentJobsCount} active job
-                {worker.currentJobsCount > 1 ? 's' : ''}
+                {t('workers.list.activeJobs', {
+                  count: worker.currentJobsCount,
+                })}
               </span>
             ) : (
-              <span>No active jobs</span>
+              <span>{t('workers.list.noActiveJobs')}</span>
             )}
-            <span>Created {dayjs(worker.createdAt).fromNow()}</span>
+            <span>
+              {t('workers.list.created', {
+                time: fromNow(worker.createdAt),
+              })}
+            </span>
           </div>
           {worker.internalNetworkId && (
             // Pinned to the bottom so badges line up across cards
@@ -252,7 +258,7 @@ const ListWorkers = () => {
                     )
                   }
                 >
-                  Internal network
+                  {t('workers.list.internalNetwork')}
                 </button>
               </Badge>
             </div>
@@ -273,15 +279,19 @@ const ListWorkers = () => {
 
   return (
     <Page
-      title="Workers"
+      title={t('workers.list.title')}
       permission="worker.read"
-      description="Workers connect your infrastructure to run scans."
+      description={t('workers.list.description')}
     >
       {/* gap-4 = the 16px rhythm of the tools and integrations pages */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full gap-4">
         <TabsList>
-          <TabsTrigger value="workspace">Workspace</TabsTrigger>
-          {isAdmin && <TabsTrigger value="global">Global</TabsTrigger>}
+          <TabsTrigger value="workspace">
+            {t('workers.list.tabs.workspace')}
+          </TabsTrigger>
+          {isAdmin && <TabsTrigger value="global">
+              {t('workers.list.tabs.global')}
+            </TabsTrigger>}
         </TabsList>
         {/* Same toolbar as DataTable (targets page): search and filters on
             the left, actions on the right from md up; stacked below md */}
@@ -295,7 +305,7 @@ const ListWorkers = () => {
             <div className="relative w-full md:min-w-48 md:flex-1 md:max-w-xs xl:max-w-sm">
               <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search workers..."
+                placeholder={t('workers.list.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="h-9 pl-8 text-xs"
@@ -306,12 +316,16 @@ const ListWorkers = () => {
               onValueChange={(value) => setSurface(value as WorkerSurface)}
             >
               <SelectTrigger className="w-[150px] border-dashed py-0 text-xs focus:outline-none focus:ring-0 focus:ring-offset-0">
-                <SelectValue placeholder="Type" />
+                <SelectValue placeholder={t('workers.list.typePlaceholder')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">All types</SelectItem>
-                <SelectItem value="EXTERNAL">External</SelectItem>
-                <SelectItem value="INTERNAL">Internal</SelectItem>
+                <SelectItem value="ALL">{t('workers.list.allTypes')}</SelectItem>
+                <SelectItem value="EXTERNAL">
+                  {t('workers.list.external')}
+                </SelectItem>
+                <SelectItem value="INTERNAL">
+                  {t('workers.list.internal')}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>

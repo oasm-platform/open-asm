@@ -18,6 +18,7 @@ import { ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChatMessage } from './chat-message';
 import { formatTokens } from './turn-stats-panel';
+import { useT } from '@/lib/i18n-dictionary';
 
 /** How often the transcript of an open, running subagent is refetched. */
 export const SUBAGENT_TRANSCRIPT_POLL_MS = 3_000;
@@ -150,7 +151,7 @@ function ToolCallDetail({ call }: { call: SubagentToolCallDto }) {
  * tab, whose own tab bar already uses those.
  */
 const SEGMENT =
-  'h-6 rounded-md px-2.5 text-xs data-[state=active]:bg-background data-[state=active]:shadow-xs data-[state=active]:after:hidden';
+  'h-6 rounded-md px-2.5 text-xs data-[state=active]:bg-background data-[state=active]:shadow-xs';
 
 interface SubagentTranscriptProps {
   subagent: SubagentResponseDto;
@@ -166,6 +167,7 @@ export function SubagentTranscript({
   subagent,
   conversationId,
 }: SubagentTranscriptProps) {
+  const t = useT();
   const [tab, setTab] = useState('conversation');
   const running = subagent.status === SubagentResponseDtoStatus.in_progress;
   const active =
@@ -200,19 +202,20 @@ export function SubagentTranscript({
   const truncated = detail?.transcriptTruncated ?? false;
   // Status and run time are on the row above
   const stats = subagent.stats && [
-    `${subagent.stats.steps} steps`,
+    t('agents.transcript.steps', { count: subagent.stats.steps }),
     `${formatTokens(subagent.stats.inputTokens)} ↑ · ${formatTokens(subagent.stats.outputTokens)} ↓`,
   ];
 
   return (
     <Tabs value={tab} onValueChange={setTab} className="gap-3">
       <div className="flex items-center gap-3">
-        <TabsList className="h-7 gap-0.5 rounded-lg bg-muted p-0.5">
+        {/* A segmented control: the selected tab is a raised pill */}
+        <TabsList indicator={false} className="h-7 gap-0.5 rounded-lg bg-muted p-0.5">
           <TabsTrigger value="conversation" className={SEGMENT}>
-            Conversation
+            {t('agents.transcript.conversation')}
           </TabsTrigger>
           <TabsTrigger value="tools" className={SEGMENT} badge={calls.length || undefined}>
-            Tool calls
+            {t('agents.transcript.toolCalls')}
           </TabsTrigger>
         </TabsList>
         {stats && (
@@ -225,8 +228,7 @@ export function SubagentTranscript({
       <TabsContent value="conversation" className="flex flex-col gap-5">
         {truncated && (
           <p className="text-xs text-muted-foreground">
-            Only the first steps were recorded: the transcript reached its size
-            limit.
+            {t('agents.transcript.truncated')}
           </p>
         )}
         {messages.map((message, i) => (
@@ -240,12 +242,12 @@ export function SubagentTranscript({
         ))}
         {subagent.status === SubagentResponseDtoStatus.pending && (
           <p className="text-sm text-muted-foreground">
-            Queued, waiting for a free slot…
+            {t('agents.transcript.queued')}
           </p>
         )}
         {subagent.status === SubagentResponseDtoStatus.cancelled && (
           <p className="text-sm text-muted-foreground">
-            Cancelled when the conversation was stopped.
+            {t('agents.transcript.cancelled')}
           </p>
         )}
         {subagent.error && (
@@ -260,7 +262,9 @@ export function SubagentTranscript({
       <TabsContent value="tools" className="-ml-1">
         {calls.length === 0 ? (
           <p className="px-1 text-sm text-muted-foreground">
-            {active ? 'No tool calls yet.' : 'No tool calls recorded.'}
+            {active
+              ? t('agents.transcript.noCallsYet')
+              : t('agents.transcript.noCalls')}
           </p>
         ) : (
           calls.map((call) => (
@@ -269,7 +273,7 @@ export function SubagentTranscript({
         )}
         {truncated && (
           <p className="px-1 pt-2 text-xs text-muted-foreground">
-            Later tool calls were not recorded.
+            {t('agents.transcript.laterNotRecorded')}
           </p>
         )}
       </TabsContent>

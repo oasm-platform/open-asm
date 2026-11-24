@@ -28,6 +28,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { type TFunction, useT } from '@/lib/i18n-dictionary';
 
 const LOGO_MAX_SIZE_BYTES = 5 * 1024 * 1024;
 // Mirrors the server allow-list in StorageController.isAllowedImageContentType.
@@ -35,11 +36,16 @@ const LOGO_ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,image/svg+xml';
 const DEFAULT_NAME = 'OASM';
 const DEFAULT_LOGO = '/logo.png';
 
-const brandSchema = z.object({
-  name: z.string().trim().min(1, 'Name is required').max(100, 'Name too long'),
-});
+const createBrandSchema = (t: TFunction) =>
+  z.object({
+    name: z
+      .string()
+      .trim()
+      .min(1, t('admin.brandSettings.nameRequired'))
+      .max(100, t('admin.brandSettings.nameTooLong')),
+  });
 
-type BrandFormValues = z.infer<typeof brandSchema>;
+type BrandFormValues = z.infer<ReturnType<typeof createBrandSchema>>;
 
 interface PendingLogo {
   file: File;
@@ -60,6 +66,8 @@ const readAsDataUrl = (file: File) =>
  * A picked logo stays local until Save; removing the saved logo is immediate.
  */
 export default function BrandNameAndLogoSettings() {
+  const t = useT();
+  const brandSchema = useMemo(() => createBrandSchema(t), [t]);
   const queryClient = useQueryClient();
   const { data: config, isLoading } = useSystemConfigsControllerGetConfig();
   const updateConfig = useSystemConfigsControllerUpdateConfig();
@@ -109,17 +117,17 @@ export default function BrandNameAndLogoSettings() {
     const file = event.target.files?.[0];
     if (!file) return;
     if (!LOGO_ACCEPT.split(',').includes(file.type)) {
-      toast.error('Unsupported file type. Use PNG, JPG, GIF, WEBP or SVG.');
+      toast.error(t('admin.brandSettings.unsupportedType'));
       return clearPendingLogo();
     }
     if (file.size > LOGO_MAX_SIZE_BYTES) {
-      toast.error('File size exceeds the 5MB limit');
+      toast.error(t('admin.brandSettings.fileTooLarge'));
       return clearPendingLogo();
     }
     try {
       setPendingLogo({ file, preview: await readAsDataUrl(file) });
     } catch {
-      toast.error('Could not read the selected file');
+      toast.error(t('admin.brandSettings.readFailed'));
       clearPendingLogo();
     }
   };
@@ -128,9 +136,9 @@ export default function BrandNameAndLogoSettings() {
     removeLogo.mutate(undefined, {
       onSuccess: async () => {
         await refreshBrand();
-        toast.success('Logo removed');
+        toast.success(t('admin.brandSettings.logoRemoved'));
       },
-      onError: () => toast.error('Failed to remove logo'),
+      onError: () => toast.error(t('admin.brandSettings.removeFailed')),
     });
 
   const uploadLogo = async (file: File) => {
@@ -150,7 +158,7 @@ export default function BrandNameAndLogoSettings() {
     } catch (error) {
       console.error('Failed to save brand settings:', error);
       toast.error(
-        pendingLogo ? 'Failed to upload logo' : 'Failed to save brand name',
+        pendingLogo ? t('admin.brandSettings.uploadFailed') : t('admin.brandSettings.saveNameFailed'),
       );
       return;
     }
@@ -158,7 +166,7 @@ export default function BrandNameAndLogoSettings() {
     // The saved name becomes the new clean baseline.
     form.reset({ name });
     await refreshBrand();
-    toast.success('Brand settings saved');
+    toast.success(t('admin.brandSettings.saved'));
   };
 
   const handleDiscard = () => {
@@ -174,8 +182,8 @@ export default function BrandNameAndLogoSettings() {
         <Card className="gap-6">
           <CardContent className="space-y-6">
             <Section
-              title="Name"
-              description="The platform name, up to 100 characters."
+              title={t('admin.brandSettings.name')}
+              description={t('admin.brandSettings.nameDescription')}
             >
               <FormField
                 control={form.control}
@@ -196,15 +204,15 @@ export default function BrandNameAndLogoSettings() {
             </Section>
 
             <Section
-              title="Logo"
-              description="Square image, PNG, JPG, GIF, WEBP or SVG, up to 5MB."
+              title={t('admin.brandSettings.logo')}
+              description={t('admin.brandSettings.logoDescription')}
             >
               <div className="flex items-center gap-4">
                 <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-dashed bg-muted/40">
                   {logoPreview ? (
                     <img
                       src={logoPreview}
-                      alt="Logo preview"
+                      alt={t('admin.brandSettings.logoPreview')}
                       className="size-full object-contain p-2"
                     />
                   ) : (
@@ -230,7 +238,7 @@ export default function BrandNameAndLogoSettings() {
                       onClick={() => fileInputRef.current?.click()}
                     >
                       <Upload />
-                      {logoPreview ? 'Change' : 'Upload'}
+                      {logoPreview ? t('admin.brandSettings.change') : t('admin.brandSettings.upload')}
                     </Button>
                     {pendingLogo ? (
                       <Button
@@ -241,16 +249,16 @@ export default function BrandNameAndLogoSettings() {
                         onClick={clearPendingLogo}
                       >
                         <X />
-                        Discard
+                        {t('admin.brandSettings.discard')}
                       </Button>
                     ) : (
                       savedLogo && (
                         <ConfirmDialog
-                          title="Remove logo"
-                          description="The platform will fall back to the default logo. This takes effect immediately."
+                          title={t('admin.brandSettings.removeLogo')}
+                          description={t('admin.brandSettings.removeLogoDescription')}
                           onConfirm={handleRemoveLogo}
-                          confirmText="Remove"
-                          cancelText="Cancel"
+                          confirmText={t('common.remove')}
+                          cancelText={t('common.cancel')}
                           trigger={
                             <Button
                               type="button"
@@ -260,7 +268,7 @@ export default function BrandNameAndLogoSettings() {
                               disabled={isSubmitting || removeLogo.isPending}
                             >
                               <Trash2 />
-                              Remove
+                              {t('common.remove')}
                             </Button>
                           }
                         />
@@ -269,16 +277,19 @@ export default function BrandNameAndLogoSettings() {
                   </div>
                   <p className="truncate text-xs text-muted-foreground">
                     {pendingLogo
-                      ? `${pendingLogo.file.name} — not saved yet`
+                      ? t('admin.brandSettings.notSaved', { file: pendingLogo.file.name })
                       : savedLogo
-                        ? 'Custom logo'
-                        : 'Using the default logo'}
+                        ? t('admin.brandSettings.customLogo')
+                        : t('admin.brandSettings.defaultLogo')}
                   </p>
                 </div>
               </div>
             </Section>
 
-            <Section title="Preview" description="How it looks in the sidebar.">
+            <Section
+              title={t('admin.brandSettings.preview')}
+              description={t('admin.brandSettings.previewDescription')}
+            >
               <div className="flex h-14 items-center gap-2.5 rounded-lg border bg-sidebar px-3">
                 <img
                   src={logoPreview ?? DEFAULT_LOGO}
@@ -299,11 +310,11 @@ export default function BrandNameAndLogoSettings() {
               disabled={!hasChanges || isSubmitting}
               onClick={handleDiscard}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={!hasChanges || isSubmitting}>
               {isSubmitting && <Loader2 className="animate-spin" />}
-              {isSubmitting ? 'Saving...' : 'Save changes'}
+              {isSubmitting ? t('admin.brandSettings.saving') : t('admin.brandSettings.saveChanges')}
             </Button>
           </CardFooter>
         </Card>

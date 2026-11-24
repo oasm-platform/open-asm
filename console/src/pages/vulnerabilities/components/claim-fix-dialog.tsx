@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -28,6 +29,7 @@ export function ClaimFixDialog({
   trigger: ReactNode;
   onSuccess?: () => void;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState('');
   const claimFix = useVulnerabilitiesControllerClaimFix();
@@ -47,16 +49,18 @@ export function ClaimFixDialog({
       },
       {
         onSuccess: (res) => {
-          toast.success('Marked as fixed', {
-            description: `${res?.updated ?? vulnerabilityIds.length} finding(s) will close once the next covering scan no longer reports them.`,
+          toast.success(t('vulnerabilities.claimFix.toastSuccess'), {
+            description: t('vulnerabilities.claimFix.toastSuccessDesc', {
+              count: String(res?.updated ?? vulnerabilityIds.length),
+            }),
           });
           handleOpenChange(false);
           onSuccess?.();
         },
         onError: (error) => {
-          toast.error('Failed to mark as fixed', {
+          toast.error(t('vulnerabilities.claimFix.toastError'), {
             description:
-              error instanceof Error ? error.message : 'An unexpected error occurred.',
+              error instanceof Error ? error.message : t('vulnerabilities.unexpectedError'),
           });
         },
       },
@@ -68,21 +72,20 @@ export function ClaimFixDialog({
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Mark fixed</DialogTitle>
+          <DialogTitle>{t('vulnerabilities.claimFix.title')}</DialogTitle>
           <DialogDescription>
             {vulnerabilityIds.length > 1
-              ? `${vulnerabilityIds.length} findings stay open`
-              : 'The finding stays open'}{' '}
-            until the next scan of the same scope confirms the fix.
+              ? t('vulnerabilities.claimFix.descMany', { n: vulnerabilityIds.length })
+              : t('vulnerabilities.claimFix.descOne')}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
-          <Label htmlFor="claim-fix-note">What was changed (optional)</Label>
+          <Label htmlFor="claim-fix-note">{t('vulnerabilities.claimFix.noteLabel')}</Label>
           <Textarea
             id="claim-fix-note"
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="e.g. Upgraded PHP to 8.3.8"
+            placeholder={t('vulnerabilities.claimFix.notePlaceholder')}
             rows={3}
             className="resize-none"
           />
@@ -93,11 +96,11 @@ export function ClaimFixDialog({
             onClick={() => handleOpenChange(false)}
             disabled={claimFix.isPending}
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={submit} disabled={claimFix.isPending}>
             {claimFix.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Mark fixed
+            {t('vulnerabilities.claimFix.title')}
           </Button>
         </DialogFooter>
       </DialogContent>

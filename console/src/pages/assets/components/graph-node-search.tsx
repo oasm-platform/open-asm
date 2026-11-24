@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useT } from '@/lib/i18n-dictionary';
 import {
   Popover,
   PopoverContent,
@@ -16,18 +17,20 @@ interface GraphNodeSearchProps {
   onSelect: (nodeId: string) => void;
 }
 
+/** Dictionary keys, resolved at render. */
 const TYPE_LABELS: Record<NodeType, string> = {
-  target: 'Target',
-  asset: 'Domain',
-  ip: 'IP',
-  service: 'Service',
-  technology: 'Technology',
-  tls: 'TLS',
-  statusCode: 'Status',
+  target: 'assets.graph.search.typeTarget',
+  asset: 'assets.graph.search.typeDomain',
+  ip: 'assets.graph.search.typeIp',
+  service: 'assets.graph.search.typeService',
+  technology: 'assets.graph.search.typeTechnology',
+  tls: 'assets.graph.search.typeTls',
+  statusCode: 'assets.graph.search.typeStatus',
 };
 
 /** Searchable node picker: filters current graph nodes by label and zooms. */
 export function GraphNodeSearch({ nodes, onSelect }: GraphNodeSearchProps) {
+  const t = useT();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
 
@@ -59,14 +62,14 @@ export function GraphNodeSearch({ nodes, onSelect }: GraphNodeSearchProps) {
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="border-dashed">
           <Search className="mr-1.5 size-3.5" />
-          Find Node
+          {t('assets.graph.search.button')}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-72 p-2" align="start">
         <div className="space-y-2">
           <Input
             autoFocus
-            placeholder="Search domains, IPs, services..."
+            placeholder={t('assets.graph.search.placeholder')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="h-8 text-xs"
@@ -74,7 +77,7 @@ export function GraphNodeSearch({ nodes, onSelect }: GraphNodeSearchProps) {
           <div className="max-h-72 overflow-y-auto">
             {results.length === 0 ? (
               <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                No matching nodes
+                {t('assets.graph.search.empty')}
               </div>
             ) : (
               results.map((n) => {
@@ -102,7 +105,7 @@ export function GraphNodeSearch({ nodes, onSelect }: GraphNodeSearchProps) {
                     />
                     <span className="truncate text-sm">{label}</span>
                     <span className="ml-auto shrink-0 text-[10px] uppercase text-muted-foreground">
-                      {TYPE_LABELS[type] ?? type}
+                      {TYPE_LABELS[type] ? t(TYPE_LABELS[type]) : type}
                     </span>
                   </div>
                 );

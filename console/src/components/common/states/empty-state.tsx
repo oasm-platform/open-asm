@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import { Inbox } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -17,7 +18,7 @@ interface EmptyStateProps {
  * users never reach a dead end; `secondaryAction` is for docs/links.
  */
 export function EmptyState({
-  title = 'Nothing here yet',
+  title,
   description,
   icon,
   action,
@@ -25,6 +26,7 @@ export function EmptyState({
   className,
   compact = false,
 }: EmptyStateProps) {
+  const t = useT();
   return (
     <div
       className={cn(
@@ -37,7 +39,9 @@ export function EmptyState({
         {icon ?? <Inbox className="size-5" aria-hidden />}
       </div>
       <div className="flex max-w-sm flex-col gap-1">
-        <p className="font-medium text-foreground">{title}</p>
+        <p className="font-medium text-foreground">
+          {title ?? t('components.emptyState.title')}
+        </p>
         {description && (
           <p className="text-sm text-pretty text-muted-foreground">
             {description}

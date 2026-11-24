@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
+import { t as tPlain, useT } from '@/lib/i18n-dictionary';
 import {
   getIssueRulesControllerListRulesQueryKey,
   useIssueRulesControllerCreateDefaultRules,
@@ -47,29 +48,30 @@ import { toast } from 'sonner';
 import {
   apiErrorMessage,
   ISSUE_PRIORITY_HINT,
+  translated,
   type IssuePriority,
 } from '../issue-utils';
 import { PriorityBadge } from './issue-chips';
 import { MemberSelect, useWorkspaceMemberOptions } from './member-select';
 
-const EVENT_LABELS: Record<IssueRuleDtoEvent, string> = {
-  'vulnerability.detected': 'Vulnerability detected',
-  'vulnerability.resurfaced': 'Vulnerability resurfaced',
-};
+const EVENT_LABELS: Record<IssueRuleDtoEvent, string> = translated({
+  'vulnerability.detected': 'issues.rules.eventDetected',
+  'vulnerability.resurfaced': 'issues.rules.eventResurfaced',
+});
 
-const GROUP_BY_LABELS: Record<IssueRuleDtoGroupBy, string> = {
-  none: 'No grouping (one issue per finding)',
-  vulnerability_name: 'Vulnerability (CVE / template)',
-  asset: 'Asset',
-  target: 'Target',
-};
+const GROUP_BY_LABELS: Record<IssueRuleDtoGroupBy, string> = translated({
+  none: 'issues.rules.groupNone',
+  vulnerability_name: 'issues.rules.groupVulnerability',
+  asset: 'issues.rules.groupAsset',
+  target: 'issues.rules.groupTarget',
+});
 
-const GROUP_BY_SHORT: Record<IssueRuleDtoGroupBy, string> = {
-  none: 'one per finding',
-  vulnerability_name: 'grouped by vulnerability',
-  asset: 'grouped by asset',
-  target: 'grouped by target',
-};
+const GROUP_BY_SHORT: Record<IssueRuleDtoGroupBy, string> = translated({
+  none: 'issues.rules.shortNone',
+  vulnerability_name: 'issues.rules.shortVulnerability',
+  asset: 'issues.rules.shortAsset',
+  target: 'issues.rules.shortTarget',
+});
 
 const SEVERITIES: IssueRuleConditionsDtoMinSeverity[] = [
   'critical',
@@ -79,18 +81,20 @@ const SEVERITIES: IssueRuleConditionsDtoMinSeverity[] = [
   'info',
 ];
 
-const capitalize = (value: string) =>
-  value.charAt(0).toUpperCase() + value.slice(1);
+/** Severity name in the active language ("High" in EN). */
+const severityLabel = (value: string) => tPlain(`vulnerabilities.severity.${value}`);
 
 export function conditionsSummary(rule: IssueRuleDto): string {
   const parts: string[] = [];
   const { minSeverity, minEpss, targetIds } = rule.conditions ?? {};
-  if (minSeverity) parts.push(`Severity ≥ ${capitalize(minSeverity)}`);
-  if (minEpss !== undefined && minEpss !== null) parts.push(`EPSS ≥ ${minEpss}`);
+  if (minSeverity)
+    parts.push(tPlain('issues.rules.severityGte', { severity: severityLabel(minSeverity) }));
+  if (minEpss !== undefined && minEpss !== null)
+    parts.push(tPlain('issues.rules.epssGte', { value: String(minEpss) }));
   if (targetIds?.length) {
-    parts.push(`${targetIds.length} target${targetIds.length > 1 ? 's' : ''}`);
+    parts.push(tPlain('issues.rules.targets', { count: targetIds.length }));
   }
-  return parts.length ? parts.join(' · ') : 'Every finding';
+  return parts.length ? parts.join(' · ') : tPlain('issues.rules.everyFinding');
 }
 
 /**
@@ -98,11 +102,12 @@ export function conditionsSummary(rule: IssueRuleDto): string {
  * one-click default rule. Rules only open vulnerability remediation issues.
  */
 export function IssueRulesSection() {
+  const t = useT();
   const queryClient = useQueryClient();
   const { data: rules, isLoading, isError } = useIssueRulesControllerListRules();
   const { members } = useWorkspaceMemberOptions();
   const memberName = (id: string | null) =>
-    id ? (members.find((m) => m.id === id)?.name ?? 'Unknown member') : null;
+    id ? (members.find((m) => m.id === id)?.name ?? t('issues.rules.unknownMember')) : null;
 
   const invalidate = () =>
     queryClient.invalidateQueries({
@@ -122,33 +127,32 @@ export function IssueRulesSection() {
       {
         onSuccess: () => void invalidate(),
         onError: (error) =>
-          toast.error(apiErrorMessage(error, 'Failed to update the rule')),
+          toast.error(apiErrorMessage(error, t('issues.rules.updateFailed'))),
       },
     );
 
   const addDefaults = () =>
     createDefaults.mutate(undefined, {
       onSuccess: () => {
-        toast.success('Default rule added');
+        toast.success(t('issues.rules.defaultAdded'));
         void invalidate();
       },
       onError: (error) =>
-        toast.error(apiErrorMessage(error, 'Failed to add the default rule')),
+        toast.error(apiErrorMessage(error, t('issues.rules.addDefaultFailed'))),
     });
 
   return (
     <div className="flex flex-col gap-3" data-testid="issue-rules-section">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h3 className="text-base font-semibold">Issue rules</h3>
+          <h3 className="text-base font-semibold">{t('issues.rules.title')}</h3>
           <p className="text-sm text-muted-foreground">
-            Open vulnerability remediation issues automatically when findings
-            match. Matching findings join the open issue of the same group.
+            {t('issues.rules.description')}
           </p>
         </div>
         <Button size="sm" onClick={() => setEditing('new')}>
           <Plus className="size-4" />
-          Add rule
+          {t('issues.rules.add')}
         </Button>
       </div>
 
@@ -159,15 +163,16 @@ export function IssueRulesSection() {
           ))}
         </div>
       ) : isError ? (
-        <p className="text-sm text-destructive">Failed to load issue rules.</p>
+        <p className="text-sm text-destructive">
+          {t('issues.rules.loadFailed')}
+        </p>
       ) : !rules?.length ? (
         <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-4 py-8 text-center">
           <Workflow className="size-6 text-muted-foreground" />
           <div>
-            <p className="text-sm font-medium">No issue rules yet</p>
+            <p className="text-sm font-medium">{t('issues.rules.empty')}</p>
             <p className="text-sm text-muted-foreground">
-              Start with the default rule: critical and high findings open a
-              remediation issue, grouped by vulnerability.
+              {t('issues.rules.emptyHint')}
             </p>
           </div>
           <Button
@@ -176,11 +181,11 @@ export function IssueRulesSection() {
             disabled={createDefaults.isPending}
             onClick={addDefaults}
           >
-            Add default rule
+            {t('issues.rules.addDefault')}
           </Button>
         </div>
       ) : (
-        <ul className="flex flex-col divide-y rounded-lg border">
+        <ul className="flex flex-col divide-y rounded-lg border dark:bg-card-surface">
           {rules.map((rule) => (
             <li
               key={rule.id}
@@ -189,7 +194,7 @@ export function IssueRulesSection() {
             >
               <Switch
                 checked={rule.enabled}
-                aria-label={`Enable ${rule.name}`}
+                aria-label={t('issues.rules.enable', { name: rule.name })}
                 onCheckedChange={(checked) => toggle(rule, checked)}
               />
               <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -201,16 +206,22 @@ export function IssueRulesSection() {
                 </div>
                 <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
                   <span>{conditionsSummary(rule)}</span>
-                  <span>→ Vulnerability remediation</span>
-                  <span>· {GROUP_BY_SHORT[rule.groupBy]}</span>
+                  <span>{t('issues.rules.toRemediation')}</span>
+                  <span>
+                    {t('issues.rules.dotShort', { text: GROUP_BY_SHORT[rule.groupBy] })}
+                  </span>
                   <span>·</span>
                   {rule.priority ? (
                     <PriorityBadge priority={rule.priority} />
                   ) : (
-                    <span>priority from severity</span>
+                    <span>{t('issues.rules.priorityFromSeverity')}</span>
                   )}
                   {rule.defaultAssigneeId && (
-                    <span>· assign {memberName(rule.defaultAssigneeId)}</span>
+                    <span>
+                      {t('issues.rules.assign', {
+                        name: memberName(rule.defaultAssigneeId) ?? '',
+                      })}
+                    </span>
                   )}
                 </span>
               </div>
@@ -218,7 +229,7 @@ export function IssueRulesSection() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  aria-label={`Edit ${rule.name}`}
+                  aria-label={t('issues.rules.edit', { name: rule.name })}
                   onClick={() => setEditing(rule)}
                 >
                   <Pencil className="size-4" />
@@ -226,7 +237,7 @@ export function IssueRulesSection() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  aria-label={`Delete ${rule.name}`}
+                  aria-label={t('issues.rules.delete', { name: rule.name })}
                   onClick={() => setDeleting(rule)}
                 >
                   <Trash2 className="size-4" />
@@ -251,9 +262,9 @@ export function IssueRulesSection() {
       <ConfirmDialog
         open={Boolean(deleting)}
         onOpenChange={(open) => !open && setDeleting(null)}
-        title={`Delete rule "${deleting?.name ?? ''}"?`}
-        description="Issues the rule already opened stay as they are."
-        confirmText="Delete"
+        title={t('issues.rules.deleteTitle', { name: deleting?.name ?? '' })}
+        description={t('issues.rules.deleteDesc')}
+        confirmText={t('common.delete')}
         onConfirm={() => {
           if (!deleting) return;
           deleteRule.mutate(
@@ -261,7 +272,7 @@ export function IssueRulesSection() {
             {
               onSuccess: () => void invalidate(),
               onError: (error) =>
-                toast.error(apiErrorMessage(error, 'Failed to delete the rule')),
+                toast.error(apiErrorMessage(error, t('issues.rules.deleteFailed'))),
             },
           );
         }}
@@ -280,6 +291,7 @@ function TargetsMultiSelect({
   value: string[];
   onChange: (value: string[]) => void;
 }) {
+  const t = useT();
   const [search, setSearch] = useState('');
   const { data } = useTargetsControllerGetTargetsInWorkspace({
     limit: 50,
@@ -297,13 +309,15 @@ function TargetsMultiSelect({
           className="w-full justify-between font-normal"
           id="rule-targets"
         >
-          {value.length ? `${value.length} selected` : 'All targets'}
+          {value.length
+            ? t('issues.rules.nSelected', { n: value.length })
+            : t('issues.rules.allTargets')}
           <ChevronDown className="size-4 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-72 p-2" align="start">
         <Input
-          placeholder="Search targets…"
+          placeholder={t('issues.rules.searchTargets')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="mb-2 h-8"
@@ -311,7 +325,7 @@ function TargetsMultiSelect({
         <div className="max-h-56 overflow-y-auto">
           {targets.length === 0 ? (
             <p className="px-2 py-3 text-sm text-muted-foreground">
-              No targets found
+              {t('issues.rules.noTargets')}
             </p>
           ) : (
             targets.map((target) => (
@@ -335,7 +349,7 @@ function TargetsMultiSelect({
             className="mt-1 w-full"
             onClick={() => onChange([])}
           >
-            Clear selection
+            {t('issues.rules.clearSelection')}
           </Button>
         )}
       </PopoverContent>
@@ -352,6 +366,7 @@ export function IssueRuleFormDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const t = useT();
   const [name, setName] = useState(rule?.name ?? '');
   const [event, setEvent] = useState<IssueRuleDtoEvent>(
     rule?.event ?? 'vulnerability.detected',
@@ -406,11 +421,11 @@ export function IssueRuleFormDialog({
   const submit = () => {
     const callbacks = {
       onSuccess: () => {
-        toast.success(rule ? 'Rule updated' : 'Rule created');
+        toast.success(rule ? t('issues.rules.updated') : t('issues.rules.created'));
         onSaved();
       },
       onError: (error: unknown) =>
-        toast.error(apiErrorMessage(error, 'Failed to save the rule')),
+        toast.error(apiErrorMessage(error, t('issues.rules.saveFailed'))),
     };
     if (rule) updateRule.mutate({ id: rule.id, data: payload }, callbacks);
     else createRule.mutate({ data: payload }, callbacks);
@@ -420,24 +435,26 @@ export function IssueRuleFormDialog({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{rule ? 'Edit rule' : 'New issue rule'}</DialogTitle>
+          <DialogTitle>
+            {rule ? t('issues.rules.editTitle') : t('issues.rules.newTitle')}
+          </DialogTitle>
           <DialogDescription>
-            Matching findings open (or join) a vulnerability remediation issue.
+            {t('issues.rules.formDesc')}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
           <div className="grid gap-1.5">
-            <Label htmlFor="rule-name">Name</Label>
+            <Label htmlFor="rule-name">{t('issues.rules.name')}</Label>
             <Input
               id="rule-name"
               value={name}
               maxLength={200}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Critical & high"
+              placeholder={t('issues.rules.namePlaceholder')}
             />
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="rule-event">Event</Label>
+            <Label htmlFor="rule-event">{t('issues.rules.event')}</Label>
             <Select
               value={event}
               onValueChange={(v) => setEvent(v as IssueRuleDtoEvent)}
@@ -456,23 +473,23 @@ export function IssueRuleFormDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
-              <Label htmlFor="rule-severity">Minimum severity</Label>
+              <Label htmlFor="rule-severity">{t('issues.rules.minSeverity')}</Label>
               <Select value={minSeverity} onValueChange={setMinSeverity}>
                 <SelectTrigger id="rule-severity">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ANY}>Any severity</SelectItem>
+                  <SelectItem value={ANY}>{t('issues.rules.anySeverity')}</SelectItem>
                   {SEVERITIES.map((severity) => (
                     <SelectItem key={severity} value={severity}>
-                      {capitalize(severity)}
+                      {severityLabel(severity)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="rule-epss">Minimum EPSS (0–1)</Label>
+              <Label htmlFor="rule-epss">{t('issues.rules.minEpss')}</Label>
               <Input
                 id="rule-epss"
                 type="number"
@@ -482,16 +499,16 @@ export function IssueRuleFormDialog({
                 value={minEpss}
                 aria-invalid={epssInvalid}
                 onChange={(e) => setMinEpss(e.target.value)}
-                placeholder="Any"
+                placeholder={t('issues.rules.any')}
               />
             </div>
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="rule-targets">Targets</Label>
+            <Label htmlFor="rule-targets">{t('issues.rules.targetsLabel')}</Label>
             <TargetsMultiSelect value={targetIds} onChange={setTargetIds} />
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="rule-group">Group findings by</Label>
+            <Label htmlFor="rule-group">{t('issues.rules.groupBy')}</Label>
             <Select
               value={groupBy}
               onValueChange={(v) => setGroupBy(v as IssueRuleDtoGroupBy)}
@@ -510,13 +527,13 @@ export function IssueRuleFormDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
-              <Label htmlFor="rule-priority">Priority</Label>
+              <Label htmlFor="rule-priority">{t('issues.rules.priority')}</Label>
               <Select value={priority} onValueChange={setPriority}>
                 <SelectTrigger id="rule-priority">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={DERIVE}>Derive from severity</SelectItem>
+                  <SelectItem value={DERIVE}>{t('issues.rules.derive')}</SelectItem>
                   {(Object.keys(ISSUE_PRIORITY_HINT) as IssuePriority[]).map(
                     (p) => (
                       <SelectItem key={p} value={p}>
@@ -528,26 +545,28 @@ export function IssueRuleFormDialog({
               </Select>
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="rule-assignee">Default assignee</Label>
+              <Label htmlFor="rule-assignee">
+                {t('issues.rules.defaultAssignee')}
+              </Label>
               <MemberSelect
                 id="rule-assignee"
                 value={assignee}
                 onChange={setAssignee}
-                noneLabel="Nobody"
-                placeholder="Nobody"
+                noneLabel={t('issues.rules.nobody')}
+                placeholder={t('issues.rules.nobody')}
               />
             </div>
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             disabled={!name.trim() || epssInvalid || saving}
             onClick={submit}
           >
-            {rule ? 'Save' : 'Create rule'}
+            {rule ? t('common.save') : t('issues.rules.createRule')}
           </Button>
         </DialogFooter>
       </DialogContent>

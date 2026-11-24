@@ -5,6 +5,7 @@ import type {
   IssueDetailDtoType,
   IssueLinkDtoResourceType,
 } from '@/services/apis/gen/queries';
+import { t } from '@/lib/i18n-dictionary';
 
 export type IssueType = IssueDetailDtoType;
 export type IssueStatus = IssueDetailDtoStatus;
@@ -12,19 +13,31 @@ export type IssuePriority = IssueDetailDtoPriority;
 export type IssueResolution = NonNullable<IssueDetailDtoResolution>;
 export type LinkResourceType = IssueLinkDtoResourceType;
 
-export const ISSUE_TYPE_LABELS: Record<IssueType, string> = {
-  vulnerability_remediation: 'Vulnerability remediation',
-  task: 'Task',
-  asset_review: 'Asset review',
-  scan_failure: 'Scan failure',
-};
+/**
+ * A label map whose values are translated on every read, so existing
+ * `MAP[value]` / `Object.entries(MAP)` call sites follow the active language.
+ */
+export function translated<K extends string>(keys: Record<K, string>): Record<K, string> {
+  const out = {} as Record<K, string>;
+  for (const [k, key] of Object.entries(keys) as [K, string][]) {
+    Object.defineProperty(out, k, { get: () => t(key), enumerable: true });
+  }
+  return out;
+}
 
-export const ISSUE_STATUS_LABELS: Record<IssueStatus, string> = {
-  open: 'Open',
-  in_progress: 'In progress',
-  resolved: 'Resolved',
-  closed: 'Closed',
-};
+export const ISSUE_TYPE_LABELS: Record<IssueType, string> = translated({
+  vulnerability_remediation: 'issues.type.vulnerabilityRemediation',
+  task: 'issues.type.task',
+  asset_review: 'issues.type.assetReview',
+  scan_failure: 'issues.type.scanFailure',
+});
+
+export const ISSUE_STATUS_LABELS: Record<IssueStatus, string> = translated({
+  open: 'issues.status.open',
+  in_progress: 'issues.status.inProgress',
+  resolved: 'issues.status.resolved',
+  closed: 'issues.status.closed',
+});
 
 export const ISSUE_PRIORITY_LABELS: Record<IssuePriority, string> = {
   p1: 'P1',
@@ -33,36 +46,36 @@ export const ISSUE_PRIORITY_LABELS: Record<IssuePriority, string> = {
   p4: 'P4',
 };
 
-export const ISSUE_PRIORITY_HINT: Record<IssuePriority, string> = {
-  p1: 'P1 · Urgent',
-  p2: 'P2 · High',
-  p3: 'P3 · Medium',
-  p4: 'P4 · Low',
-};
+export const ISSUE_PRIORITY_HINT: Record<IssuePriority, string> = translated({
+  p1: 'issues.priority.p1',
+  p2: 'issues.priority.p2',
+  p3: 'issues.priority.p3',
+  p4: 'issues.priority.p4',
+});
 
-export const ISSUE_RESOLUTION_LABELS: Record<IssueResolution, string> = {
-  fixed: 'Fixed',
-  accepted: 'Risk accepted',
-  duplicate: 'Duplicate',
-  wont_fix: "Won't fix",
-  other: 'Other',
-};
+export const ISSUE_RESOLUTION_LABELS: Record<IssueResolution, string> = translated({
+  fixed: 'issues.resolution.fixed',
+  accepted: 'issues.resolution.accepted',
+  duplicate: 'issues.resolution.duplicate',
+  wont_fix: 'issues.resolution.wontFix',
+  other: 'issues.resolution.other',
+});
 
-export const LINK_RESOURCE_LABELS: Record<LinkResourceType, string> = {
-  vulnerability: 'Vulnerabilities',
-  asset: 'Assets',
-  target: 'Targets',
-  project: 'Projects',
-  job_history: 'Runs',
-};
+export const LINK_RESOURCE_LABELS: Record<LinkResourceType, string> = translated({
+  vulnerability: 'issues.resource.vulnerability',
+  asset: 'issues.resource.asset',
+  target: 'issues.resource.target',
+  project: 'issues.resource.project',
+  job_history: 'issues.resource.jobHistory',
+});
 
-export const LINK_RESOURCE_SINGULAR: Record<LinkResourceType, string> = {
-  vulnerability: 'vulnerability',
-  asset: 'asset',
-  target: 'target',
-  project: 'project',
-  job_history: 'run',
-};
+export const LINK_RESOURCE_SINGULAR: Record<LinkResourceType, string> = translated({
+  vulnerability: 'issues.resourceOne.vulnerability',
+  asset: 'issues.resourceOne.asset',
+  target: 'issues.resourceOne.target',
+  project: 'issues.resourceOne.project',
+  job_history: 'issues.resourceOne.jobHistory',
+});
 
 export const isFinalStatus = (status: IssueStatus) =>
   status === 'resolved' || status === 'closed';

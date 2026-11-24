@@ -15,6 +15,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useT } from '@/lib/i18n-dictionary';
 
 interface EnvironmentVariablesContextType {
   showValues: boolean;
@@ -98,11 +99,14 @@ export const EnvironmentVariablesTitle = ({
   className,
   children,
   ...props
-}: EnvironmentVariablesTitleProps) => (
-  <h3 className={cn("font-medium text-sm", className)} {...props}>
-    {children ?? "Environment Variables"}
-  </h3>
-);
+}: EnvironmentVariablesTitleProps) => {
+  const t = useT();
+  return (
+    <h3 className={cn("font-medium text-sm", className)} {...props}>
+      {children ?? t('agents.ai.envVars')}
+    </h3>
+  );
+};
 
 export type EnvironmentVariablesToggleProps = ComponentProps<typeof Switch>;
 
@@ -110,6 +114,7 @@ export const EnvironmentVariablesToggle = ({
   className,
   ...props
 }: EnvironmentVariablesToggleProps) => {
+  const t = useT();
   const { showValues, setShowValues } = useContext(EnvironmentVariablesContext);
 
   return (
@@ -118,7 +123,7 @@ export const EnvironmentVariablesToggle = ({
         {showValues ? <EyeIcon size={14} /> : <EyeOffIcon size={14} />}
       </span>
       <Switch
-        aria-label="Toggle value visibility"
+        aria-label={t('agents.ai.toggleValue')}
         checked={showValues}
         onCheckedChange={setShowValues}
         {...props}

@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Button } from '@/components/ui/button';
 import { CronScheduleBuilder } from '@/components/ui/cron-schedule-builder';
 import { Input } from '@/components/ui/input';
@@ -30,6 +31,7 @@ import { AwsSsoConnect } from './aws-sso-connect';
 import { CapabilityPicker } from './capability-picker';
 import { IntegrationLogo } from './integration-logo';
 import { SchemaField, isPropertyVisible, type SchemaProperty } from './schema-field';
+import { groupLabel } from '../schema-i18n';
 
 /** Schema fields the AWS SSO wizard collects itself (not the raw form). */
 const AWS_SSO_WIZARD_FIELDS = ['region', 'startUrl', 'accountId', 'roleName'];
@@ -120,6 +122,7 @@ export function ConnectIntegrationSheet({
   open,
   onOpenChange,
 }: ConnectIntegrationSheetProps) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [formValues, setFormValues] = useState<Record<string, unknown>>({});
   const [integrationName, setIntegrationName] = useState('');
@@ -214,7 +217,7 @@ export function ConnectIntegrationSheet({
     useIntegrationsControllerCreateIntegration({
       mutation: {
         onSuccess: () => {
-          toast.success('Integration connected successfully');
+          toast.success(t('integrations.connect.success'));
           // Invalidate the connected list
           queryClient.invalidateQueries({
             queryKey: getIntegrationsControllerGetManyIntegrationsQueryKey(),
@@ -223,7 +226,7 @@ export function ConnectIntegrationSheet({
           setFormValues({});
         },
         onError: () => {
-          toast.error('Failed to connect integration');
+          toast.error(t('integrations.connect.failed'));
         },
       },
     });
@@ -240,11 +243,11 @@ export function ConnectIntegrationSheet({
     // must never create the integration from raw schema values.
     if (isAwsSso) return;
     if (!appType || !category) {
-      toast.error('Invalid integration schema');
+      toast.error(t('integrations.connect.invalidSchema'));
       return;
     }
     if (!integrationName.trim()) {
-      toast.error('Integration name is required');
+      toast.error(t('integrations.form.nameRequired'));
       return;
     }
 
@@ -260,7 +263,7 @@ export function ConnectIntegrationSheet({
     });
     if (missing.length > 0) {
       toast.error(
-        'Please fill in required fields: ' + missing.join(', '),
+        t('integrations.form.missingRequired', { fields: missing.join(', ') }),
       );
       return;
     }
@@ -287,7 +290,9 @@ export function ConnectIntegrationSheet({
         <SheetHeader>
           <div className="flex items-center gap-2">
             <IntegrationLogo url={`/static/images/integrations/${appType}.svg`} />
-            <SheetTitle>Connect {schema.title ?? appType}</SheetTitle>
+            <SheetTitle>
+              {t('integrations.connect.title', { name: schema.title ?? appType })}
+            </SheetTitle>
           </div>
           {schema.description && (
             <SheetDescription>{schema.description}</SheetDescription>
@@ -299,11 +304,11 @@ export function ConnectIntegrationSheet({
         <div className="flex-1 space-y-4 overflow-y-auto px-4 py-2">
           <div className="space-y-2">
             <Label htmlFor="integration-name">
-              Integration name <span className="text-destructive">*</span>
+              {t('integrations.form.name')} <span className="text-destructive">*</span>
             </Label>
             <Input
               id="integration-name"
-              placeholder="My Integration"
+              placeholder={t('integrations.form.namePlaceholder')}
               value={integrationName}
               onChange={(e) => setIntegrationName(e.target.value)}
             />
@@ -325,10 +330,10 @@ export function ConnectIntegrationSheet({
                     htmlFor="sync-schedule-toggle"
                     className="text-sm font-medium"
                   >
-                    Sync schedule
+                    {t('integrations.sync.schedule')}
                   </Label>
                   <p className="text-xs text-muted-foreground">
-                    Optionally run automatic syncs on a schedule.
+                    {t('integrations.sync.hint')}
                   </p>
                 </div>
                 <Switch
@@ -344,7 +349,7 @@ export function ConnectIntegrationSheet({
               {scheduleEnabled && (
                 <div className="space-y-2 pt-1">
                   <p className="text-xs text-muted-foreground">
-                    Schedule (stored in UTC)
+                    {t('integrations.sync.utc')}
                   </p>
                   <CronScheduleBuilder
                     defaultValue={draftCron || undefined}
@@ -360,7 +365,7 @@ export function ConnectIntegrationSheet({
 
           {!isAwsSso && formProperties.length === 0 && (
             <p className="text-sm text-muted-foreground">
-              No configuration required.
+              {t('integrations.connect.noConfig')}
             </p>
           )}
 
@@ -399,13 +404,11 @@ export function ConnectIntegrationSheet({
           })}
 
           {Object.entries(propertyGroups).map(([groupKey, fields]) => {
-            const groupLabel =
-              groupKey.charAt(0).toUpperCase() + groupKey.slice(1);
 
             return (
               <div key={groupKey} className="space-y-3">
                 <Label className="text-sm font-semibold">
-                  {groupLabel}
+                  {groupLabel(t, groupKey)}
                 </Label>
                 <div className="grid grid-cols-2 gap-3">
                   {fields.map(([key, prop]) => {
@@ -457,12 +460,12 @@ export function ConnectIntegrationSheet({
             onClick={() => onOpenChange(false)}
             disabled={isPending}
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
           {!isAwsSso && (
             <Button type="submit" disabled={isPending}>
               {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Connect
+              {t('integrations.connect.action')}
             </Button>
           )}
         </SheetFooter>

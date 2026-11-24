@@ -60,10 +60,28 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { t, useT } from '@/lib/i18n-dictionary';
 import type {
   WorkspaceInvitation,
   WorkspaceMembers,
 } from '@/services/apis/gen/queries';
+
+function invitationStatusLabel(status: string): string {
+  switch (status) {
+    case 'pending':
+      return t('settings.members.invitations.status.pending');
+    case 'accepted':
+      return t('settings.members.invitations.status.accepted');
+    case 'declined':
+      return t('settings.members.invitations.status.declined');
+    case 'expired':
+      return t('settings.members.invitations.status.expired');
+    case 'cancelled':
+      return t('settings.members.invitations.status.cancelled');
+    default:
+      return status;
+  }
+}
 
 const INVITATION_STATUS_VARIANT = {
   pending: 'warning',
@@ -79,6 +97,7 @@ const INVITATION_STATUS_VARIANT = {
  * returns 403 when the current member lacks them.
  */
 export default function MembersSettings() {
+  const t = useT();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -95,8 +114,7 @@ export default function MembersSettings() {
       <Card>
         <CardContent className="py-10">
           <p className="text-center text-muted-foreground">
-            No workspace selected. Please select a workspace to manage its
-            members.
+            {t('settings.members.noWorkspace')}
           </p>
         </CardContent>
       </Card>
@@ -125,9 +143,9 @@ export default function MembersSettings() {
     <div className="space-y-6">
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="members">Members</TabsTrigger>
-          <TabsTrigger value="invitations">Invitations</TabsTrigger>
-          <TabsTrigger value="permissions">Permissions</TabsTrigger>
+          <TabsTrigger value="members">{t('settings.members.tabs.members')}</TabsTrigger>
+          <TabsTrigger value="invitations">{t('settings.members.tabs.invitations')}</TabsTrigger>
+          <TabsTrigger value="permissions">{t('settings.members.tabs.permissions')}</TabsTrigger>
         </TabsList>
         <TabsContent value="members" className="pt-4">
           <MembersTab
@@ -153,6 +171,7 @@ function MembersTab({
   workspaceId: string;
   defaultInviteOpen?: boolean;
 }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [inviteOpen, setInviteOpen] = useState(defaultInviteOpen);
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
@@ -181,7 +200,7 @@ function MembersTab({
   const { mutate: removeMember } = useWorkspacesControllerRemoveMember({
     mutation: {
       onSuccess: () => {
-        toast.success('Member removed');
+        toast.success(t('settings.members.removed'));
         // Reload the members list so the removed member disappears.
         queryClient.invalidateQueries({ queryKey: ['/api/workspaces/members'] });
         invalidateWorkspaceQueries(queryClient);
@@ -205,7 +224,7 @@ function MembersTab({
   const columns: ColumnDef<WorkspaceMembers>[] = [
     {
       id: 'member',
-      header: 'Member',
+      header: t('settings.members.columns.member'),
       cell: ({ row }) => (
         <div className="flex items-center gap-3">
           <Avatar className="size-9">
@@ -218,7 +237,7 @@ function MembersTab({
           </Avatar>
           <div className="flex items-center gap-1.5">
             <span className="truncate font-medium">
-              {row.original.user?.name ?? 'Unknown user'}
+              {row.original.user?.name ?? t('settings.members.unknownUser')}
             </span>
             {isOwnerGroup(row.original.permissionGroups) && (
               <Tooltip>
@@ -227,7 +246,7 @@ function MembersTab({
                     <Crown size={16} className="text-yellow-500" />
                   </span>
                 </TooltipTrigger>
-                <TooltipContent>Owner</TooltipContent>
+                <TooltipContent>{t('settings.members.owner')}</TooltipContent>
               </Tooltip>
             )}
           </div>
@@ -236,7 +255,7 @@ function MembersTab({
     },
     {
       id: 'permission',
-      header: 'Permission',
+      header: t('settings.members.columns.permission'),
       cell: ({ row }) => (
         <div className="flex flex-wrap gap-1">
           {(row.original.permissionGroups ?? []).map((group) => (
@@ -267,12 +286,14 @@ function MembersTab({
                   onSelect={() => setEditingMemberId(row.original.id)}
                 >
                   <UserCog className="h-4 w-4" />
-                  Change permission
+                  {t('settings.members.changePermission')}
                 </DropdownMenuItem>
                 <ConfirmDialog
-                  title="Remove member"
-                  description={`Remove ${row.original.user?.name ?? 'this member'} from the workspace? They will lose access immediately.`}
-                  confirmText="Remove"
+                  title={t('settings.members.remove.title')}
+                  description={t('settings.members.remove.description', {
+                    name: row.original.user?.name ?? t('settings.members.remove.thisMember'),
+                  })}
+                  confirmText={t('common.remove')}
                   onConfirm={() => removeMember({ memberId: row.original.id })}
                   trigger={
                     <DropdownMenuItem
@@ -280,7 +301,7 @@ function MembersTab({
                       disabled={isOwner}
                     >
                       <Trash2 className="h-4 w-4" />
-                      Remove
+                      {t('common.remove')}
                     </DropdownMenuItem>
                   }
                 />
@@ -300,7 +321,7 @@ function MembersTab({
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
         <Input
-          placeholder="Search members..."
+          placeholder={t('settings.members.search')}
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           className="h-9 max-w-xs"
@@ -310,7 +331,7 @@ function MembersTab({
             <DialogTrigger asChild>
               <Button size="sm" className="h-9">
                 <UserPlus className="h-4 w-4" />
-                Invite member
+                {t('settings.members.inviteMember')}
               </Button>
             </DialogTrigger>
             <DialogContent>
@@ -332,7 +353,7 @@ function MembersTab({
         pageSize={Math.max(filteredMembers.length, 5)}
         totalItems={filteredMembers.length}
         showPagination={false}
-        emptyMessage="No members in this workspace."
+        emptyMessage={t('settings.members.empty')}
         error={isError ? <LoadError onRetry={() => refetch()} /> : undefined}
       />
 
@@ -344,7 +365,7 @@ function MembersTab({
           {editingMember && (
             <EditMemberPermissionsContent
               memberId={editingMember.id}
-              memberName={editingMember.user?.name ?? 'Member'}
+              memberName={editingMember.user?.name ?? t('settings.members.columns.member')}
               groups={groups ?? []}
               assignedGroupIds={
                 editingMember.permissionGroups?.map((group) => group.id) ?? []
@@ -360,6 +381,7 @@ function MembersTab({
 }
 
 function InvitationsTab({ workspaceId }: { workspaceId: string }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const { hasPermission } = usePermission();
@@ -378,7 +400,7 @@ function InvitationsTab({ workspaceId }: { workspaceId: string }) {
   const { mutate: cancelInvitation } = useWorkspacesControllerCancelInvitation({
     mutation: {
       onSuccess: () => {
-        toast.success('Invitation cancelled');
+        toast.success(t('settings.members.invitations.cancelled'));
         invalidateWorkspaceQueries(queryClient);
       },
     },
@@ -410,7 +432,7 @@ function InvitationsTab({ workspaceId }: { workspaceId: string }) {
   const { mutate: resendInvitation } = useWorkspacesControllerCreateInvitations({
     mutation: {
       onSuccess: () => {
-        toast.success('Invitation resent');
+        toast.success(t('settings.members.invitations.resent'));
         invalidateWorkspaceQueries(queryClient);
       },
     },
@@ -419,20 +441,20 @@ function InvitationsTab({ workspaceId }: { workspaceId: string }) {
   const columns: ColumnDef<WorkspaceInvitation>[] = [
     {
       accessorKey: 'email',
-      header: 'Email',
+      header: t('settings.members.invitations.columns.email'),
       cell: ({ row }) => (
         <span className="font-medium">{row.getValue('email')}</span>
       ),
     },
     {
       accessorKey: 'expiresAt',
-      header: 'Expires',
+      header: t('settings.members.invitations.columns.expires'),
       cell: ({ row }) =>
         new Date(row.getValue('expiresAt') as string).toLocaleString(),
     },
     {
       accessorKey: 'status',
-      header: 'Status',
+      header: t('common.status'),
       cell: ({ row }) => (
         <Badge
           variant={
@@ -441,13 +463,13 @@ function InvitationsTab({ workspaceId }: { workspaceId: string }) {
             ] ?? 'outline'
           }
         >
-          {row.original.status}
+          {invitationStatusLabel(row.original.status)}
         </Badge>
       ),
     },
     {
       accessorKey: 'permissionIds',
-      header: 'Permission groups',
+      header: t('settings.members.permissionGroups'),
       cell: ({ row }) => {
         const ids = row.original.permissionIds ?? [];
         if (ids.length === 0) {
@@ -457,7 +479,7 @@ function InvitationsTab({ workspaceId }: { workspaceId: string }) {
           <div className="flex flex-wrap gap-1">
             {ids.map((id) => (
               <Badge key={id} variant="soft">
-                {groupNameById.get(id) ?? 'Unknown group'}
+                {groupNameById.get(id) ?? t('settings.members.invitations.unknownGroup')}
               </Badge>
             ))}
           </div>
@@ -474,14 +496,16 @@ function InvitationsTab({ workspaceId }: { workspaceId: string }) {
           return (
             <div className="flex justify-end">
               <ConfirmDialog
-                title="Cancel invitation"
-                description={`Cancel the invitation for ${row.original.email}? Their invite link will stop working.`}
-                confirmText="Cancel invitation"
+                title={t('settings.members.invitations.cancel.title')}
+                description={t('settings.members.invitations.cancel.description', {
+                  email: row.original.email,
+                })}
+                confirmText={t('settings.members.invitations.cancel.title')}
                 onConfirm={() => cancelInvitation({ invitationId: row.original.id })}
                 trigger={
                   <Button variant="ghost" size="sm">
                     <X className="h-4 w-4" />
-                    Cancel
+                    {t('common.cancel')}
                   </Button>
                 }
               />
@@ -492,9 +516,11 @@ function InvitationsTab({ workspaceId }: { workspaceId: string }) {
           return (
             <div className="flex justify-end">
               <ConfirmDialog
-                title="Resend invitation"
-                description={`Send a new invitation to ${row.original.email} with the same permission groups?`}
-                confirmText="Resend invitation"
+                title={t('settings.members.invitations.resend.title')}
+                description={t('settings.members.invitations.resend.description', {
+                  email: row.original.email,
+                })}
+                confirmText={t('settings.members.invitations.resend.title')}
                 onConfirm={() =>
                   resendInvitation({
                     data: {
@@ -506,7 +532,7 @@ function InvitationsTab({ workspaceId }: { workspaceId: string }) {
                 trigger={
                   <Button variant="ghost" size="sm">
                     <RotateCcw className="h-4 w-4" />
-                    Resend
+                    {t('settings.members.invitations.resend.button')}
                   </Button>
                 }
               />
@@ -526,7 +552,7 @@ function InvitationsTab({ workspaceId }: { workspaceId: string }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
         <Input
-          placeholder="Search invitations..."
+          placeholder={t('settings.members.invitations.search')}
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           className="h-9 max-w-xs"
@@ -541,7 +567,7 @@ function InvitationsTab({ workspaceId }: { workspaceId: string }) {
         pageSize={Math.max(filteredInvitations.length, 5)}
         totalItems={filteredInvitations.length}
         showPagination={false}
-        emptyMessage="No invitations sent."
+        emptyMessage={t('settings.members.invitations.empty')}
         error={isError ? <LoadError onRetry={() => refetch()} /> : undefined}
       />
     </div>
@@ -549,6 +575,7 @@ function InvitationsTab({ workspaceId }: { workspaceId: string }) {
 }
 
 function PermissionsTab({ workspaceId }: { workspaceId: string }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [formSheet, setFormSheet] = useState<
@@ -570,7 +597,7 @@ function PermissionsTab({ workspaceId }: { workspaceId: string }) {
   const { mutate: deleteGroup } = useWorkspacesControllerDeletePermissionGroup({
     mutation: {
       onSuccess: () => {
-        toast.success('Permission group deleted');
+        toast.success(t('settings.members.groups.deleted'));
         // Reload the permission groups list and the members list (member
         // badges reference group names).
         queryClient.invalidateQueries({
@@ -595,22 +622,24 @@ function PermissionsTab({ workspaceId }: { workspaceId: string }) {
   const columns: ColumnDef<WorkspacePermissionLike>[] = [
     {
       accessorKey: 'name',
-      header: 'Name',
+      header: t('common.name'),
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
           <span className="font-medium">{row.getValue('name')}</span>
-          {row.original.isSystem && <Badge variant="soft">System</Badge>}
+          {row.original.isSystem && (
+            <Badge variant="soft">{t('settings.members.groups.system')}</Badge>
+          )}
         </div>
       ),
     },
     {
       accessorKey: 'permissions',
-      header: 'Permissions',
+      header: t('settings.members.tabs.permissions'),
       cell: ({ row }) => (
         <div className="flex flex-wrap gap-1">
           {(row.original.permissions ?? []).map((key) => (
             <Badge key={key} variant="outline">
-              {key === '*' ? 'All permissions' : key}
+              {key === '*' ? t('settings.members.groups.allPermissions') : key}
             </Badge>
           ))}
         </div>
@@ -637,19 +666,21 @@ function PermissionsTab({ workspaceId }: { workspaceId: string }) {
                     }
                   >
                     <Pencil className="h-4 w-4" />
-                    Edit
+                    {t('common.edit')}
                   </DropdownMenuItem>
                 <ConfirmDialog
-                  title="Delete permission group"
-                  description={`Delete "${row.original.name}"? Members assigned this group will lose its permissions.`}
-                  confirmText="Delete"
+                  title={t('settings.members.groups.delete.title')}
+                  description={t('settings.members.groups.delete.description', {
+                    name: row.original.name,
+                  })}
+                  confirmText={t('common.delete')}
                   onConfirm={() =>
                     deleteGroup({ permissionId: row.original.id })
                   }
                   trigger={
                     <DropdownMenuItem className="text-destructive focus:text-destructive">
                       <Trash2 className="h-4 w-4" />
-                      Delete
+                      {t('common.delete')}
                     </DropdownMenuItem>
                   }
                 />
@@ -669,7 +700,7 @@ function PermissionsTab({ workspaceId }: { workspaceId: string }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
         <Input
-          placeholder="Search permission groups..."
+          placeholder={t('settings.members.groups.search')}
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           className="h-9 max-w-xs"
@@ -681,7 +712,7 @@ function PermissionsTab({ workspaceId }: { workspaceId: string }) {
             onClick={() => setFormSheet({ mode: 'create' })}
           >
             <Plus className="h-4 w-4" />
-            Create group
+            {t('settings.members.groups.create')}
           </Button>
         )}
       </div>
@@ -694,7 +725,7 @@ function PermissionsTab({ workspaceId }: { workspaceId: string }) {
         pageSize={Math.max(filteredGroups.length, 5)}
         totalItems={filteredGroups.length}
         showPagination={false}
-        emptyMessage="No permission groups in this workspace."
+        emptyMessage={t('settings.members.groups.empty')}
         error={isError ? <LoadError onRetry={() => refetch()} /> : undefined}
       />
 
@@ -717,6 +748,7 @@ function InviteMemberDialogContent({
   onClose: () => void;
   queryClient: ReturnType<typeof useQueryClient>;
 }) {
+  const t = useT();
   const navigate = useNavigate();
   const [emailsText, setEmailsText] = useState('');
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
@@ -726,11 +758,18 @@ function InviteMemberDialogContent({
         onSuccess: (data) => {
           if (data.skipped > 0) {
             toast.warning(
-              `Invited ${data.invited} user${data.invited === 1 ? '' : 's'}. Skipped ${data.skipped} email${data.skipped === 1 ? '' : 's'} without an account or already a member.`,
+              t('settings.members.invite.partial', {
+                invited: t('settings.members.invite.invited', {
+                  count: data.invited,
+                }),
+                skipped: t('settings.members.invite.skipped', {
+                  count: data.skipped,
+                }),
+              }),
             );
           } else {
             toast.success(
-              `Invited ${data.invited} user${data.invited === 1 ? '' : 's'}`,
+              t('settings.members.invite.invited', { count: data.invited }),
             );
           }
           invalidateWorkspaceQueries(queryClient);
@@ -749,15 +788,14 @@ function InviteMemberDialogContent({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Invite members</DialogTitle>
+        <DialogTitle>{t('settings.members.invite.title')}</DialogTitle>
         <DialogDescription>
-          Invite existing users by email. They will receive an in-app
-          notification with an accept link.
+          {t('settings.members.invite.description')}
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="invite-emails">Emails</Label>
+          <Label htmlFor="invite-emails">{t('settings.members.invite.emails')}</Label>
           <Textarea
             id="invite-emails"
             placeholder="user@example.com, another@example.com"
@@ -766,15 +804,14 @@ function InviteMemberDialogContent({
             rows={4}
           />
           <p className="text-xs text-muted-foreground">
-            One or more emails, separated by commas or new lines. Users without
-            an account are skipped.
+            {t('settings.members.invite.emailsHint')}
           </p>
         </div>
         <div className="space-y-2">
-          <Label>Permission groups</Label>
+          <Label>{t('settings.members.permissionGroups')}</Label>
           {invitableGroups.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              No permission groups yet.{' '}
+              {t('settings.members.invite.noGroups')}{' '}
               <button
                 type="button"
                 className="text-primary underline underline-offset-4 hover:text-primary/80"
@@ -787,7 +824,7 @@ function InviteMemberDialogContent({
                   onClose();
                 }}
               >
-                Create one in the Permissions tab.
+                {t('settings.members.invite.createGroupLink')}
               </button>
             </p>
           ) : (
@@ -819,7 +856,7 @@ function InviteMemberDialogContent({
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button
           disabled={
@@ -831,7 +868,7 @@ function InviteMemberDialogContent({
             })
           }
         >
-          {isPending ? 'Inviting...' : 'Send invitations'}
+          {isPending ? t('settings.members.invite.sending') : t('settings.members.invite.send')}
         </Button>
       </DialogFooter>
     </>
@@ -853,6 +890,7 @@ function EditMemberPermissionsContent({
   onClose: () => void;
   queryClient: ReturnType<typeof useQueryClient>;
 }) {
+  const t = useT();
   const [selectedGroupIds, setSelectedGroupIds] =
     useState<string[]>(assignedGroupIds);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -860,7 +898,7 @@ function EditMemberPermissionsContent({
     useWorkspacesControllerUpdateMemberPermissions({
       mutation: {
         onSuccess: () => {
-          toast.success('Member permissions updated');
+          toast.success(t('settings.members.edit.updated'));
           // Refresh the members list so the permission badges and dropdown
           // states reflect the new groups.
           queryClient.invalidateQueries({ queryKey: ['/api/workspaces/members'] });
@@ -869,7 +907,7 @@ function EditMemberPermissionsContent({
         },
         onError: () => {
           setSubmitError(
-            'Failed to update member permissions. Please try again.',
+            t('settings.members.edit.failed'),
           );
         },
       },
@@ -886,9 +924,9 @@ function EditMemberPermissionsContent({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Change permission</DialogTitle>
+        <DialogTitle>{t('settings.members.changePermission')}</DialogTitle>
         <DialogDescription>
-          Permission groups for {memberName}. Changes apply immediately.
+          {t('settings.members.edit.description', { name: memberName })}
         </DialogDescription>
       </DialogHeader>
       <div className="grid gap-2">
@@ -914,7 +952,7 @@ function EditMemberPermissionsContent({
           ))}
         {groups.length === 0 && (
           <p className="text-xs text-muted-foreground">
-            No permission groups in this workspace.
+            {t('settings.members.groups.empty')}
           </p>
         )}
       </div>
@@ -923,10 +961,10 @@ function EditMemberPermissionsContent({
       )}
       <DialogFooter>
         <Button variant="outline" onClick={onClose} disabled={isPending}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button onClick={handleSave} disabled={isPending || selectedGroupIds.length === 0}>
-          {isPending ? 'Saving...' : 'Save'}
+          {isPending ? t('settings.members.saving') : t('common.save')}
         </Button>
       </DialogFooter>
     </>
@@ -942,11 +980,12 @@ type WorkspacePermissionLike = {
 };
 
 function LoadError({ onRetry }: { onRetry: () => void }) {
+  const t = useT();
   return (
     <div className="flex flex-col items-center justify-center gap-3">
-      <p>Failed to load</p>
+      <p>{t('settings.members.loadFailed')}</p>
       <Button size="sm" variant="outline" onClick={onRetry}>
-        Retry
+        {t('common.retry')}
       </Button>
     </div>
   );

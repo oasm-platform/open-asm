@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { PromptInputButton } from '@/components/ai-elements/prompt-input';
 import { SendMessageDtoAgentMode } from '@/services/apis/gen/queries';
 import { useAgentWorkers } from '@/hooks/use-agent-workers';
@@ -18,6 +19,7 @@ export const AgentModeToggle = memo(function AgentModeToggle({
   onChange,
   onWorkerChange,
 }: AgentModeToggleProps) {
+  const t = useT();
   const isAgent = value === SendMessageDtoAgentMode.agent;
   const { workers } = useAgentWorkers();
   const { openDialog } = useConnectWorkerState();
@@ -31,7 +33,7 @@ export const AgentModeToggle = memo(function AgentModeToggle({
       return;
     }
     if (next === SendMessageDtoAgentMode.agent) {
-      toast.success('Agent mode enabled');
+      toast.success(t('components.agentMode.enabled'));
     }
     if (next === SendMessageDtoAgentMode.ask) {
       onWorkerChange?.(null);
@@ -49,7 +51,7 @@ export const AgentModeToggle = memo(function AgentModeToggle({
       }
     >
       <InfinityIcon size={16} />
-      <span>Agent</span>
+      <span>{t('components.agentMode.agent')}</span>
     </PromptInputButton>
   );
 });

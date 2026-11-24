@@ -1,5 +1,6 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Plus, Sparkles } from 'lucide-react';
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -22,11 +23,13 @@ import { restoreApprovalMode } from '@/hooks/use-approval-mode';
 import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAgentSettingsDialog } from '@/hooks/useAgentSettingsDialog';
+import { usePageContextChip } from '@/hooks/usePageContextChip';
 import {
   useAiChatConversation,
   useAiChatPanelOpen,
 } from '@/hooks/useAiChatPanel';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import { withPageContext } from '@/lib/page-context';
 import { cn } from '@/lib/utils';
 import { ChatConversation } from '@/pages/agents/components/chat-conversation';
 import { CommandApprovalPrompt } from '@/pages/agents/components/command-approval-prompt';
@@ -66,6 +69,17 @@ function PanelConversation({ conversationId, isNew }: PanelConversationProps) {
   const chat = useAgentChat({ conversationId, isNew });
   const { workers, isLoading: isLoadingWorkers } = useAgentWorkers();
   const { openDialog: openConnectWorker } = useConnectWorkerState();
+  const { context: pageContext, dismiss: removePageContext } =
+    usePageContextChip();
+
+  // Every message from the panel carries the page the user is on (unless
+  // they removed it): appended to the question, so the chat API is unchanged
+  const { onSendMessage } = chat;
+  const sendMessage = useCallback(
+    (text: string, options?: { agentMode?: string }) =>
+      onSendMessage(withPageContext(text, pageContext), options),
+    [onSendMessage, pageContext],
+  );
 
   // How this chat was asked to start (useAiChat), if it was
   const startConfig =
@@ -128,11 +142,12 @@ function PanelConversation({ conversationId, isNew }: PanelConversationProps) {
       }
     }
     setPendingText(null);
-    chat.onSendMessage(pendingText, { agentMode: newChatMode });
+    sendMessage(pendingText, { agentMode: newChatMode });
   }, [
     pendingText,
     newChatMode,
     chat,
+    sendMessage,
     isLoadingWorkers,
     workers.length,
     openConnectWorker,
@@ -176,7 +191,9 @@ function PanelConversation({ conversationId, isNew }: PanelConversationProps) {
       />
       <ChatConversation
         messages={chat.messages}
-        onSendMessage={chat.onSendMessage}
+        onSendMessage={sendMessage}
+        pageContextLabel={pageContext?.title ?? null}
+        onRemovePageContext={removePageContext}
         onRetry={chat.onRetry}
         onStop={chat.onStop}
         isStreaming={chat.isStreaming}
@@ -233,6 +250,7 @@ function PanelConversation({ conversationId, isNew }: PanelConversationProps) {
 
 /** Shown instead of the chat until the workspace has an LLM provider */
 function ConnectProvider() {
+  const t = useT();
   const { open: openSettings } = useAgentSettingsDialog();
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
@@ -242,15 +260,14 @@ function ConnectProvider() {
           <Sparkles className="size-7 text-muted-foreground" />
         </div>
         <div className="space-y-1.5">
-          <h2 className="font-semibold">Connect an AI Provider</h2>
+          <h2 className="font-semibold">{t('components.aiChat.connectTitle')}</h2>
           <p className="text-sm text-muted-foreground">
-            To start chatting with the AI security agent, connect an LLM
-            provider first.
+            {t('components.aiChat.connectDescription')}
           </p>
         </div>
         <Button variant="outline" onClick={() => openSettings('provider')}>
           <Plus className="size-4" />
-          Connect
+          {t('components.aiChat.connect')}
         </Button>
       </div>
     </div>
@@ -263,6 +280,7 @@ function ConnectProvider() {
  * full screen.
  */
 export function AiChatPanel({ rowRef }: AiChatPanelProps) {
+  const t = useT();
   const panelRef = useRef<HTMLElement>(null);
   const panelWidth = useSidePanelWidth(rowRef, {
     storageKey: WIDTH_STORAGE_KEY,
@@ -316,8 +334,10 @@ export function AiChatPanel({ rowRef }: AiChatPanelProps) {
           className="w-full gap-0 p-0 sm:max-w-none [&>button]:hidden"
         >
           <SheetHeader className="sr-only">
-            <SheetTitle>AI chat</SheetTitle>
-            <SheetDescription>Chat with the AI security agent.</SheetDescription>
+            <SheetTitle>{t('components.aiChat.title')}</SheetTitle>
+            <SheetDescription>
+              {t('components.aiChat.description')}
+            </SheetDescription>
           </SheetHeader>
           {content}
         </SheetContent>
@@ -335,7 +355,7 @@ export function AiChatPanel({ rowRef }: AiChatPanelProps) {
         onResize={panelWidth.setWidth}
         onCommit={panelWidth.save}
         limits={PANEL_LIMITS}
-        label="Resize AI chat"
+        label={t('components.aiChat.resize')}
         className="block"
       />
       {/* A sibling of the page in the layout row: the page shrinks beside
@@ -343,7 +363,7 @@ export function AiChatPanel({ rowRef }: AiChatPanelProps) {
           page scrolls the document. */}
       <aside
         ref={panelRef}
-        aria-label="AI chat"
+        aria-label={t('components.aiChat.title')}
         className={cn(
           'sticky top-0 flex h-svh shrink-0 flex-col bg-background animate-in fade-in-0 slide-in-from-right-4 duration-300',
           panelWidth.width === null && 'w-[min(28rem,40vw)]',

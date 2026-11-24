@@ -16,7 +16,8 @@ const SKILL = fs.readFileSync(path.join(__dirname, 'skills', 'attack-surface-que
 const AGENT: QueryScope = { workspaceId: 'w1', permissions: ['*'], caller: 'agent' };
 
 /** The ```json blocks of the skill that are full calls (no <placeholder>). */
-const recipes = [...SKILL.matchAll(/```json\n([\s\S]*?)```/g)]
+// `\r?`: a Windows checkout has CRLF line ends.
+const recipes = [...SKILL.matchAll(/```json\r?\n([\s\S]*?)```/g)]
   .map((m) => m[1])
   .filter((block) => block.includes('"queries"') && !block.includes('<'));
 

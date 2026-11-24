@@ -3,6 +3,7 @@ import {
   StatCardSkeleton,
   StatNote,
 } from '@/components/common/stat-card';
+import { useT } from '@/lib/i18n-dictionary';
 import {
   useVulnerabilitiesControllerGetSettings,
   type GetVulnerabilitiesStatisticsResponseDto,
@@ -33,6 +34,27 @@ interface StatsStripProps {
   onSelect?: (view: StatsView) => void;
   /** Shows AI proposals to review instead of open findings (the dashboard counts those already). */
   showPendingReview?: boolean;
+  /**
+   * False leaves the per-severity counts out of the Open card, for a page
+   * that shows them elsewhere: they make every card in the row taller.
+   */
+  showSeverityBreakdown?: boolean;
+}
+
+/** Open findings per severity, zeros included. */
+export function openSeverityCounts(
+  stats: GetVulnerabilitiesStatisticsResponseDto,
+): SeverityCountsDto {
+  const bySeverity = Object.fromEntries(
+    (stats.data ?? []).map((s) => [s.severity, s.count]),
+  ) as Partial<SeverityCountsDto>;
+  return {
+    critical: bySeverity.critical ?? 0,
+    high: bySeverity.high ?? 0,
+    medium: bySeverity.medium ?? 0,
+    low: bySeverity.low ?? 0,
+    info: bySeverity.info ?? 0,
+  };
 }
 
 /** One row of compact cards on wide screens, like the dashboard totals. */
@@ -47,7 +69,9 @@ export function VulnerabilityStatsStrip({
   isLoading,
   onSelect,
   showPendingReview,
+  showSeverityBreakdown = true,
 }: StatsStripProps) {
+  const t = useT();
   const { data: settings } = useVulnerabilitiesControllerGetSettings();
 
   if (isLoading) {
@@ -63,21 +87,11 @@ export function VulnerabilityStatsStrip({
   if (!stats) {
     return (
       <p className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
-        Statistics are not available right now.
+        {t('vulnerabilities.stats.unavailable')}
       </p>
     );
   }
 
-  const bySeverity = Object.fromEntries(
-    (stats.data ?? []).map((s) => [s.severity, s.count]),
-  ) as Partial<SeverityCountsDto>;
-  const counts: SeverityCountsDto = {
-    critical: bySeverity.critical ?? 0,
-    high: bySeverity.high ?? 0,
-    medium: bySeverity.medium ?? 0,
-    low: bySeverity.low ?? 0,
-    info: bySeverity.info ?? 0,
-  };
   const open = (stats.data ?? []).reduce((sum, s) => sum + s.count, 0);
   const mttrHigh = stats.mttr?.find((m) => m.severity === 'high');
   const slaHigh = settings?.slaDays.high;
@@ -87,60 +101,76 @@ export function VulnerabilityStatsStrip({
   return (
     <div className={GRID}>
       <StatCard
-        label="New"
+        label={t('vulnerabilities.stats.new')}
         icon={Sparkles}
         value={stats.newLast7Days}
-        aside={<StatNote title="First detected in the last 7 days, still open">7d</StatNote>}
+        aside={
+          <StatNote title={t('vulnerabilities.stats.newNote')}>
+            {t('vulnerabilities.stats.d7')}
+          </StatNote>
+        }
         onClick={select('new')}
       />
       {showPendingReview ? (
         <StatCard
-          label="Pending review"
+          label={t('vulnerabilities.stats.pendingReview')}
           icon={Bot}
           value={stats.pendingReview}
-          hint="AI proposals waiting for a decision"
+          hint={t('vulnerabilities.stats.pendingHint')}
           onClick={select('pending_review')}
         />
       ) : (
         <StatCard
-          label="Open"
+          label={t('vulnerabilities.stats.open')}
           icon={ShieldAlert}
           value={open}
           onClick={select('open')}
         >
-          <SeverityBreakdown counts={counts} />
+          {showSeverityBreakdown && (
+            <SeverityBreakdown counts={openSeverityCounts(stats)} />
+          )}
         </StatCard>
       )}
       <StatCard
-        label="Resurfaced"
+        label={t('vulnerabilities.stats.resurfaced')}
         icon={RotateCcw}
         value={stats.resurfacedLast30Days}
-        aside={<StatNote title="In the last 30 days">30d</StatNote>}
+        aside={
+          <StatNote title={t('vulnerabilities.stats.last30')}>
+            {t('vulnerabilities.stats.d30')}
+          </StatNote>
+        }
       />
       <StatCard
-        label="Fixed"
+        label={t('vulnerabilities.stats.fixed')}
         icon={CircleCheck}
         value={stats.fixedLast30Days}
-        aside={<StatNote title="In the last 30 days">30d</StatNote>}
+        aside={
+          <StatNote title={t('vulnerabilities.stats.last30')}>
+            {t('vulnerabilities.stats.d30')}
+          </StatNote>
+        }
       />
       <StatCard
-        label="SLA overdue"
+        label={t('vulnerabilities.stats.slaOverdue')}
         icon={AlarmClock}
         value={stats.overdue}
         tone={stats.overdue > 0 ? SEVERITY_TEXT_CLASS.critical : undefined}
         onClick={select('overdue')}
       />
       <StatCard
-        label="MTTR high"
+        label={t('vulnerabilities.stats.mttrHigh')}
         icon={Timer}
-        value={mttrHigh?.days != null ? `${Math.round(mttrHigh.days)} d` : '—'}
+        value={mttrHigh?.days != null ? t('vulnerabilities.stats.mttrDays', { n: Math.round(mttrHigh.days) }) : '—'}
         aside={
           slaHigh ? (
-            <StatNote title={`SLA for high findings: ${slaHigh} days`}>
-              SLA {slaHigh}d
+            <StatNote title={t('vulnerabilities.stats.slaHighTitle', { n: slaHigh })}>
+              {t('vulnerabilities.stats.slaHigh', { n: slaHigh })}
             </StatNote>
           ) : (
-            <StatNote title="Fixed in the last 90 days">90d</StatNote>
+            <StatNote title={t('vulnerabilities.stats.last90')}>
+              {t('vulnerabilities.stats.d90')}
+            </StatNote>
           )
         }
       />

@@ -62,7 +62,7 @@ export interface ScopeParams {
  */
 export function expand(
   sql: string,
-  aliases: { a?: string; b?: string; c?: string; one?: Record<string, string>; project?: string },
+  aliases: { a?: string; b?: string; c?: string; one?: Record<string, string>; project?: string; ws?: string },
 ): string {
   return sql.replace(/\{([a-z]+)(?::([a-zA-Z]+))?\}/g, (whole, kind: string, arg?: string) => {
     if (kind === 'one' && arg && aliases.one?.[arg]) return aliases.one[arg];
@@ -70,6 +70,16 @@ export function expand(
     if (typeof value === 'string') return value;
     throw new Error(`AttackSurfaceQuery compiler: unbound placeholder ${whole}`);
   });
+}
+
+/**
+ * The tenant test of one row of `resource` under `alias`: its own
+ * `workspaceId` column, or its `scopePredicate`.
+ */
+export function tenantTerm(resource: ResourceDef, alias: string, workspace: string): string {
+  return resource.scopePredicate
+    ? `(${expand(resource.scopePredicate, { a: alias, ws: workspace })})`
+    : `${alias}.${SCOPE_COLUMN} = ${workspace}`;
 }
 
 /**
@@ -87,7 +97,18 @@ export class FromBuilder {
     readonly root: ResourceDef,
     /** Unquoted root alias, e.g. `r`, `i0`, `x3`. */
     readonly rootAlias: string,
+    /** Workspace parameter: scopes a joined row whose parent has no workspace column. */
+    readonly workspace: string,
   ) {}
+
+  /** Tenant test of a joined row: equal to its parent's column when both have one. */
+  private joinTenant(parent: ResourceDef, parentAlias: string, target: ResourceDef, alias: string): string {
+    if (target.global) return '';
+    if (!target.scopePredicate && !parent.scopePredicate && !parent.global) {
+      return ` AND ${alias}.${SCOPE_COLUMN} = ${parentAlias}.${SCOPE_COLUMN}`;
+    }
+    return ` AND ${tenantTerm(target, alias, this.workspace)}`;
+  }
 
   /** Quoted alias of the one-relation chain `names` (root for []). */
   aliasOf(names: readonly string[]): string {
@@ -107,7 +128,7 @@ export class FromBuilder {
         const parentAlias = this.aliasOf(names.slice(0, i));
         const alias = this.aliasOf(chain);
         const on = expand(rel.on, { a: parentAlias, b: alias });
-        const tenant = target.global ? '' : ` AND ${alias}.${SCOPE_COLUMN} = ${parentAlias}.${SCOPE_COLUMN}`;
+        const tenant = this.joinTenant(resource, parentAlias, target, alias);
         this.joins.set(
           key,
           `${rel.join === 'inner' ? 'INNER' : 'LEFT'} JOIN ${q(target.table)} ${alias} ON (${on})${tenant}`,
@@ -169,7 +190,7 @@ export function scopePredicates(
   alias: string,
   scope: ScopeParams,
 ): string[] {
-  const parts = [`${alias}.${SCOPE_COLUMN} = ${scope.workspace}`];
+  const parts = [tenantTerm(resource, alias, scope.workspace)];
   if (scope.project) {
     if (resource.projectScope === null) {
       throw new Error(`AttackSurfaceQuery compiler: ${resource.name} cannot be project-scoped`);

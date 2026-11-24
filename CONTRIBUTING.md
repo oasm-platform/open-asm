@@ -63,13 +63,13 @@ Full walkthrough: [`DEVELOPER_GUIDE.md`](DEVELOPER_GUIDE.md). Repo conventions f
 
 Small PRs get reviewed faster and more carefully. Past a few hundred lines, reviewers start skimming and bugs get through. This matters even more with AI-assisted code: a generated diff is cheap to produce, but reviewing it is no faster.
 
-**Limits** (enforced by the `pr-size` workflow):
+**Limits** (reported by the `pr-size` workflow, which comments but never fails the check):
 
 | Lines changed | Result |
 |---|---|
 | ≤ 400 | ✅ Ideal |
-| 401 – 1,000 | ⚠️ Bot posts a warning comment; check passes |
-| > 1,000, or > 40 files | 🚫 Check fails |
+| 401 – 1,000 | ⚠️ Bot posts a warning comment |
+| > 1,000, or > 40 files | 🚫 Bot posts a "too large, please split" comment |
 
 Lockfiles, generated code (`.open-api/`, `console/src/services/apis/gen/`, `routeTree.gen.ts`, `worker/internal/gen/`, connector `manifest.json`), migrations, snapshots and deleted files are not counted.
 

@@ -1,8 +1,11 @@
 package egress
 
 import (
+	"bufio"
 	"context"
+	"encoding/base64"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -91,5 +94,41 @@ func TestSocks5UpstreamCloseReachesClient(t *testing.T) {
 	b, err := io.ReadAll(c)
 	if err != nil || string(b) != "banner" {
 		t.Fatalf("got %q err=%v, want banner + EOF", b, err)
+	}
+}
+
+// rawhttp (nuclei raw/unsafe templates) CONNECTs with base64("http://<token>")
+// and peeks 5 bytes after the status line; both must work or every raw
+// request fails and nuclei marks the target unresponsive (issue #909).
+func TestConnectRawhttpClient(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	go func() {
+		c, err := ln.Accept()
+		if err == nil {
+			defer c.Close()
+			_, _ = io.Copy(io.Discard, c) // silent until the client speaks
+		}
+	}()
+	_, port, _ := net.SplitHostPort(ln.Addr().String())
+	srv := startEgress(t, testAuth("tok"), localDialer())
+	c, err := net.Dial("tcp", srv.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	auth := base64.StdEncoding.EncodeToString([]byte("http://tok"))
+	fmt.Fprintf(c, "CONNECT localhost:%s HTTP/1.1\r\nProxy-Authorization: Basic %s\r\n\r\n", port, auth)
+	_ = c.SetReadDeadline(time.Now().Add(3 * time.Second))
+	br := bufio.NewReader(c)
+	status, err := br.ReadString('\n')
+	if err != nil || !strings.HasPrefix(status, "HTTP/1.1 200 ") {
+		t.Fatalf("status line %q err=%v, want 200", status, err)
+	}
+	if _, err := br.Peek(5); err != nil {
+		t.Fatalf("peek after status line: %v (rawhttp would hang here)", err)
 	}
 }

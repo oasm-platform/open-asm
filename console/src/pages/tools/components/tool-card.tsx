@@ -15,6 +15,7 @@ import { BadgeCheck } from 'lucide-react';
 import { useState } from 'react';
 import { formatCategory } from './format-category';
 import ToolInstallButton from './tool-install-button';
+import { useT } from '@/lib/i18n-dictionary';
 
 interface ToolCardProps {
   tool: Tool;
@@ -29,6 +30,7 @@ interface ToolCardProps {
 }
 
 const ToolCard = ({ tool, onNavigate, openFrom = 'tools' }: ToolCardProps) => {
+  const t = useT();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const {
@@ -62,7 +64,8 @@ const ToolCard = ({ tool, onNavigate, openFrom = 'tools' }: ToolCardProps) => {
   return (
     // The detail link is a full-card overlay, so the install button can sit
     // beside it instead of nested inside a button
-    <div className="relative flex h-full flex-col items-start gap-2 rounded-lg border p-5 text-left transition-colors hover:bg-accent/70">
+    // Dark mode: the card fill, as outlines are off there (index.css)
+    <div className="relative flex h-full flex-col items-start gap-2 rounded-lg border p-5 text-left transition-colors hover:bg-accent/70 dark:bg-card-surface dark:hover:bg-accent/70">
       <button
         type="button"
         aria-label={tool.name}
@@ -76,7 +79,7 @@ const ToolCard = ({ tool, onNavigate, openFrom = 'tools' }: ToolCardProps) => {
           </LogoFrame>
           <h3 className="text-base font-semibold">{tool.name}</h3>
           {tool.isOfficialSupport && (
-            <span title="Official" className="inline-flex shrink-0">
+            <span title={t('tools.card.official')} className="inline-flex shrink-0">
               <BadgeCheck className="size-4 text-blue-500" />
             </span>
           )}
@@ -93,7 +96,7 @@ const ToolCard = ({ tool, onNavigate, openFrom = 'tools' }: ToolCardProps) => {
         </div>
       </div>
       <p className="text-sm text-muted-foreground line-clamp-3">
-        {tool.description || 'No description available.'}
+        {tool.description || t('tools.card.noDescription')}
       </p>
       {!!tool.categories?.length && (
         // Pinned to the bottom so badges line up across cards of different heights

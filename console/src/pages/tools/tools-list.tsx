@@ -2,6 +2,7 @@ import type { Tool } from '@/services/apis/gen/queries';
 import React, { type JSX, type ReactNode } from 'react';
 import ToolCard from './components/tool-card';
 import ToolCardLoading from './components/tool-card-loading';
+import { useT } from '@/lib/i18n-dictionary';
 
 interface ToolsListProps {
   data?: Tool[];
@@ -15,9 +16,10 @@ const ToolsList = ({
   data,
   isLoading,
   icon,
-  emptyMessage = 'No tools found',
+  emptyMessage,
   emptyDescription,
 }: ToolsListProps) => {
+  const t = useT();
   return (
     <div className="flex flex-col gap-4">
       {isLoading ? (
@@ -36,7 +38,7 @@ const ToolsList = ({
               className: 'w-6 h-6 text-gray-500',
             })}
           <span className="text-lg font-semibold text-gray-500">
-            {emptyMessage}
+            {emptyMessage ?? t('tools.list.empty')}
           </span>
           {emptyDescription && (
             <p className="max-w-sm text-sm text-muted-foreground">

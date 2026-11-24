@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Button } from '@/components/ui/button';
 import { axiosInstance } from '@/services/apis/axios-client';
 import { getGlobalWorkspaceId } from '@/utils/workspaceState';
@@ -13,10 +14,11 @@ export default function ExportDataButton({
   api,
   prefix,
 }: ExportDataButtonProps) {
+  const t = useT();
   const handleDownload = async () => {
     try {
       // Show loading state
-      const toastId = toast.loading('Exporting data...');
+      const toastId = toast.loading(t('components.export.exporting'));
 
       // Create a fresh axios instance without any interceptors for blob downloads
       const downloadAxios = axios.create({
@@ -43,7 +45,7 @@ export default function ExportDataButton({
 
         // Verify blob size before attempting download
         if (blob.size === 0) {
-          throw new Error('Export returned empty file');
+          throw new Error(t('components.export.emptyFile'));
         }
 
         // Create object URL
@@ -64,15 +66,15 @@ export default function ExportDataButton({
         window.URL.revokeObjectURL(url);
 
         // Success feedback
-        toast.success('Export completed successfully!', { id: toastId });
+        toast.success(t('components.export.completed'), { id: toastId });
       } else {
-        throw new Error(`Export failed: ${res.status}`);
+        throw new Error(t('components.export.failedStatus', { status: res.status }));
       }
     } catch (error) {
       console.error('Export error:', error);
-      toast.error('Export failed', {
+      toast.error(t('components.export.failed'), {
         description:
-          error instanceof Error ? error.message : 'Please try again',
+          error instanceof Error ? error.message : t('components.export.tryAgain'),
       });
     }
   };
@@ -80,7 +82,7 @@ export default function ExportDataButton({
   return (
     <Button variant="outline" onClick={handleDownload}>
       <Download className="h-4 w-4" />
-      <span>Export</span>
+      <span>{t('common.export')}</span>
     </Button>
   );
 }

@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import * as React from "react"
 import { Check, ChevronsUpDown, GalleryVerticalEnd } from "lucide-react"
 
@@ -20,6 +21,7 @@ export function VersionSwitcher({
   versions: string[]
   defaultVersion: string
 }) {
+  const t = useT()
   const [selectedVersion, setSelectedVersion] = React.useState(defaultVersion)
 
   return (
@@ -35,7 +37,7 @@ export function VersionSwitcher({
                 <GalleryVerticalEnd className="size-4" />
               </div>
               <div className="flex flex-col gap-0.5 leading-none">
-                <span className="font-semibold">Documentation</span>
+                <span className="font-semibold">{t('components.versionSwitcher.docs')}</span>
                 <span className="">v{selectedVersion}</span>
               </div>
               <ChevronsUpDown className="ml-auto" />

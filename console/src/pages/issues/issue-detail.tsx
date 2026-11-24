@@ -8,6 +8,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
+import { useT } from '@/lib/i18n-dictionary';
 import {
   getIssuesControllerGetByIdQueryKey,
   useIssuesControllerDelete,
@@ -47,6 +48,7 @@ function EditableTitle({
   issue: IssueDetailDto;
   onSave: (title: string) => void;
 }) {
+  const t = useT();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(issue.title);
   const commit = () => {
@@ -58,7 +60,7 @@ function EditableTitle({
   if (editing) {
     return (
       <Input
-        aria-label="Issue title"
+        aria-label={t('issues.detail.titleAria')}
         className="h-10 min-w-[min(40rem,80vw)] text-xl font-semibold md:text-xl"
         value={value}
         maxLength={500}
@@ -83,7 +85,7 @@ function EditableTitle({
         setValue(issue.title);
         setEditing(true);
       }}
-      aria-label="Edit title"
+      aria-label={t('issues.detail.editTitle')}
     >
       <span className="break-words">{issue.title}</span>
       <Pencil className="size-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
@@ -98,11 +100,12 @@ function DescriptionCard({
   issue: IssueDetailDto;
   onSave: (description: string | null) => void;
 }) {
+  const t = useT();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(issue.description ?? '');
   return (
     <DetailSection
-      title="Description"
+      title={t('issues.detail.description')}
       icon={<FileText />}
       action={
         !editing && (
@@ -115,7 +118,7 @@ function DescriptionCard({
             }}
           >
             <Pencil className="size-3.5" />
-            Edit
+            {t('common.edit')}
           </Button>
         )
       }
@@ -123,14 +126,14 @@ function DescriptionCard({
       {editing ? (
         <div className="flex flex-col gap-2">
           <Textarea
-            aria-label="Description"
+            aria-label={t('issues.detail.description')}
             rows={5}
             value={value}
             onChange={(e) => setValue(e.target.value)}
           />
           <div className="flex justify-end gap-2">
             <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               size="sm"
@@ -139,7 +142,7 @@ function DescriptionCard({
                 onSave(value.trim() ? value.trim() : null);
               }}
             >
-              Save
+              {t('common.save')}
             </Button>
           </div>
         </div>
@@ -148,15 +151,18 @@ function DescriptionCard({
           {issue.description}
         </p>
       ) : (
-        <p className="text-sm text-muted-foreground">No description.</p>
+        <p className="text-sm text-muted-foreground">
+          {t('issues.detail.noDescription')}
+        </p>
       )}
     </DetailSection>
   );
 }
 
 function DetailSkeleton() {
+  const t = useT();
   return (
-    <div className="flex flex-col gap-4" aria-label="Loading issue">
+    <div className="flex flex-col gap-4" aria-label={t('issues.detail.loading')}>
       <Skeleton className="h-8 w-2/3" />
       <Skeleton className="h-28 w-full rounded-xl" />
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -171,6 +177,7 @@ function DetailSkeleton() {
 }
 
 export default function IssueDetail({ issueId }: { issueId?: string } = {}) {
+  const t = useT();
   const params = useParams({ strict: false }) as { id?: string };
   const id = issueId ?? params.id ?? '';
   const navigate = useNavigate();
@@ -214,7 +221,7 @@ export default function IssueDetail({ issueId }: { issueId?: string } = {}) {
       {
         onSuccess: (next) => refresh(next),
         onError: (err) =>
-          toast.error(apiErrorMessage(err, 'Failed to update the issue')),
+          toast.error(apiErrorMessage(err, t('issues.detail.updateFailed'))),
       },
     );
 
@@ -224,11 +231,11 @@ export default function IssueDetail({ issueId }: { issueId?: string } = {}) {
       { id, linkId: link.id },
       {
         onSuccess: () => {
-          toast.success('Link removed');
+          toast.success(t('issues.detail.linkRemoved'));
           refresh();
         },
         onError: (err) =>
-          toast.error(apiErrorMessage(err, 'Failed to remove the link')),
+          toast.error(apiErrorMessage(err, t('issues.detail.removeLinkFailed'))),
         onSettled: () => setRemovingId(null),
       },
     );
@@ -253,15 +260,15 @@ export default function IssueDetail({ issueId }: { issueId?: string } = {}) {
   if (!issue) {
     const notFound = apiErrorStatus(error) === 404;
     return (
-      <Page title="Issue">
+      <Page title={t('issues.detail.title')}>
         <div className="flex flex-col items-center gap-3 py-16 text-center">
           <p className="text-sm text-muted-foreground">
             {notFound
-              ? 'This issue does not exist or was deleted.'
-              : 'Failed to load the issue.'}
+              ? t('issues.detail.notFound')
+              : t('issues.detail.loadFailed')}
           </p>
           <Button variant="outline" asChild>
-            <Link to="/issues">Back to issues</Link>
+            <Link to="/issues">{t('issues.detail.back')}</Link>
           </Button>
         </div>
       </Page>
@@ -270,12 +277,15 @@ export default function IssueDetail({ issueId }: { issueId?: string } = {}) {
 
   const isRemediation = issue.type === 'vulnerability_remediation';
   const ruleName = issue.ruleId
-    ? (rules?.find((r) => r.id === issue.ruleId)?.name ?? 'Deleted rule')
+    ? (rules?.find((r) => r.id === issue.ruleId)?.name ?? t('issues.detail.deletedRule'))
     : null;
-  const sourceLabel = ruleName ? `Rule “${ruleName}”` : 'Manual';
+  const sourceLabel = ruleName
+    ? t('issues.detail.sourceRule', { name: ruleName })
+    : t('issues.detail.sourceManual');
 
   return (
     <Page
+      documentTitle={`${formatIssueNo(issue.no)} ${issue.title}`}
       title={
         <EditableTitle issue={issue} onSave={(title) => update({ title })} />
       }
@@ -286,7 +296,7 @@ export default function IssueDetail({ issueId }: { issueId?: string } = {}) {
             variant="outline"
             size="icon"
             className="size-9"
-            aria-label="Delete issue"
+            aria-label={t('issues.detail.deleteAria')}
             onClick={() => setConfirmDelete(true)}
           >
             <Trash2 className="size-4" />
@@ -312,7 +322,10 @@ export default function IssueDetail({ issueId }: { issueId?: string } = {}) {
               issue={issue}
               onSave={(description) => update({ description })}
             />
-            <DetailSection title="Activity" icon={<MessageSquare />}>
+            <DetailSection
+              title={t('issues.detail.activity')}
+              icon={<MessageSquare />}
+            >
               <CommentThread subject={{ type: 'issue', id: issue.id }} />
             </DetailSection>
           </div>
@@ -332,15 +345,16 @@ export default function IssueDetail({ issueId }: { issueId?: string } = {}) {
               }
             />
             {isRemediation && (
-              <SideCard title="Automation" testId="automation-note">
+              <SideCard
+                title={t('issues.detail.automation')}
+                testId="automation-note"
+              >
                 <div className="flex items-start gap-3">
                   <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-violet-500/10 text-violet-600 dark:text-violet-300">
                     <Bot className="size-4" />
                   </span>
                   <p className="text-muted-foreground">
-                    Resolves itself (as fixed) once every linked vulnerability
-                    is fixed by a covering scan or dismissed, and reopens if one
-                    of them resurfaces.
+                    {t('issues.detail.automationNote')}
                   </p>
                 </div>
               </SideCard>
@@ -363,22 +377,22 @@ export default function IssueDetail({ issueId }: { issueId?: string } = {}) {
       <ConfirmDialog
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
-        title={`Delete ${formatIssueNo(issue.no)}?`}
-        description="The issue, its links and its comments are removed. Linked resources stay."
-        confirmText="Delete"
+        title={t('issues.detail.deleteTitle', { no: formatIssueNo(issue.no) })}
+        description={t('issues.detail.deleteDesc')}
+        confirmText={t('common.delete')}
         onConfirm={() =>
           deleteIssue.mutate(
             { id: issue.id },
             {
               onSuccess: () => {
-                toast.success(`${formatIssueNo(issue.no)} deleted`);
+                toast.success(t('issues.detail.deleted', { no: formatIssueNo(issue.no) }));
                 void queryClient.invalidateQueries({
                   queryKey: ['/api/issues'],
                 });
                 void navigate({ to: '/issues' });
               },
               onError: (err) =>
-                toast.error(apiErrorMessage(err, 'Failed to delete the issue')),
+                toast.error(apiErrorMessage(err, t('issues.detail.deleteFailed'))),
             },
           )
         }

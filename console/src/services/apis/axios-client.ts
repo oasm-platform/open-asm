@@ -8,6 +8,7 @@ export const axiosInstance = Axios.create({
   withCredentials: true,
 });
 
+import { getLanguage } from '@/utils/languageState';
 import { getGlobalWorkspaceId } from '@/utils/workspaceState';
 
 axiosInstance.interceptors.request.use((config) => {
@@ -15,6 +16,8 @@ axiosInstance.interceptors.request.use((config) => {
   if (workspaceId) {
     config.headers.set('X-Workspace-Id', workspaceId);
   }
+  // Backend translates notifications and validation errors by this header.
+  config.headers.set('Accept-Language', getLanguage());
 
   const cleanValue = (v: unknown) => v !== null && v !== undefined && v !== '';
 

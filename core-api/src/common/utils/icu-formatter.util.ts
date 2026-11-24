@@ -1,3 +1,4 @@
+import { I18nContext } from 'nestjs-i18n';
 import { IntlMessageFormat } from 'intl-messageformat';
 
 const ICU_PATTERN = /\{\w+,\s*(plural|select|selectordinal)\s*,/;
@@ -43,15 +44,29 @@ export function icuFormatter(
         }
       }
 
-      const msg = getFormatter(template, 'en');
+      // shortcut: plural rules follow the request's language, not translate()'s
+      // `lang` option; pass the locale in args once something translates outside a request.
+      const msg = getFormatter(
+        template,
+        I18nContext.current()?.lang ?? 'en',
+      );
       return msg.format(numericValues) as string;
     } catch {
       // Fall through to simple interpolation
     }
   }
 
-  return template.replace(/\{(\w+)\}/g, (_: string, key: string) => {
-    const val = values[key];
+  // Dotted paths reach into nested args, e.g. validation's {constraints.0}.
+  return template.replace(/\{([\w.]+)\}/g, (_: string, key: string) => {
+    const val = key
+      .split('.')
+      .reduce<unknown>(
+        (obj, part) =>
+          obj !== null && typeof obj === 'object'
+            ? (obj as Record<string, unknown>)[part]
+            : undefined,
+        values,
+      );
     if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
       return String(val);
     }

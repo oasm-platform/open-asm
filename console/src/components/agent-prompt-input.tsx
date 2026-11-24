@@ -2,15 +2,18 @@ import {
   PromptInput,
   PromptInputBody,
   PromptInputFooter,
+  PromptInputHeader,
   PromptInputSubmit,
-  PromptInputTextarea,
   PromptInputTools,
   type PromptInputMessage,
 } from '@/components/ai-elements/prompt-input';
+import { AgentMentionTextarea } from '@/components/agent-mention-textarea';
 import { AgentModeToggle } from '@/components/ui/agent-mode-toggle';
 import { ApprovalModeSelect } from '@/components/ui/approval-mode-select';
 import { ChatModelSwitcher } from '@/components/ui/chat-model-switcher';
+import { PanelsTopLeft, X } from 'lucide-react';
 import { useState } from 'react';
+import { useT } from '@/lib/i18n-dictionary';
 
 interface AgentPromptInputProps {
   onSubmit: (content: string, options?: { agentMode?: string }) => void;
@@ -34,6 +37,10 @@ interface AgentPromptInputProps {
   value?: string;
   /** Required with `value` to make the input controlled. */
   onValueChange?: (value: string) => void;
+  /** Label of the page attached to the next message; no chip when null. */
+  pageContextLabel?: string | null;
+  /** Detaches the page; required with `pageContextLabel` for the X button. */
+  onRemovePageContext?: () => void;
 }
 
 export default function AgentPromptInput({
@@ -46,11 +53,14 @@ export default function AgentPromptInput({
   onAgentModeChange,
   onWorkerSelect,
   showSettingsButton = true,
-  placeholder = 'Ask anything about security...',
+  placeholder,
   className,
   value,
   onValueChange,
+  pageContextLabel,
+  onRemovePageContext,
 }: AgentPromptInputProps) {
+  const t = useT();
   const [internalInput, setInternalInput] = useState('');
   const input = value ?? internalInput;
   const setInput = (next: string) => {
@@ -68,11 +78,33 @@ export default function AgentPromptInput({
   return (
     <div className={className}>
       <PromptInput onSubmit={handleSubmit} className="w-full">
+        {/* Its own row: the footer has no room left in the narrow sidebar */}
+        {pageContextLabel && (
+          <PromptInputHeader className="px-3 pt-2.5 pb-0">
+            <span
+              className="flex h-6 min-w-0 max-w-full items-center gap-1.5 rounded-md border bg-muted/50 pl-2 pr-1 text-xs text-muted-foreground"
+              title={t('agents.prompt.pageContextHint')}
+            >
+              <PanelsTopLeft className="size-3.5 shrink-0" />
+              <span className="truncate">{pageContextLabel}</span>
+              {onRemovePageContext && (
+                <button
+                  type="button"
+                  onClick={onRemovePageContext}
+                  aria-label={t('agents.prompt.removePageContext')}
+                  className="shrink-0 rounded-sm p-0.5 hover:bg-accent hover:text-foreground"
+                >
+                  <X className="size-3" />
+                </button>
+              )}
+            </span>
+          </PromptInputHeader>
+        )}
         <PromptInputBody>
-          <PromptInputTextarea
+          <AgentMentionTextarea
             value={input}
-            placeholder={placeholder}
-            onChange={(e) => setInput(e.currentTarget.value)}
+            placeholder={placeholder ?? t('agents.prompt.placeholder')}
+            onValueChange={setInput}
             disabled={isSending}
           />
         </PromptInputBody>

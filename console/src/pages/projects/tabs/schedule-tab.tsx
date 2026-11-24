@@ -1,3 +1,5 @@
+import { addDays, differenceInCalendarDays, startOfDay } from 'date-fns';
+import { formatDate, fromNow } from '@/lib/date-locale';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,6 +23,7 @@ import {
   getNextRun,
   getTimezoneLabel,
 } from '@/lib/cron-schedule';
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import {
   ProjectTriggerType,
@@ -29,8 +32,6 @@ import {
   type ProjectWorkflowTrigger,
 } from '@/services/apis/gen/queries';
 import { Link } from '@tanstack/react-router';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import { CalendarClock, CalendarDays, Workflow, Zap } from 'lucide-react';
 import { useMemo } from 'react';
 import {
@@ -39,7 +40,6 @@ import {
   workflowLabel,
 } from '../project-utils';
 
-dayjs.extend(relativeTime);
 
 const DAYS = 7;
 
@@ -49,11 +49,12 @@ function useWeek(
   names: Map<string, string>,
   timezone: string,
 ) {
+  const t = useT();
   return useMemo(() => {
-    const start = dayjs().startOf('day');
-    const end = start.add(DAYS, 'day').toDate();
+    const start = startOfDay(new Date());
+    const end = addDays(start, DAYS);
     const days = Array.from({ length: DAYS }, (_, i) => ({
-      date: start.add(i, 'day'),
+      date: addDays(start, i),
       runs: [] as Array<{ at: Date; workflow: string; triggerId: string }>,
     }));
     for (const trigger of triggers) {
@@ -64,10 +65,10 @@ function useWeek(
       for (let guard = 0; guard < 200; guard++) {
         const at = getNextRun(trigger.cron, timezone, from);
         if (!at || at >= end) break;
-        const index = dayjs(at).startOf('day').diff(start, 'day');
+        const index = differenceInCalendarDays(at, start);
         days[index]?.runs.push({
           at,
-          workflow: names.get(trigger.projectWorkflowId) ?? 'Workflow',
+          workflow: names.get(trigger.projectWorkflowId) ?? t('projects.schedule.workflowFallback'),
           triggerId: trigger.id,
         });
         from = new Date(at.getTime() + 60_000);
@@ -75,7 +76,7 @@ function useWeek(
     }
     for (const day of days) day.runs.sort((a, b) => a.at.getTime() - b.at.getTime());
     return days;
-  }, [triggers, names, timezone]);
+  }, [triggers, names, timezone, t]);
 }
 
 /**
@@ -103,6 +104,7 @@ export function ScheduleTab({
   workflows: ProjectWorkflow[];
   archived: boolean;
 }) {
+  const t = useT();
   const timezone = getLocalTimezone();
   const { data: triggers = [], isLoading } = useProjectsControllerGetTriggers(projectId);
   const names = useMemo(
@@ -118,10 +120,10 @@ export function ScheduleTab({
           <div className="flex flex-col gap-1.5">
             <CardTitle className="flex items-center gap-2">
               <CalendarDays className="size-5 text-primary" />
-              Next 7 days
+              {t('projects.schedule.next7Days')}
             </CardTitle>
             <CardDescription>
-              Event triggers have no fixed time, so they are not shown here.
+              {t('projects.schedule.next7DaysHint')}
             </CardDescription>
           </div>
           <span className="text-sm text-muted-foreground">{getTimezoneLabel(timezone)}</span>
@@ -137,8 +139,8 @@ export function ScheduleTab({
                 )}
               >
                 <span className="text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">{day.date.format('ddd')}</span>{' '}
-                  {day.date.format('DD/MM')}
+                  <span className="font-medium text-foreground">{formatDate(day.date, 'EEE')}</span>{' '}
+                  {formatDate(day.date, 'dd/MM')}
                 </span>
                 {day.runs.map((run) => (
                   <span
@@ -146,7 +148,7 @@ export function ScheduleTab({
                     className="rounded-md border-l-2 border-primary bg-primary/5 px-2 py-1 text-xs leading-tight"
                   >
                     <span className="block font-medium tabular-nums">
-                      {dayjs(run.at).format('HH:mm')}
+                      {formatDate(run.at, 'HH:mm')}
                     </span>
                     {run.workflow}
                   </span>
@@ -162,18 +164,16 @@ export function ScheduleTab({
           <div className="flex flex-col gap-1.5">
             <CardTitle className="flex items-center gap-2">
               <Zap className="size-5 text-primary" />
-              Triggers
+              {t('projects.create.steps.triggers')}
             </CardTitle>
             <CardDescription>
-              Set when each workflow runs while adding or editing it on the
-              Workflows tab. Archiving the project stops every trigger until it
-              is reopened.
+              {t('projects.schedule.triggersHint')}
             </CardDescription>
           </div>
           <Button variant="outline" asChild>
             <Link to="/projects/$id/$tab" params={{ id: projectId, tab: 'workflows' }}>
               <Workflow className="size-4" />
-              Workflows
+              {t('projects.tabs.workflows')}
             </Link>
           </Button>
         </CardHeader>
@@ -182,19 +182,19 @@ export function ScheduleTab({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Workflow</TableHead>
-                  <TableHead>Runs</TableHead>
-                  <TableHead>Condition</TableHead>
-                  <TableHead>Last fired</TableHead>
-                  <TableHead>Next</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>{t('projects.schedule.colWorkflow')}</TableHead>
+                  <TableHead>{t('projects.tabs.runs')}</TableHead>
+                  <TableHead>{t('projects.schedule.colCondition')}</TableHead>
+                  <TableHead>{t('projects.schedule.colLastFired')}</TableHead>
+                  <TableHead>{t('projects.schedule.colNext')}</TableHead>
+                  <TableHead>{t('common.status')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {!isLoading && triggers.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
-                      No triggers: workflows run only when started by hand.
+                      {t('projects.schedule.noTriggers')}
                     </TableCell>
                   </TableRow>
                 )}
@@ -216,10 +216,10 @@ export function ScheduleTab({
                             <Zap className="size-3" />
                           )}
                           {isCron
-                            ? 'Schedule'
+                            ? t('projects.runTrigger.schedule')
                             : trigger.event
                               ? TRIGGER_EVENT_LABELS[trigger.event]
-                              : 'Event'}
+                              : t('projects.runTrigger.event')}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -235,20 +235,20 @@ export function ScheduleTab({
                         )}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {trigger.lastFiredAt ? dayjs(trigger.lastFiredAt).fromNow() : '—'}
+                        {trigger.lastFiredAt ? fromNow(trigger.lastFiredAt) : '—'}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {next
-                          ? dayjs(next).format('YYYY-MM-DD HH:mm')
+                          ? formatDate(next, 'yyyy-MM-dd HH:mm')
                           : isCron || !active
                             ? '—'
-                            : 'On its event'}
+                            : t('projects.schedule.onItsEvent')}
                       </TableCell>
                       <TableCell>
                         {active ? (
-                          <Badge variant="soft">Active</Badge>
+                          <Badge variant="soft">{t('projects.list.status.active')}</Badge>
                         ) : (
-                          <Badge variant="secondary">{archived ? 'Archived' : 'Off'}</Badge>
+                          <Badge variant="secondary">{archived ? t('projects.archived') : t('projects.schedule.off')}</Badge>
                         )}
                       </TableCell>
                     </TableRow>

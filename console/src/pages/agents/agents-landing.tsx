@@ -26,7 +26,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Plus, Sparkles } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { v7 as uuidv7 } from 'uuid';
 // import AgentIcon from './components/agent-icon';
 
@@ -35,10 +35,12 @@ import {
   AGENT_PROMPT_GROUPS,
   ASK_PROMPT_GROUPS,
   CONVERSATION_STARTERS,
+  translateStarters,
 } from './components/landing-constants';
 import { ProjectScopeSelect } from './components/project-scope-select';
 import { PromptGroups } from './components/prompt-groups';
 import { WorkerSelect } from './components/worker-select';
+import { useT } from '@/lib/i18n-dictionary';
 
 const WORKER_READY_POLL_MS = 500;
 const WORKER_READY_TIMEOUT_MS = 10_000;
@@ -70,6 +72,7 @@ export default function AgentsLandingPage({
   initialAgentMode = SendMessageDtoAgentMode.ask,
 }: AgentsLandingPageProps) {
   const navigate = useNavigate();
+  const t = useT();
   const { open: openSettings } = useAgentSettingsDialog();
   // Shared by the /aistudio and /aistudio/agents routes, which both take ?text=
   // ?projectId= comes from a project's "Chat with Agent"
@@ -116,6 +119,13 @@ export default function AgentsLandingPage({
   const [haloVisible, setHaloVisible] = useState(false);
   const showHalo = useCallback(() => setHaloVisible(true), []);
   const isAgentMode = agentMode === SendMessageDtoAgentMode.agent;
+  const starters = useMemo(
+    () =>
+      isAgentMode
+        ? translateStarters(AGENT_CONVERSATION_STARTERS, 'agent', t)
+        : translateStarters(CONVERSATION_STARTERS, 'ask', t),
+    [isAgentMode, t],
+  );
   // Controlled input text, so a suggestion can be filled into it (agent mode)
   const [inputText, setInputText] = useState('');
   const inputWrapperRef = useRef<HTMLDivElement>(null);
@@ -315,17 +325,16 @@ export default function AgentsLandingPage({
             </div>
             <div className="space-y-1.5">
               <h2 className="text-xl font-semibold text-foreground">
-                Connect an AI Provider
+                {t('agents.landing.connectTitle')}
               </h2>
               <p className="text-sm text-muted-foreground max-w-sm">
-                To start chatting with the AI security agent, connect an LLM
-                provider first.
+                {t('agents.landing.connectDescription')}
               </p>
             </div>
           </div>
           <Button variant="outline" onClick={() => openSettings('provider')}>
             <Plus className="h-4 w-4" />
-            Connect
+            {t('agents.landing.connect')}
           </Button>
         </div>
       </Page>
@@ -377,11 +386,7 @@ export default function AgentsLandingPage({
             {/* Hero */}
             <div className="absolute inset-x-0 bottom-full mb-12 flex flex-col items-center gap-3 text-center">
               <TypewriterText
-                texts={
-                  isAgentMode
-                    ? AGENT_CONVERSATION_STARTERS
-                    : CONVERSATION_STARTERS
-                }
+                texts={starters}
                 className="hidden sm:inline text-xl font-medium text-foreground max-w-lg"
               />
             </div>

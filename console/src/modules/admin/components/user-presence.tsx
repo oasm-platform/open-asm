@@ -1,7 +1,6 @@
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
+import { fromNow } from '@/lib/date-locale';
+import { useT } from '@/lib/i18n-dictionary';
 
-dayjs.extend(relativeTime);
 
 /** A request within this window shows the user as online. */
 const ONLINE_WINDOW_MS = 60_000;
@@ -16,6 +15,7 @@ export const UserPresence = ({
 }: {
   lastActiveAt: string | null;
 }) => {
+  const t = useT();
   if (!lastActiveAt) {
     return <span className="text-sm text-muted-foreground">—</span>;
   }
@@ -26,11 +26,11 @@ export const UserPresence = ({
         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75" />
         <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
       </span>
-      <span className="text-sm text-green-600">Online</span>
+      <span className="text-sm text-green-600">{t('admin.presence.online')}</span>
     </span>
   ) : (
     <span className="text-sm text-muted-foreground">
-      {dayjs(lastActiveAt).fromNow()}
+      {fromNow(lastActiveAt)}
     </span>
   );
 };

@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Badge } from '@/components/ui/badge';
 import { OpenLink } from '@/components/ui/open-link';
 import type { Vulnerability } from '@/services/apis/gen/queries';
@@ -51,6 +52,7 @@ export function CodeLocation({
   vulnerability: CodeFinding;
   labelClassName: string;
 }) {
+  const t = useT();
   const {
     filePath,
     lineStart,
@@ -72,7 +74,7 @@ export function CodeLocation({
     <div className="grid grid-cols-1 gap-x-6 gap-y-3 md:grid-cols-2">
       {filePath && (
         <div className="md:col-span-2">
-          <span className={labelClassName}>File</span>
+          <span className={labelClassName}>{t('vulnerabilities.code.file')}</span>
           <div className="flex items-center gap-2">
             <span className="break-all font-mono text-sm">
               {filePath}
@@ -83,7 +85,7 @@ export function CodeLocation({
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label="Open in repository"
+                aria-label={t('vulnerabilities.code.openInRepo')}
                 className="text-muted-foreground hover:text-foreground"
               >
                 <ExternalLink className="size-4" />
@@ -94,13 +96,13 @@ export function CodeLocation({
       )}
       {commit && (
         <div>
-          <span className={labelClassName}>Commit</span>
+          <span className={labelClassName}>{t('vulnerabilities.code.commit')}</span>
           <span className="font-mono text-sm">{commit.slice(0, 12)}</span>
         </div>
       )}
       {packageName && (
         <div className="md:col-span-2">
-          <span className={labelClassName}>Dependency</span>
+          <span className={labelClassName}>{t('vulnerabilities.code.dependency')}</span>
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="font-mono">{packageName}</span>
             {installedVersion && (
@@ -108,7 +110,7 @@ export function CodeLocation({
             )}
             {fixedVersion && (
               <span className="text-muted-foreground">
-                fixed in <Badge variant="outline">{fixedVersion}</Badge>
+                {t('vulnerabilities.code.fixedIn')} <Badge variant="outline">{fixedVersion}</Badge>
               </span>
             )}
           </div>

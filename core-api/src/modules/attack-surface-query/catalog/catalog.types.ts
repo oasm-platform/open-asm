@@ -1,5 +1,17 @@
 import type { FilterOp } from '@/common/utils/filter-tree';
 
+/** Operators of an ASQ condition: the shared filter-tree ones plus ASQ's own. */
+export type AsqOp =
+  | FilterOp
+  | 'notInSubnet'
+  | 'startsWith'
+  | 'endsWith'
+  | 'between'
+  | 'containsAll'
+  | 'containsAny'
+  | 'isNull'
+  | 'isNotNull';
+
 export type FieldType =
   | 'text'
   | 'int'
@@ -33,9 +45,9 @@ export interface FieldDef {
   /** NULL possible: filters wrap the test in COALESCE(…, false) so neq/notIn keep NULL rows. */
   nullable?: boolean;
   /** Narrower than the type's operators. */
-  ops?: readonly FilterOp[];
+  ops?: readonly AsqOp[];
   /** Extra value check on top of the type's check. */
-  check?: (value: string, op: FilterOp) => boolean;
+  check?: (value: string, op: AsqOp) => boolean;
   enumValues?: readonly string[];
   sortable?: SortKind;
   groupable?: boolean;
@@ -88,6 +100,15 @@ export interface ResourceDef {
    * Predicate always ANDed (e.g. approved findings only). `{a}` = this alias.
    */
   basePredicate?: string;
+  /**
+   * Tenant test of a table without a `workspaceId` column: SQL with `{a}`
+   * (this alias) and `{ws}` (the workspace parameter) that must reach a
+   * `"workspaceId"` column, e.g. `EXISTS (SELECT 1 FROM "targets" t WHERE
+   * t.id = {a}."targetId" AND t."workspaceId" = {ws})`. It takes the place of
+   * `<alias>."workspaceId" = :ws` everywhere the compiler scopes a row.
+   * Without it the table must carry `workspaceId` (SCOPE_COLUMN).
+   */
+  scopePredicate?: string;
   /**
    * Restricts rows to a project's assets: SQL with `{a}` and `{project}`.
    * `null` = the resource cannot be read in a project-locked scope.

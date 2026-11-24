@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 /**
  * StartDiscoveryButton Component
  *
@@ -18,6 +19,7 @@ import { PlusIcon, Target } from 'lucide-react';
 export function StartDiscoveryButton() {
   const { workspaces, selectedWorkspace } = useWorkspaceSelector();
   const navigate = useNavigate({ from: '/targets/' });
+  const t = useT();
 
   const currentWorkspace = workspaces.find(
     (ws) => ws.id === selectedWorkspace,
@@ -35,7 +37,7 @@ export function StartDiscoveryButton() {
       ) : (
         <PlusIcon className="shrink-0 size-4" />
       )}
-      <span>{isDiscoveryEnabled ? 'Start discovery' : 'Create target'}</span>
+      <span>{isDiscoveryEnabled ? t('targets.startButton.startDiscovery') : t('targets.startButton.createTarget')}</span>
     </Button>
   );
 }

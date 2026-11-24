@@ -1,9 +1,11 @@
 import { UserAvatar } from '@/components/comments/comment-thread';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import type { IssueDetailDto } from '@/services/apis/gen/queries';
 import { formatDistanceToNowStrict } from 'date-fns';
+import { dateFnsLocale } from '@/lib/date-locale';
 import { CalendarClock, UserRound, Workflow } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { formatIssueNo, type IssuePriority } from '../issue-utils';
@@ -42,6 +44,7 @@ export function IssueHero({
   issue: IssueDetailDto;
   sourceLabel: string;
 }) {
+  const t = useT();
   const progress = issue.progress;
   const percent =
     progress && progress.total > 0
@@ -75,19 +78,23 @@ export function IssueHero({
                   {issue.assignee.name}
                 </span>
               ) : (
-                'Unassigned'
+                t('issues.hero.unassigned')
               )}
             </Meta>
             <Meta icon={<CalendarClock />}>
-              Opened{' '}
-              {formatDistanceToNowStrict(new Date(issue.createdAt), {
-                addSuffix: true,
+              {t('issues.hero.opened', {
+                time: formatDistanceToNowStrict(new Date(issue.createdAt), {
+                  addSuffix: true,
+                  locale: dateFnsLocale(),
+                }),
               })}
-              {issue.createdBy ? ` by ${issue.createdBy.name}` : ''}
+              {issue.createdBy
+                ? t('issues.hero.by', { name: issue.createdBy.name })
+                : ''}
             </Meta>
             {issue.dueAt && (
               <Meta icon={<CalendarClock />}>
-                Due <DueLabel dueAt={issue.dueAt} status={issue.status} />
+                {t('issues.hero.due')} <DueLabel dueAt={issue.dueAt} status={issue.status} />
               </Meta>
             )}
             <Meta icon={<Workflow />}>{sourceLabel}</Meta>
@@ -97,18 +104,18 @@ export function IssueHero({
       {progress && progress.total > 0 && (
         <div className="flex items-center gap-4 border-t px-5 py-3 text-sm">
           <span className="shrink-0 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-            Fix progress
+            {t('issues.hero.fixProgress')}
           </span>
           <Progress
             value={percent}
-            aria-label="Fix progress"
+            aria-label={t('issues.hero.fixProgress')}
             className="h-1.5 flex-1"
           />
           <span className="shrink-0 tabular-nums">
             <span className="font-semibold">{progress.done}</span>
             <span className="text-muted-foreground">
               {' '}
-              / {progress.total} fixed
+              {t('issues.hero.fixedOf', { total: progress.total })}
             </span>
           </span>
         </div>

@@ -10,6 +10,7 @@ import {
 } from '@/components/vulnerabilities/lifecycle-badges';
 import { sourceSummaryLabel } from '@/components/vulnerabilities/lifecycle';
 import { usePermission } from '@/hooks/usePermission';
+import { useT } from '@/lib/i18n-dictionary';
 import {
   useVulnerabilitiesControllerGetProposalDuplicates,
   useVulnerabilitiesControllerGetSettings,
@@ -64,37 +65,38 @@ interface Evidence {
 
 const VERDICTS: Record<
   EvidenceVerdict,
+  /** label and hint are i18n keys */
   { label: string; variant: 'success' | 'warning' | 'secondary'; hint: string }
 > = {
   evidence_checked: {
-    label: 'Quotes checked',
+    label: 'vulnerabilities.prop.verdictChecked',
     variant: 'success',
-    hint: 'Every quote was found verbatim in the tool output it cites.',
+    hint: 'vulnerabilities.prop.verdictCheckedHint',
   },
   unverified: {
-    label: 'Unverified',
+    label: 'vulnerabilities.prop.verdictUnverified',
     variant: 'warning',
-    hint: 'Not every quote was found in tool output. Check the proof yourself.',
+    hint: 'vulnerabilities.prop.verdictUnverifiedHint',
   },
   output_expired: {
-    label: 'Output expired',
+    label: 'vulnerabilities.prop.verdictExpired',
     variant: 'secondary',
-    hint: 'Some tool output was gone before it could be checked.',
+    hint: 'vulnerabilities.prop.verdictExpiredHint',
   },
 };
 
 const CITATION_STATUS: Record<CitationStatus, { icon: ReactNode; text: string }> = {
   found: {
     icon: <CircleCheck className="size-3.5 text-success" />,
-    text: 'found',
+    text: 'vulnerabilities.prop.citeFound',
   },
   not_found: {
     icon: <CircleX className="size-3.5 text-destructive" />,
-    text: 'not in the output',
+    text: 'vulnerabilities.prop.citeNotFound',
   },
   output_expired: {
     icon: <Clock className="size-3.5 text-muted-foreground" />,
-    text: 'output expired or unknown run',
+    text: 'vulnerabilities.prop.citeExpired',
   },
 };
 
@@ -150,25 +152,26 @@ const pre =
   'whitespace-pre-wrap break-all rounded bg-muted/60 p-2 font-mono text-xs';
 
 function QuotedOutput({ check }: { check: NonNullable<Evidence['check']> }) {
+  const t = useT();
   return (
     <div data-testid="evidence-check">
       <span className="text-xs font-medium text-muted-foreground">
-        Quoted tool output
+        {t('vulnerabilities.prop.quotedOutput')}
       </span>
       <p className="mt-1 text-xs text-muted-foreground">
         {check.citations.length === 0
-          ? 'The agent quoted no tool output.'
-          : VERDICTS[check.verdict].hint}
+          ? t('vulnerabilities.prop.noQuotes')
+          : t(VERDICTS[check.verdict].hint)}
       </p>
       <ul className="mt-2 flex flex-col gap-2">
         {check.citations.map((c, i) => (
           <li key={i} className="flex flex-col gap-1">
             <span className="flex flex-wrap items-center gap-1.5 text-xs">
               {CITATION_STATUS[c.status].icon}
-              <span>{CITATION_STATUS[c.status].text}</span>
+              <span>{t(CITATION_STATUS[c.status].text)}</span>
               <span className="font-mono text-muted-foreground" title={c.runId}>
-                run {c.runId.slice(0, 8)}
-                {c.line ? `, line ${c.line}` : ''}
+                {t('vulnerabilities.prop.run', { id: c.runId.slice(0, 8) })}
+                {c.line ? t('vulnerabilities.prop.line', { n: c.line }) : ''}
               </span>
             </span>
             <pre className={pre}>{c.excerpt ?? c.quote}</pre>
@@ -180,23 +183,24 @@ function QuotedOutput({ check }: { check: NonNullable<Evidence['check']> }) {
 }
 
 function EvidenceCard({ evidence }: { evidence: Evidence | null }) {
+  const t = useT();
   const verdict = evidence?.check && VERDICTS[evidence.check.verdict];
   return (
     <Card className="gap-3 py-4 shadow-none" data-testid="evidence-card">
       <CardHeader className="flex flex-row items-center justify-between gap-2 px-4">
         <CardTitle className="text-sm">
-          Evidence provided by the agent
+          {t('vulnerabilities.prop.evidenceTitle')}
         </CardTitle>
         {verdict && (
-          <Badge variant={verdict.variant} title={verdict.hint}>
-            {verdict.label}
+          <Badge variant={verdict.variant} title={t(verdict.hint)}>
+            {t(verdict.label)}
           </Badge>
         )}
       </CardHeader>
       <CardContent className="flex flex-col gap-3 px-4">
         {!evidence ? (
           <p className="text-sm text-muted-foreground">
-            The agent attached no evidence.
+            {t('vulnerabilities.prop.noEvidence')}
           </p>
         ) : (
           <>
@@ -204,8 +208,12 @@ function EvidenceCard({ evidence }: { evidence: Evidence | null }) {
               <table className="w-full text-left text-sm">
                 <thead className="text-xs text-muted-foreground">
                   <tr>
-                    <th className="w-1/2 pb-1 pr-2 font-medium">Request</th>
-                    <th className="w-1/2 pb-1 font-medium">Response</th>
+                    <th className="w-1/2 pb-1 pr-2 font-medium">
+                      {t('vulnerabilities.prop.request')}
+                    </th>
+                    <th className="w-1/2 pb-1 font-medium">
+                      {t('vulnerabilities.prop.response')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="align-top">
@@ -234,7 +242,7 @@ function EvidenceCard({ evidence }: { evidence: Evidence | null }) {
                   {evidence.baseline && (
                     <tr className="border-t">
                       <td className="py-2 pr-2 text-xs font-medium text-muted-foreground">
-                        Baseline (negative control)
+                        {t('vulnerabilities.prop.baseline')}
                       </td>
                       <td className="py-2">
                         <pre className={pre}>{evidence.baseline}</pre>
@@ -248,7 +256,7 @@ function EvidenceCard({ evidence }: { evidence: Evidence | null }) {
             {evidence.notes && (
               <div>
                 <span className="text-xs font-medium text-muted-foreground">
-                  Agent notes
+                  {t('vulnerabilities.prop.agentNotes')}
                 </span>
                 <p className="mt-1 whitespace-pre-line text-sm">
                   {evidence.notes}
@@ -267,6 +275,7 @@ function ToolCallsCard({
 }: {
   sources: VulnerabilitySourceDetailDto[];
 }) {
+  const t = useT();
   const tools = sources.filter((s) => s.kind === 'tool');
   const callIds = [...new Set(sources.flatMap((s) => s.toolCallIds ?? []))];
   const conversationId = sources.find(
@@ -275,29 +284,33 @@ function ToolCallsCard({
   return (
     <Card className="gap-3 py-4 shadow-none" data-testid="tool-calls-card">
       <CardHeader className="flex flex-row items-center justify-between px-4">
-        <CardTitle className="text-sm">Related tool calls</CardTitle>
+        <CardTitle className="text-sm">
+          {t('vulnerabilities.prop.relatedToolCalls')}
+        </CardTitle>
         <ConversationLink
           id={conversationId}
-          label="Open conversation"
+          label={t('vulnerabilities.prop.openConversation')}
           className="text-xs"
         />
       </CardHeader>
       <CardContent className="flex flex-col gap-2 px-4 text-sm">
         {tools.length === 0 && callIds.length === 0 && (
           <p className="text-muted-foreground">
-            The agent cited no tool calls.
+            {t('vulnerabilities.prop.noToolCalls')}
           </p>
         )}
         {tools.length > 0 && (
           <ul className="flex flex-col gap-1.5">
-            {tools.map((t) => (
-              <li key={t.id} className="flex flex-wrap items-center gap-2">
+            {tools.map((x) => (
+              <li key={x.id} className="flex flex-wrap items-center gap-2">
                 <Wrench className="size-3.5 text-primary" />
-                <span className="font-medium">{t.tool?.name ?? 'tool'}</span>
-                <span className="text-xs text-muted-foreground">
-                  {format(new Date(t.createdAt), 'dd MMM HH:mm')}
+                <span className="font-medium">
+                  {x.tool?.name ?? t('vulnerabilities.prop.tool')}
                 </span>
-                <RunLink id={t.jobHistoryId} className="text-xs" />
+                <span className="text-xs text-muted-foreground">
+                  {format(new Date(x.createdAt), 'dd MMM HH:mm')}
+                </span>
+                <RunLink id={x.jobHistoryId} className="text-xs" />
               </li>
             ))}
           </ul>
@@ -309,7 +322,7 @@ function ToolCallsCard({
                 key={c}
                 variant="outline"
                 className="font-mono text-xs"
-                title="Tool call id"
+                title={t('vulnerabilities.prop.toolCallId')}
               >
                 {c}
               </Badge>
@@ -330,6 +343,7 @@ function DuplicatesCard({
   canWrite: boolean;
   onChange: () => void;
 }) {
+  const t = useT();
   const { data, isLoading } =
     useVulnerabilitiesControllerGetProposalDuplicates(id);
   const { merge, isPending } = useMergeProposal(id, onChange);
@@ -337,7 +351,9 @@ function DuplicatesCard({
   return (
     <Card className="gap-3 py-4 shadow-none" data-testid="duplicates-card">
       <CardHeader className="px-4">
-        <CardTitle className="text-sm">Possible duplicates</CardTitle>
+        <CardTitle className="text-sm">
+          {t('vulnerabilities.prop.duplicates')}
+        </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3 px-4 text-sm">
         {isLoading ? (
@@ -347,8 +363,7 @@ function DuplicatesCard({
           </>
         ) : list.length === 0 ? (
           <p className="text-muted-foreground">
-            No approved finding on this asset shares a CWE/CVE, the URL or the
-            name.
+            {t('vulnerabilities.prop.noDuplicates')}
           </p>
         ) : (
           list.map((d) => (
@@ -368,8 +383,9 @@ function DuplicatesCard({
                 <div className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
                   <SeverityBadge severity={d.severity} />
                   <span>
-                    matches{' '}
-                    {d.reasons.join(', ').replace('affected_url', 'URL')}
+                    {t('vulnerabilities.prop.matches', {
+                      reasons: d.reasons.join(', ').replace('affected_url', 'URL'),
+                    })}
                   </span>
                 </div>
               </div>
@@ -379,10 +395,10 @@ function DuplicatesCard({
                   variant="outline"
                   disabled={isPending}
                   onClick={() => merge(d.id)}
-                  aria-label={`Merge into ${d.name}`}
+                  aria-label={t('vulnerabilities.prop.mergeInto', { name: d.name })}
                 >
                   <GitMerge className="mr-1 size-3.5" />
-                  Merge
+                  {t('vulnerabilities.prop.merge')}
                 </Button>
               )}
             </div>
@@ -403,6 +419,7 @@ export function ProposalReview({
   events?: VulnerabilityTimelineEventDto[];
   onChange: () => void;
 }) {
+  const t = useT();
   const { hasPermission } = usePermission();
   const { data: settings } = useVulnerabilitiesControllerGetSettings();
   const canWrite = hasPermission('vulnerability.write');
@@ -427,7 +444,7 @@ export function ProposalReview({
           trigger={
             <Button variant="outline" size="sm">
               <X className="mr-1 size-4" />
-              Reject…
+              {t('vulnerabilities.prop.reject')}
             </Button>
           }
         />
@@ -438,7 +455,7 @@ export function ProposalReview({
           trigger={
             <Button variant="outline" size="sm">
               <GitMerge className="mr-1 size-4" />
-              Merge into…
+              {t('vulnerabilities.prop.mergeIntoMenu')}
             </Button>
           }
         />
@@ -449,7 +466,7 @@ export function ProposalReview({
           trigger={
             <Button size="sm">
               <Check className="mr-1 size-4" />
-              Approve
+              {t('vulnerabilities.prop.approve')}
             </Button>
           }
         />
@@ -464,7 +481,11 @@ export function ProposalReview({
           {data.name}
         </span>
       }
-      description={pending ? 'AI proposal waiting for review' : 'AI proposal'}
+      description={
+        pending
+          ? t('vulnerabilities.prop.waiting')
+          : t('vulnerabilities.prop.aiProposal')
+      }
       permission="vulnerability.read"
       action={actions}
     >
@@ -473,17 +494,21 @@ export function ProposalReview({
           <Alert data-testid="rejected-banner">
             <XCircle className="size-4" />
             <AlertTitle>
-              Rejected
-              {data.reviewedByUser ? ` by ${data.reviewedByUser.name}` : ''}
+              {t('vulnerabilities.prop.rejected')}
+              {data.reviewedByUser
+                ? t('vulnerabilities.prop.byName', { name: data.reviewedByUser.name })
+                : ''}
               {data.reviewedAt
-                ? ` on ${format(new Date(data.reviewedAt), 'dd MMM yyyy')}`
+                ? t('vulnerabilities.prop.onDate', {
+                    date: format(new Date(data.reviewedAt), 'dd MMM yyyy'),
+                  })
                 : ''}
             </AlertTitle>
             <AlertDescription>
               {data.reviewNote ? (
                 <q className="italic">{data.reviewNote}</q>
               ) : (
-                'No reason recorded.'
+                t('vulnerabilities.prop.noReason')
               )}
             </AlertDescription>
           </Alert>
@@ -500,7 +525,9 @@ export function ProposalReview({
             {!pending && (
               <Card className="gap-3 py-4 shadow-none">
                 <CardHeader className="px-4">
-                  <CardTitle className="text-sm">Timeline</CardTitle>
+                  <CardTitle className="text-sm">
+                    {t('vulnerabilities.prop.timeline')}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="px-4">
                   <VulnerabilityTimeline events={events} />
@@ -516,14 +543,14 @@ export function ProposalReview({
               <CardHeader className="px-4">
                 <CardTitle className="flex items-center gap-1.5 text-sm">
                   <Sparkles className="size-4 text-amber-500" />
-                  Proposal
+                  {t('vulnerabilities.prop.proposal')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col gap-2 px-4">
-                <Fact label="Status">
+                <Fact label={t('vulnerabilities.prop.status')}>
                   <ReviewStatusBadge status={data.reviewStatus} />
                 </Fact>
-                <Fact label="Source">
+                <Fact label={t('vulnerabilities.prop.source')}>
                   {sourceSummaryLabel({
                     sources: sources.map((s) => ({
                       kind: s.kind,
@@ -533,12 +560,12 @@ export function ProposalReview({
                     discoveredBy: data.discoveredBy,
                   })}
                 </Fact>
-                {data.asset && <Fact label="Asset">{data.asset.value}</Fact>}
+                {data.asset && <Fact label={t('vulnerabilities.prop.asset')}>{data.asset.value}</Fact>}
                 {data.affectedUrl && (
-                  <Fact label="URL">{data.affectedUrl}</Fact>
+                  <Fact label={t('vulnerabilities.prop.url')}>{data.affectedUrl}</Fact>
                 )}
                 {!!data.cweId?.length && (
-                  <Fact label="CWE">
+                  <Fact label={t('vulnerabilities.prop.cwe')}>
                     {data.cweId.map((c) => (
                       <a
                         key={c}
@@ -553,31 +580,31 @@ export function ProposalReview({
                   </Fact>
                 )}
                 {!!data.cveId?.length && (
-                  <Fact label="CVE">{data.cveId.join(', ')}</Fact>
+                  <Fact label={t('vulnerabilities.prop.cve')}>{data.cveId.join(', ')}</Fact>
                 )}
-                <Fact label="Severity">
+                <Fact label={t('vulnerabilities.prop.severity')}>
                   <SeverityBadge severity={severity} />
                   {pending && (
                     <span className="text-xs text-muted-foreground">
-                      editable on approve
+                      {t('vulnerabilities.prop.editable')}
                     </span>
                   )}
                 </Fact>
                 {agentSource?.agentName && (
-                  <Fact label="Agent">{agentSource.agentName}</Fact>
+                  <Fact label={t('vulnerabilities.prop.agent')}>{agentSource.agentName}</Fact>
                 )}
                 {agentSource?.agentConversationId && (
-                  <Fact label="Conversation">
+                  <Fact label={t('vulnerabilities.prop.conversation')}>
                     <ConversationLink
                       id={agentSource.agentConversationId}
-                      label="Open"
+                      label={t('vulnerabilities.prop.open')}
                     />
                   </Fact>
                 )}
                 {agentSource?.createdBy && (
-                  <Fact label="Run by">{agentSource.createdBy.name}</Fact>
+                  <Fact label={t('vulnerabilities.prop.runBy')}>{agentSource.createdBy.name}</Fact>
                 )}
-                <Fact label="Proposed">
+                <Fact label={t('vulnerabilities.prop.proposed')}>
                   {format(
                     new Date(agentSource?.createdAt ?? data.createdAt),
                     'dd MMM yyyy HH:mm',
@@ -595,15 +622,17 @@ export function ProposalReview({
             {pending && (
               <Card className="gap-2 py-4 shadow-none">
                 <CardHeader className="px-4">
-                  <CardTitle className="text-sm">After approval</CardTitle>
+                  <CardTitle className="text-sm">
+                    {t('vulnerabilities.prop.afterApproval')}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="px-4 text-sm text-muted-foreground">
-                  The finding joins the list as New
                   {slaDays
-                    ? `, its ${severity} SLA of ${slaDays} days starts`
-                    : ''}{' '}
-                  and it is announced like any detection, so issue rules and
-                  notifications apply.
+                    ? t('vulnerabilities.prop.afterWithSla', {
+                        severity: t(`vulnerabilities.severity.${severity}`).toLowerCase(),
+                        days: slaDays,
+                      })
+                    : t('vulnerabilities.prop.afterNoSla')}
                 </CardContent>
               </Card>
             )}

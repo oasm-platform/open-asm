@@ -10,6 +10,7 @@ import {
 import type { CreateLLMConfigDtoProvider } from '@/services/apis/gen/queries';
 import { Loader2Icon } from 'lucide-react';
 import { Controller, useForm } from 'react-hook-form';
+import { useT } from '@/lib/i18n-dictionary';
 
 export type AgentFormData = {
   provider: CreateLLMConfigDtoProvider;
@@ -26,11 +27,16 @@ interface AgentFormProps {
   isEdit?: boolean;
 }
 
-const providerOptions: { value: CreateLLMConfigDtoProvider; label: string }[] =
+const providerOptions: {
+  value: CreateLLMConfigDtoProvider;
+  label: string;
+  /** Translated name; brand names stay as they are */
+  labelKey?: string;
+}[] =
   [
     { value: 'openai', label: 'OpenAI' },
     { value: 'anthropic', label: 'Anthropic' },
-    { value: 'custom', label: 'Custom' },
+    { value: 'custom', label: 'Custom', labelKey: 'agents.form.custom' },
   ];
 
 const defaultModels: Record<string, string> = {
@@ -46,6 +52,7 @@ export function AgentForm({
   submitButtonText,
   isEdit = false,
 }: AgentFormProps) {
+  const t = useT();
   const {
     register,
     handleSubmit,
@@ -81,11 +88,11 @@ export function AgentForm({
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
       <div className="space-y-2">
-        <label className="text-sm font-medium">Provider *</label>
+        <label className="text-sm font-medium">{t('agents.form.provider')}</label>
         <Controller
           name="provider"
           control={control}
-          rules={{ required: 'Provider is required' }}
+          rules={{ required: t('agents.form.providerRequired') }}
           render={({ field }) => (
             <Select
               value={field.value}
@@ -95,12 +102,12 @@ export function AgentForm({
               disabled={isEdit}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select provider" />
+                <SelectValue placeholder={t('agents.form.selectProvider')} />
               </SelectTrigger>
               <SelectContent>
                 {providerOptions.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
-                    {option.label}
+                    {option.labelKey ? t(option.labelKey) : option.label}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -114,11 +121,11 @@ export function AgentForm({
 
       <div className="space-y-2">
         <label className="text-sm font-medium">
-          {isEdit ? 'API Key (leave blank to keep unchanged)' : 'API Key *'}
+          {isEdit ? t('agents.form.apiKeyEdit') : t('agents.form.apiKey')}
         </label>
         <Input
           {...register('apiKey', {
-            required: isEdit ? false : 'API Key is required',
+            required: isEdit ? false : t('agents.form.apiKeyRequired'),
           })}
           type="password"
           placeholder="sk-..."
@@ -129,10 +136,10 @@ export function AgentForm({
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium">Model *</label>
+        <label className="text-sm font-medium">{t('agents.form.model')}</label>
         <Input
-          {...register('model', { required: 'Model is required' })}
-          placeholder={defaultModels[selectedProvider] ?? 'Enter model name'}
+          {...register('model', { required: t('agents.form.modelRequired') })}
+          placeholder={defaultModels[selectedProvider] ?? t('agents.form.modelPlaceholder')}
         />
         {errors.model && (
           <p className="text-red-600 text-sm">{errors.model.message}</p>
@@ -141,11 +148,11 @@ export function AgentForm({
 
       {isCustomProvider && (
         <div className="space-y-2">
-          <label className="text-sm font-medium">API Endpoint URL *</label>
+          <label className="text-sm font-medium">{t('agents.form.apiUrl')}</label>
           <Input
             {...register('apiUrl', {
               required: isCustomProvider
-                ? 'API URL is required for custom provider'
+                ? t('agents.form.apiUrlRequired')
                 : false,
             })}
             placeholder="https://api.example.com/v1"
@@ -163,7 +170,7 @@ export function AgentForm({
           onClick={() => window.history.back()}
           disabled={isPending}
         >
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button type="submit" disabled={isPending}>
           {isPending && <Loader2Icon className="animate-spin mr-2" />}

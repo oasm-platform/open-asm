@@ -1,3 +1,4 @@
+import { t as translate, useT } from '@/lib/i18n-dictionary';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -58,7 +59,7 @@ function formatUserNameShort(c: TelegramConnectDto) {
   if (c.telegramFirstName) {
     return [c.telegramFirstName, c.telegramLastName].filter(Boolean).join(' ');
   }
-  return c.telegramChatId?.slice(0, 12) ?? 'Unknown';
+  return c.telegramChatId?.slice(0, 12) ?? translate('common.unknown');
 }
 
 // ─── Pairing Dialog ───────────────────────────────────────────────
@@ -76,6 +77,7 @@ function PairingDialog({
   integrationId,
   botUsername,
 }: PairingDialogProps) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [pairingToken, setPairingToken] = useState<string | null>(null);
   const [fetchedBotUsername, setFetchedBotUsername] = useState<string | null>(
@@ -104,7 +106,7 @@ function PairingDialog({
       );
     },
     onError: () => {
-      toast.error('Failed to create pairing token');
+      toast.error(t('integrations.telegram.pairingFailed'));
     },
   });
 
@@ -159,9 +161,9 @@ function PairingDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Pair Telegram Device</DialogTitle>
+          <DialogTitle>{t('integrations.telegram.pairTitle')}</DialogTitle>
           <DialogDescription>
-            Generate a token, then send it to your Telegram bot via /start
+            {t('integrations.telegram.pairDescription')}
           </DialogDescription>
         </DialogHeader>
 
@@ -170,7 +172,7 @@ function PairingDialog({
             <div className="flex flex-col items-center gap-2 text-center">
               <Smartphone className="size-12 text-muted-foreground/50" />
               <p className="text-sm text-muted-foreground">
-                Click the button below to generate a new pairing token.
+                {t('integrations.telegram.generateHint')}
               </p>
               <Button
                 type="button"
@@ -178,7 +180,7 @@ function PairingDialog({
                 className="mt-2 gap-2"
               >
                 <QrCode className="size-4" />
-                Generate Pairing Token
+                {t('integrations.telegram.generate')}
               </Button>
             </div>
           )}
@@ -187,7 +189,7 @@ function PairingDialog({
             <div className="flex flex-col items-center gap-3 py-8">
               <Loader2 className="size-8 animate-spin text-primary" />
               <p className="text-sm text-muted-foreground">
-                Generating token...
+                {t('integrations.telegram.generating')}
               </p>
             </div>
           )}
@@ -200,10 +202,10 @@ function PairingDialog({
                     <Check className="size-12 text-green-600 dark:text-green-400" />
                   </div>
                   <p className="mt-2 text-lg font-semibold text-green-600 dark:text-green-400">
-                    Connected!
+                    {t('integrations.telegram.connectedTitle')}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Your Telegram paired successfully.
+                    {t('integrations.telegram.pairedSuccess')}
                   </p>
                 </div>
               ) : deepLink ? (
@@ -223,18 +225,17 @@ function PairingDialog({
                       rel="noopener noreferrer"
                     >
                       <ExternalLink className="size-4" />
-                      Open Telegram
+                      {t('integrations.telegram.open')}
                     </OpenLink>
                   </Button>
                   <p className="text-center text-xs text-muted-foreground">
-                    Scan QR with your phone, or click the button to open
-                    Telegram
+                    {t('integrations.telegram.scanHint')}
                   </p>
                 </div>
               ) : (
                 <div className="flex w-full flex-col items-center gap-3">
                   <p className="text-xs text-muted-foreground">
-                    Open Telegram, find your bot, and send:
+                    {t('integrations.telegram.manualHint')}
                   </p>
                   <code className="rounded-md bg-muted px-4 py-2 font-mono text-sm">
                     /start {pairingToken}
@@ -244,7 +245,7 @@ function PairingDialog({
 
               {!connected && (
                 <p className="text-xs text-muted-foreground">
-                  Token expires in 10 minutes.
+                  {t('integrations.telegram.expires')}
                 </p>
               )}
 
@@ -255,7 +256,7 @@ function PairingDialog({
                   className="w-full"
                   onClick={() => onOpenChange(false)}
                 >
-                  Done
+                  {t('integrations.telegram.done')}
                 </Button>
               ) : (
                 <div className="flex w-full gap-2">
@@ -269,7 +270,7 @@ function PairingDialog({
                     {pairingMutation.isPending ? (
                       <Loader2 className="mr-2 size-4 animate-spin" />
                     ) : null}
-                    Generate New Token
+                    {t('integrations.telegram.generateNew')}
                   </Button>
                   <Button
                     type="button"
@@ -277,7 +278,7 @@ function PairingDialog({
                     className="flex-1"
                     onClick={() => onOpenChange(false)}
                   >
-                    Done
+                    {t('integrations.telegram.done')}
                   </Button>
                 </div>
               )}
@@ -300,6 +301,7 @@ export function TelegramConnect({
   integrationId,
   botUsername,
 }: TelegramConnectProps) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -318,13 +320,13 @@ export function TelegramConnect({
         `/api/integrations/${integrationId}/telegram/connects/${connectId}`,
       ),
     onSuccess: () => {
-      toast.success('Telegram connection disconnected');
+      toast.success(t('integrations.telegram.disconnected'));
       queryClient.invalidateQueries({
         queryKey: ['telegram-connects', integrationId],
       });
     },
     onError: () => {
-      toast.error('Failed to disconnect');
+      toast.error(t('integrations.telegram.disconnectFailed'));
     },
   });
 
@@ -339,7 +341,7 @@ export function TelegramConnect({
             <div className="flex items-center gap-2">
               <Smartphone className="size-4 text-primary" />
               <CardTitle className="text-sm font-semibold">
-                Telegram Pairing
+                {t('integrations.telegram.cardTitle')}
               </CardTitle>
             </div>
             <Button
@@ -350,12 +352,11 @@ export function TelegramConnect({
               onClick={() => setDialogOpen(true)}
             >
               <Plug className="size-3.5" />
-              Pair
+              {t('integrations.telegram.pair')}
             </Button>
           </div>
           <CardDescription className="text-xs">
-            Let users connect their Telegram chat to receive notifications via
-            /start command
+            {t('integrations.telegram.cardDescription')}
           </CardDescription>
         </CardHeader>
 
@@ -372,7 +373,7 @@ export function TelegramConnect({
           {!connectsQuery.isLoading && activeConnects.length > 0 && (
             <div className="space-y-1.5">
               <p className="text-xs font-medium text-muted-foreground">
-                Connected
+                {t('integrations.telegram.connected')}
               </p>
               <div className="space-y-1">
                 {activeConnects.map((c) => (
@@ -393,12 +394,14 @@ export function TelegramConnect({
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="hidden text-xs text-green-600 dark:text-green-400 sm:inline">
-                        Connected
+                        {t('integrations.telegram.connected')}
                       </span>
                       <ConfirmDialog
-                        title="Disconnect"
-                        description={`Are you sure you want to disconnect ${formatUserNameShort(c)}?`}
-                        confirmText="Disconnect"
+                        title={t('integrations.disconnect.action')}
+                        description={t('integrations.telegram.disconnectConfirm', {
+                          name: formatUserNameShort(c),
+                        })}
+                        confirmText={t('integrations.disconnect.action')}
                         onConfirm={() => disconnectMutation.mutate(c.id)}
                         trigger={
                           <Button
@@ -406,7 +409,9 @@ export function TelegramConnect({
                             variant="ghost"
                             size="icon-sm"
                             disabled={disconnectMutation.isPending}
-                            aria-label={`Disconnect ${formatUserNameShort(c)}`}
+                            aria-label={t('integrations.telegram.disconnectLabel', {
+                              name: formatUserNameShort(c),
+                            })}
                           >
                             <Unplug className="size-3.5 text-destructive" />
                           </Button>
@@ -424,10 +429,10 @@ export function TelegramConnect({
             <div className="flex flex-col items-center gap-2 rounded-md border border-dashed py-6">
               <Smartphone className="size-8 text-muted-foreground/50" />
               <p className="text-sm text-muted-foreground">
-                No connected devices yet
+                {t('integrations.telegram.empty')}
               </p>
               <p className="text-xs text-muted-foreground/60">
-                Click "Pair New Device" to generate a QR code
+                {t('integrations.telegram.emptyHint')}
               </p>
             </div>
           )}
@@ -435,7 +440,7 @@ export function TelegramConnect({
           {/* Error state */}
           {connectsQuery.isError && (
             <p className="text-xs text-destructive">
-              Failed to load connections.{' '}
+              {t('integrations.telegram.loadFailed')}{' '}
               <Button
                 type="button"
                 variant="link"
@@ -447,7 +452,7 @@ export function TelegramConnect({
                   })
                 }
               >
-                Retry
+                {t('common.retry')}
               </Button>
             </p>
           )}

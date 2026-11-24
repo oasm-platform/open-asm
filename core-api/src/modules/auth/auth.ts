@@ -13,7 +13,10 @@ import { betterAuth, type Auth } from 'better-auth';
 import { admin, openAPI } from 'better-auth/plugins';
 import { randomUUID } from 'crypto';
 import 'dotenv/config';
+import { readdirSync } from 'fs';
+import { join } from 'path';
 import { Pool } from 'pg';
+import { z } from 'zod';
 import { resolveAuthSecret } from './auth-env';
 import { logBetterAuth } from './auth-logger';
 import { createRateLimitStorage } from './rate-limit-storage';
@@ -25,6 +28,14 @@ import { createSessionRedis, createSessionStorage } from './session-storage';
 const authRedis = createSessionRedis(process.env.REDIS_URL);
 const trustedOrigins = resolveTrustedOrigins();
 const RATE_LIMIT_WINDOW_SECONDS = 60;
+
+// Same folders nestjs-i18n loads (app.module.ts), read here because this
+// instance is built before Nest boots.
+const SUPPORTED_LANGUAGES = readdirSync(join(__dirname, '../../i18n'), {
+  withFileTypes: true,
+})
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name);
 
 export const auth: unknown = betterAuth({
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
@@ -163,6 +174,15 @@ export const auth: unknown = betterAuth({
         type: 'string',
         enum: Role,
         default: Role.USER,
+      },
+      // The console language, kept on the account so it follows the user
+      // across browsers. Set through better-auth `update-user`.
+      language: {
+        type: 'string',
+        defaultValue: 'en',
+        validator: {
+          input: z.enum(SUPPORTED_LANGUAGES as [string, ...string[]]),
+        },
       },
     },
   },

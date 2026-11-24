@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { useNavigate } from '@tanstack/react-router';
 import { Check, ChevronDown, Maximize2, SquarePen, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -16,10 +17,9 @@ import {
   useAiChatPanelOpen,
 } from '@/hooks/useAiChatPanel';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import { stripPageContextFromTitle } from '@/lib/page-context';
 import { cn } from '@/lib/utils';
 import { useAgentsControllerGetConversationsInfinite } from '@/services/apis/gen/queries';
-
-const UNTITLED = 'New conversation';
 
 interface AiChatPanelHeaderProps {
   conversationId?: string;
@@ -39,6 +39,8 @@ export function AiChatPanelHeader({
   title,
   isSaved,
 }: AiChatPanelHeaderProps) {
+  const t = useT();
+  const untitled = t('components.aiChat.newConversation');
   const { newChat, openConversation } = useAiChatConversation();
   const { close } = useAiChatPanelOpen();
   const navigate = useNavigate();
@@ -64,7 +66,8 @@ export function AiChatPanelHeader({
     [data],
   );
   const listedTitle = conversations.find((c) => c.id === conversationId)?.title;
-  const displayTitle = listedTitle || title || UNTITLED;
+  const displayTitle =
+    stripPageContextFromTitle(listedTitle || title || '') || untitled;
 
   const openInStudio = () => {
     close();
@@ -95,29 +98,31 @@ export function AiChatPanelHeader({
         <DropdownMenuContent align="start" className="w-72">
           <DropdownMenuItem onClick={newChat}>
             <SquarePen className="size-4" />
-            New conversation
+            {untitled}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-            Recent
+            {t('components.aiChat.recent')}
           </DropdownMenuLabel>
           <div className="max-h-80 overflow-y-auto">
             {isLoading ? (
               <p className="px-2 py-1.5 text-sm text-muted-foreground">
-                Loading…
+                {t('common.loading')}
               </p>
             ) : conversations.length === 0 ? (
               <p className="px-2 py-1.5 text-sm text-muted-foreground">
-                No conversations yet
+                {t('components.aiChat.noConversations')}
               </p>
             ) : (
               conversations.map((c) => (
                 <DropdownMenuItem
                   key={c.id}
                   onClick={() => openConversation(c.id)}
-                  title={c.title || UNTITLED}
+                  title={stripPageContextFromTitle(c.title ?? '') || untitled}
                 >
-                  <span className="truncate">{c.title || UNTITLED}</span>
+                  <span className="truncate">
+                    {stripPageContextFromTitle(c.title ?? '') || untitled}
+                  </span>
                   <Check
                     className={cn(
                       'ms-auto size-4 shrink-0',
@@ -135,8 +140,8 @@ export function AiChatPanelHeader({
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label="New conversation"
-          title="New conversation"
+          aria-label={untitled}
+          title={untitled}
           onClick={newChat}
         >
           <SquarePen />
@@ -144,8 +149,8 @@ export function AiChatPanelHeader({
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label="Open in AI Studio"
-          title="Open in AI Studio"
+          aria-label={t('components.aiChat.openInStudio')}
+          title={t('components.aiChat.openInStudio')}
           onClick={openInStudio}
         >
           <Maximize2 />
@@ -153,8 +158,8 @@ export function AiChatPanelHeader({
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label="Close AI chat"
-          title="Close AI chat"
+          aria-label={t('components.aiChat.close')}
+          title={t('components.aiChat.close')}
           onClick={close}
         >
           <X />

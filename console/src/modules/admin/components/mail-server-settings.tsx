@@ -45,13 +45,14 @@ import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { type TFunction, useT } from '@/lib/i18n-dictionary';
 
 interface Preset {
   label: string;
   host?: string;
   port?: number;
   secure?: boolean;
-  /** Fixed username the service expects; otherwise the admin types one */
+  /** Fixed username the service expects; otherwise the admin types one. Labels and hint are dictionary keys. */
   username?: string;
   usernameLabel?: string;
   passwordLabel: string;
@@ -60,14 +61,14 @@ interface Preset {
 
 /** SMTP settings of common mail services; all of them send over SMTP */
 const PRESETS: Record<MailProvider, Preset> = {
-  smtp: { label: 'Custom SMTP', passwordLabel: 'Password' },
+  smtp: { label: 'Custom SMTP', passwordLabel: 'admin.mailServer.label.password' },
   resend: {
     label: 'Resend',
     host: 'smtp.resend.com',
     port: 465,
     secure: true,
     username: 'resend',
-    passwordLabel: 'API key',
+    passwordLabel: 'admin.mailServer.label.apiKey',
   },
   sendgrid: {
     label: 'SendGrid',
@@ -75,54 +76,55 @@ const PRESETS: Record<MailProvider, Preset> = {
     port: 587,
     secure: false,
     username: 'apikey',
-    passwordLabel: 'API key',
+    passwordLabel: 'admin.mailServer.label.apiKey',
   },
   postmark: {
     label: 'Postmark',
     host: 'smtp.postmarkapp.com',
     port: 587,
     secure: false,
-    usernameLabel: 'Server API token',
-    passwordLabel: 'Server API token',
+    usernameLabel: 'admin.mailServer.label.serverApiToken',
+    passwordLabel: 'admin.mailServer.label.serverApiToken',
   },
   mailgun: {
     label: 'Mailgun',
     host: 'smtp.mailgun.org',
     port: 587,
     secure: false,
-    usernameLabel: 'SMTP login',
-    passwordLabel: 'SMTP password',
-    hint: 'Use smtp.eu.mailgun.org for domains in the EU region.',
+    usernameLabel: 'admin.mailServer.label.smtpLogin',
+    passwordLabel: 'admin.mailServer.label.smtpPassword',
+    hint: 'admin.mailServer.hint.mailgun',
   },
   ses: {
     label: 'Amazon SES',
     host: 'email-smtp.us-east-1.amazonaws.com',
     port: 587,
     secure: false,
-    usernameLabel: 'SMTP username',
-    passwordLabel: 'SMTP password',
-    hint: 'Change the region in the host to match your SES region.',
+    usernameLabel: 'admin.mailServer.label.smtpUsername',
+    passwordLabel: 'admin.mailServer.label.smtpPassword',
+    hint: 'admin.mailServer.hint.ses',
   },
   brevo: {
     label: 'Brevo',
     host: 'smtp-relay.brevo.com',
     port: 587,
     secure: false,
-    usernameLabel: 'SMTP login',
-    passwordLabel: 'SMTP key',
+    usernameLabel: 'admin.mailServer.label.smtpLogin',
+    passwordLabel: 'admin.mailServer.label.smtpKey',
   },
   gmail: {
     label: 'Gmail / Google Workspace',
     host: 'smtp.gmail.com',
     port: 465,
     secure: true,
-    usernameLabel: 'Gmail address',
-    passwordLabel: 'App password',
-    hint: 'Needs 2-Step Verification and an app password.',
+    usernameLabel: 'admin.mailServer.label.gmailAddress',
+    passwordLabel: 'admin.mailServer.label.appPassword',
+    hint: 'admin.mailServer.hint.gmail',
   },
 };
 
-const mailServerSchema = z
+const createMailServerSchema = (t: TFunction) =>
+  z
   .object({
     enabled: z.boolean(),
     provider: z.nativeEnum(MailProvider),
@@ -130,20 +132,20 @@ const mailServerSchema = z
     port: z
       .string()
       .trim()
-      .regex(/^\d+$/, 'Enter a port number')
-      .refine((port) => +port >= 1 && +port <= 65535, 'Port must be 1–65535'),
+      .regex(/^\d+$/, t('admin.mailServer.error.portNumber'))
+      .refine((port) => +port >= 1 && +port <= 65535, t('admin.mailServer.error.portRange')),
     secure: z.boolean(),
     username: z.string().trim().max(255),
     password: z.string().max(1024),
     fromEmail: z.union([
       z.literal(''),
-      z.string().trim().email('Invalid email address'),
+      z.string().trim().email(t('admin.mailServer.error.invalidEmail')),
     ]),
     fromName: z.string().trim().max(100),
   })
   .superRefine((values, ctx) => {
     if (!values.enabled) return;
-    const message = 'Required to turn on the mail server';
+    const message = t('admin.mailServer.error.requiredWhenOn');
     if (!values.host) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['host'], message });
     }
@@ -152,7 +154,9 @@ const mailServerSchema = z
     }
   });
 
-type MailServerFormValues = z.infer<typeof mailServerSchema>;
+type MailServerFormValues = z.infer<
+  ReturnType<typeof createMailServerSchema>
+>;
 
 const toFormValues = (
   server?: MailServerSettingsDto,
@@ -177,6 +181,8 @@ const errorMessage = (error: unknown, fallback: string) =>
  * accounts confirm their email through it.
  */
 export default function MailServerSettings() {
+  const t = useT();
+  const mailServerSchema = useMemo(() => createMailServerSchema(t), [t]);
   const queryClient = useQueryClient();
   const { data: settings, isLoading } = useSystemConfigsControllerGetSettings();
   const server = settings?.mailServer;
@@ -216,7 +222,7 @@ export default function MailServerSettings() {
       },
       {
         onSuccess: () => {
-          toast.success('Mail server saved.');
+          toast.success(t('admin.mailServer.saved'));
           form.reset({ ...values, password: '' });
           return Promise.all([
             queryClient.invalidateQueries({
@@ -229,7 +235,7 @@ export default function MailServerSettings() {
           ]);
         },
         onError: (error) => {
-          toast.error(errorMessage(error, 'Failed to save the mail server.'));
+          toast.error(errorMessage(error, t('admin.mailServer.saveFailed')));
         },
       },
     );
@@ -244,10 +250,9 @@ export default function MailServerSettings() {
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <Card className="gap-6">
             <CardHeader>
-              <CardTitle>Mail server</CardTitle>
+              <CardTitle>{t('admin.mailServer.title')}</CardTitle>
               <CardDescription>
-                Sends verification emails to new accounts. Sign-up stays closed
-                while it is off.
+                {t('admin.mailServer.cardDescription')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
@@ -257,9 +262,9 @@ export default function MailServerSettings() {
                 render={({ field }) => (
                   <FormItem className="flex items-center justify-between gap-4">
                     <div className="space-y-1">
-                      <FormLabel>Turn on mail server</FormLabel>
+                      <FormLabel>{t('admin.mailServer.enable')}</FormLabel>
                       <FormDescription>
-                        Takes effect when you save.
+                        {t('admin.mailServer.enableHint')}
                       </FormDescription>
                     </div>
                     <FormControl>
@@ -277,7 +282,7 @@ export default function MailServerSettings() {
                 name="provider"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Provider</FormLabel>
+                    <FormLabel>{t('admin.mailServer.provider')}</FormLabel>
                     <Select
                       value={field.value}
                       onValueChange={(value) =>
@@ -293,14 +298,15 @@ export default function MailServerSettings() {
                       <SelectContent>
                         {Object.values(MailProvider).map((provider) => (
                           <SelectItem key={provider} value={provider}>
-                            {PRESETS[provider].label}
+                            {provider === MailProvider.smtp
+                              ? t('admin.mailServer.customSmtp')
+                              : PRESETS[provider].label}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                     <FormDescription>
-                      Fills in the server settings; every provider is used over
-                      SMTP.
+                      {t('admin.mailServer.providerHint')}
                     </FormDescription>
                   </FormItem>
                 )}
@@ -311,7 +317,7 @@ export default function MailServerSettings() {
                   name="host"
                   render={({ field }) => (
                     <FormItem className="sm:col-span-2">
-                      <FormLabel>Host</FormLabel>
+                      <FormLabel>{t('admin.mailServer.host')}</FormLabel>
                       <FormControl>
                         <Input
                           placeholder="smtp.example.com"
@@ -320,7 +326,7 @@ export default function MailServerSettings() {
                         />
                       </FormControl>
                       {preset.hint && (
-                        <FormDescription>{preset.hint}</FormDescription>
+                        <FormDescription>{t(preset.hint)}</FormDescription>
                       )}
                       <FormMessage />
                     </FormItem>
@@ -331,7 +337,7 @@ export default function MailServerSettings() {
                   name="port"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Port</FormLabel>
+                      <FormLabel>{t('admin.mailServer.port')}</FormLabel>
                       <FormControl>
                         <Input
                           inputMode="numeric"
@@ -350,9 +356,9 @@ export default function MailServerSettings() {
                 render={({ field }) => (
                   <FormItem className="flex items-center justify-between gap-4">
                     <div className="space-y-1">
-                      <FormLabel>Implicit TLS</FormLabel>
+                      <FormLabel>{t('admin.mailServer.implicitTls')}</FormLabel>
                       <FormDescription>
-                        Usually port 465. Off uses STARTTLS, usually port 587.
+                        {t('admin.mailServer.implicitTlsHint')}
                       </FormDescription>
                     </div>
                     <FormControl>
@@ -371,7 +377,11 @@ export default function MailServerSettings() {
                   name="username"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{preset.usernameLabel ?? 'Username'}</FormLabel>
+                      <FormLabel>
+                        {preset.usernameLabel
+                          ? t(preset.usernameLabel)
+                          : t('admin.mailServer.username')}
+                      </FormLabel>
                       <FormControl>
                         <Input
                           autoComplete="off"
@@ -388,14 +398,14 @@ export default function MailServerSettings() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{preset.passwordLabel}</FormLabel>
+                      <FormLabel>{t(preset.passwordLabel)}</FormLabel>
                       <FormControl>
                         <Input
                           type="password"
                           autoComplete="new-password"
                           placeholder={
                             server?.hasPassword
-                              ? 'Saved; leave empty to keep it'
+                              ? t('admin.mailServer.passwordSaved')
                               : undefined
                           }
                           disabled={isPending}
@@ -413,7 +423,7 @@ export default function MailServerSettings() {
                   name="fromEmail"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Sender email</FormLabel>
+                      <FormLabel>{t('admin.mailServer.senderEmail')}</FormLabel>
                       <FormControl>
                         <Input
                           type="email"
@@ -431,10 +441,10 @@ export default function MailServerSettings() {
                   name="fromName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Sender name</FormLabel>
+                      <FormLabel>{t('admin.mailServer.senderName')}</FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="Defaults to the system name"
+                          placeholder={t('admin.mailServer.senderNamePlaceholder')}
                           disabled={isPending}
                           {...field}
                         />
@@ -452,11 +462,11 @@ export default function MailServerSettings() {
                 onClick={() => form.reset(toFormValues(server))}
                 disabled={isPending || !isDirty}
               >
-                Discard
+                {t('admin.mailServer.discard')}
               </Button>
               <Button type="submit" disabled={isPending || !isDirty}>
                 {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                Save
+                {t('common.save')}
               </Button>
             </CardFooter>
           </Card>
@@ -469,6 +479,7 @@ export default function MailServerSettings() {
 
 /** Sends a test email through the saved settings */
 function TestMailCard({ ready }: { ready: boolean }) {
+  const t = useT();
   const { data: session } = useSession();
   const [to, setTo] = useState<string>();
   const recipient = to ?? session?.user.email ?? '';
@@ -478,9 +489,9 @@ function TestMailCard({ ready }: { ready: boolean }) {
     mutate(
       { data: { to: recipient } },
       {
-        onSuccess: () => toast.success(`Test email sent to ${recipient}.`),
+        onSuccess: () => toast.success(t('admin.mailServer.testSent', { recipient })),
         onError: (error) => {
-          toast.error(errorMessage(error, 'Failed to send the test email.'));
+          toast.error(errorMessage(error, t('admin.mailServer.testFailed')));
         },
       },
     );
@@ -488,16 +499,16 @@ function TestMailCard({ ready }: { ready: boolean }) {
   return (
     <Card className="gap-4">
       <CardHeader>
-        <CardTitle>Send a test email</CardTitle>
+        <CardTitle>{t('admin.mailServer.testTitle')}</CardTitle>
         <CardDescription>
           {ready
-            ? 'Check that the saved settings work.'
-            : 'Save the settings and turn on the mail server first.'}
+            ? t('admin.mailServer.testReady')
+            : t('admin.mailServer.testNotReady')}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap items-end gap-3">
         <div className="grid min-w-64 flex-1 gap-2">
-          <Label htmlFor="test-mail-to">Send to</Label>
+          <Label htmlFor="test-mail-to">{t('admin.mailServer.sendTo')}</Label>
           <Input
             id="test-mail-to"
             type="email"
@@ -517,7 +528,7 @@ function TestMailCard({ ready }: { ready: boolean }) {
           ) : (
             <Send className="h-4 w-4" />
           )}
-          Send test email
+          {t('admin.mailServer.sendTest')}
         </Button>
       </CardContent>
     </Card>

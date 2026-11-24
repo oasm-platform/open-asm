@@ -12,21 +12,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useT } from '@/lib/i18n-dictionary';
 import { VulnerabilityStatus } from '@/services/apis/gen/queries';
 
 /** Status filter options with display labels */
 const STATUS_OPTIONS = [
   {
     value: VulnerabilityStatus.open,
-    label: 'Open',
+    labelKey: 'vulnerabilities.status.open',
   },
   {
     value: VulnerabilityStatus.dismissed,
-    label: 'Dismissed',
+    labelKey: 'vulnerabilities.status.dismissed',
   },
   {
     value: VulnerabilityStatus.all,
-    label: 'All',
+    labelKey: 'vulnerabilities.status.all',
   },
 ] as const;
 
@@ -42,18 +43,19 @@ interface StatusFilterProps {
  * Defaults to 'Open' status to show only active vulnerabilities.
  */
 export function StatusFilter({ value, onValueChange }: StatusFilterProps) {
+  const t = useT();
   return (
     <Select
       value={value}
       onValueChange={(val) => onValueChange(val as VulnerabilityStatus)}
     >
       <SelectTrigger className="border-dashed text-xs py-0">
-        <SelectValue placeholder="Status" />
+        <SelectValue placeholder={t('vulnerabilities.statusFilter.placeholder')} />
       </SelectTrigger>
       <SelectContent>
         {STATUS_OPTIONS.map((option) => (
           <SelectItem key={option.value} value={option.value}>
-            {option.label}
+            {t(option.labelKey)}
           </SelectItem>
         ))}
       </SelectContent>

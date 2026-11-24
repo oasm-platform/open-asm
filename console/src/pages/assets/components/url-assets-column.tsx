@@ -1,4 +1,5 @@
 import { type GetUrlAssetsDTO } from '@/services/apis/gen/queries';
+import { t } from '@/lib/i18n-dictionary';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Link } from 'lucide-react';
 import { NewBadge } from './new-badge';
@@ -6,7 +7,7 @@ import { NewBadge } from './new-badge';
 export const urlAssetsColumn: ColumnDef<GetUrlAssetsDTO>[] = [
   {
     accessorKey: 'url',
-    header: 'URL',
+    header: () => t('assets.columns.url'),
     enableHiding: false,
     size: 500,
     cell: ({ row }) => {
@@ -24,14 +25,14 @@ export const urlAssetsColumn: ColumnDef<GetUrlAssetsDTO>[] = [
   },
   {
     accessorKey: 'assetCount',
-    header: 'Number of services',
+    header: () => t('assets.columns.numberOfServices'),
     size: 250,
     cell: ({ row }) => {
       const data = row.original;
 
       return (
         <div className="flex flex-wrap gap-1 items-center">
-          {data.assetCount} {data.assetCount > 1 ? 'services' : 'service'}
+          {t('assets.columns.serviceCount', { count: data.assetCount })}
         </div>
       );
     },

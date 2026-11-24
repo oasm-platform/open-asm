@@ -607,6 +607,58 @@ describe('JobHistoryQueryService', () => {
       expect(result.steps[1].running).toBeUndefined();
     });
 
+    it('counts the failed jobs of a running step live, and keeps a finished step as recorded', async () => {
+      // Given: a running step whose stored state predates two failures, and a
+      // finished step whose jobs were partly pruned since
+      mockJobHistoryRepository.findOne.mockResolvedValueOnce({
+        ...mockJobHistory,
+        steps: {
+          ports: { status: 'dispatched', jobs: 5 },
+          vulns: { status: 'done', jobs: 4, failed: 3 },
+        },
+        workflow: {
+          ...mockJobHistory.workflow,
+          content: {
+            name: 'test-workflow',
+            jobs: {
+              ports: { run: 'nmap', category: 'ports_scanner' },
+              vulns: { run: 'nmap', category: 'vulnerabilities' },
+            },
+          },
+        },
+      });
+      mockToolsService.getInstalledTools.mockResolvedValue({
+        data: [
+          {
+            id: 'tool-nmap',
+            name: 'nmap',
+            categories: [
+              { name: ToolCategory.PORTS_SCANNER, targetTypes: HOST },
+              { name: ToolCategory.VULNERABILITIES, targetTypes: HOST },
+            ],
+          },
+        ],
+      });
+      mockJobRepository.getRawMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          { toolId: 'tool-nmap', category: 'ports_scanner', running: '1', failed: '2' },
+          { toolId: 'tool-nmap', category: 'vulnerabilities', running: '0', failed: '1' },
+        ]);
+
+      // When
+      const result = await service.getJobHistoryWorkflow(
+        mockWorkspaceId,
+        mockHistoryId,
+      );
+
+      // Then
+      expect(result.steps).toEqual([
+        expect.objectContaining({ id: 'ports', failed: 2 }),
+        expect.objectContaining({ id: 'vulns', failed: 3 }),
+      ]);
+    });
+
     it('should include the run steps so the page can show state next to the definition', async () => {
       const result = await service.getJobHistoryWorkflow(
         mockWorkspaceId,

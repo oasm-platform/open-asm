@@ -1,3 +1,5 @@
+import { fromNow } from '@/lib/date-locale';
+import { useT } from '@/lib/i18n-dictionary';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
@@ -30,8 +32,6 @@ import { formatBytes } from '@/utils/format-bytes';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { type ColumnDef } from '@tanstack/react-table';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import {
   ArrowDownWideNarrow,
   ArrowUp,
@@ -55,7 +55,6 @@ import { ShareFileDialog } from './components/share-file-dialog';
 import { StorageUsage } from './components/storage-usage';
 import { useFolderPath, useFolders } from './components/use-folders';
 
-dayjs.extend(relativeTime);
 
 type FolderRow = ArtifactFolderDto & { isFolder: true };
 type Row = ArtifactDto | FolderRow;
@@ -65,16 +64,16 @@ type ViewMode = 'grid' | 'list';
 const VIEW_KEY = 'oasm.files.view';
 
 const ACCESS_LABEL: Record<ArtifactDto['shareType'], string> = {
-  private: 'Private',
-  shared: 'Shared',
-  public: 'Public',
+  private: 'files.access.private',
+  shared: 'files.access.shared',
+  public: 'files.access.public',
 };
 
 const SORT_OPTIONS = [
-  { value: 'name', label: 'Name' },
-  { value: 'updatedAt', label: 'Modified' },
-  { value: 'createdAt', label: 'Created' },
-  { value: 'sizeBytes', label: 'Size' },
+  { value: 'name', label: 'files.sort.name' },
+  { value: 'updatedAt', label: 'files.sort.modified' },
+  { value: 'createdAt', label: 'files.sort.created' },
+  { value: 'sizeBytes', label: 'files.sort.size' },
 ];
 
 function readViewMode(): ViewMode {
@@ -86,6 +85,7 @@ function readViewMode(): ViewMode {
 }
 
 export function Files() {
+  const t = useT();
   const { hasPermission } = usePermission();
   const canManage = hasPermission('artifact.manage');
   const canWrite = hasPermission('artifact.write');
@@ -159,7 +159,7 @@ export function Files() {
   const removeFile = useArtifactsControllerRemove({
     mutation: {
       onSuccess: () => {
-        toast.success('File deleted');
+        toast.success(t('files.deleted'));
         setDeleting(null);
         refresh();
       },
@@ -228,17 +228,17 @@ export function Files() {
   const total = data?.total ?? 0;
   const loading = isLoading || (showFolders && folders.isLoading);
   const emptyMessage = filter
-    ? `No files match "${filter}"`
+    ? t('files.empty.noMatch', { filter })
     : scope === 'shared'
-      ? 'Nothing has been shared with you'
+      ? t('files.empty.sharedWithYou')
       : currentFolderId
-        ? 'This folder is empty'
-        : 'No files yet';
+        ? t('files.empty.folder')
+        : t('files.empty.noFiles');
 
   const columns: ColumnDef<Row>[] = [
     {
       accessorKey: 'name',
-      header: 'Name',
+      header: t('files.columns.name'),
       cell: ({ row }) => {
         const item = row.original;
         if (isFolder(item))
@@ -267,7 +267,7 @@ export function Files() {
             {item.source === 'agent' && (
               <Badge variant="secondary" className="gap-1">
                 <Bot className="h-3 w-3" />
-                Agent
+                {t('files.grid.agent')}
               </Badge>
             )}
           </div>
@@ -276,7 +276,7 @@ export function Files() {
     },
     {
       accessorKey: 'sizeBytes',
-      header: 'Size',
+      header: t('files.columns.size'),
       cell: ({ row }) =>
         isFolder(row.original)
           ? '—'
@@ -286,34 +286,34 @@ export function Files() {
     },
     {
       accessorKey: 'shareType',
-      header: 'Access',
+      header: t('files.columns.access'),
       enableSorting: false,
       cell: ({ row }) =>
         isFolder(row.original) ? (
           '—'
         ) : (
           <Badge variant="outline">
-            {ACCESS_LABEL[row.original.shareType]}
+            {t(ACCESS_LABEL[row.original.shareType])}
           </Badge>
         ),
     },
     {
       id: 'owner',
-      header: 'Owner',
+      header: t('files.columns.owner'),
       enableSorting: false,
       cell: ({ row }) =>
         isFolder(row.original)
           ? '—'
           : row.original.isOwner
-            ? 'You'
+            ? t('files.columns.you')
             : (row.original.createdBy?.name ?? '—'),
     },
     {
       accessorKey: 'updatedAt',
-      header: 'Modified',
+      header: t('files.columns.modified'),
       cell: ({ row }) => (
         <span className="text-muted-foreground">
-          {dayjs(row.original.updatedAt).fromNow()}
+          {fromNow(row.original.updatedAt)}
         </span>
       ),
     },
@@ -332,7 +332,7 @@ export function Files() {
               <Button
                 variant="ghost"
                 size="sm"
-                aria-label={`Download ${file.name}`}
+                aria-label={t('files.actions.download', { name: file.name })}
                 onClick={() => actions.download(file)}
               >
                 <Download className="h-4 w-4" />
@@ -342,7 +342,7 @@ export function Files() {
               <Button
                 variant="ghost"
                 size="sm"
-                aria-label={`Share ${file.name}`}
+                aria-label={t('files.actions.share', { name: file.name })}
                 onClick={() => actions.share(file)}
               >
                 <Share2 className="h-4 w-4" />
@@ -352,7 +352,7 @@ export function Files() {
               <Button
                 variant="ghost"
                 size="sm"
-                aria-label={`Delete ${file.name}`}
+                aria-label={t('files.actions.delete', { name: file.name })}
                 className="text-red-500 hover:text-red-700"
                 onClick={() => actions.remove(file)}
               >
@@ -372,9 +372,9 @@ export function Files() {
       <StorageUsage usage={usage} />
       <Tabs value={scope} onValueChange={changeScope}>
         <TabsList>
-          <TabsTrigger value="mine">My files</TabsTrigger>
-          <TabsTrigger value="shared">Shared with me</TabsTrigger>
-          {canManage && <TabsTrigger value="all">All files</TabsTrigger>}
+          <TabsTrigger value="mine">{t('files.tabs.mine')}</TabsTrigger>
+          <TabsTrigger value="shared">{t('files.tabs.shared')}</TabsTrigger>
+          {canManage && <TabsTrigger value="all">{t('files.tabs.all')}</TabsTrigger>}
         </TabsList>
       </Tabs>
 
@@ -385,8 +385,8 @@ export function Files() {
             variant="outline"
             size="icon"
             className="h-8 w-8 shrink-0"
-            aria-label="Up one level"
-            title="Up one level"
+            aria-label={t('files.upOneLevel')}
+            title={t('files.upOneLevel')}
             onClick={() => openFolder(path.at(-2)?.id ?? null)}
             disabled={path.length === 0}
           >
@@ -400,8 +400,8 @@ export function Files() {
         <div className="relative min-w-48 flex-1 sm:max-w-sm">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            aria-label="Search files"
-            placeholder={inMine ? 'Search in all folders' : 'Search'}
+            aria-label={t('files.search.label')}
+            placeholder={inMine ? t('files.search.allFolders') : t('files.search.placeholder')}
             className="pl-8"
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
@@ -414,13 +414,13 @@ export function Files() {
                 value={sortBy}
                 onValueChange={(value) => setParams({ sortBy: value, page: 1 })}
               >
-                <SelectTrigger className="w-32" aria-label="Sort by">
+                <SelectTrigger className="w-32" aria-label={t('files.sort.by')}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {SORT_OPTIONS.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
-                      {option.label}
+                      {t(option.label)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -429,9 +429,9 @@ export function Files() {
                 variant="outline"
                 size="icon"
                 aria-label={
-                  sortOrder === 'ASC' ? 'Sort descending' : 'Sort ascending'
+                  sortOrder === 'ASC' ? t('files.sort.descending') : t('files.sort.ascending')
                 }
-                title={sortOrder === 'ASC' ? 'Ascending' : 'Descending'}
+                title={sortOrder === 'ASC' ? t('files.sort.asc') : t('files.sort.desc')}
                 onClick={() =>
                   setParams({
                     sortOrder: sortOrder === 'ASC' ? 'DESC' : 'ASC',
@@ -447,13 +447,13 @@ export function Files() {
               </Button>
             </ButtonGroup>
           )}
-          <ButtonGroup aria-label="View">
+          <ButtonGroup aria-label={t('files.view.label')}>
             <Button
               variant={view === 'grid' ? 'secondary' : 'outline'}
               size="icon"
-              aria-label="Grid view"
+              aria-label={t('files.view.grid')}
               aria-pressed={view === 'grid'}
-              title="Grid view"
+              title={t('files.view.grid')}
               onClick={() => changeView('grid')}
             >
               <LayoutGrid className="h-4 w-4" />
@@ -461,9 +461,9 @@ export function Files() {
             <Button
               variant={view === 'list' ? 'secondary' : 'outline'}
               size="icon"
-              aria-label="List view"
+              aria-label={t('files.view.list')}
               aria-pressed={view === 'list'}
-              title="List view"
+              title={t('files.view.list')}
               onClick={() => changeView('list')}
             >
               <List className="h-4 w-4" />
@@ -485,14 +485,17 @@ export function Files() {
           {total > pageSize && (
             <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
               <span>
-                {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)}{' '}
-                of {total}
+                {t('files.pagination.range', {
+                  from: (page - 1) * pageSize + 1,
+                  to: Math.min(page * pageSize, total),
+                  total,
+                })}
               </span>
               <Button
                 variant="outline"
                 size="icon"
                 className="h-8 w-8"
-                aria-label="Previous page"
+                aria-label={t('files.pagination.previous')}
                 disabled={page <= 1}
                 onClick={() => setPage(page - 1)}
               >
@@ -502,7 +505,7 @@ export function Files() {
                 variant="outline"
                 size="icon"
                 className="h-8 w-8"
-                aria-label="Next page"
+                aria-label={t('files.pagination.next')}
                 disabled={page >= pageCount}
                 onClick={() => setPage(page + 1)}
               >
@@ -540,9 +543,9 @@ export function Files() {
       <ConfirmDialog
         open={deleting !== null}
         onOpenChange={(open) => !open && setDeleting(null)}
-        title="Delete file"
-        description={`Delete "${deleting?.name ?? ''}"? This cannot be undone.`}
-        confirmText="Delete"
+        title={t('files.delete.title')}
+        description={t('files.delete.description', { name: deleting?.name ?? '' })}
+        confirmText={t('common.delete')}
         disabled={removeFile.isPending}
         onConfirm={() => deleting && removeFile.mutate({ id: deleting.id })}
       />

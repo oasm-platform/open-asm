@@ -5,6 +5,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useT } from '@/lib/i18n-dictionary';
 import { useWorkspacesControllerGetWorkspaceMembers } from '@/services/apis/gen/queries';
 import { useMemo } from 'react';
 
@@ -36,8 +37,8 @@ const NONE = '__none__';
 export function MemberSelect({
   value,
   onChange,
-  placeholder = 'Unassigned',
-  noneLabel = 'Unassigned',
+  placeholder,
+  noneLabel,
   id,
   ariaLabel,
   disabled,
@@ -52,6 +53,7 @@ export function MemberSelect({
   disabled?: boolean;
   className?: string;
 }) {
+  const t = useT();
   const { members } = useWorkspaceMemberOptions();
   return (
     <Select
@@ -60,10 +62,12 @@ export function MemberSelect({
       disabled={disabled}
     >
       <SelectTrigger id={id} aria-label={ariaLabel} className={className}>
-        <SelectValue placeholder={placeholder} />
+        <SelectValue placeholder={placeholder ?? t('issues.member.unassigned')} />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value={NONE}>{noneLabel}</SelectItem>
+        <SelectItem value={NONE}>
+          {noneLabel ?? t('issues.member.unassigned')}
+        </SelectItem>
         {members.map((member) => (
           <SelectItem key={member.id} value={member.id}>
             {member.name}

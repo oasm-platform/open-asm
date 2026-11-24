@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { useState } from 'react';
 import { Filter as FilterIcon, Search, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +20,7 @@ interface Props {
 }
 
 export function FilterToolbar({ fields, value, onApply, search = '', onSearchChange, flat }: Props) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const isMobile = useIsMobile();
   const count = countConditions(value);
@@ -34,7 +36,7 @@ export function FilterToolbar({ fields, value, onApply, search = '', onSearchCha
       <div className="flex w-full min-w-0 items-center gap-2">
         <PopoverTrigger asChild>
           <Button variant="outline" size="sm" className="h-9 shrink-0">
-            <FilterIcon className="size-4" /> Add filter
+            <FilterIcon className="size-4" /> {t('components.filter.add')}
             {count > 0 && <Badge className="ml-1 rounded-full px-1.5">{count}</Badge>}
           </Button>
         </PopoverTrigger>
@@ -49,15 +51,15 @@ export function FilterToolbar({ fields, value, onApply, search = '', onSearchCha
             ) : !onSearchChange ? (
               <button type="button" className="min-w-0 flex-1 truncate px-2 text-left text-sm text-muted-foreground"
                 onClick={() => setOpen(true)}>
-                No filters applied
+                {t('components.filter.noneApplied')}
               </button>
             ) : (
-              <input aria-label="Search" placeholder="Search value"
+              <input aria-label={t('common.search')} placeholder={t('components.filter.searchValue')}
                 className="h-8 min-w-0 flex-1 bg-transparent px-2 text-base outline-none placeholder:text-muted-foreground md:text-sm"
                 value={search} onChange={(e) => onSearchChange(e.target.value)} />
             )}
             {(count > 0 || search) && (
-              <Button variant="ghost" size="icon" className="size-7" aria-label="Clear filters"
+              <Button variant="ghost" size="icon" className="size-7" aria-label={t('components.filter.clear')}
                 onClick={() => (count > 0 ? onApply(undefined) : onSearchChange?.(''))}>
                 <X className="size-4" />
               </Button>
@@ -71,7 +73,7 @@ export function FilterToolbar({ fields, value, onApply, search = '', onSearchCha
       <Sheet open={open && isMobile} onOpenChange={setOpen}>
         <SheetContent side="bottom" aria-describedby={undefined} className="max-h-[85dvh] gap-0 rounded-t-xl px-4 pb-4">
           <SheetHeader className="px-0 pt-4 pb-3">
-            <SheetTitle>Filters</SheetTitle>
+            <SheetTitle>{t('components.filter.title')}</SheetTitle>
           </SheetHeader>
           {builder}
         </SheetContent>

@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { useStatistics } from '@/hooks/useStatistics';
 import { useEffect, useState } from 'react';
 
@@ -11,6 +12,7 @@ const GRADES = [
 ];
 
 export default function Score() {
+  const t = useT();
   const { statistics, isLoading } = useStatistics();
   const [animatedOffset, setAnimatedOffset] = useState(2 * Math.PI * 70);
 
@@ -36,49 +38,54 @@ export default function Score() {
       {isLoading ? (
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-2 text-sm text-muted-foreground">Loading...</p>
+          <p className="mt-2 text-sm text-muted-foreground">{t('dashboard.score.loading')}</p>
         </div>
       ) : (
         <div
-          className="relative"
-          title="Starts at 100 and drops with open vulnerabilities, worst first. An open critical caps the grade at D, an open high at B. Info findings don't count."
+          className="flex flex-col items-center gap-2"
+          title={t('dashboard.score.tooltip')}
         >
-          <svg
-            width="170"
-            height="170"
-            viewBox="0 0 170 170"
-            className="transform -rotate-90"
-          >
-            {/* Background circle */}
-            <circle
-              cx="85"
-              cy="85"
-              r={radius}
-              stroke="var(--border)"
-              strokeWidth="8"
-              fill="transparent"
-            />
-            {/* Progress circle */}
-            <circle
-              cx="85"
-              cy="85"
-              r={radius}
-              strokeWidth="8"
-              fill="transparent"
-              strokeDasharray={strokeDasharray}
-              strokeDashoffset={animatedOffset}
-              strokeLinecap="round"
-              className={`${band.stroke} transition-all duration-1000 ease-in-out`}
-            />
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-sm text-muted-foreground">Security score</span>
-            <span className={`text-4xl font-bold ${band.text}`}>
-              {band.grade}
-            </span>
-            <span className="text-sm font-mono text-muted-foreground">
-              {scoreValue}/100
-            </span>
+          {/* Above the ring, not inside it: some languages run longer than "Security score" */}
+          <span className="text-center text-sm font-medium text-muted-foreground">
+            {t('dashboard.score.title')}
+          </span>
+          <div className="relative">
+            <svg
+              width="170"
+              height="170"
+              viewBox="0 0 170 170"
+              className="transform -rotate-90"
+            >
+              {/* Background circle */}
+              <circle
+                cx="85"
+                cy="85"
+                r={radius}
+                stroke="var(--border)"
+                strokeWidth="8"
+                fill="transparent"
+              />
+              {/* Progress circle */}
+              <circle
+                cx="85"
+                cy="85"
+                r={radius}
+                strokeWidth="8"
+                fill="transparent"
+                strokeDasharray={strokeDasharray}
+                strokeDashoffset={animatedOffset}
+                strokeLinecap="round"
+                className={`${band.stroke} transition-all duration-1000 ease-in-out`}
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className={`text-4xl font-bold ${band.text}`}>
+                {band.grade}
+              </span>
+              <span className="text-sm font-mono text-muted-foreground">
+                {scoreValue}/100
+              </span>
+            </div>
           </div>
         </div>
       )}

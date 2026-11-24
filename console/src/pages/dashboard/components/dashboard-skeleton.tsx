@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -15,7 +16,7 @@ import {
 import type { ReactNode } from 'react';
 
 const cardSurface =
-  'overflow-hidden border-border/70 bg-card/90 shadow-sm [&_[data-slot=skeleton]]:motion-reduce:animate-none';
+  'overflow-hidden border-border/70 bg-card/90 shadow-sm dark:border-transparent dark:bg-card-surface [&_[data-slot=skeleton]]:motion-reduce:animate-none';
 
 const statSparklines = [
   'M2 34 C24 30, 34 18, 54 24 S82 39, 102 19 S136 10, 158 16',
@@ -119,6 +120,7 @@ function TrendChartSkeleton({
   icon: ReactNode;
   issuesOnly?: boolean;
 }) {
+  const t = useT();
   const primaryPath = issuesOnly
     ? 'M0 178 C45 168, 72 134, 116 145 S192 104, 238 117 S312 64, 360 82 S444 45, 500 58 S565 31, 620 40'
     : 'M0 154 C44 146, 78 105, 122 121 S196 70, 242 91 S316 54, 360 66 S440 28, 500 43 S566 20, 620 26';
@@ -128,7 +130,7 @@ function TrendChartSkeleton({
   return (
     <Card
       aria-busy="true"
-      aria-label={`Loading ${title}`}
+      aria-label={t('dashboard.skeleton.loadingTitle', { title })}
       className={`${cardSurface} h-full py-0`}
       role="status"
     >
@@ -207,12 +209,13 @@ function ListCardSkeleton({
   showIcons?: boolean;
   fullHeight?: boolean;
 }) {
+  const t = useT();
   const widths = ['w-28', 'w-36', 'w-24', 'w-32', 'w-20', 'w-30'];
 
   return (
     <Card
       aria-busy="true"
-      aria-label={`Loading ${title}`}
+      aria-label={t('dashboard.skeleton.loadingTitle', { title })}
       className={`${cardSurface} gap-0 py-0 ${
         fullHeight ? 'h-full min-h-[340px]' : 'h-[340px]'
       }`}
@@ -253,6 +256,7 @@ function ListCardSkeleton({
 }
 
 export function VulnerabilityStatisticSkeleton() {
+  const t = useT();
   const items = [
     'bg-chart-5/30',
     'bg-chart-3/30',
@@ -265,7 +269,7 @@ export function VulnerabilityStatisticSkeleton() {
   return (
     <Card
       aria-busy="true"
-      aria-label="Loading vulnerability statistics"
+      aria-label={t('dashboard.skeleton.vulnStats')}
       className={`${cardSurface} h-full min-h-[350px] gap-0 py-0`}
       role="status"
     >
@@ -309,10 +313,11 @@ export function VulnerabilityStatisticSkeleton() {
 }
 
 export function TlsStatisticsSkeleton() {
+  const t = useT();
   return (
     <Card
       aria-busy="true"
-      aria-label="Loading TLS statistics"
+      aria-label={t('dashboard.skeleton.tls')}
       className={`${cardSurface} h-full gap-0 py-0`}
       role="status"
     >
@@ -353,19 +358,20 @@ export function TlsStatisticsSkeleton() {
 }
 
 export function IpLocationsSkeleton() {
+  const t = useT();
   return (
     <Card
       aria-busy="true"
-      aria-label="Loading IP locations"
+      aria-label={t('dashboard.skeleton.ipLocations')}
       className={`${cardSurface} h-full min-h-[480px] gap-0 py-0`}
       role="status"
     >
       <CardHeaderSkeleton
         icon={<MapPinned className="size-4" />}
-        title="Locations"
-        description="Distribution of asset IPs by location"
+        title={t('dashboard.locations.title')}
+        description={t('dashboard.locations.description')}
       />
-      <div className="grid flex-1 gap-4 p-4 lg:grid-cols-[minmax(0,3fr)_minmax(13rem,1fr)]">
+      <div className="grid flex-1 gap-4 p-4 @3xl/dashboard-main:grid-cols-[minmax(0,3fr)_minmax(13rem,1fr)]">
         <div className="relative min-h-[350px] overflow-hidden rounded-xl border bg-muted/20">
           <div
             className="absolute inset-0 opacity-40"
@@ -417,24 +423,25 @@ export function IpLocationsSkeleton() {
 }
 
 export function DashboardStatsSkeleton() {
+  const t = useT();
   const stats = [
     {
-      title: 'Targets',
+      title: t('dashboard.stats.targets'),
       icon: <Target className="size-5" />,
       sparkline: statSparklines[0],
     },
     {
-      title: 'Assets',
+      title: t('dashboard.stats.assets'),
       icon: <CloudCheck className="size-5" />,
       sparkline: statSparklines[1],
     },
     {
-      title: 'Services',
+      title: t('dashboard.stats.services'),
       icon: <Server className="size-5" />,
       sparkline: statSparklines[2],
     },
     {
-      title: 'Technologies',
+      title: t('dashboard.stats.technologies'),
       icon: <Cpu className="size-5" />,
       sparkline: statSparklines[3],
     },
@@ -443,8 +450,8 @@ export function DashboardStatsSkeleton() {
   return (
     <section
       aria-busy="true"
-      aria-label="Loading dashboard statistics"
-      className="grid h-full grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-4 [&_[data-slot=skeleton]]:motion-reduce:animate-none"
+      aria-label={t('dashboard.skeleton.stats')}
+      className="grid h-full grid-cols-1 gap-4 @md/dashboard-main:grid-cols-2 @3xl/dashboard-main:grid-cols-4 [&_[data-slot=skeleton]]:motion-reduce:animate-none"
       role="status"
     >
       {stats.map((stat, index) => (
@@ -460,57 +467,63 @@ export function DashboardStatsSkeleton() {
 }
 
 export function AssetTrendsSkeleton() {
+  const t = useT();
   return (
     <TrendChartSkeleton
       icon={<TrendingUp className="size-4" />}
-      title="Attack surface trend"
+      title={t('dashboard.trends.title')}
     />
   );
 }
 
 export function IssuesTimelineSkeleton() {
+  const t = useT();
   return (
     <TrendChartSkeleton
       icon={<Bug className="size-4" />}
       issuesOnly
-      title="Vulnerability trend"
+      title={t('dashboard.timeline.title')}
     />
   );
 }
 
 export function RecentAssetsSkeleton() {
+  const t = useT();
   return (
     <ListCardSkeleton
       fullHeight
       icon={<Clock3 className="size-4" />}
       showIcons={false}
-      title="Newly discovered hosts"
+      title={t('dashboard.recentAssets.title')}
     />
   );
 }
 
 export function TopPortsSkeleton() {
+  const t = useT();
   return (
-    <ListCardSkeleton icon={<Radio className="size-4" />} title="Top exposed ports" />
+    <ListCardSkeleton icon={<Radio className="size-4" />} title={t('dashboard.ports.title')} />
   );
 }
 
 export function TopTechnologiesSkeleton() {
+  const t = useT();
   return (
     <ListCardSkeleton
       icon={<Layers3 className="size-4" />}
-      title="Top technologies"
+      title={t('dashboard.technologies.title')}
     />
   );
 }
 
 export function TopAssetsVulnerabilitiesSkeleton() {
+  const t = useT();
   return (
     <ListCardSkeleton
       fullHeight
       icon={<Bug className="size-4" />}
       rows={5}
-      title="Most vulnerable assets"
+      title={t('dashboard.topAssets.title')}
     />
   );
 }

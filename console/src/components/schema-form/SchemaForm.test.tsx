@@ -27,13 +27,21 @@ const tagsSchema = {
   },
 };
 
+/** Defaulted string field: the only kind of preset a schema offers. */
+const scanNameSchema = {
+  type: 'object',
+  properties: {
+    scanName: { type: 'string', title: 'Scan name', default: 'public' },
+  },
+};
+
 describe('SchemaForm preset hints', () => {
-  it('shows placeholder, Suggestion and Apply for an empty array field with examples', () => {
+  it('shows examples only as a placeholder, never as a Suggestion', () => {
     render(<SchemaForm schema={tagsSchema} enablePresets />);
 
     expect(screen.getByPlaceholderText('e.g. cve, rce')).toBeTruthy();
-    expect(screen.getByText(/Suggestion: cve, rce/)).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Apply' })).toBeTruthy();
+    expect(screen.queryByText(/Suggestion:/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull();
   });
 
   it('falls back to examples[0] for the placeholder when ui:placeholder is absent', () => {
@@ -51,7 +59,7 @@ describe('SchemaForm preset hints', () => {
     render(<SchemaForm schema={schema} enablePresets />);
 
     expect(screen.getByPlaceholderText('cve, rce')).toBeTruthy();
-    expect(screen.getByText(/Suggestion: cve, rce/)).toBeTruthy();
+    expect(screen.queryByText(/Suggestion:/)).toBeNull();
   });
 
   it('does not suggest a preset once the field already holds that value', () => {
@@ -90,21 +98,27 @@ describe('SchemaForm preset hints', () => {
     expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull();
   });
 
-  it('Apply fills an empty array field with the example values', async () => {
+  it('Apply restores the default of a field the user cleared', async () => {
     const user = userEvent.setup();
-    render(<SchemaForm schema={tagsSchema} enablePresets />);
+    render(<SchemaForm schema={scanNameSchema} enablePresets />);
 
+    await user.clear(screen.getByLabelText('Scan name'));
+    expect(screen.getByText(/Suggestion: public/)).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Apply' }));
 
-    const inputs = screen.getAllByRole('textbox');
-    expect((inputs[0] as HTMLInputElement).value).toBe('cve');
-    expect((inputs[1] as HTMLInputElement).value).toBe('rce');
+    expect((screen.getByLabelText('Scan name') as HTMLInputElement).value).toBe('public');
   });
 
-  it('applyAllPresets fills empty fields but never sensitive ones', () => {
+  it('applyAllPresets fills empty fields from defaults only, never examples or secrets', async () => {
+    const user = userEvent.setup();
     const schema = {
       type: 'object',
       properties: {
+        scanName: {
+          type: 'string',
+          title: 'Scan name',
+          default: 'public',
+        },
         domain: {
           type: 'string',
           title: 'Scan domain',
@@ -114,7 +128,7 @@ describe('SchemaForm preset hints', () => {
           type: 'string',
           format: 'password',
           title: 'API key',
-          examples: ['sk-secret'],
+          default: 'sk-secret',
         },
         tags: {
           type: 'array',
@@ -126,6 +140,7 @@ describe('SchemaForm preset hints', () => {
     };
     const ref = createRef<SchemaFormHandle>();
     render(<SchemaForm schema={schema} enablePresets ref={ref} />);
+    await user.clear(screen.getByLabelText('Scan name'));
 
     act(() => {
       ref.current?.applyAllPresets();
@@ -135,16 +150,19 @@ describe('SchemaForm preset hints', () => {
     const named = Object.fromEntries(
       inputs.map((i) => [(i as HTMLInputElement).name, (i as HTMLInputElement).value]),
     );
-    expect(named.domain).toBe('example.com');
+    expect(named.scanName).toBe('public');
+    expect(named.domain).toBe('');
     expect((screen.getByLabelText('API key') as HTMLInputElement).value).toBe('');
-    expect(named['tags[0]']).toBe('cve');
-    expect(named['tags[1]']).toBe('rce');
+    expect(named['tags[0]']).toBe('');
   });
 
-  it('keeps hints visible in JSON-tab mode (ToolConfigForm config)', () => {
-    render(<SchemaForm schema={tagsSchema} enablePresets enableJsonTab />);
+  it('keeps hints visible in JSON-tab mode (ToolConfigForm config)', async () => {
+    const user = userEvent.setup();
+    render(<SchemaForm schema={scanNameSchema} enablePresets enableJsonTab />);
 
-    expect(screen.getByText(/Suggestion: cve, rce/)).toBeTruthy();
+    await user.clear(screen.getByLabelText('Scan name'));
+
+    expect(screen.getByText(/Suggestion: public/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Apply' })).toBeTruthy();
   });
 });

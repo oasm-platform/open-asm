@@ -1,3 +1,4 @@
+import { useT, t } from '@/lib/i18n-dictionary';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -54,7 +55,7 @@ export interface JSONSchema {
 }
 
 export interface SchemaFormHandle {
-  /** Fill empty fields from schema presets (default/examples). Never overwrites user input. */
+  /** Fill empty fields from schema defaults. Never overwrites user input. */
   applyAllPresets: () => void;
 }
 
@@ -98,10 +99,15 @@ function isSensitive(prop: SchemaProperty): boolean {
   return prop.format === 'password' || prop['ui:widget'] === 'password';
 }
 
-/** First preset candidate: examples[0], else default. Excludes sensitive fields. */
-function firstPreset(prop: SchemaProperty): unknown {
+/**
+ * Preset value: the schema `default` only. `examples` illustrate the format
+ * (a sample CVE id, a sample URL) and are not safe to run: applied to nuclei
+ * `templateIds` they select templates that don't exist and the scan finds
+ * nothing. Excludes sensitive fields.
+ */
+function presetValue(prop: SchemaProperty): unknown {
   if (isSensitive(prop)) return undefined;
-  return prop.examples?.[0] ?? prop.default;
+  return prop.default;
 }
 
 function stringifyPreset(v: unknown): string {
@@ -118,7 +124,7 @@ function stringifyPreset(v: unknown): string {
  */
 function getPlaceholder(prop: SchemaProperty): string {
   if (isSensitive(prop)) return prop['ui:placeholder'] ?? '';
-  return prop['ui:placeholder'] ?? stringifyPreset(firstPreset(prop));
+  return prop['ui:placeholder'] ?? stringifyPreset(prop.examples?.[0] ?? prop.default);
 }
 
 /** Field holds no user input — safe target for preset fill. */
@@ -361,7 +367,7 @@ function renderField(
     return (
       <Select value={selected || undefined} onValueChange={(val) => onChange(val)}>
         <SelectTrigger id={key} className="w-full">
-          <SelectValue placeholder={placeholder || 'Select...'} />
+          <SelectValue placeholder={placeholder || t('components.schemaForm.select')} />
         </SelectTrigger>
         <SelectContent>
           {enumOptions.map((opt) => (
@@ -394,15 +400,17 @@ export function SchemaForm({
   initialValues,
   onSubmit,
   onCancel,
-  submitLabel = 'Save',
+  submitLabel,
   isSubmitting = false,
   enablePresets = false,
   enableJsonTab = false,
   enableGroups = false,
   titleizeKeys = false,
-  emptyMessage = 'No configuration fields defined.',
+  emptyMessage,
   ref,
 }: SchemaFormProps) {
+  const t = useT();
+  const empty = emptyMessage ?? t('components.schemaForm.empty');
   const properties = useMemo(
     () => (schema.properties ?? {}) as Record<string, unknown>,
     [schema.properties],
@@ -467,7 +475,7 @@ export function SchemaForm({
         setStateValues(defaultsFromSchema(properties, parsed));
         setJsonError(null);
       } catch {
-        setJsonError('Invalid JSON — fix errors before switching to Form.');
+        setJsonError(t('components.schemaForm.invalidJsonSwitch'));
         return; // Block tab switch
       }
     }
@@ -479,7 +487,7 @@ export function SchemaForm({
 
     const missing = getMissingRequired(formValues, requiredFields);
     if (missing.length > 0) {
-      toast.error('Please fill in required fields: ' + missing.join(', '));
+      toast.error(t('components.schemaForm.missingRequired', { fields: missing.join(', ') }));
       return;
     }
 
@@ -506,7 +514,7 @@ export function SchemaForm({
       const next = { ...source };
       for (const [key, prop] of formEntries) {
         if (isSensitive(prop)) continue;
-        const preset = firstPreset(prop);
+        const preset = presetValue(prop);
         if (preset !== undefined && isEmptyValue(next[key])) next[key] = preset;
       }
       return next;
@@ -526,7 +534,7 @@ export function SchemaForm({
       try {
         parsed = JSON.parse(jsonText) as Record<string, unknown>;
       } catch {
-        toast.error('Invalid JSON — fix before applying presets.');
+        toast.error(t('components.schemaForm.invalidJsonPresets'));
         return;
       }
       commit(fill(parsed));
@@ -534,14 +542,14 @@ export function SchemaForm({
     }
 
     commit(fill(formValues));
-  }, [enableJsonTab, activeTab, jsonText, formValues, formEntries, onChange]);
+  }, [enableJsonTab, activeTab, jsonText, formValues, formEntries, onChange, t]);
 
   useImperativeHandle(ref, () => ({ applyAllPresets }), [applyAllPresets]);
 
   const fieldBlocks = (
     <>
-      {formEntries.length === 0 && emptyMessage && (
-        <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+      {formEntries.length === 0 && empty && (
+        <p className="text-sm text-muted-foreground">{empty}</p>
       )}
       {ungroupedEntries.map(([key, prop]) => {
         const label = titleizeKeys
@@ -549,7 +557,7 @@ export function SchemaForm({
           : (prop.title ?? key);
         const required = requiredFields.includes(key);
         const textColor = prop['ui:text-color'];
-        const preset = firstPreset(prop);
+        const preset = presetValue(prop);
         const showPresetHint =
           enablePresets &&
           preset !== undefined &&
@@ -577,7 +585,7 @@ export function SchemaForm({
             {showPresetHint && (
               <div className="flex items-center justify-between gap-2">
                 <span className="min-w-0 truncate text-xs text-muted-foreground">
-                  Suggestion: {presetDisplay(preset)}
+                  {t('components.schemaForm.suggestion', { value: presetDisplay(preset) })}
                 </span>
                 <Button
                   type="button"
@@ -586,7 +594,7 @@ export function SchemaForm({
                   className="h-6 shrink-0 px-2 text-xs"
                   onClick={() => applyPresetToField(key, preset)}
                 >
-                  Apply
+                  {t('components.schemaForm.apply')}
                 </Button>
               </div>
             )}
@@ -638,7 +646,7 @@ export function SchemaForm({
           onClick={onCancel}
           disabled={isSubmitting}
         >
-          Cancel
+          {t('common.cancel')}
         </Button>
       )}
       <Button
@@ -647,7 +655,7 @@ export function SchemaForm({
         disabled={isSubmitting || !!jsonError}
       >
         {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        {submitLabel}
+        {submitLabel ?? t('common.save')}
       </Button>
     </div>
   ) : null;
@@ -666,7 +674,7 @@ export function SchemaForm({
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange}>
       <TabsList>
-        <TabsTrigger value="form">Form</TabsTrigger>
+        <TabsTrigger value="form">{t('components.schemaForm.formTab')}</TabsTrigger>
         <TabsTrigger value="json">JSON</TabsTrigger>
       </TabsList>
 
@@ -675,7 +683,7 @@ export function SchemaForm({
       </TabsContent>
 
       <TabsContent value="json" className="space-y-2 pt-2">
-        <Label htmlFor="tool-config-json">Configuration (JSON)</Label>
+        <Label htmlFor="tool-config-json">{t('components.schemaForm.jsonLabel')}</Label>
         <Textarea
           id="tool-config-json"
           className="font-mono text-sm min-h-[200px]"
@@ -690,7 +698,7 @@ export function SchemaForm({
               setStateValues(defaultsFromSchema(properties, parsed));
               setJsonError(null);
             } catch {
-              setJsonError('Invalid JSON — fix before saving.');
+              setJsonError(t('components.schemaForm.invalidJsonSave'));
             }
           }}
         />

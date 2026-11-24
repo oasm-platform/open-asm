@@ -1,0 +1,12 @@
+{
+  "NOT_EMPTY": "{property}은(는) 비워 둘 수 없습니다",
+  "IS_STRING": "{property}은(는) 문자열이어야 합니다",
+  "IS_EMAIL": "{property}은(는) 유효한 이메일이어야 합니다",
+  "MIN_LENGTH": "{property}이(가) 너무 짧습니다 (최소 {constraints.0}자)",
+  "MAX_LENGTH": "{property}이(가) 너무 깁니다 (최대 {constraints.0}자)",
+  "IS_UUID": "{property}은(는) 유효한 ID여야 합니다",
+  "IS_ARRAY": "{property}은(는) 목록이어야 합니다",
+  "ARRAY_NOT_EMPTY": "{property}은(는) 비워 둘 수 없습니다",
+  "MATCHES": "{property}의 형식이 올바르지 않습니다",
+  "PERMISSION_KEY": "잘못된 권한 키입니다. \"*\" 또는 \"domain.action\" 형식을 사용하세요 (예: target.read)"
+}

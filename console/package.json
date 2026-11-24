@@ -1,7 +1,7 @@
 {
   "name": "console",
   "private": true,
-  "version": "0.12.2",
+  "version": "0.13.0",
   "author": "oasm-platform",
   "license": "AGPL-3.0-only",
   "type": "module",
@@ -71,7 +71,6 @@
     "codemirror-json-schema": "^0.8.1",
     "dagre-d3-es": "^7.0.14",
     "date-fns": "^4.1.0",
-    "dayjs": "^1.11.13",
     "echarts": "^6.1.0",
     "echarts-for-react": "^3.0.6",
     "embla-carousel-react": "^8.6.0",

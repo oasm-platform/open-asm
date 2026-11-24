@@ -1,3 +1,4 @@
+import { useT, t } from '@/lib/i18n-dictionary';
 import {
   PromptInputActionMenu,
   PromptInputActionMenuContent,
@@ -23,6 +24,10 @@ export const EFFORT_LABELS: Record<ReasoningEffort, string> = {
   max: 'Max',
 };
 
+/** Translated name of a reasoning effort level. */
+export const effortLabel = (effort: ReasoningEffort) =>
+  t(`components.effort.${effort}`);
+
 interface ReasoningEffortSelectProps {
   /** Levels the model accepts, lowest first. */
   efforts: ReasoningEffort[];
@@ -39,15 +44,16 @@ export const ReasoningEffortSelect = memo(function ReasoningEffortSelect({
   onChange,
   disabled,
 }: ReasoningEffortSelectProps) {
+  const t = useT();
   const active = value && efforts.includes(value) ? value : null;
-  const label = active ? EFFORT_LABELS[active] : 'Default';
+  const label = active ? effortLabel(active) : t('components.effort.default');
 
   return (
     <PromptInputActionMenu>
       <PromptInputActionMenuTrigger
-        tooltip={`Reasoning effort: ${label}`}
+        tooltip={t('components.effort.tooltip', { level: label })}
         disabled={disabled}
-        aria-label="Reasoning effort"
+        aria-label={t('components.effort.label')}
       >
         <BrainIcon size={16} />
         <span className="ml-1 text-xs">{label}</span>
@@ -58,9 +64,9 @@ export const ReasoningEffortSelect = memo(function ReasoningEffortSelect({
           onClick={() => onChange(null)}
         >
           <div className="flex-1">
-            <div className="font-medium">Default</div>
+            <div className="font-medium">{t('components.effort.default')}</div>
             <div className="text-xs text-muted-foreground">
-              Your settings default, else the provider's
+              {t('components.effort.defaultDescription')}
             </div>
           </div>
           {!active && <CheckIcon className="size-4 text-green-500" />}
@@ -71,7 +77,7 @@ export const ReasoningEffortSelect = memo(function ReasoningEffortSelect({
             className="flex items-center gap-2 cursor-pointer"
             onClick={() => onChange(effort)}
           >
-            <span className="flex-1 font-medium">{EFFORT_LABELS[effort]}</span>
+            <span className="flex-1 font-medium">{effortLabel(effort)}</span>
             {active === effort && <CheckIcon className="size-4 text-green-500" />}
           </PromptInputActionMenuItem>
         ))}

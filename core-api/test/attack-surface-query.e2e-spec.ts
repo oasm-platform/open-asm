@@ -331,6 +331,134 @@ describe('Attack surface query (e2e)', () => {
     });
   });
 
+  describe('language on Postgres', () => {
+    it('runs nested filters, operators and relation tests', async () => {
+      const result = await asq.run(scopeOf(A), {
+        queries: {
+          admin443: {
+            from: 'services',
+            window: null,
+            select: ['port'],
+            where: {
+              logic: 'and',
+              items: [
+                { not: { field: 'port', op: 'between', value: ['1', '100'] } },
+                { logic: 'or', items: [{ field: 'http.title', op: 'startsWith', value: 'Admin' }, { field: 'http.title', op: 'isNull' }] },
+              ],
+            },
+          },
+          noSsh: {
+            from: 'hosts',
+            window: null,
+            select: ['value'],
+            where: {
+              logic: 'and',
+              items: [
+                { relation: 'services', quantifier: 'none', where: { logic: 'and', items: [{ field: 'port', op: 'eq', value: '22' }] } },
+                { relation: 'services', count: { op: 'gte', value: '2' } },
+              ],
+            },
+          },
+          allWeb: {
+            from: 'hosts',
+            window: null,
+            select: ['value'],
+            where: { logic: 'and', items: [{ relation: 'services', quantifier: 'every', where: { logic: 'and', items: [{ field: 'port', op: 'in', value: ['80', '443'] }] } }] },
+          },
+          only443: {
+            from: 'hosts',
+            window: null,
+            select: ['value'],
+            where: { logic: 'and', items: [{ relation: 'services', quantifier: 'every', where: { logic: 'and', items: [{ field: 'port', op: 'eq', value: '443' }] } }] },
+          },
+          withFinding: {
+            from: 'hosts',
+            window: null,
+            select: ['value'],
+            where: { logic: 'and', items: [{ relation: 'vulnerabilities' }] },
+          },
+        },
+      });
+      expect(rowsOf(result, 'admin443')).toHaveLength(3);
+      expect(rowsOf(result, 'noSsh')).toHaveLength(3);
+      expect(rowsOf(result, 'allWeb')).toHaveLength(3);
+      expect(rowsOf(result, 'only443')).toHaveLength(0);
+      // The finding under review stays hidden: one host.
+      expect(rowsOf(result, 'withFinding').map((r) => r.value)).toEqual([`a.${A.domain}`]);
+    });
+
+    it('runs conditional aggregates, having and a filled series in a time zone', async () => {
+      const result = await asq.run(scopeOf(A), {
+        options: { timezone: 'Asia/Ho_Chi_Minh' },
+        queries: {
+          matrix: {
+            from: 'services',
+            window: null,
+            groupBy: ['host.value'],
+            aggregate: {
+              n: { fn: 'count' },
+              https: { fn: 'count', where: { logic: 'and', items: [{ field: 'port', op: 'eq', value: '443' }] } },
+              ports: { fn: 'sum', field: 'port' },
+            },
+            having: { logic: 'and', items: [{ field: 'https', op: 'gte', value: '1' }] },
+          },
+          series: {
+            from: 'services',
+            window: { since: 'now-7d' },
+            groupBy: [{ field: 'firstSeen', bucket: 'day' }],
+            aggregate: { n: { fn: 'count' } },
+            fill: true,
+          },
+        },
+      });
+      const matrix = rowsOf(result, 'matrix');
+      expect(matrix).toHaveLength(3);
+      for (const row of matrix) expect(row).toEqual(expect.objectContaining({ n: 2, https: 1, ports: 523 }));
+      const series = rowsOf(result, 'series');
+      // Every day of the window, the empty ones as 0; the two new hosts' services today.
+      expect(series).toHaveLength(8);
+      expect(series.reduce((sum, r) => sum + (r.n as number), 0)).toBe(4);
+      expect(series.filter((r) => r.n === 0)).toHaveLength(7);
+    });
+  });
+
+  describe('catalog and database agree', () => {
+    it('lets the query role read every catalog table, each scoped by its column and policy or its predicate', async () => {
+      expect(connections.rls).toBe(true);
+      const problems: string[] = [];
+      for (const res of Object.values(CATALOG)) {
+        const [row] = (await dataSource.query(
+          `SELECT has_table_privilege('asq_reader', $1, 'SELECT') AS readable,
+                  EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1 AND column_name = 'workspaceId') AS scoped,
+                  EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = $1 AND policyname = 'asq_tenant') AS policy`,
+          [res.table],
+        ));
+        if (!row.readable) problems.push(`${res.name}: asq_reader cannot SELECT ${res.table}`);
+        if (!res.global && !res.scopePredicate && !row.scoped) problems.push(`${res.name}: ${res.table} has no workspaceId (declare a scopePredicate)`);
+        if (!res.global && !res.scopePredicate && !row.policy) problems.push(`${res.name}: ${res.table} has no asq_tenant policy`);
+      }
+      expect(problems).toEqual([]);
+    });
+
+    it('selects every field of every resource under the query role', async () => {
+      for (const res of Object.values(CATALOG).filter((r) => r.root)) {
+        const fields = (r: typeof res) => Object.entries(r.fields).filter(([, f]) => !f.heavy).map(([n]) => n);
+        const result = await asq.run(scopeOf(A), {
+          queries: {
+            q: {
+              from: res.name,
+              window: null,
+              limit: 5,
+              select: fields(res),
+              include: Object.fromEntries(Object.entries(res.many).map(([m, def]) => [m, { select: fields(CATALOG[def.resource]), limit: 2 }])),
+            },
+          },
+        });
+        expect(() => rowsOf(result, 'q')).not.toThrow();
+      }
+    });
+  });
+
   describe('database execution', () => {
     it('runs read-only: a write is refused by Postgres', async () => {
       await expect(
@@ -418,6 +546,30 @@ describe('Attack surface query (e2e)', () => {
       expect((run.body as QueryBatchResult).data.s).toEqual(expect.objectContaining({ rows: expect.any(Array) }));
       await request(server).delete(`/api/attack-surface/saved-queries/${id}`).set(headersA).expect(200);
       await request(server).get(`/api/attack-surface/saved-queries/${id}`).set(headersA).expect(404);
+    });
+
+    it('runs a saved query with params, defaults when none are sent', async () => {
+      const created = await request(server)
+        .post('/api/attack-surface/saved-queries')
+        .set(headersA)
+        .send({
+          name: `by-port-${Date.now()}`,
+          spec: {
+            params: { port: { type: 'number', default: 80 } },
+            queries: { s: { from: 'services', window: null, select: ['port'], where: { logic: 'and', items: [{ field: 'port', op: 'eq', value: { $param: 'port' } }] } } },
+          },
+        })
+        .expect(201);
+      const id = (created.body as { id: string }).id;
+      const ports = async (body?: object) => {
+        const req = request(server).post(`/api/attack-surface/saved-queries/${id}/run`).set(headersA);
+        const res = await (body ? req.send(body) : req).expect(200);
+        return rowsOf(res.body, 's').map((r) => r.port);
+      };
+      expect(await ports()).toEqual([80, 80, 80]);
+      expect(await ports({ params: { port: 443 } })).toEqual([443, 443, 443]);
+      await request(server).post(`/api/attack-surface/saved-queries/${id}/run`).set(headersA).send({ params: { other: 1 } }).expect(400);
+      await request(server).delete(`/api/attack-surface/saved-queries/${id}`).set(headersA).expect(200);
     });
 
     it('queues a report-mode batch and serves its result', async () => {

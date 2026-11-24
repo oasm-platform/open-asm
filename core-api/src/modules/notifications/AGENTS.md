@@ -39,7 +39,7 @@ All routes are under `notifications`, need authentication only (`AuthGuard`, no 
 ## Invariants
 
 - Status meaning: `sent` = new (counted by the badge), `unread` = seen but not opened, `read`.
-- Text and link are rendered at read time, not stored: `i18n.translate('notification.<type>')` with `metadata` as arguments in the request language, and the URL from the pseudo-language `routers`. A new `NotificationType` needs keys in `src/i18n/en/notification.json` and `src/i18n/routers/notification.json`.
+- Text and link are rendered at read time, not stored: `i18n.translate('notification.<type>')` with `metadata` as arguments in the request language, and the URL from `buildNotificationUrl()` (`notification-link.ts`, pure switch, no i18n). A new `NotificationType` needs a key in `src/i18n/en/notification.json` plus a branch in `buildNotificationUrl()`.
 - Cursor = base64url(`createdAt|id`). `createdAt` is the microsecond string from `CURSOR_TS_SQL`, never a JS `Date` (milliseconds would skip rows created in the same millisecond). Malformed or impossible values give 400. Order is `createdAt DESC, id DESC` and the query fetches `limit + 1` without counting.
 - The row shape is defined once, in `NotificationsSink.deliver`; both the bridge lane and `createNotification` go through it.
 

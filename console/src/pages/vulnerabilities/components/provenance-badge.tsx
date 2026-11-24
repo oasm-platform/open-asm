@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Badge } from '@/components/ui/badge';
 import { VulnerabilityProvenance } from '@/services/apis/gen/queries';
 import { memo } from 'react';
@@ -10,19 +11,20 @@ export const ProvenanceBadge = memo(function ProvenanceBadge({
   provenance: VulnerabilityProvenance;
   timesSeen: number;
 }) {
+  const t = useT();
   if (provenance === VulnerabilityProvenance.new) {
-    return <Badge variant="soft">New</Badge>;
+    return <Badge variant="soft">{t('vulnerabilities.provenance.new')}</Badge>;
   }
   if (provenance === VulnerabilityProvenance.not_seen) {
     return (
       <Badge
         variant="outline"
         className="border-dashed"
-        title="A later scan of this asset with the same tool did not report it: possibly fixed"
+        title={t('vulnerabilities.provenance.notSeenTitle')}
       >
-        Not seen again
+        {t('vulnerabilities.provenance.notSeen')}
       </Badge>
     );
   }
-  return <Badge variant="secondary">Recurring ×{timesSeen}</Badge>;
+  return <Badge variant="secondary">{t('vulnerabilities.provenance.recurring', { n: timesSeen })}</Badge>;
 });

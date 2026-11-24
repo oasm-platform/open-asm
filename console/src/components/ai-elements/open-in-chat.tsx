@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import type { ComponentProps } from "react";
 import { createContext, useContext, useMemo } from "react";
+import { useT } from '@/lib/i18n-dictionary';
 
 const providers = {
   chatgpt: {
@@ -239,20 +240,24 @@ export const OpenInSeparator = (props: OpenInSeparatorProps) => (
 
 export type OpenInTriggerProps = ComponentProps<typeof DropdownMenuTrigger>;
 
-export const OpenInTrigger = ({ children, ...props }: OpenInTriggerProps) => (
-  <DropdownMenuTrigger {...props} asChild>
-    {children ?? (
-      <Button type="button" variant="outline">
-        Open in chat
-        <ChevronDownIcon className="size-4" />
-      </Button>
-    )}
-  </DropdownMenuTrigger>
-);
+export const OpenInTrigger = ({ children, ...props }: OpenInTriggerProps) => {
+  const t = useT();
+  return (
+    <DropdownMenuTrigger {...props} asChild>
+      {children ?? (
+        <Button type="button" variant="outline">
+          {t('agents.ai.openInChat')}
+          <ChevronDownIcon className="size-4" />
+        </Button>
+      )}
+    </DropdownMenuTrigger>
+  );
+};
 
 export type OpenInChatGPTProps = ComponentProps<typeof DropdownMenuItem>;
 
 export const OpenInChatGPT = (props: OpenInChatGPTProps) => {
+  const t = useT();
   const { query } = useOpenInContext();
   return (
     <DropdownMenuItem asChild {...props}>
@@ -263,7 +268,7 @@ export const OpenInChatGPT = (props: OpenInChatGPTProps) => {
         target="_blank"
       >
         <span className="shrink-0">{providers.chatgpt.icon}</span>
-        <span className="flex-1">{providers.chatgpt.title}</span>
+        <span className="flex-1">{t('agents.ai.openIn', { app: 'ChatGPT' })}</span>
         <ExternalLinkIcon className="size-4 shrink-0" />
       </OpenLink>
     </DropdownMenuItem>
@@ -273,6 +278,7 @@ export const OpenInChatGPT = (props: OpenInChatGPTProps) => {
 export type OpenInClaudeProps = ComponentProps<typeof DropdownMenuItem>;
 
 export const OpenInClaude = (props: OpenInClaudeProps) => {
+  const t = useT();
   const { query } = useOpenInContext();
   return (
     <DropdownMenuItem asChild {...props}>
@@ -283,7 +289,7 @@ export const OpenInClaude = (props: OpenInClaudeProps) => {
         target="_blank"
       >
         <span className="shrink-0">{providers.claude.icon}</span>
-        <span className="flex-1">{providers.claude.title}</span>
+        <span className="flex-1">{t('agents.ai.openIn', { app: 'Claude' })}</span>
         <ExternalLinkIcon className="size-4 shrink-0" />
       </OpenLink>
     </DropdownMenuItem>
@@ -293,6 +299,7 @@ export const OpenInClaude = (props: OpenInClaudeProps) => {
 export type OpenInT3Props = ComponentProps<typeof DropdownMenuItem>;
 
 export const OpenInT3 = (props: OpenInT3Props) => {
+  const t = useT();
   const { query } = useOpenInContext();
   return (
     <DropdownMenuItem asChild {...props}>
@@ -303,7 +310,7 @@ export const OpenInT3 = (props: OpenInT3Props) => {
         target="_blank"
       >
         <span className="shrink-0">{providers.t3.icon}</span>
-        <span className="flex-1">{providers.t3.title}</span>
+        <span className="flex-1">{t('agents.ai.openIn', { app: 'T3 Chat' })}</span>
         <ExternalLinkIcon className="size-4 shrink-0" />
       </OpenLink>
     </DropdownMenuItem>
@@ -313,6 +320,7 @@ export const OpenInT3 = (props: OpenInT3Props) => {
 export type OpenInSciraProps = ComponentProps<typeof DropdownMenuItem>;
 
 export const OpenInScira = (props: OpenInSciraProps) => {
+  const t = useT();
   const { query } = useOpenInContext();
   return (
     <DropdownMenuItem asChild {...props}>
@@ -323,7 +331,7 @@ export const OpenInScira = (props: OpenInSciraProps) => {
         target="_blank"
       >
         <span className="shrink-0">{providers.scira.icon}</span>
-        <span className="flex-1">{providers.scira.title}</span>
+        <span className="flex-1">{t('agents.ai.openIn', { app: 'Scira' })}</span>
         <ExternalLinkIcon className="size-4 shrink-0" />
       </OpenLink>
     </DropdownMenuItem>
@@ -333,6 +341,7 @@ export const OpenInScira = (props: OpenInSciraProps) => {
 export type OpenInv0Props = ComponentProps<typeof DropdownMenuItem>;
 
 export const OpenInv0 = (props: OpenInv0Props) => {
+  const t = useT();
   const { query } = useOpenInContext();
   return (
     <DropdownMenuItem asChild {...props}>
@@ -343,7 +352,7 @@ export const OpenInv0 = (props: OpenInv0Props) => {
         target="_blank"
       >
         <span className="shrink-0">{providers.v0.icon}</span>
-        <span className="flex-1">{providers.v0.title}</span>
+        <span className="flex-1">{t('agents.ai.openIn', { app: 'v0' })}</span>
         <ExternalLinkIcon className="size-4 shrink-0" />
       </OpenLink>
     </DropdownMenuItem>
@@ -353,6 +362,7 @@ export const OpenInv0 = (props: OpenInv0Props) => {
 export type OpenInCursorProps = ComponentProps<typeof DropdownMenuItem>;
 
 export const OpenInCursor = (props: OpenInCursorProps) => {
+  const t = useT();
   const { query } = useOpenInContext();
   return (
     <DropdownMenuItem asChild {...props}>
@@ -363,7 +373,7 @@ export const OpenInCursor = (props: OpenInCursorProps) => {
         target="_blank"
       >
         <span className="shrink-0">{providers.cursor.icon}</span>
-        <span className="flex-1">{providers.cursor.title}</span>
+        <span className="flex-1">{t('agents.ai.openIn', { app: 'Cursor' })}</span>
         <ExternalLinkIcon className="size-4 shrink-0" />
       </OpenLink>
     </DropdownMenuItem>

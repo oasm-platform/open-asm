@@ -1,3 +1,4 @@
+import { formatDate } from '@/lib/date-locale';
 import Page from '@/components/common/page';
 import { ToolConnectorConfigSheet } from '@/components/tools/tool-connector-config-sheet';
 import { Badge } from '@/components/ui/badge';
@@ -35,7 +36,6 @@ import {
 } from '@/services/apis/gen/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { getRouteApi, useParams } from '@tanstack/react-router';
-import dayjs from 'dayjs';
 import {
   BadgeCheck,
   Box,
@@ -52,6 +52,7 @@ import {
 } from './tool-detail-skeleton';
 import { formatCategory } from './format-category';
 import ToolInstallButton from './tool-install-button';
+import { t, useT } from '@/lib/i18n-dictionary';
 
 /** Extended profile shape returned by the API (orval type is incomplete). */
 interface ProfileWithMeta {
@@ -64,15 +65,14 @@ interface ProfileWithMeta {
 }
 
 /** Masked config values for display (API masks sensitive fields). */
-const TARGET_TYPE_LABELS: Record<string, string> = {
-  DOMAIN: 'Domain',
-  IP: 'IP',
-  CIDR: 'CIDR',
-  GIT_ORG: 'Git organization',
+const TARGET_TYPE_LABEL_KEYS: Record<string, string> = {
+  DOMAIN: 'tools.detail.targetType.domain',
+  GIT_ORG: 'tools.detail.targetType.gitOrg',
 };
 
 function formatTargetType(targetType: string): string {
-  return TARGET_TYPE_LABELS[targetType] ?? targetType;
+  const key = TARGET_TYPE_LABEL_KEYS[targetType];
+  return key ? t(key) : targetType;
 }
 
 function maskConfig(config: Record<string, unknown>): string {
@@ -88,7 +88,7 @@ function maskConfig(config: Record<string, unknown>): string {
 
 interface ToolTab {
   id: string;
-  label: string;
+  labelKey: string;
   /** Only render a tab when the data backing it exists (mirrors the reference page). */
   visible: boolean;
 }
@@ -96,6 +96,7 @@ interface ToolTab {
 const routeApi = getRouteApi('/_authed/tools/$id');
 
 export default function ToolDetail() {
+  const tr = useT();
   const { id } = useParams({ strict: false });
   const navigate = routeApi.useNavigate();
   const {
@@ -161,7 +162,9 @@ export default function ToolDetail() {
   if (error || !toolResponse) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-lg text-red-500">Error loading tool details</div>
+        <div className="text-lg text-red-500">
+          {tr('tools.detail.loadError')}
+        </div>
       </div>
     );
   }
@@ -176,12 +179,12 @@ export default function ToolDetail() {
   const tabs: ToolTab[] = [
     {
       id: 'overview',
-      label: 'Overview',
+      labelKey: 'tools.detail.tabs.overview',
       visible: overviewVisible,
     },
     {
       id: 'configuration',
-      label: 'Configuration',
+      labelKey: 'tools.detail.tabs.configuration',
       visible: isConnector && isInstalled,
     },
     // Future tabs (Reviews, Pricing, Support, ...) get appended here with
@@ -192,16 +195,16 @@ export default function ToolDetail() {
   const formatType = (type: string) => {
     switch (type) {
       case ToolsControllerGetManyToolsType.built_in:
-        return 'Built-in';
+        return tr('tools.detail.type.builtIn');
       case ToolsControllerGetManyToolsType.connector:
-        return 'Connector';
+        return tr('tools.detail.type.connector');
       default:
-        return 'Provider';
+        return tr('tools.detail.type.provider');
     }
   };
 
   return (
-    <Page>
+    <Page documentTitle={tool.name}>
       <div className="mb-4 space-y-4">
         {/* Hero: logo, name, badges, meta + install CTA */}
         <Card>
@@ -223,7 +226,10 @@ export default function ToolDetail() {
                       {tool.name}
                     </h1>
                     {tool.isOfficialSupport && (
-                      <span title="Official" className="inline-flex shrink-0">
+                      <span
+                        title={tr('tools.card.official')}
+                        className="inline-flex shrink-0"
+                      >
                         <BadgeCheck className="size-4 text-blue-500" />
                       </span>
                     )}
@@ -235,7 +241,7 @@ export default function ToolDetail() {
                         key={c.name}
                         variant="secondary"
                         className="gap-1"
-                        title="Target types this category can scan"
+                        title={tr('tools.detail.categoryTargetTypes')}
                       >
                         <Tag />
                         {formatCategory(c.name)}
@@ -281,7 +287,7 @@ export default function ToolDetail() {
                   value={tab.id}
                   className="hover:cursor-pointer"
                 >
-                  {tab.label}
+                  {tr(tab.labelKey)}
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -318,6 +324,7 @@ function toSafeHttpUrl(url: string): string {
 
 /** Overview tab content: connector manifest metadata (Version, Author, ...). */
 function OverviewSection({ meta }: { meta: ConnectorMeta }) {
+  const tr = useT();
   // New API returns string[]; accept legacy string until `task gen-api` regens types.
   const pricingTiers: string[] = (
     Array.isArray(meta.pricingTier)
@@ -329,10 +336,10 @@ function OverviewSection({ meta }: { meta: ConnectorMeta }) {
     .filter(Boolean)
     .map((tier) => tier.charAt(0).toUpperCase() + tier.slice(1).toLowerCase());
   const metaRows: { label: string; value: string; href?: string }[] = [
-    { label: 'Version', value: meta.version },
-    { label: 'Author', value: meta.author ?? '' },
+    { label: tr('tools.detail.meta.version'), value: meta.version },
+    { label: tr('tools.detail.meta.author'), value: meta.author ?? '' },
     {
-      label: 'Image',
+      label: tr('tools.detail.meta.image'),
       value: meta.image,
       // Manifest stores registry paths without scheme (ghcr.io/...) —
       // force https so the link is always openable and no other scheme
@@ -342,7 +349,7 @@ function OverviewSection({ meta }: { meta: ConnectorMeta }) {
     ...(meta.homepage
       ? [
           {
-            label: 'Homepage',
+            label: tr('tools.detail.meta.homepage'),
             value: meta.homepage,
             href: toSafeHttpUrl(meta.homepage),
           },
@@ -351,7 +358,7 @@ function OverviewSection({ meta }: { meta: ConnectorMeta }) {
     ...(meta.repositoryUrl
       ? [
           {
-            label: 'Repository',
+            label: tr('tools.detail.meta.repository'),
             value: meta.repositoryUrl,
             href: toSafeHttpUrl(meta.repositoryUrl),
           },
@@ -360,7 +367,7 @@ function OverviewSection({ meta }: { meta: ConnectorMeta }) {
     ...(meta.supportUrl
       ? [
           {
-            label: 'Support',
+            label: tr('tools.detail.meta.support'),
             value: meta.supportUrl,
             href: toSafeHttpUrl(meta.supportUrl),
           },
@@ -404,7 +411,9 @@ function OverviewSection({ meta }: { meta: ConnectorMeta }) {
 
         {pricingTiers.length > 0 && (
           <div className="mt-4">
-            <p className="text-xs text-muted-foreground">Pricing</p>
+            <p className="text-xs text-muted-foreground">
+              {tr('tools.detail.meta.pricing')}
+            </p>
             <div className="mt-1 flex flex-wrap gap-2">
               {pricingTiers.map((tier) => (
                 <Badge key={tier} variant="secondary">
@@ -421,6 +430,7 @@ function OverviewSection({ meta }: { meta: ConnectorMeta }) {
 
 /** Table of configuration profiles for a connector tool. */
 function ConfigProfilesSection({ tool }: { tool: Tool }) {
+  const tr = useT();
   const queryClient = useQueryClient();
   const toolId = tool.id;
   const navigate = routeApi.useNavigate();
@@ -469,7 +479,7 @@ function ConfigProfilesSection({ tool }: { tool: Tool }) {
     useToolConfigProfilesControllerSetDefault({
       mutation: {
         onSuccess: () => {
-          toast.success('Default profile updated');
+          toast.success(tr('tools.detail.profiles.defaultUpdated'));
           queryClient.invalidateQueries({
             queryKey: getToolConfigProfilesControllerListQueryKey(toolId),
           });
@@ -477,7 +487,7 @@ function ConfigProfilesSection({ tool }: { tool: Tool }) {
         },
         onError: (err: unknown) => {
           const msg =
-            err instanceof Error ? err.message : 'Failed to set default';
+            err instanceof Error ? err.message : tr('tools.detail.profiles.setDefaultFailed');
           toast.error(msg);
         },
       },
@@ -487,7 +497,7 @@ function ConfigProfilesSection({ tool }: { tool: Tool }) {
     useToolConfigProfilesControllerRemove({
       mutation: {
         onSuccess: () => {
-          toast.success('Profile deleted');
+          toast.success(tr('tools.detail.profiles.deleted'));
           queryClient.invalidateQueries({
             queryKey: getToolConfigProfilesControllerListQueryKey(toolId),
           });
@@ -495,7 +505,7 @@ function ConfigProfilesSection({ tool }: { tool: Tool }) {
         },
         onError: (err: unknown) => {
           const msg =
-            err instanceof Error ? err.message : 'Failed to delete profile';
+            err instanceof Error ? err.message : tr('tools.detail.profiles.deleteFailed');
           toast.error(msg);
         },
       },
@@ -517,15 +527,14 @@ function ConfigProfilesSection({ tool }: { tool: Tool }) {
       <CardContent>
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <CardTitle>Configuration Profiles</CardTitle>
+            <CardTitle>{tr('tools.detail.profiles.title')}</CardTitle>
             <CardDescription className="text-sm text-muted-foreground">
-              Manage configuration profiles for this tool. Each profile defines
-              a set of parameters that can be applied when running scans.
+              {tr('tools.detail.profiles.description')}
             </CardDescription>
           </div>
           <Button variant="outline" onClick={handleCreate}>
             <Plus className="mr-1 h-4 w-4" />
-            Config
+            {tr('tools.detail.profiles.add')}
           </Button>
         </div>
 
@@ -533,16 +542,18 @@ function ConfigProfilesSection({ tool }: { tool: Tool }) {
           <ConfigProfilesSkeleton />
         ) : profiles.length === 0 ? (
           <p className="text-sm text-center text-muted-foreground py-4">
-            No configuration profiles yet.
+            {tr('tools.detail.profiles.empty')}
           </p>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Config</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="w-[120px]">Actions</TableHead>
+                <TableHead>{tr('common.name')}</TableHead>
+                <TableHead>{tr('tools.detail.profiles.col.config')}</TableHead>
+                <TableHead>{tr('tools.detail.profiles.col.created')}</TableHead>
+                <TableHead className="w-[120px]">
+                  {tr('common.actions')}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -553,7 +564,7 @@ function ConfigProfilesSection({ tool }: { tool: Tool }) {
                       {profile.name}
                       {profile.isDefault && (
                         <Badge variant="secondary" className="text-xs">
-                          Default
+                          {tr('tools.detail.profiles.default')}
                         </Badge>
                       )}
                     </div>
@@ -562,7 +573,7 @@ function ConfigProfilesSection({ tool }: { tool: Tool }) {
                     {maskConfig(profile.config)}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {dayjs(profile.createdAt).format('DD MMM YYYY')}
+                    {formatDate(profile.createdAt, 'dd MMM yyyy')}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
@@ -573,7 +584,7 @@ function ConfigProfilesSection({ tool }: { tool: Tool }) {
                           disabled={isSettingDefault}
                           onClick={() => setDefault({ toolId, id: profile.id })}
                         >
-                          Set Default
+                          {tr('tools.detail.profiles.setDefault')}
                         </Button>
                       )}
                       <Button
@@ -584,8 +595,10 @@ function ConfigProfilesSection({ tool }: { tool: Tool }) {
                         <Settings className="h-4 w-4" />
                       </Button>
                       <ConfirmDialog
-                        title="Delete Profile"
-                        description={`Delete profile "${profile.name}"?`}
+                        title={tr('tools.detail.profiles.deleteTitle')}
+                        description={tr('tools.detail.profiles.deleteConfirm', {
+                          name: profile.name,
+                        })}
                         onConfirm={() =>
                           deleteProfile({ toolId, id: profile.id })
                         }
@@ -629,10 +642,12 @@ function ConfigProfilesSection({ tool }: { tool: Tool }) {
         <ConfirmDialog
           open={confirmSkipOpen}
           onOpenChange={setConfirmSkipOpen}
-          title="Add configuration later?"
-          description={`"${tool.name}" won't work until it has a configuration profile. You can add one later from the Configuration tab.`}
-          confirmText="Add later"
-          cancelText="Continue setup"
+          title={tr('tools.detail.profiles.skipTitle')}
+          description={tr('tools.detail.profiles.skipDescription', {
+            name: tool.name,
+          })}
+          confirmText={tr('tools.detail.profiles.skipConfirm')}
+          cancelText={tr('tools.detail.profiles.skipCancel')}
           onConfirm={() => setCreateSheetOpen(false)}
         />
       </CardContent>

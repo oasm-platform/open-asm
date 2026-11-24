@@ -1,6 +1,7 @@
 import { UserAvatar } from '@/components/comments/comment-thread';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import type { IssueProgressDto, IssueUserDto } from '@/services/apis/gen/queries';
 import { format } from 'date-fns';
@@ -27,6 +28,7 @@ const TYPE_CLASSES: Record<IssueType, string> = {
 };
 
 export function IssueTypeChip({ type }: { type: IssueType }) {
+  useT(); // re-render on language change
   return (
     <Badge variant="outline" className={cn('font-medium', TYPE_CLASSES[type])}>
       {ISSUE_TYPE_LABELS[type] ?? type}
@@ -44,6 +46,7 @@ const STATUS_CLASSES: Record<IssueStatus, string> = {
 };
 
 export function IssueStatusBadge({ status }: { status: IssueStatus }) {
+  useT(); // re-render on language change
   return (
     <Badge variant="outline" className={STATUS_CLASSES[status]}>
       {ISSUE_STATUS_LABELS[status] ?? status}
@@ -59,6 +62,7 @@ const PRIORITY_CLASSES: Record<IssuePriority, string> = {
 };
 
 export function PriorityBadge({ priority }: { priority: IssuePriority }) {
+  useT(); // re-render on language change
   return (
     <Badge
       variant="outline"
@@ -72,8 +76,11 @@ export function PriorityBadge({ priority }: { priority: IssuePriority }) {
 }
 
 export function AssigneeCell({ user }: { user: IssueUserDto | null }) {
+  const t = useT();
   if (!user) {
-    return <span className="text-xs text-muted-foreground">Unassigned</span>;
+    return <span className="text-xs text-muted-foreground">
+        {t('issues.chips.unassigned')}
+      </span>;
   }
   return (
     <span className="flex items-center gap-2">
@@ -92,6 +99,7 @@ export function DueLabel({
   status: IssueStatus;
   className?: string;
 }) {
+  const t = useT();
   const state = dueState(dueAt, status);
   if (!dueAt || state === 'none') {
     return <span className="text-muted-foreground">—</span>;
@@ -108,7 +116,7 @@ export function DueLabel({
       )}
     >
       {state === 'overdue'
-        ? `${label} · ${daysOverdue(dueAt)}d overdue`
+        ? t('issues.chips.overdue', { date: label, n: daysOverdue(dueAt) })
         : label}
     </span>
   );

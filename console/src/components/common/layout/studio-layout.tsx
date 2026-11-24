@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Button } from '@/components/ui/button';
 import { GithubBadge } from '@/components/ui/github-badge';
 import { ArrowLeft } from 'lucide-react';
@@ -5,6 +6,7 @@ import type { JSX } from 'react';
 import { Link } from '@tanstack/react-router';
 
 export default function StudioLayout({ children }: { children: JSX.Element }) {
+  const t = useT();
   return (
     <div className="[--header-height:calc(--spacing(14))] flex flex-col h-screen overflow-y-hidden">
       <header className="sticky top-0 z-50 flex shrink-0 items-center gap-2 border-b bg-background">
@@ -13,7 +15,7 @@ export default function StudioLayout({ children }: { children: JSX.Element }) {
             <Link to="/">
               <Button variant={'outline'}>
                 <ArrowLeft size={4} />
-                Back
+                {t('common.back')}
               </Button>
             </Link>
           </div>

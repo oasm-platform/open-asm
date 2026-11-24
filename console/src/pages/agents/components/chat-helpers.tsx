@@ -5,6 +5,7 @@ import { CheckIcon, CopyIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useState } from 'react';
 import { MessageAction } from '@/components/ai-elements/message';
+import { useT } from '@/lib/i18n-dictionary';
 
 // ---------------------------------------------------------------------------
 // Tool call status
@@ -65,15 +66,16 @@ export function ThinkingLabel({
   isStreaming: boolean;
   duration?: number;
 }) {
+  const t = useT();
   if (isStreaming || duration === 0) {
     return (
       <span className="inline-flex items-center gap-2 min-w-0">
-        <Shimmer duration={1}>Thinking</Shimmer>
+        <Shimmer duration={1}>{t('agents.thinking.active')}</Shimmer>
       </span>
     );
   }
-  if (duration === undefined) return <span>Thought for a few seconds</span>;
-  return <span>Thought for {duration} seconds</span>;
+  if (duration === undefined) return <span>{t('agents.thinking.fewSeconds')}</span>;
+  return <span>{t('agents.thinking.seconds', { duration })}</span>;
 }
 
 // ---------------------------------------------------------------------------
@@ -105,6 +107,7 @@ export function TypingDots() {
 // ---------------------------------------------------------------------------
 
 export function CopyButton({ text }: { text: string }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -117,8 +120,10 @@ export function CopyButton({ text }: { text: string }) {
   return (
     <MessageAction
       onClick={handleCopy}
-      label={copied ? 'Copied!' : 'Copy'}
-      tooltip={copied ? 'Copied!' : 'Copy message'}
+      label={copied ? t('agents.message.copied') : t('agents.message.copy')}
+      tooltip={
+        copied ? t('agents.message.copied') : t('agents.message.copyMessage')
+      }
     >
       {copied ? (
         <CheckIcon className="size-3.5 text-green-500" />

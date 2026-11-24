@@ -11,8 +11,10 @@ import {
   DISMISS_REASON_LABELS,
   ageLabel,
   isRiskAccepted,
+  labelOf,
   sourceSummaryLabel,
 } from '@/components/vulnerabilities/lifecycle';
+import { useT, t } from '@/lib/i18n-dictionary';
 import type { VulnerabilityListItemDto } from '@/services/apis/gen/queries';
 import type { ColumnDef } from '@tanstack/react-table';
 import { format, formatDistanceToNowStrict } from 'date-fns';
@@ -35,6 +37,7 @@ export function vulnerabilitySubline(v: VulnerabilityListItemDto): string {
 
 /** Triage cell: dismissal reason, risk acceptance end, or a fix claim. */
 function Triage({ v }: { v: VulnerabilityListItemDto }) {
+  const t = useT();
   const d = v.dismissal;
   if (d) {
     if (d.reason === 'risk_accepted') {
@@ -44,9 +47,11 @@ function Triage({ v }: { v: VulnerabilityListItemDto }) {
           className="h-6 rounded-full border-amber-500/30 text-amber-700 dark:text-amber-300"
           title={d.comment ?? undefined}
         >
-          Risk accepted
+          {t('vulnerabilities.triage.riskAccepted')}
           {d.expiresAt
-            ? ` · until ${format(new Date(d.expiresAt), 'dd MMM yyyy')}`
+            ? t('vulnerabilities.triage.until', {
+                date: format(new Date(d.expiresAt), 'dd MMM yyyy'),
+              })
             : ''}
         </Badge>
       );
@@ -57,7 +62,7 @@ function Triage({ v }: { v: VulnerabilityListItemDto }) {
         className="h-6 rounded-full"
         title={d.comment ?? undefined}
       >
-        {DISMISS_REASON_LABELS[d.reason] ?? d.reason}
+        {labelOf(DISMISS_REASON_LABELS, d.reason)}
       </Badge>
     );
   }
@@ -66,19 +71,22 @@ function Triage({ v }: { v: VulnerabilityListItemDto }) {
       <Badge
         variant="outline"
         className="h-6 rounded-full border-green-500/30 text-green-700 dark:text-green-300"
-        title={`Claimed ${format(new Date(v.fixClaimedAt), 'dd MMM yyyy')}; the next covering scan verifies it`}
+        title={t('vulnerabilities.triage.fixClaimedTitle', {
+          date: format(new Date(v.fixClaimedAt), 'dd MMM yyyy'),
+        })}
       >
-        Fix claimed
+        {t('vulnerabilities.triage.fixClaimed')}
       </Badge>
     );
   }
   return dash;
 }
 
-export const vulnerabilityColumns: ColumnDef<
+/** Built at render so headers follow the active language. */
+export const vulnerabilityColumns = (): ColumnDef<
   VulnerabilityListItemDto,
   unknown
->[] = [
+>[] => [
   {
     id: 'select',
     header: ({ table }) => (
@@ -89,7 +97,7 @@ export const vulnerabilityColumns: ColumnDef<
             (table.getIsSomePageRowsSelected() && 'indeterminate')
           }
           onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
+          aria-label={t('vulnerabilities.col.selectAll')}
           onClick={(e) => e.stopPropagation()}
         />
       </div>
@@ -102,7 +110,7 @@ export const vulnerabilityColumns: ColumnDef<
         <Checkbox
           checked={row.getIsSelected()}
           onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
+          aria-label={t('vulnerabilities.col.selectRow')}
         />
       </div>
     ),
@@ -112,7 +120,7 @@ export const vulnerabilityColumns: ColumnDef<
   },
   {
     accessorKey: 'severity',
-    header: 'Severity',
+    header: t('vulnerabilities.col.severity'),
     size: 100,
     cell: ({ row }) => (
       <div className={cellBox}>
@@ -124,7 +132,7 @@ export const vulnerabilityColumns: ColumnDef<
   },
   {
     accessorKey: 'name',
-    header: 'Name',
+    header: t('vulnerabilities.col.name'),
     size: 420,
     enableHiding: false,
     cell: ({ row }) => {
@@ -146,7 +154,7 @@ export const vulnerabilityColumns: ColumnDef<
   },
   {
     accessorKey: 'detectionStatus',
-    header: 'Status',
+    header: t('vulnerabilities.col.status'),
     size: 120,
     cell: ({ row }) => {
       const v = row.original;
@@ -163,7 +171,7 @@ export const vulnerabilityColumns: ColumnDef<
   },
   {
     accessorKey: 'timesDetected',
-    header: 'Detected',
+    header: t('vulnerabilities.col.detected'),
     size: 90,
     cell: ({ row }) => {
       const v = row.original;
@@ -174,7 +182,7 @@ export const vulnerabilityColumns: ColumnDef<
           ) : (
             <span
               className="tabular-nums"
-              title={`Reported by ${v.timesDetected} scan run(s)`}
+              title={t('vulnerabilities.col.reportedBy', { n: v.timesDetected })}
             >
               ×{v.timesDetected}
             </span>
@@ -185,14 +193,16 @@ export const vulnerabilityColumns: ColumnDef<
   },
   {
     accessorKey: 'firstDetectedDate',
-    header: 'Age',
+    header: t('vulnerabilities.col.age'),
     size: 110,
     cell: ({ row }) => {
       const v = row.original;
       if (v.detectionStatus === 'fixed' && v.fixedAt && !isProposal(v)) {
         return (
           <div className={`${cellBox} text-sm text-muted-foreground`}>
-            fixed {formatDistanceToNowStrict(new Date(v.fixedAt))} ago
+            {t('vulnerabilities.col.fixedAgo', {
+              time: formatDistanceToNowStrict(new Date(v.fixedAt)),
+            })}
           </div>
         );
       }
@@ -212,7 +222,7 @@ export const vulnerabilityColumns: ColumnDef<
   },
   {
     accessorKey: 'dueAt',
-    header: 'SLA due',
+    header: t('vulnerabilities.col.slaDue'),
     size: 130,
     cell: ({ row }) => {
       const v = row.original;
@@ -229,7 +239,7 @@ export const vulnerabilityColumns: ColumnDef<
   },
   {
     id: 'triage',
-    header: 'Triage',
+    header: t('vulnerabilities.col.triage'),
     size: 170,
     enableSorting: false,
     cell: ({ row }) => (
@@ -240,7 +250,7 @@ export const vulnerabilityColumns: ColumnDef<
   },
   {
     id: 'issue',
-    header: 'Issue',
+    header: t('vulnerabilities.col.issue'),
     size: 80,
     enableSorting: false,
     cell: ({ row }) => {

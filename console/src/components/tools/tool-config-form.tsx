@@ -3,6 +3,7 @@ import {
   type SchemaFormHandle,
 } from '@/components/schema-form';
 import type { JSONSchema } from '@/components/schema-form';
+import { useT } from '@/lib/i18n-dictionary';
 
 /**
  * Thin wrapper over the shared SchemaForm with the tool-flows enabled:
@@ -26,17 +27,18 @@ export function ToolConfigForm({
   initialValues,
   onSubmit,
   onCancel,
-  submitLabel = 'Save',
+  submitLabel,
   isSubmitting = false,
   ref,
 }: ToolConfigFormProps) {
+  const t = useT();
   return (
     <SchemaForm
       schema={schema}
       initialValues={initialValues}
       onSubmit={onSubmit}
       onCancel={onCancel}
-      submitLabel={submitLabel}
+      submitLabel={submitLabel ?? t('common.save')}
       isSubmitting={isSubmitting}
       enablePresets
       enableJsonTab

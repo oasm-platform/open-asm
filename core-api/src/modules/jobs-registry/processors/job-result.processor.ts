@@ -3,6 +3,7 @@ import {
   JobStatus,
   WorkerType,
 } from '@/common/enums/enum';
+import { JOB_RESULT_CONCURRENCY } from '@/common/constants/app.constants';
 import { JobDataResultType } from '@/common/types/app.types';
 import { DataAdapterService } from '@/modules/data-adapter/data-adapter.service';
 import { StorageService } from '@/modules/storage/storage.service';
@@ -125,7 +126,7 @@ function unresolvableButDiscoveredReason(job: Job): string | undefined {
 }
 
 @Processor(BullMQName.JOB_RESULT, {
-  concurrency: 10,
+  concurrency: JOB_RESULT_CONCURRENCY,
 })
 export class JobResultProcessor extends WorkerHost {
   private readonly logger = new Logger(JobResultProcessor.name);

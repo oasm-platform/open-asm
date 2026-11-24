@@ -1,3 +1,4 @@
+import { useT } from "@/lib/i18n-dictionary";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,6 +30,7 @@ export function ProviderForm({
   initialData = {},
   submitButtonText
 }: ProviderFormProps) {
+  const t = useT();
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     defaultValues: {
       name: initialData.name || '',
@@ -59,50 +61,50 @@ export function ProviderForm({
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
-          <label className="text-sm font-medium">Name *</label>
+          <label className="text-sm font-medium">{t('providers.form.nameLabel')}</label>
           <Input
-            {...register("name", { required: "Provider name is required" })}
-            placeholder="Provider Name"
+            {...register("name", { required: t('providers.form.nameRequired') })}
+            placeholder={t('providers.form.namePlaceholder')}
           />
           {errors.name && <p className="text-red-600 text-sm">{errors.name.message}</p>}
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium">Code *</label>
+          <label className="text-sm font-medium">{t('providers.form.codeLabel')}</label>
           <Input
-            {...register("code", { required: "Provider code is required" })}
-            placeholder="Provider Code"
+            {...register("code", { required: t('providers.form.codeRequired') })}
+            placeholder={t('providers.form.codePlaceholder')}
           />
           {errors.code && <p className="text-red-600 text-sm">{errors.code.message}</p>}
         </div>
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium">Description</label>
+        <label className="text-sm font-medium">{t('common.description')}</label>
         <Textarea
           {...register("description")}
-          placeholder="Provider Description"
+          placeholder={t('providers.form.descriptionPlaceholder')}
           rows={4}
         />
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium">Company</label>
+        <label className="text-sm font-medium">{t('providers.form.company')}</label>
         <Input
           {...register("company")}
-          placeholder="Company Name"
+          placeholder={t('providers.form.companyPlaceholder')}
         />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
-          <label className="text-sm font-medium">Logo URL</label>
+          <label className="text-sm font-medium">{t('providers.form.logoUrl')}</label>
           <Input
             {...register("logoUrl")}
             placeholder="https://example.com/logo.png"
           />
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium">Website URL</label>
+          <label className="text-sm font-medium">{t('providers.form.websiteUrl')}</label>
           <Input
             {...register("websiteUrl")}
             placeholder="https://example.com"
@@ -112,14 +114,14 @@ export function ProviderForm({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
-          <label className="text-sm font-medium">Support Email</label>
+          <label className="text-sm font-medium">{t('providers.form.supportEmail')}</label>
           <Input
             {...register("supportEmail")}
             placeholder="support@example.com"
           />
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium">API Documentation URL</label>
+          <label className="text-sm font-medium">{t('providers.form.apiDocsUrl')}</label>
           <Input
             {...register("apiDocsUrl")}
             placeholder="https://docs.example.com/api"
@@ -128,10 +130,10 @@ export function ProviderForm({
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium">License Info</label>
+        <label className="text-sm font-medium">{t('providers.form.licenseInfo')}</label>
         <Textarea
           {...register("licenseInfo")}
-          placeholder="License Information"
+          placeholder={t('providers.form.licenseInfoPlaceholder')}
           rows={3}
         />
       </div>
@@ -143,7 +145,7 @@ export function ProviderForm({
           onClick={() => window.history.back()}
           disabled={isPending}
         >
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button type="submit" disabled={isPending}>
           {isPending && <Loader2Icon className="animate-spin mr-2" />}

@@ -1,4 +1,3 @@
-import { RouteProgress } from '@/components/common/route-progress';
 import { Toaster } from '@/components/ui/sonner';
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
 import {
@@ -13,15 +12,12 @@ import ReactDOM from 'react-dom/client';
 import { ThemeProvider } from './components/ui/theme-provider';
 import { TooltipProvider } from './components/ui/tooltip';
 import { router } from './router';
-import {
-  getRootControllerGetMetadataQueryKey,
-  useRootControllerGetMetadata,
-} from './services/apis/gen/queries';
 import './styles/index.css';
 import { AxiosError } from 'axios';
 import { toast } from 'sonner';
 import { handleServerError } from './lib/handle-server-error';
 import { removeBootSplash } from '@/lib/boot-splash';
+import { useI18nReady, t } from '@/lib/i18n-dictionary';
 import { getWorkspaceListQueryOptions } from './hooks/useWorkspaceSelector';
 import {
   refetchSession,
@@ -62,7 +58,7 @@ const queryClient = new QueryClient({
         handleServerError(error);
         if (error instanceof AxiosError) {
           if (error.response?.status === 304) {
-            toast.error('Content not modified!');
+            toast.error(t('shell.toast.notModified'));
           }
         }
       },
@@ -113,22 +109,10 @@ persistQueryClient({
   },
 });
 
-function useMetadataTitle() {
-  const { data: metadata } = useRootControllerGetMetadata({
-    query: { queryKey: getRootControllerGetMetadataQueryKey() },
-  });
-  useEffect(() => {
-    if (metadata?.name) document.title = metadata.name;
-  }, [metadata]);
-}
-
-function MetadataProvider({ children }: { children: React.ReactNode }) {
-  useMetadataTitle();
-  return <>{children}</>;
-}
-
 function AppRouter() {
-  const { data: session, isPending } = useSession();
+  const { data: session, isPending: sessionPending } = useSession();
+  const i18nReady = useI18nReady();
+  const isPending = sessionPending || !i18nReady;
   // Init to undefined (not session) so the first effect run is detectable:
   // on first render session is null, which would be indistinguishable from
   // a later null state. The very first run must be skipped (see effect below).
@@ -157,7 +141,7 @@ function AppRouter() {
     // /login instead of letting _authed re-render and flash through
     // /workspaces/create first.
     if (prevSession && !session) {
-      if (!isVoluntaryLogout) toast.error('Session expired!');
+      if (!isVoluntaryLogout) toast.error(t('shell.toast.sessionExpired'));
       const currentPath = router.history.location.pathname;
       if (currentPath !== '/login') {
         router.navigate({
@@ -194,20 +178,35 @@ function AppRouter() {
     setGlobalWorkspaceId(null);
   }, [isPending, session]);
 
-  // The HTML #boot-splash covers the screen until the app is ready:
-  // - no session → login/init-admin render immediately → remove it now
-  // - session → the _authed layout removes it when its workspace load
-  //   finishes; this timeout is a fallback for non-_authed routes
-  //   (e.g. /settings) so the splash can never get stuck.
+  // The HTML #boot-splash covers the screen until the first page is on it,
+  // not before the router has loaded the page's code-split chunks and
+  // mounted it (onResolved): on a slow network, removing it earlier left a
+  // blank screen while the chunks downloaded. Pages under _authed wait
+  // further: that layout removes it once its workspace load finishes. Other
+  // pages (login, /settings, ...) are done at onResolved.
   useEffect(() => {
     if (isPending) return;
-    if (!session) {
-      removeBootSplash();
-      return;
+    const onFirstPage = () => {
+      const underAuthed = router.state.matches.some(
+        (match) => match.routeId === '/_authed',
+      );
+      if (!underAuthed) removeBootSplash();
+    };
+    const unsubscribe = router.subscribe('onResolved', onFirstPage);
+    // Already resolved before this effect ran
+    if (
+      router.state.status === 'idle' &&
+      router.state.resolvedLocation?.href === router.state.location.href
+    ) {
+      onFirstPage();
     }
-    const timeout = setTimeout(removeBootSplash, 800);
-    return () => clearTimeout(timeout);
-  }, [isPending, session]);
+    // Last resort, so the splash can never stay up for good
+    const fallback = setTimeout(removeBootSplash, 15_000);
+    return () => {
+      unsubscribe();
+      clearTimeout(fallback);
+    };
+  }, [isPending]);
 
   // Wait for session to load before rendering the router. The HTML
   // #boot-splash covers the screen while we wait — nothing renders
@@ -231,15 +230,13 @@ function App() {
   return (
     <StrictMode>
       <QueryClientProvider client={queryClient}>
-        <MetadataProvider>
-          <ThemeProvider defaultTheme="system" storageKey="theme">
-            <TooltipProvider>
-              <AppRouter />
-              <Toaster position="bottom-center" />
-              <RouteProgress />
-            </TooltipProvider>
-          </ThemeProvider>
-        </MetadataProvider>
+        {/* The document title follows the route: DocumentTitle in __root */}
+        <ThemeProvider defaultTheme="system" storageKey="theme">
+          <TooltipProvider>
+            <AppRouter />
+            <Toaster position="bottom-center" />
+          </TooltipProvider>
+        </ThemeProvider>
       </QueryClientProvider>
     </StrictMode>
   );

@@ -1,0 +1,9 @@
+{
+  "WORKSPACE_CREATED": "ワークスペース {name} を作成しました",
+  "VULNERABILITY_ANALYSIS_COMPLETED": "{name} の脆弱性分析が完了しました",
+  "ASSET_NEW_DETECT": "{targetValue} で新しいアセットを検出しました: {hosts, plural, =0 {} other {ホスト #件}}{ports, plural, =0 {} other { ポート #件}}{services, plural, =0 {} other { サービス #件}}{tech, plural, =0 {} other { 技術 #件}}",
+  "SCAN_INCOMPLETE": "{targetValue} のスキャンが完了しませんでした。{details}",
+  "NEW_VULNERABILITY_FOUND": "{assetValue} で新しい脆弱性が {count} 件見つかりました",
+  "WORKSPACE_INVITATION": "{action, select, created {ワークスペース {workspaceName} に招待されました} accepted {{userName} さんがワークスペース {workspaceName} への招待を承認しました} declined {{userName} さんがワークスペース {workspaceName} への招待を辞退しました} other {ワークスペースへの招待}}",
+  "NEW_URL_FOUND": "{targetValue} で新しい URL が {count} 件見つかりました"
+}

@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { useLLMConfigs } from '@/hooks/use-llm-configs';
 import {
   DropdownMenu,
@@ -19,6 +20,7 @@ import Image from './image';
 import { Separator } from './separator';
 
 export function LlmConfigSwitcher() {
+  const t = useT();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const itemHeightClass = 'h-10';
@@ -38,11 +40,11 @@ export function LlmConfigSwitcher() {
       { id: configId },
       {
         onSuccess: () => {
-          toast.success(`Switched to ${configName}`);
+          toast.success(t('components.llmSwitcher.switched', { name: configName }));
           void refetch();
         },
         onError: (error) => {
-          toast.error('Failed to switch provider');
+          toast.error(t('components.llmSwitcher.switchFailed'));
           console.error('Error switching provider:', error);
         },
       },
@@ -77,7 +79,7 @@ export function LlmConfigSwitcher() {
           />
           <div className="flex gap-0.5 leading-none">
             <span className="hidden md:inline font-semibold mr-2">
-              {selectedProvider ? '' : 'No provider'}
+              {selectedProvider ? '' : t('components.llmSwitcher.noProvider')}
             </span>
             {selectedProvider?.model && (
               <span className="text-muted-foreground">
@@ -135,13 +137,13 @@ export function LlmConfigSwitcher() {
           </>
         ) : (
           <div className="text-center text-sm text-muted-foreground px-2 py-4">
-            No LLM provider configured
+            {t('components.llmSwitcher.noneConfigured')}
           </div>
         )}
 
         <DropdownMenuItem onClick={handleConnect}>
           <Settings size={16} className="mr-2" />
-          Settings
+          {t('shell.settings.title')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

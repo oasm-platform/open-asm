@@ -1,6 +1,6 @@
 import { isLocalEnv } from './runtime-env';
 
-export const DEFAULT_CORS_ALLOWED_ORIGINS = [
+export const LOCAL_TRUSTED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:3000',
 ];
@@ -18,10 +18,12 @@ export function parseAllowedOrigins(
 
 /**
  * Browser origins other than the API's own that may call it with the user's
- * session: they get CORS headers, and better-auth accepts their requests.
+ * session: they get CORS headers (from the API and the storage buckets), and
+ * better-auth accepts their requests.
  * That is `TRUSTED_ORIGINS`, the console at `BASE_URL`, and the dev servers
- * in local development. Empty means same-origin only, which is all the
- * console needs behind its nginx proxy.
+ * in local development. Empty means same-origin only, which is enough for a
+ * console behind its proxy on https or localhost; over plain http on any
+ * other address its origin must be listed (see trustedRequestOrigins).
  *
  * Exact origins only: a wildcard would mean different things to CORS (exact
  * match) and better-auth (pattern), so it is refused, like any value that is
@@ -35,7 +37,7 @@ export function resolveTrustedOrigins(
   );
   const baseUrl = env.BASE_URL?.trim();
   if (baseUrl) origins.push(toOrigin('BASE_URL', baseUrl));
-  if (isLocalEnv(env)) origins.push(...DEFAULT_CORS_ALLOWED_ORIGINS);
+  if (isLocalEnv(env)) origins.push(...LOCAL_TRUSTED_ORIGINS);
   return [...new Set(origins)];
 }
 
@@ -59,6 +61,8 @@ function toOrigin(variable: string, value: string): string {
  * same-origin`. A page cannot forge that header, and it is what lets the
  * console sign in behind a proxy that drops the port from `Host` (nginx
  * `$host`), where better-auth cannot derive the console's origin itself.
+ * Browsers send it only to https or localhost, so a console on plain
+ * `http://<ip>` gets no such pass and must be in TRUSTED_ORIGINS.
  */
 export function trustedRequestOrigins(
   trusted: readonly string[],

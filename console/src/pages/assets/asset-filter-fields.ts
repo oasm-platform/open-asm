@@ -8,6 +8,7 @@ import {
   useAssetsControllerGetTechnologyAssets, useAssetsControllerGetTlsAssets, useAssetsControllerGetUrlAssets,
   useProjectsControllerGetMany,
 } from '@/services/apis/gen/queries';
+import { t } from '@/lib/i18n-dictionary';
 import { useAsset } from './context/asset-context';
 
 const IPV4 = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
@@ -39,35 +40,35 @@ const NEW_OPTIONS: FilterSuggestion[] = [
 ];
 
 export const ASSET_FILTER_FIELDS: FilterFieldConfig[] = [
-  { key: 'host', label: 'Host', operators: ['eq', 'neq', 'contains', 'notContains', 'in', 'notIn'],
+  { key: 'host', get label() { return t('assets.filter.host'); }, operators: ['eq', 'neq', 'contains', 'notContains', 'in', 'notIn'],
     useSuggestions: (s, on) => wrap(useAssetsControllerGetHostAssets(useScope(s), opts(on, (d: GetManyGetHostAssetsDTODto) => toOptions(d.data.map((e) => e.host))))) },
-  { key: 'port', label: 'Port', operators: ['eq', 'neq', 'in', 'notIn'],
+  { key: 'port', get label() { return t('assets.filter.port'); }, operators: ['eq', 'neq', 'in', 'notIn'],
     useSuggestions: (s, on) => wrap(useAssetsControllerGetPortAssets(useScope(s), opts(on, (d: GetManyGetPortAssetsDTODto) => toOptions(d.data.map((e) => e.port))))),
-    validate: (v) => (/^\d{1,5}$/.test(v) && Number(v) <= 65535 ? null : 'Port must be 0-65535') },
-  { key: 'ip', label: 'IP', operators: ['eq', 'neq', 'in', 'notIn', 'inSubnet'],
+    validate: (v) => (/^\d{1,5}$/.test(v) && Number(v) <= 65535 ? null : t('assets.filter.portInvalid')) },
+  { key: 'ip', get label() { return t('assets.filter.ip'); }, operators: ['eq', 'neq', 'in', 'notIn', 'inSubnet'],
     useSuggestions: (s, on) => wrap(useAssetsControllerGetIpAssets(useScope(s), opts(on, (d: GetManyGetIpAssetsDTODto) => toOptions(d.data.map((e) => e.ip))))),
-    validate: (v, op: FilterOp) => (op === 'inSubnet' ? (isCidr(v) ? null : `"${v}" is not a valid CIDR`) : isIp(v) ? null : `"${v}" is not a valid IP`) },
-  { key: 'tech', label: 'Technology', operators: ['eq', 'neq', 'contains', 'in', 'notIn'],
+    validate: (v, op: FilterOp) => (op === 'inSubnet' ? (isCidr(v) ? null : t('assets.filter.cidrInvalid', { value: v })) : isIp(v) ? null : t('assets.filter.ipInvalid', { value: v })) },
+  { key: 'tech', get label() { return t('assets.filter.technology'); }, operators: ['eq', 'neq', 'contains', 'in', 'notIn'],
     useSuggestions: (s, on) => wrap(useAssetsControllerGetTechnologyAssets(useScope(s), opts(on, (d: GetManyGetTechnologyAssetsDTODto) => toOptions(d.data.map((e) => e.technology.name))))) },
-  { key: 'url', label: 'URL', operators: ['eq', 'contains', 'notContains', 'in', 'notIn'],
+  { key: 'url', get label() { return t('assets.filter.url'); }, operators: ['eq', 'contains', 'notContains', 'in', 'notIn'],
     useSuggestions: (s, on) => wrap(useAssetsControllerGetUrlAssets(useScope(s), opts(on, (d: GetManyGetUrlAssetsDTODto) => toOptions(d.data.map((e) => e.url))))) },
-  { key: 'statusCode', label: 'Status code', operators: ['eq', 'neq', 'in', 'notIn'],
+  { key: 'statusCode', get label() { return t('assets.filter.statusCode'); }, operators: ['eq', 'neq', 'in', 'notIn'],
     useSuggestions: (s, on) => wrap(useAssetsControllerGetStatusCodeAssets(useScope(s), opts(on, (d: GetManyGetStatusCodeAssetsDTODto) => toOptions(d.data.map((e) => e.statusCode))))),
-    validate: (v) => (/^\d{3}$/.test(v) ? null : 'Status code must be 3 digits') },
-  { key: 'tlsHost', label: 'TLS host', operators: ['eq', 'neq', 'contains', 'in'],
+    validate: (v) => (/^\d{3}$/.test(v) ? null : t('assets.filter.statusCodeInvalid')) },
+  { key: 'tlsHost', get label() { return t('assets.filter.tlsHost'); }, operators: ['eq', 'neq', 'contains', 'in'],
     useSuggestions: (s, on) => {
       const { targetIds, limit, page } = useScope(s);
       return wrap(useAssetsControllerGetTlsAssets({ targetIds, limit, page, search: s || undefined }, opts(on, (d: GetManyGetTlsResponseDtoDto) => toOptions(d.data.map((e) => e.host)))));
     } },
-  { key: 'tag', label: 'Tag', operators: ['eq', 'neq', 'contains', 'in', 'notIn'],
+  { key: 'tag', get label() { return t('assets.filter.tag'); }, operators: ['eq', 'neq', 'contains', 'in', 'notIn'],
     useSuggestions: (s, on) => wrap(useAssetsControllerGetTagAssets({ ...useScope(s), sortBy: 'assetCount', sortOrder: 'DESC' }, opts(on, (d: GetManyGetTagAssetsDTODto) => toOptions(d.data.map((e) => e.tag))))) },
   // What the latest finished scan found; each tab judges its own rows (host,
   // service or URL). `?isNew=true` links (notifications) migrate to this.
-  { key: 'isNew', label: 'New', operators: ['eq'],
+  { key: 'isNew', get label() { return t('assets.filter.new'); }, operators: ['eq'],
     useSuggestions: () => ({ options: NEW_OPTIONS, isFetching: false }),
-    validate: (v) => (v === 'true' || v === 'false' ? null : 'Pick true or false') },
-  { key: 'project', label: 'Project', operators: ['eq', 'neq', 'in', 'notIn'],
-    validate: (v) => (UUID.test(v) ? null : 'Pick a project from the list'),
+    validate: (v) => (v === 'true' || v === 'false' ? null : t('assets.filter.newInvalid')) },
+  { key: 'project', get label() { return t('assets.filter.project'); }, operators: ['eq', 'neq', 'in', 'notIn'],
+    validate: (v) => (UUID.test(v) ? null : t('assets.filter.projectInvalid')),
     useSuggestions: (s, on) => {
       const { targetIds, limit, page } = useScope(s);
       return wrap(useProjectsControllerGetMany({ targetIds, limit, page, search: s || undefined, status: 'all' },

@@ -62,6 +62,18 @@
     scrollbar-width: thin;
     scrollbar-color: var(--border) transparent;
   }
+  /*
+   * Dark mode, flat surfaces: a plain `border` draws nothing, so cards,
+   * sidebars and popovers part by their fill instead of an outline. A border
+   * with its own color (`border-input` on fields, `border-primary`,
+   * `border-border` dividers, …) still shows, and so do dashed placeholders.
+   */
+  .dark * {
+    @apply border-transparent;
+  }
+  .dark .border-dashed {
+    @apply border-border;
+  }
   html {
     @apply overflow-x-hidden;
     scroll-behavior: smooth;
@@ -167,6 +179,84 @@
   to {
     height: 0;
   }
+}
+
+/* ── Ambient page glow ──────────────────────────────────────────────────
+ * Blue light behind the top of every app page, under the see-through
+ * header, in dark mode only (light mode keeps a plain page). Same recipe as
+ * the landing site's `.page-glow--soft`.
+ * A background image of the page column (over its background color), so it
+ * adds no element and no stacking order; it scrolls away with the page.
+ */
+.dark .app-glow {
+  background-repeat: no-repeat;
+  background-size: 100% 500px;
+  background-image:
+    radial-gradient(60rem 36rem at 50% -2rem, rgb(59 130 246 / 0.22), transparent 55%),
+    radial-gradient(40rem 24rem at 15% 0%, rgb(59 130 246 / 0.1), transparent 55%),
+    radial-gradient(40rem 24rem at 85% 0%, rgb(59 130 246 / 0.1), transparent 55%);
+}
+
+/* ── Tables (dark mode) ─────────────────────────────────────────────────
+ * A table on the page sits on the card fill, so at rest it reads as one
+ * block like the cards around it; a table already inside a card keeps that
+ * card's fill instead of stacking a second one. The container's own
+ * overflow clips the rows to its rounded corners.
+ */
+.dark [data-slot='table-container']:not([data-slot='card'] *) {
+  background-color: var(--card-surface);
+  border-radius: var(--radius);
+}
+
+/* ── Table rows (dark mode) ─────────────────────────────────────────────
+ * Dividers run the full row width, and the two touching a hovered or
+ * selected row drop out, so its fill (table.tsx) reads as one clean band.
+ * Drawn as the row's background image: the row border stays, transparent,
+ * so nothing shifts. The last body row has none, as before.
+ */
+.dark [data-slot='table-row'] {
+  border-bottom-color: transparent;
+  background-image: linear-gradient(
+    color-mix(in oklab, var(--border) 60%, transparent),
+    color-mix(in oklab, var(--border) 60%, transparent)
+  );
+  background-size: 100% 1px;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+}
+.dark [data-slot='table-body'] > [data-slot='table-row']:last-child,
+.dark [data-slot='table-row']:hover,
+.dark [data-slot='table-row'][data-state='selected'],
+.dark [data-slot='table-row']:has(+ [data-slot='table-row']:hover),
+.dark [data-slot='table-row']:has(+ [data-slot='table-row'][data-state='selected']) {
+  background-image: none;
+}
+
+/* ── Markdown tables and code (dark mode) ───────────────────────────────
+ * Outlines are off in dark mode, so tables and code blocks in markdown read
+ * as blocks by the card fill instead, with no lines: our Markdown
+ * (data-markdown, components/common/markdown.tsx) and Streamdown (AI
+ * messages, data-streamdown). Unlayered, so it wins over the blocks' own
+ * bg-* and border-border utilities. Streamdown's inner code panel and its
+ * Shiki-coloured <pre> go clear so the card fill shows through.
+ */
+.dark :is(
+    [data-markdown] div:has(> table),
+    [data-markdown] [data-slot='code-block'],
+    [data-streamdown='table-wrapper'],
+    [data-streamdown='code-block']
+  ) {
+  background-color: var(--card-surface);
+  border-color: transparent;
+}
+.dark :is([data-streamdown^='table'], [data-streamdown='code-block-body']) {
+  border-color: transparent;
+}
+.dark :is(
+    [data-streamdown='code-block-body'],
+    [data-streamdown='code-block-body'] > pre
+  ) {
+  background-color: transparent;
 }
 
 /* ── Sidebar menu stack ─────────────────────────────────────────────────

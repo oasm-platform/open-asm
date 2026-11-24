@@ -1,15 +1,15 @@
+import { fromNow } from '@/lib/date-locale';
+import { useT } from '@/lib/i18n-dictionary';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { RecentAssetsSkeleton } from './dashboard-skeleton';
 import { useAssetsControllerGetHostAssets } from '@/services/apis/gen/queries';
 import { ChevronRight, Clock } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 
-dayjs.extend(relativeTime);
 
 const RecentAssets = () => {
+  const t = useT();
   const navigate = useNavigate();
   const {
     state: { selectedWorkspaceId },
@@ -38,11 +38,11 @@ const RecentAssets = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5 text-primary" />
-            Newly discovered hosts
+            {t('dashboard.recentAssets.title')}
           </CardTitle>
         </CardHeader>
         <CardContent className="flex h-full items-center justify-center text-sm text-destructive">
-          Couldn&apos;t load data
+          {t('dashboard.tls.loadFailed')}
         </CardContent>
       </Card>
     );
@@ -53,13 +53,13 @@ const RecentAssets = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Clock className="h-5 w-5 text-primary" />
-          Newly discovered hosts
+          {t('dashboard.recentAssets.title')}
         </CardTitle>
       </CardHeader>
       <CardContent className="min-h-0 flex-1">
         {recentHosts.length === 0 ? (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            No hosts discovered yet
+            {t('dashboard.recentAssets.empty')}
           </div>
         ) : (
           <div className="min-h-0 h-full space-y-0.5 overflow-y-auto pr-1">
@@ -81,7 +81,7 @@ const RecentAssets = () => {
               >
                 <span className="truncate text-sm">{host.host}</span>
                 <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                  {dayjs(host.createdAt).fromNow()}
+                  {fromNow(host.createdAt)}
                   <ChevronRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
                 </span>
               </button>

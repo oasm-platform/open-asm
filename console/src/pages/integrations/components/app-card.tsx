@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Badge } from '@/components/ui/badge';
 import {
   capabilityLabel,
@@ -14,6 +15,7 @@ interface AppCardProps {
 }
 
 export function AppCard({ appSchema, onClick, formatCategory }: AppCardProps) {
+  const t = useT();
   const multiCapability = isMultiCapabilitySchema(appSchema);
   const capabilities = getSchemaCapabilities(appSchema);
   const available = appSchema.isAvailable !== false;
@@ -23,9 +25,10 @@ export function AppCard({ appSchema, onClick, formatCategory }: AppCardProps) {
       type="button"
       disabled={!available}
       onClick={onClick}
-      className={`flex flex-col items-start gap-2 rounded-lg border p-5 text-left transition-colors ${
+      // Dark mode: the card fill, as outlines are off there (index.css)
+      className={`flex flex-col items-start gap-2 rounded-lg border p-5 text-left transition-colors dark:bg-card-surface ${
         available
-          ? 'hover:bg-accent/70 cursor-pointer'
+          ? 'hover:bg-accent/70 dark:hover:bg-accent/70 cursor-pointer'
           : 'opacity-50 cursor-not-allowed'
       }`}
     >
@@ -34,7 +37,7 @@ export function AppCard({ appSchema, onClick, formatCategory }: AppCardProps) {
           url={`/static/images/integrations/${appSchema.$id}.svg`}
         />
         <h3 className="text-base font-semibold capitalize">
-          {appSchema.title ?? 'Unknown App'}
+          {appSchema.title ?? t('integrations.app.unknown')}
         </h3>
         {capabilities.map((capability) => (
           <Badge key={capability} variant="secondary">
@@ -47,7 +50,7 @@ export function AppCard({ appSchema, onClick, formatCategory }: AppCardProps) {
         ))}
         {!available && (
           <Badge className="hidden 2xl:block" variant="outline">
-            Coming soon
+            {t('integrations.app.comingSoon')}
           </Badge>
         )}
       </div>

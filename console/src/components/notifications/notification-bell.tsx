@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -22,6 +23,7 @@ import { patchNotificationPages } from './notification-cache';
 import { NotificationList } from './notification-list';
 
 export function NotificationBell() {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
   const { data: unreadCountData } = useNotificationsControllerGetUnreadCount();
@@ -89,7 +91,7 @@ export function NotificationBell() {
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
-        <span className="sr-only">Toggle notifications</span>
+        <span className="sr-only">{t('components.notifications.toggle')}</span>
       </Button>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent
@@ -99,13 +101,15 @@ export function NotificationBell() {
             'inset-y-0 right-0 fixed',
           )}
         >
-          <SheetTitle className="sr-only">Notifications</SheetTitle>
+          <SheetTitle className="sr-only">
+            {t('ui.notifications.title')}
+          </SheetTitle>
           <SheetDescription className="sr-only">
-            Notification panel
+            {t('components.notifications.panel')}
           </SheetDescription>
           {/* pr-12 leaves room for the sheet's absolutely-positioned close button. */}
           <div className="flex items-center justify-between border-b py-3 pl-4 pr-12">
-            <h4 className="font-semibold">Notifications</h4>
+            <h4 className="font-semibold">{t('ui.notifications.title')}</h4>
             <Button
               variant="ghost"
               size="sm"
@@ -118,7 +122,7 @@ export function NotificationBell() {
               ) : (
                 <CheckCheck className="h-3.5 w-3.5" />
               )}
-              Mark all as read
+              {t('ui.notifications.markAllRead')}
             </Button>
           </div>
           <ScrollArea className="flex-1 min-h-0">

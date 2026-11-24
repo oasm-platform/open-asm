@@ -26,6 +26,7 @@ import {
   useState,
 } from 'react';
 import { Streamdown } from 'streamdown';
+import { useT } from '@/lib/i18n-dictionary';
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage['role'];
@@ -70,6 +71,7 @@ export const MessageContent = ({
   expandable = false,
   ...props
 }: MessageContentProps) => {
+  const t = useT();
   const contentRef = useRef<HTMLDivElement>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [needsExpansion, setNeedsExpansion] = useState(false);
@@ -114,7 +116,7 @@ export const MessageContent = ({
             onClick={() => setIsExpanded(true)}
             className="h-7 rounded-full text-xs shadow-sm"
           >
-            Show more
+            {t('agents.ai.showMore')}
           </Button>
         </div>
       )}
@@ -126,7 +128,7 @@ export const MessageContent = ({
             onClick={() => setIsExpanded(false)}
             className="h-7 rounded-full text-xs text-muted-foreground"
           >
-            Show less
+            {t('agents.ai.showLess')}
           </Button>
         </div>
       )}
@@ -327,11 +329,12 @@ export const MessageBranchPrevious = ({
   children,
   ...props
 }: MessageBranchPreviousProps) => {
+  const t = useT();
   const { goToPrevious, totalBranches } = useMessageBranch();
 
   return (
     <Button
-      aria-label="Previous branch"
+      aria-label={t('agents.ai.previousBranch')}
       disabled={totalBranches <= 1}
       onClick={goToPrevious}
       size="icon-sm"
@@ -350,11 +353,12 @@ export const MessageBranchNext = ({
   children,
   ...props
 }: MessageBranchNextProps) => {
+  const t = useT();
   const { goToNext, totalBranches } = useMessageBranch();
 
   return (
     <Button
-      aria-label="Next branch"
+      aria-label={t('agents.ai.nextBranch')}
       disabled={totalBranches <= 1}
       onClick={goToNext}
       size="icon-sm"

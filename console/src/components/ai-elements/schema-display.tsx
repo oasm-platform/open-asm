@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { ChevronRightIcon } from 'lucide-react';
 import type { ComponentProps, HTMLAttributes } from 'react';
 import { createContext, useContext, useMemo } from 'react';
+import { useT } from '@/lib/i18n-dictionary';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -201,13 +202,14 @@ export const SchemaDisplayParameters = ({
   children,
   ...props
 }: SchemaDisplayParametersProps) => {
+  const t = useT();
   const { parameters } = useContext(SchemaDisplayContext);
 
   return (
     <Collapsible className={cn(className)} defaultOpen {...props}>
       <CollapsibleTrigger className="group flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-muted/50">
         <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
-        <span className="font-medium text-sm">Parameters</span>
+        <span className="font-medium text-sm">{t('agents.ai.schema.parameters')}</span>
         <Badge className="ml-auto text-xs" variant="secondary">
           {parameters?.length}
         </Badge>
@@ -333,13 +335,14 @@ export const SchemaDisplayRequest = ({
   children,
   ...props
 }: SchemaDisplayRequestProps) => {
+  const t = useT();
   const { requestBody } = useContext(SchemaDisplayContext);
 
   return (
     <Collapsible className={cn(className)} defaultOpen {...props}>
       <CollapsibleTrigger className="group flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-muted/50">
         <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
-        <span className="font-medium text-sm">Request Body</span>
+        <span className="font-medium text-sm">{t('agents.ai.schema.requestBody')}</span>
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="border-t">
@@ -360,13 +363,14 @@ export const SchemaDisplayResponse = ({
   children,
   ...props
 }: SchemaDisplayResponseProps) => {
+  const t = useT();
   const { responseBody } = useContext(SchemaDisplayContext);
 
   return (
     <Collapsible className={cn(className)} defaultOpen {...props}>
       <CollapsibleTrigger className="group flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-muted/50">
         <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
-        <span className="font-medium text-sm">Response</span>
+        <span className="font-medium text-sm">{t('agents.ai.schema.response')}</span>
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="border-t">

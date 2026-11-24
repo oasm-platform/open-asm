@@ -17,10 +17,11 @@ import { WorkerDetailSkeleton } from './detail-worker-skeleton';
 import { WorkerStatus } from './worker-status';
 import { WorkerToolsGraph } from './components/worker-tools-graph';
 import { WorkerTelemetry } from './components/worker-telemetry';
+import { t, useT } from '@/lib/i18n-dictionary';
 
 /** `built_in` -> `Built-in`, `cli` -> `CLI`, otherwise capitalize the raw value. */
 function formatType(type: string) {
-  if (type === 'built_in') return 'Built-in';
+  if (type === 'built_in') return t('workers.type.builtIn');
   if (type === 'cli') return 'CLI';
   return type.charAt(0).toUpperCase() + type.slice(1);
 }
@@ -33,6 +34,7 @@ function formatLocation(location: WorkerLocationDto) {
 }
 
 export default function WorkerDetail() {
+  const t = useT();
   const { id } = useParams({ strict: false });
 
   const {
@@ -57,7 +59,7 @@ export default function WorkerDetail() {
       <Page permission="worker.read">
         <div className="flex h-full items-center justify-center">
           <div className="text-lg text-red-500">
-            Error loading worker details
+            {t('workers.detail.loadError')}
           </div>
         </div>
       </Page>
@@ -85,7 +87,7 @@ export default function WorkerDetail() {
       <div className="min-w-0 flex-1 space-y-2">
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
           <h1 className="truncate text-xl font-semibold tracking-tight">
-            {worker.name || 'Unnamed worker'}
+            {worker.name || t('workers.detail.unnamed')}
           </h1>
           <div className="flex items-center gap-2 text-muted-foreground">
             <WorkerStatus worker={worker} />
@@ -112,7 +114,7 @@ export default function WorkerDetail() {
               className="gap-1 border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
             >
               <CircleDot className="size-3" />
-              Agent mode
+              {t('workers.detail.agentMode')}
             </Badge>
           )}
         </div>
@@ -151,7 +153,7 @@ export default function WorkerDetail() {
   );
 
   return (
-    <Page permission="worker.read">
+    <Page permission="worker.read" documentTitle={worker.name || undefined}>
       <div className="space-y-6">
         <WorkerTelemetry
           telemetry={worker.telemetry}

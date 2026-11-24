@@ -9,6 +9,7 @@ import type { ConnectFormData } from './schema';
 import { rowKey } from './schema';
 import { ConnectedConfigRow } from './connected-config-row';
 import { DialogLLMConnect } from './dialog-llm-connect';
+import { useT } from '@/lib/i18n-dictionary';
 
 function usePendingIds() {
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
@@ -38,6 +39,7 @@ function usePendingIds() {
 }
 
 export default function LlmConnect() {
+  const t = useT();
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const { addPending, removePending, isPending } = usePendingIds();
 
@@ -60,14 +62,14 @@ export default function LlmConnect() {
       try {
         await setPreferredConfig.mutateAsync({ id: configId });
         invalidate();
-        toast.success('Default model updated');
+        toast.success(t('agents.llm.defaultUpdated'));
       } catch {
-        toast.error('Failed to set default model');
+        toast.error(t('agents.llm.defaultFailed'));
       } finally {
         removePending(configId);
       }
     },
-    [setPreferredConfig, invalidate, addPending, removePending],
+    [setPreferredConfig, invalidate, addPending, removePending, t],
   );
 
   const handleModelChange = useCallback(
@@ -79,14 +81,14 @@ export default function LlmConnect() {
           data: { model: modelId },
         });
         invalidate();
-        toast.success('Model updated');
+        toast.success(t('agents.llm.modelUpdated'));
       } catch {
-        toast.error('Failed to update model');
+        toast.error(t('agents.llm.modelFailed'));
       } finally {
         removePending(configId);
       }
     },
-    [updateConfig, invalidate, addPending, removePending],
+    [updateConfig, invalidate, addPending, removePending, t],
   );
 
   const handleConnect = useCallback(
@@ -105,19 +107,19 @@ export default function LlmConnect() {
           },
         });
         invalidate();
-        toast.success('Provider connected successfully');
+        toast.success(t('agents.provider.connected'));
         return true;
       } catch (err) {
         const axiosError = err as AxiosError<{ message: string | string[] }>;
         const raw = axiosError.response?.data?.message;
         const message = Array.isArray(raw)
           ? raw.join(', ')
-          : (raw ?? 'Failed to connect provider');
+          : (raw ?? t('agents.provider.connectFailed'));
         toast.error(message);
         return false;
       }
     },
-    [createConfig, invalidate],
+    [createConfig, invalidate, t],
   );
 
   const handleDelete = useCallback(
@@ -125,22 +127,22 @@ export default function LlmConnect() {
       addPending(configId);
       try {
         await deleteConfig.mutateAsync({ id: configId });
-        toast.success('Disconnected successfully');
+        toast.success(t('agents.llm.disconnected'));
         invalidate();
         setExpandedKey(null);
       } catch {
-        toast.error('Failed to disconnect');
+        toast.error(t('agents.llm.disconnectFailed'));
       } finally {
         removePending(configId);
       }
     },
-    [deleteConfig, invalidate, addPending, removePending],
+    [deleteConfig, invalidate, addPending, removePending, t],
   );
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <div className="text-sm text-muted-foreground">Loading...</div>
+        <div className="text-sm text-muted-foreground">{t('common.loading')}</div>
       </div>
     );
   }
@@ -148,13 +150,15 @@ export default function LlmConnect() {
   if (isError) {
     return (
       <div className="flex flex-col items-center justify-center py-8 gap-3">
-        <div className="text-sm text-destructive">Failed to load providers</div>
+        <div className="text-sm text-destructive">
+          {t('agents.llm.loadFailed')}
+        </div>
         <button
           type="button"
           className="text-sm text-primary underline hover:no-underline"
           onClick={() => refetch()}
         >
-          Retry
+          {t('agents.llm.retry')}
         </button>
       </div>
     );

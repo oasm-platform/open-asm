@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { ComponentProps, ReactNode } from "react";
+import { useT, t } from '@/lib/i18n-dictionary';
 
 export type ModelSelectorProps = ComponentProps<typeof Dialog>;
 
@@ -37,23 +38,26 @@ export type ModelSelectorContentProps = ComponentProps<typeof DialogContent> & {
 export const ModelSelectorContent = ({
   className,
   children,
-  title = "Model Selector",
+  title = t('agents.ai.modelSelector'),
   ...props
-}: ModelSelectorContentProps) => (
-  <DialogContent
-    aria-describedby={undefined}
-    className={cn(
-      "outline! border-none! p-0 outline-border! outline-solid!",
-      className
-    )}
-    {...props}
-  >
-    <DialogTitle className="sr-only">{title}</DialogTitle>
-    <Command className="**:data-[slot=command-input-wrapper]:h-auto">
-      {children}
-    </Command>
-  </DialogContent>
-);
+}: ModelSelectorContentProps) => {
+  useT(); // re-render on language change
+  return (
+    <DialogContent
+      aria-describedby={undefined}
+      className={cn(
+        "outline! border-none! p-0 outline-border! outline-solid!",
+        className
+      )}
+      {...props}
+    >
+      <DialogTitle className="sr-only">{title}</DialogTitle>
+      <Command className="**:data-[slot=command-input-wrapper]:h-auto">
+        {children}
+      </Command>
+    </DialogContent>
+  );
+};
 
 export type ModelSelectorDialogProps = ComponentProps<typeof CommandDialog>;
 

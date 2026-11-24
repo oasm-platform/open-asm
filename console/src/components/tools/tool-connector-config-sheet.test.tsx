@@ -24,7 +24,7 @@ const h = vi.hoisted(() => ({
         type: 'integer',
       },
       severity: {
-        default: ['high', 'critical'],
+        default: ['info', 'low', 'medium', 'high', 'critical'],
         description: 'Only report findings at the selected severity levels.',
         items: {
           enum: ['info', 'low', 'medium', 'high', 'critical'],
@@ -32,6 +32,20 @@ const h = vi.hoisted(() => ({
         },
         title: 'Severity levels',
         type: 'array',
+      },
+      interactsh: {
+        default: true,
+        description: 'Detect blind/OOB vulnerabilities via a public interactsh server.',
+        title: 'Out-of-band detection (Interactsh)',
+        type: 'boolean',
+      },
+      excludeTags: {
+        description: 'Skip templates that match these tags.',
+        examples: [['dos', 'fuzz']],
+        items: { type: 'string' },
+        title: 'Excluded tags',
+        type: 'array',
+        'ui:placeholder': 'e.g. dos, fuzz',
       },
       tags: {
         description: 'Only run templates matching these tags.',
@@ -51,6 +65,7 @@ const h = vi.hoisted(() => ({
       },
     },
   },
+  createProfile: vi.fn(),
 }));
 
 vi.mock('@/hooks/use-tool-schema', () => ({
@@ -65,7 +80,7 @@ vi.mock('@/services/apis/gen/queries', async (importOriginal) => {
   return {
     ...actual,
     useToolConfigProfilesControllerCreate: () => ({
-      mutate: vi.fn(),
+      mutate: h.createProfile,
       isPending: false,
     }),
     useToolConfigProfilesControllerUpdate: () => ({
@@ -88,7 +103,7 @@ beforeAll(() => {
 });
 
 describe('ToolConnectorConfigSheet preset hints (end-to-end)', () => {
-  it('renders Suggestion/placeholder for empty array fields from the manifest schema', () => {
+  it('shows examples as placeholders only, with no suggestion to apply them', () => {
     const queryClient = new QueryClient();
     render(
       <QueryClientProvider client={queryClient}>
@@ -100,18 +115,12 @@ describe('ToolConnectorConfigSheet preset hints (end-to-end)', () => {
       </QueryClientProvider>,
     );
 
-    // Array fields without defaults get placeholder + Suggestion + Apply.
+    // Filter fields show their examples as placeholders. Applying them would
+    // make nuclei run only those templates, so they are never suggested.
     expect(screen.getByPlaceholderText('e.g. cve, rce')).toBeTruthy();
-    expect(screen.getByText(/Suggestion: cve, rce/)).toBeTruthy();
     expect(screen.getByPlaceholderText('e.g. CVE-2024-12345')).toBeTruthy();
-    expect(
-      screen.getByText(/Suggestion: CVE-2024-12345, wordpress-rce/),
-    ).toBeTruthy();
-
-    // Defaulted fields (rateLimit/concurrency/severity) show no suggestion.
-    expect(screen.queryByText(/Suggestion: 150/)).toBeNull();
-    expect(screen.queryByText(/Suggestion: 25/)).toBeNull();
-    expect(screen.queryByText(/Suggestion: high, critical/)).toBeNull();
+    // Defaulted fields start at their default, so nothing is suggested at all.
+    expect(screen.queryByText(/Suggestion:/)).toBeNull();
   });
 
   it('renders the tool logo in the header when logoUrl is present', () => {
@@ -138,8 +147,9 @@ describe('ToolConnectorConfigSheet preset hints (end-to-end)', () => {
     expect(img?.getAttribute('src')).toBe('/api/connectors/nuclei.png');
   });
 
-  it('Apply all presets fills empty fields, leaves defaults and secrets untouched', async () => {
+  it('default presets save the nuclei defaults with no template filter', async () => {
     const user = userEvent.setup();
+    h.createProfile.mockClear();
     const queryClient = new QueryClient();
     render(
       <QueryClientProvider client={queryClient}>
@@ -152,18 +162,22 @@ describe('ToolConnectorConfigSheet preset hints (end-to-end)', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Use default presets' }));
+    await user.type(screen.getByLabelText(/Profile name/), 'default');
+    await user.click(screen.getByRole('button', { name: 'Create' }));
 
-    const inputs = screen.getAllByRole('textbox');
-    const named = Object.fromEntries(
-      inputs.map((i) => [
-        (i as HTMLInputElement).name,
-        (i as HTMLInputElement).value,
-      ]),
-    );
-    expect(named['tags[0]']).toBe('cve');
-    expect(named['tags[1]']).toBe('rce');
-    expect(named['templateIds[0]']).toBe('CVE-2024-12345');
-    expect(named['templateIds[1]']).toBe('wordpress-rce');
+    expect(h.createProfile).toHaveBeenCalledTimes(1);
+    const { config } = h.createProfile.mock.calls[0][0].data;
+    expect(config).toMatchObject({
+      severity: ['info', 'low', 'medium', 'high', 'critical'],
+      interactsh: true,
+      rateLimit: 150,
+      concurrency: 25,
+    });
+    // An empty filter means "run every template", which is what nuclei does
+    // with no config. Example values here would select templates that don't exist.
+    expect(config.tags ?? []).toEqual([]);
+    expect(config.excludeTags ?? []).toEqual([]);
+    expect(config.templateIds ?? []).toEqual([]);
   });
 });
 describe('ToolConnectorConfigSheet dismiss', () => {

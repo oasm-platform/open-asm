@@ -16,7 +16,6 @@ import { Reflector } from '@nestjs/core';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
-import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
 import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
 import { IntegrationConfigReader } from '../integrations/integration-config.reader';
 import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
@@ -374,6 +373,49 @@ describe('JobsRegistryController', () => {
       );
     });
 
+    it('resolves a config the whole batch shares once, and each different one apart', async () => {
+      // Given: three jobs of one step and one job on another profile
+      useNessusConnector();
+      mockJobsRegistryService.getNextJobs.mockResolvedValue([
+        connectorJob({ id: 'job-1', configProfileId: 'profile-a' }),
+        connectorJob({ id: 'job-2', configProfileId: 'profile-a' }),
+        connectorJob({ id: 'job-3', configProfileId: 'profile-a' }),
+        connectorJob({ id: 'job-4', configProfileId: 'profile-b' }),
+      ]);
+      mockToolConfigProfilesService.resolveConfigForJob.mockImplementation(
+        (_ws: string, _tool: string, { configProfileId }: { configProfileId?: string }) =>
+          Promise.resolve({ apiKey: `key-${configProfileId}` }),
+      );
+
+      // When
+      const { values } = await grpc.nextBatch({ id: 'worker-1', limit: 4 }, metadata);
+
+      // Then: one decrypt per distinct config, every job still gets its own
+      expect(mockToolConfigProfilesService.resolveConfigForJob).toHaveBeenCalledTimes(2);
+      expect(values.map((job) => JSON.stringify(job.config))).toEqual([
+        expect.stringContaining('key-profile-a'),
+        expect.stringContaining('key-profile-a'),
+        expect.stringContaining('key-profile-a'),
+        expect.stringContaining('key-profile-b'),
+      ]);
+    });
+
+    it('resolves the config again on the next claim', async () => {
+      // Given: the same job shape claimed twice
+      useNessusConnector();
+      mockJobsRegistryService.getNextJobs.mockResolvedValue([
+        connectorJob({ id: 'job-1', configProfileId: 'profile-a' }),
+      ]);
+      mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({ apiKey: 'k' });
+
+      // When
+      await grpc.nextBatch({ id: 'worker-1', limit: 1 }, metadata);
+      await grpc.nextBatch({ id: 'worker-1', limit: 1 }, metadata);
+
+      // Then: decrypted values never outlive the call that needed them
+      expect(mockToolConfigProfilesService.resolveConfigForJob).toHaveBeenCalledTimes(2);
+    });
+
     it('fails a claimed job the worker may not receive the secrets of, without decrypting them', async () => {
       useNessusConnector();
       mockJobsRegistryService.getNextJobs.mockResolvedValue([
@@ -397,7 +439,8 @@ describe('JobsRegistryController', () => {
       ).toHaveBeenCalledTimes(1);
     });
 
-    it('records which secret fields were released to which worker', async () => {
+    it('hands secrets to the worker without writing an audit event per job', async () => {
+      // Given: a connector job whose config carries a secret
       useNessusConnector();
       mockJobsRegistryService.getNextJob.mockResolvedValue(connectorJob());
       mockToolConfigProfilesService.resolveConfigForJob.mockResolvedValue({
@@ -405,20 +448,13 @@ describe('JobsRegistryController', () => {
         rate: 5,
       });
 
-      await grpc.next({ id: 'worker-1' }, metadata);
+      // When
+      const job = await grpc.next({ id: 'worker-1' }, metadata);
 
-      expect(eventBridge.publishSafely).toHaveBeenCalledWith(
-        EVENT_CATALOG.job.secrets.released,
-        expect.objectContaining({
-          workspaceId: 'ws-1',
-          resourceType: 'job',
-          resourceId: 'job-9',
-          metadata: { workerId: 'worker-1', fields: ['apiKey'] },
-        }),
-        expect.anything(),
-      );
-      const [, data] = eventBridge.publishSafely.mock.calls[0];
-      expect(JSON.stringify(data)).not.toContain('nessus-key');
+      // Then: the job is dispatched with its config, and nothing is published
+      expect(job.id).toBe('job-9');
+      expect(JSON.stringify(job)).toContain('nessus-key');
+      expect(eventBridge.publishSafely).not.toHaveBeenCalled();
     });
 
     it('seals the config and repository token to a worker that registered a key, sending neither in the clear', async () => {

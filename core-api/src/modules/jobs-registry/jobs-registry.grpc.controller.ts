@@ -1,17 +1,10 @@
-import {
-  AuditActorType,
-  AuditOutcome,
-  Severity,
-  ToolCategory,
-} from '@/common/enums/enum';
+import { Severity, ToolCategory } from '@/common/enums/enum';
 import { GrpcWorkerContext } from '@/common/guards/grpc-worker-context.service';
 import { GrpcWorkerTokenGuard } from '@/common/guards/grpc-worker-token.guard';
 import { Body, Controller, Logger, UseGuards } from '@nestjs/common';
 import type { Metadata } from '@grpc/grpc-js';
 import { GrpcMethod } from '@nestjs/microservices';
 import { plainToInstance } from 'class-transformer';
-import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
-import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
 import { Asset } from '../assets/entities/assets.entity';
 import { DiscoveredUrl } from '../assets/entities/discovered-url.entity';
 import { HttpResponse } from '../assets/entities/http-response.entity';
@@ -19,7 +12,6 @@ import { Vulnerability } from '../vulnerabilities/entities/vulnerability.entity'
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { IntegrationConfigReader } from '../integrations/integration-config.reader';
 import { ToolConfigProfilesService } from '../tools/tool-config-profiles.service';
-import { getSensitiveFields } from '../tools/validators/tool-config-profiles.crypto';
 import { WorkerInstance } from '../workers/entities/worker.entity';
 import { secretReleaseDenial } from './job-secret-release.policy';
 import { sealJobSecrets } from './job-secret-sealer';
@@ -71,6 +63,9 @@ function packStructFields(record: Record<string, unknown>): Record<string, Recor
 
 const VALID_SEVERITIES = new Set<string>(Object.values(Severity));
 
+/** Decrypted job configs of one claim, keyed by what decides them. */
+type ResolvedConfigs = Map<string, Promise<Record<string, unknown> | undefined>>;
+
 /**
  * The gRPC loader is configured with `enums: String`, so the worker delivers
  * severity as the proto enum NAME (e.g. "HIGH"). Normalize it to the domain's
@@ -98,7 +93,6 @@ export class JobsRegistryGrpcController {
     private readonly toolConfigProfilesService: ToolConfigProfilesService,
     private readonly integrationConfig: IntegrationConfigReader,
     private readonly grpcWorkerContext: GrpcWorkerContext,
-    private readonly eventBridge: EventBridgeService,
     private readonly jobDispatch: JobDispatchService,
   ) {}
 
@@ -138,40 +132,14 @@ export class JobsRegistryGrpcController {
       Number(request.limit) || 1,
     );
 
+    // Jobs of one step share their config: resolve (and decrypt) each
+    // distinct one once for this call, never beyond it.
+    const configs: ResolvedConfigs = new Map();
     const mapped = await Promise.all(
-      jobs.map((job) => this.mapJobToGrpcJob(job, worker)),
+      jobs.map((job) => this.mapJobToGrpcJob(job, worker, configs)),
     );
 
     return { values: mapped.filter((job) => job !== null) };
-  }
-
-  /**
-   * Audits a dispatch that hands the worker credentials: which fields, never
-   * their values. A job without secrets records nothing.
-   */
-  private async recordSecretRelease(
-    job: GetNextJobResult,
-    worker: WorkerInstance,
-    sensitiveFields: string[],
-    config: Record<string, unknown> | undefined,
-    inputs: Record<string, string>,
-  ): Promise<void> {
-    const fields = sensitiveFields.filter((field) => config?.[field]);
-    if (inputs.token) fields.push('inputs.token');
-    if (fields.length === 0 || !job.workspaceId) return;
-
-    await this.eventBridge.publishSafely(
-      EVENT_CATALOG.job.secrets.released,
-      {
-        workspaceId: job.workspaceId,
-        actor: { type: AuditActorType.System, id: worker.id, name: worker.name },
-        outcome: AuditOutcome.Success,
-        resourceType: 'job',
-        resourceId: job.id,
-        metadata: { workerId: worker.id, fields },
-      },
-      { subject: `workspace:${job.workspaceId}/job:${job.id}` },
-    );
   }
 
   /**
@@ -225,9 +193,37 @@ export class JobsRegistryGrpcController {
    * `NextBatch` so the two paths can never drift apart. Null when the job's
    * secrets may not go to this worker: the job is failed instead.
    */
+  /**
+   * The job's decrypted config, shared with the jobs of the same call that
+   * have the same workspace, tool, profile and stored config. The result is
+   * only read (packed or sealed), so sharing it is safe.
+   */
+  private resolveConfig(
+    job: GetNextJobResult,
+    configs: ResolvedConfigs,
+  ): Promise<Record<string, unknown> | undefined> {
+    const key = JSON.stringify([
+      job.workspaceId,
+      job.tool!.id,
+      job.configProfileId ?? null,
+      job.config ?? null,
+    ]);
+    let resolved = configs.get(key);
+    if (!resolved) {
+      resolved = this.toolConfigProfilesService.resolveConfigForJob(
+        job.workspaceId!,
+        job.tool!.id,
+        { config: job.config ?? undefined, configProfileId: job.configProfileId },
+      );
+      configs.set(key, resolved);
+    }
+    return resolved;
+  }
+
   private async mapJobToGrpcJob(
     job: GetNextJobResult,
     worker: WorkerInstance,
+    configs: ResolvedConfigs = new Map(),
   ): Promise<Record<string, unknown> | null> {
     // Connector path: tool metadata present → look up registry
     const connectorEntry = job.tool
@@ -249,12 +245,7 @@ export class JobsRegistryGrpcController {
 
       let config: Record<string, unknown> | undefined;
       try {
-        config =
-          await this.toolConfigProfilesService.resolveConfigForJob(
-            job.workspaceId!,
-            job.tool!.id,
-            { config: job.config ?? undefined, configProfileId: job.configProfileId },
-          );
+        config = await this.resolveConfig(job, configs);
       } catch {
         // Never log decrypted payload — generic message only
         this.logger.warn('profile decrypt failed');
@@ -266,13 +257,6 @@ export class JobsRegistryGrpcController {
         job.tool!.name,
       );
       const inputs = await this.resolveConnectorInputs(job);
-      await this.recordSecretRelease(
-        job,
-        worker,
-        getSensitiveFields(connectorEntry.configSchema),
-        config,
-        inputs,
-      );
 
       const response: Record<string, unknown> = {
         id: job.id,

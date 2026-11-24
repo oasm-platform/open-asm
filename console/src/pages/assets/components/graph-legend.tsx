@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { NODE_TYPE_COLORS, type NodeType } from './graph-types';
 
 interface LegendTarget {
@@ -11,33 +12,35 @@ interface GraphLegendProps {
 
 const NODE_TYPES: NodeType[] = ['target', 'asset', 'ip', 'service'];
 
+// Label keys resolved at render so a language switch applies.
 const EDGE_ROWS: Array<{ label: string; type: string; note: string }> = [
-  { label: 'Domain family', type: 'belongs_to', note: 'target → domain' },
-  { label: 'Domain → IP', type: 'resolves_to', note: '' },
-  { label: 'Domain → service', type: 'runs_on', note: 'click to load' },
+  { label: 'assets.graph.legend.edgeFamily', type: 'belongs_to', note: 'assets.graph.legend.edgeFamilyNote' },
+  { label: 'assets.graph.legend.edgeIp', type: 'resolves_to', note: '' },
+  { label: 'assets.graph.legend.edgeService', type: 'runs_on', note: 'assets.graph.legend.edgeServiceNote' },
 ];
 
 const SEVERITY_ROWS = [
-  { color: 'bg-warning', text: '4xx — warning ring' },
-  { color: 'bg-destructive', text: '5xx — danger ring + glow' },
+  { color: 'bg-warning', text: 'assets.graph.legend.severity4xx' },
+  { color: 'bg-destructive', text: 'assets.graph.legend.severity5xx' },
 ];
 
 /** Collapsible-free legend: swatches for targets, node types, edges, severity. */
 export function GraphLegend({ targets }: GraphLegendProps) {
+  const t = useT();
   return (
     <div className="flex w-64 flex-col gap-3 rounded-md border bg-popover/95 p-3 text-xs shadow-md">
       {targets.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <span className="font-semibold uppercase tracking-wide text-[10px] text-muted-foreground">
-            Targets
+            {t('assets.graph.legend.targets')}
           </span>
-          {targets.map((t) => (
-            <div key={t.label} className="flex items-center gap-2">
+          {targets.map((target) => (
+            <div key={target.label} className="flex items-center gap-2">
               <span
                 className="h-2.5 w-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: t.color }}
+                style={{ backgroundColor: target.color }}
               />
-              <span className="truncate">{t.label}</span>
+              <span className="truncate">{target.label}</span>
             </div>
           ))}
         </div>
@@ -45,22 +48,22 @@ export function GraphLegend({ targets }: GraphLegendProps) {
 
       <div className="flex flex-col gap-1.5">
         <span className="font-semibold uppercase tracking-wide text-[10px] text-muted-foreground">
-          Node Types
+          {t('assets.graph.legend.nodeTypes')}
         </span>
-        {NODE_TYPES.map((t) => (
-          <div key={t} className="flex items-center gap-2">
+        {NODE_TYPES.map((type) => (
+          <div key={type} className="flex items-center gap-2">
             <span
               className="h-2.5 w-2.5 shrink-0 rounded-full"
-              style={{ backgroundColor: NODE_TYPE_COLORS[t] }}
+              style={{ backgroundColor: NODE_TYPE_COLORS[type] }}
             />
-            <span className="capitalize">{t}</span>
+            <span className="capitalize">{t(`assets.graph.nodeType.${type}`)}</span>
           </div>
         ))}
       </div>
 
       <div className="flex flex-col gap-1.5">
         <span className="font-semibold uppercase tracking-wide text-[10px] text-muted-foreground">
-          Edges
+          {t('assets.graph.legend.edges')}
         </span>
         {EDGE_ROWS.map((e) => (
           <div key={e.label} className="flex items-center gap-2">
@@ -74,10 +77,10 @@ export function GraphLegend({ targets }: GraphLegendProps) {
                 strokeWidth="1.5"
               />
             </svg>
-            <span>{e.label}</span>
+            <span>{t(e.label)}</span>
             {e.note && (
               <span className="ml-auto text-[10px] text-muted-foreground">
-                {e.note}
+                {t(e.note)}
               </span>
             )}
           </div>
@@ -86,12 +89,12 @@ export function GraphLegend({ targets }: GraphLegendProps) {
 
       <div className="flex flex-col gap-1.5">
         <span className="font-semibold uppercase tracking-wide text-[10px] text-muted-foreground">
-          Service Status
+          {t('assets.graph.legend.serviceStatus')}
         </span>
         {SEVERITY_ROWS.map((s) => (
           <div key={s.text} className="flex items-center gap-2">
             <span className={`size-2.5 shrink-0 rounded-full ${s.color}`} />
-            <span>{s.text}</span>
+            <span>{t(s.text)}</span>
           </div>
         ))}
       </div>

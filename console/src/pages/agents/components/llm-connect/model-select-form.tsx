@@ -15,6 +15,7 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useT } from '@/lib/i18n-dictionary';
 
 export function ModelSelectForm({
   provider,
@@ -29,6 +30,7 @@ export function ModelSelectForm({
   onSetPreferred: (configId: string) => void;
   isUpdating: boolean;
 }) {
+  const t = useT();
   const configId = provider.configId ?? '';
   const [selectOpen, setSelectOpen] = useState(false);
   const { data: models, isLoading } = useAgentsControllerGetProviderModels<
@@ -49,7 +51,7 @@ export function ModelSelectForm({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-foreground">Model</label>
+        <label className="text-sm font-medium text-foreground">{t('agents.llm.model')}</label>
         <Popover open={selectOpen} onOpenChange={setSelectOpen}>
           <PopoverTrigger asChild>
             <button
@@ -58,17 +60,21 @@ export function ModelSelectForm({
             >
               <span className="truncate">
                 {currentModel ||
-                  (isLoading ? 'Loading models...' : 'Select a model')}
+                  (isLoading
+                    ? t('agents.llm.loadingModels')
+                    : t('agents.llm.selectModel'))}
               </span>
               <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
             </button>
           </PopoverTrigger>
           <PopoverContent className="p-0" align="start" sideOffset={4}>
             <Command>
-              <CommandInput placeholder="Search models..." />
+              <CommandInput placeholder={t('agents.llm.searchModels')} />
               <CommandList className="max-h-[320px]">
                 <CommandEmpty>
-                  {isLoading ? 'Loading models...' : 'No models found'}
+                  {isLoading
+                    ? t('agents.llm.loadingModels')
+                    : t('agents.llm.noModels')}
                 </CommandEmpty>
                 {modelList.map((model) => (
                   <CommandItem
@@ -109,7 +115,9 @@ export function ModelSelectForm({
                 : 'text-muted-foreground'
             }
           />
-          {provider.isPreferred ? 'Default' : 'Set as Default'}
+          {provider.isPreferred
+            ? t('agents.llm.default')
+            : t('agents.llm.setDefault')}
         </Button>
         <Button
           type="button"
@@ -120,7 +128,7 @@ export function ModelSelectForm({
           className="gap-2"
         >
           <Unplug size={16} />
-          Disconnect
+          {t('agents.llm.disconnect')}
         </Button>
       </div>
     </div>

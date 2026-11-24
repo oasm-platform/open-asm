@@ -1,3 +1,4 @@
+import { formatDate } from '@/lib/date-locale';
 import { ToolLogo } from '@/components/ui/tool-logo';
 import {
   Tooltip,
@@ -6,6 +7,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useTheme } from '@/components/ui/theme-provider';
+import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import type { WorkflowStepStatusDto } from '@/services/apis/gen/queries';
 import {
@@ -22,7 +24,6 @@ import {
   type NodeTypes,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import dayjs from 'dayjs';
 import {
   CalendarClock,
   CircleAlert,
@@ -57,45 +58,46 @@ import { formatCategory } from '@/pages/tools/components/format-category';
 const STATUS_META: Record<
   string,
   {
-    label: string;
+    /** Dictionary key, resolved at render. */
+    labelKey: string;
     icon: React.ReactNode;
     text: string;
     border: string;
   }
 > = {
   pending: {
-    label: 'waiting',
+    labelKey: 'jobsRegistry.graph.status.waiting',
     icon: <CircleDashed className="size-5" />,
     text: 'text-yellow-600 dark:text-yellow-500',
     border: 'border-border',
   },
   // Jobs created, none picked up by a worker yet.
   queued: {
-    label: 'queued',
+    labelKey: 'jobsRegistry.graph.status.queued',
     icon: <Clock className="size-5" />,
     text: 'text-yellow-600 dark:text-yellow-500',
     border: 'border-yellow-500/50',
   },
   dispatched: {
-    label: 'running',
+    labelKey: 'jobsRegistry.graph.status.running',
     icon: <Loader2 className="size-5 animate-spin" />,
     text: 'text-purple-600 dark:text-purple-400',
     border: 'border-purple-500/60',
   },
   done: {
-    label: 'done',
+    labelKey: 'jobsRegistry.graph.status.done',
     icon: <CircleCheck className="size-5" />,
     text: 'text-green-600 dark:text-green-500',
     border: 'border-green-500/40',
   },
   failed: {
-    label: 'failed',
+    labelKey: 'jobsRegistry.graph.status.failed',
     icon: <CircleAlert className="size-5" />,
     text: 'text-red-600 dark:text-red-500',
     border: 'border-red-500/60',
   },
   skipped: {
-    label: 'skipped',
+    labelKey: 'jobsRegistry.graph.status.skipped',
     icon: <MinusCircle className="size-5" />,
     text: 'text-muted-foreground',
     border: 'border-border',
@@ -103,10 +105,10 @@ const STATUS_META: Record<
 };
 
 const SKIP_REASON_LABEL: Record<string, string> = {
-  'no-inputs': 'nothing to scan',
-  'blocked-by-failure': 'a step it needs failed',
-  'assets-discovery-off': 'assets discovery is disabled',
-  'run-cancelled': 'the run was cancelled',
+  'no-inputs': 'jobsRegistry.graph.skip.noInputs',
+  'blocked-by-failure': 'jobsRegistry.graph.skip.blockedByFailure',
+  'assets-discovery-off': 'jobsRegistry.graph.skip.discoveryOff',
+  'run-cancelled': 'jobsRegistry.graph.skip.runCancelled',
 };
 
 function statusMeta(status: string) {
@@ -127,9 +129,14 @@ function WorkflowStepNode({ data }: NodeProps) {
     reason,
     logoUrl,
   } = data as StepNodeData;
+  const t = useT();
   const meta = statusMeta(status);
   const skipped = status === 'skipped';
-  const skipReason = reason ? (SKIP_REASON_LABEL[reason] ?? reason) : undefined;
+  const skipReason = reason
+    ? SKIP_REASON_LABEL[reason]
+      ? t(SKIP_REASON_LABEL[reason])
+      : reason
+    : undefined;
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -170,16 +177,16 @@ function WorkflowStepNode({ data }: NodeProps) {
                 <span className="truncate text-base font-semibold">{label}</span>
                 <div className="flex items-center gap-1.5 text-sm">
                   <span className={cn('shrink-0 font-medium', meta.text)}>
-                    {meta.label}
+                    {t(meta.labelKey)}
                   </span>
                   {jobs > 0 && (
                     <span className="shrink-0 text-muted-foreground">
-                      · {jobs} job{jobs > 1 ? 's' : ''}
+                      · {t('jobsRegistry.graph.jobCount', { count: jobs })}
                     </span>
                   )}
                   {!!failed && failed > 0 && (
                     <span className="shrink-0 font-medium text-destructive">
-                      · {failed} failed
+                      · {t('jobsRegistry.graph.failed', { n: failed })}
                     </span>
                   )}
                   {skipReason && (
@@ -207,20 +214,22 @@ function WorkflowStepNode({ data }: NodeProps) {
         </TooltipTrigger>
         <TooltipContent className="max-w-72">
           <p className="font-medium">
-            {label} · {meta.label}
+            {label} · {t(meta.labelKey)}
           </p>
-          <p className="text-muted-foreground">job id: {id}</p>
-          {status === 'queued' && <p>Waiting for a worker to pick up its jobs</p>}
+          <p className="text-muted-foreground">{t('jobsRegistry.graph.jobId', { id })}</p>
+          {status === 'queued' && <p>{t('jobsRegistry.graph.queuedHint')}</p>}
           {!!running && running > 0 && (
-            <p>
-              {running} of {jobs} job(s) running
+            <p>{t('jobsRegistry.graph.runningOf', { running, count: jobs })}</p>
+          )}
+          {needs.length > 0 && (
+            <p>{t('jobsRegistry.graph.waitsForTooltip', { needs: needs.join(', ') })}</p>
+          )}
+          {!!failed && failed > 0 && (
+            <p className="text-destructive">
+              {t('jobsRegistry.graph.jobsFailed', { count: failed })}
             </p>
           )}
-          {needs.length > 0 && <p>Waits for: {needs.join(', ')}</p>}
-          {!!failed && failed > 0 && (
-            <p className="text-destructive">{failed} job(s) failed</p>
-          )}
-          {skipReason && <p>Skipped: {skipReason}</p>}
+          {skipReason && <p>{t('jobsRegistry.graph.skipped', { reason: skipReason })}</p>}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -229,16 +238,17 @@ function WorkflowStepNode({ data }: NodeProps) {
 
 const TRIGGER_META: Record<
   RunTrigger,
-  { label: string; icon: React.ReactNode }
+  { labelKey: string; icon: React.ReactNode }
 > = {
-  manual: { label: 'Manual', icon: <MousePointerClick className="size-5" /> },
-  scheduled: { label: 'Schedule', icon: <CalendarClock className="size-5" /> },
-  event: { label: 'Assets added', icon: <Zap className="size-5" /> },
+  manual: { labelKey: 'jobsRegistry.filter.runType.manual', icon: <MousePointerClick className="size-5" /> },
+  scheduled: { labelKey: 'jobsRegistry.graph.trigger.schedule', icon: <CalendarClock className="size-5" /> },
+  event: { labelKey: 'jobsRegistry.graph.trigger.assetsAdded', icon: <Zap className="size-5" /> },
 };
 
 /** First node of every run: how it was started. Every root step hangs off it. */
 function WorkflowTriggerNode({ data }: NodeProps) {
   const { trigger, startedAt } = data as TriggerNodeData;
+  const t = useT();
   const meta = TRIGGER_META[trigger] ?? TRIGGER_META.manual;
 
   return (
@@ -248,12 +258,12 @@ function WorkflowTriggerNode({ data }: NodeProps) {
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Trigger
+          {t('jobsRegistry.graph.trigger.title')}
         </span>
-        <span className="truncate text-base font-semibold">{meta.label}</span>
+        <span className="truncate text-base font-semibold">{t(meta.labelKey)}</span>
         {startedAt && (
           <span className="truncate font-mono text-xs text-muted-foreground">
-            {dayjs(startedAt).format('YYYY-MM-DD HH:mm')}
+            {formatDate(startedAt, 'yyyy-MM-dd HH:mm')}
           </span>
         )}
       </div>

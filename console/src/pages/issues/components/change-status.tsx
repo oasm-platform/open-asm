@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useT } from '@/lib/i18n-dictionary';
 import {
   useIssuesControllerChangeStatus,
   type ChangeIssueStatusDto,
@@ -55,6 +56,7 @@ export function ChangeStatusControl({
   issue: IssueDetailDto;
   onChanged: (issue: IssueDetailDto) => void;
 }) {
+  const t = useT();
   const [target, setTarget] = useState<IssueStatus | null>(null);
   const [resolution, setResolution] = useState<IssueResolution | ''>('');
   const [note, setNote] = useState('');
@@ -67,14 +69,16 @@ export function ChangeStatusControl({
       { id: issue.id, data },
       {
         onSuccess: (updated) => {
-          toast.success(`Status changed to ${ISSUE_STATUS_LABELS[data.status]}`);
+          toast.success(
+            t('issues.status.changed', { status: ISSUE_STATUS_LABELS[data.status] }),
+          );
           setTarget(null);
           setResolution('');
           setNote('');
           onChanged(updated);
         },
         onError: (error) => {
-          const message = apiErrorMessage(error, 'Failed to change the status');
+          const message = apiErrorMessage(error, t('issues.status.changeFailed'));
           if (apiErrorStatus(error) === 409) {
             setTarget(null);
             setConflict(message);
@@ -102,7 +106,7 @@ export function ChangeStatusControl({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" disabled={changeStatus.isPending}>
-            Change status
+            {t('issues.status.change')}
             <ChevronDown className="size-4" />
           </Button>
         </DropdownMenuTrigger>
@@ -121,7 +125,7 @@ export function ChangeStatusControl({
           className="basis-full"
           data-testid="status-conflict"
         >
-          <AlertTitle>Cannot reopen this issue</AlertTitle>
+          <AlertTitle>{t('issues.status.cannotReopen')}</AlertTitle>
           <AlertDescription>
             {conflict}
             <Button
@@ -130,7 +134,7 @@ export function ChangeStatusControl({
               className="h-auto p-0"
               onClick={() => setConflict(null)}
             >
-              Dismiss
+              {t('issues.status.dismiss')}
             </Button>
           </AlertDescription>
         </Alert>
@@ -140,21 +144,25 @@ export function ChangeStatusControl({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              Mark as {target ? ISSUE_STATUS_LABELS[target].toLowerCase() : ''}
+              {t('issues.status.markAs', {
+                status: target ? ISSUE_STATUS_LABELS[target].toLowerCase() : '',
+              })}
             </DialogTitle>
             <DialogDescription>
-              Pick a resolution. It is recorded in the activity.
+              {t('issues.status.pickResolution')}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-3">
             <div className="grid gap-1.5">
-              <Label htmlFor="status-resolution">Resolution</Label>
+              <Label htmlFor="status-resolution">
+                {t('issues.status.resolution')}
+              </Label>
               <Select
                 value={resolution}
                 onValueChange={(v) => setResolution(v as IssueResolution)}
               >
                 <SelectTrigger id="status-resolution">
-                  <SelectValue placeholder="Select a resolution" />
+                  <SelectValue placeholder={t('issues.status.selectResolution')} />
                 </SelectTrigger>
                 <SelectContent>
                   {Object.entries(ISSUE_RESOLUTION_LABELS).map(
@@ -168,7 +176,9 @@ export function ChangeStatusControl({
               </Select>
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="status-note">Note (optional)</Label>
+              <Label htmlFor="status-note">
+                {t('issues.status.noteOptional')}
+              </Label>
               <Textarea
                 id="status-note"
                 rows={3}
@@ -179,7 +189,7 @@ export function ChangeStatusControl({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTarget(null)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               disabled={!resolution || changeStatus.isPending}
@@ -193,7 +203,7 @@ export function ChangeStatusControl({
                 })
               }
             >
-              Confirm
+              {t('common.confirm')}
             </Button>
           </DialogFooter>
         </DialogContent>

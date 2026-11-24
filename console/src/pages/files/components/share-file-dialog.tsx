@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -29,10 +30,10 @@ import { toast } from 'sonner';
 
 type ShareType = ArtifactDto['shareType'];
 
-const ACCESS_OPTIONS: { value: ShareType; label: string }[] = [
-  { value: 'private', label: 'Private — only you' },
-  { value: 'shared', label: 'Shared — you and the people below' },
-  { value: 'public', label: 'Public — anyone with the link' },
+const ACCESS_OPTIONS: { value: ShareType; labelKey: string }[] = [
+  { value: 'private', labelKey: 'files.share.private' },
+  { value: 'shared', labelKey: 'files.share.shared' },
+  { value: 'public', labelKey: 'files.share.public' },
 ];
 
 interface ShareFileDialogProps {
@@ -46,6 +47,7 @@ export function ShareFileDialog({
   onOpenChange,
   onChanged,
 }: ShareFileDialogProps) {
+  const t = useT();
   const [access, setAccess] = useState(file.shareType);
   const [emails, setEmails] = useState('');
   const shares = useArtifactsControllerGetShares(file.id);
@@ -81,11 +83,11 @@ export function ShareFileDialog({
     void shares.refetch();
     if (result.skipped) {
       toast.warning(
-        `${result.skipped} email(s) skipped: not a member of this workspace`,
+        t('files.share.skipped', { count: result.skipped }),
       );
     }
     if (result.shared) {
-      toast.success(`Shared with ${result.shared} member(s)`);
+      toast.success(t('files.share.sharedWith', { count: result.shared }));
       // Adding people to a private file only takes effect once it is shared.
       if (access === 'private') await changeAccess('shared');
     }
@@ -95,15 +97,14 @@ export function ShareFileDialog({
     <Dialog open onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Share “{file.name}”</DialogTitle>
+          <DialogTitle>{t('files.share.title', { name: file.name })}</DialogTitle>
           <DialogDescription>
-            Only members of this workspace can be added. Use a public link for
-            anyone else.
+            {t('files.share.description')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-2">
-          <Label htmlFor="file-access">General access</Label>
+          <Label htmlFor="file-access">{t('files.share.generalAccess')}</Label>
           <Select
             value={access}
             onValueChange={(v) =>
@@ -117,7 +118,7 @@ export function ShareFileDialog({
             <SelectContent>
               {ACCESS_OPTIONS.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
-                  {option.label}
+                  {t(option.labelKey)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -126,15 +127,15 @@ export function ShareFileDialog({
 
         {access === 'public' && (
           <div className="flex gap-2">
-            <Input readOnly value={publicUrl} aria-label="Public link" />
+            <Input readOnly value={publicUrl} aria-label={t('files.share.publicLink')} />
             <Button
               variant="outline"
               size="icon"
-              aria-label="Copy public link"
+              aria-label={t('files.share.copyPublicLink')}
               onClick={() =>
                 void navigator.clipboard
                   .writeText(publicUrl)
-                  .then(() => toast.success('Link copied'))
+                  .then(() => toast.success(t('files.share.linkCopied')))
               }
             >
               <Copy />
@@ -149,24 +150,24 @@ export function ShareFileDialog({
             void share().catch(() => {});
           }}
         >
-          <Label htmlFor="share-emails">Add people</Label>
+          <Label htmlFor="share-emails">{t('files.share.addPeople')}</Label>
           <div className="flex gap-2">
             <Input
               id="share-emails"
-              placeholder="alice@example.com, bob@example.com"
+              placeholder={t('files.share.emailsPlaceholder')}
               value={emails}
               onChange={(e) => setEmails(e.target.value)}
             />
             <Button type="submit" disabled={!emails.trim() || addShares.isPending}>
-              Share
+              {t('files.share.share')}
             </Button>
           </div>
         </form>
 
         <div className="space-y-1">
-          <p className="text-sm font-medium">People with access</p>
+          <p className="text-sm font-medium">{t('files.share.peopleWithAccess')}</p>
           {shares.data?.length ? (
-            <ul className="divide-y rounded-md border">
+            <ul className="divide-y rounded-md border dark:bg-card-surface">
               {shares.data.map((user) => (
                 <li
                   key={user.id}
@@ -176,7 +177,7 @@ export function ShareFileDialog({
                   <Button
                     variant="ghost"
                     size="icon"
-                    aria-label={`Remove ${user.name}`}
+                    aria-label={t('files.share.remove', { name: user.name })}
                     disabled={removeShare.isPending}
                     onClick={() =>
                       removeShare.mutate({ id: file.id, userId: user.id })
@@ -189,7 +190,7 @@ export function ShareFileDialog({
             </ul>
           ) : (
             <p className="text-sm text-muted-foreground">
-              {shares.isLoading ? 'Loading…' : 'Not shared with anyone yet.'}
+              {shares.isLoading ? t('files.share.loading') : t('files.share.notShared')}
             </p>
           )}
         </div>

@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { useT } from '@/lib/i18n-dictionary';
 import {
   getProjectsControllerGetFilesQueryKey,
   projectsControllerCompleteFile,
@@ -52,6 +53,7 @@ async function postToForm(
  * and up to five text files, uploaded into the workspace Files.
  */
 export function AgentContextCard({ project }: { project: Project }) {
+  const t = useT();
   const archived = !!project.archivedAt;
   const queryClient = useQueryClient();
   const invalidate = useInvalidateProjects();
@@ -77,17 +79,17 @@ export function AgentContextCard({ project }: { project: Project }) {
       { id: project.id, data: { instruction: instruction.trim() || null } },
       {
         onSuccess: () => {
-          toast.success('Instruction saved');
+          toast.success(t('projects.agent.instructionSaved'));
           void invalidate();
         },
         onError: (error) =>
-          toast.error(apiErrorMessage(error, 'Failed to save the instruction')),
+          toast.error(apiErrorMessage(error, t('projects.agent.instructionFailed'))),
       },
     );
 
   const uploadFile = async (file: File) => {
     if (file.size > FILE_MAX_BYTES) {
-      toast.error('A project file can be at most 10 MB');
+      toast.error(t('projects.agent.fileTooLarge'));
       return;
     }
     setUploading(true);
@@ -98,9 +100,9 @@ export function AgentContextCard({ project }: { project: Project }) {
       });
       await postToForm(upload, file);
       await projectsControllerCompleteFile(project.id, artifact.id);
-      toast.success(`${file.name} added`);
+      toast.success(t('projects.agent.fileAdded', { name: file.name }));
     } catch (error) {
-      toast.error(apiErrorMessage(error, 'Failed to upload the file'));
+      toast.error(apiErrorMessage(error, t('projects.agent.uploadFailed')));
     } finally {
       setUploading(false);
       void refreshFiles();
@@ -119,26 +121,24 @@ export function AgentContextCard({ project }: { project: Project }) {
       ) : (
         <Upload className="size-4" />
       )}
-      {uploading ? 'Uploading…' : 'Upload'}
+      {uploading ? t('projects.agent.uploading') : t('common.upload')}
     </Button>
   );
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>AI agent</CardTitle>
+        <CardTitle>{t('projects.agent.title')}</CardTitle>
         <CardDescription>
-          Every AI Studio chat started from this project follows these
-          instructions and can read these files.
+          {t('projects.agent.description')}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-8">
         <section className="mt-2 flex flex-col gap-3">
           <div className="flex flex-col gap-1">
-            <Label htmlFor="project-instruction">Instructions</Label>
+            <Label htmlFor="project-instruction">{t('projects.agent.instructions')}</Label>
             <p className="text-sm text-muted-foreground">
-              Tell the agent how to work on this project: what to focus on,
-              what to stay away from and how to report back.
+              {t('projects.agent.instructionsHint')}
             </p>
           </div>
           <div className="relative">
@@ -148,7 +148,7 @@ export function AgentContextCard({ project }: { project: Project }) {
               disabled={archived}
               maxLength={INSTRUCTION_MAX}
               onChange={(e) => setInstruction(e.target.value)}
-              placeholder="e.g. Only test the staging hosts and rank findings by business impact"
+              placeholder={t('projects.agent.instructionsPlaceholder')}
               rows={6}
               className="min-h-36 resize-y pb-7"
             />
@@ -162,7 +162,7 @@ export function AgentContextCard({ project }: { project: Project }) {
               disabled={archived || instruction.trim() === saved || update.isPending}
               onClick={saveInstruction}
             >
-              Save
+              {t('common.save')}
             </Button>
           </div>
         </section>
@@ -171,14 +171,13 @@ export function AgentContextCard({ project }: { project: Project }) {
           <div className="flex items-start justify-between gap-4">
             <div className="flex flex-col gap-1">
               <Label>
-                Files
+                {t('projects.agent.files')}
                 <span className="font-normal text-muted-foreground">
                   {list.length}/{PROJECT_FILE_LIMIT}
                 </span>
               </Label>
               <p className="text-sm text-muted-foreground">
-                Reference material the agent should know, such as scope notes,
-                rules of engagement or asset lists.
+                {t('projects.agent.filesHint')}
               </p>
             </div>
             {list.length > 0 && uploadButton}
@@ -188,7 +187,7 @@ export function AgentContextCard({ project }: { project: Project }) {
             type="file"
             accept={ACCEPT}
             className="hidden"
-            aria-label="Upload a project file"
+            aria-label={t('projects.agent.uploadAria')}
             onChange={(e) => {
               const file = e.target.files?.[0];
               e.target.value = '';
@@ -201,9 +200,9 @@ export function AgentContextCard({ project }: { project: Project }) {
                 <FileText className="size-5 text-muted-foreground" />
               </div>
               <div className="flex flex-col gap-1">
-                <p className="text-sm font-medium">No files yet</p>
+                <p className="text-sm font-medium">{t('projects.agent.noFiles')}</p>
                 <p className="text-xs text-muted-foreground">
-                  Markdown, text or CSV, up to 10 MB each
+                  {t('projects.agent.noFilesHint')}
                 </p>
               </div>
               {uploadButton}
@@ -222,14 +221,15 @@ export function AgentContextCard({ project }: { project: Project }) {
                     <span className="truncate text-sm font-medium">{file.name}</span>
                     <span className="text-xs text-muted-foreground">
                       {formatSize(file.sizeBytes)}
-                      {file.createdByName && ` · added by ${file.createdByName}`}
+                      {file.createdByName &&
+                        ` · ${t('projects.agent.addedBy', { name: file.createdByName })}`}
                     </span>
                   </div>
                   <Button
                     variant="ghost"
                     size="icon"
                     className="size-8 text-muted-foreground"
-                    aria-label={`Detach ${file.name}`}
+                    aria-label={t('projects.agent.detachAria', { name: file.name })}
                     disabled={archived || remove.isPending}
                     onClick={() =>
                       remove.mutate(
@@ -237,7 +237,7 @@ export function AgentContextCard({ project }: { project: Project }) {
                         {
                           onSuccess: () => void refreshFiles(),
                           onError: (error) =>
-                            toast.error(apiErrorMessage(error, 'Failed to detach the file')),
+                            toast.error(apiErrorMessage(error, t('projects.agent.detachFailed'))),
                         },
                       )
                     }
@@ -249,8 +249,7 @@ export function AgentContextCard({ project }: { project: Project }) {
             </ul>
           )}
           <p className="text-xs text-muted-foreground">
-            Files are stored in the workspace Files and count toward its storage.
-            Removing one here keeps it there.
+            {t('projects.agent.storageNote')}
           </p>
         </section>
       </CardContent>

@@ -2,6 +2,7 @@ import { FileCode, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import type { TemplateTab } from '../hooks/use-template-tabs';
+import { useT } from '@/lib/i18n-dictionary';
 
 type Props = {
   tabs: TemplateTab[];
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export function TemplateTabs({ tabs, activeId, onSelect, onClose, leading }: Props) {
+  const t = useT();
   if (!tabs.length && !leading) return null;
   return (
     <div className="flex overflow-x-auto border-b bg-background">
@@ -41,14 +43,14 @@ export function TemplateTabs({ tabs, activeId, onSelect, onClose, leading }: Pro
               {dirty && (
                 <span
                   role="img"
-                  aria-label="Unsaved changes"
+                  aria-label={t('templates.tabs.unsaved')}
                   className="size-1.5 rounded-full bg-foreground"
                 />
               )}
             </button>
             <button
               type="button"
-              aria-label={`Close ${tab.name}`}
+              aria-label={t('templates.tabs.close', { name: tab.name })}
               onClick={() => onClose(tab)}
               className="rounded p-1 hover:bg-muted-foreground/20 focus-visible:ring-2 focus-visible:ring-ring outline-none"
             >

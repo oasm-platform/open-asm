@@ -157,7 +157,9 @@ export const Markdown = memo(function Markdown({
   preview,
 }: MarkdownProps) {
   return (
-    <div className={cn('leading-[1.75] wrap-break-word', className)}>
+    // data-markdown: tables and code inside take the card fill in dark mode
+    // (index.css)
+    <div data-markdown className={cn('leading-[1.75] wrap-break-word', className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={preview ? previewComponents : fullComponents}

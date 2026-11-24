@@ -1,3 +1,4 @@
+import { useT, t as translate } from '@/lib/i18n-dictionary';
 import { CodeBlock } from '@/components/common/code-block';
 import { Button } from '@/components/ui/button';
 import {
@@ -103,6 +104,7 @@ const JOIN_SUCCESS_CLOSE_MS = 1600;
  * in, draws its tick and sends out one ripple.
  */
 function JoinSuccess() {
+  const t = useT();
   const reduceMotion = useReducedMotion();
   return (
     <div
@@ -152,10 +154,10 @@ function JoinSuccess() {
         transition={{ duration: 0.3, delay: 0.35 }}
       >
         <p className="mt-2 text-lg font-semibold text-green-600 dark:text-green-400">
-          Connected!
+          {t('components.connectWorker.connected')}
         </p>
         <p className="text-sm text-muted-foreground">
-          Your worker joined successfully.
+          {t('components.connectWorker.joined')}
         </p>
       </motion.div>
     </div>
@@ -163,6 +165,7 @@ function JoinSuccess() {
 }
 
 export function ConnectWorkerDialog() {
+  const t = useT();
   const {
     state: { isOpen, networkId, onJoined },
     closeDialog,
@@ -216,7 +219,7 @@ export function ConnectWorkerDialog() {
       })
       .catch(() => {
         if (generation === generationRef.current) {
-          toast.error('Failed to create worker API key');
+          toast.error(translate('components.connectWorker.createKeyFailed'));
         }
       });
 
@@ -265,7 +268,7 @@ export function ConnectWorkerDialog() {
       return true;
     } catch {
       if (generation === generationRef.current) {
-        toast.error('Failed to rotate API key');
+        toast.error(translate('components.connectWorker.rotateFailed'));
       }
       return false;
     } finally {
@@ -302,7 +305,7 @@ export function ConnectWorkerDialog() {
     // auto-rotate may issue another one.
     showKey(null);
     setJoined(true);
-    toast.success('Worker connected successfully');
+    toast.success(translate('components.connectWorker.connectedToast'));
     // Right away: the caller waits for the worker to be ready meanwhile.
     if (event.resourceId) onJoined?.(event.resourceId);
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
@@ -322,17 +325,17 @@ export function ConnectWorkerDialog() {
   const networkFlagBash = networkId ? ` --network "${networkId}"` : '';
 
   const getCommand = (value: string): string => {
-    if (!isApiKeyReady) return 'Loading...';
+    if (!isApiKeyReady) return t('common.loading');
     switch (value) {
       case 'devmode':
         return `task worker:dev apiKey=${apiKey} replicas=1 maxJobs=10${networkFlag}`;
       case 'docker':
         return `docker run -d --name open-asm-worker -e WORKER_API_KEY=${apiKey} -e WORKER_GRPC_HOST=${grpcHost} -e WORKER_GRPC_PORT=16276 -e WORKER_MAX_CONCURRENCY=10 open-asm-worker:latest`;
       case 'windows':
-        if (!homePageUrl) return 'Loading...';
+        if (!homePageUrl) return t('common.loading');
         return `powershell irm ${homePageUrl}/install.ps1 -OutFile "$env:TEMP\\install.ps1"; & "$env:TEMP\\install.ps1" -ApiKey "${apiKey}"${grpcFlagPowerShell}${networkFlagPowerShell} -Run`;
       case 'linux':
-        if (!homePageUrl) return 'Loading...';
+        if (!homePageUrl) return t('common.loading');
         return `curl -fsSL ${homePageUrl}/install.sh | bash -s -- --api-key "${apiKey}"${grpcFlagBash}${networkFlagBash} --run`;
       default:
         return '';
@@ -341,7 +344,7 @@ export function ConnectWorkerDialog() {
 
   const handleRotate = async () => {
     if (await rotate()) {
-      toast.success('API key rotated successfully');
+      toast.success(t('components.connectWorker.rotated'));
     }
   };
 
@@ -356,11 +359,11 @@ export function ConnectWorkerDialog() {
     <Dialog open={isOpen} onOpenChange={(open) => !open && closeDialog()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Connect worker</DialogTitle>
+          <DialogTitle>{t('shell.create.connectWorker')}</DialogTitle>
           <DialogDescription>
             {showTabList
-              ? 'Select your environment and copy the command to connect a worker:'
-              : 'Copy the command to connect a worker:'}
+              ? t('components.connectWorker.descriptionTabs')
+              : t('components.connectWorker.description')}
           </DialogDescription>
         </DialogHeader>
         {joined ? (
@@ -399,10 +402,10 @@ export function ConnectWorkerDialog() {
           >
             <Clock size={14} />
             {isExpired ? (
-              'API key expired, generating a new one…'
+              t('components.connectWorker.expired')
             ) : (
               <span>
-                One-time API key, expires in{' '}
+                {t('components.connectWorker.expiresIn')}{' '}
                 <span className="font-mono tabular-nums">
                   {formatRemaining(remainingMs)}
                 </span>
@@ -420,12 +423,12 @@ export function ConnectWorkerDialog() {
               onClick={handleRotate}
               disabled={isRotating || !selectedWorkspaceId}
             >
-              Rotate API key
+              {t('components.connectWorker.rotate')}
             </Button>
           )}
           <DialogClose asChild>
             <Button variant="outline" type="button" onClick={closeDialog}>
-              Close
+              {t('common.close')}
             </Button>
           </DialogClose>
         </DialogFooter>

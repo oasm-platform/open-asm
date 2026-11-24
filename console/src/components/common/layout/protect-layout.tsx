@@ -46,7 +46,10 @@ export default function ProtectedLayout({ children }: ProtectedLayoutProps) {
         {/* AI Studio pages fill the viewport instead of growing the document,
             so they size with flex rather than vh math. */}
         {/* min-w-0: wide tables scroll inside their own container instead of widening the page. */}
-        <SidebarInset className={cn('min-w-0', isAiStudio && 'h-svh')}>
+        {/* app-glow: blue light behind the header and the top of the page */}
+        <SidebarInset
+          className={cn('min-w-0', isAiStudio ? 'h-svh' : 'app-glow')}
+        >
           {isAiStudio ? (
             // AI Studio has no app header. On mobile the sidebar trigger floats
             // over the page's top-left corner instead, where the header kept it:

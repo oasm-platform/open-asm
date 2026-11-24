@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { ComponentProps, HTMLAttributes } from "react";
 import { createContext, useContext, useMemo } from "react";
+import { useT } from '@/lib/i18n-dictionary';
 
 type TestStatus = "passed" | "failed" | "skipped" | "running";
 
@@ -85,6 +86,7 @@ export const TestResultsSummary = ({
   children,
   ...props
 }: TestResultsSummaryProps) => {
+  const t = useT();
   const { summary } = useContext(TestResultsContext);
 
   if (!summary) {
@@ -100,7 +102,7 @@ export const TestResultsSummary = ({
             variant="secondary"
           >
             <CheckCircle2Icon className="size-3" />
-            {summary.passed} passed
+            {t('agents.ai.tests.passed', { count: summary.passed })}
           </Badge>
           {summary.failed > 0 && (
             <Badge
@@ -108,7 +110,7 @@ export const TestResultsSummary = ({
               variant="secondary"
             >
               <XCircleIcon className="size-3" />
-              {summary.failed} failed
+              {t('agents.ai.tests.failed', { count: summary.failed })}
             </Badge>
           )}
           {summary.skipped > 0 && (
@@ -117,7 +119,7 @@ export const TestResultsSummary = ({
               variant="secondary"
             >
               <CircleIcon className="size-3" />
-              {summary.skipped} skipped
+              {t('agents.ai.tests.skipped', { count: summary.skipped })}
             </Badge>
           )}
         </>
@@ -163,6 +165,7 @@ export const TestResultsProgress = ({
   children,
   ...props
 }: TestResultsProgressProps) => {
+  const t = useT();
   const { summary } = useContext(TestResultsContext);
 
   if (!summary) {
@@ -188,7 +191,10 @@ export const TestResultsProgress = ({
           </div>
           <div className="flex justify-between text-muted-foreground text-xs">
             <span>
-              {summary.passed}/{summary.total} tests passed
+              {t('agents.ai.tests.summary', {
+                passed: summary.passed,
+                total: summary.total,
+              })}
             </span>
             <span>{passedPercent.toFixed(0)}%</span>
           </div>

@@ -1,5 +1,6 @@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { IssueRefLink } from '@/components/vulnerabilities/lifecycle-badges';
+import { useT } from '@/lib/i18n-dictionary';
 import type {
   VulnerabilityDetailDto,
   VulnerabilityTimelineEventDto,
@@ -21,6 +22,7 @@ export function ResurfacedBanner({
   data: VulnerabilityDetailDto;
   events?: VulnerabilityTimelineEventDto[];
 }) {
+  const t = useT();
   if (data.detectionStatus !== 'resurfaced') return null;
   const sorted = [...(events ?? [])].sort(byNewest);
   const resurfaced = sorted.find(
@@ -41,27 +43,30 @@ export function ResurfacedBanner({
       data-testid="resurfaced-banner"
     >
       <RotateCcw className="size-4 !text-pink-600" />
-      <AlertTitle>Resurfaced</AlertTitle>
+      <AlertTitle>{t('vulnerabilities.resurfaced.title')}</AlertTitle>
       <AlertDescription className="flex flex-wrap items-center gap-x-1 text-sm">
         {resurfaced ? (
           <>
-            Reported again on{' '}
-            {format(new Date(resurfaced.occurredAt), 'dd MMM yyyy')}
+            {t('vulnerabilities.resurfaced.reportedAgainOn', {
+              date: format(new Date(resurfaced.occurredAt), 'dd MMM yyyy'),
+            })}
             {resurfaced.jobHistoryId && (
               <>
                 {' '}
-                by <RunLink id={resurfaced.jobHistoryId} />
+                {t('vulnerabilities.resurfaced.by')}{' '}
+                <RunLink id={resurfaced.jobHistoryId} />
               </>
             )}
           </>
         ) : (
-          'Reported again'
+          t('vulnerabilities.resurfaced.reportedAgain')
         )}
         {fixedAt && (
           <>
             {' '}
-            after it was confirmed fixed on{' '}
-            {format(new Date(fixedAt), 'dd MMM yyyy')}
+            {t('vulnerabilities.resurfaced.afterFixedOn', {
+              date: format(new Date(fixedAt), 'dd MMM yyyy'),
+            })}
             {fixedRun && (
               <>
                 {' '}
@@ -74,7 +79,9 @@ export function ResurfacedBanner({
         {data.openIssue && (
           <>
             {' '}
-            Issue <IssueRefLink issue={data.openIssue} /> is open again.
+            {t('vulnerabilities.resurfaced.issue')}{' '}
+            <IssueRefLink issue={data.openIssue} />{' '}
+            {t('vulnerabilities.resurfaced.openAgain')}
           </>
         )}
       </AlertDescription>

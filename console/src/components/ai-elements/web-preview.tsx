@@ -23,6 +23,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useT } from '@/lib/i18n-dictionary';
 
 export interface WebPreviewContextValue {
   url: string;
@@ -144,6 +145,7 @@ export const WebPreviewUrl = ({
   onKeyDown,
   ...props
 }: WebPreviewUrlProps) => {
+  const t = useT();
   const { url, setUrl } = useWebPreview();
   const [prevUrl, setPrevUrl] = useState(url);
   const [inputValue, setInputValue] = useState(url);
@@ -175,7 +177,7 @@ export const WebPreviewUrl = ({
       className="h-8 flex-1 text-sm"
       onChange={onChange ?? handleChange}
       onKeyDown={handleKeyDown}
-      placeholder="Enter URL..."
+      placeholder={t('agents.ai.preview.enterUrl')}
       value={value ?? inputValue}
       {...props}
     />
@@ -192,6 +194,7 @@ export const WebPreviewBody = ({
   src,
   ...props
 }: WebPreviewBodyProps) => {
+  const t = useT();
   const { url } = useWebPreview();
 
   return (
@@ -201,7 +204,7 @@ export const WebPreviewBody = ({
         // oxlint-disable-next-line eslint-plugin-react(iframe-missing-sandbox)
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
         src={(src ?? url) || undefined}
-        title="Preview"
+        title={t('agents.ai.preview.title')}
         {...props}
       />
       {loading}
@@ -223,6 +226,7 @@ export const WebPreviewConsole = ({
   children,
   ...props
 }: WebPreviewConsoleProps) => {
+  const t = useT();
   const { consoleOpen, setConsoleOpen } = useWebPreview();
 
   return (
@@ -237,7 +241,7 @@ export const WebPreviewConsole = ({
           className="flex w-full items-center justify-between p-4 text-left font-medium hover:bg-muted/50"
           variant="ghost"
         >
-          Console
+          {t('agents.ai.preview.console')}
           <ChevronDownIcon
             className={cn(
               "h-4 w-4 transition-transform duration-200",
@@ -254,7 +258,7 @@ export const WebPreviewConsole = ({
       >
         <div className="max-h-48 space-y-1 overflow-y-auto">
           {logs.length === 0 ? (
-            <p className="text-muted-foreground">No console output</p>
+            <p className="text-muted-foreground">{t('agents.ai.preview.noConsole')}</p>
           ) : (
             logs.map((log) => (
               <div

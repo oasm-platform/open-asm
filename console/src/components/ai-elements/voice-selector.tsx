@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { createContext, useCallback, useContext, useMemo } from "react";
+import { useT, t } from '@/lib/i18n-dictionary';
 
 interface VoiceSelectorContextValue {
   value: string | undefined;
@@ -111,20 +112,23 @@ export type VoiceSelectorContentProps = ComponentProps<typeof DialogContent> & {
 export const VoiceSelectorContent = ({
   className,
   children,
-  title = "Voice Selector",
+  title = t('agents.ai.voiceSelector'),
   ...props
-}: VoiceSelectorContentProps) => (
-  <DialogContent
-    aria-describedby={undefined}
-    className={cn("p-0", className)}
-    {...props}
-  >
-    <DialogTitle className="sr-only">{title}</DialogTitle>
-    <Command className="**:data-[slot=command-input-wrapper]:h-auto">
-      {children}
-    </Command>
-  </DialogContent>
-);
+}: VoiceSelectorContentProps) => {
+  useT(); // re-render on language change
+  return (
+    <DialogContent
+      aria-describedby={undefined}
+      className={cn("p-0", className)}
+      {...props}
+    >
+      <DialogTitle className="sr-only">{title}</DialogTitle>
+      <Command className="**:data-[slot=command-input-wrapper]:h-auto">
+        {children}
+      </Command>
+    </DialogContent>
+  );
+};
 
 export type VoiceSelectorDialogProps = ComponentProps<typeof CommandDialog>;
 
@@ -490,6 +494,7 @@ export const VoiceSelectorPreview = ({
   onClick,
   ...props
 }: VoiceSelectorPreviewProps) => {
+  const t = useT();
   const handleClick = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation();
@@ -509,7 +514,7 @@ export const VoiceSelectorPreview = ({
 
   return (
     <Button
-      aria-label={playing ? "Pause preview" : "Play preview"}
+      aria-label={playing ? t('agents.ai.pausePreview') : t('agents.ai.playPreview')}
       className={cn("size-6", className)}
       disabled={loading}
       onClick={handleClick}

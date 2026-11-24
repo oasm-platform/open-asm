@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import type { GetManyGetAssetsResponseDtoDto } from "@/services/apis/gen/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
@@ -13,6 +14,7 @@ interface AssetsDiscoveringProps {
 const AssetsDiscovering = ({ domains, targetId }: AssetsDiscoveringProps) => {
   // This hook is used to get data from the query cache.
   const queryClient = useQueryClient();
+  const t = useT();
 
   // Mocking the data for demonstration. In a real app, this would come from a query.
   const assets: GetManyGetAssetsResponseDtoDto | undefined =
@@ -85,7 +87,7 @@ const AssetsDiscovering = ({ domains, targetId }: AssetsDiscoveringProps) => {
                 ease: "linear",
               }}
             >
-              Discovering assets...
+              {t('targets.discovering.title')}
             </motion.span>
           </div>
 

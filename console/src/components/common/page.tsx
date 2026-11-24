@@ -1,12 +1,17 @@
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { usePermission } from '@/hooks/usePermission';
 import { Loader2 } from 'lucide-react';
-import { useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import AccessDenied from './access-denied';
 
 interface PageProps {
   children?: React.ReactNode;
   title?: string | React.ReactNode;
+  /**
+   * The browser tab's title, e.g. the item the page shows. Defaults to a
+   * string `title`, else the route's name.
+   */
+  documentTitle?: string;
   description?: string;
   header?: React.ReactNode;
   action?: React.ReactNode;
@@ -19,6 +24,7 @@ interface PageProps {
 const Page = ({
   children,
   title,
+  documentTitle,
   description,
   header,
   action,
@@ -28,14 +34,7 @@ const Page = ({
 }: PageProps) => {
   const { hasPermission, isLoading } = usePermission();
 
-  useEffect(() => {
-    if (typeof title === 'string' && title) {
-      document.title = `${title} | OASM`;
-    }
-    return () => {
-      document.title = 'OASM';
-    };
-  }, [title]);
+  useDocumentTitle(documentTitle ?? (typeof title === 'string' ? title : null));
 
   const canRender = !permission || hasPermission(permission);
 
@@ -44,6 +43,12 @@ const Page = ({
       <div
         className={cn(
           'flex flex-wrap items-end justify-between gap-3',
+          // The title's capitals start ~7.5px below its line box (32px line
+          // on 24px Geist), so the gap above them looks ~6px wider than the
+          // page's side padding: pull the row up to match it. Dark mode has
+          // no line under the header, so the title sits right up close.
+          // Only with a title: an empty row must not ride up into the header.
+          (title || description) && '-mt-1.5 dark:-mt-4',
           headerClassName,
         )}
       >

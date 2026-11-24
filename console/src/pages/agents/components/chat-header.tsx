@@ -1,5 +1,4 @@
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
+import { fromNow } from '@/lib/date-locale';
 import { Link } from '@tanstack/react-router';
 import { MoreVertical, PanelRightOpen, SquarePen } from 'lucide-react';
 import { useMemo } from 'react';
@@ -7,15 +6,14 @@ import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import { stripPageContextFromTitle } from '@/lib/page-context';
 import { cn } from '@/lib/utils';
 import {
   SendMessageDtoAgentMode,
   useAgentsControllerGetConversationsInfinite,
 } from '@/services/apis/gen/queries';
+import { useT } from '@/lib/i18n-dictionary';
 
-dayjs.extend(relativeTime);
-
-const UNTITLED = 'New conversation';
 
 interface ChatHeaderProps {
   conversationId?: string;
@@ -44,6 +42,7 @@ export function ChatHeader({
   hasActivity = false,
   agentMode,
 }: ChatHeaderProps) {
+  const t = useT();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -68,7 +67,9 @@ export function ChatHeader({
         .find((c) => c.id === conversationId)?.title,
     [data, conversationId],
   );
-  const displayTitle = listedTitle || title || UNTITLED;
+  const displayTitle =
+    stripPageContextFromTitle(listedTitle || title || '') ||
+    t('agents.conversations.newConversation');
   const isMobile = useIsMobile();
 
   return (
@@ -94,7 +95,7 @@ export function ChatHeader({
           </h1>
           {createdAt && (
             <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
-              · {dayjs(createdAt).fromNow()}
+              · {fromNow(createdAt)}
             </span>
           )}
         </div>
@@ -117,8 +118,8 @@ export function ChatHeader({
             variant="ghost"
             size="icon-sm"
             className="rounded-full text-muted-foreground"
-            aria-label="New chat"
-            title="New chat"
+            aria-label={t('agents.header.newChat')}
+            title={t('agents.header.newChat')}
           >
             <Link
               to={
@@ -139,8 +140,8 @@ export function ChatHeader({
               'relative text-muted-foreground hover:cursor-pointer',
               isMobile && 'rounded-full',
             )}
-            aria-label="Open side panel"
-            title="Open side panel"
+            aria-label={t('agents.header.openSidePanel')}
+            title={t('agents.header.openSidePanel')}
             onClick={onOpenPanel}
           >
             {/* Mobile opens it full screen, not as a split: a menu-like icon */}

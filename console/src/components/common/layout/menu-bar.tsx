@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Link, useLocation } from '@tanstack/react-router';
 import * as React from 'react';
 
@@ -55,6 +56,7 @@ import {
 } from './sidebar-styles';
 
 interface SubMenuItem {
+  /** Dictionary key or plain text; rendered through t(). */
   title: string;
   icon: React.ReactNode;
   url: string;
@@ -64,6 +66,7 @@ interface SubMenuItem {
 }
 
 export interface NavGroup {
+  /** Dictionary key or plain text; rendered through t(). */
   title: string;
   /** Render the group without its label (title still keys the group). */
   hideTitle?: boolean;
@@ -74,23 +77,23 @@ export interface NavGroup {
 
 export const menu: NavGroup[] = [
   {
-    title: 'Overview',
+    title: 'shell.nav.overview',
     hideTitle: true,
     url: '#',
     items: [
       {
-        title: 'Dashboard',
+        title: 'shell.nav.dashboard',
         icon: <LayoutDashboard />,
         url: '/',
       },
       {
-        title: 'AI Studio',
+        title: 'shell.nav.aiStudio',
         icon: <Sparkles />,
         url: '/aistudio',
         permission: 'agent.read',
       },
       {
-        title: 'Projects',
+        title: 'shell.nav.projects',
         icon: <FolderKanban />,
         url: '/projects',
         permission: 'project.read',
@@ -98,17 +101,17 @@ export const menu: NavGroup[] = [
     ],
   },
   {
-    title: 'Attack surface',
+    title: 'shell.nav.attackSurface',
     url: '#',
     items: [
       {
-        title: 'Targets',
+        title: 'shell.nav.targets',
         icon: <Target />,
         url: '/targets',
         permission: 'target.read',
       },
       {
-        title: 'Assets',
+        title: 'shell.nav.assets',
         icon: <CloudCheck />,
         url: '/assets',
         permission: 'asset.read',
@@ -121,23 +124,23 @@ export const menu: NavGroup[] = [
     ],
   },
   {
-    title: 'Security',
+    title: 'shell.nav.security',
     url: '#',
     items: [
       {
-        title: 'Vulnerabilities',
+        title: 'shell.nav.vulnerabilities',
         icon: <Bug />,
         url: '/vulnerabilities',
         permission: 'vulnerability.read',
       },
       {
-        title: 'Issues',
+        title: 'shell.nav.issues',
         icon: <CircleDot />,
         url: '/issues',
         permission: 'workspace.read',
       },
       {
-        title: 'Reports',
+        title: 'shell.nav.reports',
         icon: <FileChartPie />,
         url: '/reports',
         permission: 'report.read',
@@ -146,28 +149,28 @@ export const menu: NavGroup[] = [
   },
 
   {
-    title: 'Management',
+    title: 'shell.nav.management',
     url: '#',
     items: [
       {
-        title: 'Tools',
+        title: 'shell.nav.tools',
         icon: <Cpu />,
         url: '/tools',
       },
       {
-        title: 'Integrations',
+        title: 'shell.nav.integrations',
         icon: <Puzzle />,
         url: '/integrations',
         permission: 'integration.read',
       },
       {
-        title: 'Workers',
+        title: 'shell.nav.workers',
         icon: <Server />,
         url: '/workers',
         permission: 'worker.read',
       },
       {
-        title: 'Jobs Registry',
+        title: 'shell.nav.jobsRegistry',
         icon: <CirclePlay />,
         url: '/jobs',
         permission: 'job.read',
@@ -206,6 +209,7 @@ export function AppSidebar({
   children,
   ...props
 }: AppSidebarProps) {
+  const t = useT();
   const location = useLocation();
   const { state, isMobile, setOpenMobile } = useSidebar();
   const { data } = useSession();
@@ -239,7 +243,7 @@ export function AppSidebar({
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       asChild
-                      tooltip="Back"
+                      tooltip={t('common.back')}
                       className="h-10 items-center rounded-lg text-[15px] font-semibold hover:cursor-pointer"
                     >
                       <Link
@@ -248,7 +252,7 @@ export function AppSidebar({
                         className="flex items-center"
                       >
                         <ArrowLeft className="size-5!" />
-                        <span>Back</span>
+                        <span>{t('common.back')}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -258,14 +262,14 @@ export function AppSidebar({
             {!primary && title && (
               <h2 className="truncate px-2.5 pt-1 text-lg font-semibold tracking-tight text-foreground group-data-[collapsible=icon]:hidden">
                 {isBack ? (
-                  title
+                  t(title)
                 ) : (
                   <Link
                     to={backUrl}
                     onClick={() => setOpenMobile(false)}
                     className="transition-opacity hover:opacity-80"
                   >
-                    {title}
+                    {t(title)}
                   </Link>
                 )}
               </h2>
@@ -282,11 +286,11 @@ export function AppSidebar({
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <SidebarMenuButton
-                        tooltip="Create"
+                        tooltip={t('common.create')}
                         className="h-9 rounded-lg border border-border/60 px-2.5 text-[13px] font-medium hover:cursor-pointer"
                       >
                         <Plus />
-                        <span>Create</span>
+                        <span>{t('common.create')}</span>
                         <ChevronDown className="ml-auto group-data-[collapsible=icon]:hidden" />
                       </SidebarMenuButton>
                     </DropdownMenuTrigger>
@@ -300,7 +304,7 @@ export function AppSidebar({
                           onClick={() => setOpenMobile(false)}
                         >
                           <Target />
-                          Target
+                          {t('shell.create.target')}
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
@@ -309,7 +313,7 @@ export function AppSidebar({
                           onClick={() => setOpenMobile(false)}
                         >
                           <FolderKanban />
-                          Project
+                          {t('shell.create.project')}
                         </Link>
                       </DropdownMenuItem>
                       {/* Join keys require workspace.apikey on the API. */}
@@ -321,7 +325,7 @@ export function AppSidebar({
                           }}
                         >
                           <Plug />
-                          Connect worker
+                          {t('shell.create.connectWorker')}
                         </DropdownMenuItem>
                       )}
                     </DropdownMenuContent>
@@ -354,7 +358,7 @@ export function AppSidebar({
                           'group-data-[collapsible=icon]:-mt-7',
                         )}
                       >
-                        {group.title}
+                        {t(group.title)}
                       </SidebarGroupLabel>
                     )}
                     <SidebarMenu className={sidebarMenuClassName}>
@@ -374,7 +378,7 @@ export function AppSidebar({
                             <SidebarMenuButton
                               asChild
                               isActive={isActive}
-                              tooltip={item.title}
+                              tooltip={t(item.title)}
                               className={cn('group', sidebarItemClassName)}
                             >
                               <Link
@@ -383,7 +387,7 @@ export function AppSidebar({
                                 className="flex w-full items-center justify-start"
                               >
                                 {item.icon}{' '}
-                                <span className="truncate">{item.title}</span>
+                                <span className="truncate">{t(item.title)}</span>
                                 {item.isNew && (
                                   <span className="ml-auto">
                                     <NewBadge />

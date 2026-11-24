@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import { stripPageContextFromTitle } from '@/lib/page-context';
 import { cn } from '@/lib/utils';
 import {
   formatCost,
@@ -25,17 +26,15 @@ import {
 } from '@/services/apis/gen/queries';
 import { Link } from '@tanstack/react-router';
 import { format, formatDistanceToNow, parseISO } from 'date-fns';
+import { dateFnsLocale } from '@/lib/date-locale';
 import { useState, type ReactNode } from 'react';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { t, useT } from '@/lib/i18n-dictionary';
 
 const RANGES = [7, 30, 90] as const;
 
 /** Fields every usage bucket (summary, day, model, session) carries */
 type UsageTotals = Omit<UsageDayDto, 'date'>;
-
-const chartConfig = {
-  tokens: { label: 'Tokens', color: 'var(--chart-1)' },
-} satisfies ChartConfig;
 
 /** Time zone the backend counts days in, so a day matches the user's clock */
 const timeZone = (() => {
@@ -52,7 +51,7 @@ export function formatUsageCost({
   costComplete,
 }: Pick<UsageTotals, 'costUsd' | 'costComplete'>): string {
   if (costComplete) return formatCost(costUsd);
-  return costUsd > 0 ? `≥ ${formatCost(costUsd)}` : 'n/a';
+  return costUsd > 0 ? `≥ ${formatCost(costUsd)}` : t('agents.usage.notAvailable');
 }
 
 const totalTokens = (t: UsageTotals) => t.inputTokens + t.outputTokens;
@@ -125,6 +124,10 @@ function Section({
 }
 
 function DailyChart({ daily }: { daily: UsageDayDto[] }) {
+  const t = useT();
+  const chartConfig = {
+    tokens: { label: t('agents.usage.tokens'), color: 'var(--chart-1)' },
+  } satisfies ChartConfig;
   const data = daily.map((day) => ({
     ...day,
     label: format(parseISO(day.date), 'MMM d'),
@@ -161,12 +164,12 @@ function DailyChart({ daily }: { daily: UsageDayDto[] }) {
                 return (
                   <div className="grid w-full gap-1">
                     {[
-                      ['Tokens', formatTokens(day.tokens)],
-                      ['Input', formatTokens(day.inputTokens)],
-                      ['Output', formatTokens(day.outputTokens)],
-                      ['Cache hit', formatCacheHit(day)],
-                      ['Requests', String(day.requests)],
-                      ['Cost', formatUsageCost(day)],
+                      [t('agents.usage.tokens'), formatTokens(day.tokens)],
+                      [t('agents.usage.input'), formatTokens(day.inputTokens)],
+                      [t('agents.usage.output'), formatTokens(day.outputTokens)],
+                      [t('agents.usage.cacheHit'), formatCacheHit(day)],
+                      [t('agents.usage.requests'), String(day.requests)],
+                      [t('agents.usage.cost'), formatUsageCost(day)],
                     ].map(([label, value]) => (
                       <div key={label} className="flex justify-between gap-4">
                         <span className="text-muted-foreground">{label}</span>
@@ -197,6 +200,7 @@ function DailyChart({ daily }: { daily: UsageDayDto[] }) {
  * workspace: finished answers and subagent runs of their conversations.
  */
 export default function AgentUsagePage() {
+  const t = useT();
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
@@ -221,20 +225,20 @@ export default function AgentUsagePage() {
 
   return (
     <Page
-      title="Usage"
-      description="Tokens, cost and sessions you used in this workspace"
+      title={t('agents.usage.title')}
+      description={t('agents.usage.description')}
       // max-md:pt-10 clears the sidebar trigger floating at the top-left
       className="mx-auto w-full max-w-5xl max-md:pt-10"
       permission="agent.read"
       action={
         <Select value={String(days)} onValueChange={(v) => setDays(Number(v))}>
-          <SelectTrigger size="sm" className="w-[140px]" aria-label="Usage period">
+          <SelectTrigger size="sm" className="w-[140px]" aria-label={t('agents.usage.period')}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {RANGES.map((range) => (
               <SelectItem key={range} value={String(range)}>
-                Last {range} days
+                {t('agents.usage.lastDays', { days: range })}
               </SelectItem>
             ))}
           </SelectContent>
@@ -257,72 +261,72 @@ export default function AgentUsagePage() {
         ) : isError || !summary ? (
           <div className="rounded-xl border border-dashed p-6 text-center">
             <p className="text-sm text-muted-foreground">
-              Could not load usage. Try again later.
+              {t('agents.usage.loadFailed')}
             </p>
           </div>
         ) : summary.requests === 0 ? (
           <div className="rounded-xl border border-dashed p-6 text-center">
             <p className="text-sm text-muted-foreground">
-              No AI Studio usage in the last {days} days.
+              {t('agents.usage.empty', { days })}
             </p>
           </div>
         ) : (
           <>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
               <StatTile
-                label="Cost"
+                label={t('agents.usage.cost')}
                 value={formatUsageCost(summary)}
                 hint={
                   summary.costComplete
-                    ? 'Estimated from model prices'
-                    : 'Some models have no known price'
+                    ? t('agents.usage.costEstimated')
+                    : t('agents.usage.costIncomplete')
                 }
               />
               <StatTile
-                label="Sessions"
+                label={t('agents.usage.sessions')}
                 value={summary.sessions.toLocaleString()}
-                hint={`${summary.responses} answers · ${summary.subagentRuns} subagent runs`}
+                hint={t('agents.usage.sessionsHint', { responses: summary.responses, subagentRuns: summary.subagentRuns })}
               />
               <StatTile
-                label="Requests"
+                label={t('agents.usage.requests')}
                 value={summary.requests.toLocaleString()}
-                hint="Model calls"
+                hint={t('agents.usage.requestsHint')}
               />
               <StatTile
-                label="Input tokens"
+                label={t('agents.usage.inputTokens')}
                 value={formatTokens(summary.inputTokens)}
-                hint={`${formatTokens(summary.cacheReadTokens)} read from cache`}
+                hint={t('agents.usage.inputTokensHint', { tokens: formatTokens(summary.cacheReadTokens) })}
               />
               <StatTile
-                label="Output tokens"
+                label={t('agents.usage.outputTokens')}
                 value={formatTokens(summary.outputTokens)}
-                hint={`${formatTokens(totalTokens(summary))} tokens in total`}
+                hint={t('agents.usage.outputTokensHint', { tokens: formatTokens(totalTokens(summary)) })}
               />
               <StatTile
-                label="Cache hit"
+                label={t('agents.usage.cacheHit')}
                 value={formatCacheHit(summary)}
                 valueClassName={cacheHitTone(summary)}
-                hint="Of input tokens, served from cache"
+                hint={t('agents.usage.cacheHitHint')}
               />
             </div>
 
-            <Section title="Tokens per day">
+            <Section title={t('agents.usage.tokensPerDay')}>
               <div className="rounded-xl border bg-card/50 p-4">
                 <DailyChart daily={data.daily} />
               </div>
             </Section>
 
-            <Section title="By model">
+            <Section title={t('agents.usage.byModel')}>
               <div className="overflow-x-auto rounded-xl border">
                 <table className="w-full text-sm">
                   <thead className="text-xs text-muted-foreground">
                     <tr className="border-b">
-                      <th className="px-3 py-2 text-left font-medium">Model</th>
-                      <th className="px-3 py-2 text-right font-medium">Requests</th>
-                      <th className="px-3 py-2 text-right font-medium">Input</th>
-                      <th className="px-3 py-2 text-right font-medium">Output</th>
-                      <th className="px-3 py-2 text-right font-medium">Cache hit</th>
-                      <th className="px-3 py-2 text-right font-medium">Cost</th>
+                      <th className="px-3 py-2 text-left font-medium">{t('agents.usage.model')}</th>
+                      <th className="px-3 py-2 text-right font-medium">{t('agents.usage.requests')}</th>
+                      <th className="px-3 py-2 text-right font-medium">{t('agents.usage.input')}</th>
+                      <th className="px-3 py-2 text-right font-medium">{t('agents.usage.output')}</th>
+                      <th className="px-3 py-2 text-right font-medium">{t('agents.usage.cacheHit')}</th>
+                      <th className="px-3 py-2 text-right font-medium">{t('agents.usage.cost')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -378,7 +382,7 @@ export default function AgentUsagePage() {
               </div>
             </Section>
 
-            <Section title="Top sessions">
+            <Section title={t('agents.usage.topSessions')}>
               <div className="flex flex-col divide-y rounded-xl border">
                 {data.sessions.map((session) => (
                   <Link
@@ -389,22 +393,28 @@ export default function AgentUsagePage() {
                   >
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">
-                        {session.title ?? 'New conversation'}
+                        {stripPageContextFromTitle(session.title ?? '') ||
+                          t('agents.conversations.newConversation')}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {formatDistanceToNow(new Date(session.lastActiveAt), {
                           addSuffix: true,
+                          locale: dateFnsLocale(),
                         })}
                       </p>
                     </div>
                     <div className="shrink-0 text-right text-xs tabular-nums">
                       <p className="font-medium">
-                        {formatTokens(session.inputTokens)} in ·{' '}
-                        {formatTokens(session.outputTokens)} out
+                        {t('agents.usage.sessionTokens', {
+                          input: formatTokens(session.inputTokens),
+                          output: formatTokens(session.outputTokens),
+                        })}
                       </p>
                       <p className="text-muted-foreground">
                         <span className={cacheHitTone(session)}>
-                          {formatCacheHit(session)} cache
+                          {t('agents.usage.sessionCache', {
+                            rate: formatCacheHit(session),
+                          })}
                         </span>{' '}
                         · {formatUsageCost(session)}
                       </p>
@@ -415,8 +425,7 @@ export default function AgentUsagePage() {
             </Section>
 
             <p className="text-xs text-muted-foreground">
-              Your finished answers and subagent runs in this workspace. Stopped
-              answers are not counted.
+              {t('agents.usage.footnote')}
             </p>
           </>
         )}

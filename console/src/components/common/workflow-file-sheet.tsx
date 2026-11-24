@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { CodeBlock } from '@/components/common/code-block';
 import { Button } from '@/components/ui/button';
 import {
@@ -85,7 +86,7 @@ export function WorkflowFileSheet({
   open,
   onOpenChange,
   isLoading = false,
-  emptyMessage = 'No workflow attached.',
+  emptyMessage,
 }: {
   yaml: string;
   description: string;
@@ -95,12 +96,13 @@ export function WorkflowFileSheet({
   isLoading?: boolean;
   emptyMessage?: string;
 }) {
+  const t = useT();
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetTrigger asChild>
         <Button variant="ghost" size="sm">
           <Code2 className="h-4 w-4" />
-          View workflow
+          {t('components.workflowSheet.view')}
         </Button>
       </SheetTrigger>
       <SheetContent
@@ -108,7 +110,7 @@ export function WorkflowFileSheet({
         className="w-full gap-0 overflow-y-auto sm:max-w-2xl"
       >
         <SheetHeader>
-          <SheetTitle>Workflow definition</SheetTitle>
+          <SheetTitle>{t('components.workflowSheet.title')}</SheetTitle>
           <SheetDescription>{description}</SheetDescription>
         </SheetHeader>
         <div className="px-4 pb-4">
@@ -117,7 +119,9 @@ export function WorkflowFileSheet({
           ) : yaml ? (
             <CodeBlock language="yaml" showLine value={yaml} />
           ) : (
-            <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+            <p className="text-sm text-muted-foreground">
+              {emptyMessage ?? t('components.workflowSheet.empty')}
+            </p>
           )}
         </div>
       </SheetContent>

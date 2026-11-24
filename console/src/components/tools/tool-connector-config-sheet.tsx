@@ -25,6 +25,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { useT } from '@/lib/i18n-dictionary';
 
 interface ToolConnectorConfigSheetProps {
   open: boolean;
@@ -75,6 +76,7 @@ export function ToolConnectorConfigSheet({
   onInlineSubmit,
   onDismiss,
 }: ToolConnectorConfigSheetProps) {
+  const t = useT();
   const queryClient = useQueryClient();
   const isEdit = !!initialData;
   const dismiss = () => (onDismiss ? onDismiss() : onOpenChange(false));
@@ -98,7 +100,7 @@ export function ToolConnectorConfigSheet({
     useToolConfigProfilesControllerCreate({
       mutation: {
         onSuccess: () => {
-          toast.success('Profile created');
+          toast.success(t('tools.configSheet.created'));
           queryClient.invalidateQueries({
             queryKey: getToolConfigProfilesControllerListQueryKey(tool.id),
           });
@@ -108,7 +110,7 @@ export function ToolConnectorConfigSheet({
         },
         onError: (err: unknown) => {
           const msg =
-            err instanceof Error ? err.message : 'Failed to create profile';
+            err instanceof Error ? err.message : t('tools.configSheet.createFailed');
           toast.error(msg);
         },
       },
@@ -118,7 +120,7 @@ export function ToolConnectorConfigSheet({
     useToolConfigProfilesControllerUpdate({
       mutation: {
         onSuccess: () => {
-          toast.success('Profile updated');
+          toast.success(t('tools.configSheet.updated'));
           queryClient.invalidateQueries({
             queryKey: getToolConfigProfilesControllerListQueryKey(tool.id),
           });
@@ -128,7 +130,7 @@ export function ToolConnectorConfigSheet({
         },
         onError: (err: unknown) => {
           const msg =
-            err instanceof Error ? err.message : 'Failed to update profile';
+            err instanceof Error ? err.message : t('tools.configSheet.updateFailed');
           toast.error(msg);
         },
       },
@@ -152,7 +154,7 @@ export function ToolConnectorConfigSheet({
     }
 
     if (!profileName.trim()) {
-      toast.error('Profile name is required');
+      toast.error(t('tools.configSheet.nameRequired'));
       return;
     }
 
@@ -197,10 +199,10 @@ export function ToolConnectorConfigSheet({
             </LogoFrame>
             <SheetTitle>
               {mode === 'inline'
-                ? 'Configure Tool'
+                ? t('tools.configSheet.configureTool')
                 : isEdit
-                  ? 'Edit Configuration Profile'
-                  : 'Create Configuration Profile'}
+                  ? t('tools.configSheet.editTitle')
+                  : t('tools.configSheet.createTitle')}
             </SheetTitle>
           </div>
         </SheetHeader>
@@ -214,14 +216,14 @@ export function ToolConnectorConfigSheet({
                 size="sm"
                 onClick={() => formRef.current?.applyAllPresets()}
               >
-                Use default presets
+                {t('tools.configSheet.usePresets')}
               </Button>
             </div>
           )}
           {!inline && mode !== 'inline' && (
             <div className="space-y-2">
               <Label htmlFor="profile-name">
-                Profile name <span className="text-destructive">*</span>
+                {t('tools.configSheet.profileName')} <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="profile-name"
@@ -241,18 +243,23 @@ export function ToolConnectorConfigSheet({
               initialValues={inline || mode === 'inline' ? defaultConfig : initialData?.config}
               onSubmit={handleSubmit}
               onCancel={dismiss}
-              submitLabel={mode === 'inline' ? 'Apply' : isEdit ? 'Update' : 'Create'}
+              submitLabel={
+                mode === 'inline'
+                  ? t('tools.configSheet.apply')
+                  : isEdit
+                    ? t('tools.configSheet.update')
+                    : t('common.create')
+              }
               isSubmitting={isPending}
             />
           ) : isSchemaLoading ? (
             <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Loading schema...
+              {t('tools.configSheet.loadingSchema')}
             </div>
           ) : (
             <div className="rounded-md border border-dashed px-4 py-6 text-sm text-muted-foreground">
-              This tool doesn't require configuration. You can still create a
-              profile (empty config) to use as default.
+              {t('tools.configSheet.noConfig')}
             </div>
           )}
         </div>
@@ -265,7 +272,7 @@ export function ToolConnectorConfigSheet({
               onClick={dismiss}
               disabled={isPending}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             {!isSchemaLoading && (
               <Button
@@ -279,7 +286,11 @@ export function ToolConnectorConfigSheet({
                 }
                 disabled={isPending}
               >
-                {mode === 'inline' ? 'Apply' : isEdit ? 'Update' : 'Create'}
+                {mode === 'inline'
+                  ? t('tools.configSheet.apply')
+                  : isEdit
+                    ? t('tools.configSheet.update')
+                    : t('common.create')}
               </Button>
             )}
           </SheetFooter>

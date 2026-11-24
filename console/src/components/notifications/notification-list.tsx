@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import {
   type NotificationResponseDto,
   useNotificationsControllerGetNotificationsInfinite,
@@ -13,6 +14,7 @@ interface NotificationListProps {
 }
 
 export function NotificationList({ onClose }: NotificationListProps) {
+  const t = useT();
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
     useNotificationsControllerGetNotificationsInfinite(
       { limit: PAGE_SIZE },
@@ -61,7 +63,7 @@ export function NotificationList({ onClose }: NotificationListProps) {
   if (notifications.length === 0) {
     return (
       <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-        No notifications
+        {t('components.notifications.empty')}
       </div>
     );
   }

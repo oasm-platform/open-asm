@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMemo } from 'react';
 import { useForm, type Resolver } from 'react-hook-form';
 import { getConnectSchema, type ConnectFormData } from './schema';
+import { useT } from '@/lib/i18n-dictionary';
 
 export function ConnectForm({
   provider,
@@ -18,6 +19,7 @@ export function ConnectForm({
   onCancel: () => void;
   isSubmitting: boolean;
 }) {
+  const t = useT();
   const isCustomProvider =
     provider.providerId === LLMConfigWithProviderDtoProviderId.custom;
   const schema = useMemo(
@@ -25,8 +27,9 @@ export function ConnectForm({
       getConnectSchema(
         isCustomProvider,
         provider.isAcceptCustomApiUrl ?? false,
+        t,
       ),
-    [isCustomProvider, provider.isAcceptCustomApiUrl],
+    [isCustomProvider, provider.isAcceptCustomApiUrl, t],
   );
 
   const {
@@ -50,23 +53,23 @@ export function ConnectForm({
       className="flex flex-col gap-3"
     >
       <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-foreground">Name</label>
+        <label className="text-sm font-medium text-foreground">{t('agents.connect.name')}</label>
         <Input
           {...register('name')}
-          placeholder="e.g. My Work Key"
+          placeholder={t('agents.connect.namePlaceholder')}
           autoComplete="off"
           autoFocus
           onFocus={(e) => e.target.select()}
         />
         <p className="text-xs text-muted-foreground">
-          A friendly name to identify this configuration later.
+          {t('agents.connect.nameHint')}
         </p>
       </div>
 
       {provider.isAcceptCustomApiUrl && (
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-foreground">
-            API Endpoint
+            {t('agents.connect.apiEndpoint')}
           </label>
           <Input
             {...register('apiUrl')}
@@ -76,37 +79,38 @@ export function ConnectForm({
             error={errors.apiUrl?.message}
           />
           <p className="text-xs text-muted-foreground">
-            Base URL for the provider&apos;s API (e.g. OpenAI-compatible
-            endpoints).
+            {t('agents.connect.apiEndpointHint')}
           </p>
         </div>
       )}
 
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium text-foreground">
-          API Key{' '}
+          {t('agents.connect.apiKey')}{' '}
           {!isApiKeyOptional && <span className="text-destructive">*</span>}
         </label>
         <Input
           {...register('apiKey')}
           type="password"
-          placeholder={isApiKeyOptional ? '(optional)' : ''}
+          placeholder={isApiKeyOptional ? t('agents.connect.optional') : ''}
           autoComplete="new-password"
           error={errors.apiKey?.message}
         />
         <p className="text-xs text-muted-foreground">
           {isApiKeyOptional
-            ? 'Your API key is stored securely and never shared.'
-            : 'Required. Your API key is stored securely and never shared.'}
+            ? t('agents.connect.apiKeyHint')
+            : t('agents.connect.apiKeyRequiredHint')}
         </p>
       </div>
 
       <div className="flex justify-between items-center gap-2">
         <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button type="submit" size="sm" disabled={isSubmitting}>
-          {isSubmitting ? 'Connecting...' : 'Connect'}
+          {isSubmitting
+            ? t('agents.connect.connecting')
+            : t('agents.connect.connect')}
         </Button>
       </div>
     </form>

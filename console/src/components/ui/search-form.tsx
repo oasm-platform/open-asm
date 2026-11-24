@@ -1,3 +1,4 @@
+import { useT } from '@/lib/i18n-dictionary';
 import { Label } from '@/components/ui/label';
 import {
   SidebarGroup,
@@ -26,6 +27,7 @@ const formSchema = z.object({
 });
 
 export function SearchForm({ ...props }: React.ComponentProps<'form'>) {
+  const t = useT();
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -50,7 +52,7 @@ export function SearchForm({ ...props }: React.ComponentProps<'form'>) {
           <SidebarGroupContent className="relative">
             <div className="w-full">
               <Label htmlFor="search" className="sr-only">
-                Search
+                {t('common.search')}
               </Label>
               <Popover>
                 <PopoverTrigger className="w-full">
@@ -60,7 +62,7 @@ export function SearchForm({ ...props }: React.ComponentProps<'form'>) {
                     render={({ field }) => (
                       <>
                         <SidebarInput
-                          placeholder="Search"
+                          placeholder={t('common.search')}
                           className="pl-8"
                           autoComplete="off"
                           {...field}
@@ -98,6 +100,7 @@ const DropdownCard = React.memo(
     setValue: UseFormSetValue<{ value: string }>;
     value: string;
   }) => {
+    const t = useT();
     const { mutate } = useSearchControllerDeleteSearchHistory();
 
     const debouncedValue = useDebounce(value, 500);
@@ -124,8 +127,8 @@ const DropdownCard = React.memo(
       const q = value.toLowerCase();
       return menu
         .flatMap((group) => group.items)
-        .filter((item) => item.title.toLowerCase().includes(q));
-    }, [value]);
+        .filter((item) => t(item.title).toLowerCase().includes(q));
+    }, [value, t]);
 
     return (
       <>
@@ -134,7 +137,7 @@ const DropdownCard = React.memo(
               <div className="flex justify-center items-center p-6">
                 <Search className="size-8 mr-2" />
                 <div>
-                  <p>No result found</p>
+                  <p>{t('shell.search.noResult')}</p>
                 </div>
               </div>
             )}
@@ -142,15 +145,15 @@ const DropdownCard = React.memo(
             <div className="flex justify-center items-center p-6">
               <HistoryIcon className="size-10 mr-2" />
               <div>
-                <p>Your search history is empty</p>
-                <span>Search something to continue</span>
+                <p>{t('shell.search.historyEmpty')}</p>
+                <span>{t('shell.search.historyHint')}</span>
               </div>
             </div>
           )}
           {value.length === 0 && historyData && historyData.total > 0 && (
             <div className="mb-2">
               <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">
-                History
+                {t('shell.search.history')}
               </div>
               {historyData.data.map((e) => (
                 <div
@@ -164,7 +167,7 @@ const DropdownCard = React.memo(
                     </span>
                     <X
                     className="size-4 ml-auto text-gray-400 hover:text-red-500 hover:bg-red-100 rounded-full p-0.5 transition-colors cursor-pointer"
-                    aria-label="Delete search history"
+                    aria-label={t('shell.search.deleteHistory')}
                     onClick={(evt) => {
                       evt.stopPropagation();
                       mutate(
@@ -186,7 +189,7 @@ const DropdownCard = React.memo(
           {value.length > 0 && features.length > 0 && (
             <div className="mb-2">
               <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">
-                Features
+                {t('shell.search.features')}
               </div>
               {features.map((item) => (
                 <div
@@ -198,7 +201,7 @@ const DropdownCard = React.memo(
                     {item.icon}
                   </span>
                   <span className="text-gray-700 dark:text-gray-300 text-sm truncate">
-                    {item.title}
+                    {t(item.title)}
                   </span>
                 </div>
               ))}
@@ -207,7 +210,7 @@ const DropdownCard = React.memo(
           {value.length > 0 && data && data.data.targets.length > 0 && (
             <div className="mb-2">
               <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">
-                Targets
+                {t('shell.nav.targets')}
               </div>
               {data.data.targets.map((target) => (
                 <div
@@ -226,7 +229,7 @@ const DropdownCard = React.memo(
           {value.length > 0 && data && data.data.assets.length > 0 && (
             <div className="mb-2">
               <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">
-                Assets
+                {t('shell.nav.assets')}
               </div>
               {data.data.assets.map((asset) => (
                 <div

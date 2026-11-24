@@ -20,6 +20,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { SeverityBadge } from '@/components/vulnerabilities/lifecycle-badges';
 import useDebounce from '@/hooks/use-debounce';
+import { useT } from '@/lib/i18n-dictionary';
 import {
   useAssetsControllerGetAssetsInWorkspace,
   useIssuesControllerAddLinks,
@@ -86,9 +87,9 @@ function usePickerOptions(type: LinkResourceType, search: string) {
   if (type === 'target') {
     return {
       isLoading: targets.isLoading,
-      options: (targets.data?.data ?? []).map<PickerOption>((t) => ({
-        id: t.id,
-        label: <span className="truncate">{t.value}</span>,
+      options: (targets.data?.data ?? []).map<PickerOption>((x) => ({
+        id: x.id,
+        label: <span className="truncate">{x.value}</span>,
       })),
     };
   }
@@ -113,6 +114,7 @@ export function AddLinkDialog({
   linkedIds: Set<string>;
   onLinked: () => void;
 }) {
+  const t = useT();
   const [type, setType] = useState<LinkResourceType>(defaultType);
   const [search, setSearch] = useState('');
   const debounced = useDebounce(search, 300);
@@ -141,14 +143,16 @@ export function AddLinkDialog({
       {
         onSuccess: () => {
           toast.success(
-            ids.length === 1 ? 'Link added' : `${ids.length} links added`,
+            ids.length === 1
+              ? t('issues.addLink.added')
+              : t('issues.addLink.addedMany', { n: ids.length }),
           );
           reset();
           onOpenChange(false);
           onLinked();
         },
         onError: (error) =>
-          toast.error(apiErrorMessage(error, 'Failed to add the link')),
+          toast.error(apiErrorMessage(error, t('issues.addLink.failed'))),
       },
     );
   };
@@ -163,15 +167,14 @@ export function AddLinkDialog({
     >
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Link resources</DialogTitle>
+          <DialogTitle>{t('issues.addLink.title')}</DialogTitle>
           <DialogDescription>
-            Attach vulnerabilities, assets, targets, projects or runs to this
-            issue.
+            {t('issues.addLink.description')}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3">
           <div className="grid gap-1.5">
-            <Label htmlFor="link-type">Resource type</Label>
+            <Label htmlFor="link-type">{t('issues.addLink.resourceType')}</Label>
             <Select
               value={type}
               onValueChange={(v) => {
@@ -184,10 +187,10 @@ export function AddLinkDialog({
               </SelectTrigger>
               <SelectContent>
                 {(Object.keys(LINK_RESOURCE_SINGULAR) as LinkResourceType[]).map(
-                  (t) => (
-                    <SelectItem key={t} value={t}>
-                      {LINK_RESOURCE_SINGULAR[t].charAt(0).toUpperCase() +
-                        LINK_RESOURCE_SINGULAR[t].slice(1)}
+                  (key) => (
+                    <SelectItem key={key} value={key}>
+                      {LINK_RESOURCE_SINGULAR[key].charAt(0).toUpperCase() +
+                        LINK_RESOURCE_SINGULAR[key].slice(1)}
                     </SelectItem>
                   ),
                 )}
@@ -198,8 +201,10 @@ export function AddLinkDialog({
           {picker ? (
             <div className="grid gap-2">
               <Input
-                aria-label="Search resources"
-                placeholder={`Search ${LINK_RESOURCE_SINGULAR[type]}…`}
+                aria-label={t('issues.addLink.searchAria')}
+                placeholder={t('issues.addLink.search', {
+                  type: LINK_RESOURCE_SINGULAR[type],
+                })}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -214,7 +219,7 @@ export function AddLinkDialog({
                   </div>
                 ) : picker.options.length === 0 ? (
                   <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-                    Nothing found
+                    {t('issues.addLink.nothingFound')}
                   </p>
                 ) : (
                   picker.options.map((option) => {
@@ -228,7 +233,7 @@ export function AddLinkDialog({
                         <Checkbox
                           checked={checked}
                           disabled={already}
-                          aria-label={`Select ${option.id}`}
+                          aria-label={t('issues.addLink.select', { id: option.id })}
                           onCheckedChange={() =>
                             setSelected((prev) =>
                               prev.includes(option.id)
@@ -247,9 +252,11 @@ export function AddLinkDialog({
           ) : (
             <div className="grid gap-1.5">
               <Label htmlFor="link-id">
-                {LINK_RESOURCE_SINGULAR[type].charAt(0).toUpperCase() +
-                  LINK_RESOURCE_SINGULAR[type].slice(1)}{' '}
-                ID
+                {t('issues.addLink.idLabel', {
+                  type:
+                    LINK_RESOURCE_SINGULAR[type].charAt(0).toUpperCase() +
+                    LINK_RESOURCE_SINGULAR[type].slice(1),
+                })}
               </Label>
               <Input
                 id="link-id"
@@ -259,20 +266,24 @@ export function AddLinkDialog({
                 placeholder="00000000-0000-0000-0000-000000000000"
               />
               {rawInvalid && (
-                <p className="text-xs text-destructive">Enter a valid ID</p>
+                <p className="text-xs text-destructive">
+                  {t('issues.addLink.invalidId')}
+                </p>
               )}
             </div>
           )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             disabled={!ids.length || rawInvalid || addLinks.isPending}
             onClick={submit}
           >
-            {ids.length > 1 ? `Link ${ids.length}` : 'Link'}
+            {ids.length > 1
+              ? t('issues.addLink.linkN', { n: ids.length })
+              : t('issues.addLink.link')}
           </Button>
         </DialogFooter>
       </DialogContent>

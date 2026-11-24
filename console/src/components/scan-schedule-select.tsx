@@ -5,6 +5,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useT } from '@/lib/i18n-dictionary';
 import { UpdateTargetDtoScanSchedule } from '@/services/apis/gen/queries';
 import { Clock, X } from 'lucide-react';
 
@@ -17,27 +18,27 @@ interface ScanScheduleSelectProps {
 const scheduleOptions = [
   {
     value: UpdateTargetDtoScanSchedule['disabled'],
-    label: 'Disabled',
+    labelKey: 'projects.scanSchedule.disabled',
   },
   {
     value: UpdateTargetDtoScanSchedule['0_0_*_*_*'],
-    label: 'Daily',
+    labelKey: 'projects.scanSchedule.daily',
   },
   {
     value: UpdateTargetDtoScanSchedule['0_0_*/3_*_*'],
-    label: 'Every 3 days',
+    labelKey: 'projects.scanSchedule.every3Days',
   },
   {
     value: UpdateTargetDtoScanSchedule['0_0_*_*_0'],
-    label: 'Weekly',
+    labelKey: 'projects.scanSchedule.weekly',
   },
   {
     value: UpdateTargetDtoScanSchedule['0_0_*/14_*_*'],
-    label: 'Every 2 weeks',
+    labelKey: 'projects.scanSchedule.every2Weeks',
   },
   {
     value: UpdateTargetDtoScanSchedule['0_0_1_*_*'],
-    label: 'Monthly',
+    labelKey: 'projects.scanSchedule.monthly',
   },
 ];
 
@@ -46,10 +47,11 @@ export const ScanScheduleSelect = ({
   onChange,
   disabled,
 }: ScanScheduleSelectProps) => {
+  const t = useT();
   return (
     <Select disabled={disabled} value={value} onValueChange={onChange}>
       <SelectTrigger id="scan-frequency" className="w-[160px] h-9 text-sm">
-        <SelectValue placeholder="Select frequency" />
+        <SelectValue placeholder={t('projects.scanSchedule.placeholder')} />
       </SelectTrigger>
       <SelectContent>
         {scheduleOptions.map((option) => (
@@ -63,7 +65,7 @@ export const ScanScheduleSelect = ({
             ) : (
               <Clock className="inline-block w-4 h-4 mr-2" />
             )}
-            {option.label}
+            {t(option.labelKey)}
           </SelectItem>
         ))}
       </SelectContent>

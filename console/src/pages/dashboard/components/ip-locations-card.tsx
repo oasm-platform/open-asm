@@ -1,3 +1,4 @@
+import { countryName, useT } from '@/lib/i18n-dictionary';
 import { useTheme } from '@/components/ui/theme-provider';
 import { IpLocationsSkeleton } from './dashboard-skeleton';
 import countriesData from '@/data/countries.json';
@@ -27,6 +28,10 @@ const allCountryNames = (
   }))
   .filter((c) => c.name) as { name: string; code?: string }[];
 
+// Regions are keyed by the English NAME; only the shown text is localized
+const codeByName = new Map(allCountryNames.map((c) => [c.name, c.code]));
+const localName = (name: string) => countryName(codeByName.get(name), name);
+
 interface IpLocationsCardProps {
   data: IpLocationData[];
   totalIps: number;
@@ -42,6 +47,7 @@ export default function IpLocationsCard({
   onCountrySelect,
   isLoading = false,
 }: IpLocationsCardProps) {
+  const t = useT();
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   const chartRef = useRef<ReactEChartsCore>(null);
@@ -81,7 +87,9 @@ export default function IpLocationsCard({
           fontFamily: 'system-ui, sans-serif',
         },
         formatter: (params: { name?: string; value?: number | null }) => {
-          const name = params.name ?? 'Unknown';
+          const name = params.name
+            ? localName(params.name)
+            : t('common.unknown');
           const value = params.value ?? 0;
           if (!params.value) return '';
           return `<div style="font-weight:600;margin-bottom:4px">${name}</div>
@@ -123,6 +131,7 @@ export default function IpLocationsCard({
           nameProperty: 'NAME',
           selectedMode: 'single',
           select: {
+            label: { formatter: (p: { name: string }) => localName(p.name) },
             itemStyle: {
               areaColor: isDark
                 ? 'rgba(96, 165, 250, 0.5)'
@@ -159,6 +168,7 @@ export default function IpLocationsCard({
             },
             label: {
               show: false,
+              formatter: (p: { name: string }) => localName(p.name),
             },
           },
           itemStyle: {
@@ -168,11 +178,12 @@ export default function IpLocationsCard({
           },
           label: {
             show: false,
+            formatter: (p: { name: string }) => localName(p.name),
           },
         },
       ],
     }),
-    [data, maxIpCount, isDark],
+    [data, maxIpCount, isDark, t],
   );
 
   const onEvents = useMemo(
@@ -190,16 +201,17 @@ export default function IpLocationsCard({
 
   return (
     <div
-      className={`rounded-xl border h-full relative ${isDark ? 'bg-card' : 'bg-white'}`}
+      className={`rounded-xl border h-full relative ${isDark ? 'bg-card-surface' : 'bg-white'}`}
     >
       <div className="absolute top-4 left-4 z-10">
-        <h3 className="font-semibold text-base">Locations</h3>
+        <h3 className="font-semibold text-base">{t('dashboard.locations.title')}</h3>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Distribution of asset IPs by location
+          {t('dashboard.locations.description')}
         </p>
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-4 p-4 pt-0 gap-4">
-        <div className="lg:col-span-3 relative overflow-hidden rounded-xl">
+      {/* Sized by the dashboard's main column (`dashboard-main` container) */}
+      <div className="grid grid-cols-1 @3xl/dashboard-main:grid-cols-4 p-4 pt-0 gap-4">
+        <div className="@3xl/dashboard-main:col-span-3 relative overflow-hidden rounded-xl">
           <ReactEChartsCore
             ref={chartRef}
             echarts={echarts}
@@ -212,7 +224,8 @@ export default function IpLocationsCard({
         </div>
         {data.length > 0 && (
           <div
-            className={`lg:col-span-1 rounded-xl p-2 self-center ${isDark ? 'bg-card' : 'bg-white'}`}
+            // Dark mode: no fill of its own, it sits on the see-through card
+            className={`@3xl/dashboard-main:col-span-1 rounded-xl p-2 self-center ${isDark ? '' : 'bg-white'}`}
           >
             <IpLocationsTable
               data={data}
