@@ -90,6 +90,14 @@ func (p *httpProxy) authenticate(r *http.Request) (string, bool) {
 			return label, true
 		}
 	}
+	// rawhttp (nuclei raw/unsafe templates) splits the proxy URL at "@" with
+	// the scheme still on, sending base64("http://<token>"): user "http",
+	// pass "//<token>".
+	if (user == "http" || user == "https") && strings.HasPrefix(pass, "//") {
+		if label, ok := p.srv.auth(pass[2:]); ok {
+			return label, true
+		}
+	}
 	return "", false
 }
 
@@ -206,7 +214,11 @@ func (p *httpProxy) tunnel(w *connResponseWriter, r *http.Request) {
 	var upBytes, downBytes int64
 	var wg sync.WaitGroup
 	p.srv.logInfo("egress allow exec=%s method=CONNECT target=%s", label, r.Host)
-	_, _ = w.conn.Write([]byte("HTTP/1.1 200 Connection established\r\n\r\n"))
+	// The header is load-bearing: rawhttp peeks 5 bytes after the status line
+	// (duplicate-status-line check) and would block forever on a bare "\r\n",
+	// since the upstream sends nothing until the client speaks. RFC 9110 has
+	// clients ignore Content-Length on a 2xx CONNECT.
+	_, _ = w.conn.Write([]byte("HTTP/1.1 200 Connection established\r\nContent-Length: 0\r\n\r\n"))
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
