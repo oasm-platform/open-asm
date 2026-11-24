@@ -6,11 +6,17 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useJobsRegistryControllerGetManyJobs } from "@/services/apis/gen/queries";
 
 
+/**
+ * The widget lists the latest 100 jobs with a count over the workspace's
+ * jobs; every open dashboard re-ran it each second.
+ */
+const JOBS_WIDGET_POLL_MS = 10_000;
+
 const JobsRegistry = () => {
   const t = useT();
     const { data } = useJobsRegistryControllerGetManyJobs(
         { limit: 100, page: 1, sortBy: "updatedAt", sortOrder: "DESC" },
-        { query: { refetchInterval: 1000 } }
+        { query: { refetchInterval: JOBS_WIDGET_POLL_MS } }
     );
 
     const getStatusColor = (status: string) => {

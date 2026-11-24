@@ -53,6 +53,12 @@ func (c *Client) Join(ctx context.Context) error {
 		req.EncryptionPublicKey = c.encKey.PublicKey()
 	}
 
+	// Core requeues this worker's IN_PROGRESS jobs that the list leaves out.
+	// No claim may land between the snapshot and core applying it: see claimMu.
+	c.claimMu.Lock()
+	defer c.claimMu.Unlock()
+	req.RunningJobIds = c.runningJobIDs()
+
 	resp, err := c.workers.Join(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to join: %w", err)

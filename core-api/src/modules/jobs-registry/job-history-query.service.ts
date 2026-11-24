@@ -559,6 +559,8 @@ export class JobHistoryQueryService {
 
   // Jobs a worker is executing, per step (tool + category). A dispatched step
   // only has its jobs created: until a worker picks one up it is queued.
+  // Failures are counted here too: the engine records them on the step only
+  // once the step drains, so a running step reads them live.
   const rawRunning = await this.repo
     .createQueryBuilder('job')
     .select('job.toolId', 'toolId')
@@ -567,14 +569,25 @@ export class JobHistoryQueryService {
       `COUNT(*) FILTER (WHERE job.status = '${JobStatus.IN_PROGRESS}')`,
       'running',
     )
+    .addSelect(
+      `COUNT(*) FILTER (WHERE job.status = '${JobStatus.FAILED}')`,
+      'failed',
+    )
     .where('job.jobHistoryId = :historyId', { historyId: jobHistory.id })
     .groupBy('job.toolId')
     .addGroupBy('job.category')
-    .getRawMany<{ toolId: string; category: string; running: string }>();
+    .getRawMany<{
+      toolId: string;
+      category: string;
+      running: string;
+      failed?: string;
+    }>();
   const runningByStep = new Map<string, number>();
-  rawRunning.forEach((row) =>
-    runningByStep.set(`${row.toolId}:${row.category}`, Number(row.running ?? 0)),
-  );
+  const failedByStep = new Map<string, number>();
+  rawRunning.forEach((row) => {
+    runningByStep.set(`${row.toolId}:${row.category}`, Number(row.running ?? 0));
+    failedByStep.set(`${row.toolId}:${row.category}`, Number(row.failed ?? 0));
+  });
 
   // Map tools from workflow content with their computed status.
   // Only id/name/logoUrl/status are exposed — the UI renders nothing else
@@ -639,6 +652,12 @@ export class JobHistoryQueryService {
     const derived = tool ? toolStatusMap.get(tool.id!) : undefined;
     const category = this.stepCategory(tool, job.category);
     const running = tool ? runningByStep.get(`${tool.id}:${category}`) : 0;
+    // A finished step keeps what the engine recorded: its jobs may since have
+    // been retried or pruned.
+    const failed =
+      state?.status === 'dispatched' && tool
+        ? failedByStep.get(`${tool.id}:${category}`) || undefined
+        : state?.failed;
     return {
       id,
       name: job.name ?? id,
@@ -648,7 +667,7 @@ export class JobHistoryQueryService {
       status: state?.status ?? this.toRunStepStatus(derived),
       reason: state?.reason,
       jobs: state?.jobs ?? 0,
-      failed: state?.failed,
+      failed,
       running: running || undefined,
       toolId: tool?.id,
       logoUrl: tool?.logoUrl,

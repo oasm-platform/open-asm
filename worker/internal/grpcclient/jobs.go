@@ -10,6 +10,11 @@ import (
 // NextJob pulls the next job from the registry.
 // Returns (nil, nil) when no job is available.
 func (c *Client) NextJob(ctx context.Context) (*jobsRegistry.Job, error) {
+	c.claimMu.RLock()
+	defer c.claimMu.RUnlock()
+	ctx, cancel := context.WithTimeout(ctx, c.claimTimeout)
+	defer cancel()
+
 	job, err := c.jobs.Next(ctx, &jobsRegistry.Worker{Id: c.WorkerID()})
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch next job: %w", err)
@@ -17,7 +22,35 @@ func (c *Client) NextJob(ctx context.Context) (*jobsRegistry.Job, error) {
 	if job == nil || job.Id == "" {
 		return nil, nil
 	}
+	c.trackRunning(job.Id)
 	return job, nil
+}
+
+// ReleaseJob forgets a claimed job once its concurrency slot is released, so
+// the next Join no longer reports it as running. Unknown ids are ignored.
+func (c *Client) ReleaseJob(jobID string) {
+	c.runningMu.Lock()
+	delete(c.running, jobID)
+	c.runningMu.Unlock()
+}
+
+func (c *Client) trackRunning(ids ...string) {
+	c.runningMu.Lock()
+	for _, id := range ids {
+		c.running[id] = struct{}{}
+	}
+	c.runningMu.Unlock()
+}
+
+// runningJobIDs is what Join reports: the claimed jobs not released yet.
+func (c *Client) runningJobIDs() []string {
+	c.runningMu.Lock()
+	defer c.runningMu.Unlock()
+	ids := make([]string, 0, len(c.running))
+	for id := range c.running {
+		ids = append(ids, id)
+	}
+	return ids
 }
 
 // NextJobs claims up to `limit` jobs in a single request.
@@ -31,6 +64,12 @@ func (c *Client) NextJobs(ctx context.Context, limit int) ([]*jobsRegistry.Job, 
 	if limit < 1 {
 		return nil, nil
 	}
+
+	// Held until the claimed jobs are recorded: see claimMu.
+	c.claimMu.RLock()
+	defer c.claimMu.RUnlock()
+	ctx, cancel := context.WithTimeout(ctx, c.claimTimeout)
+	defer cancel()
 
 	resp, err := c.jobs.NextBatch(ctx, &jobsRegistry.NextBatchRequest{
 		Id:    c.WorkerID(),
@@ -51,6 +90,7 @@ func (c *Client) NextJobs(ctx context.Context, limit int) ([]*jobsRegistry.Job, 
 			continue
 		}
 		jobs = append(jobs, job)
+		c.trackRunning(job.GetId())
 	}
 	return jobs, nil
 }

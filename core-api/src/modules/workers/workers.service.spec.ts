@@ -1,3 +1,7 @@
+import {
+  LAST_SEEN_WRITE_INTERVAL_MS,
+  WORKER_TIMEOUT,
+} from '@/common/constants/app.constants';
 import { JobStatus, WorkerScope, WorkerType } from '@/common/enums/enum';
 import { ConfigService } from '@nestjs/config';
 
@@ -884,7 +888,9 @@ describe('WorkersService', () => {
 
       await service.workerDisconnected('worker-1');
 
-      expect((mockJobsRegistryService.repo as any).execute).toHaveBeenCalled();
+      // The worker usually keeps running its jobs through a dropped stream
+      // (a core-api restart, a network blip); a dead one is swept instead.
+      expect((mockJobsRegistryService.repo as any).execute).not.toHaveBeenCalled();
       expect(mockEventBridge.publishSafely).toHaveBeenCalledWith(
         EVENT_CATALOG.worker.disconnected,
         expect.objectContaining({
@@ -904,6 +910,52 @@ describe('WorkersService', () => {
       await service.workerDisconnected('worker-1');
 
       expect(mockEventBridge.publishSafely).not.toHaveBeenCalled();
+    });
+
+    it('requeues only the jobs a rejoining worker no longer runs, trusting no malformed id', async () => {
+      // Given: a worker reporting two running jobs, one id malformed
+      (mockConfigService.get as jest.Mock).mockReturnValue(undefined);
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 'w-existing',
+        token: 'tok-existing',
+        workspaceId: 'ws-1',
+      });
+      const running = '6f1c2f3e-8a4b-4c5d-9e6f-7a8b9c0d1e2f';
+
+      // When
+      await service.join(
+        { apiKey: 'api-key-1', token: 'tok-existing' },
+        { runningJobIds: [running, "x' OR 1=1 --"] },
+      );
+
+      // Then: one requeue, scoped to the worker, sparing the valid id only
+      const repo = mockJobsRegistryService.repo as any;
+      expect(repo.execute).toHaveBeenCalledTimes(1);
+      expect(repo.andWhere).toHaveBeenCalledWith(
+        expect.stringContaining('ANY'),
+        { running: [running] },
+      );
+    });
+
+    it('requeues every in-progress job of a worker that reports none', async () => {
+      // Given: an older worker build, which sends no list
+      (mockConfigService.get as jest.Mock).mockReturnValue(undefined);
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 'w-existing',
+        token: 'tok-existing',
+        workspaceId: 'ws-1',
+      });
+
+      // When
+      await service.join({ apiKey: 'api-key-1', token: 'tok-existing' });
+
+      // Then: the previous behaviour, nothing spared
+      const repo = mockJobsRegistryService.repo as any;
+      expect(repo.execute).toHaveBeenCalledTimes(1);
+      expect(repo.andWhere).not.toHaveBeenCalledWith(
+        expect.stringContaining('ANY'),
+        expect.anything(),
+      );
     });
 
     it('publishes worker.rejoined on a token rejoin', async () => {
@@ -927,6 +979,67 @@ describe('WorkersService', () => {
         }),
         expect.anything(),
       );
+    });
+  });
+
+  describe('alive', () => {
+    const now = 1_000_000_000;
+
+    beforeEach(() => {
+      jest.spyOn(Date, 'now').mockReturnValue(now);
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('records the heartbeat once lastSeenAt is older than the write interval', async () => {
+      // Given
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 'w-1',
+        token: 'tok',
+        lastSeenAt: new Date(now - LAST_SEEN_WRITE_INTERVAL_MS),
+      });
+
+      // When
+      const worker = await service.alive({ token: 'tok' });
+
+      // Then: one read, one write, and the caller sees the new timestamp
+      expect(mockWorkerInstanceRepository.findOne).toHaveBeenCalledTimes(1);
+      expect(mockWorkerInstanceRepository.update).toHaveBeenCalledWith(
+        { id: 'w-1' },
+        { lastSeenAt: new Date(now) },
+      );
+      expect(worker.lastSeenAt).toEqual(new Date(now));
+    });
+
+    it('skips the write while lastSeenAt is recent', async () => {
+      // Given: the previous heartbeat was written 10 s ago
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 'w-1',
+        token: 'tok',
+        lastSeenAt: new Date(now - 10_000),
+      });
+
+      // When
+      const worker = await service.alive({ token: 'tok' });
+
+      // Then
+      expect(mockWorkerInstanceRepository.update).not.toHaveBeenCalled();
+      expect(worker.id).toBe('w-1');
+    });
+
+    it('rejects an unknown token', async () => {
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue(null);
+
+      await expect(service.alive({ token: 'nope' })).rejects.toThrow('Invalid token');
+      expect(mockWorkerInstanceRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('stays well inside the timeout the sweep uses', () => {
+      // A connected worker must never look stale to the sweep: one missed
+      // heartbeat (10 s) on top of a skipped write still lands under it.
+      expect(LAST_SEEN_WRITE_INTERVAL_MS + 10_000).toBeLessThan(WORKER_TIMEOUT);
     });
   });
 

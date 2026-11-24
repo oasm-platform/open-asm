@@ -26,6 +26,8 @@ import { WorkspacesService } from '../workspaces/workspaces.service';
 import { JobHistory } from './entities/job-history.entity';
 import { Job } from './entities/job.entity';
 import { JobsRegistryService } from './jobs-registry.service';
+import { RunAdvanceGate } from './run-advance-gate';
+import { MAX_CONCURRENT_RUN_ADVANCES } from '@/common/constants/app.constants';
 import { InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 export interface StartRunInput {
@@ -74,6 +76,8 @@ interface RunGraph {
 @Injectable()
 export class WorkflowRunnerService {
   private readonly logger = new Logger(WorkflowRunnerService.name);
+  /** Every `advance` runs through it; see `RunAdvanceGate`. */
+  private readonly gate = new RunAdvanceGate(MAX_CONCURRENT_RUN_ADVANCES);
 
   constructor(
     private readonly dataSource: DataSource,
@@ -136,7 +140,9 @@ export class WorkflowRunnerService {
       jobRunType: input.jobRunType,
     });
 
-    const { dispatched } = await this.advance(jobHistory.id, context);
+    const { dispatched } = await this.gate.limit(() =>
+      this.advance(jobHistory.id, context),
+    );
     return { jobHistory, dispatched };
   }
 
@@ -191,7 +197,14 @@ export class WorkflowRunnerService {
     if (!jobHistoryId) return;
 
     try {
-      await this.advance(jobHistoryId);
+      // Until its step drains, a finished job changes nothing the engine acts
+      // on: skip the run lock and the aggregate over every job of the run.
+      if (await this.stepStillRunning(jobHistoryId, job)) return;
+      // Jobs finishing together all see the step drained: one pass per run
+      // at a time on this instance, the rest folded into one more pass.
+      await this.gate.coalesce(jobHistoryId, async () => {
+        await this.advance(jobHistoryId);
+      });
     } catch (error) {
       this.logger.error(
         `Failed to advance run ${jobHistoryId} after job ${job?.id}: ${
@@ -201,9 +214,34 @@ export class WorkflowRunnerService {
     }
   }
 
+  /**
+   * Whether the finished job's step (its tool and category in the run) still
+   * has a pending or in-progress job. Runs after the job's terminal status was
+   * committed, so of two last jobs finishing together the later probe always
+   * sees the other one finished: at least one of them advances the run. A job
+   * that does not name its step is treated as drained.
+   */
+  private async stepStillRunning(jobHistoryId: string, job: Job): Promise<boolean> {
+    const toolId = job.tool?.id;
+    if (!toolId || !job.category) return false;
+    const row: unknown = await this.dataSource
+      .getRepository(Job)
+      .createQueryBuilder('job')
+      .select('1', 'one')
+      .where('job."jobHistoryId" = :jobHistoryId', { jobHistoryId })
+      .andWhere('job."toolId" = :toolId', { toolId })
+      .andWhere('job.category = :category', { category: job.category })
+      .andWhere('job.status IN (:...active)', {
+        active: [JobStatus.PENDING, JobStatus.IN_PROGRESS],
+      })
+      .limit(1)
+      .getRawOne();
+    return row !== undefined;
+  }
+
   /** Recomputes the run and dispatches whatever became ready. */
   public async advanceRun(jobHistoryId: string): Promise<void> {
-    await this.advance(jobHistoryId);
+    await this.gate.limit(() => this.advance(jobHistoryId));
   }
 
   private async advance(
@@ -217,6 +255,7 @@ export class WorkflowRunnerService {
     let completionJob: Job | null = null;
     let dispatched = 0;
     let completed = false;
+    let workspaceIdOfRun = '';
 
     try {
       const jobHistory = await queryRunner.manager
@@ -244,6 +283,7 @@ export class WorkflowRunnerService {
 
       const workflow = jobHistory.workflow;
       const workspaceId = workflow.workspace?.id ?? '';
+      workspaceIdOfRun = workspaceId;
       const context =
         prebuilt ?? (await this.buildRunGraph(workflow, workflow.workspace?.id));
       const scope: WorkflowRunScope = jobHistory.scope ?? {};
@@ -282,22 +322,27 @@ export class WorkflowRunnerService {
           }
 
           try {
-            const jobs = await this.jobsRegistryService.createNewJob({
-              tool,
-              config: step.config,
-              configProfileId: step.configProfileId,
-              category: step.category,
-              input: step.input,
-              // Every step of a run reuses the scope captured at start, so a
-              // subdomain step's newly discovered assets are picked up by the
-              // next step while a project run stays inside its selection.
-              targetIds: scope.targetIds,
-              assetIds: scope.assetIds,
-              workflow,
-              jobHistory,
-              priority: tool.priority,
-              workspaceId,
-            });
+            // On the run's transaction: the step's jobs commit together with
+            // its `dispatched` state, or not at all.
+            const jobs = await this.jobsRegistryService.createNewJob(
+              {
+                tool,
+                config: step.config,
+                configProfileId: step.configProfileId,
+                category: step.category,
+                input: step.input,
+                // Every step of a run reuses the scope captured at start, so a
+                // subdomain step's newly discovered assets are picked up by the
+                // next step while a project run stays inside its selection.
+                targetIds: scope.targetIds,
+                assetIds: scope.assetIds,
+                workflow,
+                jobHistory,
+                priority: tool.priority,
+                workspaceId,
+              },
+              { manager: queryRunner.manager },
+            );
 
             if (jobs.length === 0) {
               state = withStepSkipped(state, step.id, 'no-inputs');
@@ -346,6 +391,11 @@ export class WorkflowRunnerService {
       throw error;
     } finally {
       await queryRunner.release();
+    }
+
+    // Workers hear about new jobs only once they are committed and claimable.
+    if (dispatched > 0) {
+      this.jobsRegistryService.notifyJobsAvailable(workspaceIdOfRun);
     }
 
     // Emitted after the commit so listeners never read uncommitted state.
