@@ -183,8 +183,8 @@ const JobDetailPanel = memo(function JobDetailPanel({
         <Field label={t('jobsRegistry.run.asset')}>
           {job.asset?.id ? (
             <Link
-              to="/assets/services/$id"
-              params={{ id: job.asset.id }}
+              to="/assets"
+              search={{ tab: 'host', filter: job.asset.value }}
               className="hover:underline"
             >
               {job.asset.value}
