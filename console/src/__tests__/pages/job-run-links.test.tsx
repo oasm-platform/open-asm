@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { within } from '@testing-library/react';
 import { renderWithProviders, screen, waitFor } from '@/test/utils';
 import Runs from '@/pages/jobs-registry/runs';
 
@@ -74,7 +75,11 @@ describe('Job run asset links', () => {
     jobs.value[0].asset = null;
     const { user } = renderWithProviders(<Runs />);
     await user.click(await screen.findByText(String(jobs.value[0].id)));
-    await screen.findByText('Asset');
-    expect(screen.queryAllByRole('link')).toHaveLength(0);
+    const assetField = (await screen.findByText('Asset')).parentElement!;
+    expect(within(assetField).getByText('—')).toBeInTheDocument();
+    expect(within(assetField).queryByRole('link')).toBeNull();
+    const serviceField = screen.getByText('Asset service').parentElement!;
+    expect(within(serviceField).getByText('—')).toBeInTheDocument();
+    expect(within(serviceField).queryByRole('link')).toBeNull();
   });
 });
