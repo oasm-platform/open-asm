@@ -1,6 +1,7 @@
 import {
   EventTriggerType,
   JobRunType,
+  JobStatus,
   ToolCategory,
 } from '@/common/enums/enum';
 import { JobsRegistryService } from '@/modules/jobs-registry/jobs-registry.service';
@@ -53,7 +54,16 @@ function workflow(
 }
 
 interface FakeDb {
-  dataSource: { createQueryRunner: jest.Mock };
+  dataSource: { createQueryRunner: jest.Mock; getRepository: jest.Mock };
+  /** What the drain probe sees: whether the job's step still has active jobs. */
+  setStepActive: (active: boolean) => void;
+  /** The drain probe's query builder, to assert on its filters. */
+  probe: { where: jest.Mock; andWhere: jest.Mock; getRawOne: jest.Mock };
+  queryRunner: {
+    manager: unknown;
+    commitTransaction: jest.Mock;
+    rollbackTransaction: jest.Mock;
+  };
   history: JobHistory;
   setSummaries: (summaries: StepJobSummary[]) => void;
   setActiveCount: (count: number) => void;
@@ -72,6 +82,11 @@ interface CreateNewJobArgs {
   priority?: number;
   workspaceId: string;
   category?: string;
+}
+
+/** Options the runner passes to JobsRegistryService.createNewJob. */
+interface CreateNewJobOptions {
+  manager?: unknown;
 }
 
 /**
@@ -95,6 +110,15 @@ interface QueryRunnerChain {
   getCount: jest.Mock;
 }
 
+/** The drain probe's builder; annotated so its self-reference is not `any`. */
+interface ProbeChain {
+  select: jest.Mock;
+  where: jest.Mock;
+  andWhere: jest.Mock;
+  limit: jest.Mock;
+  getRawOne: jest.Mock;
+}
+
 function createFakeDb(overrides: Partial<JobHistory> = {}): FakeDb {
   const history = {
     id: 'history-1',
@@ -108,6 +132,14 @@ function createFakeDb(overrides: Partial<JobHistory> = {}): FakeDb {
 
   let summaries: StepJobSummary[] = [];
   let activeCount = 0;
+  let stepActive = false;
+  const probe: ProbeChain = {
+    select: jest.fn(() => probe),
+    where: jest.fn(() => probe),
+    andWhere: jest.fn(() => probe),
+    limit: jest.fn(() => probe),
+    getRawOne: jest.fn(() => Promise.resolve(stepActive ? { one: 1 } : undefined)),
+  };
   let lastJob: Job | null = null;
 
   const historyBuilder: QueryRunnerChain = {
@@ -179,7 +211,15 @@ function createFakeDb(overrides: Partial<JobHistory> = {}): FakeDb {
   };
 
   return {
-    dataSource: { createQueryRunner: jest.fn(() => queryRunner) },
+    dataSource: {
+      createQueryRunner: jest.fn(() => queryRunner),
+      getRepository: jest.fn(() => ({ createQueryBuilder: () => probe })),
+    },
+    setStepActive: (active) => {
+      stepActive = active;
+    },
+    probe,
+    queryRunner,
     history,
     setSummaries: (next) => {
       summaries = next;
@@ -197,7 +237,11 @@ describe('WorkflowRunnerService', () => {
   let service: WorkflowRunnerService;
   let db: FakeDb;
 
-  const createNewJob = jest.fn<Promise<unknown[]>, [CreateNewJobArgs]>();
+  const createNewJob = jest.fn<
+    Promise<unknown[]>,
+    [CreateNewJobArgs, CreateNewJobOptions?]
+  >();
+  const notifyJobsAvailable = jest.fn();
   const getToolByNames = jest.fn();
   const getWorkspaceConfigValue = jest.fn();
   const emit = jest.fn();
@@ -212,7 +256,10 @@ describe('WorkflowRunnerService', () => {
       providers: [
         WorkflowRunnerService,
         { provide: DataSource, useValue: fake.dataSource },
-        { provide: JobsRegistryService, useValue: { createNewJob } },
+        {
+          provide: JobsRegistryService,
+          useValue: { createNewJob, notifyJobsAvailable },
+        },
         { provide: ToolsService, useValue: { getToolByNames } },
         { provide: WorkspacesService, useValue: { getWorkspaceConfigValue } },
         { provide: EventEmitter2, useValue: { emit } },
@@ -474,6 +521,90 @@ describe('WorkflowRunnerService', () => {
       await service.advanceRun('history-1');
 
       expect(createNewJob).not.toHaveBeenCalled();
+    });
+
+    it("creates step jobs on the run's transaction and announces them after the commit", async () => {
+      // Given: a run whose first step is done
+      await setup(
+        createFakeDb({
+          workflow: workflow([
+            { name: 'Scan Subdomain', run: 'subfinder' },
+            { name: 'Port Scan', run: 'naabu', needs: ['Scan Subdomain'] },
+          ]),
+          steps: { 'Scan Subdomain': { status: 'dispatched', jobs: 1 } },
+        }),
+      );
+      getToolByNames.mockResolvedValue([
+        tool('subfinder', ToolCategory.SUBDOMAINS),
+        tool('naabu', ToolCategory.PORTS_SCANNER),
+      ]);
+      db.setSummaries([
+        {
+          tool: 'subfinder',
+          category: 'subdomains',
+          total: 1,
+          pending: 0,
+          inProgress: 0,
+          completed: 1,
+          failed: 0,
+          cancelled: 0,
+        },
+      ]);
+      const order: string[] = [];
+      createNewJob.mockImplementation(() => {
+        order.push('create');
+        return Promise.resolve([{ id: 'job-1' }]);
+      });
+      db.queryRunner.commitTransaction.mockImplementation(() => {
+        order.push('commit');
+      });
+      notifyJobsAvailable.mockImplementation(() => order.push('notify'));
+
+      // When
+      await service.advanceRun('history-1');
+
+      // Then: the jobs are written with the run's own manager, and workers
+      // hear about them only once they are committed
+      expect(createNewJob.mock.calls[0][1]?.manager).toBe(db.queryRunner.manager);
+      expect(order).toEqual(['create', 'commit', 'notify']);
+      expect(notifyJobsAvailable).toHaveBeenCalledWith('workspace-1');
+    });
+
+    it('announces nothing when the advance rolls back', async () => {
+      // Given: a run whose state write fails after its jobs were created
+      await setup(
+        createFakeDb({
+          workflow: workflow([
+            { name: 'Scan Subdomain', run: 'subfinder' },
+            { name: 'Port Scan', run: 'naabu', needs: ['Scan Subdomain'] },
+          ]),
+          steps: { 'Scan Subdomain': { status: 'dispatched', jobs: 1 } },
+        }),
+      );
+      getToolByNames.mockResolvedValue([
+        tool('subfinder', ToolCategory.SUBDOMAINS),
+        tool('naabu', ToolCategory.PORTS_SCANNER),
+      ]);
+      db.setSummaries([
+        {
+          tool: 'subfinder',
+          category: 'subdomains',
+          total: 1,
+          pending: 0,
+          inProgress: 0,
+          completed: 1,
+          failed: 0,
+          cancelled: 0,
+        },
+      ]);
+      db.queryRunner.commitTransaction.mockRejectedValue(new Error('commit failed'));
+
+      // When
+      await expect(service.advanceRun('history-1')).rejects.toThrow('commit failed');
+
+      // Then
+      expect(createNewJob).toHaveBeenCalledTimes(1);
+      expect(notifyJobsAvailable).not.toHaveBeenCalled();
     });
 
     it('dispatches the dependent step once the dependency jobs are done', async () => {
@@ -758,6 +889,85 @@ describe('WorkflowRunnerService', () => {
       await service.onJobTerminal({ id: 'job-1' } as Job);
 
       expect(createNewJob).not.toHaveBeenCalled();
+    });
+
+    const finishedNaabuJob = {
+      id: 'job-1',
+      category: 'ports_scanner',
+      tool: { id: 'tool-naabu', name: 'naabu' },
+      jobHistory: { id: 'history-1' },
+    } as unknown as Job;
+
+    it('leaves the run alone while its step still has jobs to run', async () => {
+      // Given: other jobs of the same step are still pending or running
+      await setup(createFakeDb());
+      db.setStepActive(true);
+
+      // When
+      await service.onJobTerminal(finishedNaabuJob);
+
+      // Then: no lock on the run, no aggregate, no dispatch
+      expect(db.dataSource.createQueryRunner).not.toHaveBeenCalled();
+      expect(createNewJob).not.toHaveBeenCalled();
+    });
+
+    it("probes only the job's own step among the run's active jobs", async () => {
+      // Given
+      await setup(createFakeDb());
+      db.setStepActive(true);
+
+      // When
+      await service.onJobTerminal(finishedNaabuJob);
+
+      // Then
+      const filters = [
+        ...db.probe.where.mock.calls,
+        ...db.probe.andWhere.mock.calls,
+      ].map(([, params]: [string, Record<string, unknown>]) => params);
+      expect(filters).toEqual(
+        expect.arrayContaining([
+          { jobHistoryId: 'history-1' },
+          { toolId: 'tool-naabu' },
+          { category: 'ports_scanner' },
+          { active: [JobStatus.PENDING, JobStatus.IN_PROGRESS] },
+        ]),
+      );
+    });
+
+    it("advances the run when the job was its step's last", async () => {
+      // Given
+      await setup(
+        createFakeDb({
+          workflow: workflow([
+            { name: 'Port Scan', run: 'naabu' },
+            { name: 'HTTP Probe', run: 'httpx', needs: ['Port Scan'] },
+          ]),
+          steps: { 'Port Scan': { status: 'dispatched', jobs: 1 } },
+        }),
+      );
+      getToolByNames.mockResolvedValue([
+        tool('naabu', ToolCategory.PORTS_SCANNER),
+        tool('httpx', ToolCategory.HTTP_PROBE),
+      ]);
+      db.setSummaries([
+        {
+          tool: 'naabu',
+          category: 'ports_scanner',
+          total: 1,
+          pending: 0,
+          inProgress: 0,
+          completed: 1,
+          failed: 0,
+          cancelled: 0,
+        },
+      ]);
+      db.setStepActive(false);
+
+      // When
+      await service.onJobTerminal(finishedNaabuJob);
+
+      // Then
+      expect(createNewJob.mock.calls[0][0].tool.name).toBe('httpx');
     });
   });
 

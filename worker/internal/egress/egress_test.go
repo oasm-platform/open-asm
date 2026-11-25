@@ -144,14 +144,17 @@ func TestDialVettedSkipsPrivateAnswers(t *testing.T) {
 		return []string{"10.0.0.9", "203.0.113.7"}, nil
 	}
 	var attempted []string
+	dialErr := errors.New("no route in test")
 	srv.dialIP = func(ctx context.Context, network, addr string) (net.Conn, error) {
 		attempted = append(attempted, addr)
-		return nil, errors.New("no route in test")
+		return nil, dialErr
 	}
 	_, err := srv.dialVetted(context.Background(), "tcp", "mixed.example:443")
+	// An allowed address that fails to connect (closed/filtered port) is an
+	// upstream error, not a policy denial.
 	var be *blockedError
-	if !errors.As(err, &be) {
-		t.Fatalf("all-public-unreachable must end refused, got %v", err)
+	if errors.As(err, &be) || !errors.Is(err, dialErr) {
+		t.Fatalf("unreachable public address must surface the dial error, got %v", err)
 	}
 	if len(attempted) != 1 || attempted[0] != "203.0.113.7:443" {
 		t.Fatalf("must skip 10.0.0.9 and attempt 203.0.113.7:443, attempted %v", attempted)

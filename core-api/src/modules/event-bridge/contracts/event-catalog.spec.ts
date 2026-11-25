@@ -88,10 +88,11 @@ describe('event catalog', () => {
       // tool install/uninstall audit events, plus 14 for the vulnerability
       // lifecycle and generic issues (resurfaced/fixed/proposed, review
       // approved/rejected/merged, settings.updated, comment.created and the
-      // issue updated/resolved/assigned/deleted/link.added/link.removed facts).
+      // issue updated/resolved/assigned/deleted/link.added/link.removed facts),
+      // minus `job.secrets.released` (a persisted row per dispatched job).
       // Asserting the
       // count means the removal cannot be half-reverted without failing here.
-      expect(EVENT_DEFINITIONS).toHaveLength(115);
+      expect(EVENT_DEFINITIONS).toHaveLength(114);
     });
 
     it('has no worker.alive leaf, so nothing can publish a heartbeat', () => {
@@ -190,7 +191,8 @@ describe('event catalog', () => {
 
     it('carries the audit action count', () => {
       // 47 + vulnerability.review.{approved,rejected,merged} + vulnerability.settings.updated
-      expect(AUDIT_ACTION_CATALOG).toHaveLength(52);
+      // - job.secrets.released
+      expect(AUDIT_ACTION_CATALOG).toHaveLength(51);
     });
   });
 

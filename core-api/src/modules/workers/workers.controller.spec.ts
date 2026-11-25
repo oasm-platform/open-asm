@@ -355,6 +355,33 @@ describe('WorkersController.grpcJoin', () => {
       join('172.19.0.5:443', '203.0.113.7, 172.19.0.7'),
     ).resolves.toBe('203.0.113.7');
   });
+
+  it('hands the jobs the worker still runs to the rejoin', async () => {
+    // Given
+    const workersService = {
+      join: jest.fn().mockResolvedValue({ id: 'w-1', token: 't-1' }),
+    };
+    const controller = new WorkersController(
+      workersService as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    // When
+    await controller.grpcJoin(
+      { apiKey: 'key', token: 't-1', runningJobIds: ['job-a', 'job-b'] },
+      new Metadata(),
+      { getPeer: () => '203.0.113.7:1' },
+    );
+
+    // Then
+    expect(workersService.join).toHaveBeenCalledWith(expect.anything(), {
+      runningJobIds: ['job-a', 'job-b'],
+    });
+  });
 });
 
 describe('WorkersController tool archive gRPC', () => {

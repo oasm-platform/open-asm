@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import type { DataSourceOptions } from 'typeorm';
 import { DataSource } from 'typeorm';
+import { DB_POOL_SIZE } from '../common/constants/app.constants';
 
 const {
   POSTGRES_HOST,
@@ -39,6 +40,7 @@ export const dataSourceOptions: DataSourceOptions = {
   type: 'postgres',
   ...databaseConnectionConfig,
   synchronize: false,
+  poolSize: DB_POOL_SIZE,
   entities: [__dirname + '/../**/**/*.entity{.ts,.js}'],
   migrations: [__dirname + '/migrations/**/*{.ts,.js}'],
   migrationsRun: NODE_ENV === 'development',
