@@ -91,7 +91,7 @@ export class AttackSurfaceQueryService {
   }
 
   /**
-   * Runs a batch. Report mode is queued instead (HTTP only): the call returns
+   * Runs a batch (the `report` caller runs it synchronously, interactive mode only). Report mode is queued instead (HTTP only): the call returns
    * the job to poll.
    */
   async run(scope: QueryScope, input: unknown): Promise<QueryBatchResult | AsqReportState> {

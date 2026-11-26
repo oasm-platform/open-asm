@@ -85,6 +85,15 @@ describe('AttackSurfaceQueryService', () => {
     await expect(service.getReport('22222222-2222-4222-8222-222222222222', jobId)).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
+  it('refuses report mode for the in-process report caller without queueing', async () => {
+    const { service, queue } = setup();
+    await expect(
+      service.run({ ...SCOPE, caller: 'report' }, { queries: { a: { from: 'hosts' } }, options: { mode: 'report' } }),
+    ).rejects.toMatchObject({ code: 'INVALID_QUERY' });
+    expect(queue.add).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
+  });
+
   it('records a failed report job without throwing', async () => {
     const { service } = setup();
     await service.runReportJob('job-1', { workspaceId: SCOPE.workspaceId, permissions: ['asset.read'], input: { queries: { v: { from: 'vulnerabilities' } } } });
