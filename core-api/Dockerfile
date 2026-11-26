@@ -1,4 +1,4 @@
-FROM node:22-alpine AS base
+FROM node:26-alpine AS base
 RUN apk add --no-cache curl
 COPY package.json /tmp/pm/package.json
 RUN npm install -g corepack && corepack enable \
@@ -7,7 +7,7 @@ ENV PNPM_HOME=/root/.local/share/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 
 # Build stage — native platform (QEMU-free) for pnpm install + build
-FROM --platform=$BUILDPLATFORM node:22-alpine AS builder
+FROM --platform=$BUILDPLATFORM node:26-alpine AS builder
 
 ARG APP_VERSION
 ENV APP_VERSION=$APP_VERSION

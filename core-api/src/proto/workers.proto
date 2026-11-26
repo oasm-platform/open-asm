@@ -16,6 +16,10 @@ message JoinRequest {
   // private half of. Core seals job secrets to it (Job.sealed). Registered
   // once per worker identity; a different key on rejoin is ignored.
   optional bytes encryption_public_key = 5;
+  // Jobs the worker is still running when it (re)joins. Core keeps them
+  // IN_PROGRESS and requeues the worker's other IN_PROGRESS jobs. Older
+  // workers send none, so all of their jobs are requeued, as before.
+  repeated string running_job_ids = 6;
 }
 
 enum WorkerRunMode {

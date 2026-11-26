@@ -149,9 +149,9 @@ export class WorkspacesService implements OnModuleInit {
       where: {
         id: In(workspaceIds),
       },
-      // The only caller (IntegrationSyncService.resolveActingUser) needs the
-      // workspace owner to act on behalf of scheduled syncs — without the
-      // relation, `owner` is never loaded.
+      // IntegrationSyncService.resolveActingUser needs the workspace owner to
+      // act on behalf of scheduled syncs — without the relation, `owner` is
+      // never loaded. ReportRunner only reads the name and ignores it.
       relations: ['owner'],
     });
   }

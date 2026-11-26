@@ -11,6 +11,12 @@ export const APP_NAME = 'Open Attack Surface Management';
 export const DEFAULT_ADMIN_ID = '00bd7b24-2f88-4e2f-84e0-835bf28e7905';
 export const WORKER_TIMEOUT = 60000; // milliseconds
 /**
+ * `WorkersService.alive` writes `workers.lastSeenAt` at most this often. The
+ * Alive stream ticks every 10 s, so every worker cost a write per tick; the
+ * sweep only needs the timestamp to stay under WORKER_TIMEOUT.
+ */
+export const LAST_SEEN_WRITE_INTERVAL_MS = 30_000;
+/**
  * Lifetime of a one-time worker join key, in seconds. A key is consumed by the
  * first successful join; rotating replaces it with a fresh one.
  */
@@ -25,6 +31,13 @@ export const MCP_API_KEY_HEADER = 'x-oasm-api-key';
 /** Controller path (under API_GLOBAL_PREFIX) that authenticates with MCP_API_KEY_HEADER instead of a session. */
 export const MCP_AUTH_PATH = 'mcp';
 export const WORKER_TOKEN_HEADER = 'worker-token';
+/**
+ * How long `GrpcWorkerTokenGuard` trusts a worker token it checked, per
+ * instance. Every claim and result is a gRPC call, so without it each one cost
+ * a `workers` lookup; with it a deleted worker keeps working here for at most
+ * this long.
+ */
+export const WORKER_TOKEN_CACHE_MS = 10_000;
 /**
  * gRPC metadata a worker sends on RemoteExecuteSubscribe ("1") when it runs
  * agent shell commands inside a per-session sandbox container. A global
@@ -83,6 +96,37 @@ export const MAX_JOB_CLAIM_SIZE = 100;
  * for a scope it no longer has.
  */
 export const WORKER_CLAIM_CACHE_MS = 5_000;
+
+/**
+ * Jobs per INSERT when a step creates its jobs. One statement for a whole step
+ * overflows Postgres' 65,535 bind parameters (a job row binds ~16) somewhere
+ * past four thousand jobs, and TypeORM's `save()` spends minutes preparing a
+ * step of 50,000 before it fails.
+ */
+export const JOB_INSERT_CHUNK = 1_000;
+
+/**
+ * Run advances one core-api instance runs at once (`RunAdvanceGate`). An
+ * advance holds a pooled connection for its transaction and borrows more while
+ * it holds the run's lock, so this must stay well under the pool size: with
+ * the default pool of 10, ten unbounded advances queued on one run's lock left
+ * the lock holder waiting forever for a connection.
+ */
+export const MAX_CONCURRENT_RUN_ADVANCES = 4;
+
+/**
+ * `JobResultProcessor` jobs one core-api instance runs at once. Each holds a
+ * pooled connection while it syncs a result, so it stays under `DB_POOL_SIZE`
+ * together with the run advances (see `database-config.spec.ts`).
+ */
+export const JOB_RESULT_CONCURRENCY = 20;
+
+/**
+ * Postgres connections per core-api instance. The `pg` default of 10 was the
+ * ceiling for results, claims and HTTP together. Postgres `max_connections`
+ * must cover every instance: instances x DB_POOL_SIZE plus headroom.
+ */
+export const DB_POOL_SIZE = 30;
 
 /**
  * How far back the dashboard timeline looks. The timeline query runs two window

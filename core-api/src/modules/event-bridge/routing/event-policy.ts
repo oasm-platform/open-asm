@@ -68,7 +68,6 @@ export const EVENT_POLICY: Record<EventName, EventPolicy> = {
   'report.exported': { persist: true, severity: 'important' },
   'report.deleted': { persist: true, severity: 'normal' },
   'job.cancelled': { persist: true, severity: 'normal' },
-  'job.secrets.released': { persist: true, severity: 'normal' },
   'workflow.created': { persist: true, severity: 'normal' },
   'workflow.updated': { persist: true, severity: 'normal' },
   'workflow.deleted': { persist: true, severity: 'important' },

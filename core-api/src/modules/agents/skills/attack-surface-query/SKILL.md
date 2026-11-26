@@ -47,14 +47,16 @@ description: How to read the workspace's attack surface with query_attack_surfac
 | `urls` | a URL discovered on a service | `url`, `firstSeen`, `isNew` | `service` | – |
 | `ips` | an IP a host resolves to | `ip`, `source` (dns_a, dns_aaaa), `firstSeen` | `host` | – |
 | `dnsRecords` | a DNS record of a host | `recordType`, `value`, `firstSeen` | `host` | – |
-| `vulnerabilities` | an approved finding | `name`, `severity` (info, low, medium, high, critical), `cvssScore`, `epssScore`, `cve`, `cwe`, `tags`, `ports`, `affectedUrl`, `detectionStatus` (new, active, resurfaced, fixed), `isOpen`, `firstSeen`, `lastSeen`, `fixedAt` | `host`, `tool` | – |
+| `vulnerabilities` | an approved finding | `name`, `severity` (info, low, medium, high, critical), `cvssScore`, `epssScore`, `cve`, `cwe`, `tags`, `ports`, `affectedUrl`, `detectionStatus` (new, active, resurfaced, fixed), `isOpen`, `firstSeen`, `lastSeen`, `fixedAt`, `cvssMetric`, `vprScore`, `bid`, `references`, `ipAddress`, `hostName`, `publishedAt`, `firstDetected`, `analyzeStatus`, `isDismissed` | `host`, `tool` | – |
+| `tags` | a tag of a service | `tag`, `firstSeen` | `service` | – |
 | `rollups` | a pre-computed count | `metric` (port, technology, webserver, statusCode, tlsVersion), `key`, `value`, `computedAt` | – | – |
 
-Only through a relation: `http` = a service's latest HTTP response (`url`, `title`, `statusCode`, `webserver`, `scheme`, `contentType`, `contentLength`, `faviconMd5`, `failed`, `probedAt`; `body`/`rawHeader`/`header` are too large for the agent), `statusCodes` (`statusCode`, `isPrimary`, `chainIndex`), `tags` (`tag`), `tools` (`name`).
+Only through a relation: `http` = a service's latest HTTP response (`url`, `title`, `statusCode`, `webserver`, `scheme`, `contentType`, `contentLength`, `faviconMd5`, `failed`, `probedAt`; `body`/`rawHeader`/`header` are too large for the agent), `statusCodes` (`statusCode`, `isPrimary`, `chainIndex`), `tools` (`name`). A finding's `description` and `solution` are too large for the agent.
 
 - `isNew`: found by the latest finished run of its workflow on that target (the "new" badge).
 - `isOpen`: approved, still detected and not dismissed — the "open" count of every screen. AI proposals under review never appear.
-- `cve`, `cwe`, `tags`, `ports` of a finding are lists of strings.
+- `cve`, `cwe`, `tags`, `ports`, `bid`, `references` of a finding are lists of strings.
+- `isDismissed`: dismissed or risk accepted, and the dismissal has not expired.
 - Dot paths chain at most two related rows in `select` (`service.host.value`).
 
 ## where

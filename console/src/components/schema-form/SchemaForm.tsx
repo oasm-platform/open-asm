@@ -55,7 +55,7 @@ export interface JSONSchema {
 }
 
 export interface SchemaFormHandle {
-  /** Fill empty fields from schema presets (default/examples). Never overwrites user input. */
+  /** Fill empty fields from schema defaults. Never overwrites user input. */
   applyAllPresets: () => void;
 }
 
@@ -99,10 +99,15 @@ function isSensitive(prop: SchemaProperty): boolean {
   return prop.format === 'password' || prop['ui:widget'] === 'password';
 }
 
-/** First preset candidate: examples[0], else default. Excludes sensitive fields. */
-function firstPreset(prop: SchemaProperty): unknown {
+/**
+ * Preset value: the schema `default` only. `examples` illustrate the format
+ * (a sample CVE id, a sample URL) and are not safe to run: applied to nuclei
+ * `templateIds` they select templates that don't exist and the scan finds
+ * nothing. Excludes sensitive fields.
+ */
+function presetValue(prop: SchemaProperty): unknown {
   if (isSensitive(prop)) return undefined;
-  return prop.examples?.[0] ?? prop.default;
+  return prop.default;
 }
 
 function stringifyPreset(v: unknown): string {
@@ -119,7 +124,7 @@ function stringifyPreset(v: unknown): string {
  */
 function getPlaceholder(prop: SchemaProperty): string {
   if (isSensitive(prop)) return prop['ui:placeholder'] ?? '';
-  return prop['ui:placeholder'] ?? stringifyPreset(firstPreset(prop));
+  return prop['ui:placeholder'] ?? stringifyPreset(prop.examples?.[0] ?? prop.default);
 }
 
 /** Field holds no user input — safe target for preset fill. */
@@ -509,7 +514,7 @@ export function SchemaForm({
       const next = { ...source };
       for (const [key, prop] of formEntries) {
         if (isSensitive(prop)) continue;
-        const preset = firstPreset(prop);
+        const preset = presetValue(prop);
         if (preset !== undefined && isEmptyValue(next[key])) next[key] = preset;
       }
       return next;
@@ -552,7 +557,7 @@ export function SchemaForm({
           : (prop.title ?? key);
         const required = requiredFields.includes(key);
         const textColor = prop['ui:text-color'];
-        const preset = firstPreset(prop);
+        const preset = presetValue(prop);
         const showPresetHint =
           enablePresets &&
           preset !== undefined &&

@@ -55,6 +55,18 @@ type Client struct {
 	mu       sync.RWMutex
 	workerID string
 
+	// claimMu orders claims against Join: a claim holds it shared from its
+	// request until its jobs are recorded in running, Join holds it exclusive
+	// while it reports running. So no job core marked IN_PROGRESS for this
+	// worker is missing from the list core keeps on rejoin.
+	claimMu sync.RWMutex
+	// running holds the claimed jobs whose slot is not released yet; Join
+	// reports them (JoinRequest.running_job_ids). Guarded by runningMu.
+	runningMu sync.Mutex
+	running   map[string]struct{}
+	// claimTimeout bounds one claim RPC: Join waits for claims in flight.
+	claimTimeout time.Duration // default 30s
+
 	// Unexported for test control (same-package tests only).
 	connectBaseDelay time.Duration // default 2s
 	connectMaxDelay  time.Duration // default 30s
@@ -137,6 +149,8 @@ func NewClient(apiKey, grpcHost, toolPath string, logger Logger, dialOpts ...grp
 		telemetryMaxDelay:    30 * time.Second,
 		telemetryCallTimeout: 3 * time.Second,
 		jobsAvailable:        make(chan struct{}, 1),
+		running:              make(map[string]struct{}),
+		claimTimeout:         30 * time.Second,
 	}
 
 	c.tokenFile, c.tokenLock = claimTokenFile(resolveTokenFilePath(), logger)

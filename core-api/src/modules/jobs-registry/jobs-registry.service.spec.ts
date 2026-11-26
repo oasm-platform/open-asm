@@ -1021,6 +1021,33 @@ describe('JobsRegistryService', () => {
     });
   });
 
+  describe('findJobForUpdate', () => {
+    it("loads what a result needs without the run's workflow", async () => {
+      // Given
+      mockJobRepository.findOne.mockResolvedValue({ id: 'job-1' });
+
+      // When
+      await service.findJobForUpdate('worker-1', 'job-1');
+
+      // Then: only the job of this worker that is still running, with the
+      // relations the result path reads; no workflow content per result
+      const [options] = mockJobRepository.findOne.mock.calls[0] as [
+        { where: unknown; relations: Record<string, unknown> },
+      ];
+      expect(options.where).toEqual({
+        workerId: 'worker-1',
+        id: 'job-1',
+        status: JobStatus.IN_PROGRESS,
+      });
+      expect(options.relations).toEqual({
+        asset: { target: true },
+        jobHistory: true,
+        tool: true,
+        assetService: true,
+      });
+    });
+  });
+
   describe('createNewJob', () => {
     const mockJobRepo = {
       create: jest
@@ -1029,9 +1056,7 @@ describe('JobsRegistryService', () => {
           id: 'job-uuid',
           ...partial,
         })),
-      save: jest
-        .fn()
-        .mockImplementation((jobs: unknown) => Promise.resolve(jobs)),
+      insert: jest.fn().mockResolvedValue({ identifiers: [] }),
     };
 
     const apex = { id: 'a-apex', value: 'example.com', isPrimary: true, target: { type: TargetType.DOMAIN } };
@@ -1105,7 +1130,7 @@ describe('JobsRegistryService', () => {
         [app, web8443],
       ]);
       expect(jobs.every((job) => job.category === ToolCategory.VULNERABILITIES)).toBe(true);
-      expect(mockJobRepo.save).toHaveBeenCalledTimes(1);
+      expect(mockJobRepo.insert).toHaveBeenCalledTimes(1);
       expect(mockWorkerStreamRegistry.publishJobsAvailable).toHaveBeenCalledWith('ws-1');
     });
 
@@ -1173,7 +1198,55 @@ describe('JobsRegistryService', () => {
       load.mockResolvedValue({ scope: { assets: [] }, assets: new Map(), services: new Map() });
 
       expect(await run({ tool: nikto })).toEqual([]);
-      expect(mockJobRepo.save).not.toHaveBeenCalled();
+      expect(mockJobRepo.insert).not.toHaveBeenCalled();
+    });
+
+    it('inserts a big step in chunks of JOB_INSERT_CHUNK', async () => {
+      // Given: 2,500 never-probed hosts in scope
+      const hosts = Array.from({ length: 2_500 }, (_, i) => ({
+        id: `a-${i}`,
+        value: `h${i}.example.com`,
+        isPrimary: false,
+        targetType: TargetType.DOMAIN,
+      }));
+      load.mockResolvedValue({
+        scope: { assets: hosts },
+        assets: new Map(hosts.map((host) => [host.id, host])),
+        services: new Map(),
+      });
+
+      // When
+      const jobs = await run({ tool: nikto });
+
+      // Then: three statements, none over the chunk size, every job written once
+      const sizes = mockJobRepo.insert.mock.calls.map(
+        ([rows]: [unknown[]]) => rows.length,
+      );
+      expect(sizes).toEqual([1_000, 1_000, 500]);
+      expect(jobs).toHaveLength(2_500);
+      expect(mockWorkerStreamRegistry.publishJobsAvailable).toHaveBeenCalledTimes(1);
+    });
+
+    it("writes on the caller's transaction and leaves the hint to the caller", async () => {
+      // Given: a caller transaction whose savepoint hands out its own repository
+      const txRepo = { insert: jest.fn().mockResolvedValue({ identifiers: [] }) };
+      const manager = {
+        transaction: jest.fn((work: (m: unknown) => Promise<unknown>) =>
+          work({ getRepository: () => txRepo }),
+        ),
+      };
+
+      // When
+      await service.createNewJob(
+        { workspaceId: 'ws-1', workflow: { id: 'wf-1' }, tool: nikto } as any,
+        { manager: manager as any },
+      );
+
+      // Then
+      expect(manager.transaction).toHaveBeenCalledTimes(1);
+      expect(txRepo.insert).toHaveBeenCalledTimes(1);
+      expect(mockJobRepo.insert).not.toHaveBeenCalled();
+      expect(mockWorkerStreamRegistry.publishJobsAvailable).not.toHaveBeenCalled();
     });
 
     describe('category selection', () => {

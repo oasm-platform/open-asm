@@ -1,13 +1,13 @@
 import React from 'react';
 import { Document, Page, StyleSheet, Text, View } from '@react-pdf/renderer';
-import type { QueryReportData } from '../../types/query-report-data.type';
-import { slate } from '../theme';
-import { ReportFooter } from '../components/ReportFooter';
-import { ReportHeader } from '../components/ReportHeader';
-import { SectionHeader } from '../components/SectionHeader';
+import type { QueryReportData } from './data.type';
+import { slate } from '../../shared/theme';
+import { ReportFooter } from '../../shared/components/ReportFooter';
+import { ReportHeader } from '../../shared/components/ReportHeader';
+import { SectionHeader } from '../../shared/components/SectionHeader';
 
 // Ensure fonts are registered
-import '../fonts';
+import '../../shared/fonts';
 
 const styles = StyleSheet.create({
   page: {
@@ -32,7 +32,7 @@ const styles = StyleSheet.create({
 });
 
 /** A saved attack surface query rendered as one table per query. */
-export const QueryReportDocument: React.FC<{ data: QueryReportData }> = ({ data }) => (
+export const QueryDocument: React.FC<{ data: QueryReportData }> = ({ data }) => (
   <Document title={data.title}>
     <Page size="A4" orientation="landscape" style={styles.page} wrap>
       <ReportHeader logoBase64={data.logoBase64} reportTitle={data.title} />

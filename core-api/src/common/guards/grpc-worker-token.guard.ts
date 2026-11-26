@@ -26,6 +26,12 @@ export class GrpcWorkerTokenGuard implements CanActivate {
       throw new RpcException('Worker token is missing');
     }
 
+    // Every claim and result goes through here; a worker's calls cost one
+    // lookup per WORKER_TOKEN_CACHE_MS instead of one each.
+    if (this.grpcWorkerContext.getFresh(workerToken)) {
+      return true;
+    }
+
     const workerInstance =
       await this.workersService.validateWorkerToken(workerToken);
 

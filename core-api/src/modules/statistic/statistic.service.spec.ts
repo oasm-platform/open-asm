@@ -2,7 +2,6 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { Severity } from '@/common/enums/enum';
 import type { Statistic } from './entities/statistic.entity';
-import { ReportStatisticsService } from './report-statistics.service';
 import { StatisticService } from './statistic.service';
 import { DataSource } from 'typeorm';
 import { GeoIpService } from '@/services/geo-ip/geo-ip.service';
@@ -11,7 +10,6 @@ import { TechnologyForwarderService } from '../technology/technology-forwarder.s
 
 describe('StatisticService', () => {
   let service: StatisticService;
-  let reports: ReportStatisticsService;
 
   const mockQueryBuilder = {
     select: jest.fn().mockReturnThis(),
@@ -63,7 +61,6 @@ describe('StatisticService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         StatisticService,
-        ReportStatisticsService,
         { provide: DataSource, useValue: mockDataSource },
         { provide: GeoIpService, useValue: mockGeoIpService },
         { provide: RedisService, useValue: mockRedisService },
@@ -75,7 +72,6 @@ describe('StatisticService', () => {
     }).compile();
 
     service = module.get<StatisticService>(StatisticService);
-    reports = module.get(ReportStatisticsService);
   });
 
   it('should be defined', () => {
@@ -254,20 +250,6 @@ describe('StatisticService', () => {
       );
 
       expect(live.vuls).toBe(3);
-    });
-  });
-
-  describe('ReportStatisticsService.getCountForWorkspace', () => {
-    it('sums open vulnerabilities across severities, leaving Info out', async () => {
-      mockQueryBuilder.getRawMany.mockResolvedValueOnce([
-        { workspaceId: 'workspace-1', severity: 'critical', count: '2' },
-        { workspaceId: 'workspace-1', severity: 'info', count: '40' },
-        { workspaceId: 'workspace-1', severity: 'low', count: '3' },
-      ]);
-
-      await expect(
-        reports.getCountForWorkspace('vulnerabilities', 'workspace-1'),
-      ).resolves.toBe(5);
     });
   });
 

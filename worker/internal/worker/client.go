@@ -263,7 +263,12 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 				wg.Add(1)
 				go func(sc context.Context, j *pb.Job) {
 					defer wg.Done()
-					releaseSem := func() { <-semaphore }
+					// The slot and the job's place in the running list (reported
+					// to core on rejoin) are given back together.
+					releaseSem := func() {
+						grpcClient.ReleaseJob(j.GetId())
+						<-semaphore
+					}
 					hadJob, usedAsync := processJob(sc, j, grpcClient, getBrowser, toolPath, events, mgr, proxy, releaseSem)
 					if !usedAsync {
 						releaseSem() // Legacy: release at return
