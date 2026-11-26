@@ -1,4 +1,4 @@
-import { Severity, TargetType, VulnerabilityDetectionStatus } from '@/common/enums/enum';
+import { Severity, TargetType, VulnerabilityAnalyzeStatus, VulnerabilityDetectionStatus } from '@/common/enums/enum';
 import { freshRunInCteSql } from '@/modules/assets/fresh-runs';
 import {
   approvedVulnerabilityCondition,
@@ -409,16 +409,26 @@ export const tagsResource: ResourceDef = {
   table: 'asset_services_tags',
   description: 'Tags of services.',
   permission: 'asset.read',
-  root: false,
-  projectScope: null,
+  root: true,
+  projectScope: projectByService,
   fields: {
     id,
     tag: { sql: '{a}.tag', type: 'text', description: 'Tag', groupable: true },
+    // No (workspaceId, createdAt DESC, id DESC) index on asset_services_tags: bounded, not indexed.
+    firstSeen: { ...firstSeen('When the tag was added'), sortable: 'bounded' },
   },
-  one: {},
+  one: {
+    service: {
+      resource: 'services',
+      description: 'The service the tag belongs to',
+      on: '{b}.id = {a}."assetServiceId"',
+      join: 'inner',
+    },
+  },
   many: {},
-  defaultSelect: ['tag'],
-  defaultOrder: [{ field: 'tag', dir: 'asc' }],
+  defaultSelect: ['tag', 'service.host.value'],
+  defaultOrder: newest,
+  defaultTimeField: 'firstSeen',
 };
 
 export const ipsResource: ResourceDef = {
@@ -524,6 +534,28 @@ export const vulnerabilitiesResource: ResourceDef = {
     firstSeen: firstSeen('When the finding was first recorded'),
     lastSeen: { sql: '{a}."lastSeenDate"', type: 'timestamp', description: 'When a scan last reported it', nullable: true, sortable: 'bounded' },
     fixedAt: { sql: '{a}."fixedAt"', type: 'timestamp', description: 'When a covering scan closed it', nullable: true },
+    description: { sql: '{a}.description', type: 'text', description: 'Finding description', nullable: true, heavy: true },
+    solution: { sql: '{a}.solution', type: 'text', description: 'Remediation advice', nullable: true, heavy: true },
+    cvssMetric: { sql: '{a}."cvssMetric"', type: 'text', description: 'CVSS vector', nullable: true },
+    vprScore: { sql: '{a}."vprScore"', type: 'float', description: 'VPR score', nullable: true },
+    bid: { sql: '{a}."bidId"', type: 'textArray', description: 'Bugtraq ids', nullable: true },
+    references: { sql: '{a}."references"', type: 'textArray', description: 'Reference URLs', nullable: true },
+    ipAddress: { sql: '{a}."ipAddress"', type: 'text', description: 'IP address the scanner reported', nullable: true },
+    hostName: { sql: '{a}.host', type: 'text', description: 'Host name the scanner reported', nullable: true },
+    publishedAt: { sql: '{a}."publicationDate"', type: 'timestamp', description: 'When the vulnerability was published', nullable: true },
+    firstDetected: { sql: '{a}."firstDetectedDate"', type: 'timestamp', description: 'When a scan first detected it', nullable: true },
+    analyzeStatus: {
+      sql: '{a}."analyzeStatus"',
+      type: 'enum',
+      description: 'AI analysis state',
+      enumValues: Object.values(VulnerabilityAnalyzeStatus),
+      groupable: true,
+    },
+    isDismissed: {
+      sql: `EXISTS (SELECT 1 FROM "vulnerability_dismissals" asq_vd WHERE asq_vd."vulnerabilityId" = {a}.id AND (asq_vd."expiresAt" IS NULL OR asq_vd."expiresAt" > now()))`,
+      type: 'bool',
+      description: 'Dismissed (or risk accepted) and the dismissal has not expired',
+    },
   },
   one: {
     host: {

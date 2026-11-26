@@ -8,15 +8,28 @@ import { getManyResponse } from '@/common/utils/get-many-response.util';
 import { StorageService } from '@/modules/storage/storage.service';
 import { GetManyReportsQueryDto } from './dto/reports.dto';
 import { Report } from './entities/report.entity';
-import type { ReportData } from './types/report-data.type';
-import type { VulnerabilityReportData } from './types/vulnerability-report-data.type';
-import { VulnerabilityReportService } from './services/vulnerability-report.service';
-import { SummaryReportService } from './services/summary-report.service';
-import { renderReportPdf } from './renderer/pdf-renderer';
+import { ReportRunner } from './report-runner';
+import { renderTemplatePdf } from './templates/render';
+import { BUILTIN_TEMPLATES } from './templates/registry';
+import type { ReportOptions } from './templates/shared/asq-filters';
+import type { BuiltinTemplate } from './templates/template.types';
 import { AsqSavedQueriesService } from '@/modules/attack-surface-query/asq-saved-queries.service';
-import type { QueryBatchResult, QueryScope } from '@/modules/attack-surface-query/domain/query.types';
-import { toReportTables } from './services/query-report';
+import type { QueryScope } from '@/modules/attack-surface-query/domain/query.types';
 import { NotFoundError } from '@/common/errors/domain.errors';
+
+/** Filters as they arrive on the preview query string. */
+interface PreviewOptions extends Omit<ReportOptions, 'startDate' | 'endDate'> {
+  startDate?: string;
+  endDate?: string;
+}
+
+function toReportOptions(options: PreviewOptions = {}): ReportOptions {
+  return {
+    ...options,
+    startDate: options.startDate ? new Date(options.startDate) : undefined,
+    endDate: options.endDate ? new Date(options.endDate) : undefined,
+  };
+}
 
 @Injectable()
 export class ReportsService {
@@ -27,8 +40,7 @@ export class ReportsService {
     @InjectRepository(Report)
     private readonly reportRepo: Repository<Report>,
     private readonly storageService: StorageService,
-    private readonly vulnerabilityReportService: VulnerabilityReportService,
-    private readonly summaryReportService: SummaryReportService,
+    private readonly runner: ReportRunner,
     private readonly savedQueries: AsqSavedQueriesService,
   ) {
     this.logoPath = path.join(process.cwd(), 'public', 'images', 'logo.png');
@@ -109,45 +121,53 @@ export class ReportsService {
   }
 
   async generateReport(
-    workspaceId: string,
+    scope: QueryScope,
     userId: string,
     type: 'SUMMARY' | 'VULNERABILITY' = 'SUMMARY',
-    options?: {
-      startDate?: Date;
-      endDate?: Date;
-      targetIds?: string[];
-      vulnIds?: string[];
-      minSeverity?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
-    },
+    options: ReportOptions = {},
   ): Promise<{ filePath: string; fileName: string }> {
-    let data: ReportData | VulnerabilityReportData;
+    const pdfBuffer = await (type === 'VULNERABILITY'
+      ? this.render(BUILTIN_TEMPLATES.vulnerability, scope, options)
+      : this.render(BUILTIN_TEMPLATES.summary, scope, options));
+    return this.store(scope.workspaceId, userId, type, pdfBuffer);
+  }
 
-    if (type === 'VULNERABILITY') {
-      data = await this.vulnerabilityReportService.getVulnerabilityReportData(
-        workspaceId,
-        options,
-      );
-    } else {
-      data = await this.summaryReportService.getSummaryReportData(
-        workspaceId,
-        options,
-      );
-    }
+  /** Renders a saved attack surface query as a PDF (one table per query), run as the caller. */
+  async generateQueryReport(
+    scope: QueryScope,
+    userId: string,
+    savedQueryId: string,
+  ): Promise<{ filePath: string; fileName: string }> {
+    const saved = await this.savedQueries.get(scope.workspaceId, savedQueryId);
+    const pdfBuffer = await this.render(BUILTIN_TEMPLATES.query, scope, {
+      spec: saved.spec,
+      title: saved.name,
+      description: saved.description,
+    });
+    return this.store(scope.workspaceId, userId, 'QUERY', pdfBuffer);
+  }
 
-    const enrichedData = {
-      ...data,
-      logoBase64: this.logoBase64 ?? data.logoBase64,
-    };
+  previewSummaryReport(scope: QueryScope, options?: PreviewOptions): Promise<Buffer> {
+    return this.render(BUILTIN_TEMPLATES.summary, scope, toReportOptions(options));
+  }
 
-    const pdfBuffer = await renderReportPdf(type, enrichedData);
+  previewVulnerabilityReport(scope: QueryScope, options?: PreviewOptions): Promise<Buffer> {
+    return this.render(BUILTIN_TEMPLATES.vulnerability, scope, toReportOptions(options));
+  }
 
+  private async render<O, D>(template: BuiltinTemplate<O, D>, scope: QueryScope, options: O): Promise<Buffer> {
+    const data = await this.runner.run(template, scope, options);
+    return renderTemplatePdf(template, { ...data, logoBase64: this.logoBase64 ?? undefined });
+  }
+
+  private async store(
+    workspaceId: string,
+    userId: string,
+    type: 'SUMMARY' | 'VULNERABILITY' | 'QUERY',
+    pdfBuffer: Buffer,
+  ): Promise<{ filePath: string; fileName: string }> {
     const fileName = `report-${type.toLowerCase()}-${generateToken(24)}-${Date.now()}.pdf`;
-    const { path: uploadPath } = await this.storageService.uploadFile(
-      fileName,
-      pdfBuffer,
-      'reports',
-    );
-
+    const { path: uploadPath } = await this.storageService.uploadFile(fileName, pdfBuffer, 'reports');
     await this.reportRepo.save({
       workspace: { id: workspaceId },
       user: { id: userId },
@@ -155,93 +175,7 @@ export class ReportsService {
       path: uploadPath,
       fileName,
     });
-
     return { filePath: uploadPath, fileName };
-  }
-
-  /**
-   * Renders a saved attack surface query as a PDF report (one table per
-   * query) and stores it like the other reports. The query runs with the
-   * caller's permissions, in one consistent snapshot.
-   */
-  async generateQueryReport(
-    scope: QueryScope,
-    userId: string,
-    savedQueryId: string,
-  ): Promise<{ filePath: string; fileName: string }> {
-    const saved = await this.savedQueries.get(scope.workspaceId, savedQueryId);
-    const spec = saved.spec as { options?: Record<string, unknown> };
-    const result = (await this.savedQueries.runSpec(scope, {
-      ...spec,
-      options: { ...(spec.options ?? {}), consistent: true, mode: 'interactive' },
-    })) as QueryBatchResult;
-
-    const pdfBuffer = await renderReportPdf('QUERY', {
-      title: saved.name,
-      description: saved.description,
-      generatedAt: new Date().toISOString(),
-      tables: toReportTables(result),
-      logoBase64: this.logoBase64 ?? undefined,
-    });
-
-    const fileName = `report-query-${generateToken(24)}-${Date.now()}.pdf`;
-    const { path: uploadPath } = await this.storageService.uploadFile(fileName, pdfBuffer, 'reports');
-    await this.reportRepo.save({
-      workspace: { id: scope.workspaceId },
-      user: { id: userId },
-      type: 'QUERY',
-      path: uploadPath,
-      fileName,
-    });
-    return { filePath: uploadPath, fileName };
-  }
-
-  async previewSummaryReport(
-    workspaceId: string,
-    options?: {
-      startDate?: string;
-      endDate?: string;
-      targetIds?: string[];
-    },
-  ): Promise<Buffer> {
-    const data = await this.summaryReportService.getSummaryReportData(
-      workspaceId,
-      {
-        startDate: options?.startDate ? new Date(options.startDate) : undefined,
-        endDate: options?.endDate ? new Date(options.endDate) : undefined,
-        targetIds: options?.targetIds,
-      },
-    );
-    return renderReportPdf('SUMMARY', {
-      ...data,
-      logoBase64: this.logoBase64 ?? data.logoBase64,
-    });
-  }
-
-  async previewVulnerabilityReport(
-    workspaceId: string,
-    options?: {
-      startDate?: string;
-      endDate?: string;
-      targetIds?: string[];
-      vulnIds?: string[];
-      minSeverity?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
-    },
-  ): Promise<Buffer> {
-    const data = await this.vulnerabilityReportService.getVulnerabilityReportData(
-      workspaceId,
-      {
-        startDate: options?.startDate ? new Date(options.startDate) : undefined,
-        endDate: options?.endDate ? new Date(options.endDate) : undefined,
-        targetIds: options?.targetIds,
-        vulnIds: options?.vulnIds,
-        minSeverity: options?.minSeverity,
-      },
-    );
-    return renderReportPdf('VULNERABILITY', {
-      ...data,
-      logoBase64: this.logoBase64 ?? data.logoBase64,
-    });
   }
 
   async deleteReport(id: string, workspaceId: string): Promise<void> {

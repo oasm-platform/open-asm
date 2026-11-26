@@ -1,41 +1,19 @@
-import type { Severity, VulnerabilityAnalyzeStatus, JobStatus } from '@/common/enums/enum';
+import type { Severity } from '@/common/enums/enum';
 import type { TargetType } from '@/modules/targets/entities/target.entity';
 
 type RiskLevel = Exclude<Severity, Severity.INFO>;
-
-type ScanStatus = VulnerabilityAnalyzeStatus | Exclude<JobStatus, JobStatus.CANCELLED>;
 
 type Trend = 'increasing' | 'decreasing' | 'stable';
 
 interface WeeklyStats {
   totalTargets: number;
   targetsChange: number;
-  targetsChangePercent: number;
   totalAssets: number;
   assetsChange: number;
-  assetsChangePercent: number;
   totalServices: number;
   servicesChange: number;
-  servicesChangePercent: number;
   securityScore: number;
   scoreChange: number;
-  scoreChangePercent: number;
-  activeVulns: number;
-  vulnsChange: number;
-  vulnsChangePercent: number;
-  criticalVulns: number;
-  criticalChange: number;
-  criticalChangePercent: number;
-  highVulns: number;
-  mediumVulns: number;
-  lowVulns: number;
-  infoVulns: number;
-  newVulns: number;
-  resolvedVulns: number;
-}
-
-interface MonthlyStats extends WeeklyStats {
-  scansCompleted: number;
 }
 
 interface VulnerabilityTrends {
@@ -82,21 +60,11 @@ interface NewDiscoveries {
 }
 
 interface NewFinding {
-  id: string;
   title: string;
   severity: Severity;
   cvss: number;
   asset: string;
-  category: string;
   discovered: string;
-  status: ScanStatus;
-}
-
-interface ResolvedFinding {
-  id: string;
-  title: string;
-  resolved: string;
-  daysOpen: number;
 }
 
 interface RiskDistribution {
@@ -104,16 +72,6 @@ interface RiskDistribution {
   count: number;
   percent: number;
   color: string;
-}
-
-interface Target {
-  id: string;
-  identifier: string;
-  type: TargetType;
-  status: ScanStatus;
-  riskLevel: RiskLevel;
-  provider: string;
-  lastScan: string;
 }
 
 interface VulnerabilityByTarget {
@@ -141,12 +99,9 @@ export interface ReportData {
   dateRange?: string;
   dateRangeLabel?: string;
   weekly: WeeklyStats;
-  monthly: MonthlyStats;
   vulnerabilityTrends: VulnerabilityTrends;
   newDiscoveries: NewDiscoveries;
   newFindings: NewFinding[];
-  resolvedFindings: ResolvedFinding[];
   riskDistribution: RiskDistribution[];
-  targets: Target[];
   vulnerabilityByTarget: VulnerabilityByTarget[];
 }

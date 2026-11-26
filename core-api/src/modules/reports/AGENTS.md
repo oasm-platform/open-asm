@@ -1,14 +1,15 @@
 # reports module
 
-PDF reports for a workspace: a summary (attack surface) report and a vulnerability report, rendered server-side with `@react-pdf/renderer` and stored in the `reports` bucket.
+PDF reports for a workspace: a summary (attack surface) report, a vulnerability report and a saved-query report. Each is a builtin template: a set of attack surface queries, a mapper from their results to the document's data, and a React PDF document rendered server-side with `@react-pdf/renderer` and stored in the `reports` bucket.
 
 ## Layout
 
-- `reports.controller.ts`: routes under `reports`.
-- `reports.service.ts`: `ReportsService` (list with presigned links, generate + upload, preview, delete).
-- `services/summary-report.service.ts`, `services/vulnerability-report.service.ts`: build the data objects (`types/report-data.type.ts`, `types/vulnerability-report-data.type.ts`).
-- `renderer/`: React PDF documents (`summary/SummaryReportDocument.tsx`, `vuln/VulnReportDocument.tsx`), shared `components/`, `theme.ts`, `helpers.ts`, `fonts.ts`, entry `pdf-renderer.tsx` (`renderReportPdf`).
-- `renderer/assets/*.ttf`: Inter and JetBrains Mono fonts.
+- `reports.controller.ts`: routes under `reports`; builds the `QueryScope` (`reportScope`: workspace and permissions from the guard, `caller: 'report'`).
+- `reports.service.ts`: `ReportsService` (list with presigned links, generate + upload, preview, delete). `render` = `ReportRunner.run` then `renderTemplatePdf`; `store` uploads and inserts the row.
+- `report-runner.ts`: `ReportRunner.run(template, scope, options)`: reads the workspace name (`WorkspacesService.getWorkspacesByIds`, the guard already checked membership), runs each batch of `template.queries(options, now)` through `AttackSurfaceQueryService.run`, then `template.toData(results, ctx)`.
+- `templates/registry.ts` (`BUILTIN_TEMPLATES`: `summary`, `vulnerability`, `query`), `templates/template.types.ts` (`BuiltinTemplate`), `templates/render.tsx` (`renderTemplatePdf`).
+- `templates/builtin/<id>/`: `queries.ts` (the batches), `to-data.ts` (mapper), `data.type.ts`, the `*Document.tsx`, `index.ts` (the template object).
+- `templates/shared/`: `asq-filters.ts` (`ReportOptions`, `findingFilters`, `open`), `batch-result.ts` (`rowsOf`, `firstError`, `num`, `at`, `str`, `strArray`), `severity-matrix.ts`, `report-header.ts` (`weekStart`, `riskLevel`, `trendStats`), `components/`, `theme.ts`, `fonts.ts`, `assets/*.ttf`.
 - `entities/report.entity.ts`, `dto/reports.dto.ts`.
 
 ## Public surface
@@ -16,43 +17,47 @@ PDF reports for a workspace: a summary (attack surface) report and a vulnerabili
 | Route | Permission | Event |
 |---|---|---|
 | `GET reports` | `report.read` | none |
-| `GET reports/preview/summary` | `report.read` | `report.exported` (metadata `format: pdf`) |
-| `GET reports/preview/vulnerability` | `report.read` | none |
-| `POST reports/generate/summary` | `report.write` | `report.generated` (metadata `reportType: summary`) |
-| `POST reports/generate/vulnerability` | `report.write` | none |
-| `POST reports/generate/query` (`{ savedQueryId }`) | `report.write`, plus the read permission of every resource the saved query reads | `report.generated` (metadata `reportType: query`) |
+| `GET reports/preview/summary` | `report.read` + `target.read`, `asset.read`, `vulnerability.read` | `report.exported` (metadata `format: pdf`) |
+| `GET reports/preview/vulnerability` | `report.read` + `target.read`, `asset.read`, `vulnerability.read` | none |
+| `POST reports/generate/summary` | `report.write` + the same catalog read keys | `report.generated` (metadata `reportType: summary`) |
+| `POST reports/generate/vulnerability` | `report.write` + the same catalog read keys | none |
+| `POST reports/generate/query` (`{ savedQueryId }`) | `report.write` + the read key of every resource the saved query reads | `report.generated` (metadata `reportType: query`) |
 | `DELETE reports/:id` | `report.write` | `report.deleted` |
 
+- The catalog read keys are enforced by ASQ, not by `@WorkspaceAccess`: the report runs as the member, so a missing key gives `PERMISSION_DENIED`, which `AsqErrorInterceptor` (on every route that runs a template) answers as 403 with body `{ error: { code, message } }`. Nothing is rendered or stored then.
 - Registered in `combine.module.ts`. Exports nothing.
 - Previews stream the PDF inline with `@Res()` and store nothing. Generate renders, uploads and inserts a `reports` row; the response is only a message, the file shows up in `GET reports`.
 - Generation is synchronous inside the request: no queue, no worker.
 
 ## Data model
 
-- `reports` (`Report`, extends `BaseEntity`): `workspaceId` (ManyToOne, CASCADE, no explicit column property), `userId` (CASCADE), `type` varchar `'SUMMARY' | 'VULNERABILITY' | 'QUERY'` (default `SUMMARY`), `path` = `reports/<fileName>`, `fileName` = `report-<type>-<token>-<ms>.pdf`. Hard delete.
-- `QUERY` reports render a saved attack surface query (`services/query-report.ts` flattens each query to a table, at most `QUERY_REPORT_MAX_ROWS` rows; `renderer/query/QueryReportDocument.tsx`), run as the caller in one consistent snapshot, with the saved query's params at their defaults (`AsqSavedQueriesService.runSpec`).
+- `reports` (`Report`, extends `BaseEntity`): `workspaceId` (ManyToOne, CASCADE, no explicit column property), `userId` (CASCADE), `type` varchar `'SUMMARY' | 'VULNERABILITY' | 'QUERY'` (default `SUMMARY`), `path` = `reports/<fileName>`, `fileName` = `report-<type>-<token>-<ms>.pdf`. Hard delete. No schema change came with the templates.
 
 ## Invariants
 
-- The `reports` bucket is `private` in `StorageService`. `getMany` presigns each row's download URL on every list call (`contentType: application/pdf`, attachment with the file name); never return `path` as a URL.
-- Every query is scoped by workspace: the row lookup by `{ id, workspace: { id } }` (404 otherwise) and the vulnerability data through `asset → target → workspace` joins (`applyWorkspaceFilter`). Filters `targetIds` / `vulnIds` are applied on top of that scope, not instead of it.
-- Report data counts open findings only (`openVulnerabilityCondition`); the vulnerability report's full list excludes `info`.
-- The security score comes from `StatisticService.calculateSecurityScore`, the same formula as the dashboard. Change it there, not here.
-- `renderReportPdf` adds `systemName` and `classification` itself; the logo is read once from `public/images/logo.png` (relative to `process.cwd()`) and silently skipped if missing.
+- The scope is compiled by ASQ: every query is workspace-scoped and permission-checked there with `caller: 'report'` (in-process only, never from a request body; limits in `REPORT_SYNC`, see the ASQ AGENTS.md). The user filters (`targetIds`, `vulnIds`, dates, `minSeverity`) are `where` items on top of that scope, at most 1000 ids (more is `INVALID_QUERY`, 400).
+- A failed query fails the report: `rowsOf` throws the `AsqError` of a batch entry that is `{ error }`, so nothing is uploaded and no `reports` row exists. The runner never swallows it. Exception: the `QUERY` template keeps per-table `{ error }` rendering (`toReportTables`), because those queries are user-authored.
+- `ReportRunner` warns when a query hit its row cap (see Gotchas); the PDF is then missing rows.
+- The security score is `StatisticService.calculateSecurityScore` (static), the same formula as the dashboard. Change it there, not here.
+- Open findings only (`isOpen eq true`); the vulnerability list excludes `info`. Dismissed is `isDismissed` (unexpired dismissal) and not `fixed`.
+- `renderTemplatePdf` adds `systemName`, `classification` and the logo (`public/images/logo.png` relative to `process.cwd()`, skipped if missing); mappers must not.
 - `deleteReport` ignores storage errors and always removes the row.
 
 ## Coupling
 
-- Imports `StatisticModule` (`ReportStatisticsService`: `getCountForWorkspace`, `getSeverityCounts`, `getVulnerabilityTrends`, `getTopAssetsWithVulnerabilities`, `getTargetVulnerabilityStats`) and registers repositories for `Vulnerability`, `Target`, `AssetService`, `AssetTag`, `Workspace` to query those tables directly.
-- Imports `AttackSurfaceQueryModule` (`AsqSavedQueriesService`) for query reports; the route uses `AsqErrorInterceptor` so query errors keep their status.
-- Imports `StorageModule` for `StorageService`. Audit actions for these routes are listed in `audit/constants/audit-events.ts`.
+- Imports `AttackSurfaceQueryModule` (`AttackSurfaceQueryService`, `AsqSavedQueriesService`) and `StorageModule`. Uses the global `WorkspacesService`. Imports `StatisticService` only as a static (`calculateSecurityScore`), no `StatisticModule`.
+- Registers only the `Report` repository: no foreign repositories, no raw SQL over other modules' tables.
+- Audit actions for these routes are in `audit/constants/audit-events.ts`.
 
 ## Gotchas
 
-- `.tsx` files compile because `tsconfig.json` sets `jsx: react-jsx` and `nest-cli.json` builds with SWC including `.tsx`. Fonts are loaded from `__dirname/assets`, which works in `dist` only because `nest-cli.json` copies `**/*.ttf` as assets. Adding a font of another type needs a new asset glob.
-- Jest needs `@react-pdf` and `react` in `transformIgnorePatterns` (already set in `package.json`). Every spec here `jest.mock`s `./renderer/pdf-renderer`; keep doing that in new specs.
-- `getAllVulnerabilities` has no row limit: it loads every open non-info finding with asset and tool into memory and into the PDF.
+- Row caps: every list query is `limit` 10 000 at most (the `report` caller's `maxLimit`). `allVulnerabilities` and the new-port risk list stop there. A list cut at its limit returns `nextCursor` (`truncated` only flags string cuts and the response budget), a grouped query (`targets`, `byTarget`, `discoveryRisk`) returns exactly `limit` rows. `ReportRunner.warnCapped` logs all three. The `QUERY` template clamps explicit limits to `QUERY_REPORT_MAX_ROWS + 1`.
+- Reports share ASQ's process-wide connection semaphore (`ASQ_MAX_CONNECTIONS`, 3; `BUSY` after a 2 s wait) with interactive and agent queries. A report holds a slot for a whole consistent batch (summary: two in a row), so a few concurrent reports can starve queries.
+- After a timeout inside a consistent batch the later statements fail with `25P02` (`INTERNAL`). `firstError` (summary and vulnerability `toData`) throws the first error in execution order so the real `QUERY_TIMEOUT` surfaces.
+- Trend day buckets are UTC (the old service used the server's zone). `weekStart` is Monday 00:00 in the server's local time.
+- `.tsx` files compile because `tsconfig.json` sets `jsx: react-jsx` and `nest-cli.json` builds with SWC including `.tsx`. Fonts load from `__dirname/assets` (`templates/shared/assets`); `nest-cli.json` copies `**/*.ttf`, so a font of another type needs a new asset glob.
+- Unit specs `jest.mock` `./templates/render` and `./templates/registry` (the documents are not loadable in Jest); keep doing that. The e2e config maps `@react-pdf/renderer` to `test/stubs/react-pdf-renderer.js`, so e2e checks the data from `ReportRunner.run`, not the PDF bytes.
 
 ## Testing
 
-`reports.service.spec.ts`, `reports.controller.spec.ts`, `reports.audit-wiring.spec.ts` (asserts the `@PublishEvent` metadata per handler). No spec renders a real PDF or covers the data services in `services/`.
+Unit: `report-runner.spec.ts`, `reports.service.spec.ts`, `reports.service.routing.spec.ts` (right template per type), `reports.controller.spec.ts`, `reports.audit-wiring.spec.ts`, and per template `templates/builtin/*/{queries,to-data}.spec.ts`. E2E (live DB): `core-api/test/reports-builtin.e2e-spec.ts` (hand-computed summary and vulnerability numbers, tenant isolation, empty workspace, id limits, 403 for a member without `vulnerability.read`, a failing query stores nothing). No spec renders a real PDF.

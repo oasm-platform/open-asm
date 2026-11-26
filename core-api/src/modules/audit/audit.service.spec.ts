@@ -12,10 +12,12 @@ import { WorkspacePermissions } from '@/common/decorators/workspace-permissions.
 import { AuditEvent } from './entities/audit-event.entity';
 
 // reports.controller transitively imports @react-pdf/renderer (ESM) via
-// ./renderer/pdf-renderer, which cannot load under jest. Mock it the same way
-// reports.controller.spec.ts does so S11 can resolve the controller class.
-jest.mock('@/modules/reports/renderer/pdf-renderer', () => ({
-  renderReportPdf: jest.fn().mockResolvedValue(Buffer.from('mock-pdf')),
+// templates/registry (the PDF documents) and templates/render, which cannot
+// load under jest. Mock both the same way reports.controller.spec.ts does so
+// S11 can resolve the controller class.
+jest.mock('@/modules/reports/templates/registry', () => ({ BUILTIN_TEMPLATES: {} }));
+jest.mock('@/modules/reports/templates/render', () => ({
+  renderTemplatePdf: jest.fn().mockResolvedValue(Buffer.from('mock-pdf')),
 }));
 import {
   AUDIT_EVENT_LABELS,
