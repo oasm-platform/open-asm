@@ -136,6 +136,9 @@ describe('report fields', () => {
   it('makes tags a root reaching its service, host and target', () => {
     expect(CATALOG.tags.root).toBe(true);
     expect(CATALOG.tags.fields.firstSeen.type).toBe('timestamp');
+    // asset_services_tags has no (workspaceId, createdAt, id) index.
+    expect(CATALOG.tags.fields.firstSeen.sortable).toBe('bounded');
+    expect(servicesResource.many.tags.indexedOrder).toEqual([]);
     const rules = { allowMany: false, maxOneHops: 2 };
     const res = resolvePath(CATALOG, CATALOG.tags, 'service.target.value', rules);
     expect(res.ok).toBe(true);

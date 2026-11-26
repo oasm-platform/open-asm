@@ -414,7 +414,8 @@ export const tagsResource: ResourceDef = {
   fields: {
     id,
     tag: { sql: '{a}.tag', type: 'text', description: 'Tag', groupable: true },
-    firstSeen: firstSeen('When the tag was added'),
+    // No (workspaceId, createdAt DESC, id DESC) index on asset_services_tags: bounded, not indexed.
+    firstSeen: { ...firstSeen('When the tag was added'), sortable: 'bounded' },
   },
   one: {
     service: {
