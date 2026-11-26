@@ -3,6 +3,7 @@ import { NotFoundError } from '@/common/errors/domain.errors';
 import { AttackSurfaceQueryService } from '@/modules/attack-surface-query/attack-surface-query.service';
 import type { QueryBatchResult, QueryScope } from '@/modules/attack-surface-query/domain/query.types';
 import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
+import type { QueryBatchInput } from '@/modules/attack-surface-query/domain/query.schema';
 import type { BuiltinTemplate } from './templates/template.types';
 
 /** Runs a builtin template's queries as the caller and turns the results into the document's data. */
@@ -25,16 +26,24 @@ export class ReportRunner {
     for (const batch of template.queries(options, now)) {
       // Caller 'report' never gets a queued report job back, so the result is always a batch.
       const result = (await this.asq.run(scope, batch)) as QueryBatchResult;
-      this.warnTruncated(template.id, result);
+      this.warnCapped(template.id, batch, result);
       results.push(result);
     }
     return template.toData(results, { workspaceName: workspace.name, now, options });
   }
 
-  private warnTruncated(templateId: string, result: QueryBatchResult): void {
+  /**
+   * A list stopped at its `limit` returns `nextCursor` (not `truncated`); a grouped query has no cursor, so
+   * it is capped when it returns exactly `limit` rows. Either way the PDF is missing rows.
+   */
+  private warnCapped(templateId: string, batch: QueryBatchInput, result: QueryBatchResult): void {
     for (const [name, outcome] of Object.entries(result.data)) {
-      if ('rows' in outcome && outcome.truncated) {
-        this.logger.warn(`Report "${templateId}": query "${name}" was truncated, the PDF is missing rows`);
+      if (!('rows' in outcome)) continue;
+      const spec = batch.queries[name] as { limit?: number; groupBy?: unknown[] } | undefined;
+      const groupedAtLimit =
+        !!spec?.groupBy?.length && spec.limit !== undefined && outcome.rows.length >= spec.limit;
+      if (outcome.truncated || outcome.nextCursor || groupedAtLimit) {
+        this.logger.warn(`Report "${templateId}": query "${name}" hit its row cap, the PDF is missing rows`);
       }
     }
   }

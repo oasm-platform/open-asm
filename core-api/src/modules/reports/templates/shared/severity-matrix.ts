@@ -1,4 +1,4 @@
-import { num } from './batch-result';
+import { num, type Row } from './batch-result';
 
 const and = (items: unknown[]) => ({ logic: 'and', items });
 const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info'] as const;
@@ -11,7 +11,7 @@ export const severityMatrix = {
   ),
 };
 
-export const matrixOf = (r: Record<string, any>) => ({
+export const matrixOf = (r: Row) => ({
   total: num(r.total),
   critical: num(r.critical),
   high: num(r.high),
@@ -31,7 +31,7 @@ export function lastPoints(series: number[], size: number): number[] {
 }
 
 /** Daily trend rows (`n` per day) as today's `last30Days` / `last7Days` arrays. */
-export function trendSeries(rows: Record<string, any>[]): { last30Days: number[]; last7Days: number[] } {
+export function trendSeries(rows: Row[]): { last30Days: number[]; last7Days: number[] } {
   const last30Days = lastPoints(rows.map((r) => num(r.n)), POINTS_30);
   return { last30Days, last7Days: lastPoints(last30Days, POINTS_7) };
 }

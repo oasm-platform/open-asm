@@ -17,6 +17,9 @@ export interface RenderExtras {
   classification: string;
 }
 
+/** What a mapper returns: the data without the fields `renderTemplatePdf` adds. */
+export type MappedData<D> = Omit<D, 'systemName' | 'classification'>;
+
 export interface BuiltinTemplate<O, D> {
   id: TemplateId;
   reportType: 'SUMMARY' | 'VULNERABILITY' | 'QUERY';

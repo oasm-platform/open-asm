@@ -86,4 +86,33 @@ describe('ReportRunner', () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('summary'));
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('"all"'));
   });
+
+  const run = async (batches: unknown[], data: unknown) => {
+    const { asq, runner } = setup();
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    asq.run.mockResolvedValue({ data });
+    const tpl = { id: 'summary', queries: () => batches, toData: () => 1 } as unknown as BuiltinTemplate<unknown, unknown>;
+    await runner.run(tpl, scope, {});
+    return warn;
+  };
+
+  it('warns when a list returns a nextCursor even though truncated is false', async () => {
+    const warn = await run([{ queries: { all: {} } }], { all: { rows: [{}], nextCursor: 'c', truncated: false } });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('"all"'));
+  });
+
+  it('warns when a grouped query returns exactly its limit', async () => {
+    const q = { byTarget: { groupBy: [{ field: 'x' }], limit: 2 } };
+    const warn = await run([{ queries: q }], { byTarget: { rows: [{}, {}], truncated: false } });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('"byTarget"'));
+  });
+
+  it('does not warn when a grouped query is under its limit or a list ends at its limit', async () => {
+    const q = { byTarget: { groupBy: [{ field: 'x' }], limit: 3 }, list: { limit: 2 } };
+    const warn = await run([{ queries: q }], {
+      byTarget: { rows: [{}, {}], truncated: false },
+      list: { rows: [{}, {}], nextCursor: null, truncated: false },
+    });
+    expect(warn).not.toHaveBeenCalled();
+  });
 });

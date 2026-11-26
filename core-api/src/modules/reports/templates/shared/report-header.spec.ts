@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return -- spec helpers read untyped query specs */
 import { formatDay, reportHeader, riskLevel, trendStats, weekStart } from './report-header';
 
 // Wednesday 2026-11-25 (ISO week 48)
@@ -76,7 +75,7 @@ describe('riskLevel', () => {
 });
 
 describe('trendStats', () => {
-  const days = (first: number, second: number) => [...Array(15).fill(first), ...Array(15).fill(second)];
+  const days = (first: number, second: number) => [...Array<number>(15).fill(first), ...Array<number>(15).fill(second)];
 
   it('avgPerWeek is the last 7 days total / 7, rounded to one decimal', () => {
     expect(trendStats([], [1, 1, 1, 1, 1, 1, 2]).avgPerWeek).toBe(1.1);

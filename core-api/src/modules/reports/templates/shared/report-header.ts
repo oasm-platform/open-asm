@@ -17,8 +17,9 @@ export function weekStart(now: Date): Date {
   return d;
 }
 
-export function formatDay(d: Date | string): string {
-  const date = new Date(d);
+/** `dd/mm/yyyy`; query rows hand dates over as Date or ISO string. */
+export function formatDay(d: unknown): string {
+  const date = new Date(d as Date | string);
   const day = String(date.getDate()).padStart(2, '0');
   const month = String(date.getMonth() + 1).padStart(2, '0');
   return `${day}/${month}/${date.getFullYear()}`;

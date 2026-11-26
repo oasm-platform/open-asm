@@ -1,15 +1,13 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment -- rows are untyped JSON from the query engine */
 import type { QueryBatchResult } from '@/modules/attack-surface-query/domain/query.types';
-import { Severity } from '@/common/enums/enum';
+import { Severity, type TargetType } from '@/common/enums/enum';
 import { StatisticService } from '@/modules/statistic/statistic.service';
-import { num, rowsOf } from '../../shared/batch-result';
+import { at, firstError, num, type Row, rowsOf, str, strArray } from '../../shared/batch-result';
 import { formatDay, reportHeader, riskLevel, trendStats } from '../../shared/report-header';
 import type { ReportOptions } from '../../shared/asq-filters';
 import { matrixOf, trendSeries } from '../../shared/severity-matrix';
-import type { TemplateContext } from '../../template.types';
+import type { MappedData, TemplateContext } from '../../template.types';
 import type { ReportData } from './data.type';
 
-type Row = Record<string, any>;
 type RiskLevel = Exclude<Severity, Severity.INFO>;
 
 const LEVELS = [Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM, Severity.LOW, Severity.INFO] as const;
@@ -27,7 +25,10 @@ const TECH_CATEGORY = 'Technology';
 /** Severity counts of one aggregate column (`current` or `lastWeek`). */
 function severityCounts(rows: Row[], column: 'current' | 'lastWeek'): Record<Severity, number> {
   const counts = Object.fromEntries(LEVELS.map((s) => [s, 0])) as Record<Severity, number>;
-  for (const r of rows) if (r.severity in counts) counts[r.severity as Severity] = num(r[column]);
+  for (const r of rows) {
+    const severity = str(r.severity);
+    if (severity in counts) counts[severity as Severity] = num(r[column]);
+  }
   return counts;
 }
 
@@ -38,7 +39,8 @@ function totalAndChange(results: QueryBatchResult[], name: string): [number, num
   return [total, total - num(r.lastWeek)];
 }
 
-export function summaryToData(results: QueryBatchResult[], ctx: TemplateContext<ReportOptions>): ReportData {
+export function summaryToData(results: QueryBatchResult[], ctx: TemplateContext<ReportOptions>): MappedData<ReportData> {
+  firstError(results);
   const severityRows = rowsOf(results, 'severity');
   const current = severityCounts(severityRows, 'current');
   const lastWeek = severityCounts(severityRows, 'lastWeek');
@@ -52,10 +54,10 @@ export function summaryToData(results: QueryBatchResult[], ctx: TemplateContext<
   const trend = trendSeries(rowsOf(results, 'trend'));
 
   const discoveryRisk = new Map<string, number>();
-  for (const r of rowsOf(results, 'discoveryRisk') as Row[]) discoveryRisk.set(String(r.host?.target?.value), num(r.n));
+  for (const r of rowsOf(results, 'discoveryRisk')) discoveryRisk.set(String(at(r, 'host', 'target', 'value')), num(r.n));
   const targetRisk = (value: string) => riskLevel(discoveryRisk.get(value) ?? 0) as RiskLevel;
   const targets = (name: string) =>
-    rowsOf(results, name).map((r: Row) => ({
+    rowsOf(results, name).map((r) => ({
       identifier: String(r.value),
       discovered: formatDay(r.firstSeen),
       provider: PROVIDER,
@@ -65,7 +67,7 @@ export function summaryToData(results: QueryBatchResult[], ctx: TemplateContext<
   const portRows = rowsOf(results, 'portRisk');
   // Open findings on the same host whose `ports` list the port, like the old `v.ports @> ARRAY[port]`.
   const portRiskCount = (hostId: unknown, port: number) =>
-    portRows.filter((v: Row) => v.host?.id === hostId && Array.isArray(v.ports) && v.ports.includes(String(port)))
+    portRows.filter((v) => at(v, 'host', 'id') === hostId && strArray(v.ports).includes(String(port)))
       .length;
 
   return {
@@ -86,25 +88,25 @@ export function summaryToData(results: QueryBatchResult[], ctx: TemplateContext<
     newDiscoveries: {
       domains: targets('newDomains'),
       ipAddresses: targets('newIps'),
-      ports: (rowsOf(results, 'newPorts') as Row[]).map((r: Row) => ({
+      ports: rowsOf(results, 'newPorts').map((r) => ({
         port: num(r.port),
         service: String(r.value),
         discovered: formatDay(r.firstSeen),
-        target: r.target?.value ?? '',
-        riskLevel: riskLevel(portRiskCount(r.host?.id, num(r.port))) as RiskLevel,
+        target: str(at(r, 'target', 'value')),
+        riskLevel: riskLevel(portRiskCount(at(r, 'host', 'id'), num(r.port))) as RiskLevel,
       })),
-      technologies: rowsOf(results, 'newTech').map((r: Row) => ({
+      technologies: rowsOf(results, 'newTech').map((r) => ({
         name: String(r.tag),
         discovered: formatDay(r.firstSeen),
-        target: r.service?.target?.value ?? '',
+        target: str(at(r, 'service', 'target', 'value')),
         category: TECH_CATEGORY,
       })),
     },
-    newFindings: rowsOf(results, 'newFindings').map((v: Row) => ({
+    newFindings: rowsOf(results, 'newFindings').map((v) => ({
       title: String(v.name),
       severity: v.severity as Severity,
       cvss: num(v.cvssScore),
-      asset: v.host?.value || 'Unknown',
+      asset: str(at(v, 'host', 'value')) || 'Unknown',
       discovered: formatDay(v.firstSeen),
     })),
     riskDistribution: RISK_COLORS.map(([level, color]) => ({
@@ -113,9 +115,9 @@ export function summaryToData(results: QueryBatchResult[], ctx: TemplateContext<
       percent: total > 0 ? (current[level] / total) * 100 : 0,
       color,
     })),
-    vulnerabilityByTarget: rowsOf(results, 'byTarget').map((r: Row) => {
+    vulnerabilityByTarget: rowsOf(results, 'byTarget').map((r) => {
       const { total: t, critical, high, medium, low } = matrixOf(r);
-      return { target: r.host?.target?.value ?? '', type: r.host?.target?.type ?? '', critical, high, medium, low, total: t };
+      return { target: str(at(r, 'host', 'target', 'value')), type: str(at(r, 'host', 'target', 'type')) as TargetType, critical, high, medium, low, total: t };
     }),
-  } as ReportData;
+  };
 }

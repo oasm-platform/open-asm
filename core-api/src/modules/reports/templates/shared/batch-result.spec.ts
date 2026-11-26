@@ -1,6 +1,6 @@
 import { AsqError } from '@/modules/attack-surface-query/domain/query-errors';
 import type { QueryBatchResult } from '@/modules/attack-surface-query/domain/query.types';
-import { num, rowsOf } from './batch-result';
+import { at, firstError, num, rowsOf, str, strArray } from './batch-result';
 
 const meta = { now: '2026-01-01T00:00:00.000Z', tookMs: 1, queries: {} };
 const batch = (data: QueryBatchResult['data']): QueryBatchResult => ({ data, meta });
@@ -40,5 +40,36 @@ describe('num', () => {
     [NaN, 0],
   ])('num(%p) = %p', (v, expected) => {
     expect(num(v)).toBe(expected);
+  });
+});
+
+describe('firstError', () => {
+  it('throws the first error in execution order, not the one a mapper reads first', () => {
+    const results = [
+      batch({ q6: { rows: [], truncated: false } }),
+      batch({
+        q7: { error: { code: 'QUERY_TIMEOUT', message: 'slow' } },
+        q8: { error: { code: 'INTERNAL', message: 'current transaction is aborted' } },
+      }),
+    ];
+    expect(() => rowsOf(results, 'q8')).toThrow('aborted');
+    expect(() => firstError(results)).toThrow(expect.objectContaining({ code: 'QUERY_TIMEOUT', message: 'slow' }));
+  });
+
+  it('does nothing when every query succeeded', () => {
+    expect(() => firstError([batch({ a: { rows: [], truncated: false } })])).not.toThrow();
+  });
+});
+
+describe('accessors', () => {
+  it('reads nested paths safely', () => {
+    expect(at({ a: { b: 1 } }, 'a', 'b')).toBe(1);
+    expect(at({ a: null }, 'a', 'b')).toBeUndefined();
+    expect(at(undefined, 'a')).toBeUndefined();
+  });
+  it('coerces scalars', () => {
+    expect(str(3)).toBe('');
+    expect(strArray(['a', 1])).toEqual(['a', '1']);
+    expect(strArray(null)).toEqual([]);
   });
 });

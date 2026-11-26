@@ -9,7 +9,7 @@ PDF reports for a workspace: a summary (attack surface) report, a vulnerability 
 - `report-runner.ts`: `ReportRunner.run(template, scope, options)`: reads the workspace name (`WorkspacesService.getWorkspacesByIds`, the guard already checked membership), runs each batch of `template.queries(options, now)` through `AttackSurfaceQueryService.run`, then `template.toData(results, ctx)`.
 - `templates/registry.ts` (`BUILTIN_TEMPLATES`: `summary`, `vulnerability`, `query`), `templates/template.types.ts` (`BuiltinTemplate`), `templates/render.tsx` (`renderTemplatePdf`).
 - `templates/builtin/<id>/`: `queries.ts` (the batches), `to-data.ts` (mapper), `data.type.ts`, the `*Document.tsx`, `index.ts` (the template object).
-- `templates/shared/`: `asq-filters.ts` (`ReportOptions`, `findingFilters`, `open`), `batch-result.ts` (`rowsOf`, `num`), `severity-matrix.ts`, `report-header.ts` (`weekStart`, `riskLevel`, `trendStats`), `components/`, `theme.ts`, `fonts.ts`, `assets/*.ttf`.
+- `templates/shared/`: `asq-filters.ts` (`ReportOptions`, `findingFilters`, `open`), `batch-result.ts` (`rowsOf`, `firstError`, `num`, `at`, `str`, `strArray`), `severity-matrix.ts`, `report-header.ts` (`weekStart`, `riskLevel`, `trendStats`), `components/`, `theme.ts`, `fonts.ts`, `assets/*.ttf`.
 - `entities/report.entity.ts`, `dto/reports.dto.ts`.
 
 ## Public surface
@@ -37,7 +37,7 @@ PDF reports for a workspace: a summary (attack surface) report, a vulnerability 
 
 - The scope is compiled by ASQ: every query is workspace-scoped and permission-checked there with `caller: 'report'` (in-process only, never from a request body; limits in `REPORT_SYNC`, see the ASQ AGENTS.md). The user filters (`targetIds`, `vulnIds`, dates, `minSeverity`) are `where` items on top of that scope, at most 1000 ids (more is `INVALID_QUERY`, 400).
 - A failed query fails the report: `rowsOf` throws the `AsqError` of a batch entry that is `{ error }`, so nothing is uploaded and no `reports` row exists. The runner never swallows it. Exception: the `QUERY` template keeps per-table `{ error }` rendering (`toReportTables`), because those queries are user-authored.
-- `ReportRunner` warns when a query came back `truncated`; the PDF is then missing rows.
+- `ReportRunner` warns when a query hit its row cap (see Gotchas); the PDF is then missing rows.
 - The security score is `StatisticService.calculateSecurityScore` (static), the same formula as the dashboard. Change it there, not here.
 - Open findings only (`isOpen eq true`); the vulnerability list excludes `info`. Dismissed is `isDismissed` (unexpired dismissal) and not `fixed`.
 - `renderTemplatePdf` adds `systemName`, `classification` and the logo (`public/images/logo.png` relative to `process.cwd()`, skipped if missing); mappers must not.
@@ -51,7 +51,9 @@ PDF reports for a workspace: a summary (attack surface) report, a vulnerability 
 
 ## Gotchas
 
-- Row caps: every list query is `limit` 10 000 at most (the `report` caller's `maxLimit`). `allVulnerabilities` and the per-target tables stop there; the runner logs a truncation warning. The new-port risk reads at most 10 000 open findings.
+- Row caps: every list query is `limit` 10 000 at most (the `report` caller's `maxLimit`). `allVulnerabilities` and the new-port risk list stop there. A list cut at its limit returns `nextCursor` (`truncated` only flags string cuts and the response budget), a grouped query (`targets`, `byTarget`, `discoveryRisk`) returns exactly `limit` rows. `ReportRunner.warnCapped` logs all three. The `QUERY` template clamps explicit limits to `QUERY_REPORT_MAX_ROWS + 1`.
+- Reports share ASQ's process-wide connection semaphore (`ASQ_MAX_CONNECTIONS`, 3; `BUSY` after a 2 s wait) with interactive and agent queries. A report holds a slot for a whole consistent batch (summary: two in a row), so a few concurrent reports can starve queries.
+- After a timeout inside a consistent batch the later statements fail with `25P02` (`INTERNAL`). `firstError` (summary and vulnerability `toData`) throws the first error in execution order so the real `QUERY_TIMEOUT` surfaces.
 - Trend day buckets are UTC (the old service used the server's zone). `weekStart` is Monday 00:00 in the server's local time.
 - `.tsx` files compile because `tsconfig.json` sets `jsx: react-jsx` and `nest-cli.json` builds with SWC including `.tsx`. Fonts load from `__dirname/assets` (`templates/shared/assets`); `nest-cli.json` copies `**/*.ttf`, so a font of another type needs a new asset glob.
 - Unit specs `jest.mock` `./templates/render` and `./templates/registry` (the documents are not loadable in Jest); keep doing that. The e2e config maps `@react-pdf/renderer` to `test/stubs/react-pdf-renderer.js`, so e2e checks the data from `ReportRunner.run`, not the PDF bytes.
