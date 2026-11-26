@@ -249,7 +249,7 @@ export class SummaryReportService {
       riskDistribution,
       targets,
       vulnerabilityByTarget,
-    };
+    } as ReportData; // Task 8 deletes this service; the type shrank to what the document reads
   }
 
   private async getNewVulnerabilityCount(
