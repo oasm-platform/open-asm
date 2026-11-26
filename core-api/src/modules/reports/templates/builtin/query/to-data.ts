@@ -1,6 +1,8 @@
 import type { QueryBatchResult } from '@/modules/attack-surface-query/domain/query.types';
 
-import type { QueryReportTable } from './data.type';
+import type { TemplateContext } from '../../template.types';
+import type { QueryReportData, QueryReportTable } from './data.type';
+import type { QueryReportOptions } from './queries';
 
 /** Rows a query contributes to a PDF; the rest is marked truncated. */
 export const QUERY_REPORT_MAX_ROWS = 500;
@@ -60,4 +62,13 @@ export function toReportTables(result: QueryBatchResult): QueryReportTable[] {
       truncated: outcome.truncated || flat.length > QUERY_REPORT_MAX_ROWS || Boolean(outcome.nextCursor),
     };
   });
+}
+
+export function queryToData(results: QueryBatchResult[], ctx: TemplateContext<QueryReportOptions>): QueryReportData {
+  return {
+    title: ctx.options.title,
+    description: ctx.options.description,
+    generatedAt: ctx.now.toISOString(),
+    tables: toReportTables(results[0]),
+  };
 }

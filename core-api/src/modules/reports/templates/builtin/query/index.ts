@@ -1,6 +1,7 @@
 import type { BuiltinTemplate } from '../../template.types';
 import type { QueryReportData } from './data.type';
-import { queryQueries, queryToData, type QueryReportOptions } from './queries';
+import { queryQueries, type QueryReportOptions } from './queries';
+import { queryToData } from './to-data';
 import { QueryDocument } from './QueryDocument';
 
 export const queryTemplate: BuiltinTemplate<QueryReportOptions, QueryReportData> = {

@@ -1,4 +1,7 @@
-import { flattenRow, QUERY_REPORT_MAX_ROWS, toReportTables } from './to-data';
+import type { QueryBatchResult } from '@/modules/attack-surface-query/domain/query.types';
+import { flattenRow, QUERY_REPORT_MAX_ROWS, queryToData, toReportTables } from './to-data';
+
+const now = new Date('2026-11-26T10:00:00.000Z');
 
 describe('query report tables', () => {
   it('flattens nested rows into dotted columns and leaves ids out', () => {
@@ -45,5 +48,14 @@ describe('query report tables', () => {
 
   it('flattens only plain objects', () => {
     expect(flattenRow({ a: { b: { c: 1 } }, l: [1, 2] })).toEqual({ 'a.b.c': 1, l: [1, 2] });
+  });
+});
+
+describe('queryToData', () => {
+  it('builds report data with title, description, timestamp and tables of the first result', () => {
+    const result: QueryBatchResult = { data: { a: { rows: [{ name: 'x' }], truncated: false } } } as never;
+    const data = queryToData([result], { workspaceName: 'w', now, options: { spec: {}, title: 'T', description: 'D' } });
+    expect(data).toMatchObject({ title: 'T', description: 'D', generatedAt: now.toISOString() });
+    expect(data.tables).toEqual([{ name: 'a', columns: ['name'], rows: [['x']], truncated: false }]);
   });
 });

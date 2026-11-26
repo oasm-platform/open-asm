@@ -5,7 +5,6 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { TargetsModule } from '../targets/targets.module';
 import { VulnerabilitiesModule } from '../vulnerabilities/vulnerabilities.module';
 import { Statistic } from './entities/statistic.entity';
-import { ReportStatisticsService } from './report-statistics.service';
 import { StatisticCronService } from './statistic-cron.service';
 import { StatisticController } from './statistic.controller';
 import { StatisticSnapshotService } from './statistic-snapshot.service';
@@ -25,9 +24,8 @@ import { TechnologyModule } from '../technology/technology.module';
   providers: [
     StatisticService,
     StatisticSnapshotService,
-    ReportStatisticsService,
     StatisticCronService,
   ],
-  exports: [StatisticService, ReportStatisticsService],
+  exports: [StatisticService],
 })
 export class StatisticModule {}

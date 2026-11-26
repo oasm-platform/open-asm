@@ -176,12 +176,6 @@ const FOREIGN_ENTITIES = [
   // WRITE: project-owned workflows (project-<id>-<uuid>.yaml) are created,
   // edited and deleted with their bindings in the project's transactions
   'modules/projects <- Workflow (modules/workflows)',
-  // read model: PDF reports
-  'modules/reports <- AssetService (modules/assets)',
-  'modules/reports <- AssetTag (modules/assets)',
-  'modules/reports <- Target (modules/targets)',
-  'modules/reports <- Vulnerability (modules/vulnerabilities)',
-  'modules/reports <- Workspace (modules/workspaces)',
   // read model: global search
   'modules/search <- Vulnerability (modules/vulnerabilities)',
   // read: a GIT_ORG target must name a SOURCE_CODE integration
@@ -331,14 +325,12 @@ const CROSS_MODULE_IMPORTS = [
   'modules/providers -> modules/auth',
   'modules/providers -> modules/tools',
   'modules/remote-execute -> modules/workers',
-  'modules/reports -> modules/assets',
   'modules/reports -> modules/attack-surface-query',
   'modules/reports -> modules/auth',
   'modules/reports -> modules/event-bridge',
   'modules/reports -> modules/statistic',
   'modules/reports -> modules/storage',
   'modules/reports -> modules/targets',
-  'modules/reports -> modules/vulnerabilities',
   'modules/reports -> modules/workspaces',
   'modules/root -> modules/admin',
   'modules/root -> modules/storage',

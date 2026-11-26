@@ -5,7 +5,6 @@ Dashboard numbers for a workspace (live counts, timelines, top-N lists, TLS and 
 ## Layout
 
 - `statistic.service.ts`: `StatisticService`, the dashboard and report queries (raw SQL / query builders over other modules' tables), Redis caching, `calculateStatistics` (the live numbers, also what the cron stores) and `calculateSecurityScore`.
-- `report-statistics.service.ts`: `ReportStatisticsService`: what the PDF reports print (`getSeverityCounts`, `getVulnerabilityTrends` / `getDailyVulnerabilityCounts`, `getTopAssetsWithVulnerabilities`, `getTargetVulnerabilityStats`, `getCountForWorkspace`). Exported for the reports module.
 - `statistic-snapshot.service.ts`: `StatisticSnapshotService`: the daily snapshot (`calculateAndStoreStatistics`, `filterChangedStatistics`) and the workflow start/end handlers. It reads the counts through `StatisticService`.
 - `statistic-cron.service.ts`: `@Cron('0 0 * * *')` + `@Lock('cron:statistic-daily', { ttl: 600_000 })` → `StatisticSnapshotService.calculateAndStoreStatistics()`.
 - `statistic.controller.ts`: read-only routes under `statistic`.
@@ -19,7 +18,7 @@ All routes are `GET`, `@WorkspaceAccess('workspace.read')`, workspace from the `
 
 - `statistic/attention` (`getAttention`) is the dashboard's "Needs attention": raw counts go through the pure `buildWorkspaceInsights` in `workspace-insights.ts`, which drops zero counts and orders worst first. Its TLS count is `getTlsStatistics` `alreadyExpired + expireInAMonth`, so it matches the Certificates card. "Failed runs" are distinct `jobHistoryId`s with a failed job of the workspace in 7 days (jobs have no `workspaceId`; the path is asset → target). `InsightLevel` is reused from `targets/dto/target-overview.dto.ts`.
 
-- Registered in `combine.module.ts`. Exports `StatisticService` and `ReportStatisticsService`.
+- Registered in `combine.module.ts`. Exports `StatisticService`.
 - Agent tool use: `agents/tools/workspace.tools.ts` calls `getStatistics`.
 - Consumes in-process `EventEmitter2` events `EventTriggerType.WORKFLOW_START` and `WORKFLOW_END` (`@OnEvent` on `StatisticSnapshotService`, emitted by `jobs-registry.service.ts` and `workflow-runner.service.ts`).
 - Publishes `workflow.run.completed` (`WorkflowRunCompletedPayload`) through `EventBridgeService.publishSafely`, only for runs of `DefaultWorkflow.DOMAIN_DISCOVERY` / `IP_ADDRESS_DISCOVERY`.
@@ -40,7 +39,7 @@ All routes are `GET`, `@WorkspaceAccess('workspace.read')`, workspace from the `
 
 - `StatisticService` injects `DataSource`, `GeoIpService`, `RedisService`, `TechnologyForwarderService` (imports `TechnologyModule`); `StatisticSnapshotService` injects `DataSource`, `RedisService`, `WorkspacesService`, `EventBridgeService` and `StatisticService`. It queries `targets`, `assets`, `asset_services`, `asset_tags`, `vulnerabilities`, `tls_certificates` and more directly; it does not call those modules' services.
 - The module imports `TechnologyModule` (for `TechnologyForwarderService`), plus `TargetsModule`, `AssetsModule`, `VulnerabilitiesModule` and `NotificationsModule`, although the service injects nothing from those four. The old Statistic → Vulnerabilities → Agents → Statistic cycle is gone (vulnerabilities no longer imports agents), so there is no `forwardRef`.
-- Imported by `reports` (`ReportStatisticsService` for the data, `StatisticService.calculateSecurityScore` for the score), `search` (`getTotalAssets`, `getTotalTargets`) and `agents`.
+- Imported statically by `reports` (`StatisticService.calculateSecurityScore` for the score, no module import), `search` (`getTotalAssets`, `getTotalTargets`) and `agents`.
 - Notifications about discovery runs are produced downstream from `workflow.run.completed`, not here.
 
 ## Testing

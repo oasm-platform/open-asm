@@ -1,10 +1,9 @@
-import { QueryDocument } from './builtin/query/QueryDocument';
-import { SummaryDocument } from './builtin/summary/SummaryDocument';
-import { VulnerabilityDocument } from './builtin/vulnerability/VulnerabilityDocument';
+import { queryTemplate } from './builtin/query';
+import { summaryTemplate } from './builtin/summary';
+import { vulnerabilityTemplate } from './builtin/vulnerability';
 
-// Documents only for now; full templates (queries + toData) replace this as `BUILTIN_TEMPLATES`.
-export const BUILTIN_DOCUMENTS = {
-  summary: { Document: SummaryDocument },
-  vulnerability: { Document: VulnerabilityDocument },
-  query: { Document: QueryDocument },
+export const BUILTIN_TEMPLATES = {
+  summary: summaryTemplate,
+  vulnerability: vulnerabilityTemplate,
+  query: queryTemplate,
 };
