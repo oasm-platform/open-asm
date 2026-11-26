@@ -60,11 +60,11 @@ describe('ReportsController query scope and error mapping', () => {
 
   it('runs every preview and generate route as caller "report" with the request permissions', async () => {
     const { service, controller } = build();
-    await controller.previewSummaryReport({} as never, 'w1', req, res);
-    await controller.previewVulReport({} as never, 'w1', req, res);
-    await controller.generateSummaryReport({} as never, 'w1', 'u1', req);
-    await controller.generateVulReport({} as never, 'w1', 'u1', req);
-    await controller.generateQueryReport({ savedQueryId: 'q' } as never, 'w1', 'u1', req);
+    await controller.previewSummaryReport({}, 'w1', req, res);
+    await controller.previewVulReport({}, 'w1', req, res);
+    await controller.generateSummaryReport({}, 'w1', 'u1', req);
+    await controller.generateVulReport({}, 'w1', 'u1', req);
+    await controller.generateQueryReport({ savedQueryId: 'q' }, 'w1', 'u1', req);
 
     expect(service.previewSummaryReport).toHaveBeenCalledWith(scope, expect.anything());
     expect(service.previewVulnerabilityReport).toHaveBeenCalledWith(scope, expect.anything());
@@ -75,7 +75,7 @@ describe('ReportsController query scope and error mapping', () => {
 
   it('falls back to no permissions when the request carries none', async () => {
     const { service, controller } = build();
-    await controller.generateSummaryReport({} as never, 'w1', 'u1', {} as never);
+    await controller.generateSummaryReport({}, 'w1', 'u1', {} as never);
     expect(service.generateReport).toHaveBeenCalledWith(
       { workspaceId: 'w1', permissions: [], caller: 'report' },
       'u1',

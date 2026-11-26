@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return -- spec helpers read untyped query specs */
 import { CATALOG } from '@/modules/attack-surface-query/catalog/catalog';
 import { assertWithinBudget } from '@/modules/attack-surface-query/domain/query-cost';
 import { AsqError } from '@/modules/attack-surface-query/domain/query-errors';

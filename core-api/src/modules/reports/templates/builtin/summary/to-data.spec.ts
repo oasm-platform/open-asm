@@ -101,8 +101,8 @@ describe('summaryToData', () => {
       }),
     ];
     const d = summaryToData(results, ctx);
-    const score = StatisticService.calculateSecurityScore({ critical: 1, high: 3, medium: 0, low: 6, info: 10 } as never);
-    const lastScore = StatisticService.calculateSecurityScore({ critical: 0, high: 2, medium: 0, low: 1, info: 0 } as never);
+    const score = StatisticService.calculateSecurityScore({ critical: 1, high: 3, medium: 0, low: 6, info: 10 });
+    const lastScore = StatisticService.calculateSecurityScore({ critical: 0, high: 2, medium: 0, low: 1, info: 0 });
 
     expect(d.weekly).toEqual({
       totalTargets: 5,

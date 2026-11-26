@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return -- spec helpers read untyped query specs */
 import { formatDay, reportHeader, riskLevel, trendStats, weekStart } from './report-header';
 
 // Wednesday 2026-11-25 (ISO week 48)

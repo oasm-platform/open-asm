@@ -140,7 +140,7 @@ export class ReportsService {
   ): Promise<{ filePath: string; fileName: string }> {
     const saved = await this.savedQueries.get(scope.workspaceId, savedQueryId);
     const pdfBuffer = await this.render(BUILTIN_TEMPLATES.query, scope, {
-      spec: saved.spec as Record<string, unknown>,
+      spec: saved.spec,
       title: saved.name,
       description: saved.description,
     });

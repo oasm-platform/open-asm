@@ -27,9 +27,9 @@ describe('ReportRunner', () => {
   it('runs the batches in order as the caller and hands every result to toData', async () => {
     const { asq, runner } = setup();
     const order: string[] = [];
-    asq.run.mockImplementation(async (_s, batch) => {
+    asq.run.mockImplementation((_s, batch) => {
       order.push(Object.keys(batch.queries)[0]);
-      return { data: { [order.at(-1)!]: { rows: [], truncated: false } } };
+      return Promise.resolve({ data: { [order.at(-1)!]: { rows: [], truncated: false } } });
     });
     const toData = jest.fn().mockReturnValue({ ok: true });
     const tpl = template(toData);

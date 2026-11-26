@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment -- rows are untyped JSON from the query engine */
 import type { QueryBatchResult } from '@/modules/attack-surface-query/domain/query.types';
 import { Severity } from '@/common/enums/enum';
 import { StatisticService } from '@/modules/statistic/statistic.service';
