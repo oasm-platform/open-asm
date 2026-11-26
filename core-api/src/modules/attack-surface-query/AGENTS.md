@@ -51,7 +51,7 @@ AttackSurfaceQuery (ASQ): a JSON query language over the attack surface tables (
 ## Coupling
 
 - Imports nothing but TypeORM/BullMQ; uses the global `RedisService` and `DataSource`. Imports pure helpers from `assets/fresh-runs.ts` and `vulnerabilities/open-vulnerability.ts`.
-- Imported by `AgentsModule` (tools) and `ReportsModule` (`POST reports/generate/query`).
+- Imported by `AgentsModule` (tools) and `ReportsModule`: it runs its builtin templates (summary, vulnerability, query) through `AttackSurfaceQueryService.run` with caller `'report'`, and `POST reports/generate/query` uses `AsqSavedQueriesService`.
 
 ## Gotchas
 
