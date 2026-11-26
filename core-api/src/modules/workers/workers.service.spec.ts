@@ -192,16 +192,16 @@ describe('WorkersService', () => {
       } as WorkerInstance;
       const registrations = new Map([[worker.id, worker]]);
       (mockWorkerInstanceRepository.find as jest.Mock).mockImplementation(
-        async () => [...registrations.values()],
+        () => Promise.resolve([...registrations.values()]),
       );
       (mockWorkerInstanceRepository.delete as jest.Mock).mockImplementation(
-        async (id: string) => ({ affected: registrations.delete(id) ? 1 : 0 }),
+        (id: string) => Promise.resolve({ affected: registrations.delete(id) ? 1 : 0 }),
       );
       (mockWorkerInstanceRepository.findOne as jest.Mock).mockImplementation(
-        async ({ where }: { where: { token?: string; id?: string } }) =>
-          [...registrations.values()].find((entry) =>
+        ({ where }: { where: { token?: string; id?: string } }) =>
+          Promise.resolve([...registrations.values()].find((entry) =>
             where.token ? entry.token === where.token : entry.id === where.id,
-          ) ?? null,
+          ) ?? null),
       );
       (mockWorkerInstanceRepository.manager as any) = {
         query: jest.fn().mockResolvedValue(undefined),
