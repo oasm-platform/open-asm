@@ -1,6 +1,6 @@
 import type { QueryBatchResult } from '@/modules/attack-surface-query/domain/query.types';
 
-import type { QueryReportTable } from '../types/query-report-data.type';
+import type { QueryReportTable } from './data.type';
 
 /** Rows a query contributes to a PDF; the rest is marked truncated. */
 export const QUERY_REPORT_MAX_ROWS = 500;

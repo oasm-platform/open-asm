@@ -1,4 +1,4 @@
-import { flattenRow, QUERY_REPORT_MAX_ROWS, toReportTables } from './query-report';
+import { flattenRow, QUERY_REPORT_MAX_ROWS, toReportTables } from './to-data';
 
 describe('query report tables', () => {
   it('flattens nested rows into dotted columns and leaves ids out', () => {

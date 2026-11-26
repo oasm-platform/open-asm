@@ -1,21 +1,21 @@
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
-import type { ReportData } from '../../types/report-data.type';
-import { toUpper } from '../helpers';
+import type { ReportData } from './data.type';
+import { toUpper } from '../../shared/helpers';
 
-import { slate, palette } from '../theme';
-import { CoverPage } from '../components/CoverPage';
-import { ReportHeader } from '../components/ReportHeader';
-import { ReportFooter } from '../components/ReportFooter';
-import { ReportInfo } from '../components/ReportInfo';
-import { SectionHeader } from '../components/SectionHeader';
-import { MetricCard } from '../components/MetricCard';
-import { SeverityDistribution } from '../components/SeverityDistribution';
-import { SeverityBadge, RiskBadge } from '../components/Badge';
-import { BarChart } from '../components/BarChart';
+import { slate, palette } from '../../shared/theme';
+import { CoverPage } from '../../shared/components/CoverPage';
+import { ReportHeader } from '../../shared/components/ReportHeader';
+import { ReportFooter } from '../../shared/components/ReportFooter';
+import { ReportInfo } from '../../shared/components/ReportInfo';
+import { SectionHeader } from '../../shared/components/SectionHeader';
+import { MetricCard } from '../../shared/components/MetricCard';
+import { SeverityDistribution } from '../../shared/components/SeverityDistribution';
+import { SeverityBadge, RiskBadge } from '../../shared/components/Badge';
+import { BarChart } from '../../shared/components/BarChart';
 
 // Ensure fonts are registered
-import '../fonts';
+import '../../shared/fonts';
 
 const styles = StyleSheet.create({
   contentPage: {
@@ -756,11 +756,11 @@ function packIntoPages(sections: SectionEntry[]): SectionEntry[][] {
 
 // ============ Main Document ======================================
 
-interface SummaryReportDocumentProps {
+export interface SummaryDocumentProps {
   data: ReportData;
 }
 
-export const SummaryReportDocument: React.FC<SummaryReportDocumentProps> = ({
+export const SummaryDocument: React.FC<SummaryDocumentProps> = ({
   data,
 }) => {
   const pages = packIntoPages(buildSections(data));

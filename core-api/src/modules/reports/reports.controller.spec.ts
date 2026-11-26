@@ -2,8 +2,10 @@ import { WorkspacePermissions } from '@/common/decorators/workspace-permissions.
 import { Reflector } from '@nestjs/core';
 import { ReportsController } from './reports.controller';
 
-jest.mock('./renderer/pdf-renderer', () => ({
-  renderReportPdf: jest.fn().mockResolvedValue(Buffer.from('mock-pdf')),
+// The registry pulls in the React PDF documents, which Jest cannot load without rendering.
+jest.mock('./templates/registry', () => ({ BUILTIN_DOCUMENTS: {} }));
+jest.mock('./templates/render', () => ({
+  renderTemplatePdf: jest.fn().mockResolvedValue(Buffer.from('mock-pdf')),
 }));
 
 describe('ReportsController workspace permission guards', () => {

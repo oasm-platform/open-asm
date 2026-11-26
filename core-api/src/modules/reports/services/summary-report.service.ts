@@ -15,7 +15,7 @@ import {
 } from '@/modules/vulnerabilities/open-vulnerability';
 import { Severity, VulnerabilityAnalyzeStatus, JobStatus } from '@/common/enums/enum';
 import type { TargetType } from '@/modules/targets/entities/target.entity';
-import type { ReportData } from '../types/report-data.type';
+import type { ReportData } from '../templates/builtin/summary/data.type';
 import { NotFoundError } from '@/common/errors/domain.errors';
 
 type RiskLevel = Exclude<Severity, Severity.INFO>;

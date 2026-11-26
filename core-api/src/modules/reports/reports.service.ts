@@ -8,14 +8,13 @@ import { getManyResponse } from '@/common/utils/get-many-response.util';
 import { StorageService } from '@/modules/storage/storage.service';
 import { GetManyReportsQueryDto } from './dto/reports.dto';
 import { Report } from './entities/report.entity';
-import type { ReportData } from './types/report-data.type';
-import type { VulnerabilityReportData } from './types/vulnerability-report-data.type';
 import { VulnerabilityReportService } from './services/vulnerability-report.service';
 import { SummaryReportService } from './services/summary-report.service';
-import { renderReportPdf } from './renderer/pdf-renderer';
+import { renderTemplatePdf } from './templates/render';
+import { BUILTIN_DOCUMENTS } from './templates/registry';
 import { AsqSavedQueriesService } from '@/modules/attack-surface-query/asq-saved-queries.service';
 import type { QueryBatchResult, QueryScope } from '@/modules/attack-surface-query/domain/query.types';
-import { toReportTables } from './services/query-report';
+import { toReportTables } from './templates/builtin/query/to-data';
 import { NotFoundError } from '@/common/errors/domain.errors';
 
 @Injectable()
@@ -120,26 +119,27 @@ export class ReportsService {
       minSeverity?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
     },
   ): Promise<{ filePath: string; fileName: string }> {
-    let data: ReportData | VulnerabilityReportData;
+    let pdfBuffer: Buffer;
 
     if (type === 'VULNERABILITY') {
-      data = await this.vulnerabilityReportService.getVulnerabilityReportData(
+      const data = await this.vulnerabilityReportService.getVulnerabilityReportData(
         workspaceId,
         options,
       );
+      pdfBuffer = await renderTemplatePdf(BUILTIN_DOCUMENTS.vulnerability, {
+        ...data,
+        logoBase64: this.logoBase64 ?? data.logoBase64,
+      });
     } else {
-      data = await this.summaryReportService.getSummaryReportData(
+      const data = await this.summaryReportService.getSummaryReportData(
         workspaceId,
         options,
       );
+      pdfBuffer = await renderTemplatePdf(BUILTIN_DOCUMENTS.summary, {
+        ...data,
+        logoBase64: this.logoBase64 ?? data.logoBase64,
+      });
     }
-
-    const enrichedData = {
-      ...data,
-      logoBase64: this.logoBase64 ?? data.logoBase64,
-    };
-
-    const pdfBuffer = await renderReportPdf(type, enrichedData);
 
     const fileName = `report-${type.toLowerCase()}-${generateToken(24)}-${Date.now()}.pdf`;
     const { path: uploadPath } = await this.storageService.uploadFile(
@@ -176,7 +176,7 @@ export class ReportsService {
       options: { ...(spec.options ?? {}), consistent: true, mode: 'interactive' },
     })) as QueryBatchResult;
 
-    const pdfBuffer = await renderReportPdf('QUERY', {
+    const pdfBuffer = await renderTemplatePdf(BUILTIN_DOCUMENTS.query, {
       title: saved.name,
       description: saved.description,
       generatedAt: new Date().toISOString(),
@@ -212,7 +212,7 @@ export class ReportsService {
         targetIds: options?.targetIds,
       },
     );
-    return renderReportPdf('SUMMARY', {
+    return renderTemplatePdf(BUILTIN_DOCUMENTS.summary, {
       ...data,
       logoBase64: this.logoBase64 ?? data.logoBase64,
     });
@@ -238,7 +238,7 @@ export class ReportsService {
         minSeverity: options?.minSeverity,
       },
     );
-    return renderReportPdf('VULNERABILITY', {
+    return renderTemplatePdf(BUILTIN_DOCUMENTS.vulnerability, {
       ...data,
       logoBase64: this.logoBase64 ?? data.logoBase64,
     });

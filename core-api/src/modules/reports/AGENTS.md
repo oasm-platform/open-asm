@@ -6,9 +6,11 @@ PDF reports for a workspace: a summary (attack surface) report and a vulnerabili
 
 - `reports.controller.ts`: routes under `reports`.
 - `reports.service.ts`: `ReportsService` (list with presigned links, generate + upload, preview, delete).
-- `services/summary-report.service.ts`, `services/vulnerability-report.service.ts`: build the data objects (`types/report-data.type.ts`, `types/vulnerability-report-data.type.ts`).
-- `renderer/`: React PDF documents (`summary/SummaryReportDocument.tsx`, `vuln/VulnReportDocument.tsx`), shared `components/`, `theme.ts`, `helpers.ts`, `fonts.ts`, entry `pdf-renderer.tsx` (`renderReportPdf`).
-- `renderer/assets/*.ttf`: Inter and JetBrains Mono fonts.
+- `services/summary-report.service.ts`, `services/vulnerability-report.service.ts`: build the data objects (`templates/builtin/{summary,vulnerability}/data.type.ts`).
+- `templates/builtin/{summary,vulnerability,query}/`: React PDF documents (`SummaryDocument.tsx`, `VulnerabilityDocument.tsx`, `QueryDocument.tsx`) and `data.type.ts`; `query/to-data.ts` flattens a query result to tables.
+- `templates/shared/`: `components/`, `theme.ts`, `helpers.ts`, `fonts.ts`.
+- `templates/shared/assets/*.ttf`: Inter and JetBrains Mono fonts.
+- `templates/template.types.ts` (`BuiltinTemplate`), `templates/registry.ts` (`BUILTIN_DOCUMENTS`), `templates/render.tsx` (`renderTemplatePdf`).
 - `entities/report.entity.ts`, `dto/reports.dto.ts`.
 
 ## Public surface
@@ -30,7 +32,7 @@ PDF reports for a workspace: a summary (attack surface) report and a vulnerabili
 ## Data model
 
 - `reports` (`Report`, extends `BaseEntity`): `workspaceId` (ManyToOne, CASCADE, no explicit column property), `userId` (CASCADE), `type` varchar `'SUMMARY' | 'VULNERABILITY' | 'QUERY'` (default `SUMMARY`), `path` = `reports/<fileName>`, `fileName` = `report-<type>-<token>-<ms>.pdf`. Hard delete.
-- `QUERY` reports render a saved attack surface query (`services/query-report.ts` flattens each query to a table, at most `QUERY_REPORT_MAX_ROWS` rows; `renderer/query/QueryReportDocument.tsx`), run as the caller in one consistent snapshot, with the saved query's params at their defaults (`AsqSavedQueriesService.runSpec`).
+- `QUERY` reports render a saved attack surface query (`templates/builtin/query/to-data.ts` flattens each query to a table, at most `QUERY_REPORT_MAX_ROWS` rows; `templates/builtin/query/QueryDocument.tsx`), run as the caller in one consistent snapshot, with the saved query's params at their defaults (`AsqSavedQueriesService.runSpec`).
 
 ## Invariants
 
@@ -38,7 +40,7 @@ PDF reports for a workspace: a summary (attack surface) report and a vulnerabili
 - Every query is scoped by workspace: the row lookup by `{ id, workspace: { id } }` (404 otherwise) and the vulnerability data through `asset → target → workspace` joins (`applyWorkspaceFilter`). Filters `targetIds` / `vulnIds` are applied on top of that scope, not instead of it.
 - Report data counts open findings only (`openVulnerabilityCondition`); the vulnerability report's full list excludes `info`.
 - The security score comes from `StatisticService.calculateSecurityScore`, the same formula as the dashboard. Change it there, not here.
-- `renderReportPdf` adds `systemName` and `classification` itself; the logo is read once from `public/images/logo.png` (relative to `process.cwd()`) and silently skipped if missing.
+- `renderTemplatePdf` adds `systemName` and `classification` itself; the logo is read once from `public/images/logo.png` (relative to `process.cwd()`) and silently skipped if missing.
 - `deleteReport` ignores storage errors and always removes the row.
 
 ## Coupling
@@ -49,8 +51,8 @@ PDF reports for a workspace: a summary (attack surface) report and a vulnerabili
 
 ## Gotchas
 
-- `.tsx` files compile because `tsconfig.json` sets `jsx: react-jsx` and `nest-cli.json` builds with SWC including `.tsx`. Fonts are loaded from `__dirname/assets`, which works in `dist` only because `nest-cli.json` copies `**/*.ttf` as assets. Adding a font of another type needs a new asset glob.
-- Jest needs `@react-pdf` and `react` in `transformIgnorePatterns` (already set in `package.json`). Every spec here `jest.mock`s `./renderer/pdf-renderer`; keep doing that in new specs.
+- `.tsx` files compile because `tsconfig.json` sets `jsx: react-jsx` and `nest-cli.json` builds with SWC including `.tsx`. Fonts are loaded from `__dirname/assets` (`templates/shared/assets`), which works in `dist` only because `nest-cli.json` copies `**/*.ttf` as assets. Adding a font of another type needs a new asset glob.
+- Jest needs `@react-pdf` and `react` in `transformIgnorePatterns` (already set in `package.json`). Every spec here `jest.mock`s `./templates/render` and `./templates/registry` (the documents are not loadable in Jest); keep doing that in new specs.
 - `getAllVulnerabilities` has no row limit: it loads every open non-info finding with asset and tool into memory and into the PDF.
 
 ## Testing

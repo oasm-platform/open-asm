@@ -8,8 +8,10 @@ import { VulnerabilityReportService } from './services/vulnerability-report.serv
 import { SummaryReportService } from './services/summary-report.service';
 import { AsqSavedQueriesService } from '@/modules/attack-surface-query/asq-saved-queries.service';
 
-jest.mock('./renderer/pdf-renderer', () => ({
-  renderReportPdf: jest.fn().mockResolvedValue(Buffer.from('mock-pdf')),
+// The registry pulls in the React PDF documents, which Jest cannot load without rendering.
+jest.mock('./templates/registry', () => ({ BUILTIN_DOCUMENTS: {} }));
+jest.mock('./templates/render', () => ({
+  renderTemplatePdf: jest.fn().mockResolvedValue(Buffer.from('mock-pdf')),
 }));
 
 describe('ReportsService', () => {
