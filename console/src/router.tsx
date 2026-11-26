@@ -24,6 +24,12 @@ const router = createRouter({
   routeTree,
   defaultPreload: 'intent',
   defaultPreloadStaleTime: 5 * 60 * 1000,
+  // Back/forward returns to where the page was left; a new visit starts at
+  // the top. Pages still loading their data finish the restore through
+  // useDeferredScrollRestoration (__root).
+  scrollRestoration: true,
+  // Not the smooth scroll html sets: the page must not glide from the top
+  scrollRestorationBehavior: 'instant',
 
   defaultErrorComponent: DefaultErrorComponent,
   context: { queryClient: undefined!, session: null },
