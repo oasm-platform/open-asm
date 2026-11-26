@@ -34,7 +34,7 @@ Scan worker nodes: join/identity, liveness, listing, the gRPC channels a worker 
 - `workers` (`WorkerInstance`): `token` is stored in plain text and looked up by `IDX_workers_token`. `type` is a `WorkerType`; `scope` is `workspace` or `cloud`; `runMode` is `'cli' | 'node' | null`; `enabledAgentMode`.
 - `name` is what the worker reports on join: `WORKER_NAME`, else its OS hostname. It is trimmed and capped at `WORKER_NAME_MAX_LENGTH` (128). `ipAddress` is the joining peer, resolved through `TRUSTED_PROXIES` (`resolveClientIp`); it may be IPv4-mapped (`::ffff:a.b.c.d`).
 - `workspaceId` FK `CASCADE`. `internalNetworkId` FK `CASCADE`: deleting an internal network deletes its workers. `toolId` is set for PROVIDER workers.
-- `currentJobsCount`, `toolsCount` and `isOnline` are computed, not columns. Rows are hard-deleted by the sweep.
+- `currentJobsCount`, `toolsCount` and `isOnline` are computed, not columns. Offline workspace registrations are retained by the sweep so their persisted tokens can resume them. Non-workspace rows are hard-deleted after timeout.
 
 ## Invariants
 
@@ -48,7 +48,7 @@ Scan worker nodes: join/identity, liveness, listing, the gRPC channels a worker 
 - A `RemoteExecuteResult` is accepted only from the worker the session's last push went to (`isResultFromAssignedWorker`). Sessions with no recorded push are accepted.
 - **Never return `token`.** `getWorkers` passes `ignoreFields: ['token', 'tool']`, and `getWorkerById` builds its DTO field by field.
 - **Job release.** When an `Alive` stream drops, `releaseWorkerJobs` sets the worker's IN_PROGRESS jobs to PENDING and clears `workerId`; the row stays. A rejoin (`fallbackWorkerRejoin`) sets them to PENDING but keeps `workerId`.
-- **Sweep.** `@Interval(WORKER_TIMEOUT)` (60 s) runs on every replica with no lock. It deletes workers whose `lastSeenAt` is older than 60 s and that have no `Alive` stream **on this instance**, and announces `timed_out` only when the delete affected a row. It then runs `resetStuckAndFailedJobs`: IN_PROGRESS jobs of missing workers and FAILED jobs with `retryCount < JOB_MAX_RETRIES` and an asset go back to PENDING. It needs no `@Lock`: the replica holding a worker's `Alive` stream writes `lastSeenAt` every 10 s, so no replica sees a connected worker as stale, and every step is idempotent. A lock would only add a Redis dependency to the sweep.
+- **Sweep.** `@Interval(WORKER_TIMEOUT)` (60 s) runs on every replica with no lock. For workers whose `lastSeenAt` is older than 60 s and that have no `Alive` stream **on this instance**, it releases IN_PROGRESS jobs. Workspace registrations, tokens and encryption public keys remain available for authenticated rejoin; other workers are deleted and `timed_out` is announced only when the delete affected a row. Retained workspace workers do not repeatedly emit `timed_out`. It then runs `resetStuckAndFailedJobs`: IN_PROGRESS jobs of missing workers and FAILED jobs with `retryCount < JOB_MAX_RETRIES` and an asset go back to PENDING. It needs no `@Lock`: the replica holding a worker's `Alive` stream writes `lastSeenAt` every 10 s, so no replica sees a connected worker as stale, and every step is idempotent. A lock would only add a Redis dependency to the sweep.
 - `Storage` serves only files under `<cwd>/public/archived` (a `static/` prefix maps to `public/`). `BuiltinToolRegistry` accepts only `os_arch` matching `^[a-z0-9]+_[a-z0-9]+$`.
 - Worker detail lists a connector only when the latest telemetry shows a container for that slug.
 

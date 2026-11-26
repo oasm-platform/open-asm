@@ -127,13 +127,14 @@ export class WorkersService {
   }
 
   /**
-   * Automatically removes any workers that have been offline for at least 1 minute (60 seconds)
-   * from the database. Uses hybrid approach: checks in-memory gRPC stream state first,
-   * then falls back to DB lastSeenAt timestamp.
+   * Releases jobs held by workers offline for at least 60 seconds. Workspace
+   * registrations survive an outage so their persisted tokens can resume them;
+   * ephemeral cloud workers are removed as before.
    *
    * - Worker has active gRPC stream → SKIP (connected)
    * - Worker has no stream BUT lastSeenAt not expired → SKIP (grace period)
-   * - Worker has no stream AND lastSeenAt expired → DELETE
+   * - Worker has no stream AND lastSeenAt expired → release jobs, then remove
+   *   only non-workspace registrations
    */
   @Interval(WORKER_TIMEOUT)
   async autoCleanupWorkersAndJobs() {
@@ -152,7 +153,7 @@ export class WorkersService {
       }
 
       this.logger.log(
-        `[autoCleanup] Worker ${worker.id} has no active stream and lastSeenAt expired, removing`,
+        `[autoCleanup] Worker ${worker.id} has no active stream and lastSeenAt expired, releasing jobs`,
       );
       await this.workerLeave(worker);
     }
@@ -162,12 +163,17 @@ export class WorkersService {
   }
 
   /**
-   * Removes a timed-out worker, releasing its jobs first.
+   * Releases a timed-out worker's jobs, retaining workspace join identities.
    *
    * @param worker - The worker instance to be removed.
    */
   private async workerLeave(worker: WorkerInstance) {
     await this.releaseWorkerJobs(worker.id);
+    // A workspace join key is single-use. Deleting its worker here also
+    // revokes the persisted token and makes routine restarts require pairing.
+    if (worker.scope === WorkerScope.WORKSPACE) {
+      return;
+    }
     const { affected } = await this.repo.delete(worker.id);
     // Every replica runs this sweep; only the one that removed the row
     // announces it.
@@ -178,8 +184,8 @@ export class WorkersService {
 
   /**
    * Handles a dropped gRPC alive stream: frees the worker's jobs for other
-   * workers and announces the disconnect. The row stays until
-   * {@link autoCleanupWorkersAndJobs} times it out, so a reconnect is cheap.
+   * workers and announces the disconnect. Workspace registrations remain
+   * available for authenticated reconnection after the timeout sweep.
    */
   public async workerDisconnected(workerId: string) {
     await this.releaseWorkerJobs(workerId);
