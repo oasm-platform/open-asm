@@ -1,6 +1,7 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsOptional, IsString, IsEnum, IsUUID } from 'class-validator';
+import { IsArray, IsOptional, IsString, IsEnum, IsUUID, IsIn, IsNotIn } from 'class-validator';
+import { IsCronSchedule } from '@/modules/projects/dto/cron-schedule.validator';
 
 const ReportType = {
   SUMMARY: 'SUMMARY',
@@ -177,4 +178,54 @@ export class GetManyReportsQueryDto extends GetManyBaseQueryParams {
   @IsOptional()
   @IsEnum(ReportType)
   type?: ReportType;
+}
+
+export class CreateReportScheduleDto {
+  @ApiProperty({ enum: ['SUMMARY', 'VULNERABILITY'] })
+  @IsIn(['SUMMARY', 'VULNERABILITY'])
+  type: 'SUMMARY' | 'VULNERABILITY';
+
+  @ApiProperty({ example: '0 8 * * 1', description: '5-field cron expression in UTC' })
+  @IsCronSchedule()
+  @IsNotIn(['disabled'])
+  cron: string;
+
+  @ApiProperty({ required: false, type: [String], description: 'Target IDs to filter' })
+  @IsOptional()
+  @IsArray()
+  @IsUUID('all', { each: true })
+  targetIds?: string[];
+
+  @ApiProperty({ required: false, enum: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'], description: 'Vulnerability report only' })
+  @IsOptional()
+  @IsEnum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'])
+  minSeverity?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
+}
+
+class ReportScheduleOptionsDto {
+  @ApiProperty({ required: false, type: [String] })
+  targetIds?: string[];
+
+  @ApiProperty({ required: false, enum: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'] })
+  minSeverity?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
+}
+
+export class ReportScheduleResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty({ description: 'Owner: the report runs with their permissions' })
+  userId: string;
+
+  @ApiProperty({ enum: ['SUMMARY', 'VULNERABILITY'] })
+  type: 'SUMMARY' | 'VULNERABILITY';
+
+  @ApiProperty({ description: '5-field cron expression in UTC' })
+  cron: string;
+
+  @ApiProperty({ type: ReportScheduleOptionsDto })
+  options: ReportScheduleOptionsDto;
+
+  @ApiProperty()
+  createdAt: Date;
 }

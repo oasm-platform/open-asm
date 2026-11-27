@@ -20,6 +20,9 @@ describe('ReportsController workspace permission guards', () => {
     ['generateSummaryReport', 'POST /generate/summary', ['report.write']],
     ['generateVulReport', 'POST /generate/vulnerability', ['report.write']],
     ['deleteReport', 'DELETE /:id', ['report.write']],
+    ['listSchedules', 'GET /schedules', ['report.read']],
+    ['createSchedule', 'POST /schedules', ['report.write']],
+    ['deleteSchedule', 'DELETE /schedules/:id', ['report.write']],
   ];
 
   it.each(cases)('%s (%s) requires %j', (method, route, keys) => {
@@ -37,7 +40,7 @@ describe('ReportsController workspace permission guards', () => {
 describe('ReportsController query scope and error mapping', () => {
   const proto = ReportsController.prototype as unknown as Record<string, object>;
 
-  it.each(['previewSummaryReport', 'previewVulReport', 'generateSummaryReport', 'generateVulReport', 'generateQueryReport'])(
+  it.each(['previewSummaryReport', 'previewVulReport', 'generateSummaryReport', 'generateVulReport', 'generateQueryReport', 'createSchedule'])(
     '%s maps AsqError through AsqErrorInterceptor',
     (method) => {
       expect(Reflect.getMetadata(INTERCEPTORS_METADATA, proto[method])).toContain(AsqErrorInterceptor);
@@ -52,8 +55,8 @@ describe('ReportsController query scope and error mapping', () => {
     const service = {
       previewSummaryReport: jest.fn().mockResolvedValue(Buffer.from('p')),
       previewVulnerabilityReport: jest.fn().mockResolvedValue(Buffer.from('p')),
-      generateReport: jest.fn().mockResolvedValue({}),
-      generateQueryReport: jest.fn().mockResolvedValue({}),
+      enqueueReport: jest.fn().mockResolvedValue(undefined),
+      enqueueQueryReport: jest.fn().mockResolvedValue(undefined),
     };
     return { service, controller: new ReportsController(service as never) };
   }
@@ -68,15 +71,15 @@ describe('ReportsController query scope and error mapping', () => {
 
     expect(service.previewSummaryReport).toHaveBeenCalledWith(scope, expect.anything());
     expect(service.previewVulnerabilityReport).toHaveBeenCalledWith(scope, expect.anything());
-    expect(service.generateReport).toHaveBeenNthCalledWith(1, scope, 'u1', 'SUMMARY', expect.anything());
-    expect(service.generateReport).toHaveBeenNthCalledWith(2, scope, 'u1', 'VULNERABILITY', expect.anything());
-    expect(service.generateQueryReport).toHaveBeenCalledWith(scope, 'u1', 'q');
+    expect(service.enqueueReport).toHaveBeenNthCalledWith(1, scope, 'u1', 'SUMMARY', expect.anything());
+    expect(service.enqueueReport).toHaveBeenNthCalledWith(2, scope, 'u1', 'VULNERABILITY', expect.anything());
+    expect(service.enqueueQueryReport).toHaveBeenCalledWith(scope, 'u1', 'q');
   });
 
   it('falls back to no permissions when the request carries none', async () => {
     const { service, controller } = build();
     await controller.generateSummaryReport({}, 'w1', 'u1', {} as never);
-    expect(service.generateReport).toHaveBeenCalledWith(
+    expect(service.enqueueReport).toHaveBeenCalledWith(
       { workspaceId: 'w1', permissions: [], caller: 'report' },
       'u1',
       'SUMMARY',

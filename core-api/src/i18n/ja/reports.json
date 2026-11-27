@@ -4,9 +4,7 @@
   "severity.medium": "中",
   "severity.low": "低",
   "severity.info": "情報",
-  "toast.summaryGenerated": "サマリーレポートを生成しました",
   "toast.summaryFailed": "サマリーレポートを生成できませんでした",
-  "toast.vulnGenerated": "脆弱性レポートを生成しました",
   "toast.vulnFailed": "脆弱性レポートを生成できませんでした",
   "toast.deleted": "レポートを削除しました",
   "toast.deleteFailed": "レポートを削除できませんでした",
@@ -30,5 +28,17 @@
   "tabs.all": "すべて",
   "tabs.summary": "サマリー",
   "tabs.vulnerability": "脆弱性",
-  "tabs.templates": "テンプレート"
+  "tabs.templates": "テンプレート",
+  "toast.queued": "レポートをキューに追加しました。準備ができたら通知します。",
+  "toast.scheduleCreated": "レポートのスケジュールを保存しました",
+  "toast.scheduleFailed": "レポートのスケジュールを保存できませんでした",
+  "toast.scheduleDeleted": "レポートのスケジュールを削除しました",
+  "generate.schedule": "スケジュールで繰り返す",
+  "generate.saveSchedule": "スケジュールを保存",
+  "tabs.schedules": "スケジュール",
+  "schedules.columns.report": "レポート",
+  "schedules.columns.runs": "実行",
+  "schedules.empty": "レポートのスケジュールはまだありません",
+  "schedules.delete.title": "スケジュールを削除",
+  "schedules.delete.description": "このレポートのスケジュール生成を停止しますか？"
 }

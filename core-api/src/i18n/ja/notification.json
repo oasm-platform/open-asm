@@ -5,5 +5,7 @@
   "SCAN_INCOMPLETE": "{targetValue} のスキャンが完了しませんでした。{details}",
   "NEW_VULNERABILITY_FOUND": "{assetValue} で新しい脆弱性が {count} 件見つかりました",
   "WORKSPACE_INVITATION": "{action, select, created {ワークスペース {workspaceName} に招待されました} accepted {{userName} さんがワークスペース {workspaceName} への招待を承認しました} declined {{userName} さんがワークスペース {workspaceName} への招待を辞退しました} other {ワークスペースへの招待}}",
-  "NEW_URL_FOUND": "{targetValue} で新しい URL が {count} 件見つかりました"
+  "NEW_URL_FOUND": "{targetValue} で新しい URL が {count} 件見つかりました",
+  "REPORT_GENERATED": "レポート {fileName} の準備ができました",
+  "REPORT_FAILED": "レポートの生成に失敗しました: {error}"
 }

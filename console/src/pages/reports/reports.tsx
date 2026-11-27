@@ -4,6 +4,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { Download, FileText, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { type DateRange } from 'react-day-picker';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import Page from '@/components/common/page';
@@ -20,7 +21,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { OpenLink } from '@/components/ui/open-link';
+import { CronScheduleBuilder } from '@/components/ui/cron-schedule-builder';
 import { Field } from '@/components/ui/field';
+import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
@@ -31,6 +34,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger, useQueryTab } from '@/components/ui/tabs';
+import { useLiveEvents } from '@/hooks/use-live-events';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import {
   useWorkspaceSelector,
@@ -38,12 +42,14 @@ import {
 } from '@/hooks/useWorkspaceSelector';
 import type { ReportResponseDto } from '@/services/apis/gen/queries';
 import {
+  useReportsControllerCreateSchedule,
   useReportsControllerDeleteReport,
   useReportsControllerGenerateSummaryReport,
   useReportsControllerGenerateVulReport,
   useReportsControllerGetMany,
 } from '@/services/apis/gen/queries';
 import CreateWorkspace from '../workspaces/create-workspace';
+import { ReportSchedules, reportSchedulesKey } from './report-schedules';
 
 
 const SEVERITY_OPTIONS = [
@@ -62,10 +68,13 @@ export default function Reports() {
   const [reportType, setReportType] = useState<ReportType>('SUMMARY');
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [minSeverity, setMinSeverity] = useState<string>('');
+  const [repeat, setRepeat] = useState(false);
+  const [cron, setCron] = useState('');
+  const queryClient = useQueryClient();
   const [activeTab, setTab] = useQueryTab({
     tabParam: 'tab',
     defaultValue: 'all',
-    validValues: ['all', 'SUMMARY', 'VULNERABILITY', 'templates'],
+    validValues: ['all', 'SUMMARY', 'VULNERABILITY', 'schedules', 'templates'],
   });
 
   const { workspaces, isLoading: wsLoading } = useWorkspaceSelector();
@@ -111,8 +120,7 @@ export default function Reports() {
       onSuccess: () => {
         setGenerateOpen(false);
         resetForm();
-        toast.success(t('reports.toast.summaryGenerated'));
-        refetch();
+        toast.success(t('reports.toast.queued'));
       },
       onError: () => {
         toast.error(t('reports.toast.summaryFailed'));
@@ -125,14 +133,30 @@ export default function Reports() {
       onSuccess: () => {
         setGenerateOpen(false);
         resetForm();
-        toast.success(t('reports.toast.vulnGenerated'));
-        refetch();
+        toast.success(t('reports.toast.queued'));
       },
       onError: () => {
         toast.error(t('reports.toast.vulnFailed'));
       },
     },
   });
+
+  const scheduleMutation = useReportsControllerCreateSchedule({
+    mutation: {
+      onSuccess: () => {
+        setGenerateOpen(false);
+        resetForm();
+        toast.success(t('reports.toast.scheduleCreated'));
+        void queryClient.invalidateQueries({ queryKey: reportSchedulesKey(selectedWorkspaceId) });
+      },
+      onError: () => {
+        toast.error(t('reports.toast.scheduleFailed'));
+      },
+    },
+  });
+
+  // A queued report shows up when its "ready" notification arrives.
+  useLiveEvents('notification.*', () => void refetch());
 
   const deleteMutation = useReportsControllerDeleteReport({
     mutation: {
@@ -150,10 +174,24 @@ export default function Reports() {
     setReportType('SUMMARY');
     setDateRange(undefined);
     setMinSeverity('');
+    setRepeat(false);
+    setCron('');
   };
 
+  const severity = minSeverity
+    ? (minSeverity as 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO')
+    : undefined;
+
   const handleGenerate = () => {
-    if (reportType === 'SUMMARY') {
+    if (repeat) {
+      scheduleMutation.mutate({
+        data: {
+          type: reportType,
+          cron,
+          minSeverity: reportType === 'VULNERABILITY' ? severity : undefined,
+        },
+      });
+    } else if (reportType === 'SUMMARY') {
       summaryMutation.mutate({
         data: {
           startDate: dateRange?.from?.toISOString(),
@@ -165,9 +203,7 @@ export default function Reports() {
         data: {
           startDate: dateRange?.from?.toISOString(),
           endDate: dateRange?.to?.toISOString(),
-          minSeverity: minSeverity
-            ? (minSeverity as 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO')
-            : undefined,
+          minSeverity: severity,
         },
       });
     }
@@ -179,7 +215,8 @@ export default function Reports() {
 
   const reports = data?.data ?? [];
   const total = data?.total ?? 0;
-  const isPending = summaryMutation.isPending || vulMutation.isPending;
+  const isPending =
+    summaryMutation.isPending || vulMutation.isPending || scheduleMutation.isPending;
 
   const columns: ColumnDef<ReportResponseDto>[] = [
     {
@@ -293,12 +330,23 @@ export default function Reports() {
               </RadioGroup>
             </Field>
 
-            {/* Date Range - for both types */}
-            <DatePickerWithRange
-              value={dateRange}
-              onChange={setDateRange}
-              label={t('reports.generate.dateRange')}
-            />
+            <div className="flex items-center gap-2">
+              <Switch id="report-repeat" checked={repeat} onCheckedChange={setRepeat} />
+              <Label htmlFor="report-repeat" className="cursor-pointer">
+                {t('reports.generate.schedule')}
+              </Label>
+            </div>
+
+            {/* A scheduled report always covers all data, so no date range. */}
+            {repeat ? (
+              <CronScheduleBuilder onChange={(change) => setCron(change.cron)} />
+            ) : (
+              <DatePickerWithRange
+                value={dateRange}
+                onChange={setDateRange}
+                label={t('reports.generate.dateRange')}
+              />
+            )}
 
             {/* Min Severity - vuln only */}
             {reportType === 'VULNERABILITY' && (
@@ -331,8 +379,12 @@ export default function Reports() {
             >
               {t('common.cancel')}
             </Button>
-            <Button onClick={handleGenerate} disabled={isPending}>
-              {isPending ? t('reports.generate.generating') : t('reports.generate.generate')}
+            <Button onClick={handleGenerate} disabled={isPending || (repeat && !cron)}>
+              {isPending
+                ? t('reports.generate.generating')
+                : repeat
+                  ? t('reports.generate.saveSchedule')
+                  : t('reports.generate.generate')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -354,6 +406,7 @@ export default function Reports() {
             <TabsTrigger value="all">{t('reports.tabs.all')}</TabsTrigger>
             <TabsTrigger value="SUMMARY">{t('reports.tabs.summary')}</TabsTrigger>
             <TabsTrigger value="VULNERABILITY">{t('reports.tabs.vulnerability')}</TabsTrigger>
+            <TabsTrigger value="schedules">{t('reports.tabs.schedules')}</TabsTrigger>
             <TabsTrigger value="templates">{t('reports.tabs.templates')}</TabsTrigger>
           </TabsList>
           <TabsContent value="all">
@@ -415,6 +468,9 @@ export default function Reports() {
               onFilterChange={setFilter}
               totalItems={total}
             />
+          </TabsContent>
+          <TabsContent value="schedules">
+            <ReportSchedules workspaceId={selectedWorkspaceId} />
           </TabsContent>
           <TabsContent value="templates">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 mt-4">

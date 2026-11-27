@@ -1,16 +1,17 @@
 # reports module
 
-PDF reports for a workspace: a summary (attack surface) report, a vulnerability report and a saved-query report. Each is a builtin template: a set of attack surface queries, a mapper from their results to the document's data, and a React PDF document rendered server-side with `@react-pdf/renderer` and stored in the `reports` bucket.
+PDF reports for a workspace: a summary (attack surface) report, a vulnerability report and a saved-query report. Each is a builtin template: a set of attack surface queries, a mapper from their results to the document's data, and a React PDF document rendered server-side with `@react-pdf/renderer`. Generation is queued (BullMQ), and the PDF is stored as a workspace artifact (`source: 'report'`), so it counts against the storage quota.
 
 ## Layout
 
 - `reports.controller.ts`: routes under `reports`; builds the `QueryScope` (`reportScope`: workspace and permissions from the guard, `caller: 'report'`).
-- `reports.service.ts`: `ReportsService` (list with presigned links, generate + upload, preview, delete). `render` = `ReportRunner.run` then `renderTemplatePdf`; `store` uploads and inserts the row.
-- `report-runner.ts`: `ReportRunner.run(template, scope, options)`: reads the workspace name (`WorkspacesService.getWorkspacesByIds`, the guard already checked membership), runs each batch of `template.queries(options, now)` through `AttackSurfaceQueryService.run`, then `template.toData(results, ctx)`.
+- `reports.service.ts`: `ReportsService` (list with presigned links, enqueue, `runJob`, schedules + `runSchedule`, preview, delete). `render` = `ReportRunner.run` then `renderTemplatePdf`; `store` calls `ArtifactsService.createFromBuffer` and inserts the row (deletes the artifact if the insert fails).
+- `report.processors.ts`: `ReportGenerateProcessor` (`REPORT_GENERATE`, `report-generate`) and `ReportScheduleProcessor` (`REPORT_SCHEDULE`, `report-schedule`), both concurrency 1, `attempts: 1`.
+- `report-runner.ts`: `ReportRunner.validate(template, scope, options)` (ASQ `validate` on every batch, no DB) and `ReportRunner.run(template, scope, options)`: reads the workspace name (`WorkspacesService.getWorkspacesByIds`, the guard already checked membership), runs each batch of `template.queries(options, now)` through `AttackSurfaceQueryService.run`, then `template.toData(results, ctx)`.
 - `templates/registry.ts` (`BUILTIN_TEMPLATES`: `summary`, `vulnerability`, `query`), `templates/template.types.ts` (`BuiltinTemplate`), `templates/render.tsx` (`renderTemplatePdf`).
 - `templates/builtin/<id>/`: `queries.ts` (the batches), `to-data.ts` (mapper), `data.type.ts`, the `*Document.tsx`, `index.ts` (the template object).
 - `templates/shared/`: `asq-filters.ts` (`ReportOptions`, `findingFilters`, `open`), `batch-result.ts` (`rowsOf`, `firstError`, `num`, `at`, `str`, `strArray`), `severity-matrix.ts`, `report-header.ts` (`weekStart`, `riskLevel`, `trendStats`), `components/`, `theme.ts`, `fonts.ts`, `assets/*.ttf`.
-- `entities/report.entity.ts`, `dto/reports.dto.ts`.
+- `entities/report.entity.ts`, `entities/report-schedule.entity.ts`, `dto/reports.dto.ts`.
 
 ## Public surface
 
@@ -19,19 +20,25 @@ PDF reports for a workspace: a summary (attack surface) report, a vulnerability 
 | `GET reports` | `report.read` | none |
 | `GET reports/preview/summary` | `report.read` + `target.read`, `asset.read`, `vulnerability.read` | `report.exported` (metadata `format: pdf`) |
 | `GET reports/preview/vulnerability` | `report.read` + `target.read`, `asset.read`, `vulnerability.read` | none |
-| `POST reports/generate/summary` | `report.write` + the same catalog read keys | `report.generated` (metadata `reportType: summary`) |
-| `POST reports/generate/vulnerability` | `report.write` + the same catalog read keys | none |
-| `POST reports/generate/query` (`{ savedQueryId }`) | `report.write` + the read key of every resource the saved query reads | `report.generated` (metadata `reportType: query`) |
+| `POST reports/generate/summary` (202) | `report.write` + the same catalog read keys | `report.generated` (metadata `reportType: summary`) |
+| `POST reports/generate/vulnerability` (202) | `report.write` + the same catalog read keys | none |
+| `POST reports/generate/query` (`{ savedQueryId }`, 202) | `report.write` + the read key of every resource the saved query reads | `report.generated` (metadata `reportType: query`) |
 | `DELETE reports/:id` | `report.write` | `report.deleted` |
+| `GET reports/schedules` | `report.read` | none |
+| `POST reports/schedules` (`type`, `cron` UTC, `targetIds?`, `minSeverity?`) | `report.write` + the catalog read keys | none |
+| `DELETE reports/schedules/:id` | `report.write` | none |
 
 - The catalog read keys are enforced by ASQ, not by `@WorkspaceAccess`: the report runs as the member, so a missing key gives `PERMISSION_DENIED`, which `AsqErrorInterceptor` (on every route that runs a template) answers as 403 with body `{ error: { code, message } }`. Nothing is rendered or stored then.
 - Registered in `combine.module.ts`. Exports nothing.
-- Previews stream the PDF inline with `@Res()` and store nothing. Generate renders, uploads and inserts a `reports` row; the response is only a message, the file shows up in `GET reports`.
-- Generation is synchronous inside the request: no queue, no worker.
+- Previews stream the PDF inline with `@Res()` and store nothing.
+- Generate validates the template's queries as the caller (`ReportRunner.validate`, so 403 `PERMISSION_DENIED` / 400 `INVALID_QUERY` stay synchronous), then queues a `ReportJob` with a snapshot of the caller's permissions and answers 202. `report.generated` therefore means "requested".
+- `runJob` never throws (a retry would reuse stale permissions): it publishes `report.completed` (not persisted) with `outcome` success/failure and payload `{ userId, reportType, fileName?, error? }`. The notifications lane turns it into `REPORT_GENERATED` / `REPORT_FAILED` for that user (`notification-rules.ts`, link `/reports`). A full quota (409 `STORAGE_QUOTA_EXCEEDED` from artifacts) is a failure notification.
+- Schedules: one BullMQ job scheduler per row, id `report-schedule:<id>`, upserted on create, removed on delete. `runSchedule` loads the owner's permissions *at fire time* (`WorkspacesService.getMembershipWithPermissions`); a missing row or an owner who left the workspace removes the scheduler (and the row). There is no boot reconcile and no edit: edit = delete + create.
 
 ## Data model
 
-- `reports` (`Report`, extends `BaseEntity`): `workspaceId` (ManyToOne, CASCADE, no explicit column property), `userId` (CASCADE), `type` varchar `'SUMMARY' | 'VULNERABILITY' | 'QUERY'` (default `SUMMARY`), `path` = `reports/<fileName>`, `fileName` = `report-<type>-<token>-<ms>.pdf`. Hard delete. No schema change came with the templates.
+- `reports` (`Report`, extends `BaseEntity`): `workspaceId` (ManyToOne, CASCADE, no explicit column property), `userId` (CASCADE), `type` varchar `'SUMMARY' | 'VULNERABILITY' | 'QUERY'` (default `SUMMARY`), `fileName` = `report-<type>-<token>-<ms>.pdf`, nullable `artifactId` (FK `artifacts`, CASCADE), `path` = `artifacts/<objectKey>` (older rows: `reports/<fileName>`, `artifactId` null, never charged to the quota). Hard delete: with an artifact, `deleteReport` calls `ArtifactsService.deleteServerFile` (frees the quota), without one it deletes the object in `reports`. Deleting the file in Files removes the report row by cascade.
+- `report_schedules` (`ReportSchedule`): `workspaceId` (CASCADE), `userId` = owner (CASCADE), `type` `'SUMMARY' | 'VULNERABILITY'`, `options` jsonb (`targetIds`, `minSeverity`; no dates, every run covers all data), `cron` (5-field, UTC, validated by `IsCronSchedule` from projects, `disabled` refused).
 
 ## Invariants
 
@@ -45,8 +52,8 @@ PDF reports for a workspace: a summary (attack surface) report, a vulnerability 
 
 ## Coupling
 
-- Imports `AttackSurfaceQueryModule` (`AttackSurfaceQueryService`, `AsqSavedQueriesService`) and `StorageModule`. Uses the global `WorkspacesService`. Imports `StatisticService` only as a static (`calculateSecurityScore`), no `StatisticModule`.
-- Registers only the `Report` repository: no foreign repositories, no raw SQL over other modules' tables.
+- Imports `AttackSurfaceQueryModule` (`AttackSurfaceQueryService`, `AsqSavedQueriesService`), `ArtifactsModule` (`ArtifactsService`: quota + upload) and `StorageModule`. Uses the global `WorkspacesService` and `EventBridgeService`. Imports `IsCronSchedule` from `projects/dto/cron-schedule.validator.ts`. Imports `StatisticService` only as a static (`calculateSecurityScore`), no `StatisticModule`.
+- Registers only the `Report` and `ReportSchedule` repositories: no foreign repositories, no raw SQL over other modules' tables.
 - Audit actions for these routes are in `audit/constants/audit-events.ts`.
 
 ## Gotchas
@@ -60,4 +67,4 @@ PDF reports for a workspace: a summary (attack surface) report, a vulnerability 
 
 ## Testing
 
-Unit: `report-runner.spec.ts`, `reports.service.spec.ts`, `reports.service.routing.spec.ts` (right template per type), `reports.controller.spec.ts`, `reports.audit-wiring.spec.ts`, and per template `templates/builtin/*/{queries,to-data}.spec.ts`. E2E (live DB): `core-api/test/reports-builtin.e2e-spec.ts` (hand-computed summary and vulnerability numbers, tenant isolation, empty workspace, id limits, 403 for a member without `vulnerability.read`, a failing query stores nothing). No spec renders a real PDF.
+Unit: `report-runner.spec.ts`, `reports.service.spec.ts` (queueing, `runJob` events, schedules, artifact delete), `reports.service.routing.spec.ts` (right template per type, artifact storage), `reports.controller.spec.ts`, `reports.audit-wiring.spec.ts`, and per template `templates/builtin/*/{queries,to-data}.spec.ts`. E2E (live DB): `core-api/test/reports-builtin.e2e-spec.ts` (hand-computed summary and vulnerability numbers, tenant isolation, empty workspace, id limits, 403 for a member without `vulnerability.read`, a failing query stores nothing). No spec renders a real PDF.

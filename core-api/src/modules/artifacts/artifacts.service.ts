@@ -401,6 +401,15 @@ export class ArtifactsService {
     return { message: 'File deleted' };
   }
 
+  /** Deletes a server-side file (no owner check) and frees its quota; the caller authorized it. */
+  async deleteServerFile(id: string): Promise<void> {
+    await this.artifactRepo.update(
+      { id, status: ArtifactStatus.READY },
+      { status: ArtifactStatus.DELETED },
+    );
+    await this.purge(id);
+  }
+
   async getShares(
     workspaceId: string,
     userId: string,

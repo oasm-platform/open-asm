@@ -4,9 +4,7 @@
   "severity.medium": "中",
   "severity.low": "低",
   "severity.info": "信息",
-  "toast.summaryGenerated": "已成功生成摘要报告",
   "toast.summaryFailed": "无法生成摘要报告",
-  "toast.vulnGenerated": "已成功生成漏洞报告",
   "toast.vulnFailed": "无法生成漏洞报告",
   "toast.deleted": "报告已删除",
   "toast.deleteFailed": "无法删除报告",
@@ -30,5 +28,17 @@
   "tabs.all": "全部",
   "tabs.summary": "摘要",
   "tabs.vulnerability": "漏洞",
-  "tabs.templates": "模板"
+  "tabs.templates": "模板",
+  "toast.queued": "报告已加入队列，准备就绪后会通知您。",
+  "toast.scheduleCreated": "报告计划已保存",
+  "toast.scheduleFailed": "无法保存报告计划",
+  "toast.scheduleDeleted": "报告计划已删除",
+  "generate.schedule": "按计划重复",
+  "generate.saveSchedule": "保存计划",
+  "tabs.schedules": "计划",
+  "schedules.columns.report": "报告",
+  "schedules.columns.runs": "运行时间",
+  "schedules.empty": "暂无报告计划",
+  "schedules.delete.title": "删除计划",
+  "schedules.delete.description": "停止按计划生成此报告？"
 }

@@ -25,16 +25,16 @@ Workspace files ("Files" in the console): objects in the `artifacts` bucket, the
 | `GET public/artifacts/:id` | `@Public()`, redirects to a 5-minute URL; 404 unless ready and `public` |
 
 - Registered in `combine.module.ts`. Exports `ArtifactsService`, `ArtifactFoldersService`, `ArtifactQuotaService`.
-- There is no upload route here. Uploads come from `projects/project-files.service.ts` (`presignUpload` / `completeUpload`), the agent tool `save_file` in `agents/tools/artifact.tools.ts` (`createFromBuffer`), and `templates` (`createFromBuffer`, `replaceContent`).
+- There is no upload route here. Uploads come from `projects/project-files.service.ts` (`presignUpload` / `completeUpload`), the agent tool `save_file` in `agents/tools/artifact.tools.ts` (`createFromBuffer`), `templates` (`createFromBuffer`, `replaceContent`) and `reports` (`createFromBuffer` with `source: 'report'`, private; `deleteServerFile` on report delete, no owner check: the caller authorized it).
 - Events: `@PublishEvent` on download, update, delete, share, unshare (`EVENT_CATALOG.artifact.*`); `artifact.created` is published from the service (`publishCreated`), actor type `Agent` unless the caller passes one. `storage.quota.updated` comes from `admin/workspaces` (`PATCH admin/workspaces/:id/storage-quota` → `setQuota`).
 
 ## Data model
 
-- `artifacts`: `workspaceId` (CASCADE), `createdByUserId` (SET NULL), `parentFolderId` (NO ACTION), `source` (`upload`/`agent`/`template`), `bucket` + `objectKey` UNIQUE, `sizeBytes` bigint (mapped to number), `shareType` (`private`/`shared`/`public`), `status` (`pending`/`ready`/`deleted`), `metadata` jsonb, `expiresAt`. No TypeORM soft delete: `deleted` is a status.
+- `artifacts`: `workspaceId` (CASCADE), `createdByUserId` (SET NULL), `parentFolderId` (NO ACTION), `source` (`upload`/`agent`/`template`/`report`), `bucket` + `objectKey` UNIQUE, `sizeBytes` bigint (mapped to number), `shareType` (`private`/`shared`/`public`), `status` (`pending`/`ready`/`deleted`), `metadata` jsonb, `expiresAt`. No TypeORM soft delete: `deleted` is a status.
 - `artifact_shares`: unique `(artifactId, userId)`, both FKs CASCADE.
 - `artifact_folders`: tree via `parentFolderId` (NO ACTION), `createdByUserId` null only for the workspace templates folder.
 - `workspace_storage_usage`: PK `workspaceId`, `usedBytes`, `reservedBytes`, nullable `quotaBytes` (null = `ARTIFACT_WORKSPACE_QUOTA_BYTES`, 1 GiB), CHECKs keep all three non-negative. Created lazily on first reservation.
-- `project_artifacts` (projects module) references `artifacts`.
+- `project_artifacts` (projects module) and `reports.artifactId` (reports module, CASCADE) reference `artifacts`.
 
 ## Invariants
 
@@ -49,7 +49,7 @@ Workspace files ("Files" in the console): objects in the `artifacts` bucket, the
 
 ## Coupling
 
-- Imported by `workspaces`, `projects`, `templates`, `agents`, `admin/workspaces`. Imports `StorageModule`; uses the global `EventBridgeService`, and the `WorkspaceMembers` repository through `DataSource`.
+- Imported by `workspaces`, `projects`, `templates`, `agents`, `reports`, `admin/workspaces`. Imports `StorageModule`; uses the global `EventBridgeService`, and the `WorkspaceMembers` repository through `DataSource`.
 - `ArtifactFoldersService` injects `ArtifactsService`, not the reverse.
 - `jobs-registry/jobs-registry.service.ts` reads `Artifact` rows directly (`signCustomTemplates`) and `templates` queries `artifacts` directly; keep `source`, `status`, `bucket`, `objectKey` and `updatedAt` semantics stable.
 

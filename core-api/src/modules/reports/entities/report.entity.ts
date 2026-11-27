@@ -1,4 +1,5 @@
 import { BaseEntity } from '@/common/entities/base.entity';
+import { Artifact } from '@/modules/artifacts/entities/artifact.entity';
 import { User } from '@/modules/auth/entities/user.entity';
 import { Workspace } from '@/modules/workspaces/entities/workspace.entity';
 import { Column, Entity, JoinColumn, ManyToOne, Relation } from 'typeorm';
@@ -27,4 +28,12 @@ export class Report extends BaseEntity {
 
   @Column('text')
   fileName: string;
+
+  /** The file and its quota charge; null on reports made before reports were artifacts. */
+  @Column('uuid', { nullable: true })
+  artifactId: string | null;
+
+  @ManyToOne(() => Artifact, { onDelete: 'CASCADE', nullable: true })
+  @JoinColumn({ name: 'artifactId' })
+  artifact?: Relation<Artifact>;
 }

@@ -4,9 +4,7 @@
   "severity.medium": "Media",
   "severity.low": "Bassa",
   "severity.info": "Info",
-  "toast.summaryGenerated": "Report riepilogativo generato",
   "toast.summaryFailed": "Impossibile generare il report riepilogativo",
-  "toast.vulnGenerated": "Report delle vulnerabilità generato",
   "toast.vulnFailed": "Impossibile generare il report delle vulnerabilità",
   "toast.deleted": "Report eliminato",
   "toast.deleteFailed": "Impossibile eliminare il report",
@@ -30,5 +28,17 @@
   "tabs.all": "Tutti",
   "tabs.summary": "Riepilogo",
   "tabs.vulnerability": "Vulnerabilità",
-  "tabs.templates": "Modelli"
+  "tabs.templates": "Modelli",
+  "toast.queued": "Report in coda. Riceverai una notifica quando sarà pronto.",
+  "toast.scheduleCreated": "Pianificazione del report salvata",
+  "toast.scheduleFailed": "Impossibile salvare la pianificazione del report",
+  "toast.scheduleDeleted": "Pianificazione del report eliminata",
+  "generate.schedule": "Ripeti secondo una pianificazione",
+  "generate.saveSchedule": "Salva pianificazione",
+  "tabs.schedules": "Pianificazioni",
+  "schedules.columns.report": "Report",
+  "schedules.columns.runs": "Esecuzione",
+  "schedules.empty": "Nessuna pianificazione di report",
+  "schedules.delete.title": "Elimina pianificazione",
+  "schedules.delete.description": "Smettere di generare questo report secondo la pianificazione?"
 }

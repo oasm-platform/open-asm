@@ -274,6 +274,7 @@ export const EVENT_CATALOG = {
     generated: { name: 'report.generated', summary: 'Report generated' },
     exported: { name: 'report.exported', summary: 'Report exported' },
     deleted: { name: 'report.deleted', summary: 'Report deleted' },
+    completed: { name: 'report.completed', summary: 'Queued report finished or failed' },
   },
   // `cancelled` is the audited action; the rest are job transitions that never
   // reached the audit trail. `reset_stuck` needs a hook added — today the

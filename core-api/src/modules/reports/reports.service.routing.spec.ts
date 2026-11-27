@@ -1,4 +1,10 @@
 import { Test } from '@nestjs/testing';
+import { getQueueToken } from '@nestjs/bullmq';
+import { BullMQName } from '@/common/enums/enum';
+import { ArtifactsService } from '@/modules/artifacts/artifacts.service';
+import { EventBridgeService } from '@/modules/event-bridge/publishing/event-bridge.service';
+import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
+import { ReportSchedule } from './entities/report-schedule.entity';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { StorageService } from '@/modules/storage/storage.service';
 import { AsqSavedQueriesService } from '@/modules/attack-surface-query/asq-saved-queries.service';
@@ -27,13 +33,14 @@ describe('ReportsService routes reports to their builtin template', () => {
   const runner = { run: jest.fn() };
   const repo = { save: jest.fn() };
   const storage = { uploadFile: jest.fn() };
+  const artifacts = { createFromBuffer: jest.fn(), deleteServerFile: jest.fn() };
   const savedQueries = { get: jest.fn() };
   const render = renderTemplatePdf as jest.Mock;
 
   beforeEach(async () => {
     jest.clearAllMocks();
     runner.run.mockResolvedValue({ title: 'data' });
-    storage.uploadFile.mockResolvedValue({ path: 'reports/x.pdf' });
+    artifacts.createFromBuffer.mockResolvedValue({ id: 'a1' });
     const module = await Test.createTestingModule({
       providers: [
         ReportsService,
@@ -41,6 +48,12 @@ describe('ReportsService routes reports to their builtin template', () => {
         { provide: StorageService, useValue: storage },
         { provide: ReportRunner, useValue: runner },
         { provide: AsqSavedQueriesService, useValue: savedQueries },
+        { provide: getRepositoryToken(ReportSchedule), useValue: {} },
+        { provide: ArtifactsService, useValue: artifacts },
+        { provide: WorkspacesService, useValue: {} },
+        { provide: EventBridgeService, useValue: {} },
+        { provide: getQueueToken(BullMQName.REPORT_GENERATE), useValue: {} },
+        { provide: getQueueToken(BullMQName.REPORT_SCHEDULE), useValue: {} },
       ],
     }).compile();
     service = module.get(ReportsService);
@@ -54,7 +67,16 @@ describe('ReportsService routes reports to their builtin template', () => {
     expect(templateRun()).toBe('summary');
     expect(renderedWith()).toBe('summary');
     expect(runner.run).toHaveBeenCalledWith(expect.anything(), scope, { targetIds: ['t'] });
-    expect(repo.save).toHaveBeenCalledWith(expect.objectContaining({ type: 'SUMMARY', path: 'reports/x.pdf' }));
+    expect(artifacts.createFromBuffer).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceId: 'w1', userId: 'u1', source: 'report', mimeType: 'application/pdf' }),
+    );
+    expect(repo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'SUMMARY',
+        artifactId: 'a1',
+        path: expect.stringMatching(/^artifacts\/workspaces\/w1\/a1\/report-summary-.+\.pdf$/),
+      }),
+    );
   });
 
   it('generateReport VULNERABILITY uses the vulnerability template', async () => {
@@ -99,15 +121,21 @@ describe('ReportsService routes reports to their builtin template', () => {
   ])('a failing runner uploads nothing and saves no row (%s)', async (type) => {
     runner.run.mockRejectedValue(new Error('query failed'));
     await expect(service.generateReport(scope, 'u1', type)).rejects.toThrow('query failed');
-    expect(storage.uploadFile).not.toHaveBeenCalled();
+    expect(artifacts.createFromBuffer).not.toHaveBeenCalled();
     expect(repo.save).not.toHaveBeenCalled();
+  });
+
+  it('a row that fails to save deletes its artifact, so the quota is freed', async () => {
+    repo.save.mockRejectedValueOnce(new Error('db down'));
+    await expect(service.generateReport(scope, 'u1', 'SUMMARY')).rejects.toThrow('db down');
+    expect(artifacts.deleteServerFile).toHaveBeenCalledWith('a1');
   });
 
   it('a failing runner stops a query report too', async () => {
     savedQueries.get.mockResolvedValue({ name: 'n', description: null, spec: {} });
     runner.run.mockRejectedValue(new Error('nope'));
     await expect(service.generateQueryReport(scope, 'u1', 'q1')).rejects.toThrow('nope');
-    expect(storage.uploadFile).not.toHaveBeenCalled();
+    expect(artifacts.createFromBuffer).not.toHaveBeenCalled();
     expect(repo.save).not.toHaveBeenCalled();
   });
 });

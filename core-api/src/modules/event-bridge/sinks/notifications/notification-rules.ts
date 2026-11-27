@@ -1,4 +1,4 @@
-import { NotificationScope, NotificationType } from '@/common/enums/enum';
+import { AuditOutcome, NotificationScope, NotificationType } from '@/common/enums/enum';
 import type { EventName } from '../../contracts/event-catalog';
 import type { ConsumedEvent } from '../../contracts/event-envelope';
 import { hasUnfinishedSteps, readPayload } from '../../contracts/event-payloads';
@@ -135,6 +135,29 @@ export const NOTIFICATION_RULES: Partial<Record<EventName, NotificationRule[]>> 
             id: p.vulnerabilityId ?? '',
             name: p.vulnerabilityName ?? '',
           };
+        },
+      },
+    ],
+    // A queued report is done: tell who asked for it (or the schedule owner).
+    'report.completed': [
+      {
+        type: NotificationType.REPORT_GENERATED,
+        scope: NotificationScope.USER,
+        audience: { userId: (event) => readPayload('report.completed', event).userId },
+        when: (event) => event.outcome === AuditOutcome.Success,
+        metadata: (event) => {
+          const p = readPayload('report.completed', event);
+          return { reportType: p.reportType ?? '', fileName: p.fileName ?? '' };
+        },
+      },
+      {
+        type: NotificationType.REPORT_FAILED,
+        scope: NotificationScope.USER,
+        audience: { userId: (event) => readPayload('report.completed', event).userId },
+        when: (event) => event.outcome === AuditOutcome.Failure,
+        metadata: (event) => {
+          const p = readPayload('report.completed', event);
+          return { reportType: p.reportType ?? '', error: p.error ?? '' };
         },
       },
     ],
