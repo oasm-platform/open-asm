@@ -430,8 +430,10 @@ export type I18nTranslations = {
         "network.emptyHint": string;
         "network.emptyFiltered": string;
         "network.showRequests": string;
-        "network.linkLabel": string;
-        "network.linkLabelFailed": string;
+        "network.linkLabel.one": string;
+        "network.linkLabel.other": string;
+        "network.linkLabelFailed.one": string;
+        "network.linkLabelFailed.other": string;
         "network.detail.back": string;
         "network.detail.sections": string;
         "network.detail.headers": string;
@@ -1052,6 +1054,10 @@ export type I18nTranslations = {
         "ai.tests.skipped": string;
         "ai.tests.summary": string;
         "ai.envVars": string;
+        "network.linkLabel.few": string;
+        "network.linkLabel.many": string;
+        "network.linkLabelFailed.few": string;
+        "network.linkLabelFailed.many": string;
         "workflow.agentCount.few": string;
         "workflow.agentCount.many": string;
         "workflow.findings.few": string;

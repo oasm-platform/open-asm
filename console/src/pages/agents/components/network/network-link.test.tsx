@@ -29,7 +29,7 @@ describe('NetworkLinkButton', () => {
     render(<Harness open={open} toolCallId="k1" />);
 
     const button = screen.getByRole('button', {
-      name: 'Network: 2 requests, 1 failed',
+      name: 'Network: 2 requests, failed: 1',
     });
     await userEvent.click(button);
     expect(open).toHaveBeenCalledWith('k1');
@@ -38,7 +38,7 @@ describe('NetworkLinkButton', () => {
   it('announces only the count when nothing failed', () => {
     render(<Harness open={vi.fn()} toolCallId="k2" />);
     expect(
-      screen.getByRole('button', { name: 'Network: 1 requests' }),
+      screen.getByRole('button', { name: 'Network: 1 request' }),
     ).toBeInTheDocument();
   });
 
