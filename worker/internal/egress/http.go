@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -144,6 +145,56 @@ func requestTarget(r *http.Request) string {
 	return r.Host
 }
 
+// eventRec is an HTTPEvent in progress; nil when the request is not
+// recorded, so every method is a no-op for connector traffic.
+type eventRec struct {
+	HTTPEvent
+	rec *Recorder
+}
+
+func (p *httpProxy) startEvent(id identity, scheme, method, host, port string, defaultPort uint32) *eventRec {
+	if id.runSession == "" || p.srv.rec == nil {
+		return nil
+	}
+	ev := &eventRec{rec: p.srv.rec}
+	ev.ID = NewEventID()
+	ev.SessionID = id.runSession
+	ev.Scheme = scheme
+	ev.Method = method
+	ev.Host = strings.ToLower(host)
+	ev.Port = defaultPort
+	if n, err := strconv.ParseUint(port, 10, 16); err == nil {
+		ev.Port = uint32(n)
+	}
+	ev.SentAt = time.Now()
+	return ev
+}
+
+func (ev *eventRec) deny() {
+	if ev != nil {
+		ev.Outcome = OutcomeDenied
+		ev.Error = "policy"
+	}
+}
+
+func (ev *eventRec) fail(err error) {
+	if ev != nil {
+		ev.Outcome = OutcomeUpstreamError
+		ev.Error = err.Error()
+	}
+}
+
+func (ev *eventRec) done() {
+	if ev == nil {
+		return
+	}
+	if ev.Outcome == 0 {
+		ev.Outcome = OutcomeAllowed
+	}
+	ev.CompletedAt = time.Now()
+	ev.rec.Record(ev.HTTPEvent)
+}
+
 func (p *httpProxy) forward(w *connResponseWriter, r *http.Request) {
 	id, ok := p.needAuth(w, r)
 	if !ok {
@@ -151,8 +202,26 @@ func (p *httpProxy) forward(w *connResponseWriter, r *http.Request) {
 	}
 	label := id.label
 	host := r.URL.Hostname()
+	ev := p.startEvent(id, "http", r.Method, host, r.URL.Port(), 80)
+	defer ev.done()
+	var reqCap, respCap *bodyCapture
+	if ev != nil {
+		ev.Path = MaskQuery(r.URL.RequestURI())
+		h := r.Header.Clone()
+		h.Del("Proxy-Authorization")
+		ev.RequestHeaders = MaskHeaders(h)
+		reqCap, respCap = &bodyCapture{}, &bodyCapture{}
+		if r.Body != nil && r.Body != http.NoBody {
+			r.Body = captureReader{ReadCloser: r.Body, c: reqCap}
+		}
+		defer func() {
+			ev.RequestBody, ev.RequestBytes, ev.RequestBodyTruncated = reqCap.buf, reqCap.total, reqCap.truncated()
+			ev.ResponseBody, ev.ResponseBodyTruncated = respCap.buf, respCap.truncated()
+		}()
+	}
 	if denyTarget(host, p.srv.deny, p.srv.allow) {
 		p.srv.logWarning("egress deny exec=%s method=%s target=%s reason=policy", label, r.Method, requestTarget(r))
+		ev.deny()
 		http.Error(w, "egress denied by policy", http.StatusForbidden)
 		return
 	}
@@ -168,10 +237,12 @@ func (p *httpProxy) forward(w *connResponseWriter, r *http.Request) {
 		var be *blockedError
 		if errors.As(err, &be) {
 			p.srv.logWarning("egress deny exec=%s method=%s target=%s reason=%s", label, r.Method, requestTarget(r), be)
+			ev.deny()
 			http.Error(w, "egress denied by policy", http.StatusForbidden)
 			return
 		}
 		p.srv.logWarning("egress upstream error exec=%s method=%s target=%s err=%v", label, r.Method, requestTarget(r), err)
+		ev.fail(err)
 		http.Error(w, "upstream error", http.StatusBadGateway)
 		return
 	}
@@ -185,6 +256,7 @@ func (p *httpProxy) forward(w *connResponseWriter, r *http.Request) {
 	out.Header.Del("Expect")
 	out.RequestURI = ""
 	if err := out.Write(upstream); err != nil {
+		ev.fail(err)
 		http.Error(w, "upstream error", http.StatusBadGateway)
 		return
 	}
@@ -192,6 +264,7 @@ func (p *httpProxy) forward(w *connResponseWriter, r *http.Request) {
 
 	uresp, err := http.ReadResponse(bufio.NewReader(upstream), r)
 	if err != nil {
+		ev.fail(err)
 		http.Error(w, "upstream error", http.StatusBadGateway)
 		return
 	}
@@ -202,7 +275,16 @@ func (p *httpProxy) forward(w *connResponseWriter, r *http.Request) {
 		}
 	}
 	w.WriteHeader(uresp.StatusCode)
-	n, _ := io.Copy(w, uresp.Body)
+	var body io.Reader = uresp.Body
+	if ev != nil {
+		ev.StatusCode = uint32(uresp.StatusCode)
+		ev.ResponseHeaders = MaskHeaders(uresp.Header)
+		body = io.TeeReader(uresp.Body, respCap)
+	}
+	n, _ := io.Copy(w, body)
+	if ev != nil {
+		ev.ResponseBytes = uint64(n)
+	}
 	p.srv.logInfo("egress bytes exec=%s method=%s target=%s bytes=%d", label, r.Method, requestTarget(r), n)
 }
 
@@ -212,12 +294,16 @@ func (p *httpProxy) tunnel(w *connResponseWriter, r *http.Request) {
 		return
 	}
 	label := id.label
-	connectHost := r.Host
-	if h, _, err := net.SplitHostPort(r.Host); err == nil {
-		connectHost = h
+	connectHost, connectPort := r.Host, ""
+	if h, port, err := net.SplitHostPort(r.Host); err == nil {
+		connectHost, connectPort = h, port
 	}
+	// Phase 1 treats every tunnel as https: CONNECT carries no scheme.
+	ev := p.startEvent(id, "https", "", connectHost, connectPort, 443)
+	defer ev.done()
 	if denyTarget(connectHost, p.srv.deny, p.srv.allow) {
 		p.srv.logWarning("egress deny exec=%s method=CONNECT target=%s reason=policy", label, r.Host)
+		ev.deny()
 		http.Error(w, "egress denied by policy", http.StatusForbidden)
 		return
 	}
@@ -228,10 +314,12 @@ func (p *httpProxy) tunnel(w *connResponseWriter, r *http.Request) {
 		var be *blockedError
 		if errors.As(err, &be) {
 			p.srv.logWarning("egress deny exec=%s method=CONNECT target=%s reason=%s", label, r.Host, be)
+			ev.deny()
 			http.Error(w, "egress denied by policy", http.StatusForbidden)
 			return
 		}
 		p.srv.logWarning("egress upstream error exec=%s method=CONNECT target=%s err=%v", label, r.Host, err)
+		ev.fail(err)
 		http.Error(w, "upstream error", http.StatusBadGateway)
 		return
 	}
@@ -252,5 +340,8 @@ func (p *httpProxy) tunnel(w *connResponseWriter, r *http.Request) {
 	_ = w.conn.Close()
 	_ = upstream.Close()
 	wg.Wait()
+	if ev != nil {
+		ev.RequestBytes, ev.ResponseBytes = uint64(upBytes), uint64(downBytes)
+	}
 	p.srv.logInfo("egress bytes exec=%s method=CONNECT target=%s up=%d down=%d", label, r.Host, upBytes, downBytes)
 }
