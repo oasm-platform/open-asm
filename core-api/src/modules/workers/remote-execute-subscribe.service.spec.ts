@@ -241,6 +241,23 @@ describe('RemoteExecuteSubscribeService — agent worker scoping', () => {
     expect(service.isAgentReady('w-own', 'ws-1')).toBe(false);
   });
 
+  it('disconnectWorker ends the stream of a removed worker and stops serving it', () => {
+    const reg = service.registerWorker(
+      worker('w-own', 'ws-1', WorkerScope.WORKSPACE),
+    );
+    let completed = false;
+    reg.observable.subscribe({ complete: () => (completed = true) });
+
+    service.disconnectWorker('w-own');
+
+    expect(completed).toBe(true);
+    expect(service.isAgentReady('w-own', 'ws-1')).toBe(false);
+  });
+
+  it('disconnectWorker ignores a worker with no stream on this instance', () => {
+    expect(() => service.disconnectWorker('w-unknown')).not.toThrow();
+  });
+
   it('fails an in-flight tool run at once when its worker disconnects', () => {
     const reg = service.registerWorker(
       worker('w-own', 'ws-1', WorkerScope.WORKSPACE),

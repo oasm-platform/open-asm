@@ -210,6 +210,17 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
     return this.workers.get(workerId);
   }
 
+  /**
+   * Ends a removed worker's subscribe stream on this instance, so agents stop
+   * pushing to it at once instead of until the worker drops the stream. The
+   * stream's own finalize runs the usual disconnect cleanup. A stream held by
+   * another instance stays open until the worker drops it, but every guarded
+   * call (results, job claims) is refused once the token cache expires.
+   */
+  disconnectWorker(workerId: string): void {
+    this.workers.get(workerId)?.complete();
+  }
+
   private isWorkerAlive(workerId: string): boolean {
     const subject = this.workers.get(workerId);
     return subject !== undefined && !subject.closed;

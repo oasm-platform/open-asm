@@ -416,6 +416,10 @@ export const EVENT_CATALOG = {
       name: 'worker.rejoined',
       summary: 'Worker rejoined and reclaimed its jobs',
     },
+    removed: {
+      name: 'worker.removed',
+      summary: 'Worker removed and its token revoked',
+    },
     network: {
       connected: {
         name: 'worker.network.connected',

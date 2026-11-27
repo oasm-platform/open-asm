@@ -1,3 +1,4 @@
+import { WORKER_TIMEOUT } from '@/common/constants/app.constants';
 import { SortOrder } from '@/common/dtos/get-many-base.dto';
 import { ToolCategory, WorkerScope, WorkerType } from '@/common/enums/enum';
 import { getManyResponse } from '@/common/utils/get-many-response.util';
@@ -30,6 +31,15 @@ const hasCategory = (category: ToolCategory) =>
   Raw((alias) => `${alias} @> :categoryFilter::jsonb`, {
     categoryFilter: JSON.stringify([{ name: category }]),
   });
+
+/**
+ * Parameters for "seen within the worker timeout". Offline workspace workers
+ * keep their row for a token rejoin, so a row alone does not make a worker
+ * available; a connected worker refreshes `lastSeenAt` well inside this window.
+ */
+const liveWorkersSince = () => ({
+  liveSince: new Date(Date.now() - WORKER_TIMEOUT),
+});
 
 // Search input is trimmed and capped to keep ILIKE patterns cheap and bounded.
 const MAX_SEARCH_LENGTH = 100;
@@ -95,6 +105,7 @@ export class ToolsService {
         cloudScope: WorkerScope.CLOUD,
       })
       .andWhere('w.type = :type', { type: WorkerType.BUILT_IN })
+      .andWhere('w."lastSeenAt" >= :liveSince', liveWorkersSince())
       .getCount();
   }
 
@@ -124,6 +135,7 @@ export class ToolsService {
           cloudScope: WorkerScope.CLOUD,
         })
         .andWhere('w."toolId" IN (:...toolIds)', { toolIds })
+        .andWhere('w."lastSeenAt" >= :liveSince', liveWorkersSince())
         .groupBy('w."toolId"')
         .getRawMany();
 

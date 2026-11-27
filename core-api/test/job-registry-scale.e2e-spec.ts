@@ -1,3 +1,4 @@
+import { WORKER_TIMEOUT } from '@/common/constants/app.constants';
 import { JobStatus, WorkerScope, WorkerType } from '@/common/enums/enum';
 import { Asset } from '@/modules/assets/entities/assets.entity';
 import { JobHistory } from '@/modules/jobs-registry/entities/job-history.entity';
@@ -565,6 +566,78 @@ describe('Job registry at scale (e2e)', () => {
       expect(byId.get(retryable.id)).toMatchObject({ status: JobStatus.PENDING });
       expect(byId.get(exhausted.id)).toMatchObject({ status: JobStatus.FAILED });
       expect(byId.get(done.id)).toMatchObject({ status: JobStatus.COMPLETED });
+    });
+
+    it('revisits a retained workspace worker only while it holds running jobs', async () => {
+      // Given: two workspace workers offline past the timeout, one still
+      // holding a running job
+      const workers = dataSource.getRepository(WorkerInstance);
+      const idle = await createWorker();
+      const busy = await createWorker();
+      await workers.update([idle.id, busy.id], {
+        lastSeenAt: new Date(Date.now() - 2 * WORKER_TIMEOUT),
+      });
+      const [running] = await createPendingJobs(1);
+      await dataSource
+        .getRepository(Job)
+        .update(running.id, { status: JobStatus.IN_PROGRESS, workerId: busy.id });
+      const service = app.app.get(WorkersService);
+      const release = jest.spyOn(service, 'releaseWorkerJobs');
+
+      // When
+      let releasedWorkerIds: string[];
+      try {
+        await service.autoCleanupWorkersAndJobs();
+        releasedWorkerIds = release.mock.calls.map(([workerId]) => workerId);
+      } finally {
+        release.mockRestore();
+      }
+
+      // Then: only the busy worker is revisited, and both identities survive
+      expect(releasedWorkerIds).toContain(busy.id);
+      expect(releasedWorkerIds).not.toContain(idle.id);
+      expect(
+        await dataSource.getRepository(Job).findOneByOrFail({ id: running.id }),
+      ).toMatchObject({ status: JobStatus.PENDING });
+      expect(await workers.existsBy({ id: idle.id })).toBe(true);
+      expect(await workers.existsBy({ id: busy.id })).toBe(true);
+    });
+  });
+
+  describe('worker removal', () => {
+    it('requeues the running jobs and revokes the token', async () => {
+      // Given
+      const worker = await createWorker();
+      const [running] = await createPendingJobs(1);
+      await dataSource
+        .getRepository(Job)
+        .update(running.id, { status: JobStatus.IN_PROGRESS, workerId: worker.id });
+      const service = app.app.get(WorkersService);
+
+      // When
+      await service.removeWorker(worker.id, workspaceId);
+
+      // Then
+      expect(
+        await dataSource.getRepository(Job).findOneByOrFail({ id: running.id }),
+      ).toMatchObject({ status: JobStatus.PENDING });
+      expect(await service.validateWorkerToken(worker.token)).toBeNull();
+      await expect(
+        service.join({ apiKey: 'consumed-join-key', token: worker.token }),
+      ).rejects.toThrow();
+    });
+
+    it("never removes another workspace's worker", async () => {
+      // Given
+      const worker = await createWorker();
+
+      // When / Then
+      await expect(
+        app.app.get(WorkersService).removeWorker(worker.id, randomUUID()),
+      ).rejects.toThrow('Worker not found');
+      expect(
+        await dataSource.getRepository(WorkerInstance).existsBy({ id: worker.id }),
+      ).toBe(true);
     });
   });
 
