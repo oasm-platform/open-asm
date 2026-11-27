@@ -3,6 +3,7 @@ package grpcclient
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"oasm-worker/internal/egress"
@@ -26,16 +27,16 @@ func (c *Client) ReportEgressHttpLogs(ctx context.Context, events []egress.HTTPE
 
 func egressLogToPb(e egress.HTTPEvent) *workers.EgressHttpLog {
 	return &workers.EgressHttpLog{
-		Id:                    e.ID,
-		SessionId:             e.SessionID,
-		Scheme:                e.Scheme,
-		Method:                e.Method,
-		Host:                  e.Host,
+		Id:                    validUTF8(e.ID),
+		SessionId:             validUTF8(e.SessionID),
+		Scheme:                validUTF8(e.Scheme),
+		Method:                validUTF8(e.Method),
+		Host:                  validUTF8(e.Host),
 		Port:                  e.Port,
-		Path:                  e.Path,
+		Path:                  validUTF8(e.Path),
 		StatusCode:            e.StatusCode,
 		Outcome:               outcomeToPb(e.Outcome),
-		Error:                 e.Error,
+		Error:                 validUTF8(e.Error),
 		RequestBytes:          e.RequestBytes,
 		ResponseBytes:         e.ResponseBytes,
 		SentAt:                timestamppb.New(e.SentAt),
@@ -49,13 +50,17 @@ func egressLogToPb(e egress.HTTPEvent) *workers.EgressHttpLog {
 	}
 }
 
+// validUTF8 keeps one raw byte from a server or client from failing the
+// whole batch: proto3 refuses to marshal a string that is not valid UTF-8.
+func validUTF8(s string) string { return strings.ToValidUTF8(s, "\uFFFD") }
+
 func headersToPb(hs []egress.Header) []*workers.HttpHeader {
 	if len(hs) == 0 {
 		return nil
 	}
 	out := make([]*workers.HttpHeader, len(hs))
 	for i, h := range hs {
-		out[i] = &workers.HttpHeader{Name: h.Name, Value: h.Value}
+		out[i] = &workers.HttpHeader{Name: validUTF8(h.Name), Value: validUTF8(h.Value)}
 	}
 	return out
 }

@@ -3,6 +3,7 @@ package egress
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -263,7 +264,7 @@ func (r *Recorder) deliver(ctx context.Context, batch []HTTPEvent) {
 	if perm != nil && perm.unsupported {
 		r.pausedUntil.Store(r.now().Add(r.cooldown).UnixNano())
 		if r.logger != nil {
-			r.logger.Warning("core-api does not support ReportEgressHttpLogs; agent HTTP logging paused for %v", r.cooldown)
+			r.logger.Warning("core-api does not support ReportEgressHttpLogs; agent HTTP logging paused for %s", strings.TrimSuffix(r.cooldown.String(), "0s"))
 		}
 		return
 	}

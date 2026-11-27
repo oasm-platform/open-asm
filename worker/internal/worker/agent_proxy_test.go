@@ -288,7 +288,7 @@ func TestEgressRecorderPermanentCodesSendOnce(t *testing.T) {
 			}
 			log.mu.Lock()
 			defer log.mu.Unlock()
-			if code == codes.Unimplemented && (len(log.warns) != 1 || !strings.Contains(log.warns[0], "paused for 10m")) {
+			if code == codes.Unimplemented && (len(log.warns) != 1 || !strings.HasSuffix(log.warns[0], "paused for 10m")) {
 				t.Fatalf("warnings = %v", log.warns)
 			}
 		})

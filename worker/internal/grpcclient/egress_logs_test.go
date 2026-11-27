@@ -111,3 +111,47 @@ func TestEgressOutcomeToPb(t *testing.T) {
 		}
 	}
 }
+
+// One raw non-UTF-8 byte from a server or client must not make the whole
+// batch fail to marshal: proto3 strings must be valid UTF-8.
+func TestReportEgressHttpLogsSanitizesInvalidUTF8(t *testing.T) {
+	srv := newTestServer(t)
+	srv.workersSrv.joinFn = func(context.Context, *workers.JoinRequest) (*workers.JoinResponse, error) {
+		return &workers.JoinResponse{WorkerId: "worker-1", WorkerToken: "token-1"}, nil
+	}
+	if err := srv.client.Join(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	bad := egress.HTTPEvent{
+		ID: "bad", SessionID: "s", Scheme: "http", Method: "G\xffT", Host: "h\xff.test",
+		Path: "/caf\xe9?q=1", Error: "x\xff", Outcome: egress.OutcomeAllowed,
+		RequestHeaders:  []egress.Header{{Name: "X-\xff", Value: "v"}},
+		ResponseHeaders: []egress.Header{{Name: "X-Name", Value: "Jos\xe9"}},
+		ResponseBody:    []byte{0xff},
+	}
+	if _, err := proto.Marshal(egressLogToPb(bad)); err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	var got *workers.EgressHttpLogBatch
+	srv.workersSrv.egressLogsFn = func(_ context.Context, req *workers.EgressHttpLogBatch) (*workers.EgressHttpLogAck, error) {
+		got = req
+		return &workers.EgressHttpLogAck{Accepted: 2}, nil
+	}
+	good := egress.HTTPEvent{ID: "good", SessionID: "s", Path: "/ok", Outcome: egress.OutcomeAllowed}
+	if _, err := srv.client.ReportEgressHttpLogs(context.Background(), []egress.HTTPEvent{bad, good}, 0); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.GetLogs()) != 2 || got.Logs[1].GetPath() != "/ok" {
+		t.Fatalf("batch = %v", got)
+	}
+	b := got.Logs[0]
+	if b.GetPath() != "/caf�?q=1" || b.GetResponseHeaders()[0].GetValue() != "Jos�" ||
+		b.GetMethod() != "G�T" || b.GetHost() != "h�.test" || b.GetError() != "x�" ||
+		b.GetRequestHeaders()[0].GetName() != "X-�" {
+		t.Fatalf("sanitized log = %v", b)
+	}
+	if string(b.GetResponseBody()) != "\xff" {
+		t.Fatal("bodies are bytes and must pass through unchanged")
+	}
+}
