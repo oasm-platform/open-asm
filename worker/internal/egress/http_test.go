@@ -253,3 +253,27 @@ func TestAuthenticateRunTokenIdentity(t *testing.T) {
 		t.Fatalf("execution token identity = %+v, %v; want label exec-test, no runSession", id, ok)
 	}
 }
+
+// Agent commands send user "oasm" with the run token as password: some
+// clients (GNU wget 1.x) only send credentials when both halves are set.
+func TestAuthenticateRunTokenAsPassword(t *testing.T) {
+	runs := NewRunCredentials()
+	p := newHTTPProxy(&Server{auth: testAuth("exec-tok"), runs: runs})
+	tok, revoke := runs.Issue("sess-pw")
+	defer revoke()
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
+	basic := func(userpass string) string {
+		return "Basic " + base64.StdEncoding.EncodeToString([]byte(userpass))
+	}
+	req.Header.Set("Proxy-Authorization", basic("oasm:"+tok))
+	if id, ok := p.authenticate(req); !ok || id.runSession != "sess-pw" {
+		t.Fatalf("oasm:<token> = %+v, %v; want runSession sess-pw", id, ok)
+	}
+	for _, cred := range []string{"oasm:", "oasm", "oasm:wrong", ":oasm"} {
+		req.Header.Set("Proxy-Authorization", basic(cred))
+		if id, ok := p.authenticate(req); ok {
+			t.Fatalf("%q must not authenticate, got %+v", cred, id)
+		}
+	}
+}

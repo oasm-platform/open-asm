@@ -3,6 +3,8 @@ package worker
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -32,10 +34,10 @@ func TestAgentProxyEnv(t *testing.T) {
 	p := &agentProxy{runs: egress.NewRunCredentials(), port: 26277, grpcHost: "core-api"}
 	got := p.env("abc123")
 	want := []string{
-		"HTTP_PROXY=http://abc123@127.0.0.1:26277",
-		"HTTPS_PROXY=http://abc123@127.0.0.1:26277",
-		"http_proxy=http://abc123@127.0.0.1:26277",
-		"https_proxy=http://abc123@127.0.0.1:26277",
+		"HTTP_PROXY=http://oasm:abc123@127.0.0.1:26277",
+		"HTTPS_PROXY=http://oasm:abc123@127.0.0.1:26277",
+		"http_proxy=http://oasm:abc123@127.0.0.1:26277",
+		"https_proxy=http://oasm:abc123@127.0.0.1:26277",
 		"NO_PROXY=localhost,127.0.0.1,::1,core-api",
 		"no_proxy=localhost,127.0.0.1,::1,core-api",
 	}
@@ -54,7 +56,7 @@ func TestAgentProxyEnv(t *testing.T) {
 func TestAgentProxyCommandEnvNilKeepsToday(t *testing.T) {
 	t.Setenv("HTTPS_PROXY", "http://corp-proxy:3128")
 	var p *agentProxy
-	env, revoke := p.commandEnv("/opt/tools", "sess")
+	env, revoke := p.commandEnv("/opt/tools", "sess", &warnCapture{})
 	revoke()
 	if !slices.Equal(env, setupCmdEnv("/opt/tools", false)) {
 		t.Fatalf("nil proxy env differs from setupCmdEnv")
@@ -69,7 +71,7 @@ func TestAgentProxyCommandEnvReplacesInherited(t *testing.T) {
 	t.Setenv("all_proxy", "socks5://corp:1080")
 	runs := egress.NewRunCredentials()
 	p := &agentProxy{runs: runs, port: 4000, grpcHost: "core"}
-	env, revoke := p.commandEnv("/opt/tools", "sess-x")
+	env, revoke := p.commandEnv("/opt/tools", "sess-x", &warnCapture{})
 	v := envValues(env, "HTTPS_PROXY")
 	if len(v) != 1 || !strings.HasPrefix(v[0], "http://") || !strings.HasSuffix(v[0], "@127.0.0.1:4000") {
 		t.Fatalf("HTTPS_PROXY = %v, want exactly the agent proxy", v)
@@ -77,7 +79,7 @@ func TestAgentProxyCommandEnvReplacesInherited(t *testing.T) {
 	if len(envValues(env, "all_proxy")) != 0 {
 		t.Fatal("inherited all_proxy must be dropped")
 	}
-	token := strings.TrimSuffix(strings.TrimPrefix(v[0], "http://"), "@127.0.0.1:4000")
+	token := strings.TrimSuffix(strings.TrimPrefix(v[0], "http://oasm:"), "@127.0.0.1:4000")
 	if s, ok := runs.Lookup(token); !ok || s != "sess-x" {
 		t.Fatalf("issued token must resolve to the session, got %q %v", s, ok)
 	}
@@ -130,7 +132,7 @@ func TestExecuteRemoteCommandProxiedRevokesAtExit(t *testing.T) {
 	if len(rec.exits) != 1 || rec.exits[0] != 0 {
 		t.Fatalf("exits = %v, want [0]", rec.exits)
 	}
-	token := strings.TrimSuffix(strings.TrimPrefix(out, "http://"), "@127.0.0.1:4000")
+	token := strings.TrimSuffix(strings.TrimPrefix(out, "http://oasm:"), "@127.0.0.1:4000")
 	if _, ok := runs.Lookup(token); ok {
 		t.Fatal("token must be revoked once the command exits")
 	}
@@ -151,7 +153,7 @@ type exitCheckingSender struct {
 // SendStdout stands in for a proxied request: the command printed its
 // proxy URL, so record one event under the command's session.
 func (s *exitCheckingSender) SendStdout(ctx context.Context, b []byte) error {
-	s.token = strings.TrimSuffix(strings.TrimPrefix(string(b), "http://"), "@127.0.0.1:4000")
+	s.token = strings.TrimSuffix(strings.TrimPrefix(string(b), "http://oasm:"), "@127.0.0.1:4000")
 	s.rec.Record(egress.HTTPEvent{ID: egress.NewEventID(), SessionID: "sess-f", Outcome: egress.OutcomeAllowed})
 	return s.recordingSender.SendStdout(ctx, b)
 }
@@ -308,5 +310,83 @@ func TestEgressRecorderRetriesTransientCodes(t *testing.T) {
 	}
 	if n := client.calls.Load(); n < 2 {
 		t.Fatalf("send calls = %d, want a retry", n)
+	}
+}
+
+func TestWriteWgetRC(t *testing.T) {
+	path, err := writeWgetRC("tok123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(path)
+	if filepath.Dir(path) != filepath.Clean(os.TempDir()) {
+		t.Fatalf("rc file %s must live in %s", path, os.TempDir())
+	}
+	fi, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Mode().Perm() != 0o600 {
+		t.Fatalf("mode = %v, want 0600", fi.Mode().Perm())
+	}
+	b, _ := os.ReadFile(path)
+	if want := "http-proxy-user = oasm\nhttp-proxy-password = tok123\n"; string(b) != want {
+		t.Fatalf("contents = %q, want %q", b, want)
+	}
+}
+
+// wget2 ignores proxy-URL userinfo; WGET2RC hands it the same credentials.
+func TestAgentProxyCommandEnvWgetRC(t *testing.T) {
+	runs := egress.NewRunCredentials()
+	p := &agentProxy{runs: runs, port: 4000, grpcHost: "core"}
+	env, release := p.commandEnv("/opt/tools", "sess-w", &warnCapture{})
+	rc := envValues(env, "WGET2RC")
+	if len(rc) != 1 {
+		t.Fatalf("WGET2RC = %v, want one", rc)
+	}
+	token := strings.TrimSuffix(strings.TrimPrefix(envValues(env, "HTTP_PROXY")[0], "http://oasm:"), "@127.0.0.1:4000")
+	b, err := os.ReadFile(rc[0])
+	if err != nil || !strings.Contains(string(b), "http-proxy-password = "+token+"\n") {
+		t.Fatalf("rc = %q, %v; want the run token", b, err)
+	}
+	release()
+	release()
+	if _, err := os.Stat(rc[0]); !os.IsNotExist(err) {
+		t.Fatalf("rc file must be removed on release, stat err = %v", err)
+	}
+}
+
+func TestExecuteRemoteCommandRemovesWgetRC(t *testing.T) {
+	p := &agentProxy{runs: egress.NewRunCredentials(), port: 4000, grpcHost: "core"}
+	sb, err := newSessionSandbox(t.TempDir(), "sess-rc", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := &recordingSender{}
+	executeRemoteCommand(context.Background(), rec, "sess-rc", `test -s "$WGET2RC" && printf '%s' "$WGET2RC"`, sb, nil, "/tools", p)
+	path := strings.Join(rec.stdout, "")
+	if path == "" || len(rec.exits) != 1 || rec.exits[0] != 0 {
+		t.Fatalf("command must see a non-empty WGET2RC file, out=%q exits=%v", path, rec.exits)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("rc file must be gone after exit, stat err = %v", err)
+	}
+}
+
+// A failed rc write costs wget2 only: the command still runs proxied.
+func TestAgentProxyCommandEnvWgetRCFailureKeepsProxy(t *testing.T) {
+	t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "missing"))
+	p := &agentProxy{runs: egress.NewRunCredentials(), port: 4000, grpcHost: "core"}
+	log := &warnCapture{}
+	env, release := p.commandEnv("/opt/tools", "sess-f", log)
+	defer release()
+	if len(envValues(env, "WGET2RC")) != 0 {
+		t.Fatal("WGET2RC must be unset when the file could not be written")
+	}
+	if len(envValues(env, "HTTP_PROXY")) != 1 {
+		t.Fatal("the proxy env must still be set")
+	}
+	if len(log.warns) != 1 || !strings.Contains(log.warns[0], "wget2") {
+		t.Fatalf("warnings = %v", log.warns)
 	}
 }
