@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
@@ -12,6 +12,7 @@ import {
   guardApprovalMeta,
   type ToolPolicy,
 } from '../agents.guard';
+import { saveHttpLogSession } from '../http-requests/http-log-session';
 import { AgentFunction } from './agent-function';
 import { pageForModel } from './connector.tools';
 import { deniedMessage } from './helpers';
@@ -19,6 +20,8 @@ import type { AgentFunctionContext } from './types';
 
 /** stderr kept in the model's result; it is not paged like stdout */
 const STDERR_MAX_CHARS = 4 * 1024;
+
+const logger = new Logger('RemoteExecuteTools');
 
 /** The page after a browser command, for the user's Browser panel. */
 export interface BrowserScreenshotEvent {
@@ -144,6 +147,7 @@ export class RemoteExecuteTools {
         emitter?.emit('remote-execute-output', { toolCallId, ...event });
       },
       ctx.abortSignal,
+      this.httpLogSessionWriter(ctx, sessionId),
     );
     // A browser command comes back with the page as a JPEG: a live view
     // for the user's Browser panel, never stored nor shown to the model
@@ -174,6 +178,37 @@ export class RemoteExecuteTools {
       ...(result.stderr.length > STDERR_MAX_CHARS
         ? { stderrTruncated: true }
         : {}),
+    };
+  }
+
+  /**
+   * Records who the command runs for, so the worker's HTTP logs for this
+   * session can be stored under the conversation. Without a conversation or
+   * a user there is nobody to show them to. Logging is a side channel: a
+   * Redis failure must never stop the command.
+   */
+  private httpLogSessionWriter(
+    ctx: AgentFunctionContext,
+    sessionId: string,
+  ): ((workerId: string) => Promise<void>) | undefined {
+    const { conversationId, userId } = ctx;
+    if (!conversationId || !userId) return undefined;
+    return async (workerId) => {
+      try {
+        await saveHttpLogSession(this.redisService, sessionId, {
+          workspaceId: ctx.workspaceId,
+          conversationId,
+          createdBy: userId,
+          toolCallId: ctx.toolCallId || null,
+          subagentId: ctx.subagentId ?? null,
+          agentName: ctx.agentName ?? 'main',
+          workerId,
+        });
+      } catch (err) {
+        logger.warn(
+          `HTTP log session ${sessionId} not saved: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
     };
   }
 }

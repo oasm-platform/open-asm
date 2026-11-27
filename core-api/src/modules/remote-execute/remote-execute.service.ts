@@ -116,6 +116,8 @@ export class RemoteExecuteService {
     timeoutMs = 60_000,
     onEvent?: ResultEventListener,
     abortSignal?: AbortSignal,
+    /** Runs with the picked worker id before the command is pushed to it. */
+    beforePush?: (workerId: string) => Promise<void>,
   ): Promise<RemoteCommandResult> {
     return this.collectResults(
       sessionId,
@@ -126,6 +128,7 @@ export class RemoteExecuteService {
           workspaceId,
           sessionId,
           command,
+          beforePush,
         ),
       timeoutMs,
       { onEvent, abortSignal },

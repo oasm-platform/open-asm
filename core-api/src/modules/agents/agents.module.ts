@@ -51,6 +51,8 @@ import { AgentSubagent } from './entities/agent-subagent.entity';
 import { AgentToolRule } from './entities/agent-tool-rule.entity';
 import { AgentsGuardService } from './agents.guard';
 import { AgentWorkflowNote } from './entities/agent-workflow-note.entity';
+import { AgentHttpRequestPayload } from './http-requests/agent-http-request-payload.entity';
+import { AgentHttpRequest } from './http-requests/agent-http-request.entity';
 import { HttpModule } from '@nestjs/axios';
 import { VulnerabilityAnalyzerAdapter } from './vulnerability-analyzer.adapter';
 import { IssuesModule } from '../issues/issues.module';
@@ -83,6 +85,8 @@ export const AGENT_FUNCTION_HOSTS = [
       AgentWorkflowNote,
       AgentDefinition,
       AgentToolRule,
+      AgentHttpRequest,
+      AgentHttpRequestPayload,
       Project,
     ]),
     AttackSurfaceQueryModule,

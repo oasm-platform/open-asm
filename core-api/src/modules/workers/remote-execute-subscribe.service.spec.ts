@@ -130,6 +130,60 @@ describe('RemoteExecuteSubscribeService — agent worker scoping', () => {
     expect(qb.execute).not.toHaveBeenCalled();
   });
 
+  describe('beforePush', () => {
+    it('runs with the picked worker before the command reaches it', async () => {
+      const seen = connect(worker('w-own', 'ws-1', WorkerScope.WORKSPACE));
+      conversationRepo.findOne.mockResolvedValue({ id: 'c1', workerId: null });
+      const pushedWhenCalled: number[] = [];
+      const beforePush = jest.fn(async () => {
+        pushedWhenCalled.push(seen.length);
+      });
+
+      await service.pushCommandWithConversation(
+        'c1',
+        'ws-1',
+        's1',
+        'id',
+        beforePush,
+      );
+
+      expect(beforePush).toHaveBeenCalledWith('w-own');
+      expect(pushedWhenCalled).toEqual([0]);
+      expect(seen).toHaveLength(1);
+    });
+
+    it('runs on the no-conversation path too', async () => {
+      const seen = connect(worker('w-own', 'ws-1', WorkerScope.WORKSPACE));
+      const beforePush = jest.fn(async () => {
+        expect(seen).toHaveLength(0);
+      });
+
+      await service.pushCommandWithConversation(
+        '',
+        'ws-1',
+        's1',
+        'id',
+        beforePush,
+      );
+
+      expect(beforePush).toHaveBeenCalledWith('w-own');
+      expect(seen).toHaveLength(1);
+    });
+
+    it('is not called when no worker can take the command', async () => {
+      conversationRepo.findOne.mockResolvedValue({ id: 'c1', workerId: null });
+      const beforePush = jest.fn();
+
+      await expect(
+        service.pushCommandWithConversation('c1', 'ws-1', 's1', 'id', beforePush),
+      ).resolves.toBeNull();
+      await expect(
+        service.pushCommandWithConversation('', 'ws-1', 's2', 'id', beforePush),
+      ).resolves.toBeNull();
+      expect(beforePush).not.toHaveBeenCalled();
+    });
+  });
+
   it('keeps an in-scope offline pin and serves this push from a fallback', async () => {
     connect(worker('w-own', 'ws-1', WorkerScope.WORKSPACE));
     conversationRepo.findOne.mockResolvedValue({
