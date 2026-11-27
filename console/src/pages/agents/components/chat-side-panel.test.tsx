@@ -294,6 +294,24 @@ describe('ChatSidePanel', () => {
     expect(screen.getByText('No stats yet')).toBeInTheDocument();
   });
 
+  it('labels only the selected tab, the others keep theirs for screen readers', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    const label = (name: RegExp) =>
+      screen
+        .getByRole('tab', { name })
+        .querySelector('[data-slot="tab-label"]')!;
+    // Shown once the strip has room; never wrapping, whatever the language
+    expect(label(/Plan/)).toHaveClass('@md/tabs:not-sr-only', 'whitespace-nowrap');
+    expect(label(/Stats/)).toHaveClass('sr-only', 'whitespace-nowrap');
+    expect(label(/Stats/)).not.toHaveClass('@md/tabs:not-sr-only');
+
+    await user.click(screen.getByRole('tab', { name: /Stats/ }));
+    expect(label(/Stats/)).toHaveClass('@md/tabs:not-sr-only');
+    expect(label(/Plan/)).not.toHaveClass('@md/tabs:not-sr-only');
+  });
+
   it('closes from its own button', async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();

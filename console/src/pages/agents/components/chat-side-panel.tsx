@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import type { RemoteExecuteStreamEvent } from '@/hooks/use-remote-execute-stream';
 import { cn } from '@/lib/utils';
 import type {
@@ -17,9 +17,10 @@ import {
   Wrench,
   type LucideIcon,
 } from 'lucide-react';
-import { useMemo, type ReactNode } from 'react';
+import { useMemo } from 'react';
 import { AgentTodoPanel, type AgentTodoItem } from './agent-todo-panel';
 import { AgentWorkflowPanel } from './agent-workflow-panel';
+import { PanelTab, PanelTabStrip } from './panel-tab-strip';
 import { BrowserPanel, type LiveBrowserScreenshot } from './browser-panel';
 import { isSubagentActive, SubagentsPanel } from './subagents-panel';
 import {
@@ -69,11 +70,6 @@ export function sidePanelContent({
     tools: extractToolCalls(messages).length > 0,
     stats: !!(metadata?.model || metadata?.lastTurn),
   };
-}
-
-/** Hidden below xl, where the narrow panel shows only icons and counts */
-function TabLabel({ children }: { children: ReactNode }) {
-  return <span className="sr-only xl:not-sr-only">{children}</span>;
 }
 
 /** Tab badge while something in that tab is still running */
@@ -170,57 +166,56 @@ export function ChatSidePanel({
       className={cn('min-h-0 gap-0', className)}
     >
       {/* Same height as the chat header beside it; the close button sits
-          where the open button was. Below xl the panel is narrow: the tabs
-          show only their icon and count (the label stays for screen
-          readers and the tooltip), and scroll rather than push the button
-          out */}
-      <div className="flex h-14 shrink-0 items-center gap-3 border-b pl-5 pr-4 md:pr-6">
-        <TabsList className="no-scrollbar h-full min-w-0 justify-start gap-4 overflow-x-auto xl:gap-6">
-          <TabsTrigger
+          where the open button was. Tab labels vary a lot by language, so
+          the tabs are icons and counts with only the selected one labelled
+          (see PanelTabStrip) */}
+      <div className="@container/tabs flex h-14 shrink-0 items-center gap-2 border-b pl-4 pr-3 @md/tabs:pl-5 md:pr-6">
+        <PanelTabStrip value={tab} className="gap-3 @xl/tabs:gap-5">
+          <PanelTab
             value="plan"
-            title={t('agents.sidePanel.tabs.plan')}
+            active={tab === 'plan'}
+            icon={ListChecks}
+            label={t('agents.sidePanel.tabs.plan')}
             badge={todos?.length ? `${completed}/${todos.length}` : undefined}
-          >
-            <ListChecks />
-            <TabLabel>{t('agents.sidePanel.tabs.plan')}</TabLabel>
-          </TabsTrigger>
-          <TabsTrigger value="workflow" title={t('agents.sidePanel.tabs.workflow')}>
-            <Workflow />
-            <TabLabel>{t('agents.sidePanel.tabs.workflow')}</TabLabel>
-          </TabsTrigger>
-          <TabsTrigger
+          />
+          <PanelTab
+            value="workflow"
+            active={tab === 'workflow'}
+            icon={Workflow}
+            label={t('agents.sidePanel.tabs.workflow')}
+          />
+          <PanelTab
             value="subagents"
-            title={t('agents.sidePanel.tabs.subagents')}
+            active={tab === 'subagents'}
+            icon={Network}
+            label={t('agents.sidePanel.tabs.subagents')}
             badge={
               subagents.length > 0 ? (running > 0 ? running : subagents.length) : undefined
             }
             badgeClassName={running > 0 ? RUNNING_BADGE : undefined}
-          >
-            <Network />
-            <TabLabel>{t('agents.sidePanel.tabs.subagents')}</TabLabel>
-          </TabsTrigger>
-          <TabsTrigger
+          />
+          <PanelTab
             value="browser"
-            title={t('agents.sidePanel.tabs.browser')}
+            active={tab === 'browser'}
+            icon={Globe}
+            label={t('agents.sidePanel.tabs.browser')}
             badge={browserScreenshots.length > 1 ? browserScreenshots.length : undefined}
-          >
-            <Globe />
-            <TabLabel>{t('agents.sidePanel.tabs.browser')}</TabLabel>
-          </TabsTrigger>
-          <TabsTrigger
+          />
+          <PanelTab
             value="tools"
-            title={t('agents.sidePanel.tabs.tools')}
+            active={tab === 'tools'}
+            icon={Wrench}
+            label={t('agents.sidePanel.tabs.tools')}
             badge={toolCalls.length > 0 ? `${toolCallsDone}/${toolCalls.length}` : undefined}
             badgeClassName={toolCallsRunning > 0 ? RUNNING_BADGE : undefined}
-          >
-            <Wrench />
-            <TabLabel>{t('agents.sidePanel.tabs.tools')}</TabLabel>
-          </TabsTrigger>
-          <TabsTrigger value="stats" title={t('agents.sidePanel.tabs.stats')}>
-            <BarChart3 />
-            <TabLabel>{t('agents.sidePanel.tabs.stats')}</TabLabel>
-          </TabsTrigger>
-        </TabsList>
+          />
+          <PanelTab
+            value="stats"
+            active={tab === 'stats'}
+            icon={BarChart3}
+            label={t('agents.sidePanel.tabs.stats')}
+          />
+        </PanelTabStrip>
         <Button
           variant="ghost"
           size="icon-sm"
