@@ -7387,6 +7387,148 @@ export type UpdateToolRuleDto = {
   description?: UpdateToolRuleDtoDescription;
 };
 
+export type AgentHttpRequestListItemDtoOutcome =
+  (typeof AgentHttpRequestListItemDtoOutcome)[keyof typeof AgentHttpRequestListItemDtoOutcome];
+
+export const AgentHttpRequestListItemDtoOutcome = {
+  allowed: 'allowed',
+  denied: 'denied',
+  upstream_error: 'upstream_error',
+  cancelled: 'cancelled',
+} as const;
+
+export type AgentHttpRequestListItemDto = {
+  id: string;
+  conversationId: string;
+  /** @nullable */
+  conversationTitle: string | null;
+  /** @nullable */
+  toolCallId: string | null;
+  /** Remote-execute session of the command */
+  runId: string;
+  /** @nullable */
+  subagentId: string | null;
+  /** Subagent name, or `main` */
+  agentName: string;
+  /** @nullable */
+  workerId: string | null;
+  scheme: string;
+  /**
+   * Null for a CONNECT tunnel that was not intercepted
+   * @nullable
+   */
+  method: string | null;
+  host: string;
+  port: number;
+  /** @nullable */
+  path: string | null;
+  /** @nullable */
+  statusCode: number | null;
+  outcome: AgentHttpRequestListItemDtoOutcome;
+  /** @nullable */
+  error: string | null;
+  requestBytes: number;
+  responseBytes: number;
+  sentAt: string;
+  completedAt: string;
+  durationMs: number;
+  tlsIntercepted: boolean;
+  createdAt: string;
+};
+
+export type AgentHttpRequestListResponseDto = {
+  data: AgentHttpRequestListItemDto[];
+  /** @nullable */
+  nextCursor: string | null;
+};
+
+export type AgentHttpHeaderDto = {
+  name: string;
+  /** Sensitive values are masked as `***` */
+  value: string;
+};
+
+export type AgentHttpRequestPayloadDto = {
+  requestHeaders: AgentHttpHeaderDto[];
+  responseHeaders: AgentHttpHeaderDto[];
+  /** @nullable */
+  requestBody: string | null;
+  /** @nullable */
+  responseBody: string | null;
+  /**
+   * `base64` for a binary or non-UTF-8 body
+   * @nullable
+   */
+  requestBodyEncoding: string | null;
+  /** @nullable */
+  responseBodyEncoding: string | null;
+  requestBodyTruncated: boolean;
+  responseBodyTruncated: boolean;
+  /** @nullable */
+  contentType: string | null;
+};
+
+export type AgentHttpRequestDetailDtoOutcome =
+  (typeof AgentHttpRequestDetailDtoOutcome)[keyof typeof AgentHttpRequestDetailDtoOutcome];
+
+export const AgentHttpRequestDetailDtoOutcome = {
+  allowed: 'allowed',
+  denied: 'denied',
+  upstream_error: 'upstream_error',
+  cancelled: 'cancelled',
+} as const;
+
+export type AgentHttpRequestDetailDto = {
+  id: string;
+  conversationId: string;
+  /** @nullable */
+  conversationTitle: string | null;
+  /** @nullable */
+  toolCallId: string | null;
+  /** Remote-execute session of the command */
+  runId: string;
+  /** @nullable */
+  subagentId: string | null;
+  /** Subagent name, or `main` */
+  agentName: string;
+  /** @nullable */
+  workerId: string | null;
+  scheme: string;
+  /**
+   * Null for a CONNECT tunnel that was not intercepted
+   * @nullable
+   */
+  method: string | null;
+  host: string;
+  port: number;
+  /** @nullable */
+  path: string | null;
+  /** @nullable */
+  statusCode: number | null;
+  outcome: AgentHttpRequestDetailDtoOutcome;
+  /** @nullable */
+  error: string | null;
+  requestBytes: number;
+  responseBytes: number;
+  sentAt: string;
+  completedAt: string;
+  durationMs: number;
+  tlsIntercepted: boolean;
+  createdAt: string;
+  /**
+   * Null for a CONNECT tunnel with no recorded payload
+   * @nullable
+   */
+  payload: AgentHttpRequestPayloadDto | null;
+  /**
+   * Shell command of the tool call that made the request
+   * @nullable
+   */
+  command: string | null;
+  /** @nullable */
+  messageId: string | null;
+};
+
 export type SchemaFieldDto = {
   name: string;
   type: string;
@@ -8927,6 +9069,67 @@ export type AgentsControllerGetWorkspaceMemoryParams = {
   sortBy?: string;
   sortOrder?: string;
 };
+
+export type AgentHttpRequestsControllerGetHttpRequestsParams = {
+  conversationId?: string;
+  /**
+   * Remote-execute session of the command
+   */
+  runId?: string;
+  /**
+   * Subagent name, or `main`
+   */
+  agentName?: string;
+  subagentId?: string;
+  /**
+   * Host prefix, case-insensitive
+   */
+  host?: string;
+  method?: string;
+  statusClass?: AgentHttpRequestsControllerGetHttpRequestsStatusClass;
+  outcome?: AgentHttpRequestsControllerGetHttpRequestsOutcome;
+  /**
+   * Only requests that were not allowed or got a status >= 400
+   */
+  errorsOnly?: boolean;
+  /**
+   * Sent at or after (ISO date)
+   */
+  from?: string;
+  /**
+   * Sent at or before (ISO date)
+   */
+  to?: string;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  /**
+   * Opaque keyset cursor; page forward with the nextCursor of the previous response
+   */
+  cursor?: string;
+};
+
+export type AgentHttpRequestsControllerGetHttpRequestsStatusClass =
+  (typeof AgentHttpRequestsControllerGetHttpRequestsStatusClass)[keyof typeof AgentHttpRequestsControllerGetHttpRequestsStatusClass];
+
+export const AgentHttpRequestsControllerGetHttpRequestsStatusClass = {
+  '2xx': '2xx',
+  '3xx': '3xx',
+  '4xx': '4xx',
+  '5xx': '5xx',
+} as const;
+
+export type AgentHttpRequestsControllerGetHttpRequestsOutcome =
+  (typeof AgentHttpRequestsControllerGetHttpRequestsOutcome)[keyof typeof AgentHttpRequestsControllerGetHttpRequestsOutcome];
+
+export const AgentHttpRequestsControllerGetHttpRequestsOutcome = {
+  allowed: 'allowed',
+  denied: 'denied',
+  upstream_error: 'upstream_error',
+  cancelled: 'cancelled',
+} as const;
 
 export type ReportsControllerGetManyParams = {
   search?: string;
@@ -58142,6 +58345,361 @@ export const useAgentsControllerDeleteToolRule = <
 };
 
 /**
+ * Keyset-paginated HTTP requests made by the current user's agent commands, newest first
+ * @summary List agent HTTP requests
+ */
+export const agentHttpRequestsControllerGetHttpRequests = (
+  params?: AgentHttpRequestsControllerGetHttpRequestsParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AgentHttpRequestListResponseDto>(
+    { url: `/api/agents/http-requests`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getAgentHttpRequestsControllerGetHttpRequestsQueryKey = (
+  params?: AgentHttpRequestsControllerGetHttpRequestsParams,
+) => {
+  return [`/api/agents/http-requests`, ...(params ? [params] : [])] as const;
+};
+
+export const getAgentHttpRequestsControllerGetHttpRequestsQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>
+  >,
+  TError = unknown,
+>(
+  params?: AgentHttpRequestsControllerGetHttpRequestsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAgentHttpRequestsControllerGetHttpRequestsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>>
+  > = ({ signal }) =>
+    agentHttpRequestsControllerGetHttpRequests(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentHttpRequestsControllerGetHttpRequestsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>>
+>;
+export type AgentHttpRequestsControllerGetHttpRequestsQueryError = unknown;
+
+export function useAgentHttpRequestsControllerGetHttpRequests<
+  TData = Awaited<
+    ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>
+  >,
+  TError = unknown,
+>(
+  params: undefined | AgentHttpRequestsControllerGetHttpRequestsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>
+          >,
+          TError,
+          Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentHttpRequestsControllerGetHttpRequests<
+  TData = Awaited<
+    ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>
+  >,
+  TError = unknown,
+>(
+  params?: AgentHttpRequestsControllerGetHttpRequestsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>
+          >,
+          TError,
+          Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentHttpRequestsControllerGetHttpRequests<
+  TData = Awaited<
+    ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>
+  >,
+  TError = unknown,
+>(
+  params?: AgentHttpRequestsControllerGetHttpRequestsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List agent HTTP requests
+ */
+
+export function useAgentHttpRequestsControllerGetHttpRequests<
+  TData = Awaited<
+    ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>
+  >,
+  TError = unknown,
+>(
+  params?: AgentHttpRequestsControllerGetHttpRequestsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAgentHttpRequestsControllerGetHttpRequestsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * One logged request with its headers, bodies and the command that made it
+ * @summary Get an agent HTTP request
+ */
+export const agentHttpRequestsControllerGetHttpRequest = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AgentHttpRequestDetailDto>(
+    { url: `/api/agents/http-requests/${id}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAgentHttpRequestsControllerGetHttpRequestQueryKey = (
+  id: string,
+) => {
+  return [`/api/agents/http-requests/${id}`] as const;
+};
+
+export const getAgentHttpRequestsControllerGetHttpRequestQueryOptions = <
+  TData = Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAgentHttpRequestsControllerGetHttpRequestQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>
+  > = ({ signal }) =>
+    agentHttpRequestsControllerGetHttpRequest(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentHttpRequestsControllerGetHttpRequestQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>
+>;
+export type AgentHttpRequestsControllerGetHttpRequestQueryError = unknown;
+
+export function useAgentHttpRequestsControllerGetHttpRequest<
+  TData = Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+          TError,
+          Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentHttpRequestsControllerGetHttpRequest<
+  TData = Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+          TError,
+          Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentHttpRequestsControllerGetHttpRequest<
+  TData = Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get an agent HTTP request
+ */
+
+export function useAgentHttpRequestsControllerGetHttpRequest<
+  TData = Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAgentHttpRequestsControllerGetHttpRequestQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
  * Resources, fields, operators and relations the caller may query.
  * @summary Attack surface query schema
  */
@@ -63049,6 +63607,336 @@ export function useEventsControllerStream<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions = getEventsControllerStreamQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Language codes the backend has translations for. The console uses this to offer a language switcher.
+ * @summary List supported languages
+ */
+export const i18nDictionaryControllerGetLanguages = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/i18n/languages`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getI18nDictionaryControllerGetLanguagesQueryKey = () => {
+  return [`/api/i18n/languages`] as const;
+};
+
+export const getI18nDictionaryControllerGetLanguagesQueryOptions = <
+  TData = Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getI18nDictionaryControllerGetLanguagesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>
+  > = ({ signal }) =>
+    i18nDictionaryControllerGetLanguages(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type I18nDictionaryControllerGetLanguagesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>
+>;
+export type I18nDictionaryControllerGetLanguagesQueryError = unknown;
+
+export function useI18nDictionaryControllerGetLanguages<
+  TData = Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+          TError,
+          Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useI18nDictionaryControllerGetLanguages<
+  TData = Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+          TError,
+          Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useI18nDictionaryControllerGetLanguages<
+  TData = Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List supported languages
+ */
+
+export function useI18nDictionaryControllerGetLanguages<
+  TData = Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getI18nDictionaryControllerGetLanguagesQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Merged namespaces from backend memory (same source the API translates with). Missing languages fall back only when the service resolves them; unknown codes give 404.
+ * @summary Get UI dictionary for a language
+ */
+export const i18nDictionaryControllerGetDictionary = (
+  lang: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/i18n/${lang}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getI18nDictionaryControllerGetDictionaryQueryKey = (
+  lang: string,
+) => {
+  return [`/api/i18n/${lang}`] as const;
+};
+
+export const getI18nDictionaryControllerGetDictionaryQueryOptions = <
+  TData = Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+  TError = unknown,
+>(
+  lang: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getI18nDictionaryControllerGetDictionaryQueryKey(lang);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>
+  > = ({ signal }) =>
+    i18nDictionaryControllerGetDictionary(lang, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: lang !== null && lang !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type I18nDictionaryControllerGetDictionaryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>
+>;
+export type I18nDictionaryControllerGetDictionaryQueryError = unknown;
+
+export function useI18nDictionaryControllerGetDictionary<
+  TData = Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+  TError = unknown,
+>(
+  lang: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+          TError,
+          Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useI18nDictionaryControllerGetDictionary<
+  TData = Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+  TError = unknown,
+>(
+  lang: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+          TError,
+          Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useI18nDictionaryControllerGetDictionary<
+  TData = Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+  TError = unknown,
+>(
+  lang: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get UI dictionary for a language
+ */
+
+export function useI18nDictionaryControllerGetDictionary<
+  TData = Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+  TError = unknown,
+>(
+  lang: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getI18nDictionaryControllerGetDictionaryQueryOptions(
+    lang,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
