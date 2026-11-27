@@ -10,7 +10,10 @@ import (
 // RecorderOptions tunes a Recorder; zero values take the defaults.
 type RecorderOptions struct {
 	Capacity, MaxBatch, MaxBatchBytes int
-	Interval                          time.Duration
+	// MaxQueuedBytes bounds the memory of queued and in-flight events:
+	// Capacity alone allows ~1.3 GB of bodies while core-api is down.
+	MaxQueuedBytes int
+	Interval       time.Duration
 	// Send delivers one batch plus the number of events dropped since the
 	// last successful delivery.
 	Send   func(ctx context.Context, batch []HTTPEvent, dropped uint64) error
@@ -21,13 +24,14 @@ type RecorderOptions struct {
 // bounded and Record never blocks, so a slow or unreachable core-api costs
 // dropped log rows (counted and reported) instead of slowing agent traffic.
 type Recorder struct {
-	send     func(ctx context.Context, batch []HTTPEvent, dropped uint64) error
-	logger   Logger
-	maxBatch int
-	maxBytes int
-	interval time.Duration
-	ch       chan HTTPEvent
-	dropped  atomic.Uint64
+	send      func(ctx context.Context, batch []HTTPEvent, dropped uint64) error
+	logger    Logger
+	maxBatch  int
+	maxBytes  int
+	maxQueued int
+	interval  time.Duration
+	ch        chan HTTPEvent
+	dropped   atomic.Uint64
 
 	// Fields rather than constants so tests need not wait out real backoff.
 	retryBase, retryMax, sendTimeout time.Duration
@@ -35,6 +39,7 @@ type Recorder struct {
 
 	mu      sync.Mutex
 	pending map[string]int // session -> queued + in-flight events
+	queued  int            // eventSize of queued + in-flight events
 	settled chan struct{}  // closed and replaced whenever pending shrinks
 }
 
@@ -48,6 +53,9 @@ func NewRecorder(o RecorderOptions) *Recorder {
 	if o.MaxBatchBytes <= 0 {
 		o.MaxBatchBytes = 1 << 20
 	}
+	if o.MaxQueuedBytes <= 0 {
+		o.MaxQueuedBytes = 64 << 20
+	}
 	if o.Interval <= 0 {
 		o.Interval = time.Second
 	}
@@ -56,6 +64,7 @@ func NewRecorder(o RecorderOptions) *Recorder {
 		logger:      o.Logger,
 		maxBatch:    o.MaxBatch,
 		maxBytes:    o.MaxBatchBytes,
+		maxQueued:   o.MaxQueuedBytes,
 		interval:    o.Interval,
 		ch:          make(chan HTTPEvent, o.Capacity),
 		retryBase:   500 * time.Millisecond,
@@ -67,24 +76,32 @@ func NewRecorder(o RecorderOptions) *Recorder {
 	}
 }
 
-// Record queues e without blocking; a full queue drops it.
+// Record queues e without blocking; a full queue or byte budget drops it.
 func (r *Recorder) Record(e HTTPEvent) {
+	size := eventSize(e)
 	// Counted before the send so FlushSession can never miss an event that
 	// is already in the channel.
 	r.mu.Lock()
+	if r.queued+size > r.maxQueued {
+		r.mu.Unlock()
+		r.dropped.Add(1)
+		return
+	}
 	r.pending[e.SessionID]++
+	r.queued += size
 	r.mu.Unlock()
 	select {
 	case r.ch <- e:
 	default:
 		r.dropped.Add(1)
-		r.settle(e.SessionID, 1)
+		r.settle(e.SessionID, 1, size)
 	}
 }
 
-func (r *Recorder) settle(session string, n int) {
+func (r *Recorder) settle(session string, n, size int) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.queued -= size
 	if left := r.pending[session] - n; left > 0 {
 		r.pending[session] = left
 	} else {
@@ -95,12 +112,14 @@ func (r *Recorder) settle(session string, n int) {
 }
 
 func (r *Recorder) settleBatch(batch []HTTPEvent) {
-	counts := make(map[string]int)
+	type tally struct{ n, size int }
+	counts := make(map[string]tally)
 	for _, e := range batch {
-		counts[e.SessionID]++
+		t := counts[e.SessionID]
+		counts[e.SessionID] = tally{t.n + 1, t.size + eventSize(e)}
 	}
-	for s, n := range counts {
-		r.settle(s, n)
+	for s, t := range counts {
+		r.settle(s, t.n, t.size)
 	}
 }
 
@@ -172,7 +191,8 @@ func (r *Recorder) deliver(ctx context.Context, batch []HTTPEvent) {
 		backoff = min(backoff*2, r.retryMax)
 	}
 	r.dropped.Add(dropped + uint64(len(batch)))
-	if r.logger != nil {
+	// A batch carrying only the dropped count loses nothing new.
+	if r.logger != nil && len(batch) > 0 {
 		r.logger.Warning("egress http log batch dropped events=%d err=%v", len(batch), err)
 	}
 }

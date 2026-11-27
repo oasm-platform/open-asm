@@ -91,6 +91,99 @@ func TestRecorderBatchesBySize(t *testing.T) {
 	}
 }
 
+func TestRecorderBatchesByBytes(t *testing.T) {
+	calls := make(chan sendCall, 8)
+	body := make([]byte, 1000)
+	r := NewRecorder(RecorderOptions{
+		MaxBatchBytes: 2 * eventSize(HTTPEvent{ID: "a", SessionID: "s", RequestBody: body}),
+		Interval:      time.Hour,
+		Send: func(_ context.Context, batch []HTTPEvent, dropped uint64) error {
+			calls <- sendCall{batch, dropped}
+			return nil
+		},
+	})
+	for i := range 4 {
+		r.Record(HTTPEvent{ID: string(rune('a' + i)), SessionID: "s", RequestBody: body})
+	}
+	go r.Run(t.Context())
+	for i := range 2 {
+		select {
+		case c := <-calls:
+			if len(c.batch) != 2 {
+				t.Fatalf("batch %d size = %d, want 2", i, len(c.batch))
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatalf("batch %d never sent", i)
+		}
+	}
+}
+
+func TestRecorderDropsOverByteBudget(t *testing.T) {
+	body := make([]byte, 1000)
+	ev := func(id string) HTTPEvent { return HTTPEvent{ID: id, SessionID: "s", RequestBody: body} }
+	entered := make(chan struct{}, 1)
+	release := make(chan struct{})
+	calls := make(chan sendCall, 8)
+	var once sync.Once
+	r := NewRecorder(RecorderOptions{
+		MaxBatch: 1,
+		// Room for two events: the one held by Send and one queued.
+		MaxQueuedBytes: 2*eventSize(ev("e0")) + 10,
+		Interval:       10 * time.Millisecond,
+		Send: func(_ context.Context, batch []HTTPEvent, dropped uint64) error {
+			once.Do(func() {
+				entered <- struct{}{}
+				<-release
+			})
+			calls <- sendCall{batch, dropped}
+			return nil
+		},
+	})
+	go r.Run(t.Context())
+
+	r.Record(ev("e0"))
+	<-entered // e0 is in flight and still counts against the budget.
+	r.Record(ev("e1"))
+	r.Record(ev("e2"))
+	r.Record(ev("e3"))
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	close(release)
+	r.FlushSession(ctx, "s")
+	if ctx.Err() != nil {
+		t.Fatal("FlushSession hung on events dropped over the byte budget")
+	}
+
+	var dropped uint64
+	var ids []string
+	for len(ids) < 2 || dropped < 2 {
+		select {
+		case c := <-calls:
+			dropped += c.dropped
+			for _, e := range c.batch {
+				ids = append(ids, e.ID)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatalf("got ids %v dropped %d", ids, dropped)
+		}
+	}
+	if dropped != 2 || len(ids) != 2 || ids[0] != "e0" || ids[1] != "e1" {
+		t.Fatalf("ids = %v dropped = %d, want [e0 e1] and 2", ids, dropped)
+	}
+
+	// Delivered events release their budget.
+	r.Record(ev("e4"))
+	select {
+	case c := <-calls:
+		if len(c.batch) != 1 || c.batch[0].ID != "e4" {
+			t.Fatalf("after drain got %+v", c)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("budget was not released after delivery")
+	}
+}
+
 func TestRecorderRetriesThenSucceeds(t *testing.T) {
 	var mu sync.Mutex
 	attempts := 0
