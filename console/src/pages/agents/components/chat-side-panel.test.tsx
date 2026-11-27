@@ -9,6 +9,20 @@ import type { RemoteExecuteStreamEvent } from '@/hooks/use-remote-execute-stream
 import type { UIMessage } from 'ai';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('@/hooks/useWorkspaceSelector', () => ({
+  useWorkspaceState: () => ({ state: { selectedWorkspaceId: 'ws-1' } }),
+}));
+
+// The Network tab's request details
+vi.mock('@/services/apis/gen/queries', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/services/apis/gen/queries')>()),
+  useAgentHttpRequestsControllerGetHttpRequest: () => ({
+    data: undefined,
+    isLoading: true,
+    isError: false,
+  }),
+}));
 import type { AgentTodoItem } from './agent-todo-panel';
 import type { LiveBrowserScreenshot } from './browser-panel';
 import type { NetworkData } from './network/network-panel';
@@ -156,9 +170,15 @@ function Harness({
   onSelectToolCall,
   network,
   networkToolCallId,
+  networkResetKey,
+  conversationId,
+  initialTab = 'plan',
 }: {
   network?: NetworkData;
   networkToolCallId?: string;
+  networkResetKey?: number;
+  conversationId?: string;
+  initialTab?: SidePanelTab;
   subagents?: SubagentResponseDto[];
   messages?: UIMessage[];
   remoteExecuteEvents?: Map<string, RemoteExecuteStreamEvent[]>;
@@ -166,7 +186,7 @@ function Harness({
   onClose?: () => void;
   onSelectToolCall?: (id: string) => void;
 }) {
-  const [tab, setTab] = useState<SidePanelTab>('plan');
+  const [tab, setTab] = useState<SidePanelTab>(initialTab);
   return (
     <ChatSidePanel
       tab={tab}
@@ -182,6 +202,8 @@ function Harness({
       browserScreenshots={browserScreenshots}
       network={network}
       networkToolCallId={networkToolCallId}
+      networkResetKey={networkResetKey}
+      conversationId={conversationId}
     />
   );
 }
@@ -407,6 +429,48 @@ describe('ChatSidePanel', () => {
         'button',
       ),
     ).toHaveLength(2);
+  });
+
+  it("a tool card's link shows its requests even over a request's details", async () => {
+    const user = userEvent.setup();
+    const rows = [httpRow('h1', 'k1', 200), httpRow('h2', 'k2', 200)];
+    const props = {
+      messages: [
+        remoteCommand('k1', 'curl https://a.example.com'),
+        remoteCommand('k2', 'curl https://b.example.com'),
+      ],
+      network: fakeNetwork(rows),
+      conversationId: 'conv-1',
+      initialTab: 'network' as const,
+    };
+    const { rerender } = render(<Harness {...props} networkResetKey={0} />);
+
+    await user.click(screen.getByRole('button', { name: /^h1/ }));
+    expect(screen.getByRole('button', { name: 'Back to requests' })).toBeInTheDocument();
+
+    rerender(<Harness {...props} networkToolCallId="k2" networkResetKey={1} />);
+    expect(screen.queryByRole('button', { name: 'Back to requests' })).toBeNull();
+    expect(screen.getByText('Command: curl https://b.example.com')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^h2/ })).toBeInTheDocument();
+  });
+
+  it('starts the Network tab over in another conversation', async () => {
+    const user = userEvent.setup();
+    const props = {
+      network: fakeNetwork([httpRow('h1', 'k1', 200), httpRow('h2', 'k1', 500)]),
+      initialTab: 'network' as const,
+    };
+    const { rerender } = render(<Harness {...props} conversationId="conv-1" />);
+
+    await user.click(screen.getByRole('button', { name: 'Errors' }));
+    await user.type(screen.getByRole('searchbox', { name: 'Filter requests' }), 'h2');
+
+    rerender(<Harness {...props} conversationId="conv-2" />);
+    expect(screen.getByRole('searchbox', { name: 'Filter requests' })).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 
   it('closes from its own button', async () => {

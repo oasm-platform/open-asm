@@ -26,6 +26,7 @@ export function useConversationHttpRequests(
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
   const params = { conversationId, limit: NETWORK_PAGE_SIZE };
+  const enabled = !!selectedWorkspaceId && !!conversationId;
 
   const query = useInfiniteQuery({
     queryKey: [
@@ -42,7 +43,7 @@ export function useConversationHttpRequests(
       ),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    enabled: !!selectedWorkspaceId && !!conversationId,
+    enabled,
     refetchInterval: running && watching ? NETWORK_POLL_MS : false,
     refetchIntervalInBackground: false,
   });
@@ -50,9 +51,9 @@ export function useConversationHttpRequests(
   const { refetch } = query;
   const wasRunning = useRef(running);
   useEffect(() => {
-    if (wasRunning.current && !running && conversationId) void refetch();
+    if (wasRunning.current && !running && enabled) void refetch();
     wasRunning.current = running;
-  }, [running, conversationId, refetch]);
+  }, [running, enabled, refetch]);
 
   const requests = useMemo<AgentHttpRequestListItemDto[]>(
     () => (query.data?.pages.flatMap((page) => page.data) ?? []).reverse(),

@@ -7,8 +7,10 @@ import {
   useConversationHttpRequests,
 } from './use-conversation-http-requests';
 
+const workspace = vi.hoisted(() => ({ id: 'ws-1' as string | null }));
+
 vi.mock('@/hooks/useWorkspaceSelector', () => ({
-  useWorkspaceState: () => ({ state: { selectedWorkspaceId: 'ws-1' } }),
+  useWorkspaceState: () => ({ state: { selectedWorkspaceId: workspace.id } }),
 }));
 
 vi.mock('@/services/apis/gen/queries', async (importOriginal) => ({
@@ -40,6 +42,7 @@ describe('useConversationHttpRequests', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
   });
   afterEach(() => {
+    workspace.id = 'ws-1';
     vi.useRealTimers();
     vi.clearAllMocks();
   });
@@ -96,6 +99,18 @@ describe('useConversationHttpRequests', () => {
       wrapper,
     });
     await act(() => vi.advanceTimersByTimeAsync(NETWORK_POLL_MS * 2));
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it('does not reload at the end of a run without a workspace', async () => {
+    workspace.id = null;
+    const fn = await fetcher();
+    const { rerender } = renderHook(
+      ({ running }) => useConversationHttpRequests('c1', { running }),
+      { wrapper, initialProps: { running: true } },
+    );
+    rerender({ running: false });
+    await act(() => vi.advanceTimersByTimeAsync(NETWORK_POLL_MS));
     expect(fn).not.toHaveBeenCalled();
   });
 });

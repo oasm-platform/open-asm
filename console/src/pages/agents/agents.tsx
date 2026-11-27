@@ -153,9 +153,12 @@ export default function AgentsChatPage() {
       setNetworkFilter(toolCallId ? { conversationId, toolCallId } : null),
     [conversationId],
   );
+  // Each link opens the list afresh, even over a request's details
+  const [networkOpens, setNetworkOpens] = useState(0);
   const openNetwork = useCallback(
     (toolCallId: string) => {
       setNetworkToolCallId(toolCallId);
+      setNetworkOpens((n) => n + 1);
       setPanelTab('network');
       if (isLargeScreen) setPanel(true);
       else setSheetOpen(true);
@@ -201,6 +204,7 @@ export default function AgentsChatPage() {
       network={network}
       networkToolCallId={networkToolCallId}
       onNetworkToolCallChange={setNetworkToolCallId}
+      networkResetKey={networkOpens}
       className="flex-1"
     />
   );

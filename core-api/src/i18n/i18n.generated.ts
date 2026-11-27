@@ -430,6 +430,8 @@ export type I18nTranslations = {
         "network.emptyHint": string;
         "network.emptyFiltered": string;
         "network.showRequests": string;
+        "network.linkLabel": string;
+        "network.linkLabelFailed": string;
         "network.detail.back": string;
         "network.detail.sections": string;
         "network.detail.headers": string;
@@ -445,7 +447,6 @@ export type I18nTranslations = {
         "network.detail.remote": string;
         "network.detail.agent": string;
         "network.detail.worker": string;
-        "network.detail.command": string;
         "network.detail.showInChat": string;
         "network.detail.requestHeaders": string;
         "network.detail.responseHeaders": string;

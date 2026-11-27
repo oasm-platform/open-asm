@@ -41,15 +41,24 @@ function useScrollableStrip(value: string | undefined) {
     el.addEventListener('scroll', update, { passive: true });
     const resize =
       typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
-    // The tabs too: a label or count can outgrow the strip without
-    // resizing it
-    resize?.observe(el);
-    el.querySelectorAll('[data-slot="tabs-trigger"]').forEach((tab) =>
-      resize?.observe(tab),
-    );
+    // The tabs too, including ones added later: a label or count can
+    // outgrow the strip without resizing it
+    const watchTabs = () => {
+      resize?.observe(el);
+      el.querySelectorAll('[data-slot="tabs-trigger"]').forEach((tab) =>
+        resize?.observe(tab),
+      );
+    };
+    watchTabs();
+    const added = new MutationObserver(() => {
+      watchTabs();
+      update();
+    });
+    added.observe(el, { childList: true, subtree: true });
     return () => {
       el.removeEventListener('scroll', update);
       resize?.disconnect();
+      added.disconnect();
     };
   }, [update]);
 

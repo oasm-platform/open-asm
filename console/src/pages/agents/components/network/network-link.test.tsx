@@ -29,10 +29,17 @@ describe('NetworkLinkButton', () => {
     render(<Harness open={open} toolCallId="k1" />);
 
     const button = screen.getByRole('button', {
-      name: 'Show HTTP requests of this command (2)',
+      name: 'Network: 2 requests, 1 failed',
     });
     await userEvent.click(button);
     expect(open).toHaveBeenCalledWith('k1');
+  });
+
+  it('announces only the count when nothing failed', () => {
+    render(<Harness open={vi.fn()} toolCallId="k2" />);
+    expect(
+      screen.getByRole('button', { name: 'Network: 1 requests' }),
+    ).toBeInTheDocument();
   });
 
   it('is absent for a command with no logged requests, or outside a conversation', () => {

@@ -140,6 +140,8 @@ interface ChatSidePanelProps extends SidePanelData {
   /** The Network tab shows only this tool call's requests */
   networkToolCallId?: string | null;
   onNetworkToolCallChange?: (toolCallId: string | null) => void;
+  /** A change starts the Network tab over: its list, unfiltered by text */
+  networkResetKey?: number;
   className?: string;
 }
 
@@ -164,6 +166,7 @@ export function ChatSidePanel({
   network,
   networkToolCallId,
   onNetworkToolCallChange,
+  networkResetKey = 0,
   className,
 }: ChatSidePanelProps) {
   const t = useT();
@@ -378,7 +381,9 @@ export function ChatSidePanel({
         className="flex min-h-0 flex-col animate-in fade-in-0 duration-200"
       >
         {network ? (
+          // Nothing carries over to another conversation or a tool card's link
           <NetworkPanel
+            key={`${conversationId ?? ''}:${networkResetKey}`}
             network={network}
             toolCallFilter={networkFilter}
             onClearToolCallFilter={() => onNetworkToolCallChange?.(null)}

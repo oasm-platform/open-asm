@@ -49,7 +49,14 @@ export function NetworkLinkButton({ toolCallId }: { toolCallId: string }) {
       variant="ghost"
       size="sm"
       className="h-7 gap-1 px-1.5 font-mono text-xs text-zinc-400 tabular-nums hover:bg-zinc-800 hover:text-zinc-100"
-      aria-label={`${label} (${counts.total})`}
+      aria-label={
+        counts.errors > 0
+          ? t('agents.network.linkLabelFailed', {
+              count: counts.total,
+              failed: counts.errors,
+            })
+          : t('agents.network.linkLabel', { count: counts.total })
+      }
       title={label}
       onClick={() => link.open(toolCallId)}
     >
