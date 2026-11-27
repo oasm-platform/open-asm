@@ -3,45 +3,44 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useT } from '@/lib/i18n-dictionary';
 import { useWorkersControllerRemoveWorker } from '@/services/apis/gen/queries';
 import { useNavigate } from '@tanstack/react-router';
-import { Trash2 } from 'lucide-react';
+import { Unplug } from 'lucide-react';
 import { toast } from 'sonner';
 
 /**
- * Removes a workspace worker after a confirmation, which revokes its token,
+ * Disconnects a workspace worker after a confirmation, which revokes its token,
  * then returns to the worker list.
  */
-export function RemoveWorkerButton({ workerId }: { workerId: string }) {
+export function DisconnectWorkerButton({ workerId }: { workerId: string }) {
   const t = useT();
   const navigate = useNavigate();
 
   const removeWorker = useWorkersControllerRemoveWorker({
     mutation: {
       onSuccess: () => {
-        toast.success(t('workers.remove.success'));
+        toast.success(t('workers.disconnect.success'));
         void navigate({ to: '/workers' });
       },
       onError: () => {
-        toast.error(t('workers.remove.failed'));
+        toast.error(t('workers.disconnect.failed'));
       },
     },
   });
 
   return (
     <ConfirmDialog
-      title={t('workers.remove.title')}
-      description={t('workers.remove.description')}
-      confirmText={t('common.remove')}
+      title={t('workers.disconnect.title')}
+      description={t('workers.disconnect.description')}
+      confirmText={t('workers.disconnect.confirm')}
       disabled={removeWorker.isPending}
       onConfirm={() => removeWorker.mutate({ id: workerId })}
       trigger={
         <Button
-          variant="ghost"
-          size="icon"
-          className="shrink-0 text-red-600 hover:text-red-800"
-          aria-label={t('workers.remove.action')}
-          title={t('workers.remove.action')}
+          variant="outline"
+          className="text-destructive"
+          disabled={removeWorker.isPending}
         >
-          <Trash2 className="size-4" />
+          <Unplug className="size-4" />
+          {t('workers.disconnect.action')}
         </Button>
       }
     />
