@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -15,6 +16,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 func TestNewEventIDIsUUIDv7(t *testing.T) {
@@ -378,4 +380,42 @@ func TestConnectorTokenDoesNotRecord(t *testing.T) {
 	}
 	resp.Body.Close()
 	sink.none(t)
+}
+
+// Ingest drops or cuts oversize fields anyway; capping on the worker keeps
+// one huge request from pushing a batch past the gRPC message limit.
+func TestMaskHeadersCaps(t *testing.T) {
+	h := http.Header{}
+	for i := range 150 {
+		h.Set(fmt.Sprintf("X-H-%03d", i), "v")
+	}
+	if got := MaskHeaders(h); len(got) != maxHeaders {
+		t.Fatalf("headers = %d, want %d", len(got), maxHeaders)
+	}
+
+	long := http.Header{strings.Repeat("N", 300): {strings.Repeat("v", 9000)}}
+	got := MaskHeaders(long)
+	if len(got) != 1 || len(got[0].Name) != maxHeaderName || len(got[0].Value) != maxHeaderValue {
+		t.Fatalf("got name=%d value=%d", len(got[0].Name), len(got[0].Value))
+	}
+
+	// A cut never splits a rune: proto3 strings must stay valid UTF-8.
+	multi := http.Header{"X-U": {strings.Repeat("é", maxHeaderValue)}}
+	v := MaskHeaders(multi)[0].Value
+	if !utf8.ValidString(v) || len(v) > maxHeaderValue {
+		t.Fatalf("cut value len=%d valid=%v", len(v), utf8.ValidString(v))
+	}
+}
+
+func TestEventDoneCapsPathAndError(t *testing.T) {
+	r := NewRecorder(RecorderOptions{})
+	ev := &eventRec{rec: r}
+	ev.SessionID = "s"
+	ev.Path = "/" + strings.Repeat("p", 10000)
+	ev.fail(errors.New(strings.Repeat("e", 1000)))
+	ev.done()
+	got := <-r.ch
+	if len(got.Path) != maxPath || len(got.Error) != maxError {
+		t.Fatalf("path=%d error=%d", len(got.Path), len(got.Error))
+	}
 }

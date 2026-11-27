@@ -95,3 +95,19 @@ func TestReportEgressHttpLogsReturnsError(t *testing.T) {
 		t.Fatal("an Unimplemented server must surface as an error so the recorder retries")
 	}
 }
+
+func TestEgressOutcomeToPb(t *testing.T) {
+	cases := map[egress.Outcome]workers.EgressHttpOutcome{
+		egress.OutcomeAllowed:       workers.EgressHttpOutcome_EGRESS_HTTP_OUTCOME_ALLOWED,
+		egress.OutcomeDenied:        workers.EgressHttpOutcome_EGRESS_HTTP_OUTCOME_DENIED,
+		egress.OutcomeUpstreamError: workers.EgressHttpOutcome_EGRESS_HTTP_OUTCOME_UPSTREAM_ERROR,
+		egress.OutcomeCancelled:     workers.EgressHttpOutcome_EGRESS_HTTP_OUTCOME_CANCELLED,
+		egress.Outcome(0):           workers.EgressHttpOutcome_EGRESS_HTTP_OUTCOME_UNSPECIFIED,
+		egress.Outcome(99):          workers.EgressHttpOutcome_EGRESS_HTTP_OUTCOME_UNSPECIFIED,
+	}
+	for in, want := range cases {
+		if got := egressLogToPb(egress.HTTPEvent{Outcome: in}).GetOutcome(); got != want {
+			t.Errorf("outcome %d -> %v, want %v", in, got, want)
+		}
+	}
+}

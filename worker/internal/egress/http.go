@@ -192,6 +192,8 @@ func (ev *eventRec) done() {
 		ev.Outcome = OutcomeAllowed
 	}
 	ev.CompletedAt = time.Now()
+	ev.Path = cut(ev.Path, maxPath)
+	ev.Error = cut(ev.Error, maxError)
 	ev.rec.Record(ev.HTTPEvent)
 }
 

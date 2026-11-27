@@ -3,7 +3,9 @@ package egress
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -309,5 +311,140 @@ func TestRecorderFlushSession(t *testing.T) {
 	failing.FlushSession(short, "s2")
 	if d := time.Since(start); d < 90*time.Millisecond || d > 2*time.Second {
 		t.Fatalf("FlushSession with failing Send returned after %v, want ~100ms", d)
+	}
+}
+
+type warnLog struct {
+	mu    sync.Mutex
+	warns []string
+}
+
+func (l *warnLog) Info(string, ...any) {}
+func (l *warnLog) Warning(msg string, args ...any) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.warns = append(l.warns, fmt.Sprintf(msg, args...))
+}
+
+func (l *warnLog) count() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return len(l.warns)
+}
+
+func TestRecorderPermanentErrorDropsWithoutRetry(t *testing.T) {
+	var attempts atomic.Int32
+	r := NewRecorder(RecorderOptions{
+		Interval: time.Hour,
+		Send: func(context.Context, []HTTPEvent, uint64) error {
+			attempts.Add(1)
+			return Permanent(errors.New("permission denied"))
+		},
+	})
+	go r.Run(t.Context())
+	r.Record(HTTPEvent{ID: "a", SessionID: "s"})
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	start := time.Now()
+	r.FlushSession(ctx, "s")
+	// The default 500 ms backoff would show here had it retried.
+	if d := time.Since(start); d > 300*time.Millisecond {
+		t.Fatalf("FlushSession took %v on a permanent error", d)
+	}
+	if n := attempts.Load(); n != 1 {
+		t.Fatalf("send attempts = %d, want 1", n)
+	}
+	if n := r.dropped.Load(); n != 1 {
+		t.Fatalf("dropped = %d, want 1", n)
+	}
+}
+
+func TestRecorderUnsupportedPausesRecording(t *testing.T) {
+	var mu sync.Mutex
+	now := time.Date(2026, 11, 27, 10, 0, 0, 0, time.UTC)
+	unsupported := true
+	var attempts atomic.Int32
+	sent := make(chan sendCall, 4)
+	log := &warnLog{}
+	r := NewRecorder(RecorderOptions{
+		Interval: time.Hour,
+		Logger:   log,
+		Send: func(_ context.Context, batch []HTTPEvent, dropped uint64) error {
+			attempts.Add(1)
+			mu.Lock()
+			defer mu.Unlock()
+			if unsupported {
+				return Unsupported(errors.New("unimplemented"))
+			}
+			sent <- sendCall{batch, dropped}
+			return nil
+		},
+	})
+	r.now = func() time.Time {
+		mu.Lock()
+		defer mu.Unlock()
+		return now
+	}
+	go r.Run(t.Context())
+
+	r.Record(HTTPEvent{ID: "a", SessionID: "s"})
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	r.FlushSession(ctx, "s")
+	if ctx.Err() != nil {
+		t.Fatal("FlushSession hung on an unsupported endpoint")
+	}
+
+	// Paused: nothing queues, so the flush wait is free.
+	for _, id := range []string{"b", "c", "d"} {
+		r.Record(HTTPEvent{ID: id, SessionID: "s"})
+		r.mu.Lock()
+		n := r.pending["s"]
+		r.mu.Unlock()
+		if n != 0 {
+			t.Fatalf("event %s queued while paused", id)
+		}
+		start := time.Now()
+		r.FlushSession(ctx, "s")
+		if d := time.Since(start); d > 50*time.Millisecond {
+			t.Fatalf("FlushSession while paused took %v", d)
+		}
+	}
+	if n := attempts.Load(); n != 1 {
+		t.Fatalf("send attempts = %d, want 1", n)
+	}
+	if n := log.count(); n != 1 {
+		t.Fatalf("warnings = %v, want exactly one", log.warns)
+	}
+
+	mu.Lock()
+	now = now.Add(10*time.Minute + time.Second)
+	unsupported = false
+	mu.Unlock()
+	r.Record(HTTPEvent{ID: "e", SessionID: "s"})
+	r.FlushSession(ctx, "s")
+	select {
+	case c := <-sent:
+		if len(c.batch) != 1 || c.batch[0].ID != "e" || c.dropped != 4 {
+			t.Fatalf("after cooldown got ids=%d dropped=%d", len(c.batch), c.dropped)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("recording did not resume after the cooldown")
+	}
+}
+
+func TestRecorderFlushSessionDoesNotWaitForTick(t *testing.T) {
+	r := NewRecorder(RecorderOptions{
+		Interval: time.Hour,
+		Send:     func(context.Context, []HTTPEvent, uint64) error { return nil },
+	})
+	go r.Run(t.Context())
+	r.Record(HTTPEvent{ID: "a", SessionID: "s"})
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	start := time.Now()
+	r.FlushSession(ctx, "s")
+	if d := time.Since(start); d > 500*time.Millisecond {
+		t.Fatalf("FlushSession took %v, want an immediate flush", d)
 	}
 }

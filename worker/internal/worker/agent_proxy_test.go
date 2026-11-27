@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"oasm-worker/internal/egress"
 	workers "oasm-worker/internal/gen/workers"
 )
@@ -250,5 +252,61 @@ func TestEgressRecorderWarnsOnRejectedWithoutRetry(t *testing.T) {
 	defer log.mu.Unlock()
 	if len(log.warns) != 1 || !strings.Contains(log.warns[0], "rejected 1 of 2") {
 		t.Fatalf("warnings = %v", log.warns)
+	}
+}
+
+type errLogReporter struct {
+	calls atomic.Int32
+	err   error
+}
+
+func (f *errLogReporter) ReportEgressHttpLogs(context.Context, []egress.HTTPEvent, uint64) (*workers.EgressHttpLogAck, error) {
+	f.calls.Add(1)
+	return nil, f.err
+}
+
+// Resending cannot fix these, and an older core-api without the RPC must not
+// cost every command the full flush wait.
+func TestEgressRecorderPermanentCodesSendOnce(t *testing.T) {
+	for _, code := range []codes.Code{codes.Unimplemented, codes.PermissionDenied, codes.Unauthenticated, codes.InvalidArgument} {
+		t.Run(code.String(), func(t *testing.T) {
+			client := &errLogReporter{err: fmt.Errorf("report egress http logs: %w", status.Error(code, "no"))}
+			log := &warnCapture{}
+			rec := newEgressRecorder(client, log)
+			go rec.Run(t.Context())
+
+			rec.Record(egress.HTTPEvent{ID: "a", SessionID: "s"})
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			start := time.Now()
+			rec.FlushSession(ctx, "s")
+			if d := time.Since(start); d > 300*time.Millisecond {
+				t.Fatalf("FlushSession took %v", d)
+			}
+			if n := client.calls.Load(); n != 1 {
+				t.Fatalf("send calls = %d, want 1", n)
+			}
+			log.mu.Lock()
+			defer log.mu.Unlock()
+			if code == codes.Unimplemented && (len(log.warns) != 1 || !strings.Contains(log.warns[0], "paused for 10m")) {
+				t.Fatalf("warnings = %v", log.warns)
+			}
+		})
+	}
+}
+
+func TestEgressRecorderRetriesTransientCodes(t *testing.T) {
+	client := &errLogReporter{err: status.Error(codes.Unavailable, "down")}
+	rec := newEgressRecorder(client, &warnCapture{})
+	go rec.Run(t.Context())
+	rec.Record(egress.HTTPEvent{ID: "a", SessionID: "s"})
+	ctx, cancel := context.WithTimeout(t.Context(), 800*time.Millisecond)
+	defer cancel()
+	rec.FlushSession(ctx, "s")
+	if ctx.Err() == nil {
+		t.Fatal("an unavailable core-api must be retried, not dropped at once")
+	}
+	if n := client.calls.Load(); n < 2 {
+		t.Fatalf("send calls = %d, want a retry", n)
 	}
 }

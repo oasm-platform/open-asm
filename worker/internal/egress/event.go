@@ -10,9 +10,9 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
-// Outcome values match the proto enum numbers so the gRPC layer can cast.
 type Outcome int
 
 const (
@@ -26,6 +26,28 @@ const (
 const BodyCap = 64 * 1024
 
 const masked = "***"
+
+// Field caps mirror what core-api ingest keeps, so an oversize request cannot
+// push a batch past the gRPC message limit only to be cut there anyway.
+const (
+	maxHeaders     = 100
+	maxHeaderName  = 256
+	maxHeaderValue = 8 * 1024
+	maxPath        = 8 * 1024
+	maxError       = 500
+)
+
+// cut shortens s to at most n bytes without splitting a rune: proto3 string
+// fields must be valid UTF-8 or the whole batch fails to marshal.
+func cut(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return s[:n]
+}
 
 type Header struct{ Name, Value string }
 
@@ -82,7 +104,8 @@ func sensitiveHeader(name string) bool {
 }
 
 // MaskHeaders flattens h with credential-bearing values replaced, sorted by
-// name so stored rows are stable regardless of map iteration order.
+// name so stored rows are stable regardless of map iteration order, and
+// capped to the ingest limits.
 func MaskHeaders(h http.Header) []Header {
 	names := make([]string, 0, len(h))
 	for k := range h {
@@ -92,11 +115,15 @@ func MaskHeaders(h http.Header) []Header {
 	var out []Header
 	for _, k := range names {
 		mask := sensitiveHeader(k)
+		name := cut(k, maxHeaderName)
 		for _, v := range h[k] {
+			if len(out) == maxHeaders {
+				return out
+			}
 			if mask {
 				v = masked
 			}
-			out = append(out, Header{Name: k, Value: v})
+			out = append(out, Header{Name: name, Value: cut(v, maxHeaderValue)})
 		}
 	}
 	return out

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"oasm-worker/internal/egress"
 	workers "oasm-worker/internal/gen/workers"
 )
@@ -36,7 +38,7 @@ func newEgressRecorder(client egressLogReporter, log egress.Logger) *egress.Reco
 		Send: func(ctx context.Context, batch []egress.HTTPEvent, dropped uint64) error {
 			ack, err := client.ReportEgressHttpLogs(ctx, batch, dropped)
 			if err != nil {
-				return err
+				return classifyReportErr(err)
 			}
 			if ack.GetRejected() > 0 {
 				log.Warning("core-api rejected %d of %d agent http log rows", ack.GetRejected(), len(batch))
@@ -44,6 +46,17 @@ func newEgressRecorder(client egressLogReporter, log egress.Logger) *egress.Reco
 			return nil
 		},
 	})
+}
+
+// classifyReportErr tells the recorder which failures a resend cannot fix.
+func classifyReportErr(err error) error {
+	switch status.Code(err) {
+	case codes.Unimplemented:
+		return egress.Unsupported(err)
+	case codes.PermissionDenied, codes.Unauthenticated, codes.InvalidArgument:
+		return egress.Permanent(err)
+	}
+	return err
 }
 
 // flushWait bounds how long EXIT waits for a command's request logs: logging
