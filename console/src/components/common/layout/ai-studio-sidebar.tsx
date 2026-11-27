@@ -11,7 +11,6 @@ import {
   FolderKanban,
   Loader2,
   MoreHorizontal,
-  Network,
   Pencil,
   Plug,
   Settings,
@@ -325,24 +324,6 @@ export function AiStudioSidebar() {
                   <BarChart3 />
                   <span className="truncate">
                     {t('shell.aiStudio.usage')}
-                  </span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild
-                isActive={pathname === '/aistudio/http-requests'}
-                tooltip={t('shell.aiStudio.httpRequests')}
-                className={sidebarItemClassName}
-              >
-                <Link
-                  to="/aistudio/http-requests"
-                  onClick={() => setOpenMobile(false)}
-                >
-                  <Network />
-                  <span className="truncate">
-                    {t('shell.aiStudio.httpRequests')}
                   </span>
                 </Link>
               </SidebarMenuButton>

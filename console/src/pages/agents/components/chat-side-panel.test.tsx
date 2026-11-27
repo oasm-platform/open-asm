@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type {
+  AgentHttpRequestListItemDto,
   ConversationMetadataDto,
   SubagentResponseDto,
 } from '@/services/apis/gen/queries';
@@ -10,6 +11,7 @@ import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { AgentTodoItem } from './agent-todo-panel';
 import type { LiveBrowserScreenshot } from './browser-panel';
+import type { NetworkData } from './network/network-panel';
 import {
   ChatSidePanel,
   sidePanelContent,
@@ -80,6 +82,64 @@ const browserCommand = (
   ],
 });
 
+const remoteCommand = (toolCallId: string, command: string): UIMessage => ({
+  id: `m-${toolCallId}`,
+  role: 'assistant',
+  parts: [
+    {
+      type: 'dynamic-tool',
+      toolName: 'execute_remote_command',
+      toolCallId,
+      state: 'output-available',
+      input: { command },
+      output: { stdout: '' },
+    },
+  ],
+});
+
+const httpRow = (
+  id: string,
+  toolCallId: string,
+  statusCode: number,
+): AgentHttpRequestListItemDto => ({
+  id,
+  conversationId: 'conv-1',
+  conversationTitle: null,
+  toolCallId,
+  runId: 'run-1',
+  subagentId: null,
+  agentName: 'main',
+  workerId: null,
+  scheme: 'https',
+  method: 'GET',
+  host: 'api.example.com',
+  port: 443,
+  path: `/${id}`,
+  statusCode,
+  outcome: 'allowed',
+  error: null,
+  requestBytes: 0,
+  responseBytes: 10,
+  sentAt: '2026-11-27T10:00:00.000Z',
+  completedAt: '2026-11-27T10:00:00.100Z',
+  durationMs: 100,
+  tlsIntercepted: false,
+  createdAt: '2026-11-27T10:00:00.100Z',
+});
+
+const fakeNetwork = (requests: AgentHttpRequestListItemDto[]) =>
+  ({
+    requests,
+    data: { pages: [{ data: requests, nextCursor: null }], pageParams: [] },
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    hasNextPage: false,
+    isFetchingNextPage: false,
+    fetchNextPage: vi.fn(),
+    refetch: vi.fn(),
+  }) as unknown as NetworkData;
+
 const liveShot: LiveBrowserScreenshot = {
   toolCallId: 'b2',
   command: 'browser -s b-1 click @e3',
@@ -94,7 +154,11 @@ function Harness({
   browserScreenshots,
   onClose = () => {},
   onSelectToolCall,
+  network,
+  networkToolCallId,
 }: {
+  network?: NetworkData;
+  networkToolCallId?: string;
   subagents?: SubagentResponseDto[];
   messages?: UIMessage[];
   remoteExecuteEvents?: Map<string, RemoteExecuteStreamEvent[]>;
@@ -116,6 +180,8 @@ function Harness({
       onSelectToolCall={onSelectToolCall}
       remoteExecuteEvents={remoteExecuteEvents}
       browserScreenshots={browserScreenshots}
+      network={network}
+      networkToolCallId={networkToolCallId}
     />
   );
 }
@@ -312,6 +378,37 @@ describe('ChatSidePanel', () => {
     expect(label(/Plan/)).not.toHaveClass('@md/tabs:not-sr-only');
   });
 
+  it('counts the HTTP requests on the Network tab, and flags failures', async () => {
+    const user = userEvent.setup();
+    const rows = [
+      httpRow('h1', 'k1', 200),
+      httpRow('h2', 'k1', 503),
+      httpRow('h3', 'k2', 200),
+    ];
+    render(
+      <Harness
+        messages={[remoteCommand('k1', 'curl -s https://api.example.com')]}
+        network={fakeNetwork(rows)}
+        networkToolCallId="k1"
+      />,
+    );
+
+    const tab = screen.getByRole('tab', { name: /Network/ });
+    expect(tab).toHaveTextContent('3');
+    expect(tab).toHaveAccessibleName(/Errors: 1/);
+
+    await user.click(tab);
+    // Filtered to the picked command, named by it
+    expect(
+      screen.getByText('Command: curl -s https://api.example.com'),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('list', { name: 'HTTP requests' })).getAllByRole(
+        'button',
+      ),
+    ).toHaveLength(2);
+  });
+
   it('closes from its own button', async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
@@ -333,6 +430,7 @@ describe('sidePanelContent', () => {
       subagents: false,
       browser: false,
       tools: false,
+      network: false,
       stats: false,
     });
     expect(
@@ -342,6 +440,7 @@ describe('sidePanelContent', () => {
         messages: toolMessages,
         metadata,
         browserScreenshots: [liveShot],
+        httpRequestCount: 2,
       }),
     ).toEqual({
       plan: false,
@@ -349,6 +448,7 @@ describe('sidePanelContent', () => {
       subagents: true,
       browser: true,
       tools: true,
+      network: true,
       stats: true,
     });
   });

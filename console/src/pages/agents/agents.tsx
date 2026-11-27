@@ -26,6 +26,11 @@ import {
   useSidePanelWidth,
   type PanelLimits,
 } from '@/components/ui/side-panel-resizer';
+import {
+  NetworkLinkProvider,
+  useNetworkLink,
+} from './components/network/network-link';
+import { useConversationHttpRequests } from './components/network/use-conversation-http-requests';
 import { isSubagentActive } from './components/subagents-panel';
 import { useMediaQuery } from './components/use-media-query';
 import { useT } from '@/lib/i18n-dictionary';
@@ -126,6 +131,39 @@ export default function AgentsChatPage() {
     setTimeout(() => setSelectedToolCallId(null), 2500);
   }, []);
 
+  // The Network tab polls only while it is on screen; the tool cards' links
+  // use whatever it loaded last
+  const networkOnScreen =
+    panelTab === 'network' && (isLargeScreen ? panelOpen : sheetOpen);
+  const network = useConversationHttpRequests(conversationId, {
+    running: isStreaming,
+    watching: networkOnScreen,
+  });
+  // Kept with its conversation, so another chat opens unfiltered
+  const [networkFilter, setNetworkFilter] = useState<{
+    conversationId?: string;
+    toolCallId: string;
+  } | null>(null);
+  const networkToolCallId =
+    networkFilter && networkFilter.conversationId === conversationId
+      ? networkFilter.toolCallId
+      : null;
+  const setNetworkToolCallId = useCallback(
+    (toolCallId: string | null) =>
+      setNetworkFilter(toolCallId ? { conversationId, toolCallId } : null),
+    [conversationId],
+  );
+  const openNetwork = useCallback(
+    (toolCallId: string) => {
+      setNetworkToolCallId(toolCallId);
+      setPanelTab('network');
+      if (isLargeScreen) setPanel(true);
+      else setSheetOpen(true);
+    },
+    [isLargeScreen, setPanel, setNetworkToolCallId],
+  );
+  const networkLink = useNetworkLink(network.requests, openNetwork);
+
   const handleOpenPanel = () => {
     // Open on a tab that has something to show (checked on click only: it
     // walks every message)
@@ -136,6 +174,7 @@ export default function AgentsChatPage() {
       messages,
       metadata: conversationMeta,
       browserScreenshots,
+      httpRequestCount: network.requests.length,
     });
     if (!panelContent[panelTab]) {
       const firstWithContent = SIDE_PANEL_TABS.find((t) => panelContent[t]);
@@ -159,6 +198,9 @@ export default function AgentsChatPage() {
       onSelectToolCall={handleSelectToolCall}
       remoteExecuteEvents={remoteExecuteEvents}
       browserScreenshots={browserScreenshots}
+      network={network}
+      networkToolCallId={networkToolCallId}
+      onNetworkToolCallChange={setNetworkToolCallId}
       className="flex-1"
     />
   );
@@ -185,52 +227,54 @@ export default function AgentsChatPage() {
             hasActivity={subagents.some(isSubagentActive)}
             agentMode={agentMode}
           />
-          <ChatConversation
-            messages={messages}
-            onSendMessage={onSendMessage}
-            onRetry={onRetry}
-            onStop={onStop}
-            isStreaming={isStreaming}
-            isLoadingMessages={isLoadingHistory}
-            streamError={streamError}
-            isRetrying={isRetrying}
-            retryAttempt={retryAttempt}
-            onDismissError={onDismissError}
-            selectedConfigId={selectedModel?.configId ?? null}
-            selectedModel={selectedModel?.model ?? null}
-            onSelectModel={onSelectModel}
-            hasSentFirstMessage={hasSentFirstMessage}
-            onLoadMore={onLoadMore}
-            hasMoreMessages={hasMoreMessages}
-            isLoadingMoreMessages={isLoadingMoreMessages}
-            agentMode={agentMode}
-            selectedWorkerId={selectedWorkerId}
-            onWorkerSelect={onWorkerSelect}
-            project={project}
-            todos={todos}
-            goal={goal}
-            // Large screens and mobile keep the plan in the side panel
-            // only; in between it also sits above the input
-            showTodoAboveInput={!isMobile && !isLargeScreen}
-            selectedToolCallId={selectedToolCallId}
-            remoteExecuteEvents={remoteExecuteEvents}
-            approvalPrompt={
-              pendingApproval && (
-                <CommandApprovalPrompt
-                  key={pendingApproval.approvalId}
-                  approval={pendingApproval}
-                  queueSize={pendingApprovalCount}
-                  isSubmitting={isDecidingApproval}
-                  onDecide={onDecideApproval}
-                />
-              )
-            }
-          />
+          <NetworkLinkProvider value={networkLink}>
+            <ChatConversation
+              messages={messages}
+              onSendMessage={onSendMessage}
+              onRetry={onRetry}
+              onStop={onStop}
+              isStreaming={isStreaming}
+              isLoadingMessages={isLoadingHistory}
+              streamError={streamError}
+              isRetrying={isRetrying}
+              retryAttempt={retryAttempt}
+              onDismissError={onDismissError}
+              selectedConfigId={selectedModel?.configId ?? null}
+              selectedModel={selectedModel?.model ?? null}
+              onSelectModel={onSelectModel}
+              hasSentFirstMessage={hasSentFirstMessage}
+              onLoadMore={onLoadMore}
+              hasMoreMessages={hasMoreMessages}
+              isLoadingMoreMessages={isLoadingMoreMessages}
+              agentMode={agentMode}
+              selectedWorkerId={selectedWorkerId}
+              onWorkerSelect={onWorkerSelect}
+              project={project}
+              todos={todos}
+              goal={goal}
+              // Large screens and mobile keep the plan in the side panel
+              // only; in between it also sits above the input
+              showTodoAboveInput={!isMobile && !isLargeScreen}
+              selectedToolCallId={selectedToolCallId}
+              remoteExecuteEvents={remoteExecuteEvents}
+              approvalPrompt={
+                pendingApproval && (
+                  <CommandApprovalPrompt
+                    key={pendingApproval.approvalId}
+                    approval={pendingApproval}
+                    queueSize={pendingApprovalCount}
+                    isSubmitting={isDecidingApproval}
+                    onDecide={onDecideApproval}
+                  />
+                )
+              }
+            />
+          </NetworkLinkProvider>
         </div>
 
         {/* Side panel — large screens only: splits the view with the chat
             (2/5 until xl, then half, until the divider is dragged) and shows
-            the plan, subagents, browser, tool calls or turn stats one tab at
+            the plan, subagents, browser, tool calls, HTTP requests or turn stats one tab at
             a time */}
         {panelOpen && (
           <>

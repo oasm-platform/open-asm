@@ -34,6 +34,7 @@ import {
   TypingDots,
 } from './chat-helpers';
 import { useT } from '@/lib/i18n-dictionary';
+import { NetworkLinkButton } from './network/network-link';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -123,6 +124,7 @@ function ToolCallItem({
       <ToolCallDisplay
         toolCall={toToolCallState(item)}
         streamEvents={remoteExecuteEvents?.get(item.toolCallId)}
+        terminalActions={<NetworkLinkButton toolCallId={item.toolCallId} />}
       />
     </div>
   );

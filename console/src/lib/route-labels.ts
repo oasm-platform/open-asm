@@ -48,7 +48,6 @@ const ROUTE_LABELS: Record<string, string> = {
   '/aistudio/agents': 'shell.route.agents',
   '/aistudio/connectors': 'shell.aiStudio.connectors',
   '/aistudio/usage': 'shell.route.aiUsage',
-  '/aistudio/http-requests': 'shell.route.aiHttpRequests',
   '/agents/create': 'shell.route.newAgent',
   '/agents/:id': 'shell.route.agent',
   '/agents/:id/edit': 'shell.route.editAgent',

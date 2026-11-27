@@ -1,5 +1,5 @@
 import { useT } from '@/lib/i18n-dictionary';
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import {
   Terminal,
   TerminalActions,
@@ -15,9 +15,12 @@ import type { ToolCallState } from './tool-call-display';
 export function RemoteExecuteTerminal({
   toolCall,
   streamEvents,
+  actions,
 }: {
   toolCall: ToolCallState;
   streamEvents?: RemoteExecuteStreamEvent[];
+  /** Extra header buttons, before Copy */
+  actions?: ReactNode;
 }) {
   const t = useT();
   const command = String(
@@ -82,6 +85,7 @@ export function RemoteExecuteTerminal({
         <div className="flex items-center gap-1 ml-auto">
           <TerminalStatus />
           <TerminalActions>
+            {actions}
             <TerminalCopyButton />
           </TerminalActions>
         </div>

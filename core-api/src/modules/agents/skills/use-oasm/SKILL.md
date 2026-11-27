@@ -55,7 +55,6 @@ The user chats from the **Ask AI** sidebar while browsing the console. When the 
 | `/reports` | Reports | report exports | none: explain the page; no tool reads reports |
 | `/integrations` | Integrations | cloud, CI and messaging integrations | none: configured in the UI only |
 | `/aistudio` | AI Studio | the full-page chat; no page is attached here | none |
-| `/aistudio/http-requests` | Agent HTTP requests | HTTP requests the user's agent shell commands made through the worker egress proxy; HTTPS rows are connection metadata only | none: no tool reads this log |
 | `/agents/:id` | Agent detail | a custom agent definition | none: configuration page |
 | `/providers` | LLM providers | the user's model connections | none: configuration page |
 | `/workspaces` | Workspaces | the user's workspaces | none: configuration page |

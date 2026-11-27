@@ -41,7 +41,12 @@ function useScrollableStrip(value: string | undefined) {
     el.addEventListener('scroll', update, { passive: true });
     const resize =
       typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
+    // The tabs too: a label or count can outgrow the strip without
+    // resizing it
     resize?.observe(el);
+    el.querySelectorAll('[data-slot="tabs-trigger"]').forEach((tab) =>
+      resize?.observe(tab),
+    );
     return () => {
       el.removeEventListener('scroll', update);
       resize?.disconnect();
@@ -71,12 +76,13 @@ export function PanelTabStrip({
   value,
   className,
   children,
+  ...props
 }: {
   /** The selected tab, to keep it scrolled into view */
   value: string;
   className?: string;
   children: ReactNode;
-}) {
+} & Pick<ComponentProps<typeof TabsList>, 'aria-label'>) {
   const ref = useScrollableStrip(value);
   return (
     <TabsList
@@ -85,6 +91,7 @@ export function PanelTabStrip({
         'no-scrollbar h-full min-w-0 shrink justify-start overflow-x-auto overflow-y-hidden',
         className,
       )}
+      {...props}
     >
       {children}
     </TabsList>
@@ -97,7 +104,8 @@ type LabelFrom = 'always' | 'md';
 const LABEL_SHOWN: Record<LabelFrom, string> = {
   always: 'max-w-40 truncate',
   // Below 28rem the strip only has room for icons and counts
-  md: 'sr-only @md/tabs:not-sr-only @md/tabs:max-w-40 @md/tabs:truncate',
+  // and from 42rem for a long label in full
+  md: 'sr-only @md/tabs:not-sr-only @md/tabs:max-w-28 @2xl/tabs:max-w-40 @md/tabs:truncate',
 };
 
 /**
