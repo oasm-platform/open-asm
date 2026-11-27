@@ -4257,6 +4257,11 @@ export type I18nTranslations = {
         "detail.loadError": string;
         "detail.unnamed": string;
         "detail.agentMode": string;
+        "remove.action": string;
+        "remove.title": string;
+        "remove.description": string;
+        "remove.success": string;
+        "remove.failed": string;
         "type.builtIn": string;
         "list.title": string;
         "list.description": string;

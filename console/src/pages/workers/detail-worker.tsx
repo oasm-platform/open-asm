@@ -17,6 +17,8 @@ import { WorkerDetailSkeleton } from './detail-worker-skeleton';
 import { WorkerStatus } from './worker-status';
 import { WorkerToolsGraph } from './components/worker-tools-graph';
 import { WorkerTelemetry } from './components/worker-telemetry';
+import { RemoveWorkerButton } from './components/remove-worker-button';
+import { usePermission } from '@/hooks/usePermission';
 import { t, useT } from '@/lib/i18n-dictionary';
 
 /** `built_in` -> `Built-in`, `cli` -> `CLI`, otherwise capitalize the raw value. */
@@ -36,6 +38,7 @@ function formatLocation(location: WorkerLocationDto) {
 export default function WorkerDetail() {
   const t = useT();
   const { id } = useParams({ strict: false });
+  const { hasPermission } = usePermission();
 
   const {
     data: worker,
@@ -66,6 +69,9 @@ export default function WorkerDetail() {
     );
   }
 
+  // Only workspace workers can be removed; cloud workers expire on their own.
+  const canRemove =
+    worker.scope === 'workspace' && hasPermission('worker.write');
   const tools = worker.tools ?? [];
   // The API omits the IP when it is local/private, so there is nothing to show.
   const location = worker.location ? formatLocation(worker.location) : '';
@@ -149,6 +155,7 @@ export default function WorkerDetail() {
           </div>
         )}
       </div>
+      {canRemove && <RemoveWorkerButton workerId={worker.id} />}
     </div>
   );
 
