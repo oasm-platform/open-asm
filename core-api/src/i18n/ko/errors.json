@@ -188,7 +188,7 @@
   "repositoriesOnlyExistGitOrganizationTargets": "저장소는 Git 조직 대상에만 존재합니다",
   "requiresArtifactManage": "artifact.manage 권한이 필요합니다",
   "requiresReportWrite": "report.write 권한이 필요합니다",
-  "reservedRoot": "\"{TEMPLATES_FOLDER_NAME}\"은(는) 루트에서 예약된 이름입니다",
+  "reservedRoot": "\"{name}\"은(는) 루트에서 예약된 이름입니다",
   "resolutionRequiredMarkIssue": "이슈를 {status}(으)로 표시하려면 해결 내용이 필요합니다",
   "resourceTypeResourceIdMustGiven": "resourceType과 resourceId는 함께 지정해야 합니다",
   "resourcesNotFoundWorkspace": "이 워크스페이스에서 리소스를 찾을 수 없습니다: {value}",

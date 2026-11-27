@@ -188,7 +188,7 @@
   "repositoriesOnlyExistGitOrganizationTargets": "代码仓库仅存在于 Git 组织目标上",
   "requiresArtifactManage": "需要 artifact.manage 权限",
   "requiresReportWrite": "需要 report.write",
-  "reservedRoot": "“{TEMPLATES_FOLDER_NAME}”是根目录下的保留名称",
+  "reservedRoot": "“{name}”是根目录下的保留名称",
   "resolutionRequiredMarkIssue": "将工单标记为 {status} 时必须提供解决方式",
   "resourceTypeResourceIdMustGiven": "resourceType 和 resourceId 必须同时提供",
   "resourcesNotFoundWorkspace": "此工作区中未找到资源：{value}",

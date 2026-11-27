@@ -32,6 +32,9 @@ import { isNotFound } from '@/common/errors/error-checks';
 import { ConflictError, ForbiddenError, InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 export const TEMPLATES_FOLDER_NAME = 'custom-templates';
+export const REPORTS_FOLDER_NAME = 'reports';
+/** Root folders owned by the workspace (no creator), readable by every member. */
+export const WORKSPACE_FOLDER_NAMES = [TEMPLATES_FOLDER_NAME, REPORTS_FOLDER_NAME];
 export const TEMPLATE_NAME_RE = /\.ya?ml$/i;
 export const TEMPLATE_NAME_ERROR =
   'Template name must be 1-200 characters and end in .yaml or .yml';
@@ -496,7 +499,7 @@ export class ArtifactsService {
     return folder;
   }
 
-  /** Own folder, or the workspace-owned templates folder (readable by every member). */
+  /** Own folder, or a workspace-owned root folder (readable by every member). */
   async findReadableFolder(
     workspaceId: string,
     userId: string,
@@ -509,7 +512,7 @@ export class ArtifactsService {
         workspaceId,
         parentFolderId: IsNull(),
         createdByUserId: IsNull(),
-        name: TEMPLATES_FOLDER_NAME,
+        name: In(WORKSPACE_FOLDER_NAMES),
       }));
     if (!folder) {
       throw new NotFoundError('Folder not found');

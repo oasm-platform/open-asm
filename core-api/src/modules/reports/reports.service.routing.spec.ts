@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
 import { BullMQName } from '@/common/enums/enum';
 import { ArtifactsService } from '@/modules/artifacts/artifacts.service';
+import { ArtifactFoldersService } from '@/modules/artifacts/artifact-folders.service';
 import { EventBridgeService } from '@/modules/event-bridge/publishing/event-bridge.service';
 import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
 import { ReportSchedule } from './entities/report-schedule.entity';
@@ -34,6 +35,7 @@ describe('ReportsService routes reports to their builtin template', () => {
   const repo = { save: jest.fn() };
   const storage = { uploadFile: jest.fn() };
   const artifacts = { createFromBuffer: jest.fn(), deleteServerFile: jest.fn() };
+  const folders = { ensureWorkspaceFolder: jest.fn().mockResolvedValue({ id: 'reports-folder' }) };
   const savedQueries = { get: jest.fn() };
   const render = renderTemplatePdf as jest.Mock;
 
@@ -41,6 +43,7 @@ describe('ReportsService routes reports to their builtin template', () => {
     jest.clearAllMocks();
     runner.run.mockResolvedValue({ title: 'data' });
     artifacts.createFromBuffer.mockResolvedValue({ id: 'a1' });
+    folders.ensureWorkspaceFolder.mockResolvedValue({ id: 'reports-folder' });
     const module = await Test.createTestingModule({
       providers: [
         ReportsService,
@@ -50,6 +53,7 @@ describe('ReportsService routes reports to their builtin template', () => {
         { provide: AsqSavedQueriesService, useValue: savedQueries },
         { provide: getRepositoryToken(ReportSchedule), useValue: {} },
         { provide: ArtifactsService, useValue: artifacts },
+        { provide: ArtifactFoldersService, useValue: folders },
         { provide: WorkspacesService, useValue: {} },
         { provide: EventBridgeService, useValue: {} },
         { provide: getQueueToken(BullMQName.REPORT_GENERATE), useValue: {} },
@@ -68,7 +72,13 @@ describe('ReportsService routes reports to their builtin template', () => {
     expect(renderedWith()).toBe('summary');
     expect(runner.run).toHaveBeenCalledWith(expect.anything(), scope, { targetIds: ['t'] });
     expect(artifacts.createFromBuffer).toHaveBeenCalledWith(
-      expect.objectContaining({ workspaceId: 'w1', userId: 'u1', source: 'report', mimeType: 'application/pdf' }),
+      expect.objectContaining({
+        workspaceId: 'w1',
+        userId: 'u1',
+        source: 'report',
+        mimeType: 'application/pdf',
+        parentFolderId: 'reports-folder',
+      }),
     );
     expect(repo.save).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -9,7 +9,13 @@ import { ArtifactSource, AuditActorType, AuditOutcome, BullMQName } from '@/comm
 import { generateToken } from '@/common/utils/gen-token.util';
 import { firstMissingPermission } from '@/common/utils/permission-keys.util';
 import { isNotFound } from '@/common/errors/error-checks';
-import { ARTIFACTS_BUCKET, ArtifactsService, toObjectKey } from '@/modules/artifacts/artifacts.service';
+import { ArtifactFoldersService } from '@/modules/artifacts/artifact-folders.service';
+import {
+  ARTIFACTS_BUCKET,
+  ArtifactsService,
+  REPORTS_FOLDER_NAME,
+  toObjectKey,
+} from '@/modules/artifacts/artifacts.service';
 import { EVENT_CATALOG } from '@/modules/event-bridge/contracts/event-catalog';
 import { EventBridgeService } from '@/modules/event-bridge/publishing/event-bridge.service';
 import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
@@ -73,6 +79,7 @@ export class ReportsService {
     private readonly scheduleRepo: Repository<ReportSchedule>,
     private readonly storageService: StorageService,
     private readonly artifacts: ArtifactsService,
+    private readonly folders: ArtifactFoldersService,
     private readonly runner: ReportRunner,
     private readonly savedQueries: AsqSavedQueriesService,
     private readonly workspaces: WorkspacesService,
@@ -306,6 +313,7 @@ export class ReportsService {
   ): Promise<{ filePath: string; fileName: string }> {
     const fileName = `report-${type.toLowerCase()}-${generateToken(24)}-${Date.now()}.pdf`;
     // As a workspace file the PDF counts against the storage quota (409 when full).
+    const folder = await this.folders.ensureWorkspaceFolder(workspaceId, REPORTS_FOLDER_NAME);
     const artifact = await this.artifacts.createFromBuffer({
       workspaceId,
       userId,
@@ -313,6 +321,7 @@ export class ReportsService {
       name: fileName,
       mimeType: 'application/pdf',
       buffer: pdfBuffer,
+      parentFolderId: folder.id,
       actorType: AuditActorType.User,
     });
     const uploadPath = `${ARTIFACTS_BUCKET}/${toObjectKey(workspaceId, artifact.id, fileName)}`;

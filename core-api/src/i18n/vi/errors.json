@@ -188,7 +188,7 @@
   "repositoriesOnlyExistGitOrganizationTargets": "Kho mã chỉ tồn tại trên mục tiêu tổ chức Git",
   "requiresArtifactManage": "Yêu cầu quyền artifact.manage",
   "requiresReportWrite": "Cần quyền report.write",
-  "reservedRoot": "\"{TEMPLATES_FOLDER_NAME}\" là tên dành riêng ở thư mục gốc",
+  "reservedRoot": "\"{name}\" là tên dành riêng ở thư mục gốc",
   "resolutionRequiredMarkIssue": "Cần có cách giải quyết để đánh dấu issue là {status}",
   "resourceTypeResourceIdMustGiven": "resourceType và resourceId phải được cung cấp cùng nhau",
   "resourcesNotFoundWorkspace": "Không tìm thấy tài nguyên trong workspace này: {value}",

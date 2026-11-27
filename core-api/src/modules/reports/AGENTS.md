@@ -5,7 +5,7 @@ PDF reports for a workspace: a summary (attack surface) report, a vulnerability 
 ## Layout
 
 - `reports.controller.ts`: routes under `reports`; builds the `QueryScope` (`reportScope`: workspace and permissions from the guard, `caller: 'report'`).
-- `reports.service.ts`: `ReportsService` (list with presigned links, enqueue, `runJob`, schedules + `runSchedule`, preview, delete). `render` = `ReportRunner.run` then `renderTemplatePdf`; `store` calls `ArtifactsService.createFromBuffer` and inserts the row (deletes the artifact if the insert fails).
+- `reports.service.ts`: `ReportsService` (list with presigned links, enqueue, `runJob`, schedules + `runSchedule`, preview, delete). `render` = `ReportRunner.run` then `renderTemplatePdf`; `store` puts the PDF in the `reports` workspace folder (`ArtifactFoldersService.ensureWorkspaceFolder`) through `ArtifactsService.createFromBuffer` and inserts the row (deletes the artifact if the insert fails).
 - `report.processors.ts`: `ReportGenerateProcessor` (`REPORT_GENERATE`, `report-generate`) and `ReportScheduleProcessor` (`REPORT_SCHEDULE`, `report-schedule`), both concurrency 1, `attempts: 1`.
 - `report-runner.ts`: `ReportRunner.validate(template, scope, options)` (ASQ `validate` on every batch, no DB) and `ReportRunner.run(template, scope, options)`: reads the workspace name (`WorkspacesService.getWorkspacesByIds`, the guard already checked membership), runs each batch of `template.queries(options, now)` through `AttackSurfaceQueryService.run`, then `template.toData(results, ctx)`.
 - `templates/registry.ts` (`BUILTIN_TEMPLATES`: `summary`, `vulnerability`, `query`), `templates/template.types.ts` (`BuiltinTemplate`), `templates/render.tsx` (`renderTemplatePdf`).
@@ -52,7 +52,7 @@ PDF reports for a workspace: a summary (attack surface) report, a vulnerability 
 
 ## Coupling
 
-- Imports `AttackSurfaceQueryModule` (`AttackSurfaceQueryService`, `AsqSavedQueriesService`), `ArtifactsModule` (`ArtifactsService`: quota + upload) and `StorageModule`. Uses the global `WorkspacesService` and `EventBridgeService`. Imports `IsCronSchedule` from `projects/dto/cron-schedule.validator.ts`. Imports `StatisticService` only as a static (`calculateSecurityScore`), no `StatisticModule`.
+- Imports `AttackSurfaceQueryModule` (`AttackSurfaceQueryService`, `AsqSavedQueriesService`), `ArtifactsModule` (`ArtifactsService`: quota + upload, `ArtifactFoldersService`: the `reports` folder) and `StorageModule`. Uses the global `WorkspacesService` and `EventBridgeService`. Imports `IsCronSchedule` from `projects/dto/cron-schedule.validator.ts`. Imports `StatisticService` only as a static (`calculateSecurityScore`), no `StatisticModule`.
 - Registers only the `Report` and `ReportSchedule` repositories: no foreign repositories, no raw SQL over other modules' tables.
 - Audit actions for these routes are in `audit/constants/audit-events.ts`.
 

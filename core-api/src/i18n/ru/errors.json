@@ -188,7 +188,7 @@
   "repositoriesOnlyExistGitOrganizationTargets": "Репозитории есть только у целей типа Git-организация",
   "requiresArtifactManage": "Требуется право artifact.manage",
   "requiresReportWrite": "Требуется report.write",
-  "reservedRoot": "Имя \"{TEMPLATES_FOLDER_NAME}\" в корне зарезервировано",
+  "reservedRoot": "Имя \"{name}\" в корне зарезервировано",
   "resolutionRequiredMarkIssue": "Чтобы перевести задачу в статус {status}, требуется решение",
   "resourceTypeResourceIdMustGiven": "resourceType и resourceId должны указываться вместе",
   "resourcesNotFoundWorkspace": "Ресурсы не найдены в этом рабочем пространстве: {value}",

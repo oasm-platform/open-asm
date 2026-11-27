@@ -188,7 +188,7 @@
   "repositoriesOnlyExistGitOrganizationTargets": "Los repositorios solo existen en objetivos de organización Git",
   "requiresArtifactManage": "Requiere artifact.manage",
   "requiresReportWrite": "Requiere report.write",
-  "reservedRoot": "\"{TEMPLATES_FOLDER_NAME}\" está reservado en la raíz",
+  "reservedRoot": "\"{name}\" está reservado en la raíz",
   "resolutionRequiredMarkIssue": "Se requiere una resolución para marcar una incidencia como {status}",
   "resourceTypeResourceIdMustGiven": "resourceType y resourceId deben indicarse juntos",
   "resourcesNotFoundWorkspace": "Recursos no encontrados en este workspace: {value}",

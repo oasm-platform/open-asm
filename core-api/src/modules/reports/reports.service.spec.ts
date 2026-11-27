@@ -3,6 +3,7 @@ import { getQueueToken } from '@nestjs/bullmq';
 import { AuditOutcome, BullMQName } from '@/common/enums/enum';
 import { NotFoundError } from '@/common/errors/domain.errors';
 import { ArtifactsService } from '@/modules/artifacts/artifacts.service';
+import { ArtifactFoldersService } from '@/modules/artifacts/artifact-folders.service';
 import { EventBridgeService } from '@/modules/event-bridge/publishing/event-bridge.service';
 import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
 import { ReportSchedule } from './entities/report-schedule.entity';
@@ -82,6 +83,7 @@ describe('ReportsService', () => {
         { provide: ReportRunner, useValue: runner },
         { provide: getRepositoryToken(ReportSchedule), useValue: scheduleRepo },
         { provide: ArtifactsService, useValue: artifacts },
+        { provide: ArtifactFoldersService, useValue: { ensureWorkspaceFolder: jest.fn() } },
         { provide: WorkspacesService, useValue: workspaces },
         { provide: EventBridgeService, useValue: eventBridge },
         { provide: getQueueToken(BullMQName.REPORT_GENERATE), useValue: generateQueue },
