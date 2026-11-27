@@ -174,6 +174,43 @@ describe('AgentHttpRequestsPage', () => {
     ).toHaveAttribute('href', '/aistudio/conversations/c1');
   });
 
+  it('keeps the last request in the sheet while it closes', async () => {
+    const { user } = await setup([{ data: [GET_ROW], nextCursor: null }]);
+    const queries = await import('@/services/apis/gen/queries');
+    const detailHook = vi.mocked(
+      queries.useAgentHttpRequestsControllerGetHttpRequest,
+    );
+
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'http://api.acme.com:8080/v1/users?id=***',
+      }),
+    );
+    await screen.findByRole('dialog');
+    await user.keyboard('{Escape}');
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
+    expect(detailHook).toHaveBeenLastCalledWith('r1', expect.anything());
+  });
+
+  it('keeps the rows when a refresh fails', async () => {
+    const { fetcher, user } = await setup([
+      { data: [GET_ROW], nextCursor: null },
+    ]);
+    const url = 'http://api.acme.com:8080/v1/users?id=***';
+    await screen.findByRole('button', { name: url });
+
+    fetcher.mockRejectedValueOnce(new Error('offline'));
+    await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+    expect(
+      await screen.findByText('Could not load HTTP requests. Try again later.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: url })).toBeInTheDocument();
+  });
+
   it('shows binary bodies by size until base64 is asked for', async () => {
     const { user } = await setup([{ data: [GET_ROW], nextCursor: null }], {}, {
       ...DETAIL,

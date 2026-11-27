@@ -254,14 +254,18 @@ export function HttpRequestDetail({
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
+  // The sheet keeps rendering while it animates closed; holding the last id
+  // keeps its request on screen instead of flashing the load error.
+  const [shownId, setShownId] = useState(requestId);
+  if (requestId && requestId !== shownId) setShownId(requestId);
   const { data, isLoading, isError } =
-    useAgentHttpRequestsControllerGetHttpRequest(requestId ?? '', {
+    useAgentHttpRequestsControllerGetHttpRequest(shownId ?? '', {
       query: {
         queryKey: [
-          ...getAgentHttpRequestsControllerGetHttpRequestQueryKey(requestId ?? ''),
+          ...getAgentHttpRequestsControllerGetHttpRequestQueryKey(shownId ?? ''),
           selectedWorkspaceId,
         ],
-        enabled: !!requestId && !!selectedWorkspaceId,
+        enabled: !!shownId && !!selectedWorkspaceId,
       },
     });
 

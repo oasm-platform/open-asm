@@ -37,11 +37,7 @@ import {
   statusVariant,
 } from './format';
 
-export interface HttpRequestsSearch {
-  conversationId?: string;
-  host?: string;
-  errorsOnly?: boolean;
-}
+import type { HttpRequestsSearch } from './search';
 
 const PAGE_SIZE = 50;
 const POLL_MS = 10_000;
@@ -277,7 +273,13 @@ export default function AgentHttpRequestsPage({
           )}
         </div>
 
-        {isError ? (
+        {/* A failed poll keeps the rows already shown; only say so inline */}
+        {isError && data && (
+          <p role="status" className="text-xs text-muted-foreground">
+            {t('agents.httpRequests.loadFailed')}
+          </p>
+        )}
+        {isError && !data ? (
           <div className="rounded-xl border border-dashed p-6 text-center">
             <p className="text-sm text-muted-foreground">
               {t('agents.httpRequests.loadFailed')}

@@ -1,12 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { z } from 'zod';
 import AgentHttpRequestsPage from '@/pages/agents/http-requests/http-requests';
-
-const httpRequestsSearchSchema = z.object({
-  conversationId: z.string().optional(),
-  host: z.string().optional(),
-  errorsOnly: z.boolean().optional(),
-});
+import { httpRequestsSearchSchema } from '@/pages/agents/http-requests/search';
 
 export const Route = createFileRoute('/_authed/aistudio/http-requests')({
   validateSearch: httpRequestsSearchSchema,
