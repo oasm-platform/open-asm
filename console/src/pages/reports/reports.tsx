@@ -20,7 +20,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { OpenLink } from '@/components/ui/open-link';
 import { CronScheduleBuilder } from '@/components/ui/cron-schedule-builder';
 import { Field } from '@/components/ui/field';
 import { Switch } from '@/components/ui/switch';
@@ -40,8 +39,10 @@ import {
   useWorkspaceSelector,
   useWorkspaceState,
 } from '@/hooks/useWorkspaceSelector';
+import { handleServerError } from '@/lib/handle-server-error';
 import type { ReportResponseDto } from '@/services/apis/gen/queries';
 import {
+  reportsControllerGetDownloadUrl,
   useReportsControllerCreateSchedule,
   useReportsControllerDeleteReport,
   useReportsControllerGenerateSummaryReport,
@@ -70,6 +71,7 @@ export default function Reports() {
   const [minSeverity, setMinSeverity] = useState<string>('');
   const [repeat, setRepeat] = useState(false);
   const [cron, setCron] = useState('');
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const [activeTab, setTab] = useQueryTab({
     tabParam: 'tab',
@@ -213,6 +215,20 @@ export default function Reports() {
     deleteMutation.mutate({ id: report.id });
   };
 
+  // The list carries no URLs; one is signed only for the report being downloaded.
+  const handleDownload = async (report: ReportResponseDto) => {
+    setDownloadingId(report.id);
+    try {
+      const { url } = await reportsControllerGetDownloadUrl(report.id);
+      // The URL forces `Content-Disposition: attachment`, so the page stays put.
+      window.location.assign(url);
+    } catch (error) {
+      handleServerError(error);
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   const reports = data?.data ?? [];
   const total = data?.total ?? 0;
   const isPending =
@@ -246,14 +262,17 @@ export default function Reports() {
       header: '',
       cell: ({ row }) => (
         <div className="flex justify-end gap-1">
-          <Button asChild variant="ghost" size="sm">
-            <OpenLink
-              href={row.original.downloadUrl}
-              aria-label={t('reports.download', { name: row.original.fileName })}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Download className="h-4 w-4" />
-            </OpenLink>
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={t('reports.download', { name: row.original.fileName })}
+            disabled={downloadingId === row.original.id}
+            onClick={(e) => {
+              e.stopPropagation();
+              void handleDownload(row.original);
+            }}
+          >
+            <Download className="h-4 w-4" />
           </Button>
           <ConfirmDialog
             title={t('reports.delete.title')}

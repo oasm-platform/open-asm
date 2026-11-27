@@ -30,6 +30,7 @@ import {
   GetManyReportsQueryDto,
   PreviewSummaryQueryDto,
   PreviewVulQueryDto,
+  ReportDownloadResponseDto,
   ReportResponseDto,
   ReportScheduleResponseDto,
 } from './dto/reports.dto';
@@ -239,6 +240,21 @@ export class ReportsController {
   ): Promise<DefaultMessageResponseDto> {
     await this.reportsService.deleteSchedule(params.id, workspaceId);
     return { message: 'Report schedule deleted' };
+  }
+
+  @Doc({
+    summary: 'Get a report download URL',
+    description: 'Returns a presigned URL that downloads the report PDF as an attachment.',
+    response: { serialization: ReportDownloadResponseDto },
+    request: { getWorkspaceId: true },
+  })
+  @WorkspaceAccess('report.read')
+  @Get(':id/download')
+  getDownloadUrl(
+    @Param() params: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<ReportDownloadResponseDto> {
+    return this.reportsService.getDownloadUrl(params.id, workspaceId);
   }
 
   @Doc({

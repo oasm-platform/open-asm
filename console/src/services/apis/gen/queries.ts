@@ -7560,10 +7560,6 @@ export type ReportResponseDto = {
   fileName: string;
   type: ReportResponseDtoType;
   createdAt: string;
-  /** Presigned S3 download URL (hour-bucketed signature, default 2 days) */
-  downloadUrl: string;
-  /** Presigned URL lifetime in seconds */
-  downloadExpiresIn: number;
 };
 
 export type GetManyReportResponseDtoDto = {
@@ -7681,6 +7677,13 @@ export type CreateReportScheduleDto = {
   targetIds?: string[];
   /** Vulnerability report only */
   minSeverity?: CreateReportScheduleDtoMinSeverity;
+};
+
+export type ReportDownloadResponseDto = {
+  /** Presigned URL that downloads the PDF as an attachment */
+  url: string;
+  /** URL lifetime in seconds */
+  expiresIn: number;
 };
 
 /**
@@ -60734,6 +60737,177 @@ export const useReportsControllerDeleteSchedule = <
     queryClient,
   );
 };
+
+/**
+ * Returns a presigned URL that downloads the report PDF as an attachment.
+ * @summary Get a report download URL
+ */
+export const reportsControllerGetDownloadUrl = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ReportDownloadResponseDto>(
+    { url: `/api/reports/${id}/download`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getReportsControllerGetDownloadUrlQueryKey = (id: string) => {
+  return [`/api/reports/${id}/download`] as const;
+};
+
+export const getReportsControllerGetDownloadUrlQueryOptions = <
+  TData = Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getReportsControllerGetDownloadUrlQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>
+  > = ({ signal }) =>
+    reportsControllerGetDownloadUrl(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ReportsControllerGetDownloadUrlQueryResult = NonNullable<
+  Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>
+>;
+export type ReportsControllerGetDownloadUrlQueryError = unknown;
+
+export function useReportsControllerGetDownloadUrl<
+  TData = Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+          TError,
+          Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useReportsControllerGetDownloadUrl<
+  TData = Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+          TError,
+          Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useReportsControllerGetDownloadUrl<
+  TData = Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get a report download URL
+ */
+
+export function useReportsControllerGetDownloadUrl<
+  TData = Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getReportsControllerGetDownloadUrlQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
 
 /**
  * Deletes a generated report PDF.

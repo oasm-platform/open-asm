@@ -15,6 +15,7 @@ describe('ReportsController workspace permission guards', () => {
 
   const cases: Array<[string, string, string[]]> = [
     ['getMany', 'GET /', ['report.read']],
+    ['getDownloadUrl', 'GET /:id/download', ['report.read']],
     ['previewSummaryReport', 'GET /preview/summary', ['report.read']],
     ['previewVulReport', 'GET /preview/vulnerability', ['report.read']],
     ['generateSummaryReport', 'POST /generate/summary', ['report.write']],
@@ -74,6 +75,14 @@ describe('ReportsController query scope and error mapping', () => {
     expect(service.enqueueReport).toHaveBeenNthCalledWith(1, scope, 'u1', 'SUMMARY', expect.anything());
     expect(service.enqueueReport).toHaveBeenNthCalledWith(2, scope, 'u1', 'VULNERABILITY', expect.anything());
     expect(service.enqueueQueryReport).toHaveBeenCalledWith(scope, 'u1', 'q');
+  });
+
+  it('getDownloadUrl signs the report of the current workspace only', async () => {
+    const service = { getDownloadUrl: jest.fn().mockResolvedValue({ url: 'u', expiresIn: 300 }) };
+    const controller = new ReportsController(service as never);
+
+    await expect(controller.getDownloadUrl({ id: 'r1' }, 'w1')).resolves.toEqual({ url: 'u', expiresIn: 300 });
+    expect(service.getDownloadUrl).toHaveBeenCalledWith('r1', 'w1');
   });
 
   it('falls back to no permissions when the request carries none', async () => {

@@ -142,25 +142,23 @@ export class ReportsService implements OnApplicationBootstrap {
     qb.orderBy(sortColumn, sortOrder);
 
     const total = await qb.getCount();
-    const reports = await qb.limit(limit).offset(offset).getMany();
-
-    const data = await Promise.all(
-      reports.map(async (report) => {
-        const idx = report.path.indexOf('/');
-        const bucket = report.path.slice(0, idx);
-        const filePath = report.path.slice(idx + 1);
-        const { url: downloadUrl, expiresIn } =
-          await this.storageService.getPresignedDownloadUrl({
-            bucket,
-            key: filePath,
-            fileName: report.fileName,
-            contentType: 'application/pdf',
-          });
-        return { ...report, downloadUrl, downloadExpiresIn: expiresIn };
-      }),
-    );
+    const data = await qb.limit(limit).offset(offset).getMany();
 
     return getManyResponse({ query, data, total });
+  }
+
+  /** Signs one report on demand, so listing reports signs nothing. */
+  async getDownloadUrl(id: string, workspaceId: string): Promise<{ url: string; expiresIn: number }> {
+    const report = await this.findById(id, workspaceId);
+    // `path` is `<bucket>/<key>`: `artifacts/<objectKey>`, or `reports/<fileName>` for older rows.
+    const idx = report.path.indexOf('/');
+    const { url, expiresIn } = await this.storageService.getPresignedDownloadUrl({
+      bucket: report.path.slice(0, idx),
+      key: report.path.slice(idx + 1),
+      fileName: report.fileName,
+      contentType: 'application/pdf',
+    });
+    return { url, expiresIn };
   }
 
   private loadLogo(): void {

@@ -5,7 +5,7 @@ PDF reports for a workspace: a summary (attack surface) report, a vulnerability 
 ## Layout
 
 - `reports.controller.ts`: routes under `reports`; builds the `QueryScope` (`reportScope`: workspace and permissions from the guard, `caller: 'report'`).
-- `reports.service.ts`: `ReportsService` (list with presigned links, enqueue, `runJob`, schedules + `runSchedule`, preview, delete). `render` = `ReportRunner.run` then `renderTemplatePdf`; `store` puts the PDF in the `reports` workspace folder (`ArtifactFoldersService.ensureWorkspaceFolder`) through `ArtifactsService.createFromBuffer` and inserts the row (deletes the artifact if the insert fails).
+- `reports.service.ts`: `ReportsService` (list, `getDownloadUrl` presigning one report on demand, enqueue, `runJob`, schedules + `runSchedule`, preview, delete). `render` = `ReportRunner.run` then `renderTemplatePdf`; `store` puts the PDF in the `reports` workspace folder (`ArtifactFoldersService.ensureWorkspaceFolder`) through `ArtifactsService.createFromBuffer` and inserts the row (deletes the artifact if the insert fails).
 - `report.processors.ts`: `ReportGenerateProcessor` (`REPORT_GENERATE`, `report-generate`) and `ReportScheduleProcessor` (`REPORT_SCHEDULE`, `report-schedule`), both concurrency 1, `attempts: 1`.
 - `report-runner.ts`: `ReportRunner.validate(template, scope, options)` (ASQ `validate` on every batch, no DB) and `ReportRunner.run(template, scope, options)`: reads the workspace name (`WorkspacesService.getWorkspacesByIds`, the guard already checked membership), runs each batch of `template.queries(options, now)` through `AttackSurfaceQueryService.run`, then `template.toData(results, ctx)`.
 - `templates/registry.ts` (`BUILTIN_TEMPLATES`: `summary`, `vulnerability`, `query`), `templates/template.types.ts` (`BuiltinTemplate`), `templates/render.tsx` (`renderTemplatePdf`).
@@ -18,6 +18,7 @@ PDF reports for a workspace: a summary (attack surface) report, a vulnerability 
 | Route | Permission | Event |
 |---|---|---|
 | `GET reports` | `report.read` | none |
+| `GET reports/:id/download` | `report.read` | none |
 | `GET reports/preview/summary` | `report.read` + `target.read`, `asset.read`, `vulnerability.read` | `report.exported` (metadata `format: pdf`) |
 | `GET reports/preview/vulnerability` | `report.read` + `target.read`, `asset.read`, `vulnerability.read` | none |
 | `POST reports/generate/summary` (202) | `report.write` + the same catalog read keys | `report.generated` (metadata `reportType: summary`) |
@@ -31,6 +32,7 @@ PDF reports for a workspace: a summary (attack surface) report, a vulnerability 
 - The catalog read keys are enforced by ASQ, not by `@WorkspaceAccess`: the report runs as the member, so a missing key gives `PERMISSION_DENIED`, which `AsqErrorInterceptor` (on every route that runs a template) answers as 403 with body `{ error: { code, message } }`. Nothing is rendered or stored then.
 - Registered in `combine.module.ts`. Exports nothing.
 - Previews stream the PDF inline with `@Res()` and store nothing.
+- `GET reports` returns rows only; nothing is signed per row. `GET reports/:id/download` looks the report up in the caller's workspace (404 otherwise) and returns `{ url, expiresIn }`, a presigned URL with an attachment disposition named after `fileName`. It splits `path` at the first `/` into bucket and key, so older `reports/<fileName>` rows keep working.
 - Generate validates the template's queries as the caller (`ReportRunner.validate`, so 403 `PERMISSION_DENIED` / 400 `INVALID_QUERY` stay synchronous), then queues a `ReportJob` with a snapshot of the caller's permissions and answers 202. `report.generated` therefore means "requested".
 - `runJob` never throws (a retry would reuse stale permissions): it publishes `report.completed` (not persisted) with `outcome` success/failure and payload `{ userId, reportType, fileName?, error? }`. The notifications lane turns it into `REPORT_GENERATED` / `REPORT_FAILED` for that user (`notification-rules.ts`, link `/reports`). A full quota (409 `STORAGE_QUOTA_EXCEEDED` from artifacts) is a failure notification.
 - `report.completed`'s `error` is only the message of a domain error, an `AsqError` or a 4xx Nest exception (`userFacingError`); anything else reads `Report generation failed` and the raw message stays in the log.

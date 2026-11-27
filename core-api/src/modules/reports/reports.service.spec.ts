@@ -79,6 +79,7 @@ describe('ReportsService', () => {
           useValue: {
             uploadFile: jest.fn(),
             deleteFile: jest.fn(),
+            getPresignedDownloadUrl: jest.fn(),
           },
         },
         { provide: ReportRunner, useValue: runner },
@@ -178,6 +179,63 @@ describe('ReportsService', () => {
 
       expect(artifacts.deleteServerFile).toHaveBeenCalledWith('a1');
       expect(storageService.deleteFile).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getMany', () => {
+    it('lists the rows without presigning a download URL for each', async () => {
+      const rows = [{ ...mockReport, path: 'artifacts/workspaces/w1/a1/r.pdf' }];
+      const qb = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        offset: jest.fn().mockReturnThis(),
+        getCount: jest.fn().mockResolvedValue(1),
+        getMany: jest.fn().mockResolvedValue(rows),
+      };
+      jest.spyOn(reportRepository, 'createQueryBuilder').mockReturnValue(qb as never);
+
+      const result = await service.getMany(
+        { limit: 10, page: 1, sortBy: 'createdAt', sortOrder: 'DESC' } as never,
+        'w1',
+      );
+
+      expect(storageService.getPresignedDownloadUrl).not.toHaveBeenCalled();
+      expect(result.data).toEqual(rows);
+      expect(result.data[0]).not.toHaveProperty('downloadUrl');
+    });
+  });
+
+  describe('getDownloadUrl', () => {
+    it("presigns the report's object as a PDF named after the report", async () => {
+      jest.spyOn(reportRepository, 'findOne').mockResolvedValue({
+        ...mockReport,
+        path: 'artifacts/workspaces/w1/a1/acme-vulnerability-report-2026-11-27-1430.pdf',
+        fileName: 'acme-vulnerability-report-2026-11-27-1430.pdf',
+      } as Report);
+      jest
+        .spyOn(storageService, 'getPresignedDownloadUrl')
+        .mockResolvedValue({ url: 'https://storage.test/r.pdf?sig=1', expiresIn: 300 });
+
+      await expect(service.getDownloadUrl('r1', 'w1')).resolves.toEqual({
+        url: 'https://storage.test/r.pdf?sig=1',
+        expiresIn: 300,
+      });
+      expect(reportRepository.findOne).toHaveBeenCalledWith({ where: { id: 'r1', workspace: { id: 'w1' } } });
+      expect(storageService.getPresignedDownloadUrl).toHaveBeenCalledWith({
+        bucket: 'artifacts',
+        key: 'workspaces/w1/a1/acme-vulnerability-report-2026-11-27-1430.pdf',
+        fileName: 'acme-vulnerability-report-2026-11-27-1430.pdf',
+        contentType: 'application/pdf',
+      });
+    });
+
+    it('is 404 for a report of another workspace, and signs nothing', async () => {
+      jest.spyOn(reportRepository, 'findOne').mockResolvedValue(null);
+
+      await expect(service.getDownloadUrl('r1', 'w2')).rejects.toBeInstanceOf(NotFoundError);
+      expect(storageService.getPresignedDownloadUrl).not.toHaveBeenCalled();
     });
   });
 
