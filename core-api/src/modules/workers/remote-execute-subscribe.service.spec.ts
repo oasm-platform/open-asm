@@ -135,8 +135,9 @@ describe('RemoteExecuteSubscribeService — agent worker scoping', () => {
       const seen = connect(worker('w-own', 'ws-1', WorkerScope.WORKSPACE));
       conversationRepo.findOne.mockResolvedValue({ id: 'c1', workerId: null });
       const pushedWhenCalled: number[] = [];
-      const beforePush = jest.fn(async () => {
+      const beforePush = jest.fn(() => {
         pushedWhenCalled.push(seen.length);
+        return Promise.resolve();
       });
 
       await service.pushCommandWithConversation(
@@ -154,8 +155,9 @@ describe('RemoteExecuteSubscribeService — agent worker scoping', () => {
 
     it('runs on the no-conversation path too', async () => {
       const seen = connect(worker('w-own', 'ws-1', WorkerScope.WORKSPACE));
-      const beforePush = jest.fn(async () => {
+      const beforePush = jest.fn(() => {
         expect(seen).toHaveLength(0);
+        return Promise.resolve();
       });
 
       await service.pushCommandWithConversation(

@@ -32,7 +32,7 @@ let seq = 0;
 const nextId = () =>
   `0190a000-0000-7000-8000-${String(++seq).padStart(12, '0')}`;
 
-const SENT_S = 1_790_000_000;
+const SENT_S = Math.floor(Date.now() / 1000) - 60;
 
 const log = (over: Partial<EgressHttpLogInput> = {}): EgressHttpLogInput => ({
   id: nextId(),
@@ -260,6 +260,82 @@ describe('AgentHttpIngestService', () => {
       0,
     );
     expect(result).toEqual({ accepted: 0, rejected: 4 });
+  });
+
+  it('rejects a sentAt older than an hour, a year-0001 sentAt and out-of-range nanos', async () => {
+    const h = setup();
+    const oldS = SENT_S - 2 * 60 * 60;
+    const result = await h.service.ingest(
+      WORKER,
+      [
+        log({
+          sentAt: { seconds: String(oldS), nanos: 0 },
+          completedAt: { seconds: String(oldS + 1), nanos: 0 },
+        }),
+        log({
+          sentAt: { seconds: '-62135596800', nanos: 0 },
+          completedAt: { seconds: '-62135596800', nanos: 0 },
+        }),
+        log({ sentAt: { seconds: String(SENT_S), nanos: 1e9 } }),
+        log({ sentAt: { seconds: String(SENT_S), nanos: -1 } }),
+        log({ completedAt: { seconds: String(SENT_S + 1), nanos: 1.5 } }),
+      ],
+      0,
+    );
+    expect(result).toEqual({ accepted: 0, rejected: 5 });
+  });
+
+  it('keeps stored strings well-formed when a cut splits a surrogate pair or the worker sends a lone one', async () => {
+    const h = setup();
+    const straddling = 'v'.repeat(8191) + '😀';
+    const lone = 'bad\ud83dvalue';
+    const result = await h.service.ingest(
+      WORKER,
+      [
+        log({
+          requestHeaders: [{ name: 'X-Emoji', value: straddling }],
+          responseHeaders: [{ name: 'Content-Type', value: lone }],
+          error: lone,
+          path: `/p${lone}`,
+        }),
+      ],
+      0,
+    );
+    expect(result).toEqual({ accepted: 1, rejected: 0 });
+    const [row] = rowsOf(h, AgentHttpRequest);
+    const [payload] = rowsOf(h, AgentHttpRequestPayload);
+    const wellFormed = (v: unknown) =>
+      !/[\uD800-\uDFFF]/.test(String(v).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, ''));
+    const reqHeaders = payload.requestHeaders as [string, string][];
+    expect(reqHeaders[0][1]).toHaveLength(8192);
+    expect(wellFormed(reqHeaders[0][1])).toBe(true);
+    expect(wellFormed((payload.responseHeaders as [string, string][])[0][1])).toBe(true);
+    expect(wellFormed(payload.contentType)).toBe(true);
+    expect(wellFormed(row.error)).toBe(true);
+    expect(wellFormed(row.path)).toBe(true);
+    expect(row.error).toBe('bad\uFFFDvalue');
+  });
+
+  it('drops headers with an empty name', async () => {
+    const h = setup();
+    await h.service.ingest(
+      WORKER,
+      [log({ requestHeaders: [{ name: '', value: 'x' }, { name: 'A', value: 'b' }] })],
+      0,
+    );
+    const [payload] = rowsOf(h, AgentHttpRequestPayload);
+    expect(payload.requestHeaders).toEqual([['A', 'b']]);
+  });
+
+  it('keeps a leading BOM in a UTF-8 body', async () => {
+    const h = setup();
+    await h.service.ingest(
+      WORKER,
+      [log({ responseBody: Buffer.from('\uFEFFhi') })],
+      0,
+    );
+    const [payload] = rowsOf(h, AgentHttpRequestPayload);
+    expect(payload.responseBody).toBe('\uFEFFhi');
   });
 
   it('rejects invalid fields event by event', async () => {

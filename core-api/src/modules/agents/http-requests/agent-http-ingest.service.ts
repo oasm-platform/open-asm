@@ -55,6 +55,8 @@ const MAX_PATH = 8192;
 const MAX_ERROR = 500;
 const MAX_FUTURE_MS = 5 * 60 * 1000;
 const MAX_INT = 2_147_483_647;
+/** Sessions live 15 min; older events are bogus and may not fit timestamptz. */
+const MAX_AGE_MS = 60 * 60 * 1000;
 const METHOD = /^[A-Z][A-Z0-9_-]{0,15}$/;
 const UINT = /^\d+$/;
 const INT = /^-?\d+$/;
@@ -66,7 +68,9 @@ const OUTCOMES: Record<string, AgentHttpOutcome> = {
   EGRESS_HTTP_OUTCOME_CANCELLED: AgentHttpOutcome.CANCELLED,
 };
 
-const utf8 = new TextDecoder('utf-8', { fatal: true });
+const utf8 = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
+// Lone UTF-16 surrogates, which jsonb and text refuse.
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
 
 /**
  * Stores the HTTP requests a worker's egress proxy saw for agent shell
@@ -114,6 +118,8 @@ export class AgentHttpIngestService {
       if (row) mapped.push(row);
     }
 
+    // A conversation deleted between this check and the insert fails the
+    // batch on its FK; the worker's retry then filters it out here.
     const live = await this.existingConversations(
       mapped.map((m) => m.request.conversationId),
     );
@@ -170,7 +176,7 @@ export class AgentHttpIngestService {
 }
 
 function isSessionId(value: string): boolean {
-  return value.length > 0 && value.length <= 64;
+  return value.length > 0 && value.length <= 64 && wellFormed(value) === value;
 }
 
 /** The session came through Redis as untyped JSON; trust none of it unchecked. */
@@ -228,19 +234,20 @@ function mapLog(
   const sentMs = timestampMs(log.sentAt);
   const completedMs = timestampMs(log.completedAt);
   if (sentMs === null || completedMs === null) return null;
-  if (sentMs > now + MAX_FUTURE_MS || completedMs < sentMs) return null;
+  if (sentMs > now + MAX_FUTURE_MS || sentMs < now - MAX_AGE_MS) return null;
+  if (completedMs < sentMs) return null;
   const durationMs = completedMs - sentMs;
   if (durationMs > MAX_INT) return null;
 
-  const error = stripNul(str(log.error)).slice(0, MAX_ERROR);
+  const error = cut(str(log.error), MAX_ERROR);
   const requestHeaders = headers(log.requestHeaders);
   const responseHeaders = headers(log.responseHeaders);
   const requestBody = body(log.requestBody, log.requestBodyTruncated);
   const responseBody = body(log.responseBody, log.responseBodyTruncated);
-  const contentType =
-    responseHeaders
-      .find(([name]) => name.toLowerCase() === 'content-type')?.[1]
-      .slice(0, 255) ?? null;
+  const contentTypeHeader = responseHeaders.find(
+    ([name]) => name.toLowerCase() === 'content-type',
+  );
+  const contentType = contentTypeHeader ? cut(contentTypeHeader[1], 255) : null;
 
   return {
     request: {
@@ -283,13 +290,24 @@ function mapLog(
   };
 }
 
+/**
+ * protobufjs does not validate UTF-8, so a worker string can hold a lone
+ * surrogate; one such value would fail the whole batch's insert.
+ */
 function str(value: unknown): string {
-  return typeof value === 'string' ? value : '';
+  return typeof value === 'string' ? wellFormed(value) : '';
 }
 
-/** Postgres text and jsonb both refuse U+0000. */
-function stripNul(value: string): string {
-  return value.replaceAll('\0', '');
+function wellFormed(value: string): string {
+  return value.replace(LONE_SURROGATE, '\uFFFD');
+}
+
+/**
+ * Postgres text and jsonb both refuse U+0000, and a cut by UTF-16 units can
+ * split a surrogate pair.
+ */
+function cut(value: string, max: number): string {
+  return wellFormed(value.replaceAll('\0', '').slice(0, max));
 }
 
 function byteCount(value: unknown): number | null {
@@ -303,7 +321,8 @@ function timestampMs(ts: ProtoTimestamp | null | undefined): number | null {
   if (!ts) return null;
   const seconds = typeof ts.seconds === 'number' ? String(ts.seconds) : str(ts.seconds);
   if (!INT.test(seconds)) return null;
-  const nanos = Number.isInteger(ts.nanos) ? ts.nanos : 0;
+  const nanos = ts.nanos ?? 0;
+  if (!Number.isInteger(nanos) || nanos < 0 || nanos >= 1e9) return null;
   const ms = Number(seconds) * 1000 + Math.floor(nanos / 1e6);
   return Number.isSafeInteger(ms) ? ms : null;
 }
@@ -313,11 +332,12 @@ function headers(
 ): HttpHeaderPair[] {
   if (!Array.isArray(list)) return [];
   return list
-    .slice(0, MAX_HEADERS)
     .map((h): HttpHeaderPair => [
-      stripNul(str(h?.name)).slice(0, MAX_HEADER_NAME),
-      stripNul(str(h?.value)).slice(0, MAX_HEADER_VALUE),
-    ]);
+      cut(str(h?.name), MAX_HEADER_NAME),
+      cut(str(h?.value), MAX_HEADER_VALUE),
+    ])
+    .filter(([name]) => name.length > 0)
+    .slice(0, MAX_HEADERS);
 }
 
 function body(
