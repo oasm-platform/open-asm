@@ -28,6 +28,7 @@ const (
 	WorkersService_BuiltinToolRegistry_FullMethodName    = "/workers.WorkersService/BuiltinToolRegistry"
 	WorkersService_RemoteExecuteSubscribe_FullMethodName = "/workers.WorkersService/RemoteExecuteSubscribe"
 	WorkersService_RemoteExecuteResult_FullMethodName    = "/workers.WorkersService/RemoteExecuteResult"
+	WorkersService_ReportEgressHttpLogs_FullMethodName   = "/workers.WorkersService/ReportEgressHttpLogs"
 	WorkersService_Connect_FullMethodName                = "/workers.WorkersService/Connect"
 )
 
@@ -44,6 +45,7 @@ type WorkersServiceClient interface {
 	BuiltinToolRegistry(ctx context.Context, in *BuiltinToolRegistryRequest, opts ...grpc.CallOption) (*BuiltinToolRegistryResponse, error)
 	RemoteExecuteSubscribe(ctx context.Context, in *RemoteExecuteSubscribeRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RemoteExecuteSubscribeResponse], error)
 	RemoteExecuteResult(ctx context.Context, in *RemoteExecuteResultStream, opts ...grpc.CallOption) (*RemoteExecuteResultAck, error)
+	ReportEgressHttpLogs(ctx context.Context, in *EgressHttpLogBatch, opts ...grpc.CallOption) (*EgressHttpLogAck, error)
 	// Long-lived bidirectional channel: the push half is what lets core-api stop a
 	// running job instead of only flipping its status in the database.
 	Connect(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[WorkerToCore, CoreToWorker], error)
@@ -174,6 +176,16 @@ func (c *workersServiceClient) RemoteExecuteResult(ctx context.Context, in *Remo
 	return out, nil
 }
 
+func (c *workersServiceClient) ReportEgressHttpLogs(ctx context.Context, in *EgressHttpLogBatch, opts ...grpc.CallOption) (*EgressHttpLogAck, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EgressHttpLogAck)
+	err := c.cc.Invoke(ctx, WorkersService_ReportEgressHttpLogs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *workersServiceClient) Connect(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[WorkerToCore, CoreToWorker], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &WorkersService_ServiceDesc.Streams[3], WorkersService_Connect_FullMethodName, cOpts...)
@@ -200,6 +212,7 @@ type WorkersServiceServer interface {
 	BuiltinToolRegistry(context.Context, *BuiltinToolRegistryRequest) (*BuiltinToolRegistryResponse, error)
 	RemoteExecuteSubscribe(*RemoteExecuteSubscribeRequest, grpc.ServerStreamingServer[RemoteExecuteSubscribeResponse]) error
 	RemoteExecuteResult(context.Context, *RemoteExecuteResultStream) (*RemoteExecuteResultAck, error)
+	ReportEgressHttpLogs(context.Context, *EgressHttpLogBatch) (*EgressHttpLogAck, error)
 	// Long-lived bidirectional channel: the push half is what lets core-api stop a
 	// running job instead of only flipping its status in the database.
 	Connect(grpc.BidiStreamingServer[WorkerToCore, CoreToWorker]) error
@@ -239,6 +252,9 @@ func (UnimplementedWorkersServiceServer) RemoteExecuteSubscribe(*RemoteExecuteSu
 }
 func (UnimplementedWorkersServiceServer) RemoteExecuteResult(context.Context, *RemoteExecuteResultStream) (*RemoteExecuteResultAck, error) {
 	return nil, status.Error(codes.Unimplemented, "method RemoteExecuteResult not implemented")
+}
+func (UnimplementedWorkersServiceServer) ReportEgressHttpLogs(context.Context, *EgressHttpLogBatch) (*EgressHttpLogAck, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReportEgressHttpLogs not implemented")
 }
 func (UnimplementedWorkersServiceServer) Connect(grpc.BidiStreamingServer[WorkerToCore, CoreToWorker]) error {
 	return status.Error(codes.Unimplemented, "method Connect not implemented")
@@ -405,6 +421,24 @@ func _WorkersService_RemoteExecuteResult_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _WorkersService_ReportEgressHttpLogs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EgressHttpLogBatch)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkersServiceServer).ReportEgressHttpLogs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkersService_ReportEgressHttpLogs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkersServiceServer).ReportEgressHttpLogs(ctx, req.(*EgressHttpLogBatch))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _WorkersService_Connect_Handler(srv interface{}, stream grpc.ServerStream) error {
 	return srv.(WorkersServiceServer).Connect(&grpc.GenericServerStream[WorkerToCore, CoreToWorker]{ServerStream: stream})
 }
@@ -442,6 +476,10 @@ var WorkersService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RemoteExecuteResult",
 			Handler:    _WorkersService_RemoteExecuteResult_Handler,
+		},
+		{
+			MethodName: "ReportEgressHttpLogs",
+			Handler:    _WorkersService_ReportEgressHttpLogs_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

@@ -486,16 +486,18 @@ func Start(ctx context.Context, cfg *config.Config, events chan<- TuiEvent) {
 						log.Error("WORKER_EGRESS_ALLOW ignored, private targets stay blocked: %v", err)
 					}
 					runs := egress.NewRunCredentials()
+					recorder := newEgressRecorder(grpcClient, log)
 					egressServer, err := egress.NewServer(
 						fmt.Sprintf(":%d", cfg.EgressPort),
 						mgrInit.ProxyAuth,
-						egress.Options{DenyHosts: []string{egressHostOf(dockerRT.ConnectorAddr()), cfg.GrpcHost}, Allow: allow, Logger: log, Runs: runs},
+						egress.Options{DenyHosts: []string{egressHostOf(dockerRT.ConnectorAddr()), cfg.GrpcHost}, Allow: allow, Logger: log, Runs: runs, Recorder: recorder},
 					)
 					if err != nil {
 						log.Error("egress proxy init failed (non-fatal) — containers keep direct egress: %v", err)
 					} else {
 						dockerRT.ConfigureEgress(runtime.WithEgressPort(dockerRT.ConnectorAddr(), egressServer.Port()), cfg.GrpcHost, true)
-						agentEgress = &agentProxy{runs: runs, port: egressServer.Port(), grpcHost: cfg.GrpcHost}
+						agentEgress = &agentProxy{runs: runs, port: egressServer.Port(), grpcHost: cfg.GrpcHost, recorder: recorder}
+						go recorder.Run(workerCtx)
 						go func() {
 							log.Success("egress proxy listening on %s", egressServer.Addr())
 							if err := egressServer.Serve(workerCtx); err != nil {

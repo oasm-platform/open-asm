@@ -2,11 +2,16 @@ package worker
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"oasm-worker/internal/egress"
+	workers "oasm-worker/internal/gen/workers"
 )
 
 var proxyEnvKeys = []string{"HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "NO_PROXY", "no_proxy", "ALL_PROXY", "all_proxy"}
@@ -126,5 +131,124 @@ func TestExecuteRemoteCommandProxiedRevokesAtExit(t *testing.T) {
 	token := strings.TrimSuffix(strings.TrimPrefix(out, "http://"), "@127.0.0.1:4000")
 	if _, ok := runs.Lookup(token); ok {
 		t.Fatal("token must be revoked once the command exits")
+	}
+}
+
+// exitCheckingSender records, at the moment EXIT is sent, whether the run
+// token was already revoked and the session's log batch already delivered.
+type exitCheckingSender struct {
+	recordingSender
+	runs      *egress.RunCredentials
+	rec       *egress.Recorder
+	token     string
+	delivered *atomic.Bool
+
+	tokenLiveAtExit, undeliveredAtExit bool
+}
+
+// SendStdout stands in for a proxied request: the command printed its
+// proxy URL, so record one event under the command's session.
+func (s *exitCheckingSender) SendStdout(ctx context.Context, b []byte) error {
+	s.token = strings.TrimSuffix(strings.TrimPrefix(string(b), "http://"), "@127.0.0.1:4000")
+	s.rec.Record(egress.HTTPEvent{ID: egress.NewEventID(), SessionID: "sess-f", Outcome: egress.OutcomeAllowed})
+	return s.recordingSender.SendStdout(ctx, b)
+}
+
+func (s *exitCheckingSender) SendExit(ctx context.Context, c int32) error {
+	_, s.tokenLiveAtExit = s.runs.Lookup(s.token)
+	s.undeliveredAtExit = !s.delivered.Load()
+	return s.recordingSender.SendExit(ctx, c)
+}
+
+// Core-api must have the command's request rows before it sees EXIT, or the
+// agent's next turn could look for logs that are still on the worker.
+func TestRemoteCommandFlushesBeforeExit(t *testing.T) {
+	var delivered atomic.Bool
+	rec := egress.NewRecorder(egress.RecorderOptions{
+		Interval: 10 * time.Millisecond,
+		Send: func(context.Context, []egress.HTTPEvent, uint64) error {
+			// Slow enough that EXIT would win without the flush wait.
+			time.Sleep(300 * time.Millisecond)
+			delivered.Store(true)
+			return nil
+		},
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go rec.Run(ctx)
+
+	runs := egress.NewRunCredentials()
+	p := &agentProxy{runs: runs, port: 4000, grpcHost: "core", recorder: rec}
+	sb, err := newSessionSandbox(t.TempDir(), "sess-f", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &exitCheckingSender{runs: runs, rec: rec, delivered: &delivered}
+	executeRemoteCommand(context.Background(), s, "sess-f", `printf '%s' "$HTTP_PROXY"`, sb, nil, "/tools", p)
+
+	if len(s.exits) != 1 || s.exits[0] != 0 {
+		t.Fatalf("exits = %v, want [0]", s.exits)
+	}
+	if s.token == "" {
+		t.Fatal("command printed no proxy token")
+	}
+	if s.tokenLiveAtExit {
+		t.Fatal("token must be revoked before EXIT is sent")
+	}
+	if s.undeliveredAtExit {
+		t.Fatal("the session's log batch must be delivered before EXIT is sent")
+	}
+}
+
+// A nil proxy (no egress server) has nothing to flush and must not block.
+func TestAgentProxyFlushNil(t *testing.T) {
+	var p *agentProxy
+	p.flush("sess")
+}
+
+type fakeLogReporter struct {
+	calls atomic.Int32
+	ack   *workers.EgressHttpLogAck
+}
+
+func (f *fakeLogReporter) ReportEgressHttpLogs(context.Context, []egress.HTTPEvent, uint64) (*workers.EgressHttpLogAck, error) {
+	f.calls.Add(1)
+	return f.ack, nil
+}
+
+type warnCapture struct {
+	mu    sync.Mutex
+	warns []string
+}
+
+func (w *warnCapture) Info(string, ...any) {}
+func (w *warnCapture) Warning(msg string, args ...any) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.warns = append(w.warns, fmt.Sprintf(msg, args...))
+}
+
+// Rejections are final on the core-api side: warn once, never resend.
+func TestEgressRecorderWarnsOnRejectedWithoutRetry(t *testing.T) {
+	client := &fakeLogReporter{ack: &workers.EgressHttpLogAck{Accepted: 1, Rejected: 1}}
+	log := &warnCapture{}
+	rec := newEgressRecorder(client, log)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go rec.Run(ctx)
+
+	rec.Record(egress.HTTPEvent{ID: "a", SessionID: "s"})
+	rec.Record(egress.HTTPEvent{ID: "b", SessionID: "s"})
+	fctx, fcancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer fcancel()
+	rec.FlushSession(fctx, "s")
+
+	if n := client.calls.Load(); n != 1 {
+		t.Fatalf("send calls = %d, want 1", n)
+	}
+	log.mu.Lock()
+	defer log.mu.Unlock()
+	if len(log.warns) != 1 || !strings.Contains(log.warns[0], "rejected 1 of 2") {
+		t.Fatalf("warnings = %v", log.warns)
 	}
 }

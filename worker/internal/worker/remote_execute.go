@@ -495,6 +495,7 @@ func executeRemoteCommand(ctx context.Context, handler remoteResultSender, sessi
 	// Before EXIT is reported: background children that outlive the shell
 	// must not keep egress under this command's identity.
 	revoke()
+	proxy.flush(sessionID)
 	if waitErr != nil {
 		if exitErr, ok := waitErr.(*exec.ExitError); ok {
 			exitCode = int32(exitErr.ExitCode())

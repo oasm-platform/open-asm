@@ -1,12 +1,15 @@
 package worker
 
 import (
+	"context"
 	"net"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"oasm-worker/internal/egress"
+	workers "oasm-worker/internal/gen/workers"
 )
 
 // agentProxy routes agent host shell commands through the worker egress
@@ -17,6 +20,46 @@ type agentProxy struct {
 	runs     *egress.RunCredentials
 	port     int
 	grpcHost string
+	recorder *egress.Recorder
+}
+
+type egressLogReporter interface {
+	ReportEgressHttpLogs(ctx context.Context, events []egress.HTTPEvent, dropped uint64) (*workers.EgressHttpLogAck, error)
+}
+
+// newEgressRecorder ships the proxy's request logs to core-api. Rejected rows
+// are only logged: core-api rejects them for good (unknown session, wrong
+// worker), so a resend would be rejected again.
+func newEgressRecorder(client egressLogReporter, log egress.Logger) *egress.Recorder {
+	return egress.NewRecorder(egress.RecorderOptions{
+		Logger: log,
+		Send: func(ctx context.Context, batch []egress.HTTPEvent, dropped uint64) error {
+			ack, err := client.ReportEgressHttpLogs(ctx, batch, dropped)
+			if err != nil {
+				return err
+			}
+			if ack.GetRejected() > 0 {
+				log.Warning("core-api rejected %d of %d agent http log rows", ack.GetRejected(), len(batch))
+			}
+			return nil
+		},
+	})
+}
+
+// flushWait bounds how long EXIT waits for a command's request logs: logging
+// must never hold up the agent for long when core-api is slow or down.
+const flushWait = 2 * time.Second
+
+// flush waits until the session's recorded requests reached core-api. It is
+// detached from the command ctx: a cancelled stream must not skip the wait
+// that keeps EXIT behind the command's log rows.
+func (p *agentProxy) flush(sessionID string) {
+	if p == nil || p.recorder == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), flushWait)
+	defer cancel()
+	p.recorder.FlushSession(ctx, sessionID)
 }
 
 // env returns the proxy variables for one command's token. No ALL_PROXY:

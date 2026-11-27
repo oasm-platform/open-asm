@@ -415,6 +415,61 @@ func (ContainerExecutionState) EnumDescriptor() ([]byte, []int) {
 	return file_workers_proto_rawDescGZIP(), []int{6}
 }
 
+type EgressHttpOutcome int32
+
+const (
+	EgressHttpOutcome_EGRESS_HTTP_OUTCOME_UNSPECIFIED    EgressHttpOutcome = 0
+	EgressHttpOutcome_EGRESS_HTTP_OUTCOME_ALLOWED        EgressHttpOutcome = 1
+	EgressHttpOutcome_EGRESS_HTTP_OUTCOME_DENIED         EgressHttpOutcome = 2
+	EgressHttpOutcome_EGRESS_HTTP_OUTCOME_UPSTREAM_ERROR EgressHttpOutcome = 3
+	EgressHttpOutcome_EGRESS_HTTP_OUTCOME_CANCELLED      EgressHttpOutcome = 4
+)
+
+// Enum value maps for EgressHttpOutcome.
+var (
+	EgressHttpOutcome_name = map[int32]string{
+		0: "EGRESS_HTTP_OUTCOME_UNSPECIFIED",
+		1: "EGRESS_HTTP_OUTCOME_ALLOWED",
+		2: "EGRESS_HTTP_OUTCOME_DENIED",
+		3: "EGRESS_HTTP_OUTCOME_UPSTREAM_ERROR",
+		4: "EGRESS_HTTP_OUTCOME_CANCELLED",
+	}
+	EgressHttpOutcome_value = map[string]int32{
+		"EGRESS_HTTP_OUTCOME_UNSPECIFIED":    0,
+		"EGRESS_HTTP_OUTCOME_ALLOWED":        1,
+		"EGRESS_HTTP_OUTCOME_DENIED":         2,
+		"EGRESS_HTTP_OUTCOME_UPSTREAM_ERROR": 3,
+		"EGRESS_HTTP_OUTCOME_CANCELLED":      4,
+	}
+)
+
+func (x EgressHttpOutcome) Enum() *EgressHttpOutcome {
+	p := new(EgressHttpOutcome)
+	*p = x
+	return p
+}
+
+func (x EgressHttpOutcome) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (EgressHttpOutcome) Descriptor() protoreflect.EnumDescriptor {
+	return file_workers_proto_enumTypes[7].Descriptor()
+}
+
+func (EgressHttpOutcome) Type() protoreflect.EnumType {
+	return &file_workers_proto_enumTypes[7]
+}
+
+func (x EgressHttpOutcome) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use EgressHttpOutcome.Descriptor instead.
+func (EgressHttpOutcome) EnumDescriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{7}
+}
+
 type JoinRequest struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	ApiKey   string                 `protobuf:"bytes,1,opt,name=api_key,json=apiKey,proto3" json:"api_key,omitempty"`
@@ -2744,6 +2799,358 @@ func (x *CancelRequest) GetCancelledBy() string {
 	return ""
 }
 
+type EgressHttpLogBatch struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Logs          []*EgressHttpLog       `protobuf:"bytes,1,rep,name=logs,proto3" json:"logs,omitempty"`
+	Dropped       uint64                 `protobuf:"varint,2,opt,name=dropped,proto3" json:"dropped,omitempty"` // events dropped on the worker since the last batch (buffer full)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EgressHttpLogBatch) Reset() {
+	*x = EgressHttpLogBatch{}
+	mi := &file_workers_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EgressHttpLogBatch) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EgressHttpLogBatch) ProtoMessage() {}
+
+func (x *EgressHttpLogBatch) ProtoReflect() protoreflect.Message {
+	mi := &file_workers_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EgressHttpLogBatch.ProtoReflect.Descriptor instead.
+func (*EgressHttpLogBatch) Descriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *EgressHttpLogBatch) GetLogs() []*EgressHttpLog {
+	if x != nil {
+		return x.Logs
+	}
+	return nil
+}
+
+func (x *EgressHttpLogBatch) GetDropped() uint64 {
+	if x != nil {
+		return x.Dropped
+	}
+	return 0
+}
+
+type EgressHttpLog struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	Id                    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`                                // UUIDv7, idempotency key = agent_http_requests.id
+	SessionId             string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"` // remote-execute session the proxy credential was issued for
+	Scheme                string                 `protobuf:"bytes,3,opt,name=scheme,proto3" json:"scheme,omitempty"`
+	Method                string                 `protobuf:"bytes,4,opt,name=method,proto3" json:"method,omitempty"` // "" for CONNECT
+	Host                  string                 `protobuf:"bytes,5,opt,name=host,proto3" json:"host,omitempty"`
+	Port                  uint32                 `protobuf:"varint,6,opt,name=port,proto3" json:"port,omitempty"`
+	Path                  string                 `protobuf:"bytes,7,opt,name=path,proto3" json:"path,omitempty"`                                // "" for CONNECT
+	StatusCode            uint32                 `protobuf:"varint,8,opt,name=status_code,json=statusCode,proto3" json:"status_code,omitempty"` // 0 when none
+	Outcome               EgressHttpOutcome      `protobuf:"varint,9,opt,name=outcome,proto3,enum=workers.EgressHttpOutcome" json:"outcome,omitempty"`
+	Error                 string                 `protobuf:"bytes,10,opt,name=error,proto3" json:"error,omitempty"`
+	RequestBytes          uint64                 `protobuf:"varint,11,opt,name=request_bytes,json=requestBytes,proto3" json:"request_bytes,omitempty"`
+	ResponseBytes         uint64                 `protobuf:"varint,12,opt,name=response_bytes,json=responseBytes,proto3" json:"response_bytes,omitempty"`
+	SentAt                *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=sent_at,json=sentAt,proto3" json:"sent_at,omitempty"`
+	CompletedAt           *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
+	RequestHeaders        []*HttpHeader          `protobuf:"bytes,15,rep,name=request_headers,json=requestHeaders,proto3" json:"request_headers,omitempty"`    // masked
+	ResponseHeaders       []*HttpHeader          `protobuf:"bytes,16,rep,name=response_headers,json=responseHeaders,proto3" json:"response_headers,omitempty"` // masked
+	RequestBody           []byte                 `protobuf:"bytes,17,opt,name=request_body,json=requestBody,proto3" json:"request_body,omitempty"`             // capped
+	ResponseBody          []byte                 `protobuf:"bytes,18,opt,name=response_body,json=responseBody,proto3" json:"response_body,omitempty"`          // capped
+	RequestBodyTruncated  bool                   `protobuf:"varint,19,opt,name=request_body_truncated,json=requestBodyTruncated,proto3" json:"request_body_truncated,omitempty"`
+	ResponseBodyTruncated bool                   `protobuf:"varint,20,opt,name=response_body_truncated,json=responseBodyTruncated,proto3" json:"response_body_truncated,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *EgressHttpLog) Reset() {
+	*x = EgressHttpLog{}
+	mi := &file_workers_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EgressHttpLog) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EgressHttpLog) ProtoMessage() {}
+
+func (x *EgressHttpLog) ProtoReflect() protoreflect.Message {
+	mi := &file_workers_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EgressHttpLog.ProtoReflect.Descriptor instead.
+func (*EgressHttpLog) Descriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *EgressHttpLog) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *EgressHttpLog) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *EgressHttpLog) GetScheme() string {
+	if x != nil {
+		return x.Scheme
+	}
+	return ""
+}
+
+func (x *EgressHttpLog) GetMethod() string {
+	if x != nil {
+		return x.Method
+	}
+	return ""
+}
+
+func (x *EgressHttpLog) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *EgressHttpLog) GetPort() uint32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *EgressHttpLog) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *EgressHttpLog) GetStatusCode() uint32 {
+	if x != nil {
+		return x.StatusCode
+	}
+	return 0
+}
+
+func (x *EgressHttpLog) GetOutcome() EgressHttpOutcome {
+	if x != nil {
+		return x.Outcome
+	}
+	return EgressHttpOutcome_EGRESS_HTTP_OUTCOME_UNSPECIFIED
+}
+
+func (x *EgressHttpLog) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+func (x *EgressHttpLog) GetRequestBytes() uint64 {
+	if x != nil {
+		return x.RequestBytes
+	}
+	return 0
+}
+
+func (x *EgressHttpLog) GetResponseBytes() uint64 {
+	if x != nil {
+		return x.ResponseBytes
+	}
+	return 0
+}
+
+func (x *EgressHttpLog) GetSentAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.SentAt
+	}
+	return nil
+}
+
+func (x *EgressHttpLog) GetCompletedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CompletedAt
+	}
+	return nil
+}
+
+func (x *EgressHttpLog) GetRequestHeaders() []*HttpHeader {
+	if x != nil {
+		return x.RequestHeaders
+	}
+	return nil
+}
+
+func (x *EgressHttpLog) GetResponseHeaders() []*HttpHeader {
+	if x != nil {
+		return x.ResponseHeaders
+	}
+	return nil
+}
+
+func (x *EgressHttpLog) GetRequestBody() []byte {
+	if x != nil {
+		return x.RequestBody
+	}
+	return nil
+}
+
+func (x *EgressHttpLog) GetResponseBody() []byte {
+	if x != nil {
+		return x.ResponseBody
+	}
+	return nil
+}
+
+func (x *EgressHttpLog) GetRequestBodyTruncated() bool {
+	if x != nil {
+		return x.RequestBodyTruncated
+	}
+	return false
+}
+
+func (x *EgressHttpLog) GetResponseBodyTruncated() bool {
+	if x != nil {
+		return x.ResponseBodyTruncated
+	}
+	return false
+}
+
+type HttpHeader struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HttpHeader) Reset() {
+	*x = HttpHeader{}
+	mi := &file_workers_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HttpHeader) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HttpHeader) ProtoMessage() {}
+
+func (x *HttpHeader) ProtoReflect() protoreflect.Message {
+	mi := &file_workers_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HttpHeader.ProtoReflect.Descriptor instead.
+func (*HttpHeader) Descriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *HttpHeader) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *HttpHeader) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+type EgressHttpLogAck struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Accepted      uint32                 `protobuf:"varint,1,opt,name=accepted,proto3" json:"accepted,omitempty"`
+	Rejected      uint32                 `protobuf:"varint,2,opt,name=rejected,proto3" json:"rejected,omitempty"` // unknown session, wrong worker, invalid fields
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EgressHttpLogAck) Reset() {
+	*x = EgressHttpLogAck{}
+	mi := &file_workers_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EgressHttpLogAck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EgressHttpLogAck) ProtoMessage() {}
+
+func (x *EgressHttpLogAck) ProtoReflect() protoreflect.Message {
+	mi := &file_workers_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EgressHttpLogAck.ProtoReflect.Descriptor instead.
+func (*EgressHttpLogAck) Descriptor() ([]byte, []int) {
+	return file_workers_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *EgressHttpLogAck) GetAccepted() uint32 {
+	if x != nil {
+		return x.Accepted
+	}
+	return 0
+}
+
+func (x *EgressHttpLogAck) GetRejected() uint32 {
+	if x != nil {
+		return x.Rejected
+	}
+	return 0
+}
+
 var File_workers_proto protoreflect.FileDescriptor
 
 const file_workers_proto_rawDesc = "" +
@@ -2959,7 +3366,41 @@ const file_workers_proto_rawDesc = "" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x16\n" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\x12&\n" +
 	"\fcancelled_by\x18\x03 \x01(\tH\x00R\vcancelledBy\x88\x01\x01B\x0f\n" +
-	"\r_cancelled_by*_\n" +
+	"\r_cancelled_by\"Z\n" +
+	"\x12EgressHttpLogBatch\x12*\n" +
+	"\x04logs\x18\x01 \x03(\v2\x16.workers.EgressHttpLogR\x04logs\x12\x18\n" +
+	"\adropped\x18\x02 \x01(\x04R\adropped\"\x8b\x06\n" +
+	"\rEgressHttpLog\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\x12\x16\n" +
+	"\x06scheme\x18\x03 \x01(\tR\x06scheme\x12\x16\n" +
+	"\x06method\x18\x04 \x01(\tR\x06method\x12\x12\n" +
+	"\x04host\x18\x05 \x01(\tR\x04host\x12\x12\n" +
+	"\x04port\x18\x06 \x01(\rR\x04port\x12\x12\n" +
+	"\x04path\x18\a \x01(\tR\x04path\x12\x1f\n" +
+	"\vstatus_code\x18\b \x01(\rR\n" +
+	"statusCode\x124\n" +
+	"\aoutcome\x18\t \x01(\x0e2\x1a.workers.EgressHttpOutcomeR\aoutcome\x12\x14\n" +
+	"\x05error\x18\n" +
+	" \x01(\tR\x05error\x12#\n" +
+	"\rrequest_bytes\x18\v \x01(\x04R\frequestBytes\x12%\n" +
+	"\x0eresponse_bytes\x18\f \x01(\x04R\rresponseBytes\x123\n" +
+	"\asent_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\x06sentAt\x12=\n" +
+	"\fcompleted_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\vcompletedAt\x12<\n" +
+	"\x0frequest_headers\x18\x0f \x03(\v2\x13.workers.HttpHeaderR\x0erequestHeaders\x12>\n" +
+	"\x10response_headers\x18\x10 \x03(\v2\x13.workers.HttpHeaderR\x0fresponseHeaders\x12!\n" +
+	"\frequest_body\x18\x11 \x01(\fR\vrequestBody\x12#\n" +
+	"\rresponse_body\x18\x12 \x01(\fR\fresponseBody\x124\n" +
+	"\x16request_body_truncated\x18\x13 \x01(\bR\x14requestBodyTruncated\x126\n" +
+	"\x17response_body_truncated\x18\x14 \x01(\bR\x15responseBodyTruncated\"6\n" +
+	"\n" +
+	"HttpHeader\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\"J\n" +
+	"\x10EgressHttpLogAck\x12\x1a\n" +
+	"\baccepted\x18\x01 \x01(\rR\baccepted\x12\x1a\n" +
+	"\brejected\x18\x02 \x01(\rR\brejected*_\n" +
 	"\rWorkerRunMode\x12\x1b\n" +
 	"\x17WORKER_RUN_MODE_UNKNOWN\x10\x00\x12\x17\n" +
 	"\x13WORKER_RUN_MODE_CLI\x10\x01\x12\x18\n" +
@@ -3001,7 +3442,13 @@ const file_workers_proto_rawDesc = "" +
 	" CONTAINER_EXECUTION_STATE_ACTIVE\x10\x01\x12'\n" +
 	"#CONTAINER_EXECUTION_STATE_COMPLETED\x10\x02\x12'\n" +
 	"#CONTAINER_EXECUTION_STATE_CANCELLED\x10\x03\x12$\n" +
-	" CONTAINER_EXECUTION_STATE_FAILED\x10\x042\xb2\x06\n" +
+	" CONTAINER_EXECUTION_STATE_FAILED\x10\x04*\xc4\x01\n" +
+	"\x11EgressHttpOutcome\x12#\n" +
+	"\x1fEGRESS_HTTP_OUTCOME_UNSPECIFIED\x10\x00\x12\x1f\n" +
+	"\x1bEGRESS_HTTP_OUTCOME_ALLOWED\x10\x01\x12\x1e\n" +
+	"\x1aEGRESS_HTTP_OUTCOME_DENIED\x10\x02\x12&\n" +
+	"\"EGRESS_HTTP_OUTCOME_UPSTREAM_ERROR\x10\x03\x12!\n" +
+	"\x1dEGRESS_HTTP_OUTCOME_CANCELLED\x10\x042\x82\a\n" +
 	"\x0eWorkersService\x123\n" +
 	"\x04Join\x12\x14.workers.JoinRequest\x1a\x15.workers.JoinResponse\x128\n" +
 	"\x05Alive\x12\x15.workers.AliveRequest\x1a\x16.workers.AliveResponse0\x01\x12T\n" +
@@ -3011,7 +3458,8 @@ const file_workers_proto_rawDesc = "" +
 	"\x16ConnectInternalNetwork\x12&.workers.ConnectInternalNetworkRequest\x1a'.workers.ConnectInternalNetworkResponse\x12`\n" +
 	"\x13BuiltinToolRegistry\x12#.workers.BuiltinToolRegistryRequest\x1a$.workers.BuiltinToolRegistryResponse\x12k\n" +
 	"\x16RemoteExecuteSubscribe\x12&.workers.RemoteExecuteSubscribeRequest\x1a'.workers.RemoteExecuteSubscribeResponse0\x01\x12Z\n" +
-	"\x13RemoteExecuteResult\x12\".workers.RemoteExecuteResultStream\x1a\x1f.workers.RemoteExecuteResultAck\x12;\n" +
+	"\x13RemoteExecuteResult\x12\".workers.RemoteExecuteResultStream\x1a\x1f.workers.RemoteExecuteResultAck\x12N\n" +
+	"\x14ReportEgressHttpLogs\x12\x1b.workers.EgressHttpLogBatch\x1a\x19.workers.EgressHttpLogAck\x12;\n" +
 	"\aConnect\x12\x15.workers.WorkerToCore\x1a\x15.workers.CoreToWorker(\x010\x01B\"Z oasm-worker/internal/gen/workersb\x06proto3"
 
 var (
@@ -3026,8 +3474,8 @@ func file_workers_proto_rawDescGZIP() []byte {
 	return file_workers_proto_rawDescData
 }
 
-var file_workers_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
-var file_workers_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
+var file_workers_proto_enumTypes = make([]protoimpl.EnumInfo, 8)
+var file_workers_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
 var file_workers_proto_goTypes = []any{
 	(WorkerRunMode)(0),                     // 0: workers.WorkerRunMode
 	(RemoteExecuteSubscribeEventType)(0),   // 1: workers.RemoteExecuteSubscribeEventType
@@ -3036,96 +3484,109 @@ var file_workers_proto_goTypes = []any{
 	(ContainerRuntimeState)(0),             // 4: workers.ContainerRuntimeState
 	(ContainerHealthState)(0),              // 5: workers.ContainerHealthState
 	(ContainerExecutionState)(0),           // 6: workers.ContainerExecutionState
-	(*JoinRequest)(nil),                    // 7: workers.JoinRequest
-	(*WorkerMetadata)(nil),                 // 8: workers.WorkerMetadata
-	(*JoinResponse)(nil),                   // 9: workers.JoinResponse
-	(*AliveRequest)(nil),                   // 10: workers.AliveRequest
-	(*AliveResponse)(nil),                  // 11: workers.AliveResponse
-	(*GetManifestRequest)(nil),             // 12: workers.GetManifestRequest
-	(*GetManifestResponse)(nil),            // 13: workers.GetManifestResponse
-	(*StorageRequest)(nil),                 // 14: workers.StorageRequest
-	(*StorageResponse)(nil),                // 15: workers.StorageResponse
-	(*NetworkInterfaceMessage)(nil),        // 16: workers.NetworkInterfaceMessage
-	(*ConnectInternalNetworkRequest)(nil),  // 17: workers.ConnectInternalNetworkRequest
-	(*ConnectInternalNetworkResponse)(nil), // 18: workers.ConnectInternalNetworkResponse
-	(*BuiltinToolRegistryRequest)(nil),     // 19: workers.BuiltinToolRegistryRequest
-	(*BuiltinToolRegistryResponse)(nil),    // 20: workers.BuiltinToolRegistryResponse
-	(*RemoteExecuteSubscribeRequest)(nil),  // 21: workers.RemoteExecuteSubscribeRequest
-	(*ToolRun)(nil),                        // 22: workers.ToolRun
-	(*RemoteExecuteSubscribeResponse)(nil), // 23: workers.RemoteExecuteSubscribeResponse
-	(*RemoteExecuteResultStream)(nil),      // 24: workers.RemoteExecuteResultStream
-	(*RemoteExecuteResultAck)(nil),         // 25: workers.RemoteExecuteResultAck
-	(*WorkerNodeTelemetry)(nil),            // 26: workers.WorkerNodeTelemetry
-	(*WorkerJobTelemetry)(nil),             // 27: workers.WorkerJobTelemetry
-	(*ManagedContainerTelemetry)(nil),      // 28: workers.ManagedContainerTelemetry
-	(*WorkerContainersTelemetry)(nil),      // 29: workers.WorkerContainersTelemetry
-	(*WorkerTelemetryRequest)(nil),         // 30: workers.WorkerTelemetryRequest
-	(*WorkerTelemetryResponse)(nil),        // 31: workers.WorkerTelemetryResponse
-	(*WorkerToCore)(nil),                   // 32: workers.WorkerToCore
-	(*CoreToWorker)(nil),                   // 33: workers.CoreToWorker
-	(*JobsAvailable)(nil),                  // 34: workers.JobsAvailable
-	(*RegisterRequest)(nil),                // 35: workers.RegisterRequest
-	(*RegisterResponse)(nil),               // 36: workers.RegisterResponse
-	(*Heartbeat)(nil),                      // 37: workers.Heartbeat
-	(*HeartbeatAck)(nil),                   // 38: workers.HeartbeatAck
-	(*CancelRequest)(nil),                  // 39: workers.CancelRequest
-	(*timestamppb.Timestamp)(nil),          // 40: google.protobuf.Timestamp
+	(EgressHttpOutcome)(0),                 // 7: workers.EgressHttpOutcome
+	(*JoinRequest)(nil),                    // 8: workers.JoinRequest
+	(*WorkerMetadata)(nil),                 // 9: workers.WorkerMetadata
+	(*JoinResponse)(nil),                   // 10: workers.JoinResponse
+	(*AliveRequest)(nil),                   // 11: workers.AliveRequest
+	(*AliveResponse)(nil),                  // 12: workers.AliveResponse
+	(*GetManifestRequest)(nil),             // 13: workers.GetManifestRequest
+	(*GetManifestResponse)(nil),            // 14: workers.GetManifestResponse
+	(*StorageRequest)(nil),                 // 15: workers.StorageRequest
+	(*StorageResponse)(nil),                // 16: workers.StorageResponse
+	(*NetworkInterfaceMessage)(nil),        // 17: workers.NetworkInterfaceMessage
+	(*ConnectInternalNetworkRequest)(nil),  // 18: workers.ConnectInternalNetworkRequest
+	(*ConnectInternalNetworkResponse)(nil), // 19: workers.ConnectInternalNetworkResponse
+	(*BuiltinToolRegistryRequest)(nil),     // 20: workers.BuiltinToolRegistryRequest
+	(*BuiltinToolRegistryResponse)(nil),    // 21: workers.BuiltinToolRegistryResponse
+	(*RemoteExecuteSubscribeRequest)(nil),  // 22: workers.RemoteExecuteSubscribeRequest
+	(*ToolRun)(nil),                        // 23: workers.ToolRun
+	(*RemoteExecuteSubscribeResponse)(nil), // 24: workers.RemoteExecuteSubscribeResponse
+	(*RemoteExecuteResultStream)(nil),      // 25: workers.RemoteExecuteResultStream
+	(*RemoteExecuteResultAck)(nil),         // 26: workers.RemoteExecuteResultAck
+	(*WorkerNodeTelemetry)(nil),            // 27: workers.WorkerNodeTelemetry
+	(*WorkerJobTelemetry)(nil),             // 28: workers.WorkerJobTelemetry
+	(*ManagedContainerTelemetry)(nil),      // 29: workers.ManagedContainerTelemetry
+	(*WorkerContainersTelemetry)(nil),      // 30: workers.WorkerContainersTelemetry
+	(*WorkerTelemetryRequest)(nil),         // 31: workers.WorkerTelemetryRequest
+	(*WorkerTelemetryResponse)(nil),        // 32: workers.WorkerTelemetryResponse
+	(*WorkerToCore)(nil),                   // 33: workers.WorkerToCore
+	(*CoreToWorker)(nil),                   // 34: workers.CoreToWorker
+	(*JobsAvailable)(nil),                  // 35: workers.JobsAvailable
+	(*RegisterRequest)(nil),                // 36: workers.RegisterRequest
+	(*RegisterResponse)(nil),               // 37: workers.RegisterResponse
+	(*Heartbeat)(nil),                      // 38: workers.Heartbeat
+	(*HeartbeatAck)(nil),                   // 39: workers.HeartbeatAck
+	(*CancelRequest)(nil),                  // 40: workers.CancelRequest
+	(*EgressHttpLogBatch)(nil),             // 41: workers.EgressHttpLogBatch
+	(*EgressHttpLog)(nil),                  // 42: workers.EgressHttpLog
+	(*HttpHeader)(nil),                     // 43: workers.HttpHeader
+	(*EgressHttpLogAck)(nil),               // 44: workers.EgressHttpLogAck
+	(*timestamppb.Timestamp)(nil),          // 45: google.protobuf.Timestamp
 }
 var file_workers_proto_depIdxs = []int32{
-	8,  // 0: workers.JoinRequest.metadata:type_name -> workers.WorkerMetadata
+	9,  // 0: workers.JoinRequest.metadata:type_name -> workers.WorkerMetadata
 	0,  // 1: workers.WorkerMetadata.mode:type_name -> workers.WorkerRunMode
-	16, // 2: workers.ConnectInternalNetworkRequest.network_interfaces:type_name -> workers.NetworkInterfaceMessage
+	17, // 2: workers.ConnectInternalNetworkRequest.network_interfaces:type_name -> workers.NetworkInterfaceMessage
 	1,  // 3: workers.RemoteExecuteSubscribeResponse.type:type_name -> workers.RemoteExecuteSubscribeEventType
-	22, // 4: workers.RemoteExecuteSubscribeResponse.tool_run:type_name -> workers.ToolRun
+	23, // 4: workers.RemoteExecuteSubscribeResponse.tool_run:type_name -> workers.ToolRun
 	2,  // 5: workers.RemoteExecuteResultStream.type:type_name -> workers.RemoteExecuteResultEventType
 	4,  // 6: workers.ManagedContainerTelemetry.runtime_state:type_name -> workers.ContainerRuntimeState
 	5,  // 7: workers.ManagedContainerTelemetry.health_state:type_name -> workers.ContainerHealthState
 	6,  // 8: workers.ManagedContainerTelemetry.execution_state:type_name -> workers.ContainerExecutionState
-	40, // 9: workers.ManagedContainerTelemetry.created_at:type_name -> google.protobuf.Timestamp
-	40, // 10: workers.ManagedContainerTelemetry.started_at:type_name -> google.protobuf.Timestamp
-	40, // 11: workers.ManagedContainerTelemetry.finished_at:type_name -> google.protobuf.Timestamp
-	40, // 12: workers.ManagedContainerTelemetry.state_changed_at:type_name -> google.protobuf.Timestamp
-	40, // 13: workers.ManagedContainerTelemetry.last_used_at:type_name -> google.protobuf.Timestamp
-	28, // 14: workers.WorkerContainersTelemetry.items:type_name -> workers.ManagedContainerTelemetry
-	40, // 15: workers.WorkerTelemetryRequest.observed_at:type_name -> google.protobuf.Timestamp
-	40, // 16: workers.WorkerTelemetryRequest.started_at:type_name -> google.protobuf.Timestamp
+	45, // 9: workers.ManagedContainerTelemetry.created_at:type_name -> google.protobuf.Timestamp
+	45, // 10: workers.ManagedContainerTelemetry.started_at:type_name -> google.protobuf.Timestamp
+	45, // 11: workers.ManagedContainerTelemetry.finished_at:type_name -> google.protobuf.Timestamp
+	45, // 12: workers.ManagedContainerTelemetry.state_changed_at:type_name -> google.protobuf.Timestamp
+	45, // 13: workers.ManagedContainerTelemetry.last_used_at:type_name -> google.protobuf.Timestamp
+	29, // 14: workers.WorkerContainersTelemetry.items:type_name -> workers.ManagedContainerTelemetry
+	45, // 15: workers.WorkerTelemetryRequest.observed_at:type_name -> google.protobuf.Timestamp
+	45, // 16: workers.WorkerTelemetryRequest.started_at:type_name -> google.protobuf.Timestamp
 	3,  // 17: workers.WorkerTelemetryRequest.state:type_name -> workers.WorkerRuntimeState
-	26, // 18: workers.WorkerTelemetryRequest.node:type_name -> workers.WorkerNodeTelemetry
-	27, // 19: workers.WorkerTelemetryRequest.jobs:type_name -> workers.WorkerJobTelemetry
-	29, // 20: workers.WorkerTelemetryRequest.containers:type_name -> workers.WorkerContainersTelemetry
-	40, // 21: workers.WorkerTelemetryResponse.received_at:type_name -> google.protobuf.Timestamp
-	35, // 22: workers.WorkerToCore.register:type_name -> workers.RegisterRequest
-	37, // 23: workers.WorkerToCore.heartbeat:type_name -> workers.Heartbeat
-	36, // 24: workers.CoreToWorker.register_resp:type_name -> workers.RegisterResponse
-	38, // 25: workers.CoreToWorker.heartbeat_ack:type_name -> workers.HeartbeatAck
-	39, // 26: workers.CoreToWorker.cancel:type_name -> workers.CancelRequest
-	34, // 27: workers.CoreToWorker.jobs_available:type_name -> workers.JobsAvailable
-	8,  // 28: workers.RegisterRequest.metadata:type_name -> workers.WorkerMetadata
-	7,  // 29: workers.WorkersService.Join:input_type -> workers.JoinRequest
-	10, // 30: workers.WorkersService.Alive:input_type -> workers.AliveRequest
-	30, // 31: workers.WorkersService.WorkerTelemetry:input_type -> workers.WorkerTelemetryRequest
-	12, // 32: workers.WorkersService.GetManifest:input_type -> workers.GetManifestRequest
-	14, // 33: workers.WorkersService.Storage:input_type -> workers.StorageRequest
-	17, // 34: workers.WorkersService.ConnectInternalNetwork:input_type -> workers.ConnectInternalNetworkRequest
-	19, // 35: workers.WorkersService.BuiltinToolRegistry:input_type -> workers.BuiltinToolRegistryRequest
-	21, // 36: workers.WorkersService.RemoteExecuteSubscribe:input_type -> workers.RemoteExecuteSubscribeRequest
-	24, // 37: workers.WorkersService.RemoteExecuteResult:input_type -> workers.RemoteExecuteResultStream
-	32, // 38: workers.WorkersService.Connect:input_type -> workers.WorkerToCore
-	9,  // 39: workers.WorkersService.Join:output_type -> workers.JoinResponse
-	11, // 40: workers.WorkersService.Alive:output_type -> workers.AliveResponse
-	31, // 41: workers.WorkersService.WorkerTelemetry:output_type -> workers.WorkerTelemetryResponse
-	13, // 42: workers.WorkersService.GetManifest:output_type -> workers.GetManifestResponse
-	15, // 43: workers.WorkersService.Storage:output_type -> workers.StorageResponse
-	18, // 44: workers.WorkersService.ConnectInternalNetwork:output_type -> workers.ConnectInternalNetworkResponse
-	20, // 45: workers.WorkersService.BuiltinToolRegistry:output_type -> workers.BuiltinToolRegistryResponse
-	23, // 46: workers.WorkersService.RemoteExecuteSubscribe:output_type -> workers.RemoteExecuteSubscribeResponse
-	25, // 47: workers.WorkersService.RemoteExecuteResult:output_type -> workers.RemoteExecuteResultAck
-	33, // 48: workers.WorkersService.Connect:output_type -> workers.CoreToWorker
-	39, // [39:49] is the sub-list for method output_type
-	29, // [29:39] is the sub-list for method input_type
-	29, // [29:29] is the sub-list for extension type_name
-	29, // [29:29] is the sub-list for extension extendee
-	0,  // [0:29] is the sub-list for field type_name
+	27, // 18: workers.WorkerTelemetryRequest.node:type_name -> workers.WorkerNodeTelemetry
+	28, // 19: workers.WorkerTelemetryRequest.jobs:type_name -> workers.WorkerJobTelemetry
+	30, // 20: workers.WorkerTelemetryRequest.containers:type_name -> workers.WorkerContainersTelemetry
+	45, // 21: workers.WorkerTelemetryResponse.received_at:type_name -> google.protobuf.Timestamp
+	36, // 22: workers.WorkerToCore.register:type_name -> workers.RegisterRequest
+	38, // 23: workers.WorkerToCore.heartbeat:type_name -> workers.Heartbeat
+	37, // 24: workers.CoreToWorker.register_resp:type_name -> workers.RegisterResponse
+	39, // 25: workers.CoreToWorker.heartbeat_ack:type_name -> workers.HeartbeatAck
+	40, // 26: workers.CoreToWorker.cancel:type_name -> workers.CancelRequest
+	35, // 27: workers.CoreToWorker.jobs_available:type_name -> workers.JobsAvailable
+	9,  // 28: workers.RegisterRequest.metadata:type_name -> workers.WorkerMetadata
+	42, // 29: workers.EgressHttpLogBatch.logs:type_name -> workers.EgressHttpLog
+	7,  // 30: workers.EgressHttpLog.outcome:type_name -> workers.EgressHttpOutcome
+	45, // 31: workers.EgressHttpLog.sent_at:type_name -> google.protobuf.Timestamp
+	45, // 32: workers.EgressHttpLog.completed_at:type_name -> google.protobuf.Timestamp
+	43, // 33: workers.EgressHttpLog.request_headers:type_name -> workers.HttpHeader
+	43, // 34: workers.EgressHttpLog.response_headers:type_name -> workers.HttpHeader
+	8,  // 35: workers.WorkersService.Join:input_type -> workers.JoinRequest
+	11, // 36: workers.WorkersService.Alive:input_type -> workers.AliveRequest
+	31, // 37: workers.WorkersService.WorkerTelemetry:input_type -> workers.WorkerTelemetryRequest
+	13, // 38: workers.WorkersService.GetManifest:input_type -> workers.GetManifestRequest
+	15, // 39: workers.WorkersService.Storage:input_type -> workers.StorageRequest
+	18, // 40: workers.WorkersService.ConnectInternalNetwork:input_type -> workers.ConnectInternalNetworkRequest
+	20, // 41: workers.WorkersService.BuiltinToolRegistry:input_type -> workers.BuiltinToolRegistryRequest
+	22, // 42: workers.WorkersService.RemoteExecuteSubscribe:input_type -> workers.RemoteExecuteSubscribeRequest
+	25, // 43: workers.WorkersService.RemoteExecuteResult:input_type -> workers.RemoteExecuteResultStream
+	41, // 44: workers.WorkersService.ReportEgressHttpLogs:input_type -> workers.EgressHttpLogBatch
+	33, // 45: workers.WorkersService.Connect:input_type -> workers.WorkerToCore
+	10, // 46: workers.WorkersService.Join:output_type -> workers.JoinResponse
+	12, // 47: workers.WorkersService.Alive:output_type -> workers.AliveResponse
+	32, // 48: workers.WorkersService.WorkerTelemetry:output_type -> workers.WorkerTelemetryResponse
+	14, // 49: workers.WorkersService.GetManifest:output_type -> workers.GetManifestResponse
+	16, // 50: workers.WorkersService.Storage:output_type -> workers.StorageResponse
+	19, // 51: workers.WorkersService.ConnectInternalNetwork:output_type -> workers.ConnectInternalNetworkResponse
+	21, // 52: workers.WorkersService.BuiltinToolRegistry:output_type -> workers.BuiltinToolRegistryResponse
+	24, // 53: workers.WorkersService.RemoteExecuteSubscribe:output_type -> workers.RemoteExecuteSubscribeResponse
+	26, // 54: workers.WorkersService.RemoteExecuteResult:output_type -> workers.RemoteExecuteResultAck
+	44, // 55: workers.WorkersService.ReportEgressHttpLogs:output_type -> workers.EgressHttpLogAck
+	34, // 56: workers.WorkersService.Connect:output_type -> workers.CoreToWorker
+	46, // [46:57] is the sub-list for method output_type
+	35, // [35:46] is the sub-list for method input_type
+	35, // [35:35] is the sub-list for extension type_name
+	35, // [35:35] is the sub-list for extension extendee
+	0,  // [0:35] is the sub-list for field type_name
 }
 
 func init() { file_workers_proto_init() }
@@ -3155,8 +3616,8 @@ func file_workers_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_workers_proto_rawDesc), len(file_workers_proto_rawDesc)),
-			NumEnums:      7,
-			NumMessages:   33,
+			NumEnums:      8,
+			NumMessages:   37,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

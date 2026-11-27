@@ -33,6 +33,7 @@ type fakeWorkersService struct {
 	registryFn     func(ctx context.Context, req *workers.BuiltinToolRegistryRequest) (*workers.BuiltinToolRegistryResponse, error)
 	subscribeFn    func(req *workers.RemoteExecuteSubscribeRequest, srv workers.WorkersService_RemoteExecuteSubscribeServer) error
 	resultStreamFn func(ctx context.Context, req *workers.RemoteExecuteResultStream) (*workers.RemoteExecuteResultAck, error)
+	egressLogsFn   func(ctx context.Context, req *workers.EgressHttpLogBatch) (*workers.EgressHttpLogAck, error)
 
 	// Recording fields
 	mu        sync.Mutex
@@ -118,6 +119,13 @@ func (f *fakeWorkersService) RemoteExecuteResult(ctx context.Context, req *worke
 		return f.resultStreamFn(ctx, req)
 	}
 	return nil, status.Error(codes.Unimplemented, "remote execute result not configured")
+}
+
+func (f *fakeWorkersService) ReportEgressHttpLogs(ctx context.Context, req *workers.EgressHttpLogBatch) (*workers.EgressHttpLogAck, error) {
+	if f.egressLogsFn != nil {
+		return f.egressLogsFn(ctx, req)
+	}
+	return nil, status.Error(codes.Unimplemented, "report egress http logs not configured")
 }
 
 // --- Hook-driven fake JobsRegistryService ---
