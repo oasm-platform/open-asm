@@ -93,9 +93,12 @@ describe('AiStudioSidebar', () => {
     expect(openSettingsMock).toHaveBeenCalledWith();
   });
 
-  it('links to the usage and connectors pages', async () => {
+  it('links to the usage, HTTP requests and connectors pages', async () => {
     setup();
 
+    expect(
+      await screen.findByRole('link', { name: 'HTTP requests' }),
+    ).toHaveAttribute('href', '/aistudio/http-requests');
     expect(
       await screen.findByRole('link', { name: 'Connectors' }),
     ).toHaveAttribute('href', '/aistudio/connectors');

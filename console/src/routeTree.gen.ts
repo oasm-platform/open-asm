@@ -31,6 +31,7 @@ import { Route as AuthedAgentsCreateRouteImport } from './routes/_authed/agents/
 import { Route as AuthedAistudioIndexRouteImport } from './routes/_authed/aistudio/index'
 import { Route as AuthedAistudioAgentsRouteImport } from './routes/_authed/aistudio/agents'
 import { Route as AuthedAistudioConnectorsRouteImport } from './routes/_authed/aistudio/connectors'
+import { Route as AuthedAistudioHttpRequestsRouteImport } from './routes/_authed/aistudio/http-requests'
 import { Route as AuthedAistudioUsageRouteImport } from './routes/_authed/aistudio/usage'
 import { Route as AuthedAssetsIndexRouteImport } from './routes/_authed/assets/index'
 import { Route as AuthedIntegrationsIndexRouteImport } from './routes/_authed/integrations/index'
@@ -182,6 +183,12 @@ const AuthedAistudioConnectorsRoute =
   AuthedAistudioConnectorsRouteImport.update({
     id: '/aistudio/connectors',
     path: '/aistudio/connectors',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedAistudioHttpRequestsRoute =
+  AuthedAistudioHttpRequestsRouteImport.update({
+    id: '/aistudio/http-requests',
+    path: '/aistudio/http-requests',
     getParentRoute: () => AuthedRoute,
   } as any)
 const AuthedAistudioUsageRoute = AuthedAistudioUsageRouteImport.update({
@@ -426,6 +433,7 @@ export interface FileRoutesByFullPath {
   '/agents/create': typeof AuthedAgentsCreateRoute
   '/aistudio/agents': typeof AuthedAistudioAgentsRoute
   '/aistudio/connectors': typeof AuthedAistudioConnectorsRoute
+  '/aistudio/http-requests': typeof AuthedAistudioHttpRequestsRoute
   '/aistudio/usage': typeof AuthedAistudioUsageRoute
   '/internal-networks/$id': typeof AuthedInternalNetworksIdRoute
   '/internal-networks/create': typeof AuthedInternalNetworksCreateRoute
@@ -489,6 +497,7 @@ export interface FileRoutesByTo {
   '/agents/create': typeof AuthedAgentsCreateRoute
   '/aistudio/agents': typeof AuthedAistudioAgentsRoute
   '/aistudio/connectors': typeof AuthedAistudioConnectorsRoute
+  '/aistudio/http-requests': typeof AuthedAistudioHttpRequestsRoute
   '/aistudio/usage': typeof AuthedAistudioUsageRoute
   '/internal-networks/$id': typeof AuthedInternalNetworksIdRoute
   '/internal-networks/create': typeof AuthedInternalNetworksCreateRoute
@@ -556,6 +565,7 @@ export interface FileRoutesById {
   '/_authed/agents/create': typeof AuthedAgentsCreateRoute
   '/_authed/aistudio/agents': typeof AuthedAistudioAgentsRoute
   '/_authed/aistudio/connectors': typeof AuthedAistudioConnectorsRoute
+  '/_authed/aistudio/http-requests': typeof AuthedAistudioHttpRequestsRoute
   '/_authed/aistudio/usage': typeof AuthedAistudioUsageRoute
   '/_authed/internal-networks/$id': typeof AuthedInternalNetworksIdRoute
   '/_authed/internal-networks/create': typeof AuthedInternalNetworksCreateRoute
@@ -623,6 +633,7 @@ export interface FileRouteTypes {
     | '/agents/create'
     | '/aistudio/agents'
     | '/aistudio/connectors'
+    | '/aistudio/http-requests'
     | '/aistudio/usage'
     | '/internal-networks/$id'
     | '/internal-networks/create'
@@ -686,6 +697,7 @@ export interface FileRouteTypes {
     | '/agents/create'
     | '/aistudio/agents'
     | '/aistudio/connectors'
+    | '/aistudio/http-requests'
     | '/aistudio/usage'
     | '/internal-networks/$id'
     | '/internal-networks/create'
@@ -752,6 +764,7 @@ export interface FileRouteTypes {
     | '/_authed/agents/create'
     | '/_authed/aistudio/agents'
     | '/_authed/aistudio/connectors'
+    | '/_authed/aistudio/http-requests'
     | '/_authed/aistudio/usage'
     | '/_authed/internal-networks/$id'
     | '/_authed/internal-networks/create'
@@ -962,6 +975,13 @@ declare module '@tanstack/react-router' {
       path: '/aistudio/connectors'
       fullPath: '/aistudio/connectors'
       preLoaderRoute: typeof AuthedAistudioConnectorsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/aistudio/http-requests': {
+      id: '/_authed/aistudio/http-requests'
+      path: '/aistudio/http-requests'
+      fullPath: '/aistudio/http-requests'
+      preLoaderRoute: typeof AuthedAistudioHttpRequestsRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/aistudio/usage': {
@@ -1268,6 +1288,7 @@ interface AuthedRouteChildren {
   AuthedAgentsCreateRoute: typeof AuthedAgentsCreateRoute
   AuthedAistudioAgentsRoute: typeof AuthedAistudioAgentsRoute
   AuthedAistudioConnectorsRoute: typeof AuthedAistudioConnectorsRoute
+  AuthedAistudioHttpRequestsRoute: typeof AuthedAistudioHttpRequestsRoute
   AuthedAistudioUsageRoute: typeof AuthedAistudioUsageRoute
   AuthedInternalNetworksIdRoute: typeof AuthedInternalNetworksIdRoute
   AuthedInternalNetworksCreateRoute: typeof AuthedInternalNetworksCreateRoute
@@ -1314,6 +1335,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAgentsCreateRoute: AuthedAgentsCreateRoute,
   AuthedAistudioAgentsRoute: AuthedAistudioAgentsRoute,
   AuthedAistudioConnectorsRoute: AuthedAistudioConnectorsRoute,
+  AuthedAistudioHttpRequestsRoute: AuthedAistudioHttpRequestsRoute,
   AuthedAistudioUsageRoute: AuthedAistudioUsageRoute,
   AuthedInternalNetworksIdRoute: AuthedInternalNetworksIdRoute,
   AuthedInternalNetworksCreateRoute: AuthedInternalNetworksCreateRoute,
