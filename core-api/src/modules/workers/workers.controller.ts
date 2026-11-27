@@ -45,6 +45,8 @@ import {
   WorkerJoinKeyResponseDto,
   WorkerListItemDto,
 } from './dto/workers.dto';
+import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
+import { PublishEvent } from '../event-bridge/publishing/publish-event.decorator';
 import { WorkerInstance } from './entities/worker.entity';
 import { AliveStreamManager } from './alive-stream-manager.service';
 import {
@@ -247,6 +249,29 @@ export class WorkersController {
       workspaceId,
       user.role === Role.ADMIN,
     );
+  }
+
+  @Doc({
+    summary: 'Remove a worker',
+    description:
+      'Removes a workspace worker and revokes its token: its running jobs go back to the queue, and it can only join again with a new join key. Offline workers are kept until removed.',
+    response: {
+      serialization: DefaultMessageResponseDto,
+    },
+    request: {
+      getWorkspaceId: true,
+    },
+  })
+  @PublishEvent(EVENT_CATALOG.worker.removed, { resourceIdFromRoute: true })
+  @WorkspaceAccess('worker.write')
+  @Delete(':id')
+  async removeWorker(
+    @Param('id', ParseUUIDPipe) id: string,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    const result = await this.workersService.removeWorker(id, workspaceId);
+    this.remoteExecuteSubscribeService.disconnectWorker(id);
+    return result;
   }
 
   @GrpcMethod('WorkersService', 'GetManifest')

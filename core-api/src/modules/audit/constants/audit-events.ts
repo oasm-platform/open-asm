@@ -95,6 +95,8 @@ export const AUDIT_ACTION_CATALOG = [
   // tools (43–44)
   { action: 'tool.installed', label: 'Installed tool', controller: 'ToolsController', method: 'installTool' },
   { action: 'tool.uninstalled', label: 'Uninstalled tool', controller: 'ToolsController', method: 'uninstallTool' },
+  // workers (45)
+  { action: 'worker.removed', label: 'Removed worker', controller: 'WorkersController', method: 'removeWorker' },
 ] as const satisfies readonly AuditActionEntry[];
 
 /** Union of every catalog action key — the type for the audit DTOs' `@IsIn`. */

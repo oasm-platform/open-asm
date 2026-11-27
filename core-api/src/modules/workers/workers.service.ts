@@ -2,6 +2,7 @@ import {
   LAST_SEEN_WRITE_INTERVAL_MS,
   WORKER_TIMEOUT,
 } from '@/common/constants/app.constants';
+import type { DefaultMessageResponseDto } from '@/common/dtos/default-message-response.dto';
 import { GetManyBaseResponseDto } from '@/common/dtos/get-many-base.dto';
 import {
   AuditOutcome,
@@ -21,7 +22,7 @@ import { Interval } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { isUUID } from 'class-validator';
 import { randomUUID } from 'crypto';
-import { LessThan, Repository, SelectQueryBuilder } from 'typeorm';
+import { LessThan, Not, Raw, Repository, SelectQueryBuilder } from 'typeorm';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import {
   type CatalogEvent,
@@ -165,10 +166,25 @@ export class WorkersService {
    */
   @Interval(WORKER_TIMEOUT)
   async autoCleanupWorkersAndJobs() {
+    const staleSince = LessThan(new Date(Date.now() - WORKER_TIMEOUT));
+    // A retained workspace worker is revisited only while it still holds a
+    // running job, so the sweep does not touch every offline identity on
+    // every tick. The EXISTS runs on IDX_jobs_workerId_status. CAST, not
+    // `::text`: TypeORM quotes the column alias only when a space or `)`
+    // follows it.
     const staleWorkers = await this.repo.find({
-      where: {
-        lastSeenAt: LessThan(new Date(Date.now() - WORKER_TIMEOUT)),
-      },
+      where: [
+        { lastSeenAt: staleSince, scope: Not(WorkerScope.WORKSPACE) },
+        {
+          lastSeenAt: staleSince,
+          scope: WorkerScope.WORKSPACE,
+          id: Raw(
+            (id) =>
+              `EXISTS (SELECT 1 FROM jobs j WHERE j."workerId" = CAST(${id} AS text) AND j.status = :runningJobStatus)`,
+            { runningJobStatus: JobStatus.IN_PROGRESS },
+          ),
+        },
+      ],
     });
 
     for (const worker of staleWorkers) {
@@ -207,6 +223,31 @@ export class WorkersService {
     if (affected) {
       await this.publishWorkerEvent(EVENT_CATALOG.worker.timed_out, worker);
     }
+  }
+
+  /**
+   * Removes a workspace worker on a user's request: releases its running jobs
+   * and deletes the row, which revokes its token. The sweep keeps offline
+   * workspace workers, so this is the only way to revoke one. Token checks
+   * cached by `GrpcWorkerTokenGuard` see it gone within `WORKER_TOKEN_CACHE_MS`.
+   *
+   * @throws NotFoundError when the workspace has no such workspace-scoped
+   *         worker (never 403, so existence is not leaked across workspaces).
+   */
+  public async removeWorker(
+    workerId: string,
+    workspaceId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    const worker = await this.repo.findOne({
+      where: { id: workerId, workspaceId, scope: WorkerScope.WORKSPACE },
+    });
+    if (!worker) {
+      throw new NotFoundError('Worker not found');
+    }
+
+    await this.releaseWorkerJobs(worker.id);
+    await this.repo.delete(worker.id);
+    return { message: 'Worker removed' };
   }
 
   /**
