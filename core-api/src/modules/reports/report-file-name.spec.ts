@@ -33,6 +33,15 @@ describe('reportFileName', () => {
     );
   });
 
+  it('drops apostrophes instead of splitting the word on them', () => {
+    expect(reportFileName({ workspaceName: "Admin's workspace", type: 'SUMMARY', now })).toBe(
+      'admins-workspace-attack-surface-summary-2026-11-27-1430.pdf',
+    );
+    expect(reportFileName({ workspaceName: 'Bob’s team', type: 'SUMMARY', now })).toBe(
+      'bobs-team-attack-surface-summary-2026-11-27-1430.pdf',
+    );
+  });
+
   it('drops the workspace part when its name has no latin characters', () => {
     expect(reportFileName({ workspaceName: '東京チーム', type: 'VULNERABILITY', now })).toBe(
       'vulnerability-report-2026-11-27-1430.pdf',

@@ -6,12 +6,16 @@ const LABELS = {
   VULNERABILITY: 'vulnerability-report',
 } as const;
 
-/** Lowercase ASCII words joined by `-`; diacritics dropped (`đ` does not decompose, so it is mapped). */
+/**
+ * Lowercase ASCII words joined by `-`; diacritics dropped (`đ` does not decompose, so it is mapped)
+ * and apostrophes removed, so `Admin's` stays one word.
+ */
 function slugify(value: string, max: number): string {
   return value
     .normalize('NFKD')
     .replace(/\p{M}/gu, '')
     .replace(/[đĐ]/g, 'd')
+    .replace(/['’ʼ`]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
