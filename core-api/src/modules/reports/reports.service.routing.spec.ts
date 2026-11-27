@@ -37,10 +37,12 @@ describe('ReportsService routes reports to their builtin template', () => {
   const artifacts = { createFromBuffer: jest.fn(), deleteServerFile: jest.fn() };
   const folders = { ensureWorkspaceFolder: jest.fn().mockResolvedValue({ id: 'reports-folder' }) };
   const savedQueries = { get: jest.fn() };
+  const workspaces = { getWorkspacesByIds: jest.fn() };
   const render = renderTemplatePdf as jest.Mock;
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    workspaces.getWorkspacesByIds.mockResolvedValue([{ id: 'w1', name: 'Acme Corp' }]);
     runner.run.mockResolvedValue({ title: 'data' });
     artifacts.createFromBuffer.mockResolvedValue({ id: 'a1' });
     folders.ensureWorkspaceFolder.mockResolvedValue({ id: 'reports-folder' });
@@ -54,7 +56,7 @@ describe('ReportsService routes reports to their builtin template', () => {
         { provide: getRepositoryToken(ReportSchedule), useValue: {} },
         { provide: ArtifactsService, useValue: artifacts },
         { provide: ArtifactFoldersService, useValue: folders },
-        { provide: WorkspacesService, useValue: {} },
+        { provide: WorkspacesService, useValue: workspaces },
         { provide: EventBridgeService, useValue: {} },
         { provide: getQueueToken(BullMQName.REPORT_GENERATE), useValue: {} },
         { provide: getQueueToken(BullMQName.REPORT_SCHEDULE), useValue: {} },
@@ -78,13 +80,16 @@ describe('ReportsService routes reports to their builtin template', () => {
         source: 'report',
         mimeType: 'application/pdf',
         parentFolderId: 'reports-folder',
+        name: expect.stringMatching(/^acme-corp-attack-surface-summary-\d{4}-\d{2}-\d{2}-\d{4}\.pdf$/),
       }),
     );
     expect(repo.save).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'SUMMARY',
         artifactId: 'a1',
-        path: expect.stringMatching(/^artifacts\/workspaces\/w1\/a1\/report-summary-.+\.pdf$/),
+        path: expect.stringMatching(
+          /^artifacts\/workspaces\/w1\/a1\/acme-corp-attack-surface-summary-\d{4}-\d{2}-\d{2}-\d{4}\.pdf$/,
+        ),
       }),
     );
   });
@@ -122,7 +127,12 @@ describe('ReportsService routes reports to their builtin template', () => {
       title: 'Ports',
       description: 'd',
     });
-    expect(repo.save).toHaveBeenCalledWith(expect.objectContaining({ type: 'QUERY' }));
+    expect(repo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'QUERY',
+        fileName: expect.stringMatching(/^acme-corp-ports-\d{4}-\d{2}-\d{2}-\d{4}\.pdf$/),
+      }),
+    );
   });
 
   it.each([

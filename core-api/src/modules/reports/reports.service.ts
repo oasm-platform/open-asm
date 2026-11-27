@@ -6,7 +6,6 @@ import * as path from 'path';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ArtifactSource, AuditActorType, AuditOutcome, BullMQName } from '@/common/enums/enum';
-import { generateToken } from '@/common/utils/gen-token.util';
 import { firstMissingPermission } from '@/common/utils/permission-keys.util';
 import { isNotFound } from '@/common/errors/error-checks';
 import { ArtifactFoldersService } from '@/modules/artifacts/artifact-folders.service';
@@ -24,6 +23,7 @@ import { StorageService } from '@/modules/storage/storage.service';
 import type { CreateReportScheduleDto, GetManyReportsQueryDto } from './dto/reports.dto';
 import { ReportSchedule } from './entities/report-schedule.entity';
 import { Report } from './entities/report.entity';
+import { reportFileName } from './report-file-name';
 import { ReportRunner } from './report-runner';
 import { renderTemplatePdf } from './templates/render';
 import { BUILTIN_TEMPLATES } from './templates/registry';
@@ -331,7 +331,7 @@ export class ReportsService implements OnApplicationBootstrap {
       title: saved.name,
       description: saved.description,
     });
-    return this.store(scope.workspaceId, userId, 'QUERY', pdfBuffer);
+    return this.store(scope.workspaceId, userId, 'QUERY', pdfBuffer, saved.name);
   }
 
   previewSummaryReport(scope: QueryScope, options?: PreviewOptions): Promise<Buffer> {
@@ -357,8 +357,10 @@ export class ReportsService implements OnApplicationBootstrap {
     userId: string,
     type: 'SUMMARY' | 'VULNERABILITY' | 'QUERY',
     pdfBuffer: Buffer,
+    title?: string,
   ): Promise<{ filePath: string; fileName: string }> {
-    const fileName = `report-${type.toLowerCase()}-${generateToken(24)}-${Date.now()}.pdf`;
+    const [workspace] = await this.workspaces.getWorkspacesByIds([workspaceId]);
+    const fileName = reportFileName({ workspaceName: workspace?.name ?? '', type, title, now: new Date() });
     // As a workspace file the PDF counts against the storage quota (409 when full).
     const folder = await this.folders.ensureWorkspaceFolder(workspaceId, REPORTS_FOLDER_NAME);
     const artifact = await this.artifacts.createFromBuffer({
