@@ -7675,7 +7675,7 @@ export const CreateReportScheduleDtoMinSeverity = {
 
 export type CreateReportScheduleDto = {
   type: CreateReportScheduleDtoType;
-  /** 5-field cron expression in UTC */
+  /** 5-field cron expression in UTC, at most hourly (a fixed minute) */
   cron: string;
   /** Target IDs to filter */
   targetIds?: string[];
