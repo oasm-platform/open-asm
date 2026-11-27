@@ -16,6 +16,10 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { lastValueFrom, toArray } from 'rxjs';
 import { GrpcWorkerTokenGuard } from '@/common/guards/grpc-worker-token.guard';
+import {
+  PUBLISH_EVENT_KEY,
+  type PublishEventConfig,
+} from '../event-bridge/publishing/publish-event.decorator';
 import type { GetManyWorkersDto } from './dto/workers.dto';
 import { RemoteExecuteSubscribeService } from './remote-execute-subscribe.service';
 import { WorkersController } from './workers.controller';
@@ -25,6 +29,7 @@ describe('WorkersController workspace permission guards', () => {
 
   const cases: Array<[string, string, string[]]> = [
     ['getWorkers', 'GET /', ['worker.read']],
+    ['removeWorker', 'DELETE /:id', ['worker.write']],
   ];
 
   it.each(cases)('%s (%s) requires %j', (method, route, keys) => {
@@ -36,6 +41,69 @@ describe('WorkersController workspace permission guards', () => {
       WorkersController,
     ]);
     expect(required).toEqual(keys);
+  });
+});
+
+describe('WorkersController removeWorker', () => {
+  const workspaceId = '22222222-2222-4222-8222-222222222222';
+  const workerId = '44444444-4444-4444-8444-444444444444';
+
+  it('is audited as worker.removed with the route id', () => {
+    const config = new Reflector().get<PublishEventConfig & { event: unknown }>(
+      PUBLISH_EVENT_KEY,
+      WorkersController.prototype.removeWorker,
+    );
+
+    expect(config).toEqual(
+      expect.objectContaining({
+        event: expect.objectContaining({ name: 'worker.removed' }),
+        resourceIdFromRoute: true,
+      }),
+    );
+  });
+
+  it('removes the worker of the caller workspace, then drops its local agent stream', async () => {
+    const workersService = {
+      removeWorker: jest.fn().mockResolvedValue({ message: 'Worker removed' }),
+    };
+    const remoteExecuteSubscribeService = { disconnectWorker: jest.fn() };
+    const controller = new WorkersController(
+      workersService as never,
+      remoteExecuteSubscribeService as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(controller.removeWorker(workerId, workspaceId)).resolves.toEqual({
+      message: 'Worker removed',
+    });
+
+    expect(workersService.removeWorker).toHaveBeenCalledWith(workerId, workspaceId);
+    expect(remoteExecuteSubscribeService.disconnectWorker).toHaveBeenCalledWith(
+      workerId,
+    );
+  });
+
+  it('leaves the stream alone when the worker is not found', async () => {
+    const workersService = {
+      removeWorker: jest.fn().mockRejectedValue(new Error('Worker not found')),
+    };
+    const remoteExecuteSubscribeService = { disconnectWorker: jest.fn() };
+    const controller = new WorkersController(
+      workersService as never,
+      remoteExecuteSubscribeService as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(controller.removeWorker(workerId, workspaceId)).rejects.toThrow(
+      'Worker not found',
+    );
+    expect(remoteExecuteSubscribeService.disconnectWorker).not.toHaveBeenCalled();
   });
 });
 

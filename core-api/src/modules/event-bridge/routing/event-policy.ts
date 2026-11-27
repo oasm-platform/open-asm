@@ -138,6 +138,8 @@ export const EVENT_POLICY: Record<EventName, EventPolicy> = {
   'worker.disconnected': { persist: false, severity: 'normal' },
   'worker.timed_out': { persist: false, severity: 'normal' },
   'worker.rejoined': { persist: false, severity: 'normal' },
+  // A user revoking a worker's token is an audit action, not liveness.
+  'worker.removed': { persist: true, severity: 'important' },
   'worker.network.connected': { persist: false, severity: 'normal' },
   'worker.agent_mode.enabled': { persist: false, severity: 'normal' },
 

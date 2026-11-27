@@ -8,7 +8,8 @@ import { ConfigService } from '@nestjs/config';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import type { Repository } from 'typeorm';
+import { Not } from 'typeorm';
+import type { FindOperator, Repository } from 'typeorm';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
 import { EventBridgeService } from '../event-bridge/publishing/event-bridge.service';
@@ -183,7 +184,76 @@ describe('WorkersService', () => {
     expect(service).toBeDefined();
   });
 
+  describe('removeWorker', () => {
+    const worker = {
+      id: 'worker-1',
+      token: 'worker-token',
+      scope: WorkerScope.WORKSPACE,
+      workspaceId: 'ws-1',
+    } as WorkerInstance;
+
+    it('looks the worker up only among the workspace-scoped workers of the workspace', async () => {
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue(null);
+
+      await expect(service.removeWorker('worker-1', 'ws-1')).rejects.toThrow(
+        NotFoundError,
+      );
+
+      expect(mockWorkerInstanceRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 'worker-1', workspaceId: 'ws-1', scope: WorkerScope.WORKSPACE },
+      });
+      expect(mockJobsRegistryService.repo.execute).not.toHaveBeenCalled();
+      expect(mockWorkerInstanceRepository.delete).not.toHaveBeenCalled();
+    });
+
+    it('releases the running jobs, then deletes the row so its token stops working', async () => {
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockResolvedValue(worker);
+      (mockWorkerInstanceRepository.delete as jest.Mock).mockResolvedValue({
+        affected: 1,
+      });
+
+      await expect(service.removeWorker('worker-1', 'ws-1')).resolves.toEqual({
+        message: 'Worker removed',
+      });
+
+      expect(mockJobsRegistryService.repo.where).toHaveBeenCalledWith(
+        'jobs."workerId" = :id',
+        { id: 'worker-1' },
+      );
+      expect(mockWorkerInstanceRepository.delete).toHaveBeenCalledWith('worker-1');
+      expect(
+        mockJobsRegistryService.repo.execute.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        (mockWorkerInstanceRepository.delete as jest.Mock).mock
+          .invocationCallOrder[0],
+      );
+    });
+  });
+
   describe('autoCleanupWorkersAndJobs', () => {
+    it('revisits a retained workspace worker only while it still holds running jobs', async () => {
+      (mockWorkerInstanceRepository.find as jest.Mock).mockResolvedValue([]);
+      (mockWorkerInstanceRepository.manager as any) = {
+        query: jest.fn().mockResolvedValue(undefined),
+      };
+
+      await service.autoCleanupWorkersAndJobs();
+
+      const [{ where }] = (mockWorkerInstanceRepository.find as jest.Mock).mock
+        .calls[0] as [{ where: Array<Record<string, unknown>> }];
+      expect(where).toHaveLength(2);
+      expect(where[0].scope).toEqual(Not(WorkerScope.WORKSPACE));
+      expect(where[1].scope).toBe(WorkerScope.WORKSPACE);
+      const runningJobs = where[1].id as FindOperator<string>;
+      expect(runningJobs.type).toBe('raw');
+      expect(runningJobs.getSql?.('"w"."id"')).toContain(
+        'j."workerId" = CAST("w"."id" AS text)',
+      );
+      expect(runningJobs.objectLiteralParameters).toEqual({
+        runningJobStatus: JobStatus.IN_PROGRESS,
+      });
+    });
+
     it('retains a workspace identity across timeout sweeps and resumes with its saved token', async () => {
       const worker = {
         id: 'persistent-worker',

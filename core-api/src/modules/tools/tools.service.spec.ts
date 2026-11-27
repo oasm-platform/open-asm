@@ -1,3 +1,4 @@
+import { WORKER_TIMEOUT } from '@/common/constants/app.constants';
 import { ToolCategory, WorkerType } from '@/common/enums/enum';
 
 import { randomUUID } from 'crypto';
@@ -131,6 +132,47 @@ describe('ToolsService — readiness flags', () => {
       const tool = result.data[0] as any;
       expect(tool.hasConfigProfile).toBeUndefined();
       expect(tool.isReady).toBe(true);
+    });
+  });
+
+  describe('getManyTools — availableWorkersCount', () => {
+    it('counts only workers seen within the worker timeout, so retained offline ones are not available', async () => {
+      const now = new Date('2026-11-27T10:00:00.000Z').getTime();
+      jest.spyOn(Date, 'now').mockReturnValue(now);
+      const builtIn = makeTool({
+        id: 'tool-builtin', name: 'subfinder', type: WorkerType.BUILT_IN, isBuiltIn: true,
+      });
+      const connector = makeTool({ id: 'tool-connector', name: 'nuclei' });
+      toolsRepo.findAndCount.mockResolvedValue([[builtIn, connector], 2]);
+      workspaceToolRepo.find.mockResolvedValue([]);
+      const builtInCount = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getCount: jest.fn().mockResolvedValue(1),
+      };
+      const perToolCount = {
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([]),
+      };
+      workersService.repo.createQueryBuilder
+        .mockReturnValueOnce(builtInCount)
+        .mockReturnValueOnce(perToolCount);
+
+      await service.getManyTools({ page: 1, limit: 10 } as any, 'ws-001');
+
+      const liveSince = { liveSince: new Date(now - WORKER_TIMEOUT) };
+      expect(builtInCount.andWhere).toHaveBeenCalledWith(
+        'w."lastSeenAt" >= :liveSince',
+        liveSince,
+      );
+      expect(perToolCount.andWhere).toHaveBeenCalledWith(
+        'w."lastSeenAt" >= :liveSince',
+        liveSince,
+      );
     });
   });
 

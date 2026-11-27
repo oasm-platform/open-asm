@@ -17,7 +17,16 @@ import { WorkerDetailSkeleton } from './detail-worker-skeleton';
 import { WorkerStatus } from './worker-status';
 import { WorkerToolsGraph } from './components/worker-tools-graph';
 import { WorkerTelemetry } from './components/worker-telemetry';
+import { WorkerSettingsTab } from './tabs/settings-tab';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { usePermission } from '@/hooks/usePermission';
 import { t, useT } from '@/lib/i18n-dictionary';
+
+const WORKER_TABS = [
+  { value: 'overview', labelKey: 'workers.tabs.overview' },
+  { value: 'tools', labelKey: 'workers.tabs.tools' },
+  { value: 'settings', labelKey: 'workers.tabs.settings' },
+] as const;
 
 /** `built_in` -> `Built-in`, `cli` -> `CLI`, otherwise capitalize the raw value. */
 function formatType(type: string) {
@@ -36,6 +45,7 @@ function formatLocation(location: WorkerLocationDto) {
 export default function WorkerDetail() {
   const t = useT();
   const { id } = useParams({ strict: false });
+  const { hasPermission } = usePermission();
 
   const {
     data: worker,
@@ -66,102 +76,126 @@ export default function WorkerDetail() {
     );
   }
 
+  // Only workspace workers can be disconnected; cloud workers expire on their own.
+  const canDisconnect =
+    worker.scope === 'workspace' && hasPermission('worker.write');
   const tools = worker.tools ?? [];
   // The API omits the IP when it is local/private, so there is nothing to show.
   const location = worker.location ? formatLocation(worker.location) : '';
-  const identityHeader = (
-    <div className="flex items-center gap-4 border-b border-border/60 bg-gradient-to-r from-primary/[0.07] via-transparent to-transparent p-6">
-      <div className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-muted/60 ring-1 ring-border/60">
+
+  const title = (
+    <div className="flex min-w-0 items-center gap-3">
+      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted/60 ring-1 ring-border/60">
         {worker.os ? (
           <img
             className="dark:brightness-0 dark:invert"
-            width={40}
-            height={40}
+            width={22}
+            height={22}
             src={`/${worker.os}.svg`}
             alt={worker.os}
           />
         ) : (
-          <Server className="size-8 text-muted-foreground" />
+          <Server className="size-5 text-muted-foreground" />
         )}
       </div>
-      <div className="min-w-0 flex-1 space-y-2">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-          <h1 className="truncate text-xl font-semibold tracking-tight">
-            {worker.name || t('workers.detail.unnamed')}
-          </h1>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <WorkerStatus worker={worker} />
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5">
+      <span className="truncate">
+        {worker.name || t('workers.detail.unnamed')}
+      </span>
+    </div>
+  );
+
+  const header = (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <WorkerStatus worker={worker} />
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Badge variant="outline" className="gap-1 border-border/70">
+          <Shield className="size-3" />
+          {formatType(worker.scope)}
+        </Badge>
+        <Badge variant="outline" className="gap-1 border-border/70">
+          <Box className="size-3" />
+          {formatType(worker.type)}
+        </Badge>
+        {worker.runMode && (
           <Badge variant="outline" className="gap-1 border-border/70">
-            <Shield className="size-3" />
-            {formatType(worker.scope)}
+            <Zap className="size-3" />
+            {formatType(worker.runMode)}
           </Badge>
-          <Badge variant="outline" className="gap-1 border-border/70">
-            <Box className="size-3" />
-            {formatType(worker.type)}
+        )}
+        {worker.enabledAgentMode && (
+          <Badge
+            variant="outline"
+            className="gap-1 border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+          >
+            <CircleDot className="size-3" />
+            {t('workers.detail.agentMode')}
           </Badge>
-          {worker.runMode && (
-            <Badge variant="outline" className="gap-1 border-border/70">
-              <Zap className="size-3" />
-              {formatType(worker.runMode)}
-            </Badge>
-          )}
-          {worker.enabledAgentMode && (
-            <Badge
-              variant="outline"
-              className="gap-1 border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-            >
-              <CircleDot className="size-3" />
-              {t('workers.detail.agentMode')}
-            </Badge>
-          )}
-        </div>
-        {worker.ipAddress && (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <Globe className="size-3.5" />
-              <span className="font-mono text-foreground">
-                {worker.ipAddress}
-              </span>
+        )}
+      </div>
+      {worker.ipAddress && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <Globe className="size-3.5" />
+            <span className="font-mono text-foreground">
+              {worker.ipAddress}
             </span>
-            {location && (
-              <span
-                className="flex items-center gap-1.5"
-                title={worker.location?.timezone}
-              >
-                <MapPin className="size-3.5" />
-                {location}
-                {worker.location?.countryCode && (
-                  <span className="text-xs">
-                    ({worker.location.countryCode})
-                  </span>
-                )}
-              </span>
-            )}
-            {worker.location?.isp && (
-              <span className="flex items-center gap-1.5">
-                <Building2 className="size-3.5" />
-                {worker.location.isp}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
+          </span>
+          {location && (
+            <span
+              className="flex items-center gap-1.5"
+              title={worker.location?.timezone}
+            >
+              <MapPin className="size-3.5" />
+              {location}
+              {worker.location?.countryCode && (
+                <span className="text-xs">
+                  ({worker.location.countryCode})
+                </span>
+              )}
+            </span>
+          )}
+          {worker.location?.isp && (
+            <span className="hidden items-center gap-1.5 md:flex">
+              <Building2 className="size-3.5" />
+              {worker.location.isp}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 
   return (
-    <Page permission="worker.read" documentTitle={worker.name || undefined}>
-      <div className="space-y-6">
-        <WorkerTelemetry
-          telemetry={worker.telemetry}
-          header={identityHeader}
-          tools={tools}
-        />
-
-        <div>
+    <Page
+      permission="worker.read"
+      documentTitle={worker.name || undefined}
+      title={title}
+      header={header}
+    >
+      <Tabs
+        defaultValue="overview"
+        validValues={WORKER_TABS.map((item) => item.value)}
+        className="gap-4"
+      >
+        <div className="w-full overflow-x-auto scrollbar-hide">
+          <TabsList className="flex w-max flex-nowrap rounded-none bg-transparent p-0">
+            {WORKER_TABS.map((item) => (
+              <TabsTrigger
+                key={item.value}
+                value={item.value}
+                className="h-9 flex-none hover:cursor-pointer"
+              >
+                {t(item.labelKey)}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
+        <TabsContent value="overview">
+          <WorkerTelemetry telemetry={worker.telemetry} tools={tools} />
+        </TabsContent>
+        <TabsContent value="tools">
           {/* Connected tools — bare react-flow canvas: no card chrome, no header. */}
           <WorkerToolsGraph
             tools={tools}
@@ -172,8 +206,11 @@ export default function WorkerDetail() {
               lastSeenAt: worker.lastSeenAt,
             }}
           />
-        </div>
-      </div>
+        </TabsContent>
+        <TabsContent value="settings">
+          <WorkerSettingsTab worker={worker} canDisconnect={canDisconnect} />
+        </TabsContent>
+      </Tabs>
     </Page>
   );
 }

@@ -31765,6 +31765,94 @@ export function useWorkersControllerGetWorkerById<
   return withQueryKey(query, queryOptions.queryKey);
 }
 
+/**
+ * Removes a workspace worker and revokes its token: its running jobs go back to the queue, and it can only join again with a new join key. Offline workers are kept until removed.
+ * @summary Remove a worker
+ */
+export const workersControllerRemoveWorker = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/workers/${id}`, method: 'DELETE', signal },
+    options,
+  );
+};
+
+export const getWorkersControllerRemoveWorkerMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof workersControllerRemoveWorker>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof workersControllerRemoveWorker>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['workersControllerRemoveWorker'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof workersControllerRemoveWorker>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return workersControllerRemoveWorker(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WorkersControllerRemoveWorkerMutationResult = NonNullable<
+  Awaited<ReturnType<typeof workersControllerRemoveWorker>>
+>;
+
+export type WorkersControllerRemoveWorkerMutationError = unknown;
+
+/**
+ * @summary Remove a worker
+ */
+export const useWorkersControllerRemoveWorker = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof workersControllerRemoveWorker>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof workersControllerRemoveWorker>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getWorkersControllerRemoveWorkerMutationOptions(options),
+    queryClient,
+  );
+};
+
 export const rootControllerGetHealth = (
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
