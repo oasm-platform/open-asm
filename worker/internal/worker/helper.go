@@ -21,7 +21,21 @@ func isSecretEnv(entry string) bool {
 	return false
 }
 
-func setupCmdEnv(toolPath string) []string {
+// isProxyEnv matches the proxy variables an agent command must not inherit
+// when the agent proxy sets its own: a leftover lowercase or ALL_PROXY one
+// would let some clients bypass the recorded proxy.
+func isProxyEnv(entry string) bool {
+	key, _, _ := strings.Cut(entry, "=")
+	switch strings.ToUpper(key) {
+	case "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "ALL_PROXY":
+		return true
+	}
+	return false
+}
+
+// setupCmdEnv builds a host command's env. dropProxy removes inherited
+// proxy variables (the agent proxy supplies its own).
+func setupCmdEnv(toolPath string, dropProxy bool) []string {
 	// ponytail: single-pass filter; cached PATH; case-insensitive via EqualFold on prefix only.
 	existingPath := os.Getenv("PATH")
 	environ := os.Environ()
@@ -30,7 +44,7 @@ func setupCmdEnv(toolPath string) []string {
 		if len(e) >= 5 && strings.EqualFold(e[:5], "PATH=") {
 			continue
 		}
-		if isSecretEnv(e) {
+		if isSecretEnv(e) || (dropProxy && isProxyEnv(e)) {
 			continue
 		}
 		env = append(env, e)

@@ -187,3 +187,69 @@ func TestHTTPResponseNeverLeaksToken(t *testing.T) {
 	io.Copy(io.Discard, resp.Body)
 	resp.Body.Close()
 }
+
+// A remote-command run token (URL userinfo, no password) authenticates like
+// an execution token; once revoked, a lingering background child gets 407.
+func TestProxyAcceptsRunToken(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "hello-run")
+	}))
+	t.Cleanup(backend.Close)
+
+	runs := NewRunCredentials()
+	srv, err := NewServer("127.0.0.1:0", testAuth(""), Options{Runs: runs})
+	if err != nil {
+		t.Fatalf("NewServer: %v", err)
+	}
+	srv.dial = localDialer()
+	t.Cleanup(func() { _ = srv.Close() })
+	go func() { _ = srv.Serve(t.Context()) }()
+
+	tok, revoke := runs.Issue("sess-run")
+	proxyURL := &url.URL{Scheme: "http", User: url.User(tok), Host: srv.Addr().String()}
+	client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL), DisableKeepAlives: true}}
+
+	resp, err := client.Get(backendURL(t, backend) + "/")
+	if err != nil {
+		t.Fatalf("proxied GET: %v", err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || string(body) != "hello-run" {
+		t.Fatalf("status=%d body=%q, want 200 hello-run", resp.StatusCode, body)
+	}
+
+	revoke()
+	resp, err = client.Get(backendURL(t, backend) + "/")
+	if err != nil {
+		t.Fatalf("proxied GET after revoke: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusProxyAuthRequired {
+		t.Fatalf("status after revoke = %d, want 407", resp.StatusCode)
+	}
+}
+
+func TestAuthenticateRunTokenIdentity(t *testing.T) {
+	runs := NewRunCredentials()
+	srv := &Server{auth: testAuth("exec-tok"), runs: runs}
+	p := newHTTPProxy(srv)
+	tok, revoke := runs.Issue("sess-id")
+	defer revoke()
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
+	req.Header.Set("Proxy-Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(tok+":")))
+	id, ok := p.authenticate(req)
+	if !ok || id.runSession != "sess-id" {
+		t.Fatalf("run token identity = %+v, %v; want runSession sess-id", id, ok)
+	}
+	if strings.Contains(id.label, tok) {
+		t.Fatal("identity label must never carry the token")
+	}
+
+	req.Header.Set("Proxy-Authorization", basicFor("exec-tok"))
+	id, ok = p.authenticate(req)
+	if !ok || id.runSession != "" || id.label != "exec-test" {
+		t.Fatalf("execution token identity = %+v, %v; want label exec-test, no runSession", id, ok)
+	}
+}

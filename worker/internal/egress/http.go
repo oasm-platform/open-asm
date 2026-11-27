@@ -77,39 +77,61 @@ func proxyCredentials(r *http.Request) (user, pass string, ok bool) {
 	return user, pass, true
 }
 
-func (p *httpProxy) authenticate(r *http.Request) (string, bool) {
+// identity is who a proxied request belongs to. runSession != "" marks a
+// recorded agent remote-command run; label is for log lines and never
+// carries a token.
+type identity struct {
+	label      string
+	runSession string
+}
+
+// lookup checks run tokens before execution tokens: a run token is random
+// and short-lived, so trying it first costs nothing and keeps attribution exact.
+func (p *httpProxy) lookup(token string) (identity, bool) {
+	if p.srv.runs != nil {
+		if sess, ok := p.srv.runs.Lookup(token); ok {
+			return identity{label: "agent-session=" + sess, runSession: sess}, true
+		}
+	}
+	if label, ok := p.srv.auth(token); ok {
+		return identity{label: label}, true
+	}
+	return identity{}, false
+}
+
+func (p *httpProxy) authenticate(r *http.Request) (identity, bool) {
 	user, pass, ok := proxyCredentials(r)
 	if !ok {
-		return "", false
+		return identity{}, false
 	}
-	if label, ok := p.srv.auth(user); ok {
-		return label, true
+	if id, ok := p.lookup(user); ok {
+		return id, true
 	}
 	if pass != "" {
-		if label, ok := p.srv.auth(pass); ok {
-			return label, true
+		if id, ok := p.lookup(pass); ok {
+			return id, true
 		}
 	}
 	// rawhttp (nuclei raw/unsafe templates) splits the proxy URL at "@" with
 	// the scheme still on, sending base64("http://<token>"): user "http",
 	// pass "//<token>".
 	if (user == "http" || user == "https") && strings.HasPrefix(pass, "//") {
-		if label, ok := p.srv.auth(pass[2:]); ok {
-			return label, true
+		if id, ok := p.lookup(pass[2:]); ok {
+			return id, true
 		}
 	}
-	return "", false
+	return identity{}, false
 }
 
-func (p *httpProxy) needAuth(w http.ResponseWriter, r *http.Request) (string, bool) {
-	label, ok := p.authenticate(r)
+func (p *httpProxy) needAuth(w http.ResponseWriter, r *http.Request) (identity, bool) {
+	id, ok := p.authenticate(r)
 	if !ok {
 		w.Header().Set("Proxy-Authenticate", `Basic realm="oasm-egress"`)
 		http.Error(w, "proxy authentication required", http.StatusProxyAuthRequired)
 		p.srv.logWarning("egress deny method=%s target=%s reason=auth", r.Method, requestTarget(r))
-		return "", false
+		return identity{}, false
 	}
-	return label, true
+	return id, true
 }
 
 func requestTarget(r *http.Request) string {
@@ -123,10 +145,11 @@ func requestTarget(r *http.Request) string {
 }
 
 func (p *httpProxy) forward(w *connResponseWriter, r *http.Request) {
-	label, ok := p.needAuth(w, r)
+	id, ok := p.needAuth(w, r)
 	if !ok {
 		return
 	}
+	label := id.label
 	host := r.URL.Hostname()
 	if denyTarget(host, p.srv.deny, p.srv.allow) {
 		p.srv.logWarning("egress deny exec=%s method=%s target=%s reason=policy", label, r.Method, requestTarget(r))
@@ -184,10 +207,11 @@ func (p *httpProxy) forward(w *connResponseWriter, r *http.Request) {
 }
 
 func (p *httpProxy) tunnel(w *connResponseWriter, r *http.Request) {
-	label, ok := p.needAuth(w, r)
+	id, ok := p.needAuth(w, r)
 	if !ok {
 		return
 	}
+	label := id.label
 	connectHost := r.Host
 	if h, _, err := net.SplitHostPort(r.Host); err == nil {
 		connectHost = h

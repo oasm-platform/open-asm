@@ -28,6 +28,9 @@ type Options struct {
 	Allow       []netip.Prefix // non-public ranges the operator allows (WORKER_EGRESS_ALLOW)
 	DialTimeout time.Duration
 	Logger      Logger
+	// Runs accepts per-command tokens of agent remote commands (HTTP only).
+	// nil: only execution tokens via auth.
+	Runs *RunCredentials
 }
 
 // Server is the worker-local egress proxy: one listener carrying HTTP
@@ -37,6 +40,7 @@ type Options struct {
 type Server struct {
 	lis    net.Listener
 	auth   AuthFunc
+	runs   *RunCredentials
 	deny   []string
 	allow  []netip.Prefix
 	dialTO time.Duration
@@ -63,7 +67,7 @@ func NewServer(addr string, auth AuthFunc, opts Options) (*Server, error) {
 	if to == 0 {
 		to = 10 * time.Second
 	}
-	s := &Server{lis: lis, auth: auth, deny: opts.DenyHosts, allow: opts.Allow, dialTO: to, logger: opts.Logger}
+	s := &Server{lis: lis, auth: auth, runs: opts.Runs, deny: opts.DenyHosts, allow: opts.Allow, dialTO: to, logger: opts.Logger}
 	s.dial = s.dialVetted
 	s.lookup = net.DefaultResolver.LookupHost
 	s.dialIP = s.dialRaw

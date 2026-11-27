@@ -145,7 +145,7 @@ func TestBrowserCommandNeverReachesShell(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec := &recordingSender{}
-	executeRemoteCommand(context.Background(), rec, "s", "browser -s b-x url; touch "+marker, sb, nil, dir)
+	executeRemoteCommand(context.Background(), rec, "s", "browser -s b-x url; touch "+marker, sb, nil, dir, nil)
 	if _, err := os.Stat(marker); !os.IsNotExist(err) {
 		t.Fatal("browser command line reached sh")
 	}
