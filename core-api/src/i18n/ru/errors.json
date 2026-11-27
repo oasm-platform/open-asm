@@ -73,6 +73,7 @@
   "forbidden": "Доступ запрещён",
   "gitOrganizationNeedsSourceCodeIntegration": "Для Git-организации требуется интеграция с исходным кодом: {missing}",
   "giveExactlyOneToolsTemplateCopy": "Укажите ровно одно из: tools, template или copyFromProjectWorkflowId",
+  "httpRequestNotFound": "HTTP-запрос не найден",
   "imageNotFoundProvidedUrl": "Изображение по указанному URL не найдено",
   "integrationAppCannotListRepositories": "Приложение интеграции \"{appType}\" не может получать список репозиториев",
   "integrationAppDoesNotSupportSupported": "Приложение интеграции \"{appType}\" не поддерживает: {unsupported}. Поддерживается: {supported}",

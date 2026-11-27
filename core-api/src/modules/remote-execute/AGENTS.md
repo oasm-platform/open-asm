@@ -10,7 +10,7 @@ Lets the AI agent run a shell command or a single connector tool on a worker and
 
 ## Public surface
 
-- `waitForResult(command, sessionId, conversationId, workspaceId, timeoutMs = 60_000, onEvent?, abortSignal?)` runs an agent shell command (`agents/tools/remote-execute.tool.ts`). The worker is picked by `RemoteExecuteSubscribeService.pushCommandWithConversation`: the conversation's pin, else a workspace worker, else a sandboxed global worker.
+- `waitForResult(command, sessionId, conversationId, workspaceId, timeoutMs = 60_000, onEvent?, abortSignal?, beforePush?)` runs an agent shell command (`agents/tools/remote-execute.tool.ts`). The worker is picked by `RemoteExecuteSubscribeService.pushCommandWithConversation`: the conversation's pin, else a workspace worker, else a sandboxed global worker. `beforePush(workerId)` is passed through and runs with the picked worker before the push (the agent tool writes its HTTP log session there; it swallows its own Redis errors).
 - `waitForToolRun(workerId, toolRun, sessionId, timeoutMs, options)` runs one connector tool on an explicit worker (`agents/tools/connector.tools.ts`). It is **not a job**: nothing is written to the database, and the result's `command` is `<tool> <target>` for display only.
 
 ## How a call works

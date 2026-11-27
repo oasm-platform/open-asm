@@ -73,6 +73,7 @@
   "forbidden": "禁止されています",
   "gitOrganizationNeedsSourceCodeIntegration": "Git 組織にはソースコード連携が必要です: {missing}",
   "giveExactlyOneToolsTemplateCopy": "tools、template、copyFromProjectWorkflowId のいずれか 1 つだけを指定してください",
+  "httpRequestNotFound": "HTTP リクエストが見つかりません",
   "imageNotFoundProvidedUrl": "指定された URL に画像が見つかりません",
   "integrationAppCannotListRepositories": "連携アプリ「{appType}」ではリポジトリを一覧表示できません",
   "integrationAppDoesNotSupportSupported": "連携アプリ「{appType}」は次をサポートしていません: {unsupported}。サポート対象: {supported}",

@@ -73,6 +73,7 @@
   "forbidden": "Bị cấm",
   "gitOrganizationNeedsSourceCodeIntegration": "Tổ chức Git cần một tích hợp mã nguồn: {missing}",
   "giveExactlyOneToolsTemplateCopy": "Cung cấp đúng một trong tools, template hoặc copyFromProjectWorkflowId",
+  "httpRequestNotFound": "Không tìm thấy yêu cầu HTTP",
   "imageNotFoundProvidedUrl": "Không tìm thấy hình ảnh tại URL đã cung cấp",
   "integrationAppCannotListRepositories": "Ứng dụng tích hợp \"{appType}\" không thể liệt kê kho mã",
   "integrationAppDoesNotSupportSupported": "Ứng dụng tích hợp \"{appType}\" không hỗ trợ: {unsupported}. Được hỗ trợ: {supported}",

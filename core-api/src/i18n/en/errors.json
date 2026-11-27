@@ -73,6 +73,7 @@
   "forbidden": "Forbidden",
   "gitOrganizationNeedsSourceCodeIntegration": "A Git organization needs a source-code integration: {missing}",
   "giveExactlyOneToolsTemplateCopy": "Give exactly one of tools, template or copyFromProjectWorkflowId",
+  "httpRequestNotFound": "HTTP request not found",
   "imageNotFoundProvidedUrl": "Image not found at the provided URL",
   "integrationAppCannotListRepositories": "Integration app \"{appType}\" cannot list repositories",
   "integrationAppDoesNotSupportSupported": "Integration app \"{appType}\" does not support: {unsupported}. Supported: {supported}",

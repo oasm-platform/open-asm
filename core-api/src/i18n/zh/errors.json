@@ -73,6 +73,7 @@
   "forbidden": "禁止访问",
   "gitOrganizationNeedsSourceCodeIntegration": "Git 组织需要一个源代码集成：{missing}",
   "giveExactlyOneToolsTemplateCopy": "请在 tools、template 和 copyFromProjectWorkflowId 中只提供一个",
+  "httpRequestNotFound": "未找到 HTTP 请求",
   "imageNotFoundProvidedUrl": "在提供的 URL 中未找到图片",
   "integrationAppCannotListRepositories": "集成应用“{appType}”无法列出代码仓库",
   "integrationAppDoesNotSupportSupported": "集成应用“{appType}”不支持：{unsupported}。支持：{supported}",

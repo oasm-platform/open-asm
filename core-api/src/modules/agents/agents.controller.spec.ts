@@ -2,6 +2,7 @@ import { WorkspacePermissions } from '@/common/decorators/workspace-permissions.
 import { HttpStatus, NotFoundException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AgentApprovalsController } from './agent-approvals.controller';
+import { AgentHttpRequestsController } from './agent-http-requests.controller';
 import { AgentCustomizationController } from './agent-customization.controller';
 import { AgentMcpConfigsController } from './agent-mcp-configs.controller';
 import { AgentModelsController } from './agent-models.controller';
@@ -20,6 +21,7 @@ const AGENT_CONTROLLERS = [
   AgentMcpConfigsController,
   AgentSettingsController,
   AgentCustomizationController,
+  AgentHttpRequestsController,
 ];
 
 /** The handler and the controller that declares it. */
@@ -58,6 +60,8 @@ describe('Agents controllers workspace permission guards', () => {
     ['getSkills', 'GET /skills'],
     ['getAgentConfig', 'GET /config'],
     ['getAgentDefinitions', 'GET /definitions'],
+    ['getHttpRequests', 'GET /http-requests'],
+    ['getHttpRequest', 'GET /http-requests/:id'],
   ];
 
   const write: Array<[string, string]> = [

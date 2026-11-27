@@ -1804,6 +1804,7 @@ export type I18nTranslations = {
         "forbidden": string;
         "gitOrganizationNeedsSourceCodeIntegration": string;
         "giveExactlyOneToolsTemplateCopy": string;
+        "httpRequestNotFound": string;
         "imageNotFoundProvidedUrl": string;
         "integrationAppCannotListRepositories": string;
         "integrationAppDoesNotSupportSupported": string;
