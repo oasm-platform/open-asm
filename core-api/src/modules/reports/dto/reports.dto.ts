@@ -1,6 +1,6 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsOptional, IsString, IsEnum, IsUUID, IsIn, IsNotIn } from 'class-validator';
+import { IsArray, IsOptional, IsString, IsEnum, IsUUID, IsIn, IsNotIn, Matches } from 'class-validator';
 import { IsCronSchedule } from '@/modules/projects/dto/cron-schedule.validator';
 
 const ReportType = {
@@ -185,9 +185,11 @@ export class CreateReportScheduleDto {
   @IsIn(['SUMMARY', 'VULNERABILITY'])
   type: 'SUMMARY' | 'VULNERABILITY';
 
-  @ApiProperty({ example: '0 8 * * 1', description: '5-field cron expression in UTC' })
+  @ApiProperty({ example: '0 8 * * 1', description: '5-field cron expression in UTC, at most hourly (a fixed minute)' })
   @IsCronSchedule()
   @IsNotIn(['disabled'])
+  // Each run stores a PDF against the quota and holds the single schedule worker.
+  @Matches(/^\s*\d{1,2}\s/, { message: 'cron must run at most once an hour (a fixed minute)' })
   cron: string;
 
   @ApiProperty({ required: false, type: [String], description: 'Target IDs to filter' })

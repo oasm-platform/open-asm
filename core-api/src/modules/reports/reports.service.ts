@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { HttpException, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import * as fs from 'fs';
@@ -31,7 +31,8 @@ import type { ReportOptions } from './templates/shared/asq-filters';
 import type { BuiltinTemplate } from './templates/template.types';
 import { AsqSavedQueriesService } from '@/modules/attack-surface-query/asq-saved-queries.service';
 import type { QueryScope } from '@/modules/attack-surface-query/domain/query.types';
-import { ForbiddenError, NotFoundError } from '@/common/errors/domain.errors';
+import { AsqError } from '@/modules/attack-surface-query/domain/query-errors';
+import { DomainError, ForbiddenError, NotFoundError } from '@/common/errors/domain.errors';
 
 /** Filters as they arrive on the preview query string. */
 interface PreviewOptions extends Omit<ReportOptions, 'startDate' | 'endDate'> {
@@ -66,8 +67,15 @@ export interface ReportScheduleJob {
 
 const schedulerId = (scheduleId: string) => `report-schedule:${scheduleId}`;
 
+/** What the requester may read in the failure notification: our own refusals, never a raw DB or S3 error. */
+function userFacingError(e: unknown): string {
+  if (e instanceof DomainError || e instanceof AsqError) return e.message;
+  if (e instanceof HttpException && e.getStatus() < 500) return e.message;
+  return 'Report generation failed';
+}
+
 @Injectable()
-export class ReportsService {
+export class ReportsService implements OnApplicationBootstrap {
   private readonly logger = new Logger(ReportsService.name);
   private readonly logoPath: string;
   private logoBase64: string | null = null;
@@ -192,8 +200,8 @@ export class ReportsService {
           ? await this.generateQueryReport(scope, job.userId, job.savedQueryId ?? '')
           : await this.generateReport(scope, job.userId, job.type, toReportOptions(job.options)));
     } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
-      this.logger.warn(`Report ${job.type} for workspace ${job.workspaceId} failed: ${error}`);
+      error = userFacingError(e);
+      this.logger.warn(`Report ${job.type} for workspace ${job.workspaceId} failed: ${e instanceof Error ? e.message : String(e)}`);
     }
     await this.eventBridge.publishSafely(EVENT_CATALOG.report.completed, {
       workspaceId: job.workspaceId,
@@ -245,12 +253,51 @@ export class ReportsService {
     const schedule = await this.scheduleRepo.save(
       this.scheduleRepo.create({ workspaceId: scope.workspaceId, userId, type: dto.type, cron: dto.cron, options }),
     );
+    try {
+      await this.register(schedule);
+    } catch (error) {
+      // A row without a scheduler would be listed but never run.
+      await this.scheduleRepo.delete(schedule.id);
+      throw error;
+    }
+    return schedule;
+  }
+
+  /**
+   * Re-registers every schedule and drops schedulers whose row is gone, so lost Redis data
+   * cannot stop schedules silently. Schedulers are listed before rows are read: a schedule
+   * created meanwhile (row saved before its scheduler) is never taken for an orphan.
+   */
+  async reconcileSchedules(): Promise<{ registered: number; removed: number }> {
+    const existing = await this.scheduleQueue.getJobSchedulers(0, -1);
+    const schedules = await this.scheduleRepo.find();
+    for (const schedule of schedules) await this.register(schedule);
+    const wanted = new Set(schedules.map((s) => schedulerId(s.id)));
+    let removed = 0;
+    for (const { key } of existing) {
+      if (wanted.has(key)) continue;
+      await this.scheduleQueue.removeJobScheduler(key);
+      removed++;
+    }
+    return { registered: schedules.length, removed };
+  }
+
+  async onApplicationBootstrap(): Promise<void> {
+    try {
+      const { registered, removed } = await this.reconcileSchedules();
+      this.logger.log(`Report schedules: ${registered} registered, ${removed} orphaned scheduler(s) removed`);
+    } catch (error) {
+      // Best effort: a broken Redis must not stop the API from booting.
+      this.logger.warn(`Report schedules not reconciled: ${(error as Error).message}`);
+    }
+  }
+
+  private async register(schedule: ReportSchedule): Promise<void> {
     await this.scheduleQueue.upsertJobScheduler(
       schedulerId(schedule.id),
       { pattern: schedule.cron },
       { name: schedule.id, data: { scheduleId: schedule.id } },
     );
-    return schedule;
   }
 
   async deleteSchedule(id: string, workspaceId: string): Promise<void> {

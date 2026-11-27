@@ -271,7 +271,8 @@ export const EVENT_CATALOG = {
     },
   },
   report: {
-    generated: { name: 'report.generated', summary: 'Report generated' },
+    // Published when a report is queued; whether it was made is `completed`.
+    generated: { name: 'report.generated', summary: 'Report requested' },
     exported: { name: 'report.exported', summary: 'Report exported' },
     deleted: { name: 'report.deleted', summary: 'Report deleted' },
     completed: { name: 'report.completed', summary: 'Queued report finished or failed' },

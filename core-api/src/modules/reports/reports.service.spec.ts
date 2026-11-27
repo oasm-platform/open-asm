@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
 import { AuditOutcome, BullMQName } from '@/common/enums/enum';
@@ -37,7 +38,7 @@ describe('ReportsService', () => {
   const workspaces = { getMembershipWithPermissions: jest.fn() };
   const eventBridge = { publishSafely: jest.fn() };
   const generateQueue = { add: jest.fn() };
-  const scheduleQueue = { upsertJobScheduler: jest.fn(), removeJobScheduler: jest.fn() };
+  const scheduleQueue = { upsertJobScheduler: jest.fn(), removeJobScheduler: jest.fn(), getJobSchedulers: jest.fn() };
 
   const mockReport = {
     id: '123e4567-e89b-12d3-a456-42614174000',
@@ -221,13 +222,23 @@ describe('ReportsService', () => {
     });
 
     it('turns a failure (e.g. quota exceeded) into a failed report.completed instead of throwing', async () => {
-      jest.spyOn(service, 'generateReport').mockRejectedValue(new Error('Workspace storage quota exceeded'));
+      jest.spyOn(service, 'generateReport').mockRejectedValue(
+        new ConflictException({ code: 'STORAGE_QUOTA_EXCEEDED', message: 'Workspace storage quota exceeded' }),
+      );
       await expect(service.runJob(job)).resolves.toBeUndefined();
       expect(completed()).toEqual(
         expect.objectContaining({
           outcome: AuditOutcome.Failure,
           payload: expect.objectContaining({ error: 'Workspace storage quota exceeded' }),
         }),
+      );
+    });
+
+    it('keeps a raw internal error out of the notification', async () => {
+      jest.spyOn(service, 'generateReport').mockRejectedValue(new Error('relation "assets" does not exist'));
+      await service.runJob(job);
+      expect(completed()).toEqual(
+        expect.objectContaining({ payload: expect.objectContaining({ error: 'Report generation failed' }) }),
       );
     });
 
@@ -250,6 +261,27 @@ describe('ReportsService', () => {
         { pattern: '0 8 * * 1' },
         { name: 's1', data: { scheduleId: 's1' } },
       );
+    });
+
+    it('createSchedule removes the row when the scheduler cannot be registered', async () => {
+      scheduleQueue.upsertJobScheduler.mockRejectedValueOnce(new Error('redis down'));
+      await expect(service.createSchedule(scope, 'u1', { type: 'SUMMARY', cron: '0 8 * * 1' })).rejects.toThrow(
+        'redis down',
+      );
+      expect(scheduleRepo.delete).toHaveBeenCalledWith('s1');
+    });
+
+    it('reconcileSchedules re-registers every row and drops schedulers without one', async () => {
+      scheduleQueue.getJobSchedulers.mockResolvedValue([{ key: 'report-schedule:s1' }, { key: 'report-schedule:gone' }]);
+      scheduleRepo.find.mockResolvedValue([schedule]);
+      await expect(service.reconcileSchedules()).resolves.toEqual({ registered: 1, removed: 1 });
+      expect(scheduleQueue.upsertJobScheduler).toHaveBeenCalledWith(
+        'report-schedule:s1',
+        { pattern: '0 8 * * 1' },
+        { name: 's1', data: { scheduleId: 's1' } },
+      );
+      expect(scheduleQueue.removeJobScheduler).toHaveBeenCalledTimes(1);
+      expect(scheduleQueue.removeJobScheduler).toHaveBeenCalledWith('report-schedule:gone');
     });
 
     it('deleteSchedule removes the scheduler and the row; 404 for another workspace', async () => {
