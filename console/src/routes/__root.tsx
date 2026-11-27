@@ -3,6 +3,7 @@ import { createRootRouteWithContext, Outlet, Link } from '@tanstack/react-router
 import type { RouterContext } from '@/router';
 import { useWorkspaceSync } from '@/hooks/useWorkspaceSelector';
 import { usePermission } from '@/hooks/usePermission';
+import { useDeferredScrollRestoration } from '@/hooks/useDeferredScrollRestoration';
 import { OpenLinkDialog } from '@/components/ui/open-link';
 import { DocumentTitle } from '@/components/common/document-title';
 
@@ -22,10 +23,17 @@ function RootBootstrap() {
   return null;
 }
 
+// Own component: it re-renders on every navigation, the bootstrap must not
+function DeferredScrollRestoration() {
+  useDeferredScrollRestoration();
+  return null;
+}
+
 function RootComponent() {
   return (
     <>
       <RootBootstrap />
+      <DeferredScrollRestoration />
       <DocumentTitle />
       <Outlet />
       <OpenLinkDialog />

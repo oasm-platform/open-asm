@@ -184,6 +184,64 @@ describe('WorkersService', () => {
   });
 
   describe('autoCleanupWorkersAndJobs', () => {
+    it('retains a workspace identity across timeout sweeps and resumes with its saved token', async () => {
+      const worker = {
+        id: 'persistent-worker',
+        token: 'persisted-token',
+        scope: WorkerScope.WORKSPACE,
+        workspaceId: 'ws-1',
+        encryptionPublicKey: 'registered-public-key',
+        runMode: null,
+        lastSeenAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      } as WorkerInstance;
+      const registrations = new Map([[worker.id, worker]]);
+      (mockWorkerInstanceRepository.find as jest.Mock).mockImplementation(
+        () => Promise.resolve([...registrations.values()]),
+      );
+      (mockWorkerInstanceRepository.delete as jest.Mock).mockImplementation(
+        (id: string) => Promise.resolve({ affected: registrations.delete(id) ? 1 : 0 }),
+      );
+      (mockWorkerInstanceRepository.findOne as jest.Mock).mockImplementation(
+        ({ where }: { where: { token?: string; id?: string } }) =>
+          Promise.resolve([...registrations.values()].find((entry) =>
+            where.token ? entry.token === where.token : entry.id === where.id,
+          ) ?? null),
+      );
+      (mockWorkerInstanceRepository.manager as any) = {
+        query: jest.fn().mockResolvedValue(undefined),
+      };
+
+      await service.autoCleanupWorkersAndJobs();
+      await service.autoCleanupWorkersAndJobs();
+
+      // An offline node's work must be recoverable by another worker even
+      // though its identity remains available for a later authenticated join.
+      expect(mockJobsRegistryService.repo.execute).toHaveBeenCalledTimes(2);
+      expect(mockJobsRegistryService.repo.where).toHaveBeenCalledWith(
+        'jobs."workerId" = :id', { id: worker.id },
+      );
+      expect(mockWorkerInstanceRepository.delete).not.toHaveBeenCalled();
+      expect(mockEventBridge.publishSafely).not.toHaveBeenCalled();
+      expect(await service.validateWorkerToken(worker.token)).toBe(worker);
+
+      const resumed = await service.join({
+        apiKey: 'already-consumed-join-key', token: worker.token,
+      });
+
+      expect(resumed).toMatchObject({
+        id: worker.id,
+        token: worker.token,
+        workspaceId: worker.workspaceId,
+        encryptionPublicKey: worker.encryptionPublicKey,
+      });
+      expect(mockWorkerInstanceRepository.save).not.toHaveBeenCalled();
+      expect(mockEventBridge.publishSafely).toHaveBeenCalledWith(
+        EVENT_CATALOG.worker.rejoined,
+        expect.objectContaining({ resourceId: worker.id, workspaceId: 'ws-1' }),
+        expect.anything(),
+      );
+    });
+
     it('should delete stale workers without active streams', async () => {
       const staleWorker = {
         id: 'worker-1',
@@ -846,7 +904,7 @@ describe('WorkersService', () => {
       };
     });
 
-    it('publishes worker.timed_out when a stale workspace worker is removed', async () => {
+    it('publishes worker.timed_out when a stale worker is removed', async () => {
       (mockWorkerInstanceRepository.find as jest.Mock).mockResolvedValue([
         { id: 'worker-1', workspaceId: 'ws-1' } as WorkerInstance,
       ]);

@@ -3,7 +3,7 @@ import type { ResolvedPath } from '../catalog/paths';
 import type { QueryMode } from './query.schema';
 import type { WhereNode } from './where';
 
-export type AsqCaller = 'http' | 'agent' | 'mcp';
+export type AsqCaller = 'http' | 'agent' | 'mcp' | 'report';
 
 /**
  * Who runs a query. Built from the authenticated request or the agent run,

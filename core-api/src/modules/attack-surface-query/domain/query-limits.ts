@@ -88,7 +88,27 @@ const REPORT: AsqLimits = {
   maxResponseBytes: 16 * 1024 * 1024,
 };
 
+/**
+ * Synchronous PDF report batches (in-process, scopes built by the reports
+ * controller): bigger pages and longer timeouts than interactive HTTP, but
+ * still bounded because the request waits for them.
+ */
+const REPORT_SYNC: AsqLimits = {
+  ...HTTP,
+  maxLimit: 10_000,
+  maxStringLength: 100_000,
+  costBudget: 60_000,
+  maxPlannerCost: 4_000_000,
+  maxSortRows: 5_000_000,
+  statementTimeoutMs: 30_000,
+  batchBudgetMs: 60_000,
+  maxResponseBytes: 32 * 1024 * 1024,
+  allowHeavy: true,
+  filter: { conditions: 50, depth: 4, values: 1000 },
+};
+
 export function limitsFor(caller: AsqCaller, mode: QueryMode): AsqLimits {
+  if (caller === 'report') return REPORT_SYNC;
   if (caller !== 'http') return AGENT;
   return mode === 'report' ? REPORT : HTTP;
 }

@@ -1,5 +1,15 @@
-import { assertCatalog, buildCatalog, CATALOG, checkFieldValue, describeCatalog, fieldOps, OP_VALUE_SHAPE } from './catalog';
+import {
+  assertCatalog,
+  buildCatalog,
+  CATALOG,
+  catalogCheatSheet,
+  checkFieldValue,
+  describeCatalog,
+  fieldOps,
+  OP_VALUE_SHAPE,
+} from './catalog';
 import type { ResourceDef } from './catalog.types';
+import { resolvePath } from './paths';
 import { RESOURCES, servicesResource } from './resources';
 
 const clone = (res: ResourceDef, patch: Partial<ResourceDef>): ResourceDef => ({ ...res, ...patch });
@@ -84,6 +94,55 @@ describe('checkFieldValue', () => {
     expect(checkFieldValue(ip, 'fe80::1%eth0', 'eq')).toBe(false);
     expect(checkFieldValue(ip, '10.0.0.0/16', 'inSubnet')).toBe(true);
     expect(checkFieldValue(ip, '10.0.0.0/33', 'inSubnet')).toBe(false);
+  });
+});
+
+describe('report fields', () => {
+  const vuln = CATALOG.vulnerabilities.fields;
+  it.each([
+    ['description', 'text'],
+    ['solution', 'text'],
+    ['cvssMetric', 'text'],
+    ['vprScore', 'float'],
+    ['bid', 'textArray'],
+    ['references', 'textArray'],
+    ['ipAddress', 'text'],
+    ['hostName', 'text'],
+    ['publishedAt', 'timestamp'],
+    ['firstDetected', 'timestamp'],
+    ['analyzeStatus', 'enum'],
+    ['isDismissed', 'bool'],
+  ])('vulnerabilities.%s is a %s', (name, type) => {
+    expect(vuln[name]?.type).toBe(type);
+  });
+
+  it('marks description and solution heavy and nothing else new', () => {
+    expect(vuln.description.heavy).toBe(true);
+    expect(vuln.solution.heavy).toBe(true);
+    for (const name of ['cvssMetric', 'vprScore', 'bid', 'references', 'ipAddress', 'hostName', 'publishedAt', 'firstDetected', 'analyzeStatus', 'isDismissed']) {
+      expect(vuln[name].heavy).toBeUndefined();
+    }
+  });
+
+  it('keeps heavy fields out of the agent cheat sheet', () => {
+    const line = catalogCheatSheet(CATALOG).find((l) => l.startsWith('vulnerabilities:'))!;
+    const [light, tooLarge] = line.split('too large for the agent:');
+    expect(light).not.toMatch(/\b(description|solution)\b/);
+    expect(tooLarge).toMatch(/description, solution/);
+    const described = describeCatalog(CATALOG, () => true).find((r) => r.name === 'vulnerabilities')!;
+    expect(described.fields.filter((f) => f.heavy).map((f) => f.name)).toEqual(expect.arrayContaining(['description', 'solution']));
+  });
+
+  it('makes tags a root reaching its service, host and target', () => {
+    expect(CATALOG.tags.root).toBe(true);
+    expect(CATALOG.tags.fields.firstSeen.type).toBe('timestamp');
+    // asset_services_tags has no (workspaceId, createdAt, id) index.
+    expect(CATALOG.tags.fields.firstSeen.sortable).toBe('bounded');
+    expect(servicesResource.many.tags.indexedOrder).toEqual([]);
+    const rules = { allowMany: false, maxOneHops: 2 };
+    const res = resolvePath(CATALOG, CATALOG.tags, 'service.target.value', rules);
+    expect(res.ok).toBe(true);
+    expect(describeCatalog(CATALOG, () => true).find((r) => r.name === 'tags')?.root).toBe(true);
   });
 });
 

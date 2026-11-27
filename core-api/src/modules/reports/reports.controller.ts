@@ -32,6 +32,12 @@ import {
 import { ReportsService } from './reports.service';
 import { AsqErrorInterceptor } from '@/modules/attack-surface-query/asq-error.interceptor';
 import type { RequestWithMetadata } from '@/common/interfaces/app.interface';
+import type { QueryScope } from '@/modules/attack-surface-query/domain/query.types';
+
+/** Reports run as the member who asks, so they never show more than that member may read. */
+function reportScope(workspaceId: string, req: RequestWithMetadata): QueryScope {
+  return { workspaceId, permissions: req.permissions ?? [], caller: 'report' };
+}
 
 @ApiTags('Reports')
 @Controller('reports')
@@ -59,13 +65,15 @@ export class ReportsController {
 
   @PublishEvent(EVENT_CATALOG.report.exported, { metadata: () => ({ format: 'pdf' }) })
   @WorkspaceAccess('report.read')
+  @UseInterceptors(AsqErrorInterceptor)
   @Get('preview/summary')
   async previewSummaryReport(
     @Query() query: PreviewSummaryQueryDto,
     @WorkspaceId() workspaceId: string,
+    @Req() req: RequestWithMetadata,
     @Res() res: NodeResponse,
   ) {
-    const buffer = await this.reportsService.previewSummaryReport(workspaceId, {
+    const buffer = await this.reportsService.previewSummaryReport(reportScope(workspaceId, req), {
       startDate: query.startDate,
       endDate: query.endDate,
       targetIds: query.targetIds,
@@ -78,13 +86,15 @@ export class ReportsController {
   }
 
   @WorkspaceAccess('report.read')
+  @UseInterceptors(AsqErrorInterceptor)
   @Get('preview/vulnerability')
   async previewVulReport(
     @Query() query: PreviewVulQueryDto,
     @WorkspaceId() workspaceId: string,
+    @Req() req: RequestWithMetadata,
     @Res() res: NodeResponse,
   ) {
-    const buffer = await this.reportsService.previewVulnerabilityReport(workspaceId, {
+    const buffer = await this.reportsService.previewVulnerabilityReport(reportScope(workspaceId, req), {
       startDate: query.startDate,
       endDate: query.endDate,
       targetIds: query.targetIds,
@@ -110,11 +120,13 @@ export class ReportsController {
   })
   @PublishEvent(EVENT_CATALOG.report.generated, { metadata: () => ({ reportType: 'summary' }) })
   @WorkspaceAccess('report.write')
+  @UseInterceptors(AsqErrorInterceptor)
   @Post('generate/summary')
   async generateSummaryReport(
     @Body() body: GenerateSummaryReportBodyDto,
     @WorkspaceId() workspaceId: string,
     @UserId() userId: string,
+    @Req() req: RequestWithMetadata,
   ): Promise<DefaultMessageResponseDto> {
     const options = {
       startDate: body.startDate ? new Date(body.startDate) : undefined,
@@ -123,7 +135,7 @@ export class ReportsController {
     };
 
     await this.reportsService.generateReport(
-      workspaceId,
+      reportScope(workspaceId, req),
       userId,
       'SUMMARY',
       options,
@@ -143,11 +155,13 @@ export class ReportsController {
     },
   })
   @WorkspaceAccess('report.write')
+  @UseInterceptors(AsqErrorInterceptor)
   @Post('generate/vulnerability')
   async generateVulReport(
     @Body() body: GenerateVulReportBodyDto,
     @WorkspaceId() workspaceId: string,
     @UserId() userId: string,
+    @Req() req: RequestWithMetadata,
   ): Promise<DefaultMessageResponseDto> {
     const options = {
       startDate: body.startDate ? new Date(body.startDate) : undefined,
@@ -158,7 +172,7 @@ export class ReportsController {
     };
 
     await this.reportsService.generateReport(
-      workspaceId,
+      reportScope(workspaceId, req),
       userId,
       'VULNERABILITY',
       options,
@@ -189,7 +203,7 @@ export class ReportsController {
     @Req() req: RequestWithMetadata,
   ): Promise<DefaultMessageResponseDto> {
     await this.reportsService.generateQueryReport(
-      { workspaceId, permissions: req.permissions ?? [], caller: 'http' },
+      reportScope(workspaceId, req),
       userId,
       body.savedQueryId,
     );
