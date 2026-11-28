@@ -19,7 +19,7 @@ import { EVENT_CATALOG } from '@/modules/event-bridge/contracts/event-catalog';
 import { EventBridgeService } from '@/modules/event-bridge/publishing/event-bridge.service';
 import { WorkspacesService } from '@/modules/workspaces/workspaces.service';
 import { getManyResponse } from '@/common/utils/get-many-response.util';
-import { StorageService } from '@/modules/storage/storage.service';
+import { type DispositionType, StorageService } from '@/modules/storage/storage.service';
 import type { CreateReportScheduleDto, GetManyReportsQueryDto } from './dto/reports.dto';
 import { ReportSchedule } from './entities/report-schedule.entity';
 import { Report } from './entities/report.entity';
@@ -148,7 +148,11 @@ export class ReportsService implements OnApplicationBootstrap {
   }
 
   /** Signs one report on demand, so listing reports signs nothing. */
-  async getDownloadUrl(id: string, workspaceId: string): Promise<{ url: string; expiresIn: number }> {
+  async getDownloadUrl(
+    id: string,
+    workspaceId: string,
+    disposition: DispositionType = 'attachment',
+  ): Promise<{ url: string; expiresIn: number }> {
     const report = await this.findById(id, workspaceId);
     // `path` is `<bucket>/<key>`: `artifacts/<objectKey>`, or `reports/<fileName>` for older rows.
     const idx = report.path.indexOf('/');
@@ -157,6 +161,7 @@ export class ReportsService implements OnApplicationBootstrap {
       key: report.path.slice(idx + 1),
       fileName: report.fileName,
       contentType: 'application/pdf',
+      disposition,
     });
     return { url, expiresIn };
   }

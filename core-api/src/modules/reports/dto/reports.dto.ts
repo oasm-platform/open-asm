@@ -37,6 +37,18 @@ export class ReportDownloadResponseDto {
   expiresIn: number;
 }
 
+export class ReportDownloadQueryDto {
+  @ApiProperty({
+    required: false,
+    enum: ['attachment', 'inline'],
+    default: 'attachment',
+    description: '`inline` lets the browser display the PDF (preview) instead of saving it',
+  })
+  @IsOptional()
+  @IsIn(['attachment', 'inline'])
+  disposition?: 'attachment' | 'inline';
+}
+
 export class GenerateSummaryReportBodyDto {
   @ApiProperty({
     required: false,

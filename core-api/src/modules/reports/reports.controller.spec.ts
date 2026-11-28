@@ -81,8 +81,16 @@ describe('ReportsController query scope and error mapping', () => {
     const service = { getDownloadUrl: jest.fn().mockResolvedValue({ url: 'u', expiresIn: 300 }) };
     const controller = new ReportsController(service as never);
 
-    await expect(controller.getDownloadUrl({ id: 'r1' }, 'w1')).resolves.toEqual({ url: 'u', expiresIn: 300 });
-    expect(service.getDownloadUrl).toHaveBeenCalledWith('r1', 'w1');
+    await expect(controller.getDownloadUrl({ id: 'r1' }, {}, 'w1')).resolves.toEqual({ url: 'u', expiresIn: 300 });
+    expect(service.getDownloadUrl).toHaveBeenCalledWith('r1', 'w1', 'attachment');
+  });
+
+  it('getDownloadUrl passes an inline disposition through for previews', async () => {
+    const service = { getDownloadUrl: jest.fn().mockResolvedValue({ url: 'u', expiresIn: 300 }) };
+    const controller = new ReportsController(service as never);
+
+    await controller.getDownloadUrl({ id: 'r1' }, { disposition: 'inline' }, 'w1');
+    expect(service.getDownloadUrl).toHaveBeenCalledWith('r1', 'w1', 'inline');
   });
 
   it('falls back to no permissions when the request carries none', async () => {

@@ -9069,6 +9069,21 @@ export const ReportsControllerPreviewVulReportMinSeverity = {
   INFO: 'INFO',
 } as const;
 
+export type ReportsControllerGetDownloadUrlParams = {
+  /**
+   * `inline` lets the browser display the PDF (preview) instead of saving it
+   */
+  disposition?: ReportsControllerGetDownloadUrlDisposition;
+};
+
+export type ReportsControllerGetDownloadUrlDisposition =
+  (typeof ReportsControllerGetDownloadUrlDisposition)[keyof typeof ReportsControllerGetDownloadUrlDisposition];
+
+export const ReportsControllerGetDownloadUrlDisposition = {
+  attachment: 'attachment',
+  inline: 'inline',
+} as const;
+
 export type IntegrationsControllerGetManyIntegrationsParams = {
   search?: string;
   page?: number;
@@ -60739,22 +60754,26 @@ export const useReportsControllerDeleteSchedule = <
 };
 
 /**
- * Returns a presigned URL that downloads the report PDF as an attachment.
+ * Returns a presigned URL for the report PDF: an attachment by default, or `disposition=inline` so the browser displays it.
  * @summary Get a report download URL
  */
 export const reportsControllerGetDownloadUrl = (
   id: string,
+  params?: ReportsControllerGetDownloadUrlParams,
   options?: SecondParameter<typeof orvalClient>,
   signal?: AbortSignal,
 ) => {
   return orvalClient<ReportDownloadResponseDto>(
-    { url: `/api/reports/${id}/download`, method: 'GET', signal },
+    { url: `/api/reports/${id}/download`, method: 'GET', params, signal },
     options,
   );
 };
 
-export const getReportsControllerGetDownloadUrlQueryKey = (id: string) => {
-  return [`/api/reports/${id}/download`] as const;
+export const getReportsControllerGetDownloadUrlQueryKey = (
+  id: string,
+  params?: ReportsControllerGetDownloadUrlParams,
+) => {
+  return [`/api/reports/${id}/download`, ...(params ? [params] : [])] as const;
 };
 
 export const getReportsControllerGetDownloadUrlQueryOptions = <
@@ -60762,6 +60781,7 @@ export const getReportsControllerGetDownloadUrlQueryOptions = <
   TError = unknown,
 >(
   id: string,
+  params?: ReportsControllerGetDownloadUrlParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -60776,12 +60796,13 @@ export const getReportsControllerGetDownloadUrlQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getReportsControllerGetDownloadUrlQueryKey(id);
+    queryOptions?.queryKey ??
+    getReportsControllerGetDownloadUrlQueryKey(id, params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>
   > = ({ signal }) =>
-    reportsControllerGetDownloadUrl(id, requestOptions, signal);
+    reportsControllerGetDownloadUrl(id, params, requestOptions, signal);
 
   return {
     queryKey,
@@ -60805,6 +60826,7 @@ export function useReportsControllerGetDownloadUrl<
   TError = unknown,
 >(
   id: string,
+  params: undefined | ReportsControllerGetDownloadUrlParams,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -60832,6 +60854,7 @@ export function useReportsControllerGetDownloadUrl<
   TError = unknown,
 >(
   id: string,
+  params?: ReportsControllerGetDownloadUrlParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -60859,6 +60882,7 @@ export function useReportsControllerGetDownloadUrl<
   TError = unknown,
 >(
   id: string,
+  params?: ReportsControllerGetDownloadUrlParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -60882,6 +60906,7 @@ export function useReportsControllerGetDownloadUrl<
   TError = unknown,
 >(
   id: string,
+  params?: ReportsControllerGetDownloadUrlParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -60898,6 +60923,7 @@ export function useReportsControllerGetDownloadUrl<
 } {
   const queryOptions = getReportsControllerGetDownloadUrlQueryOptions(
     id,
+    params,
     options,
   );
 

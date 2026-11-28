@@ -30,6 +30,7 @@ import {
   GetManyReportsQueryDto,
   PreviewSummaryQueryDto,
   PreviewVulQueryDto,
+  ReportDownloadQueryDto,
   ReportDownloadResponseDto,
   ReportResponseDto,
   ReportScheduleResponseDto,
@@ -244,7 +245,8 @@ export class ReportsController {
 
   @Doc({
     summary: 'Get a report download URL',
-    description: 'Returns a presigned URL that downloads the report PDF as an attachment.',
+    description:
+      'Returns a presigned URL for the report PDF: an attachment by default, or `disposition=inline` so the browser displays it.',
     response: { serialization: ReportDownloadResponseDto },
     request: { getWorkspaceId: true },
   })
@@ -252,9 +254,10 @@ export class ReportsController {
   @Get(':id/download')
   getDownloadUrl(
     @Param() params: IdQueryParamDto,
+    @Query() query: ReportDownloadQueryDto,
     @WorkspaceId() workspaceId: string,
   ): Promise<ReportDownloadResponseDto> {
-    return this.reportsService.getDownloadUrl(params.id, workspaceId);
+    return this.reportsService.getDownloadUrl(params.id, workspaceId, query.disposition ?? 'attachment');
   }
 
   @Doc({
