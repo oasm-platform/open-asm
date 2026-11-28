@@ -12,6 +12,7 @@ import {
   type QueryClient,
 } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef } from 'react';
+import { isErrorRequest } from './format';
 
 /** The API's largest page */
 export const NETWORK_PAGE_SIZE = 100;
@@ -55,6 +56,14 @@ const newerFirst = (
     ? descending(a.id, b.id)
     : descending(a.sentAt, b.sentAt);
 
+/** The API's cursor for the rows after `row`: base64url of `sentAt|id` */
+function cursorAfter(row: Pick<AgentHttpRequestListItemDto, 'sentAt' | 'id'>) {
+  return btoa(`${row.sentAt}|${row.id}`)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
 /**
  * Adds pushed rows to the conversation's loaded list. They go into the
  * newest page in the API's order; a row that would sort past that page's
@@ -68,16 +77,24 @@ export function mergeHttpRequestsIntoCache(
   push: HttpRequestsPush,
 ) {
   const queryKey = conversationHttpRequestsKey(workspaceId, conversationId);
-  const data = queryClient.getQueryData<HttpRequestsData>(queryKey);
   if (push.refetch) {
     void queryClient.invalidateQueries({ queryKey });
     return;
   }
-  const [newest, ...older] = data?.pages ?? [];
-  if (!newest || !push.requests?.length) return;
+  // A chunk of the previous conversation's stream can land after a switch
+  const pushed = push.requests?.filter((r) => r.conversationId === conversationId);
+  if (!pushed?.length) return;
 
-  const known = new Set(data!.pages.flatMap((p) => p.data.map((r) => r.id)));
-  const fresh = push.requests.filter((r) => !known.has(r.id));
+  const data = queryClient.getQueryData<HttpRequestsData>(queryKey);
+  const [newest, ...older] = data?.pages ?? [];
+  // A response in flight would replace the cache without these rows
+  if (!data || !newest || queryClient.isFetching({ queryKey }) > 0) {
+    void queryClient.invalidateQueries({ queryKey });
+    return;
+  }
+
+  const known = new Set(data.pages.flatMap((p) => p.data.map((r) => r.id)));
+  const fresh = pushed.filter((r) => !known.has(r.id));
   if (!fresh.length) return;
 
   const last = newest.data[newest.data.length - 1];
@@ -85,12 +102,21 @@ export function mergeHttpRequestsIntoCache(
     void queryClient.invalidateQueries({ queryKey });
     return;
   }
+  const merged = [...fresh, ...newest.data].sort(newerFirst);
+  if (merged.length <= NETWORK_PAGE_SIZE) {
+    queryClient.setQueryData<HttpRequestsData>(queryKey, {
+      ...data,
+      pages: [{ ...newest, data: merged }, ...older],
+    });
+    return;
+  }
+  // A long run would otherwise grow the page without end. The rows cut off
+  // now start the second page, so the loaded older pages no longer line up
+  // and are dropped; "load more" fetches them again from the new cursor.
+  const kept = merged.slice(0, NETWORK_PAGE_SIZE);
   queryClient.setQueryData<HttpRequestsData>(queryKey, {
-    ...data!,
-    pages: [
-      { ...newest, data: [...fresh, ...newest.data].sort(newerFirst) },
-      ...older,
-    ],
+    pages: [{ ...newest, data: kept, nextCursor: cursorAfter(kept[kept.length - 1]) }],
+    pageParams: data.pageParams.slice(0, 1),
   });
 }
 
@@ -157,9 +183,18 @@ export function useConversationHttpRequests(
     const reload = () => {
       pendingReload.current = undefined;
       lastReload.current = Date.now();
-      void queryClient.invalidateQueries({
-        queryKey: conversationHttpRequestsKey(selectedWorkspaceId, conversationId),
-      });
+      const key = conversationHttpRequestsKey(selectedWorkspaceId, conversationId);
+      // Invalidating refetches every loaded page in turn; new rows only land
+      // on the newest one, so an event costs one request
+      queryClient.setQueryData<HttpRequestsData>(
+        key,
+        (prev) =>
+          prev && {
+            pages: prev.pages.slice(0, 1),
+            pageParams: prev.pageParams.slice(0, 1),
+          },
+      );
+      void queryClient.invalidateQueries({ queryKey: key });
     };
     // Trailing, not dropped: the last batch of a burst must still show.
     const wait = lastReload.current + LIVE_RELOAD_MS - Date.now();
@@ -172,7 +207,13 @@ export function useConversationHttpRequests(
     [query.data],
   );
 
-  return { ...query, requests };
+  // Counted once here for the tab badge and the panel footer
+  const errorCount = useMemo(
+    () => requests.filter(isErrorRequest).length,
+    [requests],
+  );
+
+  return { ...query, requests, errorCount };
 }
 
 export type ConversationHttpRequests = ReturnType<

@@ -91,8 +91,13 @@ export function waterfall(
     const start = Date.parse(r.sentAt);
     return { id: r.id, start, end: start + Math.max(0, r.durationMs) };
   });
-  const first = Math.min(...spans.map((s) => s.start));
-  const last = Math.max(...spans.map((s) => s.end));
+  // A loop, not Math.min(...spans): spreading a long list overflows the stack
+  let first = Infinity;
+  let last = -Infinity;
+  for (const { start, end } of spans) {
+    if (start < first) first = start;
+    if (end > last) last = end;
+  }
   const total = Math.max(1, last - first);
   for (const { id, start, end } of spans) {
     const left = ((start - first) / total) * 100;

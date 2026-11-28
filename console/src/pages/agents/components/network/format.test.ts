@@ -67,4 +67,16 @@ describe('network format', () => {
     expect(bars.get('c')!.left + bars.get('c')!.width).toBeLessThanOrEqual(100);
     expect(waterfall([]).size).toBe(0);
   });
+
+  it('places more rows than a call can take as arguments', () => {
+    const base = Date.parse('2026-11-27T10:00:00.000Z');
+    const many = Array.from({ length: 200_000 }, (_, i) => ({
+      id: String(i),
+      sentAt: new Date(base + i).toISOString(),
+      durationMs: 1,
+    }));
+    const bars = waterfall(many);
+    expect(bars.get('0')!.left).toBe(0);
+    expect(bars.size).toBe(200_000);
+  });
 });

@@ -13,6 +13,8 @@ import {
   X,
 } from 'lucide-react';
 import {
+  memo,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -49,6 +51,7 @@ const WATERFALL_CELL = 'hidden @xl/network:block';
 export type NetworkData = Pick<
   ConversationHttpRequests,
   | 'requests'
+  | 'errorCount'
   | 'data'
   | 'isLoading'
   | 'isError'
@@ -100,19 +103,21 @@ function Waterfall({ bar, error }: { bar?: WaterfallBar; error: boolean }) {
   );
 }
 
+interface RequestRowProps {
+  request: AgentHttpRequestListItemDto;
+  bar?: WaterfallBar;
+  selected: boolean;
+  onOpen: (request: AgentHttpRequestListItemDto) => void;
+  onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
+}
+
 function RequestRow({
   request,
   bar,
   selected,
   onOpen,
   onKeyDown,
-}: {
-  request: AgentHttpRequestListItemDto;
-  bar?: WaterfallBar;
-  selected: boolean;
-  onOpen: () => void;
-  onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
-}) {
+}: RequestRowProps) {
   const error = isErrorRequest(request);
   const tunnel = isTunnel(request);
   return (
@@ -121,7 +126,7 @@ function RequestRow({
         type="button"
         data-request-id={request.id}
         aria-current={selected || undefined}
-        onClick={onOpen}
+        onClick={() => onOpen(request)}
         onKeyDown={onKeyDown}
         title={requestUrl(request)}
         className={cn(
@@ -167,6 +172,19 @@ function RequestRow({
   );
 }
 
+// A pushed row re-renders only the rows whose bar moved. `bar` is compared by
+// value: the waterfall map is rebuilt on every change.
+const MemoRequestRow = memo(
+  RequestRow,
+  (a, b) =>
+    a.request === b.request &&
+    a.selected === b.selected &&
+    a.onOpen === b.onOpen &&
+    a.onKeyDown === b.onKeyDown &&
+    a.bar?.left === b.bar?.left &&
+    a.bar?.width === b.bar?.width,
+);
+
 /** Moves focus between rows with the arrow keys, Home and End */
 function moveFocus(event: KeyboardEvent<HTMLButtonElement>) {
   const rows = Array.from(
@@ -209,6 +227,7 @@ export function NetworkPanel({
   const t = useT();
   const {
     requests,
+    errorCount: totalErrors,
     data,
     isLoading,
     isError,
@@ -220,7 +239,9 @@ export function NetworkPanel({
   } = network;
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<Kind>('all');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // The row itself, not its id: a reload that no longer lists it (the run
+  // ended and the list came back as one page) must not close its details
+  const [opened, setOpened] = useState<AgentHttpRequestListItemDto | null>(null);
   const [lastOpenedId, setLastOpenedId] = useState<string | null>(null);
 
   // The tab was just opened: show what is there now
@@ -240,12 +261,22 @@ export function NetworkPanel({
   }, [requests, query, kind, toolCallFilter]);
   const bars = useMemo(() => waterfall(visible), [visible]);
   const transferred = visible.reduce((sum, r) => sum + r.responseBytes, 0);
-  const errorCount = visible.filter(isErrorRequest).length;
   const filtered = visible.length !== requests.length;
+  const errorCount = filtered
+    ? visible.filter(isErrorRequest).length
+    : totalErrors;
+  // Only the loaded pages are counted
+  const more = hasNextPage ? '+' : '';
 
-  const selected = selectedId
-    ? requests.find((r) => r.id === selectedId)
+  // The listed copy when there is one, so the details follow its updates
+  const selected = opened
+    ? (requests.find((r) => r.id === opened.id) ?? opened)
     : undefined;
+
+  const open = useCallback((request: AgentHttpRequestListItemDto) => {
+    setOpened(request);
+    setLastOpenedId(request.id);
+  }, []);
 
   // Follow new rows while scrolled to the end, as DevTools does
   const listRef = useRef<HTMLDivElement>(null);
@@ -276,16 +307,23 @@ export function NetworkPanel({
       <NetworkRequestDetail
         request={selected}
         backRef={backRef}
-        onBack={() => setSelectedId(null)}
+        onBack={() => setOpened(null)}
         onShowInChat={onShowInChat}
       />
     );
   }
 
-  const open = (id: string) => {
-    setSelectedId(id);
-    setLastOpenedId(id);
-  };
+  const loadOlder = (
+    <button
+      type="button"
+      onClick={() => void fetchNextPage()}
+      disabled={isFetchingNextPage}
+      className="flex h-8 w-full cursor-pointer items-center justify-center gap-1.5 border-b text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:cursor-default"
+    >
+      {isFetchingNextPage && <Loader2 className="size-3 animate-spin" />}
+      {t('agents.network.loadOlder')}
+    </button>
+  );
 
   return (
     <div className="@container/network flex min-h-0 flex-1 flex-col">
@@ -422,32 +460,26 @@ export function NetworkPanel({
             }}
             className="min-h-0 flex-1 overflow-y-auto"
           >
-            {hasNextPage && (
-              <button
-                type="button"
-                onClick={() => void fetchNextPage()}
-                disabled={isFetchingNextPage}
-                className="flex h-8 w-full cursor-pointer items-center justify-center gap-1.5 border-b text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:cursor-default"
-              >
-                {isFetchingNextPage && <Loader2 className="size-3 animate-spin" />}
-                {t('agents.network.loadOlder')}
-              </button>
-            )}
+            {hasNextPage && (isLoading || visible.length > 0) && loadOlder}
             {isLoading ? (
               <SkeletonRows />
             ) : visible.length === 0 ? (
-              <p className="px-6 py-10 text-center text-sm text-muted-foreground">
-                {t('agents.network.emptyFiltered')}
-              </p>
+              <>
+                <p className="px-6 py-10 text-center text-sm text-muted-foreground">
+                  {t('agents.network.emptyFiltered')}
+                </p>
+                {/* The match may be among the requests not loaded yet */}
+                {hasNextPage && loadOlder}
+              </>
             ) : (
               <ul aria-label={t('agents.network.requests')}>
                 {visible.map((request) => (
-                  <RequestRow
+                  <MemoRequestRow
                     key={request.id}
                     request={request}
                     bar={bars.get(request.id)}
                     selected={request.id === lastOpenedId}
-                    onOpen={() => open(request.id)}
+                    onOpen={open}
                     onKeyDown={moveFocus}
                   />
                 ))}
@@ -459,17 +491,17 @@ export function NetworkPanel({
               {filtered
                 ? t('agents.network.summaryFiltered', {
                     shown: visible.length,
-                    count: requests.length,
+                    count: `${requests.length}${more}`,
                     size: formatBytes(transferred),
                   })
                 : t('agents.network.summary', {
-                    count: requests.length,
+                    count: `${requests.length}${more}`,
                     size: formatBytes(transferred),
                   })}
             </span>
             {errorCount > 0 && (
               <span className="ml-auto shrink-0 text-red-600 tabular-nums dark:text-red-400">
-                {t('agents.network.errorCount', { count: errorCount })}
+                {t('agents.network.errorCount', { count: `${errorCount}${more}` })}
               </span>
             )}
           </div>

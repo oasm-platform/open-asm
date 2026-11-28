@@ -1,5 +1,6 @@
 import { renderWithProviders, screen } from '@/test/utils';
 import { within } from '@testing-library/react';
+import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   AgentHttpRequestDetailDto,
@@ -107,6 +108,7 @@ const DETAIL: AgentHttpRequestDetailDto = {
 function network(overrides: Partial<NetworkData> = {}): NetworkData {
   return {
     requests: ROWS,
+    errorCount: 2,
     data: { pages: [{ data: [...ROWS].reverse(), nextCursor: null }], pageParams: [] },
     isLoading: false,
     isError: false,
@@ -122,6 +124,7 @@ function network(overrides: Partial<NetworkData> = {}): NetworkData {
 async function setup(
   props: Partial<Parameters<typeof NetworkPanel>[0]> = {},
   detail: AgentHttpRequestDetailDto = DETAIL,
+  ui = <NetworkPanel network={network()} {...props} />,
 ) {
   const queries = await import('@/services/apis/gen/queries');
   vi.mocked(queries.useAgentHttpRequestsControllerGetHttpRequest).mockReturnValue({
@@ -131,9 +134,7 @@ async function setup(
   } as unknown as ReturnType<
     typeof queries.useAgentHttpRequestsControllerGetHttpRequest
   >);
-  const view = renderWithProviders(
-    <NetworkPanel network={network()} {...props} />,
-  );
+  const view = renderWithProviders(ui);
   await screen.findByRole('searchbox', { name: 'Filter requests' });
   return view;
 }
@@ -332,5 +333,60 @@ describe('NetworkPanel', () => {
     expect(fetchNextPage).toHaveBeenCalledOnce();
     await user.click(screen.getByRole('button', { name: 'Refresh' }));
     expect(refetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a request open when a reload no longer lists it', async () => {
+    function Live() {
+      const [net, setNet] = useState(network());
+      return (
+        <>
+          {/* The run ended and the list came back as one page without that row */}
+          <button
+            type="button"
+            onClick={() =>
+              setNet(network({ requests: [BLOCKED_ROW], errorCount: 1, hasNextPage: true }))
+            }
+          >
+            reload
+          </button>
+          <NetworkPanel network={net} />
+        </>
+      );
+    }
+    const { user } = await setup({}, DETAIL, <Live />);
+    await user.click(row(/users\?id/));
+    expect(screen.getByRole('button', { name: 'Back to requests' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'reload' }));
+
+    expect(screen.getByRole('button', { name: 'Back to requests' })).toBeInTheDocument();
+    expect(
+      screen.getByText('http://api.acme.com:8080/v1/users?id=***'),
+    ).toBeInTheDocument();
+  });
+
+  it('marks the counts as partial while older requests are not loaded', async () => {
+    await setup({ network: network({ hasNextPage: true }) });
+
+    expect(screen.getByText('Requests: 4+ · 4.0 KiB transferred')).toBeInTheDocument();
+    expect(screen.getByText('Errors: 2+')).toBeInTheDocument();
+  });
+
+  it('offers older requests when none of the loaded ones match', async () => {
+    const fetchNextPage = vi.fn();
+    const { user } = await setup({
+      network: network({ hasNextPage: true, fetchNextPage }),
+    });
+
+    await user.type(screen.getByRole('searchbox', { name: 'Filter requests' }), 'nothing');
+
+    const empty = screen.getByText('No requests match this filter.');
+    const more = screen.getByRole('button', { name: 'Load older requests' });
+    // Under the message, not only above it in the list's header
+    expect(
+      empty.compareDocumentPosition(more) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    await user.click(more);
+    expect(fetchNextPage).toHaveBeenCalledOnce();
   });
 });

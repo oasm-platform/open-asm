@@ -12,6 +12,7 @@ import {
   conversationHttpRequestsKey,
   mergeHttpRequestsIntoCache,
   HTTP_REQUESTS_RECORDED,
+  NETWORK_PAGE_SIZE,
   useConversationHttpRequests,
 } from './use-conversation-http-requests';
 
@@ -118,6 +119,35 @@ describe('useConversationHttpRequests', () => {
       return { fn, ...view };
     }
 
+    it('reloads only the newest page, however many older ones are loaded', async () => {
+      const queries = await import('@/services/apis/gen/queries');
+      const fn = vi.mocked(queries.agentHttpRequestsControllerGetHttpRequests);
+      fn.mockImplementation(((params: { cursor?: string }) =>
+        Promise.resolve(
+          params.cursor
+            ? { data: [row('older')], nextCursor: null }
+            : { data: [row('new')], nextCursor: 'cursor-1' },
+        )) as never);
+      const { result } = renderHook(
+        () => useConversationHttpRequests('c1', { running: false }),
+        { wrapper },
+      );
+      await waitFor(() => expect(result.current.hasNextPage).toBe(true));
+      await act(() => result.current.fetchNextPage());
+      await waitFor(() =>
+        expect(result.current.requests.map((r) => r.id)).toEqual(['older', 'new']),
+      );
+      fn.mockClear();
+
+      act(() => liveEvents.emit(recorded('c1')));
+      await waitFor(() => expect(fn).toHaveBeenCalledTimes(1));
+      await act(() => vi.advanceTimersByTimeAsync(100));
+      expect(fn).toHaveBeenCalledTimes(1);
+      expect(fn.mock.calls[0][0]).toMatchObject({ cursor: undefined });
+      expect(result.current.data?.pages).toHaveLength(1);
+      expect(result.current.hasNextPage).toBe(true);
+    });
+
     it('listens for the recorded event only', async () => {
       await mounted();
       expect(liveEvents.patterns).toEqual(HTTP_REQUESTS_RECORDED);
@@ -204,6 +234,7 @@ describe('mergeHttpRequestsIntoCache', () => {
   const at = (id: string, second: number) =>
     ({
       id,
+      conversationId: 'c1',
       sentAt: `2026-11-27T10:00:${String(second).padStart(2, '0')}.000Z`,
     }) as AgentHttpRequestListResponseDto['data'][number];
   const key = conversationHttpRequestsKey('ws-1', 'c1');
@@ -252,10 +283,65 @@ describe('mergeHttpRequestsIntoCache', () => {
     expect(ids(client)).toEqual([['b', 'late']]);
   });
 
-  it('does nothing while the list has not loaded', () => {
+  it('reloads instead while the list has not loaded', () => {
     const client = new QueryClient();
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
     mergeHttpRequestsIntoCache(client, 'ws-1', 'c1', { requests: [at('a', 1)] });
     expect(client.getQueryData(key)).toBeUndefined();
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: key });
+  });
+
+  it('reloads instead while a fetch is in flight, which would overwrite the row', () => {
+    const client = seed([{ data: [at('b', 20)], nextCursor: null }]);
+    vi.spyOn(client, 'isFetching').mockReturnValue(1);
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
+
+    mergeHttpRequestsIntoCache(client, 'ws-1', 'c1', { requests: [at('c', 30)] });
+
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: key });
+    expect(ids(client)).toEqual([['b']]);
+  });
+
+  it("ignores another conversation's rows (a late chunk after switching)", () => {
+    const client = seed([{ data: [at('b', 20)], nextCursor: null }]);
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
+
+    mergeHttpRequestsIntoCache(client, 'ws-1', 'c1', {
+      requests: [{ ...at('x', 30), conversationId: 'c0' }],
+    });
+
+    expect(ids(client)).toEqual([['b']]);
+    expect(invalidate).not.toHaveBeenCalled();
+  });
+
+  it('keeps the newest page at one page of rows, continuing after the last kept', () => {
+    const t0 = Date.parse('2026-11-27T10:00:00.000Z');
+    const full = Array.from({ length: NETWORK_PAGE_SIZE }, (_, i) => ({
+      ...at(`r${i}`, 0),
+      sentAt: new Date(t0 - i * 1000).toISOString(),
+    }));
+    const client = seed([
+      { data: full, nextCursor: 'cursor-1' },
+      { data: [{ ...at('z', 0), sentAt: '2026-11-27T09:00:00.000Z' }], nextCursor: null },
+    ]);
+    const later = at('late', 59);
+
+    mergeHttpRequestsIntoCache(client, 'ws-1', 'c1', { requests: [later] });
+
+    const data = client.getQueryData<Data>(key)!;
+    // The trimmed row now starts the next page: older pages are dropped
+    expect(data.pages).toHaveLength(1);
+    expect(data.pageParams).toEqual([undefined]);
+    const page = data.pages[0];
+    expect(page.data).toHaveLength(NETWORK_PAGE_SIZE);
+    expect(page.data[0].id).toBe('late');
+    const last = page.data[NETWORK_PAGE_SIZE - 1];
+    expect(last.id).toBe(full[NETWORK_PAGE_SIZE - 2].id);
+    // The API's cursor: base64url of `sentAt|id`
+    expect(Buffer.from(page.nextCursor!, 'base64url').toString('utf8')).toBe(
+      `${last.sentAt}|${last.id}`,
+    );
+    expect(page.nextCursor).toMatch(/^[A-Za-z0-9_-]+$/);
   });
 
   it('invalidates the list on a refetch push', () => {

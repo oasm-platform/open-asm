@@ -22,7 +22,6 @@ import {
 import { useMemo } from 'react';
 import { AgentTodoPanel, type AgentTodoItem } from './agent-todo-panel';
 import { AgentWorkflowPanel } from './agent-workflow-panel';
-import { isErrorRequest } from './network/format';
 import { NetworkPanel, type NetworkData } from './network/network-panel';
 import { PanelTab, PanelTabStrip } from './panel-tab-strip';
 import { BrowserPanel, type LiveBrowserScreenshot } from './browser-panel';
@@ -83,7 +82,17 @@ export function sidePanelContent({
 }
 
 /** The Network tab's count, with a red dot when any request failed */
-function NetworkBadge({ total, errors }: { total: number; errors: number }) {
+function NetworkBadge({
+  total,
+  errors,
+  more,
+}: {
+  total: number;
+  errors: number;
+  /** Older requests are not loaded, so the counts are a floor */
+  more: boolean;
+}) {
+  const plus = more ? '+' : '';
   const t = useT();
   return (
     <span className="inline-flex items-center gap-1">
@@ -91,9 +100,10 @@ function NetworkBadge({ total, errors }: { total: number; errors: number }) {
         <span className="size-1.5 rounded-full bg-red-500" aria-hidden />
       )}
       {total}
+      {plus}
       {errors > 0 && (
         <span className="sr-only">
-          {t('agents.network.errorCount', { count: errors })}
+          {t('agents.network.errorCount', { count: `${errors}${plus}` })}
         </span>
       )}
     </span>
@@ -194,10 +204,7 @@ export function ChatSidePanel({
   ).length;
   const toolCallsDone = toolCalls.filter((t) => t.status === 'completed').length;
   const httpRequests = network?.requests ?? NO_REQUESTS;
-  const httpErrors = useMemo(
-    () => httpRequests.filter(isErrorRequest).length,
-    [httpRequests],
-  );
+  const httpErrors = network?.errorCount ?? 0;
   const networkFilter = useMemo(() => {
     if (!networkToolCallId) return null;
     const input = toolCalls.find((c) => c.toolCallId === networkToolCallId)
@@ -272,7 +279,11 @@ export function ChatSidePanel({
             label={t('agents.sidePanel.tabs.network')}
             badge={
               httpRequests.length > 0 ? (
-                <NetworkBadge total={httpRequests.length} errors={httpErrors} />
+                <NetworkBadge
+                  total={httpRequests.length}
+                  errors={httpErrors}
+                  more={!!network?.hasNextPage}
+                />
               ) : undefined
             }
           />

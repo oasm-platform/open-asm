@@ -141,14 +141,18 @@ const httpRow = (
   createdAt: '2026-11-27T10:00:00.100Z',
 });
 
-const fakeNetwork = (requests: AgentHttpRequestListItemDto[]) =>
+const fakeNetwork = (
+  requests: AgentHttpRequestListItemDto[],
+  hasNextPage = false,
+) =>
   ({
     requests,
+    errorCount: requests.filter((r) => (r.statusCode ?? 0) >= 400).length,
     data: { pages: [{ data: requests, nextCursor: null }], pageParams: [] },
     isLoading: false,
     isError: false,
     isFetching: false,
-    hasNextPage: false,
+    hasNextPage,
     isFetchingNextPage: false,
     fetchNextPage: vi.fn(),
     refetch: vi.fn(),
@@ -429,6 +433,15 @@ describe('ChatSidePanel', () => {
         'button',
       ),
     ).toHaveLength(2);
+  });
+
+  it('marks the Network count as partial while older requests are not loaded', () => {
+    render(
+      <Harness network={fakeNetwork([httpRow('h1', 'k1', 500)], true)} />,
+    );
+    const tab = screen.getByRole('tab', { name: /Network/ });
+    expect(tab).toHaveTextContent('1+');
+    expect(tab).toHaveAccessibleName(/Errors: 1\+/);
   });
 
   it("a tool card's link shows its requests even over a request's details", async () => {
