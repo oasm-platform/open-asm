@@ -527,6 +527,14 @@ export const EVENT_CATALOG = {
     sent: { name: 'notification.sent', summary: 'Notification delivered' },
     failed: { name: 'notification.failed', summary: 'Notification delivery failed' },
   },
+  agent: {
+    http_requests: {
+      recorded: {
+        name: 'agent.http_requests.recorded',
+        summary: 'HTTP requests of agent commands stored for a conversation',
+      },
+    },
+  },
 } as const satisfies EventNode;
 
 /**

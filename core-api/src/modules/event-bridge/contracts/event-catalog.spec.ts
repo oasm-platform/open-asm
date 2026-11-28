@@ -90,10 +90,10 @@ describe('event catalog', () => {
       // approved/rejected/merged, settings.updated, comment.created and the
       // issue updated/resolved/assigned/deleted/link.added/link.removed facts),
       // minus `job.secrets.released` (a persisted row per dispatched job),
-      // plus the `worker.removed` audit event.
+      // plus the `worker.removed` audit event, plus `agent.http_requests.recorded`.
       // Asserting the
       // count means the removal cannot be half-reverted without failing here.
-      expect(EVENT_DEFINITIONS).toHaveLength(115);
+      expect(EVENT_DEFINITIONS).toHaveLength(116);
     });
 
     it('has no worker.alive leaf, so nothing can publish a heartbeat', () => {

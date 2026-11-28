@@ -150,9 +150,11 @@ describe('event bus subscriptions', () => {
       // one is added this list must shrink. Asserting it exactly makes that
       // trade-off visible instead of silent. `project` is not here: the
       // projects lane reads its two trigger facts (`project.assets.added`,
-      // `project.run.completed`), never the audited changes.
+      // `project.run.completed`), never the audited changes. `agent` is a
+      // live UI hint for the conversation owner only, never a lane's input.
       expect(unclaimed).toEqual(
         [
+          'agent',
           'api_key',
           'artifact',
           'audit',

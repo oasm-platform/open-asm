@@ -16,6 +16,16 @@ export const CLIENT_EVENTS = [
   'workflow.*',
 ] as const;
 
+/**
+ * Events that reach ONLY the connection of the user named in `data.actor.id`,
+ * on the event's workspace: they point at data private to that user (a
+ * conversation), and even its id must not reach other members. Checked before
+ * {@link CLIENT_EVENTS}, so allowlisting their domain can never broadcast them.
+ */
+export const OWNER_ONLY_EVENTS: readonly string[] = [
+  'agent.http_requests.recorded',
+];
+
 /** Name of the push emitted for a newly delivered in-app notification. */
 export const NOTIFICATION_CREATED = 'notification.created';
 

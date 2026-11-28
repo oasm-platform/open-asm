@@ -1,6 +1,6 @@
 import type { RedisService, StreamEntry } from '@/services/redis/redis.service';
 import type { MessageEvent } from '@nestjs/common';
-import { isClientEvent } from './client-events';
+import { CLIENT_EVENTS, isClientEvent } from './client-events';
 import { EventsService } from './events.service';
 
 type OnMessage = (channel: string, message: string) => void;
@@ -233,6 +233,98 @@ describe('EventsService', () => {
 
     expect(first).toHaveLength(0);
     expect(second).toHaveLength(1);
+  });
+
+  describe('owner-only events', () => {
+    const recorded = (id: string, data: Record<string, unknown>) =>
+      entry(id, 'agent.http_requests.recorded', {
+        resourceType: 'conversation',
+        resourceId: 'conv-1',
+        metadata: { count: 3 },
+        ...data,
+      });
+
+    /** Feeds `entries` to one read and collects what each connection got. */
+    async function deliver(
+      entries: StreamEntry[],
+      connections: [string | undefined, string][],
+    ): Promise<MessageEvent[][]> {
+      redis.xread.mockResolvedValueOnce(entries);
+      const received = connections.map(() => [] as MessageEvent[]);
+      const subscriptions = connections.map(([workspaceId, userId], i) =>
+        service
+          .stream(workspaceId, userId)
+          .subscribe((event) => received[i].push(event)),
+      );
+      await flush();
+      subscriptions.forEach((s) => s.unsubscribe());
+      return received;
+    }
+
+    it('reaches only the actor\'s connection on that workspace, as ids only', async () => {
+      const [owner, otherMember, ownerElsewhere, ownerNoWorkspace] =
+        await deliver(
+          [
+            recorded('e1', {
+              workspaceId: 'ws-1',
+              actor: { type: 'agent', id: 'user-1' },
+            }),
+          ],
+          [
+            ['ws-1', 'user-1'],
+            ['ws-1', 'user-2'],
+            ['ws-2', 'user-1'],
+            [undefined, 'user-1'],
+          ],
+        );
+
+      expect(owner.map((e) => e.data)).toEqual([
+        {
+          id: 'e1',
+          type: 'agent.http_requests.recorded',
+          time: '2026-10-17T00:00:00.000Z',
+          resourceType: 'conversation',
+          resourceId: 'conv-1',
+        },
+      ]);
+      expect(otherMember).toEqual([]);
+      expect(ownerElsewhere).toEqual([]);
+      expect(ownerNoWorkspace).toEqual([]);
+    });
+
+    it('is dropped when the actor id is missing', async () => {
+      const [owner] = await deliver(
+        [
+          recorded('e1', { workspaceId: 'ws-1', actor: { type: 'agent' } }),
+          recorded('e2', { workspaceId: 'ws-1' }),
+        ],
+        [['ws-1', 'user-1']],
+      );
+      expect(owner).toEqual([]);
+    });
+
+    it('is never broadcast, even when its domain is allowlisted', async () => {
+      const allowlist = CLIENT_EVENTS as unknown as string[];
+      allowlist.push('agent.*');
+      try {
+        const [owner, otherMember] = await deliver(
+          [
+            recorded('e1', {
+              workspaceId: 'ws-1',
+              actor: { type: 'agent', id: 'user-1' },
+            }),
+          ],
+          [
+            ['ws-1', 'user-1'],
+            ['ws-1', 'user-2'],
+          ],
+        );
+        expect(owner).toHaveLength(1);
+        expect(otherMember).toEqual([]);
+      } finally {
+        allowlist.pop();
+      }
+    });
   });
 
   it('runs a single read loop for all connections', async () => {

@@ -1,3 +1,6 @@
+import { AuditActorType, AuditOutcome } from '@/common/enums/enum';
+import { EVENT_CATALOG } from '@/modules/event-bridge/contracts/event-catalog';
+import { EventBridgeService } from '@/modules/event-bridge/publishing/event-bridge.service';
 import { RedisService } from '@/services/redis/redis.service';
 import { Injectable, Logger } from '@nestjs/common';
 import { isUUID } from 'class-validator';
@@ -93,6 +96,7 @@ export class AgentHttpIngestService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly redisService: RedisService,
+    private readonly eventBridge: EventBridgeService,
   ) {}
 
   async ingest(
@@ -193,9 +197,11 @@ export class AgentHttpIngestService {
   }
 
   /**
-   * Tells open chat streams about new rows (the stream forwards them to the
-   * console's Network tab). Runs after the commit so a reader never sees a row
-   * the list route cannot return yet. Best effort: the tab also polls.
+   * Tells the console about new rows, after the commit so a reader never sees
+   * a row the list route cannot return yet. Two best-effort paths: the open
+   * chat stream gets the rows themselves, and the owner's `/events/stream`
+   * gets an ids-only hint, which covers background subagents after the turn
+   * ended and the conversation opened in another tab.
    */
   private async announce(rows: AgentHttpRequestRow[]): Promise<void> {
     const byConversation = new Map<string, AgentHttpRequestRow[]>();
@@ -204,6 +210,23 @@ export class AgentHttpIngestService {
       list.push(row);
       byConversation.set(row.conversationId, list);
     }
+    await Promise.allSettled(
+      [...byConversation].map(([conversationId, list]) =>
+        // `actor.id` is what `/events/stream` routes on: only the owner's
+        // connection to this workspace receives it.
+        this.eventBridge.publishSafely(
+          EVENT_CATALOG.agent.http_requests.recorded,
+          {
+            workspaceId: list[0].workspaceId,
+            outcome: AuditOutcome.Success,
+            actor: { type: AuditActorType.Agent, id: list[0].createdBy },
+            resourceType: 'conversation',
+            resourceId: conversationId,
+            metadata: { count: list.length },
+          },
+        ),
+      ),
+    );
     await Promise.all(
       [...byConversation].map(async ([conversationId, list]) => {
         const body =

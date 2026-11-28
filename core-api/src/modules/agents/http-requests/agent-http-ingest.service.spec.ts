@@ -1,3 +1,6 @@
+import { AuditActorType, AuditOutcome } from '@/common/enums/enum';
+import { EVENT_CATALOG } from '@/modules/event-bridge/contracts/event-catalog';
+import type { EventBridgeService } from '@/modules/event-bridge/publishing/event-bridge.service';
 import type { RedisService } from '@/services/redis/redis.service';
 import { Logger } from '@nestjs/common';
 import type { DataSource } from 'typeorm';
@@ -66,6 +69,7 @@ interface Harness {
   mget: jest.Mock;
   transaction: jest.Mock;
   publish: jest.Mock;
+  publishSafely: jest.Mock;
 }
 
 /**
@@ -77,6 +81,7 @@ function setup(opts: {
   conversations?: string[];
   existing?: string[];
   publish?: jest.Mock;
+  publishSafely?: jest.Mock;
 } = {}): Harness {
   const sessions = opts.sessions ?? { 'sess-1': session() };
   const conversations = opts.conversations ?? [CONV];
@@ -123,11 +128,14 @@ function setup(opts: {
     ),
   );
   const publish = opts.publish ?? jest.fn(() => Promise.resolve(1));
+  const publishSafely =
+    opts.publishSafely ?? jest.fn(() => Promise.resolve('evt-1'));
   const service = new AgentHttpIngestService(
     { query, transaction } as unknown as DataSource,
     { cacheClient: { mget }, publish } as unknown as RedisService,
+    { publishSafely } as unknown as EventBridgeService,
   );
-  return { service, inserted, query, mget, transaction, publish };
+  return { service, inserted, query, mget, transaction, publish, publishSafely };
 }
 
 const rowsOf = (h: Harness, entity: unknown) =>
@@ -582,6 +590,63 @@ describe('AgentHttpIngestService', () => {
       expect(Logger.prototype.warn).toHaveBeenCalledWith(
         expect.stringContaining('redis down'),
       );
+    });
+  });
+
+  describe('event bus announcement', () => {
+    const CONV_B = '77777777-7777-4777-8777-777777777777';
+    const USER_B = '88888888-8888-4888-8888-888888888888';
+
+    it('publishes one owner-attributed event per conversation with new rows', async () => {
+      const h = setup({
+        sessions: {
+          'sess-1': session(),
+          'sess-2': session({ conversationId: CONV_B, createdBy: USER_B }),
+        },
+        conversations: [CONV, CONV_B],
+      });
+
+      await h.service.ingest(
+        WORKER,
+        [log(), log({ sessionId: 'sess-2' }), log()],
+        0,
+      );
+
+      expect(h.publishSafely).toHaveBeenCalledTimes(2);
+      expect(h.publishSafely).toHaveBeenCalledWith(
+        EVENT_CATALOG.agent.http_requests.recorded,
+        {
+          workspaceId: WS,
+          outcome: AuditOutcome.Success,
+          actor: { type: AuditActorType.Agent, id: USER },
+          resourceType: 'conversation',
+          resourceId: CONV,
+          metadata: { count: 2 },
+        },
+      );
+      expect(h.publishSafely).toHaveBeenCalledWith(
+        EVENT_CATALOG.agent.http_requests.recorded,
+        expect.objectContaining({
+          actor: { type: AuditActorType.Agent, id: USER_B },
+          resourceId: CONV_B,
+          metadata: { count: 1 },
+        }),
+      );
+    });
+
+    it('announces nothing for rows that were already stored', async () => {
+      const dup = log();
+      const h = setup({ existing: [dup.id] });
+      await h.service.ingest(WORKER, [dup], 0);
+      expect(h.publishSafely).not.toHaveBeenCalled();
+    });
+
+    it('still accepts the batch when the bus publish rejects', async () => {
+      const h = setup({
+        publishSafely: jest.fn(() => Promise.reject(new Error('bus down'))),
+      });
+      const result = await h.service.ingest(WORKER, [log()], 0);
+      expect(result).toEqual({ accepted: 1, rejected: 0 });
     });
   });
 });

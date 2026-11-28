@@ -166,6 +166,9 @@ export const EVENT_POLICY: Record<EventName, EventPolicy> = {
   // consume domain `notification`, or it would loop on its own output.
   'notification.sent': { persist: false, severity: 'normal' },
   'notification.failed': { persist: false, severity: 'normal' },
+  // A UI refresh hint for the conversation owner only (`OWNER_ONLY_EVENTS` in
+  // the events module); no lane subscribes to the `agent` domain.
+  'agent.http_requests.recorded': { persist: false, severity: 'normal' },
 };
 
 /** Audit sink filter: does this event belong in `audit_events`? */

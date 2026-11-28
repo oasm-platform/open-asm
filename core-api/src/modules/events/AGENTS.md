@@ -6,7 +6,7 @@
 
 - `events.controller.ts`: the route and the workspace resolution.
 - `events.service.ts`: per-replica fan-out (`EventsService.stream`), heartbeat, Redis read loop and pattern subscription.
-- `client-events.ts`: `CLIENT_EVENTS` allowlist, the `ClientEvent` shape, `isClientEvent`, `NOTIFICATION_CREATED`.
+- `client-events.ts`: `CLIENT_EVENTS` allowlist, `OWNER_ONLY_EVENTS`, the `ClientEvent` shape, `isClientEvent`, `NOTIFICATION_CREATED`.
 
 ## Public surface
 
@@ -22,7 +22,8 @@
 - **Allowlist, not denylist.** Only `notification.*`, `worker.*`, `target.*`, `workflow.*` reach browsers. The stream also carries API key rotations, permission changes and audit exports, so a new catalog event is private until someone adds it to `CLIENT_EVENTS`.
 - **Ids only, never payloads.** A client gets name, ids and time and refetches through REST, which applies permissions. The only metadata passed through is `metadata.joinKeyId` on `worker.joined`. Do not add `payload`, `changes`, actor or IP fields.
 - Workspace events are matched on `data.workspaceId`, decoded with the bridge's own `parseData`, so an entry missing `workspaceId` or `outcome` is not forwarded.
-- Membership is the only check: any member, whatever their permissions, sees the ids/types of allowlisted events of that workspace.
+- Membership is the only check for `CLIENT_EVENTS`: any member, whatever their permissions, sees the ids/types of allowlisted events of that workspace.
+- **Owner-only events.** A name in `OWNER_ONLY_EVENTS` (today `agent.http_requests.recorded`, published by agents ingest) goes only to connections registered under `${workspaceId}:${userId}` (`owners`, joined in `stream()` only with a workspace header) whose user equals `data.actor.id` and whose workspace equals `data.workspaceId`; no `actor.id` means it is dropped. It is checked before `CLIENT_EVENTS`, needs no allowlist entry and is never broadcast even if its domain gets allowlisted. Still ids only (no actor, no metadata). Conversations are private, so another member must not even see the id.
 - The bus is read with ONE plain `XREAD` loop per replica (connection name `events:live`), never a consumer group, because the SSE client may be connected to any replica. The loop runs only while at least one workspace connection is open and starts at `XLAST`: no backlog, no replay of what was missed while disconnected.
 - Notifications use ONE `PSUBSCRIBE notification:*` per replica, routed in memory by user id; the push becomes `type: notification.created`, `resourceType: 'notification'`, `resourceId = notificationId`. A failed subscribe is forgotten and retried on the next connection.
 
@@ -39,4 +40,4 @@
 
 ## Testing
 
-`events.service.spec.ts` (allowlist, ids-only forwarding, single read loop, subscription retry, disconnect) and `events.controller.spec.ts`.
+`events.service.spec.ts` (allowlist, ids-only forwarding, owner-only routing, single read loop, subscription retry, disconnect) and `events.controller.spec.ts`.
