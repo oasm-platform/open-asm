@@ -38,14 +38,18 @@ type HttpRequestsData = InfiniteData<
   string | undefined
 >;
 
+// Code-point order, not localeCompare: Postgres sorts uuid by bytes and the
+// ISO timestamps share one format, so a locale collation could disagree.
+const descending = (a: string, b: string) => (a < b ? 1 : a > b ? -1 : 0);
+
 /** The API's order: newest first by (sentAt, id). */
 const newerFirst = (
   a: AgentHttpRequestListItemDto,
   b: AgentHttpRequestListItemDto,
 ) =>
   a.sentAt === b.sentAt
-    ? b.id.localeCompare(a.id)
-    : b.sentAt.localeCompare(a.sentAt);
+    ? descending(a.id, b.id)
+    : descending(a.sentAt, b.sentAt);
 
 /**
  * Adds pushed rows to the conversation's loaded list. They go into the
