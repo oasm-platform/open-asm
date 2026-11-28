@@ -131,13 +131,8 @@ export default function AgentsChatPage() {
     setTimeout(() => setSelectedToolCallId(null), 2500);
   }, []);
 
-  // The Network tab polls only while it is on screen; the tool cards' links
-  // use whatever it loaded last
-  const networkOnScreen =
-    panelTab === 'network' && (isLargeScreen ? panelOpen : sheetOpen);
   const network = useConversationHttpRequests(conversationId, {
     running: isStreaming,
-    watching: networkOnScreen,
   });
   // Kept with its conversation, so another chat opens unfiltered
   const [networkFilter, setNetworkFilter] = useState<{

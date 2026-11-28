@@ -1,3 +1,4 @@
+import { useLiveEvents } from '@/hooks/use-live-events';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import {
   agentHttpRequestsControllerGetHttpRequests,
@@ -6,6 +7,7 @@ import {
 } from '@/services/apis/gen/queries';
 import {
   useInfiniteQuery,
+  useQueryClient,
   type InfiniteData,
   type QueryClient,
 } from '@tanstack/react-query';
@@ -13,8 +15,10 @@ import { useEffect, useMemo, useRef } from 'react';
 
 /** The API's largest page */
 export const NETWORK_PAGE_SIZE = 100;
-/** New rows arrive over the chat stream; polling only covers a missed push. */
-export const NETWORK_POLL_MS = 10_000;
+/** Sent by `/events/stream` to the conversation owner only, when rows were stored. */
+export const HTTP_REQUESTS_RECORDED = 'agent.http_requests.recorded';
+/** A busy agent stores a batch every few hundred ms; one reload per window is enough. */
+const LIVE_RELOAD_MS = 1_000;
 
 export const conversationHttpRequestsKey = (
   workspaceId: string | null | undefined,
@@ -94,18 +98,20 @@ export function mergeHttpRequestsIntoCache(
  * The HTTP requests a conversation's agent shell commands made, oldest first
  * (the API pages newest first; "load more" brings older ones).
  *
- * New rows are pushed over the chat stream (`mergeHttpRequestsIntoCache`).
- * While a run is active and someone is looking (`watching`) it also polls
- * slowly in case a push was missed; it reloads when a run ends, which
- * catches requests the worker flushed late.
+ * While this tab streams a run, new rows come over the chat stream
+ * (`mergeHttpRequestsIntoCache`), and the list reloads when the run ends,
+ * which catches requests the worker flushed late. Otherwise (background
+ * subagents after the turn, the run streamed in another tab) the live
+ * `HTTP_REQUESTS_RECORDED` event reloads it, throttled. No polling.
  */
 export function useConversationHttpRequests(
   conversationId: string | undefined,
-  { running, watching = true }: { running: boolean; watching?: boolean },
+  { running }: { running: boolean },
 ) {
   const {
     state: { selectedWorkspaceId },
   } = useWorkspaceState();
+  const queryClient = useQueryClient();
   const queryKey = conversationHttpRequestsKey(selectedWorkspaceId, conversationId);
   const params = queryKey[3];
   const enabled = !!selectedWorkspaceId && !!conversationId;
@@ -121,8 +127,6 @@ export function useConversationHttpRequests(
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled,
-    refetchInterval: running && watching ? NETWORK_POLL_MS : false,
-    refetchIntervalInBackground: false,
   });
 
   const { refetch } = query;
@@ -131,6 +135,37 @@ export function useConversationHttpRequests(
     if (wasRunning.current && !running && enabled) void refetch();
     wasRunning.current = running;
   }, [running, enabled, refetch]);
+
+  const runningRef = useRef(running);
+  useEffect(() => {
+    runningRef.current = running;
+  }, [running]);
+  const lastReload = useRef(0);
+  const pendingReload = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => {
+    lastReload.current = 0;
+    return () => {
+      clearTimeout(pendingReload.current);
+      pendingReload.current = undefined;
+    };
+  }, [selectedWorkspaceId, conversationId]);
+
+  useLiveEvents(HTTP_REQUESTS_RECORDED, (event) => {
+    if (event.type !== HTTP_REQUESTS_RECORDED) return;
+    if (!conversationId || event.resourceId !== conversationId) return;
+    if (runningRef.current || pendingReload.current) return;
+    const reload = () => {
+      pendingReload.current = undefined;
+      lastReload.current = Date.now();
+      void queryClient.invalidateQueries({
+        queryKey: conversationHttpRequestsKey(selectedWorkspaceId, conversationId),
+      });
+    };
+    // Trailing, not dropped: the last batch of a burst must still show.
+    const wait = lastReload.current + LIVE_RELOAD_MS - Date.now();
+    if (wait > 0) pendingReload.current = setTimeout(reload, wait);
+    else reload();
+  });
 
   const requests = useMemo<AgentHttpRequestListItemDto[]>(
     () => (query.data?.pages.flatMap((page) => page.data) ?? []).reverse(),

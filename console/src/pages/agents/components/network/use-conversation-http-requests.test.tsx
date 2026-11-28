@@ -6,11 +6,12 @@ import {
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { LiveEvent } from '@/hooks/use-live-events';
 import type { AgentHttpRequestListResponseDto } from '@/services/apis/gen/queries';
 import {
   conversationHttpRequestsKey,
   mergeHttpRequestsIntoCache,
-  NETWORK_POLL_MS,
+  HTTP_REQUESTS_RECORDED,
   useConversationHttpRequests,
 } from './use-conversation-http-requests';
 
@@ -18,6 +19,21 @@ const workspace = vi.hoisted(() => ({ id: 'ws-1' as string | null }));
 
 vi.mock('@/hooks/useWorkspaceSelector', () => ({
   useWorkspaceState: () => ({ state: { selectedWorkspaceId: workspace.id } }),
+}));
+
+const liveEvents = vi.hoisted(() => ({
+  patterns: undefined as unknown,
+  handler: undefined as ((event: LiveEvent) => void) | undefined,
+  emit(event: LiveEvent) {
+    this.handler?.(event);
+  },
+}));
+
+vi.mock('@/hooks/use-live-events', () => ({
+  useLiveEvents: (patterns: unknown, handler: (event: LiveEvent) => void) => {
+    liveEvents.patterns = patterns;
+    liveEvents.handler = handler;
+  },
 }));
 
 vi.mock('@/services/apis/gen/queries', async (importOriginal) => ({
@@ -71,37 +87,78 @@ describe('useConversationHttpRequests', () => {
     );
   });
 
-  it('polls only as a safety net, every 10 s', () => {
-    expect(NETWORK_POLL_MS).toBe(10_000);
-  });
-
-  it('polls while a run is active and watched', async () => {
-    const fn = await fetcher();
-    renderHook(() => useConversationHttpRequests('c1', { running: true }), {
-      wrapper,
-    });
-    await waitFor(() => expect(fn).toHaveBeenCalledTimes(1));
-
-    await act(() => vi.advanceTimersByTimeAsync(NETWORK_POLL_MS * 2 + 100));
-    expect(fn.mock.calls.length).toBeGreaterThanOrEqual(3);
-  });
-
-  it('does not poll when idle or unwatched, but reloads once a run ends', async () => {
+  it('never polls; reloads once when a run ends', async () => {
     const fn = await fetcher();
     const { rerender } = renderHook(
-      ({ running, watching }) =>
-        useConversationHttpRequests('c1', { running, watching }),
-      { wrapper, initialProps: { running: true, watching: false } },
+      ({ running }) => useConversationHttpRequests('c1', { running }),
+      { wrapper, initialProps: { running: true } },
     );
     await waitFor(() => expect(fn).toHaveBeenCalledTimes(1));
 
-    await act(() => vi.advanceTimersByTimeAsync(NETWORK_POLL_MS * 3));
+    await act(() => vi.advanceTimersByTimeAsync(60_000));
     expect(fn).toHaveBeenCalledTimes(1);
 
-    rerender({ running: false, watching: false });
+    rerender({ running: false });
     await waitFor(() => expect(fn).toHaveBeenCalledTimes(2));
-    await act(() => vi.advanceTimersByTimeAsync(NETWORK_POLL_MS * 3));
+    await act(() => vi.advanceTimersByTimeAsync(60_000));
     expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  describe('live events', () => {
+    const recorded = (resourceId: string, type = HTTP_REQUESTS_RECORDED) =>
+      ({ id: `e-${resourceId}`, type, resourceType: 'conversation', resourceId });
+
+    async function mounted(running = false) {
+      const fn = await fetcher();
+      const view = renderHook(
+        ({ running }) => useConversationHttpRequests('c1', { running }),
+        { wrapper, initialProps: { running } },
+      );
+      await waitFor(() => expect(fn).toHaveBeenCalledTimes(1));
+      return { fn, ...view };
+    }
+
+    it('listens for the recorded event only', async () => {
+      await mounted();
+      expect(liveEvents.patterns).toEqual(HTTP_REQUESTS_RECORDED);
+    });
+
+    it('reloads on an event for this conversation, at most once a second', async () => {
+      const { fn } = await mounted();
+
+      act(() => liveEvents.emit(recorded('c1')));
+      await waitFor(() => expect(fn).toHaveBeenCalledTimes(2));
+
+      act(() => {
+        liveEvents.emit(recorded('c1'));
+        liveEvents.emit(recorded('c1'));
+      });
+      await act(() => vi.advanceTimersByTimeAsync(500));
+      expect(fn).toHaveBeenCalledTimes(2);
+
+      // The burst inside the window still lands once, at its end.
+      await act(() => vi.advanceTimersByTimeAsync(600));
+      await waitFor(() => expect(fn).toHaveBeenCalledTimes(3));
+      await act(() => vi.advanceTimersByTimeAsync(2_000));
+      expect(fn).toHaveBeenCalledTimes(3);
+    });
+
+    it('ignores other conversations and other event types', async () => {
+      const { fn } = await mounted();
+      act(() => {
+        liveEvents.emit(recorded('c2'));
+        liveEvents.emit(recorded('c1', 'worker.joined'));
+      });
+      await act(() => vi.advanceTimersByTimeAsync(2_000));
+      expect(fn).toHaveBeenCalledTimes(1);
+    });
+
+    it('leaves it to the chat stream pushes while a run is active', async () => {
+      const { fn } = await mounted(true);
+      act(() => liveEvents.emit(recorded('c1')));
+      await act(() => vi.advanceTimersByTimeAsync(2_000));
+      expect(fn).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('waits for a conversation id', async () => {
@@ -109,7 +166,7 @@ describe('useConversationHttpRequests', () => {
     renderHook(() => useConversationHttpRequests(undefined, { running: true }), {
       wrapper,
     });
-    await act(() => vi.advanceTimersByTimeAsync(NETWORK_POLL_MS * 2));
+    await act(() => vi.advanceTimersByTimeAsync(20_000));
     expect(fn).not.toHaveBeenCalled();
   });
 
@@ -121,7 +178,7 @@ describe('useConversationHttpRequests', () => {
       { wrapper, initialProps: { running: true } },
     );
     rerender({ running: false });
-    await act(() => vi.advanceTimersByTimeAsync(NETWORK_POLL_MS));
+    await act(() => vi.advanceTimersByTimeAsync(10_000));
     expect(fn).not.toHaveBeenCalled();
   });
 });
