@@ -285,7 +285,39 @@ describe('AgentHttpIngestService', () => {
     expect(result).toEqual({ accepted: 0, rejected: 4 });
   });
 
-  it('rejects a sentAt older than an hour, a year-0001 sentAt and out-of-range nanos', async () => {
+  it('accepts a tunnel open for hours when it completed recently', async () => {
+    const h = setup();
+    const result = await h.service.ingest(
+      WORKER,
+      [log({ sentAt: { seconds: String(SENT_S - 3 * 60 * 60), nanos: 0 } })],
+      0,
+    );
+    expect(result).toEqual({ accepted: 1, rejected: 0 });
+    expect(rowsOf(h, AgentHttpRequest)[0].durationMs).toBe(3 * 60 * 60 * 1000 + 250);
+  });
+
+  it('rejects a sentAt over a day old even when it completed recently', async () => {
+    const h = setup();
+    const result = await h.service.ingest(
+      WORKER,
+      [log({ sentAt: { seconds: String(SENT_S - 25 * 60 * 60), nanos: 0 } })],
+      0,
+    );
+    expect(result).toEqual({ accepted: 0, rejected: 1 });
+  });
+
+  it('rejects a completedAt over 5 min ahead', async () => {
+    const h = setup();
+    const futureS = Math.floor(Date.now() / 1000) + 6 * 60;
+    const result = await h.service.ingest(
+      WORKER,
+      [log({ completedAt: { seconds: String(futureS), nanos: 0 } })],
+      0,
+    );
+    expect(result).toEqual({ accepted: 0, rejected: 1 });
+  });
+
+  it('rejects a completedAt older than an hour, a year-0001 sentAt and out-of-range nanos', async () => {
     const h = setup();
     const oldS = SENT_S - 2 * 60 * 60;
     const result = await h.service.ingest(
@@ -337,6 +369,52 @@ describe('AgentHttpIngestService', () => {
     expect(wellFormed(row.error)).toBe(true);
     expect(wellFormed(row.path)).toBe(true);
     expect(row.error).toBe('bad\uFFFDvalue');
+  });
+
+  it('masks credential header values the worker sent in clear, keeping the names', async () => {
+    const h = setup();
+    const sensitive = [
+      'Authorization',
+      'Proxy-Authorization',
+      'Cookie',
+      'X-API-Key',
+      'X-Auth',
+      'X-Auth-Token',
+      'Api-Key',
+      'X-Apikey',
+      'X-Client-Secret',
+      'X-Password',
+      'X-Amz-Security-Token',
+      'X-Session-Id',
+      'X-Credential',
+      'Private-Key',
+    ];
+    await h.service.ingest(
+      WORKER,
+      [
+        log({
+          requestHeaders: [
+            ...sensitive.map((name) => ({ name, value: 'leak' })),
+            { name: 'Accept', value: '*/*' },
+          ],
+          responseHeaders: [
+            { name: 'Set-Cookie', value: 'sid=leak' },
+            { name: 'Content-Type', value: 'text/html' },
+          ],
+        }),
+      ],
+      0,
+    );
+    const [payload] = rowsOf(h, AgentHttpRequestPayload);
+    expect(payload.requestHeaders).toEqual([
+      ...sensitive.map((name) => [name, '***']),
+      ['Accept', '*/*'],
+    ]);
+    expect(payload.responseHeaders).toEqual([
+      ['Set-Cookie', '***'],
+      ['Content-Type', 'text/html'],
+    ]);
+    expect(payload.contentType).toBe('text/html');
   });
 
   it('drops headers with an empty name', async () => {

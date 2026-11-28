@@ -17,8 +17,8 @@ import { AgentHttpOutcome } from './agent-http-request.enums';
  * proxy. Headers and bodies live in `agent_http_request_payloads`, so the
  * list queries never read them.
  *
- * The `synchronize: false` indexes need DESC keys, a partial predicate or
- * BRIN, which the decorator cannot express: their DDL is in the
+ * The `synchronize: false` indexes need DESC keys, an opclass, a partial
+ * predicate or BRIN, which the decorator cannot express: their DDL is in the
  * AddAgentHttpRequests migration, and this keeps later generates from
  * dropping them.
  */

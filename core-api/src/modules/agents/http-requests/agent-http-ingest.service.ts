@@ -66,8 +66,25 @@ const MAX_PATH = 8192;
 const MAX_ERROR = 500;
 const MAX_FUTURE_MS = 5 * 60 * 1000;
 const MAX_INT = 2_147_483_647;
-/** Sessions live 15 min; older events are bogus and may not fit timestamptz. */
+/**
+ * An event is reported when its request completes and sessions live 15 min,
+ * so an older completedAt is bogus (and may not fit timestamptz).
+ */
 const MAX_AGE_MS = 60 * 60 * 1000;
+/** sentAt may be far older than completedAt: a CONNECT tunnel can stay open for hours. */
+const MAX_OPEN_MS = 24 * 60 * 60 * 1000;
+// Covers the worker's sensitiveHeader list (authorization, cookie, api-key,
+// ...) and more: the worker is not trusted to have masked them.
+const SENSITIVE_HEADER_PARTS = [
+  'auth',
+  'cookie',
+  'key',
+  'token',
+  'secret',
+  'password',
+  'credential',
+  'session',
+];
 const METHOD = /^[A-Z][A-Z0-9_-]{0,15}$/;
 const UINT = /^\d+$/;
 const INT = /^-?\d+$/;
@@ -323,8 +340,10 @@ function mapLog(
   const sentMs = timestampMs(log.sentAt);
   const completedMs = timestampMs(log.completedAt);
   if (sentMs === null || completedMs === null) return null;
-  if (sentMs > now + MAX_FUTURE_MS || sentMs < now - MAX_AGE_MS) return null;
-  if (completedMs < sentMs) return null;
+  if (completedMs > now + MAX_FUTURE_MS || completedMs < now - MAX_AGE_MS) {
+    return null;
+  }
+  if (completedMs < sentMs || sentMs < now - MAX_OPEN_MS) return null;
   const durationMs = completedMs - sentMs;
   if (durationMs > MAX_INT) return null;
 
@@ -421,12 +440,18 @@ function headers(
 ): HttpHeaderPair[] {
   if (!Array.isArray(list)) return [];
   return list
-    .map((h): HttpHeaderPair => [
-      cut(str(h?.name), MAX_HEADER_NAME),
-      cut(str(h?.value), MAX_HEADER_VALUE),
-    ])
+    .map((h): HttpHeaderPair => {
+      const name = cut(str(h?.name), MAX_HEADER_NAME);
+      const value = sensitiveHeader(name) ? '***' : cut(str(h?.value), MAX_HEADER_VALUE);
+      return [name, value];
+    })
     .filter(([name]) => name.length > 0)
     .slice(0, MAX_HEADERS);
+}
+
+function sensitiveHeader(name: string): boolean {
+  const n = name.toLowerCase();
+  return SENSITIVE_HEADER_PARTS.some((p) => n.includes(p));
 }
 
 function body(
