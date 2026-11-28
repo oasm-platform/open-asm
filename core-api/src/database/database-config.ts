@@ -2,6 +2,10 @@ import 'dotenv/config';
 import type { DataSourceOptions } from 'typeorm';
 import { DataSource } from 'typeorm';
 import { DB_POOL_SIZE } from '../common/constants/app.constants';
+import { useUtcTimestamps } from './pg-utc-timestamps';
+
+// Before anything connects: the app, the TypeORM CLI and better-auth's pool
+useUtcTimestamps();
 
 const {
   POSTGRES_HOST,
