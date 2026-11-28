@@ -22,7 +22,11 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type * as S3Module from '@aws-sdk/client-s3';
 import { DataSource } from 'typeorm';
 import { RustFsClient } from './rustfs.client';
-import { attachmentDisposition, StorageService } from './storage.service';
+import {
+  attachmentDisposition,
+  contentDisposition,
+  StorageService,
+} from './storage.service';
 import { ForbiddenError, InvalidInputError, NotFoundError } from '@/common/errors/domain.errors';
 
 jest.mock('@aws-sdk/s3-presigned-post', () => ({
@@ -539,6 +543,24 @@ describe('StorageService', () => {
       );
     });
 
+    it('should sign an inline disposition when asked, so a browser can display the file', async () => {
+      await service.getPresignedDownloadUrl({
+        bucket: 'default',
+        key: 'b/r.pdf',
+        fileName: 'r.pdf',
+        contentType: 'application/pdf',
+        disposition: 'inline',
+      });
+
+      const command = mockGetSignedUrl.mock.calls[0][1] as {
+        input: Record<string, unknown>;
+      };
+      expect(command.input).toMatchObject({
+        ResponseContentDisposition:
+          'inline; filename="r.pdf"; filename*=UTF-8\'\'r.pdf',
+      });
+    });
+
     it('should reject an invalid key', async () => {
       await expect(
         service.getPresignedDownloadUrl({ bucket: 'default', key: '../a' }),
@@ -593,6 +615,12 @@ describe('StorageService', () => {
     it('should encode unicode and RFC 5987 reserved characters', () => {
       expect(attachmentDisposition("bá'o(1).pdf")).toBe(
         'attachment; filename="b_\'o(1).pdf"; filename*=UTF-8\'\'b%C3%A1%27o%281%29.pdf',
+      );
+    });
+
+    it('should build an inline disposition with the same escaping', () => {
+      expect(contentDisposition('inline', 'a"b.pdf')).toBe(
+        'inline; filename="a_b.pdf"; filename*=UTF-8\'\'a%22b.pdf',
       );
     });
   });

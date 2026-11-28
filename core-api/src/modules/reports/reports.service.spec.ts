@@ -228,7 +228,25 @@ describe('ReportsService', () => {
         key: 'workspaces/w1/a1/acme-vulnerability-report-2026-11-27-1430.pdf',
         fileName: 'acme-vulnerability-report-2026-11-27-1430.pdf',
         contentType: 'application/pdf',
+        disposition: 'attachment',
       });
+    });
+
+    it('presigns an inline disposition when the console previews the report', async () => {
+      jest.spyOn(reportRepository, 'findOne').mockResolvedValue({
+        ...mockReport,
+        path: 'artifacts/workspaces/w1/a1/r.pdf',
+        fileName: 'r.pdf',
+      } as Report);
+      jest
+        .spyOn(storageService, 'getPresignedDownloadUrl')
+        .mockResolvedValue({ url: 'https://storage.test/r.pdf?sig=1', expiresIn: 300 });
+
+      await service.getDownloadUrl('r1', 'w1', 'inline');
+
+      expect(storageService.getPresignedDownloadUrl).toHaveBeenCalledWith(
+        expect.objectContaining({ disposition: 'inline' }),
+      );
     });
 
     it('is 404 for a report of another workspace, and signs nothing', async () => {

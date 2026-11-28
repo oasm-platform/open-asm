@@ -18,7 +18,7 @@ PDF reports for a workspace: a summary (attack surface) report, a vulnerability 
 | Route | Permission | Event |
 |---|---|---|
 | `GET reports` | `report.read` | none |
-| `GET reports/:id/download` | `report.read` | none |
+| `GET reports/:id/download?disposition=attachment\|inline` | `report.read` | none |
 | `GET reports/preview/summary` | `report.read` + `target.read`, `asset.read`, `vulnerability.read` | `report.exported` (metadata `format: pdf`) |
 | `GET reports/preview/vulnerability` | `report.read` + `target.read`, `asset.read`, `vulnerability.read` | none |
 | `POST reports/generate/summary` (202) | `report.write` + the same catalog read keys | `report.generated` (metadata `reportType: summary`) |
@@ -32,7 +32,7 @@ PDF reports for a workspace: a summary (attack surface) report, a vulnerability 
 - The catalog read keys are enforced by ASQ, not by `@WorkspaceAccess`: the report runs as the member, so a missing key gives `PERMISSION_DENIED`, which `AsqErrorInterceptor` (on every route that runs a template) answers as 403 with body `{ error: { code, message } }`. Nothing is rendered or stored then.
 - Registered in `combine.module.ts`. Exports nothing.
 - Previews stream the PDF inline with `@Res()` and store nothing.
-- `GET reports` returns rows only; nothing is signed per row. `GET reports/:id/download` looks the report up in the caller's workspace (404 otherwise) and returns `{ url, expiresIn }`, a presigned URL with an attachment disposition named after `fileName`. It splits `path` at the first `/` into bucket and key, so older `reports/<fileName>` rows keep working.
+- `GET reports` returns rows only; nothing is signed per row. `GET reports/:id/download` looks the report up in the caller's workspace (404 otherwise) and returns `{ url, expiresIn }`, a presigned URL with a disposition named after `fileName`: `attachment` by default, `inline` (`ReportDownloadQueryDto.disposition`) for the console's PDF preview drawer. It splits `path` at the first `/` into bucket and key, so older `reports/<fileName>` rows keep working.
 - Generate validates the template's queries as the caller (`ReportRunner.validate`, so 403 `PERMISSION_DENIED` / 400 `INVALID_QUERY` stay synchronous), then queues a `ReportJob` with a snapshot of the caller's permissions and answers 202. `report.generated` therefore means "requested".
 - `runJob` never throws (a retry would reuse stale permissions): it publishes `report.completed` (not persisted) with `outcome` success/failure and payload `{ userId, reportType, fileName?, error? }`. The notifications lane turns it into `REPORT_GENERATED` / `REPORT_FAILED` for that user (`notification-rules.ts`, link `/reports`). A full quota (409 `STORAGE_QUOTA_EXCEEDED` from artifacts) is a failure notification.
 - `report.completed`'s `error` is only the message of a domain error, an `AsqError` or a 4xx Nest exception (`userFacingError`); anything else reads `Report generation failed` and the raw message stays in the log.

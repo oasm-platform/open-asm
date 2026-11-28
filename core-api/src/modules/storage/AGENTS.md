@@ -4,7 +4,7 @@ S3-compatible object storage (RustFS locally, any S3 in the cloud): bucket setup
 
 ## Layout
 
-- `storage.service.ts`: `StorageService`, the `BUCKET_ACCESS` map, `PUBLIC_READ_BUCKETS`, helpers `getHourBucketedSigningDate` and `attachmentDisposition`.
+- `storage.service.ts`: `StorageService`, the `BUCKET_ACCESS` map, `PUBLIC_READ_BUCKETS`, helpers `getHourBucketedSigningDate`, `contentDisposition` and `attachmentDisposition`.
 - `storage.config.ts`: `parseStorageConfig` reads every storage env var, never throws (bad values fall back to defaults with a warning).
 - `rustfs.client.ts`: `RustFsClient` with two `S3Client`s, one for server calls and one for signing presigned URLs.
 - `storage.controller.ts`: presign routes and `authorizeRead`.
@@ -40,6 +40,7 @@ S3-compatible object storage (RustFS locally, any S3 in the cloud): bucket setup
 - `tenant` reads resolve the owning workspaces with `resolveObjectWorkspaceIds` (only `screenshot` is implemented, via `asset_services.screenshotPath`) and allow a member of **any** of them, because screenshot keys collide across workspaces. An unknown object is 404.
 - Two URL modes. `STORAGE_URL_BASE` unset → relative mode: URLs are `/api/storage/...`, served by the vite proxy and console nginx, and signed against `RUSTFS_ENDPOINT` path-style. `STORAGE_URL_BASE=""` → absolute mode against `S3_PUBLIC_ENDPOINT`. Signing against the wrong host gives `SignatureDoesNotMatch`.
 - Pass `absolute: true` to `getPresignedDownloadUrl` for non-browser clients (connectors fetching custom templates).
+- `getPresignedDownloadUrl` signs `Content-Disposition: attachment` when given a `fileName`; `disposition: 'inline'` lets the browser display it (reports preview). Callers choose the content type, so only pass `inline` for types that are safe to render.
 - Presign TTL is clamped to 60s–172800s. With TTL ≥ 2h the signing date is floored to the hour so repeated presigns return identical URLs (cache-friendly).
 - Public-read buckets get unsigned URLs only if the policy was verified at boot (`publicReadApplied`); otherwise they fall back to a presign.
 - `assertValidLocation` rejects keys starting with `/`, `.` or space, or containing `..`. `generateObjectKey` refuses files without an extension and `restrictedExtensions` (exe, sh, js, py...).
