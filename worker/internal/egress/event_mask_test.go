@@ -32,8 +32,11 @@ func TestMaskBody(t *testing.T) {
 		{"application/x-www-form-urlencoded", "user=a&password=hunter2&x=1", "user=a&password=***&x=1"},
 		// Cut at BodyCap mid-pair: what is there is still masked.
 		{"application/x-www-form-urlencoded; charset=utf-8", "user=a&pass", "user=a&pass"},
-		{"application/json", `{"access_token":"t","ok":1,"n":{"refresh_token":"r"},"l":[{"api_key":"k"}],"id":12345678901234567890}`,
-			`{"access_token":"***","id":12345678901234567890,"l":[{"api_key":"***"}],"n":{"refresh_token":"***"},"ok":1}`},
+		// Only masked values change: key order, spacing and numbers stay as sent.
+		{"application/json", `{"ok":1,"access_token":"t","n":{"refresh_token":{"a":[1]}},"l":[{"api_key":"k"}],"id":12345678901234567890}`,
+			`{"ok":1,"access_token":"***","n":{"refresh_token":"***"},"l":[{"api_key":"***"}],"id":12345678901234567890}`},
+		{"application/json", "{\n  \"z\": 1,\n  \"password\" :  \"p\\\"q\",\n  \"a\": 2\n}", "{\n  \"z\": 1,\n  \"password\" :  \"***\",\n  \"a\": 2\n}"},
+		{"application/json", `[{"secret":null},{"x":"secret"},{"pin_code":1234 ,"y":true}]`, `[{"secret":"***"},{"x":"secret"},{"pin_code":"***" ,"y":true}]`},
 		{"application/vnd.api+json", `{"password":"p"}`, `{"password":"***"}`},
 		// Unchanged JSON keeps its exact bytes.
 		{"application/json", `{ "b":1, "a":2 }`, `{ "b":1, "a":2 }`},

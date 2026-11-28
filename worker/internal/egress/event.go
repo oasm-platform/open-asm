@@ -176,8 +176,9 @@ func maskPairs(query string) string {
 }
 
 // MaskBody masks credential-like values in form and JSON bodies (password=,
-// "access_token":...). A JSON body that does not parse, e.g. one cut at
-// BodyCap, is kept as is; a form body is masked pair by pair either way.
+// "access_token":...), leaving every other byte as sent. A JSON body that
+// does not parse, e.g. one cut at BodyCap, is kept as is; a form body is
+// masked pair by pair either way.
 func MaskBody(contentType string, body []byte) []byte {
 	if len(body) == 0 {
 		return body
@@ -187,43 +188,95 @@ func MaskBody(contentType string, body []byte) []byte {
 	case mt == "application/x-www-form-urlencoded":
 		return []byte(maskPairs(string(body)))
 	case mt == "application/json" || strings.HasSuffix(mt, "+json"):
-		// UseNumber: a float64 round trip would corrupt large integer ids.
-		dec := json.NewDecoder(bytes.NewReader(body))
-		dec.UseNumber()
-		var v any
-		if dec.Decode(&v) != nil || !maskJSON(v) {
-			return body
-		}
-		out, err := json.Marshal(v)
-		if err != nil {
-			return body
-		}
-		return out
+		return maskJSON(body)
 	}
 	return body
 }
 
-// maskJSON masks sensitive keys at any depth and reports whether it did.
-func maskJSON(v any) bool {
-	changed := false
-	switch t := v.(type) {
-	case map[string]any:
-		for k, child := range t {
-			if sensitiveQueryKey(k) {
-				t[k] = masked
-				changed = true
-			} else if maskJSON(child) {
-				changed = true
+// maskJSON replaces the values of sensitive keys, at any depth, with "***"
+// by splicing the original bytes: re-marshalling would reorder keys and
+// reformat the body, so the log would no longer show what was sent.
+func maskJSON(body []byte) []byte {
+	if !json.Valid(body) {
+		return body
+	}
+	dec := json.NewDecoder(bytes.NewReader(body))
+	var spans [][2]int64
+	if walkJSON(dec, &spans) != nil || len(spans) == 0 {
+		return body
+	}
+	var out bytes.Buffer
+	prev := int64(0)
+	for _, s := range spans {
+		// The span starts right after the key: skip the colon and spacing.
+		start := s[0]
+		for body[start] != ':' {
+			start++
+		}
+		start++
+		for body[start] == ' ' || body[start] == '\t' || body[start] == '\n' || body[start] == '\r' {
+			start++
+		}
+		out.Write(body[prev:start])
+		out.WriteString(`"` + masked + `"`)
+		prev = s[1]
+	}
+	out.Write(body[prev:])
+	return out.Bytes()
+}
+
+// walkJSON reads one value from dec, recording the byte span (from the end
+// of the key to the end of the value) of every sensitive key's value.
+func walkJSON(dec *json.Decoder, spans *[][2]int64) error {
+	tok, err := dec.Token()
+	if err != nil {
+		return err
+	}
+	switch tok {
+	case json.Delim('{'):
+		for dec.More() {
+			key, err := dec.Token()
+			if err != nil {
+				return err
+			}
+			if k, _ := key.(string); sensitiveQueryKey(k) {
+				start := dec.InputOffset()
+				if err := skipJSON(dec); err != nil {
+					return err
+				}
+				*spans = append(*spans, [2]int64{start, dec.InputOffset()})
+			} else if err := walkJSON(dec, spans); err != nil {
+				return err
 			}
 		}
-	case []any:
-		for _, child := range t {
-			if maskJSON(child) {
-				changed = true
+		_, err = dec.Token()
+	case json.Delim('['):
+		for dec.More() {
+			if err := walkJSON(dec, spans); err != nil {
+				return err
 			}
+		}
+		_, err = dec.Token()
+	}
+	return err
+}
+
+func skipJSON(dec *json.Decoder) error {
+	for depth := 0; ; {
+		tok, err := dec.Token()
+		if err != nil {
+			return err
+		}
+		switch tok {
+		case json.Delim('{'), json.Delim('['):
+			depth++
+		case json.Delim('}'), json.Delim(']'):
+			depth--
+		}
+		if depth == 0 {
+			return nil
 		}
 	}
-	return changed
 }
 
 // bodyCapture keeps the first BodyCap bytes written and counts them all.
