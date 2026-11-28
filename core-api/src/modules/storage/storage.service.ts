@@ -67,18 +67,27 @@ export function getHourBucketedSigningDate(now: Date = new Date()): Date {
   return bucketed;
 }
 
+export type DispositionType = 'attachment' | 'inline';
+
 /**
- * `Content-Disposition: attachment` for a user-supplied file name (RFC 6266):
- * an ASCII-safe `filename` fallback plus the exact name as RFC 5987
+ * `Content-Disposition` for a user-supplied file name (RFC 6266): an
+ * ASCII-safe `filename` fallback plus the exact name as RFC 5987
  * `filename*`, so quotes or CR/LF in the name cannot break the header.
  */
-export function attachmentDisposition(fileName: string): string {
+export function contentDisposition(
+  type: DispositionType,
+  fileName: string,
+): string {
   const fallback = fileName.replace(/[^\x20-\x7e]|["\\]/g, '_');
   const encoded = encodeURIComponent(fileName).replace(
     /['()*]/g,
     (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
   );
-  return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
+  return `${type}; filename="${fallback}"; filename*=UTF-8''${encoded}`;
+}
+
+export function attachmentDisposition(fileName: string): string {
+  return contentDisposition('attachment', fileName);
 }
 
 /** Minimum clamped TTL that may use the hour-bucketed signing date (2h). */
@@ -535,8 +544,11 @@ export class StorageService implements OnModuleInit {
     contentType?: string;
     /** Keep the signed absolute URL for non-browser clients (connectors). */
     absolute?: boolean;
+    /** `inline` lets a browser display the file; only with `fileName`. */
+    disposition?: DispositionType;
   }): Promise<{ url: string; expiresIn: number }> {
     const { bucket, key, expiresIn, fileName, contentType, absolute } = opts;
+    const disposition = opts.disposition ?? 'attachment';
 
     this.assertValidLocation(bucket, key);
 
@@ -548,7 +560,7 @@ export class StorageService implements OnModuleInit {
       Bucket: bucket,
       Key: key,
       ResponseContentDisposition: fileName
-        ? attachmentDisposition(fileName)
+        ? contentDisposition(disposition, fileName)
         : undefined,
       ResponseContentType: contentType || undefined,
     });

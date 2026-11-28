@@ -5,5 +5,7 @@
   "SCAN_INCOMPLETE": "{targetValue} 的扫描未完成。{details}",
   "NEW_VULNERABILITY_FOUND": "在 {assetValue} 上发现 {count} 个新漏洞",
   "WORKSPACE_INVITATION": "{action, select, created {您已被邀请加入工作区 {workspaceName}} accepted {{userName} 已接受加入工作区 {workspaceName} 的邀请} declined {{userName} 已拒绝加入工作区 {workspaceName} 的邀请} other {工作区邀请}}",
-  "NEW_URL_FOUND": "在 {targetValue} 上发现 {count} 个新 URL"
+  "NEW_URL_FOUND": "在 {targetValue} 上发现 {count} 个新 URL",
+  "REPORT_GENERATED": "报告 {fileName} 已就绪",
+  "REPORT_FAILED": "报告生成失败：{error}"
 }

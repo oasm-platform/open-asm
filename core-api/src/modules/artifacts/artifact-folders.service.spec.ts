@@ -1,6 +1,6 @@
 import { ArtifactStatus } from '@/common/enums/enum';
 
-import { IsNull, type DataSource, type Repository } from 'typeorm';
+import { In, IsNull, type DataSource, type Repository } from 'typeorm';
 import { ArtifactFoldersService } from './artifact-folders.service';
 import type { ArtifactsService } from './artifacts.service';
 import type { ArtifactFolder } from './entities/artifact-folder.entity';
@@ -99,7 +99,7 @@ describe('ArtifactFoldersService', () => {
     await expect(service.ensureTemplatesFolder(WS)).resolves.toBe(winner);
     expect(manager.query).toHaveBeenCalledWith(
       'SELECT pg_advisory_xact_lock(hashtext($1))',
-      ['artifact-folders:templates:ws-1'],
+      ['artifact-folders:custom-templates:ws-1'],
     );
     expect(manager.query.mock.invocationCallOrder[0]).toBeLessThan(
       manager.findOne.mock.invocationCallOrder[0],
@@ -137,7 +137,7 @@ describe('ArtifactFoldersService', () => {
       expect.objectContaining({
         where: [
           { workspaceId: WS, createdByUserId: OWNER, parentFolderId: IsNull() },
-          TEMPLATES,
+          { ...TEMPLATES, name: In(['custom-templates', 'reports']) },
         ],
       }),
     );
@@ -209,7 +209,7 @@ describe('ArtifactFoldersService', () => {
     ).resolves.toMatchObject({ name: 'Q4', parentFolderId: null });
   });
 
-  it('refuses a user root folder named like the templates folder', async () => {
+  it('refuses a user root folder named like a workspace folder', async () => {
     await expect(
       service.create(WS, OWNER, { name: 'custom-templates' }),
     ).rejects.toBeInstanceOf(InvalidInputError);
@@ -219,6 +219,9 @@ describe('ArtifactFoldersService', () => {
     await expect(
       service.create(WS, OWNER, { name: 'custom-templates', parentFolderId: 'f-1' }),
     ).resolves.toBeDefined();
+    await expect(service.create(WS, OWNER, { name: 'reports' })).rejects.toThrow(
+      '"reports" is reserved at the root',
+    );
   });
 
   it('deletes the subtree and marks its files deleted for the sweep', async () => {

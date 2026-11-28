@@ -13,6 +13,8 @@ const STATIC_URLS: Partial<Record<NotificationType, string>> = {
   ASSET_NEW_DETECT: '/targets/{targetId}/inventory?isNew=true',
   NEW_VULNERABILITY_FOUND: '/targets/{targetId}/vulnerabilities',
   NEW_URL_FOUND: '/targets/{targetId}/inventory?tab=urls&isNew=true',
+  REPORT_GENERATED: '/reports',
+  REPORT_FAILED: '/reports',
 };
 
 export function buildNotificationUrl(

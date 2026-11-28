@@ -2,7 +2,7 @@ import { ArtifactStatus } from '@/common/enums/enum';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, IsNull, Repository } from 'typeorm';
-import { ArtifactsService, TEMPLATES_FOLDER_NAME } from './artifacts.service';
+import { ArtifactsService, TEMPLATES_FOLDER_NAME, WORKSPACE_FOLDER_NAMES } from './artifacts.service';
 import type {
   ArtifactFolderDetailDto,
   ArtifactFolderDto,
@@ -13,10 +13,10 @@ import { ArtifactFolder } from './entities/artifact-folder.entity';
 import { Artifact } from './entities/artifact.entity';
 import { InvalidInputError } from '@/common/errors/domain.errors';
 
-/** A user root folder with this name would be mistaken for the templates folder once its owner is deleted. */
+/** A user root folder with such a name would be mistaken for a workspace folder once its owner is deleted. */
 function assertNotReservedRoot(name: string, parentFolderId: string | null | undefined): void {
-  if (!parentFolderId && name === TEMPLATES_FOLDER_NAME) {
-    throw new InvalidInputError(`"${TEMPLATES_FOLDER_NAME}" is reserved at the root`);
+  if (!parentFolderId && WORKSPACE_FOLDER_NAMES.includes(name)) {
+    throw new InvalidInputError(`"${name}" is reserved at the root`);
   }
 }
 
@@ -53,7 +53,7 @@ export class ArtifactFoldersService {
     const folders = await this.folderRepo.find({
       where: parentFolderId
         ? own
-        : [own, { workspaceId, parentFolderId: IsNull(), createdByUserId: IsNull(), name: TEMPLATES_FOLDER_NAME }],
+        : [own, { workspaceId, parentFolderId: IsNull(), createdByUserId: IsNull(), name: In(WORKSPACE_FOLDER_NAMES) }],
       order: { name: 'ASC' },
     });
     return folders.map((folder) => this.toDto(folder));
@@ -80,12 +80,17 @@ export class ArtifactFoldersService {
   }
 
   /** The workspace-owned root folder for custom templates; created on first use. */
-  async ensureTemplatesFolder(workspaceId: string): Promise<ArtifactFolder> {
+  ensureTemplatesFolder(workspaceId: string): Promise<ArtifactFolder> {
+    return this.ensureWorkspaceFolder(workspaceId, TEMPLATES_FOLDER_NAME);
+  }
+
+  /** A workspace-owned root folder (one of `WORKSPACE_FOLDER_NAMES`); created on first use. */
+  async ensureWorkspaceFolder(workspaceId: string, name: string): Promise<ArtifactFolder> {
     const where = {
       workspaceId,
       parentFolderId: IsNull(),
       createdByUserId: IsNull(),
-      name: TEMPLATES_FOLDER_NAME,
+      name,
     };
     const order = { createdAt: 'ASC' } as const;
     // Lock-free fast path; only a miss pays for the transaction + advisory lock.
@@ -93,7 +98,7 @@ export class ArtifactFoldersService {
     if (found) return found;
     return this.dataSource.transaction(async (manager) => {
       await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
-        `artifact-folders:templates:${workspaceId}`,
+        `artifact-folders:${name}:${workspaceId}`,
       ]);
       const existing = await manager.findOne(ArtifactFolder, { where, order });
       if (existing) return existing;
@@ -102,7 +107,7 @@ export class ArtifactFoldersService {
           workspaceId,
           createdByUserId: null,
           parentFolderId: null,
-          name: TEMPLATES_FOLDER_NAME,
+          name,
         }),
       );
     });

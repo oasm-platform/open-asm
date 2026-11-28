@@ -92,6 +92,7 @@ export const EVENT_POLICY: Record<EventName, EventPolicy> = {
   // user-attributable actions the audit trail declared. A workflow run closing
   // is visible through `job.completed`/`job.failed` already.
   'workflow.run.started': { persist: false, severity: 'normal' },
+  'report.completed': { persist: false, severity: 'normal' },
   'workflow.run.completed': { persist: false, severity: 'normal' },
   'workflow.run.failed': { persist: false, severity: 'important' },
   'workflow.run.cancelled': { persist: false, severity: 'normal' },

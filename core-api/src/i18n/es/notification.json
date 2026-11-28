@@ -5,5 +5,7 @@
   "SCAN_INCOMPLETE": "El escaneo de {targetValue} no finalizó. {details}",
   "NEW_VULNERABILITY_FOUND": "{count, plural, one {# nueva vulnerabilidad encontrada} other {# nuevas vulnerabilidades encontradas}} en {assetValue}",
   "WORKSPACE_INVITATION": "{action, select, created {Te han invitado al espacio de trabajo {workspaceName}} accepted {{userName} aceptó tu invitación al espacio de trabajo {workspaceName}} declined {{userName} rechazó tu invitación al espacio de trabajo {workspaceName}} other {Invitación a un espacio de trabajo}}",
-  "NEW_URL_FOUND": "{count, plural, one {# nueva URL encontrada} other {# nuevas URL encontradas}} en {targetValue}"
+  "NEW_URL_FOUND": "{count, plural, one {# nueva URL encontrada} other {# nuevas URL encontradas}} en {targetValue}",
+  "REPORT_GENERATED": "El informe {fileName} está listo",
+  "REPORT_FAILED": "Error al generar el informe: {error}"
 }

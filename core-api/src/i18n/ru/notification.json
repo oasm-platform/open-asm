@@ -5,5 +5,7 @@
   "SCAN_INCOMPLETE": "Сканирование {targetValue} не завершено. {details}",
   "NEW_VULNERABILITY_FOUND": "{count, plural, one {Найдена # новая уязвимость} few {Найдено # новые уязвимости} many {Найдено # новых уязвимостей} other {Найдено # новой уязвимости}} на {assetValue}",
   "WORKSPACE_INVITATION": "{action, select, created {Вас пригласили в рабочее пространство {workspaceName}} accepted {{userName} принял(а) ваше приглашение в рабочее пространство {workspaceName}} declined {{userName} отклонил(а) ваше приглашение в рабочее пространство {workspaceName}} other {Приглашение в рабочее пространство}}",
-  "NEW_URL_FOUND": "{count, plural, one {Найден # новый URL} other {Найдено # новых URL}} на {targetValue}"
+  "NEW_URL_FOUND": "{count, plural, one {Найден # новый URL} other {Найдено # новых URL}} на {targetValue}",
+  "REPORT_GENERATED": "Отчёт {fileName} готов",
+  "REPORT_FAILED": "Не удалось создать отчёт: {error}"
 }

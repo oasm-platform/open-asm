@@ -169,6 +169,10 @@ export enum BullMQName {
   AUDIT_RETENTION = 'audit-retention',
   /** Report-mode attack surface queries (attack-surface-query module). */
   ASQ_REPORT = 'asq-report',
+  /** PDF reports a member asked for (reports module). */
+  REPORT_GENERATE = 'report-generate',
+  /** Cron schedules of PDF reports, one job scheduler per `report-schedule:<id>`. */
+  REPORT_SCHEDULE = 'report-schedule',
 }
 
 export enum NotificationStatus {
@@ -194,6 +198,8 @@ export enum NotificationType {
   WORKSPACE_INVITATION = 'WORKSPACE_INVITATION',
   /** A URL discovery run stored URLs no earlier run had. */
   NEW_URL_FOUND = 'NEW_URL_FOUND',
+  REPORT_GENERATED = 'REPORT_GENERATED',
+  REPORT_FAILED = 'REPORT_FAILED',
 }
 
 export enum IssueStatus {
@@ -412,6 +418,7 @@ export enum ArtifactSource {
   UPLOAD = 'upload',
   AGENT = 'agent',
   TEMPLATE = 'template',
+  REPORT = 'report',
 }
 
 export enum ArtifactShareType {

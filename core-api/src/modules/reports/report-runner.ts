@@ -32,6 +32,12 @@ export class ReportRunner {
     return template.toData(results, { workspaceName: workspace.name, now, options });
   }
 
+  /** Checks the template's queries against the caller (AsqError), so a queued report fails fast in the request. */
+  validate<O, D>(template: BuiltinTemplate<O, D>, scope: QueryScope, options: O): void {
+    const now = new Date();
+    for (const batch of template.queries(options, now)) this.asq.validate(scope, batch, now);
+  }
+
   /**
    * A list stopped at its `limit` returns `nextCursor` (not `truncated`); a grouped query has no cursor, so
    * it is capped when it returns exactly `limit` rows. Either way the PDF is missing rows.

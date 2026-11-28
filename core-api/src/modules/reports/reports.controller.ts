@@ -9,6 +9,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
   Query,
@@ -21,13 +23,17 @@ import { EVENT_CATALOG } from '../event-bridge/contracts/event-catalog';
 import { PublishEvent } from '../event-bridge/publishing/publish-event.decorator';
 import type { NodeResponse } from '@nestjs/platform-node';
 import {
+  CreateReportScheduleDto,
   GenerateQueryReportBodyDto,
   GenerateSummaryReportBodyDto,
   GenerateVulReportBodyDto,
   GetManyReportsQueryDto,
   PreviewSummaryQueryDto,
   PreviewVulQueryDto,
+  ReportDownloadQueryDto,
+  ReportDownloadResponseDto,
   ReportResponseDto,
+  ReportScheduleResponseDto,
 } from './dto/reports.dto';
 import { ReportsService } from './reports.service';
 import { AsqErrorInterceptor } from '@/modules/attack-surface-query/asq-error.interceptor';
@@ -110,7 +116,7 @@ export class ReportsController {
 
   @Doc({
     summary: 'Generate summary PDF report',
-    description: 'Generates a summary (Attack Surface Discovery) PDF report.',
+    description: 'Queues a summary (Attack Surface Discovery) PDF report; a notification tells you when it is ready.',
     response: {
       serialization: DefaultMessageResponseDto,
     },
@@ -121,6 +127,7 @@ export class ReportsController {
   @PublishEvent(EVENT_CATALOG.report.generated, { metadata: () => ({ reportType: 'summary' }) })
   @WorkspaceAccess('report.write')
   @UseInterceptors(AsqErrorInterceptor)
+  @HttpCode(HttpStatus.ACCEPTED)
   @Post('generate/summary')
   async generateSummaryReport(
     @Body() body: GenerateSummaryReportBodyDto,
@@ -128,25 +135,17 @@ export class ReportsController {
     @UserId() userId: string,
     @Req() req: RequestWithMetadata,
   ): Promise<DefaultMessageResponseDto> {
-    const options = {
-      startDate: body.startDate ? new Date(body.startDate) : undefined,
-      endDate: body.endDate ? new Date(body.endDate) : undefined,
+    await this.reportsService.enqueueReport(reportScope(workspaceId, req), userId, 'SUMMARY', {
+      startDate: body.startDate,
+      endDate: body.endDate,
       targetIds: body.targetIds,
-    };
-
-    await this.reportsService.generateReport(
-      reportScope(workspaceId, req),
-      userId,
-      'SUMMARY',
-      options,
-    );
-
-    return { message: 'Summary report generated successfully' };
+    });
+    return { message: 'Summary report queued' };
   }
 
   @Doc({
     summary: 'Generate vulnerability PDF report',
-    description: 'Generates a vulnerability assessment PDF report.',
+    description: 'Queues a vulnerability assessment PDF report; a notification tells you when it is ready.',
     response: {
       serialization: DefaultMessageResponseDto,
     },
@@ -156,6 +155,7 @@ export class ReportsController {
   })
   @WorkspaceAccess('report.write')
   @UseInterceptors(AsqErrorInterceptor)
+  @HttpCode(HttpStatus.ACCEPTED)
   @Post('generate/vulnerability')
   async generateVulReport(
     @Body() body: GenerateVulReportBodyDto,
@@ -163,28 +163,20 @@ export class ReportsController {
     @UserId() userId: string,
     @Req() req: RequestWithMetadata,
   ): Promise<DefaultMessageResponseDto> {
-    const options = {
-      startDate: body.startDate ? new Date(body.startDate) : undefined,
-      endDate: body.endDate ? new Date(body.endDate) : undefined,
+    await this.reportsService.enqueueReport(reportScope(workspaceId, req), userId, 'VULNERABILITY', {
+      startDate: body.startDate,
+      endDate: body.endDate,
       targetIds: body.targetIds,
       vulnIds: body.vulnIds,
       minSeverity: body.minSeverity,
-    };
-
-    await this.reportsService.generateReport(
-      reportScope(workspaceId, req),
-      userId,
-      'VULNERABILITY',
-      options,
-    );
-
-    return { message: 'Vulnerability report generated successfully' };
+    });
+    return { message: 'Vulnerability report queued' };
   }
 
   @Doc({
     summary: 'Generate query PDF report',
     description:
-      'Renders a saved attack surface query (one table per query) as a PDF report, run with your current permissions.',
+      'Queues a saved attack surface query (one table per query) as a PDF report, run with your current permissions.',
     response: {
       serialization: DefaultMessageResponseDto,
     },
@@ -195,6 +187,7 @@ export class ReportsController {
   @PublishEvent(EVENT_CATALOG.report.generated, { metadata: () => ({ reportType: 'query' }) })
   @WorkspaceAccess('report.write')
   @UseInterceptors(AsqErrorInterceptor)
+  @HttpCode(HttpStatus.ACCEPTED)
   @Post('generate/query')
   async generateQueryReport(
     @Body() body: GenerateQueryReportBodyDto,
@@ -202,12 +195,69 @@ export class ReportsController {
     @UserId() userId: string,
     @Req() req: RequestWithMetadata,
   ): Promise<DefaultMessageResponseDto> {
-    await this.reportsService.generateQueryReport(
-      reportScope(workspaceId, req),
-      userId,
-      body.savedQueryId,
-    );
-    return { message: 'Query report generated successfully' };
+    await this.reportsService.enqueueQueryReport(reportScope(workspaceId, req), userId, body.savedQueryId);
+    return { message: 'Query report queued' };
+  }
+
+  @Doc({
+    summary: 'List report schedules',
+    response: { serialization: ReportScheduleResponseDto, isArray: true },
+    request: { getWorkspaceId: true },
+  })
+  @WorkspaceAccess('report.read')
+  @Get('schedules')
+  listSchedules(@WorkspaceId() workspaceId: string) {
+    return this.reportsService.listSchedules(workspaceId);
+  }
+
+  @Doc({
+    summary: 'Create report schedule',
+    description: 'Generates the report on a cron (UTC), with your permissions at each run.',
+    response: { serialization: ReportScheduleResponseDto },
+    request: { getWorkspaceId: true },
+  })
+  @WorkspaceAccess('report.write')
+  @UseInterceptors(AsqErrorInterceptor)
+  @Post('schedules')
+  createSchedule(
+    @Body() body: CreateReportScheduleDto,
+    @WorkspaceId() workspaceId: string,
+    @UserId() userId: string,
+    @Req() req: RequestWithMetadata,
+  ) {
+    return this.reportsService.createSchedule(reportScope(workspaceId, req), userId, body);
+  }
+
+  @Doc({
+    summary: 'Delete report schedule',
+    response: { serialization: DefaultMessageResponseDto },
+    request: { getWorkspaceId: true },
+  })
+  @WorkspaceAccess('report.write')
+  @Delete('schedules/:id')
+  async deleteSchedule(
+    @Param() params: IdQueryParamDto,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<DefaultMessageResponseDto> {
+    await this.reportsService.deleteSchedule(params.id, workspaceId);
+    return { message: 'Report schedule deleted' };
+  }
+
+  @Doc({
+    summary: 'Get a report download URL',
+    description:
+      'Returns a presigned URL for the report PDF: an attachment by default, or `disposition=inline` so the browser displays it.',
+    response: { serialization: ReportDownloadResponseDto },
+    request: { getWorkspaceId: true },
+  })
+  @WorkspaceAccess('report.read')
+  @Get(':id/download')
+  getDownloadUrl(
+    @Param() params: IdQueryParamDto,
+    @Query() query: ReportDownloadQueryDto,
+    @WorkspaceId() workspaceId: string,
+  ): Promise<ReportDownloadResponseDto> {
+    return this.reportsService.getDownloadUrl(params.id, workspaceId, query.disposition ?? 'attachment');
   }
 
   @Doc({
