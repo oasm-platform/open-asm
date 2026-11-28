@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { CronScheduleBuilder } from '@/components/ui/cron-schedule-builder';
@@ -19,6 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { getLocalTimezone, getNextRun } from '@/lib/cron-schedule';
+import { formatDate } from '@/lib/date-locale';
 import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
 import { useAttackSurfaceQueryControllerListSaved } from '@/services/apis/gen/queries';
@@ -218,8 +220,9 @@ export function NewReportDialog({ open, onOpenChange, initialDraft }: NewReportD
                 onSelect={() => update({ repeat: true })}
               >
                 {scheduled && (
-                  <div className="pt-3">
+                  <div className="space-y-3 pt-3">
                     <CronScheduleBuilder onChange={(change) => update({ cron: change.cron })} />
+                    <UpcomingRuns cron={draft.cron} />
                   </div>
                 )}
               </DeliveryOption>
@@ -241,6 +244,37 @@ export function NewReportDialog({ open, onOpenChange, initialDraft }: NewReportD
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+const UPCOMING_RUNS = 3;
+
+/** The next few run times, so a schedule can be checked before it is saved. */
+function UpcomingRuns({ cron }: { cron: string }) {
+  const t = useT();
+  const runs = useMemo(() => {
+    const timezone = getLocalTimezone();
+    const dates: Date[] = [];
+    let from = new Date();
+    for (let i = 0; i < UPCOMING_RUNS; i++) {
+      const next = cron ? getNextRun(cron, timezone, from) : null;
+      if (!next) break;
+      dates.push(next);
+      from = new Date(next.getTime() + 60_000);
+    }
+    return dates;
+  }, [cron]);
+
+  if (runs.length === 0) return null;
+  return (
+    <div className="space-y-1 text-xs">
+      <div className="text-muted-foreground">{t('reports.generate.upcomingRuns')}</div>
+      <ol className="space-y-0.5 tabular-nums">
+        {runs.map((run) => (
+          <li key={run.getTime()}>{formatDate(run, 'EEE, PP p')}</li>
+        ))}
+      </ol>
+    </div>
   );
 }
 

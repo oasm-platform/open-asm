@@ -1,23 +1,17 @@
-import { Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { formatCronLabel, getLocalTimezone } from '@/lib/cron-schedule';
-import { fromNow } from '@/lib/date-locale';
+import { Skeleton } from '@/components/ui/skeleton';
+import { formatCronLabel, getLocalTimezone, getNextRun } from '@/lib/cron-schedule';
+import { formatDate, fromNow } from '@/lib/date-locale';
 import { useT } from '@/lib/i18n-dictionary';
+import { cn } from '@/lib/utils';
 import {
   useReportsControllerDeleteSchedule,
   useReportsControllerListSchedules,
 } from '@/services/apis/gen/queries';
+import { SEVERITY_OPTIONS, TEMPLATE_META } from './report-meta';
 
 export const reportSchedulesKey = (workspaceId?: string) => ['report-schedules', workspaceId];
 
@@ -37,62 +31,81 @@ export function ReportSchedules({ workspaceId }: { workspaceId?: string }) {
     },
   });
 
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        {[0, 1].map((i) => (
+          <Skeleton key={i} className="h-20 w-full rounded-xl" />
+        ))}
+      </div>
+    );
+  }
+
   const schedules = data ?? [];
+  if (schedules.length === 0) {
+    return (
+      <p className="rounded-xl bg-muted/40 px-4 py-8 text-center text-sm text-muted-foreground">
+        {t('reports.schedules.empty')}
+      </p>
+    );
+  }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>{t('reports.schedules.columns.report')}</TableHead>
-          <TableHead>{t('reports.schedules.columns.runs')}</TableHead>
-          <TableHead>{t('reports.columns.created')}</TableHead>
-          <TableHead />
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {!isLoading && schedules.length === 0 && (
-          <TableRow>
-            <TableCell colSpan={4} className="text-center text-muted-foreground">
-              {t('reports.schedules.empty')}
-            </TableCell>
-          </TableRow>
-        )}
-        {schedules.map((schedule) => (
-          <TableRow key={schedule.id}>
-            <TableCell className="font-medium">
-              {t(
-                schedule.type === 'VULNERABILITY'
-                  ? 'reports.generate.vulnerability'
-                  : 'reports.generate.summary',
+    <ul className="space-y-2">
+      {schedules.map((schedule) => {
+        const meta = TEMPLATE_META[schedule.type];
+        const nextRun = getNextRun(schedule.cron, timezone);
+        const severity = SEVERITY_OPTIONS.find((o) => o.value === schedule.options.minSeverity);
+        return (
+          <li key={schedule.id} className="flex items-start gap-3 rounded-xl bg-muted/40 p-4">
+            <span className={cn('mt-1.5 size-2 shrink-0 rounded-full', meta.dot)} />
+            <div className="min-w-0 flex-1 space-y-1">
+              <div className="flex flex-wrap items-baseline gap-x-2 text-sm font-medium">
+                {t(meta.labelKey)}
+                {severity && (
+                  <span className="text-xs font-normal text-muted-foreground">
+                    {t('reports.schedules.minSeverity', { level: t(severity.labelKey) })}
+                  </span>
+                )}
+                {(schedule.options.targetIds?.length ?? 0) > 0 && (
+                  <span className="text-xs font-normal text-muted-foreground">
+                    {t('reports.schedules.targetCount', {
+                      count: schedule.options.targetIds?.length ?? 0,
+                    })}
+                  </span>
+                )}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {formatCronLabel(schedule.cron, timezone) ?? schedule.cron}
+              </div>
+              {nextRun && (
+                <div className="text-xs text-muted-foreground">
+                  {t('reports.schedules.nextRun')}{' '}
+                  <span className="text-foreground" title={formatDate(nextRun, 'PPpp')}>
+                    {fromNow(nextRun)}
+                  </span>
+                </div>
               )}
-              {schedule.options.minSeverity && ` · ≥ ${schedule.options.minSeverity}`}
-            </TableCell>
-            <TableCell>{formatCronLabel(schedule.cron, timezone) ?? schedule.cron}</TableCell>
-            <TableCell className="text-muted-foreground">
-              {fromNow(schedule.createdAt)}
-            </TableCell>
-            <TableCell className="text-right">
-              <ConfirmDialog
-                title={t('reports.schedules.delete.title')}
-                description={t('reports.schedules.delete.description')}
-                confirmText={t('common.delete')}
-                disabled={deleteMutation.isPending}
-                onConfirm={() => deleteMutation.mutate({ id: schedule.id })}
-                trigger={
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                    aria-label={t('reports.schedules.delete.title')}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                }
-              />
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+            </div>
+            <ConfirmDialog
+              title={t('reports.schedules.delete.title')}
+              description={t('reports.schedules.delete.description')}
+              confirmText={t('common.delete')}
+              disabled={deleteMutation.isPending}
+              onConfirm={() => deleteMutation.mutate({ id: schedule.id })}
+              trigger={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  {t('common.delete')}
+                </Button>
+              }
+            />
+          </li>
+        );
+      })}
+    </ul>
   );
 }

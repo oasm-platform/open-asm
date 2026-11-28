@@ -1,9 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import Page from '@/components/common/page';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DataTable } from '@/components/ui/data-table';
 import { DataTableError } from '@/components/ui/data-table-error-boundary';
 import {
@@ -15,6 +16,7 @@ import {
 } from '@/components/ui/sheet';
 import { Tabs, TabsList, TabsTrigger, useQueryTab } from '@/components/ui/tabs';
 import { useLiveEvents } from '@/hooks/use-live-events';
+import { usePermission } from '@/hooks/usePermission';
 import { useServerDataTable } from '@/hooks/useServerDataTable';
 import { useWorkspaceSelector, useWorkspaceState } from '@/hooks/useWorkspaceSelector';
 import { getLocalTimezone, getNextRun } from '@/lib/cron-schedule';
@@ -28,14 +30,18 @@ import {
   useReportsControllerDeleteReport,
   useReportsControllerGetMany,
   useReportsControllerListSchedules,
+  useWorkspacesControllerGetWorkspaceMembers,
 } from '@/services/apis/gen/queries';
 import CreateWorkspace from '../workspaces/create-workspace';
 import { NewReportDialog } from './new-report-dialog';
 import { NewReportMenu } from './new-report-menu';
+import { settlePendingReports, usePendingReports } from './pending-reports';
+import { PendingReportsList } from './pending-reports-list';
 import { buildReportColumns } from './report-columns';
-import { TEMPLATE_META, type ReportDraft } from './report-meta';
+import { reportCountKey, TEMPLATE_META, templateOf, type ReportDraft } from './report-meta';
 import { ReportPreviewSheet } from './report-preview-sheet';
 import { ReportSchedules, reportSchedulesKey } from './report-schedules';
+import { ReportsEmptyState } from './reports-empty-state';
 
 type TypeFilter = 'all' | 'SUMMARY' | 'VULNERABILITY';
 
@@ -51,7 +57,6 @@ export default function Reports() {
   const [dialog, setDialog] = useState<{ key: number; draft?: Partial<ReportDraft> } | null>(null);
   const [schedulesOpen, setSchedulesOpen] = useState(false);
   const [previewed, setPreviewed] = useState<ReportResponseDto | null>(null);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useQueryTab({
     tabParam: 'tab',
     defaultValue: 'all',
@@ -80,7 +85,7 @@ export default function Reports() {
 
   // One-row pages, only for the totals shown on the type filter.
   const countQuery = (countType?: Exclude<TypeFilter, 'all'>) => ({
-    query: { queryKey: ['reports', selectedWorkspaceId, 'count', countType ?? 'all'] },
+    query: { queryKey: reportCountKey(selectedWorkspaceId, countType) },
   });
   const allCount = useReportsControllerGetMany({ limit: 1 }, countQuery());
   const summaryCount = useReportsControllerGetMany({ limit: 1, type: 'SUMMARY' }, countQuery('SUMMARY'));
@@ -110,28 +115,80 @@ export default function Reports() {
   // A queued report shows up when its "ready" notification arrives.
   useLiveEvents('notification.*', refreshReports);
 
-  const deleteMutation = useReportsControllerDeleteReport({
-    mutation: {
-      onSuccess: (_, { id }) => {
-        toast.success(t('reports.toast.deleted'));
-        if (previewed?.id === id) setPreviewed(null);
-        refreshReports();
-      },
-      onError: () => toast.error(t('reports.toast.deleteFailed')),
-    },
+  const pendingReports = usePendingReports(selectedWorkspaceId);
+  const allTotal = allCount.data?.total;
+  useEffect(() => {
+    if (!selectedWorkspaceId || allTotal === undefined) return;
+    settlePendingReports(selectedWorkspaceId, allTotal);
+    // A failed run never grows the list, so expire its entry without waiting for one.
+    const timer = window.setInterval(
+      () => settlePendingReports(selectedWorkspaceId, allTotal),
+      30_000,
+    );
+    return () => window.clearInterval(timer);
+  }, [selectedWorkspaceId, allTotal]);
+
+  // Names of who generated each report; listing members needs `member.read`.
+  const { hasPermission } = usePermission();
+  const canListMembers = hasPermission('member.read');
+  const { data: members } = useWorkspacesControllerGetWorkspaceMembers({
+    query: { enabled: canListMembers },
   });
+  const creators = useMemo(
+    () =>
+      canListMembers && members
+        ? new Map(members.flatMap((m) => (m.user ? [[m.user.id, m.user.name] as const] : [])))
+        : undefined,
+    [canListMembers, members],
+  );
+
+  const reports = useMemo(() => data?.data ?? [], [data?.data]);
+  // Selection is kept by report id: the table speaks row indexes, and a report
+  // landing on top of the list would otherwise shift every tick onto another
+  // report. It also belongs to the page it was made on: any change of page,
+  // sort, search or type starts from an empty selection.
+  const selectionScope = [page, pageSize, sortBy, sortOrder, filter, type].join('|');
+  const [selection, setSelection] = useState({ scope: '', ids: [] as string[] });
+  const selectedIds = selection.scope === selectionScope ? selection.ids : [];
+  const selected = reports.filter((report) => selectedIds.includes(report.id));
+  const rowSelection = Object.fromEntries(
+    reports.flatMap((report, index) => (selectedIds.includes(report.id) ? [[String(index), true]] : [])),
+  );
+  const setRowSelection = (rows: Record<string, boolean>) =>
+    setSelection({
+      scope: selectionScope,
+      ids: reports.filter((_, index) => rows[String(index)]).map((report) => report.id),
+    });
+  const [toDelete, setToDelete] = useState<ReportResponseDto[] | null>(null);
+
+  const deleteMutation = useReportsControllerDeleteReport();
+  const deleteReports = async (targets: ReportResponseDto[]) => {
+    const results = await Promise.allSettled(
+      targets.map((report) => deleteMutation.mutateAsync({ id: report.id })),
+    );
+    const failed = results.filter((r) => r.status === 'rejected').length;
+    const deleted = targets.length - failed;
+    if (deleted > 0) {
+      toast.success(
+        targets.length === 1
+          ? t('reports.toast.deleted')
+          : t('reports.toast.deletedMany', { count: deleted }),
+      );
+    }
+    if (failed > 0) toast.error(t('reports.toast.deleteFailed'));
+    if (previewed && targets.some((report) => report.id === previewed.id)) setPreviewed(null);
+    setRowSelection({});
+    refreshReports();
+  };
 
   // The list carries no URLs; one is signed only for the report being downloaded.
   const handleDownload = async (report: ReportResponseDto) => {
-    setDownloadingId(report.id);
     try {
       const { url } = await reportsControllerGetDownloadUrl(report.id);
       // The URL forces `Content-Disposition: attachment`, so the page stays put.
       window.location.assign(url);
     } catch (error) {
       handleServerError(error);
-    } finally {
-      setDownloadingId(null);
     }
   };
 
@@ -141,14 +198,16 @@ export default function Reports() {
   const columns = buildReportColumns(t, {
     onPreview: setPreviewed,
     onDownload: (report) => void handleDownload(report),
-    onDelete: (report) => deleteMutation.mutate({ id: report.id }),
-    downloadingId,
-    isDeleting: deleteMutation.isPending,
+    // Reports keep no options, so "again" starts from the same template only.
+    onRerun: (report) => openDialog({ template: templateOf(report.type) }),
+    onDelete: (report) => setToDelete([report]),
+    creators,
   });
 
   if (wsLoading) return null;
 
   const hasWorkspace = workspaces.length > 0;
+  const isFirstRun = allTotal === 0 && pendingReports.length === 0;
 
   return (
     <Page
@@ -175,6 +234,8 @@ export default function Reports() {
         <CreateWorkspace />
       ) : !data && !isLoading ? (
         <DataTableError message={t('reports.loadFailed')} onRetry={refetch} />
+      ) : isFirstRun ? (
+        <ReportsEmptyState onStart={openDialog} />
       ) : (
         <div className="flex flex-col gap-4">
           {nextRun && (
@@ -214,8 +275,10 @@ export default function Reports() {
             </TabsList>
           </Tabs>
 
+          <PendingReportsList reports={pendingReports} />
+
           <DataTable
-            data={data?.data ?? []}
+            data={reports}
             columns={columns}
             isLoading={isLoading}
             page={page}
@@ -232,10 +295,48 @@ export default function Reports() {
             totalItems={data?.total ?? 0}
             emptyMessage={t('reports.empty')}
             onRowClick={setPreviewed}
-            rowClassName="group/row cursor-pointer"
+            rowClassName="cursor-pointer"
+            showCheckBox
+            rowSelection={rowSelection}
+            onRowSelectionChange={setRowSelection}
+            selectionHeader={(count) => (
+              <div className="flex items-center gap-3 text-sm">
+                <span className="font-medium">{t('reports.selection.count', { count })}</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-destructive hover:text-destructive"
+                  onClick={() => setToDelete(selected)}
+                >
+                  {t('common.delete')}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-muted-foreground"
+                  onClick={() => setRowSelection({})}
+                >
+                  {t('reports.selection.clear')}
+                </Button>
+              </div>
+            )}
           />
         </div>
       )}
+
+      <ConfirmDialog
+        open={toDelete !== null}
+        onOpenChange={(open) => !open && setToDelete(null)}
+        title={t('reports.delete.title')}
+        description={
+          toDelete?.length === 1
+            ? t('reports.delete.description', { name: toDelete[0].fileName })
+            : t('reports.delete.descriptionMany', { count: toDelete?.length ?? 0 })
+        }
+        confirmText={t('common.delete')}
+        disabled={deleteMutation.isPending}
+        onConfirm={() => toDelete && void deleteReports(toDelete)}
+      />
 
       {dialog && (
         <NewReportDialog
@@ -250,7 +351,7 @@ export default function Reports() {
         report={previewed}
         onOpenChange={(open) => !open && setPreviewed(null)}
         onDownload={(report) => void handleDownload(report)}
-        onDelete={(report) => deleteMutation.mutate({ id: report.id })}
+        onDelete={(report) => void deleteReports([report])}
         isDeleting={deleteMutation.isPending}
       />
 

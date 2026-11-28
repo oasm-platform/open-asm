@@ -64,6 +64,14 @@ export const TEMPLATE_META: Record<ReportTemplate, TemplateMeta> = {
   },
 };
 
+/** Query key of the one-row page that counts the workspace's reports of a type. */
+export const reportCountKey = (workspaceId: string | undefined, type: string = 'all') => [
+  'reports',
+  workspaceId,
+  'count',
+  type,
+];
+
 /** Rows carry the entity's type, which may be a template the generated DTO does not list yet. */
 export const templateOf = (type: string): ReportTemplate =>
   type in TEMPLATE_META ? (type as ReportTemplate) : 'SUMMARY';

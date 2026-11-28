@@ -9,7 +9,8 @@ import {
   useReportsControllerGenerateSummaryReport,
   useReportsControllerGenerateVulReport,
 } from '@/services/apis/gen/queries';
-import { periodRange, type ReportDraft } from './report-meta';
+import { addPendingReport } from './pending-reports';
+import { PERIOD_PRESETS, periodRange, reportCountKey, type ReportDraft } from './report-meta';
 import { reportSchedulesKey } from './report-schedules';
 
 /** Queues a report (or saves its schedule) from a draft; resolves true once accepted. */
@@ -54,6 +55,20 @@ export function useGenerateReport() {
             targetIds,
             minSeverity: draft.minSeverity,
           },
+        });
+      }
+      if (selectedWorkspaceId) {
+        const allReports = queryClient.getQueryData<{ total?: number }>(
+          reportCountKey(selectedWorkspaceId),
+        );
+        addPendingReport({
+          workspaceId: selectedWorkspaceId,
+          template: draft.template,
+          detailKey:
+            draft.template === 'QUERY'
+              ? undefined
+              : PERIOD_PRESETS.find((preset) => preset.value === draft.period)?.labelKey,
+          total: allReports?.total ?? 0,
         });
       }
       toast.success(t('reports.toast.queued'));
