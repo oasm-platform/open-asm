@@ -56,7 +56,7 @@ func TestAgentProxyEnv(t *testing.T) {
 func TestAgentProxyCommandEnvNilKeepsToday(t *testing.T) {
 	t.Setenv("HTTPS_PROXY", "http://corp-proxy:3128")
 	var p *agentProxy
-	env, revoke := p.commandEnv("/opt/tools", "sess", &warnCapture{})
+	env, _, revoke := p.commandEnv("/opt/tools", "sess", &warnCapture{})
 	revoke()
 	if !slices.Equal(env, setupCmdEnv("/opt/tools", false)) {
 		t.Fatalf("nil proxy env differs from setupCmdEnv")
@@ -71,7 +71,7 @@ func TestAgentProxyCommandEnvReplacesInherited(t *testing.T) {
 	t.Setenv("all_proxy", "socks5://corp:1080")
 	runs := egress.NewRunCredentials()
 	p := &agentProxy{runs: runs, port: 4000, grpcHost: "core"}
-	env, revoke := p.commandEnv("/opt/tools", "sess-x", &warnCapture{})
+	env, _, revoke := p.commandEnv("/opt/tools", "sess-x", &warnCapture{})
 	v := envValues(env, "HTTPS_PROXY")
 	if len(v) != 1 || !strings.HasPrefix(v[0], "http://") || !strings.HasSuffix(v[0], "@127.0.0.1:4000") {
 		t.Fatalf("HTTPS_PROXY = %v, want exactly the agent proxy", v)
@@ -80,7 +80,7 @@ func TestAgentProxyCommandEnvReplacesInherited(t *testing.T) {
 		t.Fatal("inherited all_proxy must be dropped")
 	}
 	token := strings.TrimSuffix(strings.TrimPrefix(v[0], "http://oasm:"), "@127.0.0.1:4000")
-	if s, ok := runs.Lookup(token); !ok || s != "sess-x" {
+	if s, ok := runs.Lookup(token); !ok || s.SessionID != "sess-x" {
 		t.Fatalf("issued token must resolve to the session, got %q %v", s, ok)
 	}
 	revoke()
@@ -151,10 +151,11 @@ type exitCheckingSender struct {
 }
 
 // SendStdout stands in for a proxied request: the command printed its
-// proxy URL, so record one event under the command's session.
+// proxy URL, so record one event under the command's run.
 func (s *exitCheckingSender) SendStdout(ctx context.Context, b []byte) error {
 	s.token = strings.TrimSuffix(strings.TrimPrefix(string(b), "http://oasm:"), "@127.0.0.1:4000")
-	s.rec.Record(egress.HTTPEvent{ID: egress.NewEventID(), SessionID: "sess-f", Outcome: egress.OutcomeAllowed})
+	run, _ := s.runs.Lookup(s.token)
+	s.rec.Record(egress.HTTPEvent{ID: egress.NewEventID(), SessionID: run.SessionID, RunID: run.ID, Outcome: egress.OutcomeAllowed})
 	return s.recordingSender.SendStdout(ctx, b)
 }
 
@@ -241,11 +242,11 @@ func TestEgressRecorderWarnsOnRejectedWithoutRetry(t *testing.T) {
 	defer cancel()
 	go rec.Run(ctx)
 
-	rec.Record(egress.HTTPEvent{ID: "a", SessionID: "s"})
-	rec.Record(egress.HTTPEvent{ID: "b", SessionID: "s"})
+	rec.Record(egress.HTTPEvent{ID: "a", RunID: "s"})
+	rec.Record(egress.HTTPEvent{ID: "b", RunID: "s"})
 	fctx, fcancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer fcancel()
-	rec.FlushSession(fctx, "s")
+	rec.FlushRun(fctx, "s")
 
 	if n := client.calls.Load(); n != 1 {
 		t.Fatalf("send calls = %d, want 1", n)
@@ -277,13 +278,13 @@ func TestEgressRecorderPermanentCodesSendOnce(t *testing.T) {
 			rec := newEgressRecorder(client, log)
 			go rec.Run(t.Context())
 
-			rec.Record(egress.HTTPEvent{ID: "a", SessionID: "s"})
+			rec.Record(egress.HTTPEvent{ID: "a", RunID: "s"})
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
 			start := time.Now()
-			rec.FlushSession(ctx, "s")
+			rec.FlushRun(ctx, "s")
 			if d := time.Since(start); d > 300*time.Millisecond {
-				t.Fatalf("FlushSession took %v", d)
+				t.Fatalf("FlushRun took %v", d)
 			}
 			if n := client.calls.Load(); n != 1 {
 				t.Fatalf("send calls = %d, want 1", n)
@@ -301,10 +302,10 @@ func TestEgressRecorderRetriesTransientCodes(t *testing.T) {
 	client := &errLogReporter{err: status.Error(codes.Unavailable, "down")}
 	rec := newEgressRecorder(client, &warnCapture{})
 	go rec.Run(t.Context())
-	rec.Record(egress.HTTPEvent{ID: "a", SessionID: "s"})
+	rec.Record(egress.HTTPEvent{ID: "a", RunID: "s"})
 	ctx, cancel := context.WithTimeout(t.Context(), 800*time.Millisecond)
 	defer cancel()
-	rec.FlushSession(ctx, "s")
+	rec.FlushRun(ctx, "s")
 	if ctx.Err() == nil {
 		t.Fatal("an unavailable core-api must be retried, not dropped at once")
 	}
@@ -339,7 +340,7 @@ func TestWriteWgetRC(t *testing.T) {
 func TestAgentProxyCommandEnvWgetRC(t *testing.T) {
 	runs := egress.NewRunCredentials()
 	p := &agentProxy{runs: runs, port: 4000, grpcHost: "core"}
-	env, release := p.commandEnv("/opt/tools", "sess-w", &warnCapture{})
+	env, _, release := p.commandEnv("/opt/tools", "sess-w", &warnCapture{})
 	rc := envValues(env, "WGET2RC")
 	if len(rc) != 1 {
 		t.Fatalf("WGET2RC = %v, want one", rc)
@@ -378,7 +379,7 @@ func TestAgentProxyCommandEnvWgetRCFailureKeepsProxy(t *testing.T) {
 	t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "missing"))
 	p := &agentProxy{runs: egress.NewRunCredentials(), port: 4000, grpcHost: "core"}
 	log := &warnCapture{}
-	env, release := p.commandEnv("/opt/tools", "sess-f", log)
+	env, _, release := p.commandEnv("/opt/tools", "sess-f", log)
 	defer release()
 	if len(envValues(env, "WGET2RC")) != 0 {
 		t.Fatal("WGET2RC must be unset when the file could not be written")

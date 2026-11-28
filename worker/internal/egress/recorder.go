@@ -67,9 +67,9 @@ type Recorder struct {
 	now                              func() time.Time
 
 	mu      sync.Mutex
-	pending map[string]int // session -> queued + in-flight events
+	pending map[string]int // run id -> proxied, queued and in-flight events
 	queued  int            // eventSize of queued + in-flight events
-	settled chan struct{}  // closed and replaced whenever pending shrinks
+	settled chan struct{}  // closed and replaced when pending shrinks or an event is queued
 }
 
 func NewRecorder(o RecorderOptions) *Recorder {
@@ -115,61 +115,84 @@ func (r *Recorder) paused() bool {
 // Record queues e without blocking; a full queue or byte budget, or a pause
 // after core-api turned out not to support the endpoint, drops it.
 func (r *Recorder) Record(e HTTPEvent) {
+	r.begin(e.RunID)
+	r.commit(e)
+}
+
+// begin counts an event of run from the moment its request starts, so
+// FlushRun also waits for requests still being proxied. Each begin must be
+// matched by exactly one commit.
+func (r *Recorder) begin(run string) {
+	r.mu.Lock()
+	r.pending[run]++
+	r.mu.Unlock()
+}
+
+func (r *Recorder) commit(e HTTPEvent) {
 	if r.paused() {
 		r.dropped.Add(1)
+		r.settle(e.RunID, 1, 0)
 		return
 	}
 	size := eventSize(e)
-	// Counted before the send so FlushSession can never miss an event that
-	// is already in the channel.
 	r.mu.Lock()
 	if r.queued+size > r.maxQueued {
 		r.mu.Unlock()
 		r.dropped.Add(1)
+		r.settle(e.RunID, 1, 0)
 		return
 	}
-	r.pending[e.SessionID]++
 	r.queued += size
 	r.mu.Unlock()
 	select {
 	case r.ch <- e:
+		// A FlushRun that nudged while e was still being proxied must nudge
+		// again, or e waits for the next tick.
+		r.mu.Lock()
+		r.signal()
+		r.mu.Unlock()
 	default:
 		r.dropped.Add(1)
-		r.settle(e.SessionID, 1, size)
+		r.settle(e.RunID, 1, size)
 	}
 }
 
-func (r *Recorder) settle(session string, n, size int) {
+// signal wakes FlushRun waiters; r.mu must be held.
+func (r *Recorder) signal() {
+	close(r.settled)
+	r.settled = make(chan struct{})
+}
+
+func (r *Recorder) settle(run string, n, size int) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.queued -= size
-	if left := r.pending[session] - n; left > 0 {
-		r.pending[session] = left
+	if left := r.pending[run] - n; left > 0 {
+		r.pending[run] = left
 	} else {
-		delete(r.pending, session)
+		delete(r.pending, run)
 	}
-	close(r.settled)
-	r.settled = make(chan struct{})
+	r.signal()
 }
 
 func (r *Recorder) settleBatch(batch []HTTPEvent) {
 	type tally struct{ n, size int }
 	counts := make(map[string]tally)
 	for _, e := range batch {
-		t := counts[e.SessionID]
-		counts[e.SessionID] = tally{t.n + 1, t.size + eventSize(e)}
+		t := counts[e.RunID]
+		counts[e.RunID] = tally{t.n + 1, t.size + eventSize(e)}
 	}
 	for s, t := range counts {
 		r.settle(s, t.n, t.size)
 	}
 }
 
-// FlushSession returns once no queued or in-flight event of sessionID
+// FlushRun returns once no proxied, queued or in-flight event of run
 // remains (delivered or given up on), or when ctx is done.
-func (r *Recorder) FlushSession(ctx context.Context, sessionID string) {
+func (r *Recorder) FlushRun(ctx context.Context, run string) {
 	for {
 		r.mu.Lock()
-		n := r.pending[sessionID]
+		n := r.pending[run]
 		ch := r.settled
 		r.mu.Unlock()
 		if n == 0 {
@@ -214,7 +237,7 @@ func (r *Recorder) Run(ctx context.Context) {
 		case <-tick.C:
 			flush()
 		case <-r.nudge:
-			// Take what is already queued so the waiting session's events
+			// Take what is already queued so the waiting run's events
 			// are in this flush, not the next tick's.
 			r.drain(&batch, &size, flush)
 			flush()
@@ -260,8 +283,16 @@ func (r *Recorder) deliver(ctx context.Context, batch []HTTPEvent) {
 		}
 		backoff = min(backoff*2, r.retryMax)
 	}
+	if perm != nil && !perm.unsupported {
+		// Re-adding the count would resend it every tick in a batch core-api
+		// rejects again, forever: these rows are lost for good.
+		if r.logger != nil {
+			r.logger.Warning("egress http log batch rejected events=%d dropped=%d err=%v", len(batch), dropped, err)
+		}
+		return
+	}
 	r.dropped.Add(dropped + uint64(len(batch)))
-	if perm != nil && perm.unsupported {
+	if perm != nil {
 		r.pausedUntil.Store(r.now().Add(r.cooldown).UnixNano())
 		if r.logger != nil {
 			r.logger.Warning("core-api does not support ReportEgressHttpLogs; agent HTTP logging paused for %s", strings.TrimSuffix(r.cooldown.String(), "0s"))

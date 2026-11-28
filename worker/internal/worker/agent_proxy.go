@@ -66,16 +66,17 @@ func classifyReportErr(err error) error {
 // must never hold up the agent for long when core-api is slow or down.
 const flushWait = 2 * time.Second
 
-// flush waits until the session's recorded requests reached core-api. It is
+// flush waits until the command's recorded requests reached core-api. It is
 // detached from the command ctx: a cancelled stream must not skip the wait
-// that keeps EXIT behind the command's log rows.
-func (p *agentProxy) flush(sessionID string) {
-	if p == nil || p.recorder == nil {
+// that keeps EXIT behind the command's log rows. Keyed by run, not session:
+// a long scan elsewhere in the session must not hold this command's EXIT.
+func (p *agentProxy) flush(runID string) {
+	if p == nil || p.recorder == nil || runID == "" {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), flushWait)
 	defer cancel()
-	p.recorder.FlushSession(ctx, sessionID)
+	p.recorder.FlushRun(ctx, runID)
 }
 
 // proxyUser fills the userinfo user slot; the token goes in the password,
@@ -125,22 +126,24 @@ func writeWgetRC(token string) (string, error) {
 }
 
 // commandEnv builds a host command's env and, with the proxy active, issues
-// its run token. release revokes the token and removes the wget2 config; it
-// must be called once the command has exited and is safe to call again.
-func (p *agentProxy) commandEnv(toolPath, sessionID string, log egress.Logger) (env []string, release func()) {
+// its run token; runID keys flush. release revokes the token (closing the
+// connections still open under it) and removes the wget2 config; it must be
+// called once the command has exited and is safe to call again.
+func (p *agentProxy) commandEnv(toolPath, sessionID string, log egress.Logger) (env []string, runID string, release func()) {
 	if p == nil {
-		return setupCmdEnv(toolPath, false), func() {}
+		return setupCmdEnv(toolPath, false), "", func() {}
 	}
 	token, revoke := p.runs.Issue(sessionID)
+	run, _ := p.runs.Lookup(token)
 	env = append(setupCmdEnv(toolPath, true), p.env(token)...)
 	rc, err := writeWgetRC(token)
 	if err != nil {
 		// wget2 alone loses the proxy; every other client still works.
 		log.Warning("agent proxy: cannot write wget2 config, wget2 will get 407: %v", err)
-		return env, revoke
+		return env, run.ID, revoke
 	}
 	var once sync.Once
-	return append(env, "WGET2RC="+rc), func() {
+	return append(env, "WGET2RC="+rc), run.ID, func() {
 		once.Do(func() {
 			revoke()
 			_ = os.Remove(rc)

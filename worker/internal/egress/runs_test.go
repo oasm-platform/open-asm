@@ -8,8 +8,8 @@ func TestRunCredentialsIssueLookupRevoke(t *testing.T) {
 	if len(tok) != 64 {
 		t.Fatalf("token must be 32 random bytes hex, got len %d", len(tok))
 	}
-	if got, ok := r.Lookup(tok); !ok || got != "sess-1" {
-		t.Fatalf("Lookup(issued) = %q, %v; want sess-1, true", got, ok)
+	if got, ok := r.Lookup(tok); !ok || got.SessionID != "sess-1" {
+		t.Fatalf("Lookup(issued) = %+v, %v; want sess-1, true", got, ok)
 	}
 
 	tok2, revoke2 := r.Issue("sess-1")
@@ -23,7 +23,7 @@ func TestRunCredentialsIssueLookupRevoke(t *testing.T) {
 		t.Fatal("revoked token must not resolve")
 	}
 	revoke() // idempotent
-	if got, ok := r.Lookup(tok2); !ok || got != "sess-1" {
+	if got, ok := r.Lookup(tok2); !ok || got.SessionID != "sess-1" {
 		t.Fatal("revoking one token must not revoke another of the same session")
 	}
 	if _, ok := r.Lookup(""); ok {

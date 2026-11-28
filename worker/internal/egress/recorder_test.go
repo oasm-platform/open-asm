@@ -35,12 +35,12 @@ func TestRecorderDropsWhenFull(t *testing.T) {
 	})
 	go r.Run(t.Context())
 
-	r.Record(HTTPEvent{ID: "e0", SessionID: "s"})
+	r.Record(HTTPEvent{ID: "e0", RunID: "s"})
 	<-entered // Send holds e0; the queue is now empty with capacity 2.
-	r.Record(HTTPEvent{ID: "e1", SessionID: "s"})
-	r.Record(HTTPEvent{ID: "e2", SessionID: "s"})
+	r.Record(HTTPEvent{ID: "e1", RunID: "s"})
+	r.Record(HTTPEvent{ID: "e2", RunID: "s"})
 	start := time.Now()
-	r.Record(HTTPEvent{ID: "e3", SessionID: "s"})
+	r.Record(HTTPEvent{ID: "e3", RunID: "s"})
 	if d := time.Since(start); d > 50*time.Millisecond {
 		t.Fatalf("Record on a full queue blocked for %v", d)
 	}
@@ -78,7 +78,7 @@ func TestRecorderBatchesBySize(t *testing.T) {
 		},
 	})
 	for i := range 4 {
-		r.Record(HTTPEvent{ID: string(rune('a' + i)), SessionID: "s"})
+		r.Record(HTTPEvent{ID: string(rune('a' + i)), RunID: "s"})
 	}
 	go r.Run(t.Context())
 	for i := range 2 {
@@ -97,7 +97,7 @@ func TestRecorderBatchesByBytes(t *testing.T) {
 	calls := make(chan sendCall, 8)
 	body := make([]byte, 1000)
 	r := NewRecorder(RecorderOptions{
-		MaxBatchBytes: 2 * eventSize(HTTPEvent{ID: "a", SessionID: "s", RequestBody: body}),
+		MaxBatchBytes: 2 * eventSize(HTTPEvent{ID: "a", RunID: "s", RequestBody: body}),
 		Interval:      time.Hour,
 		Send: func(_ context.Context, batch []HTTPEvent, dropped uint64) error {
 			calls <- sendCall{batch, dropped}
@@ -105,7 +105,7 @@ func TestRecorderBatchesByBytes(t *testing.T) {
 		},
 	})
 	for i := range 4 {
-		r.Record(HTTPEvent{ID: string(rune('a' + i)), SessionID: "s", RequestBody: body})
+		r.Record(HTTPEvent{ID: string(rune('a' + i)), RunID: "s", RequestBody: body})
 	}
 	go r.Run(t.Context())
 	for i := range 2 {
@@ -122,7 +122,7 @@ func TestRecorderBatchesByBytes(t *testing.T) {
 
 func TestRecorderDropsOverByteBudget(t *testing.T) {
 	body := make([]byte, 1000)
-	ev := func(id string) HTTPEvent { return HTTPEvent{ID: id, SessionID: "s", RequestBody: body} }
+	ev := func(id string) HTTPEvent { return HTTPEvent{ID: id, RunID: "s", RequestBody: body} }
 	entered := make(chan struct{}, 1)
 	release := make(chan struct{})
 	calls := make(chan sendCall, 8)
@@ -152,9 +152,9 @@ func TestRecorderDropsOverByteBudget(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 	close(release)
-	r.FlushSession(ctx, "s")
+	r.FlushRun(ctx, "s")
 	if ctx.Err() != nil {
-		t.Fatal("FlushSession hung on events dropped over the byte budget")
+		t.Fatal("FlushRun hung on events dropped over the byte budget")
 	}
 
 	var dropped uint64
@@ -208,7 +208,7 @@ func TestRecorderRetriesThenSucceeds(t *testing.T) {
 	})
 	r.retryBase, r.retryMax = time.Millisecond, 5*time.Millisecond
 	go r.Run(t.Context())
-	r.Record(HTTPEvent{ID: "x", SessionID: "s"})
+	r.Record(HTTPEvent{ID: "x", RunID: "s"})
 	select {
 	case b := <-sent:
 		if len(b) != 1 || b[0].ID != "x" {
@@ -242,13 +242,13 @@ func TestRecorderGivesUpAndCountsDropped(t *testing.T) {
 	})
 	r.retryBase, r.retryMax = time.Millisecond, time.Millisecond
 	go r.Run(t.Context())
-	r.Record(HTTPEvent{ID: "a", SessionID: "s"})
-	r.Record(HTTPEvent{ID: "b", SessionID: "s"})
+	r.Record(HTTPEvent{ID: "a", RunID: "s"})
+	r.Record(HTTPEvent{ID: "b", RunID: "s"})
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
-	r.FlushSession(ctx, "s")
+	r.FlushRun(ctx, "s")
 	if ctx.Err() != nil {
-		t.Fatal("a batch dropped after max attempts must settle FlushSession")
+		t.Fatal("a batch dropped after max attempts must settle FlushRun")
 	}
 	mu.Lock()
 	fail = false
@@ -263,7 +263,7 @@ func TestRecorderGivesUpAndCountsDropped(t *testing.T) {
 	}
 }
 
-func TestRecorderFlushSession(t *testing.T) {
+func TestRecorderFlushRun(t *testing.T) {
 	var mu sync.Mutex
 	var sent []string
 	r := NewRecorder(RecorderOptions{
@@ -278,25 +278,25 @@ func TestRecorderFlushSession(t *testing.T) {
 		},
 	})
 	go r.Run(t.Context())
-	r.Record(HTTPEvent{ID: "a", SessionID: "s1"})
-	r.Record(HTTPEvent{ID: "b", SessionID: "s1"})
+	r.Record(HTTPEvent{ID: "a", RunID: "s1"})
+	r.Record(HTTPEvent{ID: "b", RunID: "s1"})
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
-	r.FlushSession(ctx, "s1")
+	r.FlushRun(ctx, "s1")
 	if ctx.Err() != nil {
-		t.Fatal("FlushSession waited until the deadline")
+		t.Fatal("FlushRun waited until the deadline")
 	}
 	mu.Lock()
 	if len(sent) != 2 {
-		t.Fatalf("FlushSession returned before the session's events were sent: %v", sent)
+		t.Fatalf("FlushRun returned before the session's events were sent: %v", sent)
 	}
 	mu.Unlock()
 
 	// A session with nothing pending returns at once.
 	start := time.Now()
-	r.FlushSession(ctx, "other")
+	r.FlushRun(ctx, "other")
 	if time.Since(start) > 50*time.Millisecond {
-		t.Fatal("FlushSession of an idle session must return immediately")
+		t.Fatal("FlushRun of an idle session must return immediately")
 	}
 
 	failing := NewRecorder(RecorderOptions{
@@ -304,13 +304,13 @@ func TestRecorderFlushSession(t *testing.T) {
 		Send:     func(context.Context, []HTTPEvent, uint64) error { return errors.New("down") },
 	})
 	go failing.Run(t.Context())
-	failing.Record(HTTPEvent{ID: "z", SessionID: "s2"})
+	failing.Record(HTTPEvent{ID: "z", RunID: "s2"})
 	short, cancelShort := context.WithTimeout(t.Context(), 100*time.Millisecond)
 	defer cancelShort()
 	start = time.Now()
-	failing.FlushSession(short, "s2")
+	failing.FlushRun(short, "s2")
 	if d := time.Since(start); d < 90*time.Millisecond || d > 2*time.Second {
-		t.Fatalf("FlushSession with failing Send returned after %v, want ~100ms", d)
+		t.Fatalf("FlushRun with failing Send returned after %v, want ~100ms", d)
 	}
 }
 
@@ -332,30 +332,57 @@ func (l *warnLog) count() int {
 	return len(l.warns)
 }
 
+// The lost count is not carried into the next batch either: core-api would
+// reject that dropped-only batch again on every tick, forever.
 func TestRecorderPermanentErrorDropsWithoutRetry(t *testing.T) {
 	var attempts atomic.Int32
 	r := NewRecorder(RecorderOptions{
-		Interval: time.Hour,
+		Interval: 10 * time.Millisecond,
 		Send: func(context.Context, []HTTPEvent, uint64) error {
 			attempts.Add(1)
 			return Permanent(errors.New("permission denied"))
 		},
 	})
 	go r.Run(t.Context())
-	r.Record(HTTPEvent{ID: "a", SessionID: "s"})
+	r.Record(HTTPEvent{ID: "a", RunID: "s"})
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 	start := time.Now()
-	r.FlushSession(ctx, "s")
+	r.FlushRun(ctx, "s")
 	// The default 500 ms backoff would show here had it retried.
 	if d := time.Since(start); d > 300*time.Millisecond {
-		t.Fatalf("FlushSession took %v on a permanent error", d)
+		t.Fatalf("FlushRun took %v on a permanent error", d)
 	}
+	time.Sleep(100 * time.Millisecond) // ~10 ticks
 	if n := attempts.Load(); n != 1 {
 		t.Fatalf("send attempts = %d, want 1", n)
 	}
-	if n := r.dropped.Load(); n != 1 {
-		t.Fatalf("dropped = %d, want 1", n)
+	if n := r.dropped.Load(); n != 0 {
+		t.Fatalf("dropped = %d, want 0", n)
+	}
+}
+
+// A long scan still proxying under another command of the same session
+// must not make this command's flush wait out its deadline.
+func TestRecorderFlushRunIgnoresOtherRuns(t *testing.T) {
+	r := NewRecorder(RecorderOptions{
+		Interval: time.Hour,
+		Send:     func(context.Context, []HTTPEvent, uint64) error { return nil },
+	})
+	go r.Run(t.Context())
+	r.begin("run-long") // never committed: a request still in flight
+	r.Record(HTTPEvent{ID: "a", SessionID: "s", RunID: "run-short"})
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	r.FlushRun(ctx, "run-short")
+	if ctx.Err() != nil {
+		t.Fatal("FlushRun waited on another run's in-flight event")
+	}
+	short, cancelShort := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer cancelShort()
+	r.FlushRun(short, "run-long")
+	if short.Err() == nil {
+		t.Fatal("FlushRun must wait for an event that is still being proxied")
 	}
 }
 
@@ -387,17 +414,17 @@ func TestRecorderUnsupportedPausesRecording(t *testing.T) {
 	}
 	go r.Run(t.Context())
 
-	r.Record(HTTPEvent{ID: "a", SessionID: "s"})
+	r.Record(HTTPEvent{ID: "a", RunID: "s"})
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
-	r.FlushSession(ctx, "s")
+	r.FlushRun(ctx, "s")
 	if ctx.Err() != nil {
-		t.Fatal("FlushSession hung on an unsupported endpoint")
+		t.Fatal("FlushRun hung on an unsupported endpoint")
 	}
 
 	// Paused: nothing queues, so the flush wait is free.
 	for _, id := range []string{"b", "c", "d"} {
-		r.Record(HTTPEvent{ID: id, SessionID: "s"})
+		r.Record(HTTPEvent{ID: id, RunID: "s"})
 		r.mu.Lock()
 		n := r.pending["s"]
 		r.mu.Unlock()
@@ -405,9 +432,9 @@ func TestRecorderUnsupportedPausesRecording(t *testing.T) {
 			t.Fatalf("event %s queued while paused", id)
 		}
 		start := time.Now()
-		r.FlushSession(ctx, "s")
+		r.FlushRun(ctx, "s")
 		if d := time.Since(start); d > 50*time.Millisecond {
-			t.Fatalf("FlushSession while paused took %v", d)
+			t.Fatalf("FlushRun while paused took %v", d)
 		}
 	}
 	if n := attempts.Load(); n != 1 {
@@ -421,8 +448,8 @@ func TestRecorderUnsupportedPausesRecording(t *testing.T) {
 	now = now.Add(10*time.Minute + time.Second)
 	unsupported = false
 	mu.Unlock()
-	r.Record(HTTPEvent{ID: "e", SessionID: "s"})
-	r.FlushSession(ctx, "s")
+	r.Record(HTTPEvent{ID: "e", RunID: "s"})
+	r.FlushRun(ctx, "s")
 	select {
 	case c := <-sent:
 		if len(c.batch) != 1 || c.batch[0].ID != "e" || c.dropped != 4 {
@@ -433,18 +460,18 @@ func TestRecorderUnsupportedPausesRecording(t *testing.T) {
 	}
 }
 
-func TestRecorderFlushSessionDoesNotWaitForTick(t *testing.T) {
+func TestRecorderFlushRunDoesNotWaitForTick(t *testing.T) {
 	r := NewRecorder(RecorderOptions{
 		Interval: time.Hour,
 		Send:     func(context.Context, []HTTPEvent, uint64) error { return nil },
 	})
 	go r.Run(t.Context())
-	r.Record(HTTPEvent{ID: "a", SessionID: "s"})
+	r.Record(HTTPEvent{ID: "a", RunID: "s"})
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 	start := time.Now()
-	r.FlushSession(ctx, "s")
+	r.FlushRun(ctx, "s")
 	if d := time.Since(start); d > 500*time.Millisecond {
-		t.Fatalf("FlushSession took %v, want an immediate flush", d)
+		t.Fatalf("FlushRun took %v, want an immediate flush", d)
 	}
 }

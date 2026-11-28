@@ -447,7 +447,7 @@ func executeRemoteCommand(ctx context.Context, handler remoteResultSender, sessi
 	cmd := exec.CommandContext(ctx, "sh", "-c", wrappedCmd)
 	cmd.Dir = sandbox.rootPath
 	cmd.SysProcAttr = newSysProcAttr()
-	env, release := proxy.commandEnv(toolPath, sessionID, log)
+	env, runID, release := proxy.commandEnv(toolPath, sessionID, log)
 	defer release()
 	cmd.Env = env
 
@@ -495,7 +495,7 @@ func executeRemoteCommand(ctx context.Context, handler remoteResultSender, sessi
 	// Before EXIT is reported: background children that outlive the shell
 	// must not keep egress under this command's identity.
 	release()
-	proxy.flush(sessionID)
+	proxy.flush(runID)
 	if waitErr != nil {
 		if exitErr, ok := waitErr.(*exec.ExitError); ok {
 			exitCode = int32(exitErr.ExitCode())

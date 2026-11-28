@@ -84,14 +84,15 @@ func proxyCredentials(r *http.Request) (user, pass string, ok bool) {
 type identity struct {
 	label      string
 	runSession string
+	run        *runEntry
 }
 
 // lookup checks run tokens before execution tokens: a run token is random
 // and short-lived, so trying it first costs nothing and keeps attribution exact.
 func (p *httpProxy) lookup(token string) (identity, bool) {
 	if p.srv.runs != nil {
-		if sess, ok := p.srv.runs.Lookup(token); ok {
-			return identity{label: "agent-session=" + sess, runSession: sess}, true
+		if e := p.srv.runs.entry(token); e != nil {
+			return identity{label: "agent-session=" + e.SessionID, runSession: e.SessionID, run: e}, true
 		}
 	}
 	if label, ok := p.srv.auth(token); ok {
@@ -124,15 +125,36 @@ func (p *httpProxy) authenticate(r *http.Request) (identity, bool) {
 	return identity{}, false
 }
 
-func (p *httpProxy) needAuth(w http.ResponseWriter, r *http.Request) (identity, bool) {
-	id, ok := p.authenticate(r)
+// needAuth authenticates r; for a run token it also ties the client conn to
+// the run so revoking the token cuts it. untrack must be called when the
+// request is done.
+func (p *httpProxy) needAuth(w *connResponseWriter, r *http.Request) (id identity, untrack func(), ok bool) {
+	id, ok = p.authenticate(r)
+	untrack = func() {}
+	if ok && id.run != nil {
+		untrack, ok = p.srv.runs.track(id.run, w.conn)
+	}
 	if !ok {
 		w.Header().Set("Proxy-Authenticate", `Basic realm="oasm-egress"`)
 		http.Error(w, "proxy authentication required", http.StatusProxyAuthRequired)
 		p.srv.logWarning("egress deny method=%s target=%s reason=auth", r.Method, requestTarget(r))
-		return identity{}, false
+		return identity{}, nil, false
 	}
-	return id, true
+	return id, untrack, true
+}
+
+// holdUpstream ties the upstream conn to the run as well: closing only the
+// client side would leave a tunnel's upstream->client copy blocked.
+func (p *httpProxy) holdUpstream(id identity, upstream net.Conn) func() {
+	if id.run == nil {
+		return func() {}
+	}
+	untrack, ok := p.srv.runs.track(id.run, upstream)
+	if !ok {
+		_ = upstream.Close()
+		return func() {}
+	}
+	return untrack
 }
 
 func requestTarget(r *http.Request) string {
@@ -159,6 +181,11 @@ func (p *httpProxy) startEvent(id identity, scheme, method, host, port string, d
 	ev := &eventRec{rec: p.srv.rec}
 	ev.ID = NewEventID()
 	ev.SessionID = id.runSession
+	if id.run != nil {
+		ev.RunID = id.run.ID
+	}
+	// Matched by the commit in done, which every caller defers.
+	ev.rec.begin(ev.RunID)
 	ev.Scheme = scheme
 	ev.Method = method
 	ev.Host = strings.ToLower(host)
@@ -184,6 +211,13 @@ func (ev *eventRec) fail(err error) {
 	}
 }
 
+func (ev *eventRec) cancel(err error) {
+	if ev != nil {
+		ev.Outcome = OutcomeCancelled
+		ev.Error = err.Error()
+	}
+}
+
 func (ev *eventRec) done() {
 	if ev == nil {
 		return
@@ -194,19 +228,36 @@ func (ev *eventRec) done() {
 	ev.CompletedAt = time.Now()
 	ev.Path = cut(ev.Path, maxPath)
 	ev.Error = cut(ev.Error, maxError)
-	ev.rec.Record(ev.HTTPEvent)
+	ev.rec.commit(ev.HTTPEvent)
+}
+
+// errWriter remembers the last write error, telling a client that went away
+// apart from an upstream read failure inside io.Copy.
+type errWriter struct {
+	io.Writer
+	err error
+}
+
+func (w *errWriter) Write(b []byte) (int, error) {
+	n, err := w.Writer.Write(b)
+	if err != nil {
+		w.err = err
+	}
+	return n, err
 }
 
 func (p *httpProxy) forward(w *connResponseWriter, r *http.Request) {
-	id, ok := p.needAuth(w, r)
+	id, untrack, ok := p.needAuth(w, r)
 	if !ok {
 		return
 	}
+	defer untrack()
 	label := id.label
 	host := r.URL.Hostname()
 	ev := p.startEvent(id, "http", r.Method, host, r.URL.Port(), 80)
 	defer ev.done()
 	var reqCap, respCap *bodyCapture
+	var respType string
 	if ev != nil {
 		ev.Path = MaskQuery(r.URL.RequestURI())
 		h := r.Header.Clone()
@@ -217,8 +268,8 @@ func (p *httpProxy) forward(w *connResponseWriter, r *http.Request) {
 			r.Body = captureReader{ReadCloser: r.Body, c: reqCap}
 		}
 		defer func() {
-			ev.RequestBody, ev.RequestBytes, ev.RequestBodyTruncated = reqCap.buf, reqCap.total, reqCap.truncated()
-			ev.ResponseBody, ev.ResponseBodyTruncated = respCap.buf, respCap.truncated()
+			ev.RequestBody, ev.RequestBytes, ev.RequestBodyTruncated = MaskBody(r.Header.Get("Content-Type"), reqCap.buf), reqCap.total, reqCap.truncated()
+			ev.ResponseBody, ev.ResponseBodyTruncated = MaskBody(respType, respCap.buf), respCap.truncated()
 		}()
 	}
 	if denyTarget(host, p.srv.deny, p.srv.allow) {
@@ -249,6 +300,7 @@ func (p *httpProxy) forward(w *connResponseWriter, r *http.Request) {
 		return
 	}
 	defer upstream.Close()
+	defer p.holdUpstream(id, upstream)()
 
 	out := r.Clone(context.Background())
 	out.Header.Del("Proxy-Authorization")
@@ -270,7 +322,9 @@ func (p *httpProxy) forward(w *connResponseWriter, r *http.Request) {
 		http.Error(w, "upstream error", http.StatusBadGateway)
 		return
 	}
-	defer uresp.Body.Close()
+	// No uresp.Body.Close: it drains the rest of the body, so a client that
+	// hung up would keep the download running; the deferred upstream.Close
+	// ends it instead.
 	for k, vs := range uresp.Header {
 		for _, v := range vs {
 			w.Header().Add(k, v)
@@ -280,21 +334,35 @@ func (p *httpProxy) forward(w *connResponseWriter, r *http.Request) {
 	var body io.Reader = uresp.Body
 	if ev != nil {
 		ev.StatusCode = uint32(uresp.StatusCode)
-		ev.ResponseHeaders = MaskHeaders(uresp.Header)
+		h := uresp.Header.Clone()
+		// OAuth redirects carry ?code= in Location.
+		if loc := h.Get("Location"); loc != "" {
+			h.Set("Location", MaskQuery(loc))
+		}
+		ev.ResponseHeaders = MaskHeaders(h)
+		respType = uresp.Header.Get("Content-Type")
 		body = io.TeeReader(uresp.Body, respCap)
 	}
-	n, _ := io.Copy(w, body)
+	cw := &errWriter{Writer: w}
+	n, err := io.Copy(cw, body)
 	if ev != nil {
 		ev.ResponseBytes = uint64(n)
+		switch {
+		case cw.err != nil:
+			ev.cancel(cw.err)
+		case err != nil:
+			ev.fail(err)
+		}
 	}
 	p.srv.logInfo("egress bytes exec=%s method=%s target=%s bytes=%d", label, r.Method, requestTarget(r), n)
 }
 
 func (p *httpProxy) tunnel(w *connResponseWriter, r *http.Request) {
-	id, ok := p.needAuth(w, r)
+	id, untrack, ok := p.needAuth(w, r)
 	if !ok {
 		return
 	}
+	defer untrack()
 	label := id.label
 	connectHost, connectPort := r.Host, ""
 	if h, port, err := net.SplitHostPort(r.Host); err == nil {
@@ -325,6 +393,7 @@ func (p *httpProxy) tunnel(w *connResponseWriter, r *http.Request) {
 		http.Error(w, "upstream error", http.StatusBadGateway)
 		return
 	}
+	defer p.holdUpstream(id, upstream)()
 	var upBytes, downBytes int64
 	var wg sync.WaitGroup
 	p.srv.logInfo("egress allow exec=%s method=CONNECT target=%s", label, r.Host)
@@ -337,6 +406,11 @@ func (p *httpProxy) tunnel(w *connResponseWriter, r *http.Request) {
 	go func() {
 		defer wg.Done()
 		upBytes, _ = io.Copy(upstream, w.br)
+		// Pass the client's EOF on, or the down copy blocks until the server
+		// times out its idle connection (and the event lands after EXIT).
+		if cw, ok := upstream.(interface{ CloseWrite() error }); !ok || cw.CloseWrite() != nil {
+			_ = upstream.Close()
+		}
 	}()
 	downBytes, _ = io.Copy(w.conn, upstream)
 	_ = w.conn.Close()

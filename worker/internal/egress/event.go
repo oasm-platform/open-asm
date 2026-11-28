@@ -1,10 +1,13 @@
 package egress
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"sort"
@@ -54,17 +57,19 @@ type Header struct{ Name, Value string }
 // HTTPEvent is one proxied request of an agent remote-command run.
 type HTTPEvent struct {
 	ID, SessionID, Scheme, Method, Host string
-	Port                                uint32
-	Path                                string
-	StatusCode                          uint32
-	Outcome                             Outcome
-	Error                               string
-	RequestBytes, ResponseBytes         uint64
-	SentAt, CompletedAt                 time.Time
-	RequestHeaders, ResponseHeaders     []Header
-	RequestBody, ResponseBody           []byte
-	RequestBodyTruncated                bool
-	ResponseBodyTruncated               bool
+	// RunID is worker-local (never sent): it keys FlushRun.
+	RunID                           string
+	Port                            uint32
+	Path                            string
+	StatusCode                      uint32
+	Outcome                         Outcome
+	Error                           string
+	RequestBytes, ResponseBytes     uint64
+	SentAt, CompletedAt             time.Time
+	RequestHeaders, ResponseHeaders []Header
+	RequestBody, ResponseBody       []byte
+	RequestBodyTruncated            bool
+	ResponseBodyTruncated           bool
 }
 
 // NewEventID returns a UUIDv7 so ids sort by creation time in the database.
@@ -92,10 +97,12 @@ func NewEventID() string {
 func sensitiveHeader(name string) bool {
 	n := strings.ToLower(name)
 	switch n {
-	case "authorization", "proxy-authorization", "cookie", "set-cookie", "x-auth", "x-api-key":
+	case "cookie", "set-cookie":
 		return true
 	}
-	for _, s := range []string{"api-key", "apikey", "token", "secret", "password"} {
+	// Broad on purpose: vendor headers (X-Auth-Key, Ocp-Apim-Subscription-Key,
+	// Authentication...) vary too much to list, and over-masking costs little.
+	for _, s := range []string{"auth", "key", "token", "secret", "password", "credential", "session"} {
 		if strings.Contains(n, s) {
 			return true
 		}
@@ -147,6 +154,10 @@ func MaskQuery(rawPath string) string {
 	if !ok || query == "" {
 		return rawPath
 	}
+	return path + "?" + maskPairs(query)
+}
+
+func maskPairs(query string) string {
 	parts := strings.Split(query, "&")
 	for i, p := range parts {
 		k, _, hasValue := strings.Cut(p, "=")
@@ -161,7 +172,58 @@ func MaskQuery(rawPath string) string {
 			parts[i] = k + "=" + masked
 		}
 	}
-	return path + "?" + strings.Join(parts, "&")
+	return strings.Join(parts, "&")
+}
+
+// MaskBody masks credential-like values in form and JSON bodies (password=,
+// "access_token":...). A JSON body that does not parse, e.g. one cut at
+// BodyCap, is kept as is; a form body is masked pair by pair either way.
+func MaskBody(contentType string, body []byte) []byte {
+	if len(body) == 0 {
+		return body
+	}
+	mt, _, _ := mime.ParseMediaType(contentType)
+	switch {
+	case mt == "application/x-www-form-urlencoded":
+		return []byte(maskPairs(string(body)))
+	case mt == "application/json" || strings.HasSuffix(mt, "+json"):
+		// UseNumber: a float64 round trip would corrupt large integer ids.
+		dec := json.NewDecoder(bytes.NewReader(body))
+		dec.UseNumber()
+		var v any
+		if dec.Decode(&v) != nil || !maskJSON(v) {
+			return body
+		}
+		out, err := json.Marshal(v)
+		if err != nil {
+			return body
+		}
+		return out
+	}
+	return body
+}
+
+// maskJSON masks sensitive keys at any depth and reports whether it did.
+func maskJSON(v any) bool {
+	changed := false
+	switch t := v.(type) {
+	case map[string]any:
+		for k, child := range t {
+			if sensitiveQueryKey(k) {
+				t[k] = masked
+				changed = true
+			} else if maskJSON(child) {
+				changed = true
+			}
+		}
+	case []any:
+		for _, child := range t {
+			if maskJSON(child) {
+				changed = true
+			}
+		}
+	}
+	return changed
 }
 
 // bodyCapture keeps the first BodyCap bytes written and counts them all.
