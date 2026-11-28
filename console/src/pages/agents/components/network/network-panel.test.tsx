@@ -151,14 +151,16 @@ describe('NetworkPanel', () => {
     const names = within(list)
       .getAllByRole('button')
       .map((b) => b.textContent);
-    expect(names[0]).toMatch(/^users\?id=\*\*\*/);
-    expect(names[3]).toMatch(/^admin/);
+    // Method leads each row, as in Postman
+    expect(names[0]).toMatch(/^GET\s*users\?id=\*\*\*/);
+    expect(names[3]).toMatch(/^GET\s*admin/);
 
     const ok = row(/users\?id/);
     expect(ok).toHaveTextContent('api.acme.com');
     expect(ok).toHaveTextContent('200');
     expect(ok).toHaveTextContent('2.0 KiB');
-    expect(ok).toHaveTextContent('1.5 s');
+    // 1500 ms, in whole seconds
+    expect(ok).toHaveTextContent('2 s');
     expect(ok).toHaveAttribute('title', 'http://api.acme.com:8080/v1/users?id=***');
 
     // A tunnel is named by host:port and has no status to show
@@ -172,10 +174,10 @@ describe('NetworkPanel', () => {
   it('tints failed, blocked and >= 400 requests red', async () => {
     await setup();
 
-    expect(row(/^404/)).toHaveClass('text-red-600');
-    expect(row(/^admin/)).toHaveClass('text-red-600');
-    expect(row(/^admin/)).toHaveTextContent('(blocked)');
-    expect(row(/users\?id/)).not.toHaveClass('text-red-600');
+    expect(row(/^GET\s*404/)).toHaveClass('text-destructive');
+    expect(row(/^GET\s*admin/)).toHaveClass('text-destructive');
+    expect(row(/^GET\s*admin/)).toHaveTextContent('(blocked)');
+    expect(row(/users\?id/)).not.toHaveClass('text-destructive');
   });
 
   it('filters by text and by errors', async () => {
@@ -218,15 +220,18 @@ describe('NetworkPanel', () => {
     expect(onClear).toHaveBeenCalledOnce();
   });
 
-  it('opens a request in the panel and comes back to its row', async () => {
+  it('unfolds a request under its row and folds it again', async () => {
     const onShowInChat = vi.fn();
     const { user } = await setup({ onShowInChat });
 
-    await user.click(row(/users\?id/));
+    const ok = row(/users\?id/);
+    expect(ok).toHaveAttribute('aria-expanded', 'false');
+    await user.click(ok);
 
-    const back = screen.getByRole('button', { name: 'Back to requests' });
-    expect(back).toHaveFocus();
-    expect(screen.queryByRole('list', { name: 'HTTP requests' })).toBeNull();
+    expect(ok).toHaveAttribute('aria-expanded', 'true');
+    // The list stays: the details unfold in it, under their row
+    const list = screen.getByRole('list', { name: 'HTTP requests' });
+    expect(within(list).getByRole('tab', { name: 'Headers' })).toBeInTheDocument();
     expect(
       screen.getByText('http://api.acme.com:8080/v1/users?id=***'),
     ).toBeInTheDocument();
@@ -248,9 +253,20 @@ describe('NetworkPanel', () => {
     await user.click(screen.getByRole('tab', { name: 'Timing' }));
     expect(screen.getByText('Duration')).toBeInTheDocument();
 
-    await user.click(back);
-    expect(row(/users\?id/)).toHaveFocus();
-    expect(row(/users\?id/)).toHaveAttribute('aria-current', 'true');
+    await user.click(ok);
+    expect(ok).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('tab', { name: 'Headers' })).toBeNull();
+  });
+
+  it('keeps several requests unfolded at once', async () => {
+    const { user } = await setup();
+
+    await user.click(row(/users\?id/));
+    await user.click(row(/^GET\s*404/));
+
+    expect(row(/users\?id/)).toHaveAttribute('aria-expanded', 'true');
+    expect(row(/^GET\s*404/)).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getAllByRole('tab', { name: 'Headers' })).toHaveLength(2);
   });
 
   it('moves between rows with the arrow keys', async () => {
@@ -258,11 +274,12 @@ describe('NetworkPanel', () => {
 
     row(/users\?id/).focus();
     await user.keyboard('{ArrowDown}');
-    expect(row(/^404/)).toHaveFocus();
+    expect(row(/^GET\s*404/)).toHaveFocus();
     await user.keyboard('{End}');
-    expect(row(/^admin/)).toHaveFocus();
+    expect(row(/^GET\s*admin/)).toHaveFocus();
     await user.keyboard('{Enter}');
-    expect(screen.getByRole('button', { name: 'Back to requests' })).toHaveFocus();
+    expect(row(/^GET\s*admin/)).toHaveAttribute('aria-expanded', 'true');
+    expect(row(/^GET\s*admin/)).toHaveFocus();
   });
 
   it('shows a binary body by its size until base64 is asked for', async () => {
@@ -335,7 +352,7 @@ describe('NetworkPanel', () => {
     expect(refetch).toHaveBeenCalledTimes(2);
   });
 
-  it('keeps a request open when a reload no longer lists it', async () => {
+  it('unfolds a request again when a reload drops it and older requests bring it back', async () => {
     function Live() {
       const [net, setNet] = useState(network());
       return (
@@ -349,17 +366,22 @@ describe('NetworkPanel', () => {
           >
             reload
           </button>
+          <button type="button" onClick={() => setNet(network())}>
+            load older
+          </button>
           <NetworkPanel network={net} />
         </>
       );
     }
     const { user } = await setup({}, DETAIL, <Live />);
     await user.click(row(/users\?id/));
-    expect(screen.getByRole('button', { name: 'Back to requests' })).toBeInTheDocument();
+    expect(row(/users\?id/)).toHaveAttribute('aria-expanded', 'true');
 
     await user.click(screen.getByRole('button', { name: 'reload' }));
+    expect(screen.queryByRole('button', { name: /users\?id/ })).toBeNull();
 
-    expect(screen.getByRole('button', { name: 'Back to requests' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'load older' }));
+    expect(row(/users\?id/)).toHaveAttribute('aria-expanded', 'true');
     expect(
       screen.getByText('http://api.acme.com:8080/v1/users?id=***'),
     ).toBeInTheDocument();

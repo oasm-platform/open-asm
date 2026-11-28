@@ -60,7 +60,8 @@ export function statusText(
 }
 
 export function formatDuration(ms: number): string {
-  return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`;
+  // Whole seconds only
+  return ms < 1000 ? `${Math.round(ms)} ms` : `${Math.round(ms / 1000)} s`;
 }
 
 /** Decoded size of a base64 string, without decoding it */

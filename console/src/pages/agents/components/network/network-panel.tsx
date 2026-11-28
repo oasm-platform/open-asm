@@ -1,4 +1,9 @@
 import { Button } from '@/components/ui/button';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useT } from '@/lib/i18n-dictionary';
 import { cn } from '@/lib/utils';
@@ -6,6 +11,7 @@ import type { AgentHttpRequestListItemDto } from '@/services/apis/gen/queries';
 import { formatBytes } from '@/utils/format-bytes';
 import {
   ArrowLeftRight,
+  ChevronRight,
   Loader2,
   Lock,
   RefreshCw,
@@ -32,6 +38,7 @@ import {
   waterfall,
   type WaterfallBar,
 } from './format';
+import { MethodBadge } from './method-badge';
 import { NetworkRequestDetail } from './network-request-detail';
 import { StatusCell } from './status-cell';
 import type { ConversationHttpRequests } from './use-conversation-http-requests';
@@ -41,10 +48,11 @@ type Kind = 'all' | 'errors';
 /** A list scrolled within this many px of its end follows new rows */
 const STICK_PX = 24;
 
-// One template per width of @container/network: Method joins at 28rem,
-// Waterfall at 36rem, so the list never scrolls sideways
+// Fold chevron, Method, Name, Status, Size, Time, Waterfall; one template per
+// width of @container/network: Method joins at 28rem, Waterfall at 36rem,
+// so the list never scrolls sideways. Every column reads from the left
 const COLUMNS =
-  'grid grid-cols-[minmax(0,1fr)_5rem_3.75rem_3.5rem] @md/network:grid-cols-[minmax(0,1fr)_5rem_4.25rem_3.75rem_3.5rem] @xl/network:grid-cols-[minmax(0,1fr)_5rem_4.25rem_3.75rem_3.5rem_minmax(4rem,24%)] items-center gap-x-2';
+  'grid grid-cols-[0.875rem_minmax(0,1fr)_5rem_4.5rem_4.5rem] @md/network:grid-cols-[0.875rem_4.75rem_minmax(0,1fr)_5rem_4.5rem_4.5rem] @xl/network:grid-cols-[0.875rem_4.75rem_minmax(0,1fr)_5rem_4.5rem_4.5rem_minmax(4rem,24%)] items-center gap-x-3 text-left';
 const METHOD_CELL = 'hidden @md/network:block';
 const WATERFALL_CELL = 'hidden @xl/network:block';
 
@@ -72,16 +80,17 @@ function SkeletonRows() {
   return (
     <div className="space-y-px" aria-hidden>
       {Array.from({ length: 6 }, (_, i) => (
-        <div key={i} className={cn(COLUMNS, 'h-9 px-3')}>
-          <div className="space-y-1">
-            <Skeleton className="h-3 w-3/4" />
-            <Skeleton className="h-2.5 w-1/2" />
+        <div key={i} className={cn(COLUMNS, 'h-12 border-b border-border/60 px-3')}>
+          <Skeleton className="size-3.5" />
+          <Skeleton className={cn('h-5 w-12', METHOD_CELL)} />
+          <div className="space-y-1.5">
+            <Skeleton className="h-3.5 w-3/4" />
+            <Skeleton className="h-3 w-1/2" />
           </div>
-          <Skeleton className="h-3 w-8" />
-          <Skeleton className={cn('h-3 w-10', METHOD_CELL)} />
-          <Skeleton className="h-3 w-10" />
-          <Skeleton className="h-3 w-9" />
-          <Skeleton className={cn('h-2 w-full', WATERFALL_CELL)} />
+          <Skeleton className="h-5 w-10" />
+          <Skeleton className="h-3.5 w-12" />
+          <Skeleton className="h-3.5 w-10" />
+          <Skeleton className={cn('h-1.5 w-full', WATERFALL_CELL)} />
         </div>
       ))}
     </div>
@@ -91,11 +100,11 @@ function SkeletonRows() {
 function Waterfall({ bar, error }: { bar?: WaterfallBar; error: boolean }) {
   if (!bar) return null;
   return (
-    <div className={cn('relative h-1.5 rounded-full bg-muted/60', WATERFALL_CELL)}>
+    <div className={cn('relative h-1.5 rounded-full bg-muted', WATERFALL_CELL)}>
       <div
         className={cn(
           'absolute inset-y-0 rounded-full',
-          error ? 'bg-red-500/70' : 'bg-sky-500/80',
+          error ? 'bg-destructive/70' : 'bg-primary/70',
         )}
         style={{ left: `${bar.left}%`, width: `${bar.width}%` }}
       />
@@ -106,68 +115,87 @@ function Waterfall({ bar, error }: { bar?: WaterfallBar; error: boolean }) {
 interface RequestRowProps {
   request: AgentHttpRequestListItemDto;
   bar?: WaterfallBar;
-  selected: boolean;
-  onOpen: (request: AgentHttpRequestListItemDto) => void;
+  expanded: boolean;
+  onToggle: (id: string, open: boolean) => void;
   onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
+  onShowInChat?: (toolCallId: string) => void;
 }
 
+/** A request row that unfolds its details under itself */
 function RequestRow({
   request,
   bar,
-  selected,
-  onOpen,
+  expanded,
+  onToggle,
   onKeyDown,
+  onShowInChat,
 }: RequestRowProps) {
   const error = isErrorRequest(request);
   const tunnel = isTunnel(request);
   return (
-    <li className="even:bg-muted/25">
-      <button
-        type="button"
-        data-request-id={request.id}
-        aria-current={selected || undefined}
-        onClick={() => onOpen(request)}
-        onKeyDown={onKeyDown}
-        title={requestUrl(request)}
-        className={cn(
-          COLUMNS,
-          'w-full cursor-pointer px-3 py-1 text-left font-mono text-[11px] tabular-nums transition-colors outline-none',
-          'hover:bg-muted/70 focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-inset',
-          error && 'bg-red-500/[0.06] text-red-600 hover:bg-red-500/10 dark:text-red-400',
-          selected && 'bg-primary/10 hover:bg-primary/15',
-        )}
+    <li className="border-b border-border/60">
+      <Collapsible
+        open={expanded}
+        onOpenChange={(open) => onToggle(request.id, open)}
       >
-        <span className="min-w-0">
-          <span className="flex min-w-0 items-center gap-1">
-            {tunnel && (
-              <Lock className="size-3 shrink-0 opacity-60" aria-hidden />
-            )}
-            <span className="truncate font-medium">{requestName(request)}</span>
-          </span>
-          <span
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            data-request-id={request.id}
+            onKeyDown={onKeyDown}
+            title={requestUrl(request)}
             className={cn(
-              'block truncate font-sans text-[10px]',
-              error ? 'opacity-75' : 'text-muted-foreground',
+              COLUMNS,
+              'group w-full cursor-pointer px-3 py-1.5 text-sm tabular-nums transition-colors outline-none',
+              'hover:bg-muted/60 focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset',
+              error && 'bg-destructive/5 text-destructive hover:bg-destructive/10',
+              'data-[state=open]:bg-muted/60',
             )}
           >
-            <span className="@md/network:hidden">
-              {displayMethod(request.method)} ·{' '}
+            <ChevronRight
+              className="size-3.5 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-90"
+              aria-hidden
+            />
+            <span className={cn('min-w-0', METHOD_CELL)}>
+              <MethodBadge method={request.method} />
             </span>
-            {request.host}
-          </span>
-        </span>
-        <StatusCell request={request} className="truncate" />
-        <span className={cn('truncate', METHOD_CELL)}>
-          {displayMethod(request.method)}
-        </span>
-        <span className="truncate text-right">
-          {formatBytes(request.responseBytes)}
-        </span>
-        <span className="truncate text-right">
-          {formatDuration(request.durationMs)}
-        </span>
-        <Waterfall bar={bar} error={error} />
-      </button>
+            <span className="min-w-0">
+              <span className="flex min-w-0 items-center gap-1.5">
+                {tunnel && (
+                  <Lock className="size-3.5 shrink-0 opacity-60" aria-hidden />
+                )}
+                <span className="truncate font-medium">{requestName(request)}</span>
+              </span>
+              <span
+                className={cn(
+                  'block truncate text-xs',
+                  error ? 'opacity-75' : 'text-muted-foreground',
+                )}
+              >
+                {/* Below 28rem the Method column is hidden */}
+                <span className="@md/network:hidden">
+                  {displayMethod(request.method)} ·{' '}
+                </span>
+                {request.host}
+              </span>
+            </span>
+            <span className="min-w-0">
+              <StatusCell request={request} />
+            </span>
+            <span className="truncate">
+              {formatBytes(request.responseBytes)}
+            </span>
+            <span className="truncate">
+              {formatDuration(request.durationMs)}
+            </span>
+            <Waterfall bar={bar} error={error} />
+          </button>
+        </CollapsibleTrigger>
+        {/* Unmounted while folded, so the details load on first unfold */}
+        <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+          <NetworkRequestDetail request={request} onShowInChat={onShowInChat} />
+        </CollapsibleContent>
+      </Collapsible>
     </li>
   );
 }
@@ -178,9 +206,10 @@ const MemoRequestRow = memo(
   RequestRow,
   (a, b) =>
     a.request === b.request &&
-    a.selected === b.selected &&
-    a.onOpen === b.onOpen &&
+    a.expanded === b.expanded &&
+    a.onToggle === b.onToggle &&
     a.onKeyDown === b.onKeyDown &&
+    a.onShowInChat === b.onShowInChat &&
     a.bar?.left === b.bar?.left &&
     a.bar?.width === b.bar?.width,
 );
@@ -211,7 +240,7 @@ function moveFocus(event: KeyboardEvent<HTMLButtonElement>) {
 /**
  * The conversation's HTTP requests as Chrome DevTools' Network panel shows
  * them, sized for the side panel: oldest first, following new rows while
- * scrolled to the end, with a request's details opening in its place.
+ * scrolled to the end, each request unfolding its details under its row.
  */
 export function NetworkPanel({
   network,
@@ -239,10 +268,9 @@ export function NetworkPanel({
   } = network;
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<Kind>('all');
-  // The row itself, not its id: a reload that no longer lists it (the run
-  // ended and the list came back as one page) must not close its details
-  const [opened, setOpened] = useState<AgentHttpRequestListItemDto | null>(null);
-  const [lastOpenedId, setLastOpenedId] = useState<string | null>(null);
+  // By id: a row a reload drops (the run ended and the list came back as one
+  // page) unfolds again when loading older requests brings it back
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
 
   // The tab was just opened: show what is there now
   const isFetchingRef = useRef(isFetching);
@@ -268,69 +296,43 @@ export function NetworkPanel({
   // Only the loaded pages are counted
   const more = hasNextPage ? '+' : '';
 
-  // The listed copy when there is one, so the details follow its updates
-  const selected = opened
-    ? (requests.find((r) => r.id === opened.id) ?? opened)
-    : undefined;
-
-  const open = useCallback((request: AgentHttpRequestListItemDto) => {
-    setOpened(request);
-    setLastOpenedId(request.id);
+  const toggle = useCallback((id: string, open: boolean) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (open) next.add(id);
+      else next.delete(id);
+      return next;
+    });
   }, []);
 
-  // Follow new rows while scrolled to the end, as DevTools does
+  // Follow new rows while scrolled to the end, as DevTools does, but not
+  // while details are unfolded: a new row would scroll them away mid-read
   const listRef = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
+  const reading = expanded.size > 0;
   useLayoutEffect(() => {
     const el = listRef.current;
-    if (el && stick.current) el.scrollTop = el.scrollHeight;
-  }, [visible.length, selected]);
-
-  // Focus follows the view: into the details, then back to the row
-  const backRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (selected) {
-      backRef.current?.focus();
-    } else if (lastOpenedId) {
-      listRef.current
-        ?.querySelector<HTMLButtonElement>(
-          `button[data-request-id="${CSS.escape(lastOpenedId)}"]`,
-        )
-        ?.focus();
-    }
-    // Only when the view switches
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!selected]);
-
-  if (selected) {
-    return (
-      <NetworkRequestDetail
-        request={selected}
-        backRef={backRef}
-        onBack={() => setOpened(null)}
-        onShowInChat={onShowInChat}
-      />
-    );
-  }
+    if (el && stick.current && !reading) el.scrollTop = el.scrollHeight;
+  }, [visible.length, reading]);
 
   const loadOlder = (
     <button
       type="button"
       onClick={() => void fetchNextPage()}
       disabled={isFetchingNextPage}
-      className="flex h-8 w-full cursor-pointer items-center justify-center gap-1.5 border-b text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:cursor-default"
+      className="flex h-9 w-full cursor-pointer items-center justify-center gap-1.5 border-b border-border/60 text-sm text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:cursor-default"
     >
-      {isFetchingNextPage && <Loader2 className="size-3 animate-spin" />}
+      {isFetchingNextPage && <Loader2 className="size-3.5 animate-spin" />}
       {t('agents.network.loadOlder')}
     </button>
   );
 
   return (
     <div className="@container/network flex min-h-0 flex-1 flex-col">
-      <div className="flex h-10 shrink-0 items-center gap-2 border-b px-3">
+      <div className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
         <div className="relative min-w-0 flex-1">
           <Search
-            className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground"
+            className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
             aria-hidden
           />
           <input
@@ -339,13 +341,13 @@ export function NetworkPanel({
             onChange={(e) => setQuery(e.target.value)}
             aria-label={t('agents.network.filter')}
             placeholder={t('agents.network.filterPlaceholder')}
-            className="h-7 w-full min-w-0 rounded-md border border-input bg-transparent pr-2 pl-7 text-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 dark:bg-input/30"
+            className="h-8 w-full min-w-0 rounded-md border border-input bg-transparent pr-3 pl-8 text-sm shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
           />
         </div>
         <div
           role="group"
           aria-label={t('agents.network.kind')}
-          className="flex shrink-0 rounded-md bg-muted p-0.5"
+          className="flex h-8 shrink-0 items-center rounded-md bg-muted p-0.5"
         >
           {(['all', 'errors'] as const).map((value) => (
             <button
@@ -354,7 +356,7 @@ export function NetworkPanel({
               aria-pressed={kind === value}
               onClick={() => setKind(value)}
               className={cn(
-                'h-6 cursor-pointer rounded-[5px] px-2 text-xs whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:outline-none',
+                'h-7 cursor-pointer rounded-sm px-2.5 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none',
                 kind === value && 'bg-background text-foreground shadow-xs',
               )}
             >
@@ -364,7 +366,7 @@ export function NetworkPanel({
         </div>
         <Button
           variant="ghost"
-          size="icon-xs"
+          size="icon-sm"
           className="shrink-0 text-muted-foreground"
           aria-label={t('agents.network.refresh')}
           title={t('agents.network.refresh')}
@@ -376,8 +378,8 @@ export function NetworkPanel({
       </div>
 
       {toolCallFilter && (
-        <div className="flex shrink-0 items-center border-b px-3 py-1.5">
-          <span className="inline-flex max-w-full min-w-0 items-center gap-1 rounded-md bg-accent py-0.5 pr-0.5 pl-2 text-xs text-accent-foreground">
+        <div className="flex shrink-0 items-center border-b px-3 py-2">
+          <span className="inline-flex max-w-full min-w-0 items-center gap-1 rounded-md bg-accent py-0.5 pr-0.5 pl-2 text-xs font-medium text-accent-foreground">
             <span className="truncate font-mono" title={toolCallFilter.command}>
               {t('agents.network.commandFilter', {
                 command: toolCallFilter.command,
@@ -390,7 +392,7 @@ export function NetworkPanel({
               onClick={onClearToolCallFilter}
               className="shrink-0 cursor-pointer rounded-sm p-0.5 hover:bg-background/60"
             >
-              <X className="size-3" />
+              <X className="size-3.5" />
             </button>
           </span>
         </div>
@@ -400,7 +402,7 @@ export function NetworkPanel({
       {isError && data && (
         <p
           role="status"
-          className="shrink-0 border-b bg-red-500/5 px-3 py-1 text-[11px] text-red-600 dark:text-red-400"
+          className="shrink-0 border-b bg-destructive/5 px-3 py-1.5 text-xs text-destructive"
         >
           {t('agents.network.loadFailed')}
         </p>
@@ -433,20 +435,17 @@ export function NetworkPanel({
             aria-hidden
             className={cn(
               COLUMNS,
-              'h-7 shrink-0 border-b bg-muted/40 px-3 text-[11px] font-medium text-muted-foreground',
+              'h-9 shrink-0 border-b border-border/60 px-3 text-[11px] font-medium tracking-wider whitespace-nowrap text-muted-foreground uppercase',
             )}
           >
-            <span className="truncate">{t('agents.network.col.name')}</span>
-            <span className="truncate">{t('agents.network.col.status')}</span>
+            <span />
             <span className={cn('truncate', METHOD_CELL)}>
               {t('agents.network.col.method')}
             </span>
-            <span className="truncate text-right">
-              {t('agents.network.col.size')}
-            </span>
-            <span className="truncate text-right">
-              {t('agents.network.col.time')}
-            </span>
+            <span className="truncate">{t('agents.network.col.name')}</span>
+            <span className="truncate">{t('agents.network.col.status')}</span>
+            <span className="truncate">{t('agents.network.col.size')}</span>
+            <span className="truncate">{t('agents.network.col.time')}</span>
             <span className={cn('truncate', WATERFALL_CELL)}>
               {t('agents.network.col.waterfall')}
             </span>
@@ -478,15 +477,16 @@ export function NetworkPanel({
                     key={request.id}
                     request={request}
                     bar={bars.get(request.id)}
-                    selected={request.id === lastOpenedId}
-                    onOpen={open}
+                    expanded={expanded.has(request.id)}
+                    onToggle={toggle}
                     onKeyDown={moveFocus}
+                    onShowInChat={onShowInChat}
                   />
                 ))}
               </ul>
             )}
           </div>
-          <div className="flex h-7 shrink-0 items-center gap-3 border-t px-3 text-[11px] text-muted-foreground">
+          <div className="flex h-9 shrink-0 items-center gap-3 border-t px-3 text-xs text-muted-foreground">
             <span className="truncate tabular-nums">
               {filtered
                 ? t('agents.network.summaryFiltered', {
@@ -500,7 +500,7 @@ export function NetworkPanel({
                   })}
             </span>
             {errorCount > 0 && (
-              <span className="ml-auto shrink-0 text-red-600 tabular-nums dark:text-red-400">
+              <span className="ml-auto shrink-0 text-destructive tabular-nums">
                 {t('agents.network.errorCount', { count: `${errorCount}${more}` })}
               </span>
             )}

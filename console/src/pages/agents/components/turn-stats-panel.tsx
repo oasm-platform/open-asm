@@ -21,14 +21,14 @@ export function formatTokens(value: number | null | undefined): string {
   return compact.format(value ?? 0);
 }
 
-/** 850 -> "850ms", 4_200 -> "4.2s", 249_000 -> "4m9s" */
+/** 850 -> "850ms", 4_200 -> "4s", 249_000 -> "4m9s"; whole seconds only */
 export function formatDuration(ms: number | null | undefined): string {
   if (ms === null || ms === undefined) return '—';
   if (ms < 1_000) return `${Math.round(ms)}ms`;
-  const seconds = ms / 1_000;
-  if (seconds < 60) return `${seconds.toFixed(1)}s`;
-  const minutes = Math.floor(seconds / 60);
-  return `${minutes}m${Math.round(seconds - minutes * 60)}s`;
+  // Rounded once, so 59.6 s reads "1m0s", never "60s" or "0m60s"
+  const seconds = Math.round(ms / 1_000);
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m${seconds % 60}s`;
 }
 
 export function formatCost(usd: number | null | undefined): string {

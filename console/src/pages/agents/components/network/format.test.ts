@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  formatDuration,
   isErrorRequest,
   requestName,
   requestUrl,
@@ -8,6 +9,12 @@ import {
 } from './format';
 
 describe('network format', () => {
+  it('shows durations in ms, then in whole seconds', () => {
+    expect(formatDuration(91)).toBe('91 ms');
+    expect(formatDuration(1_500)).toBe('2 s');
+    expect(formatDuration(75_800)).toBe('76 s');
+  });
+
   it('names a request by its last path segment, like DevTools', () => {
     const base = { method: 'GET', host: 'api.acme.com', port: 443 };
     expect(requestName({ ...base, path: '/v1/users?id=***' })).toBe('users?id=***');

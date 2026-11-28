@@ -78,8 +78,9 @@ function useScrollableStrip(value: string | undefined) {
  * A tab row for a narrow, resizable panel. Labels differ a lot in length
  * between languages, so the triggers never depend on them fitting: each tab
  * is its icon (and count), the selected one adds its label when the strip
- * has room (`labelFrom`), and the strip scrolls with faded edges as a last
- * resort instead of wrapping or pushing what follows it out.
+ * has room (`labelFrom`), every tab does once it is wide (56rem), and the
+ * strip scrolls with faded edges as a last resort instead of wrapping or
+ * pushing what follows it out.
  */
 export function PanelTabStrip({
   value,
@@ -118,8 +119,17 @@ const LABEL_SHOWN: Record<LabelFrom, string> = {
 };
 
 /**
+ * An unselected tab's label: only once the strip is wide enough for every
+ * tab's icon, label and count (a desktop side panel, from 56rem); a narrow
+ * or mobile panel keeps icons only
+ */
+const LABEL_IDLE =
+  'sr-only @4xl/tabs:not-sr-only @4xl/tabs:max-w-40 @4xl/tabs:truncate';
+
+/**
  * One tab of a `PanelTabStrip`: its icon, the label as a tooltip, and the
- * label inline only while selected. The label stays the accessible name.
+ * label inline while selected, or on every tab of a wide strip. The label
+ * stays the accessible name.
  */
 export function PanelTab({
   value,
@@ -159,7 +169,7 @@ export function PanelTab({
                 // sr-only's reset (not-sr-only) sets white-space: normal;
                 // a label never wraps
                 'whitespace-nowrap',
-                active || !Icon ? LABEL_SHOWN[Icon ? labelFrom : 'always'] : 'sr-only',
+                active || !Icon ? LABEL_SHOWN[Icon ? labelFrom : 'always'] : LABEL_IDLE,
               )}
             >
               {label}

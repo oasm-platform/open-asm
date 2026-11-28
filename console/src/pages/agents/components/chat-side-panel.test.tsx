@@ -386,7 +386,7 @@ describe('ChatSidePanel', () => {
     expect(screen.getByText('No stats yet')).toBeInTheDocument();
   });
 
-  it('labels only the selected tab, the others keep theirs for screen readers', async () => {
+  it('labels the selected tab once there is room, and every tab on a wide strip', async () => {
     const user = userEvent.setup();
     render(<Harness />);
 
@@ -396,12 +396,15 @@ describe('ChatSidePanel', () => {
         .querySelector('[data-slot="tab-label"]')!;
     // Shown once the strip has room; never wrapping, whatever the language
     expect(label(/Plan/)).toHaveClass('@md/tabs:not-sr-only', 'whitespace-nowrap');
-    expect(label(/Stats/)).toHaveClass('sr-only', 'whitespace-nowrap');
+    // The others keep theirs for screen readers, and show it on a desktop-wide
+    // strip; a narrow or mobile one stays icons only
+    expect(label(/Stats/)).toHaveClass('sr-only', '@4xl/tabs:not-sr-only', 'whitespace-nowrap');
     expect(label(/Stats/)).not.toHaveClass('@md/tabs:not-sr-only');
 
     await user.click(screen.getByRole('tab', { name: /Stats/ }));
     expect(label(/Stats/)).toHaveClass('@md/tabs:not-sr-only');
     expect(label(/Plan/)).not.toHaveClass('@md/tabs:not-sr-only');
+    expect(label(/Plan/)).toHaveClass('@4xl/tabs:not-sr-only');
   });
 
   it('counts the HTTP requests on the Network tab, and flags failures', async () => {
@@ -444,7 +447,7 @@ describe('ChatSidePanel', () => {
     expect(tab).toHaveAccessibleName(/Errors: 1\+/);
   });
 
-  it("a tool card's link shows its requests even over a request's details", async () => {
+  it("a tool card's link shows its requests, folded, even with a request unfolded", async () => {
     const user = userEvent.setup();
     const rows = [httpRow('h1', 'k1', 200), httpRow('h2', 'k2', 200)];
     const props = {
@@ -458,13 +461,19 @@ describe('ChatSidePanel', () => {
     };
     const { rerender } = render(<Harness {...props} networkResetKey={0} />);
 
-    await user.click(screen.getByRole('button', { name: /^h1/ }));
-    expect(screen.getByRole('button', { name: 'Back to requests' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^GET\s*h1/ }));
+    expect(screen.getByRole('button', { name: /^GET\s*h1/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
 
     rerender(<Harness {...props} networkToolCallId="k2" networkResetKey={1} />);
-    expect(screen.queryByRole('button', { name: 'Back to requests' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^GET\s*h1/ })).toBeNull();
     expect(screen.getByText('Command: curl https://b.example.com')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^h2/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^GET\s*h2/ })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
   });
 
   it('starts the Network tab over in another conversation', async () => {

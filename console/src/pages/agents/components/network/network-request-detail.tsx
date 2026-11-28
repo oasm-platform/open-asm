@@ -14,35 +14,45 @@ import {
 } from '@/services/apis/gen/queries';
 import { formatBytes } from '@/utils/format-bytes';
 import { format } from 'date-fns';
-import { ArrowLeft, LocateFixed, Lock } from 'lucide-react';
-import { useState, type ReactNode, type Ref } from 'react';
+import { LocateFixed, Lock } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
 import { PanelTab, PanelTabStrip } from '../panel-tab-strip';
 import {
   base64Size,
-  displayMethod,
   formatDuration,
   isErrorRequest,
   isTunnel,
-  requestName,
   requestUrl,
 } from './format';
+import { MethodBadge } from './method-badge';
 import { StatusCell } from './status-cell';
 
 type DetailTab = 'headers' | 'payload' | 'response' | 'timing';
 
+/** Titled like the other side panel tabs' sections */
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="space-y-1.5">
-      <h3 className="text-xs font-semibold text-foreground">{title}</h3>
+    <section className="space-y-2">
+      <h3 className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+        {title}
+      </h3>
       {children}
     </section>
   );
 }
 
-/** Name/value rows; the names column shrinks first on a narrow panel */
-function Pairs({ children }: { children: ReactNode }) {
+/**
+ * Name/value rows; the names column shrinks first on a narrow panel. `mono`
+ * for raw protocol text (headers), which reads as code elsewhere in the app
+ */
+function Pairs({ children, mono = false }: { children: ReactNode; mono?: boolean }) {
   return (
-    <dl className="grid grid-cols-[minmax(5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-1 font-mono text-[11px] leading-relaxed">
+    <dl
+      className={cn(
+        'grid grid-cols-[minmax(5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-1.5 leading-relaxed',
+        mono ? 'font-mono text-xs' : 'text-sm',
+      )}
+    >
       {children}
     </dl>
   );
@@ -63,13 +73,13 @@ function HeaderList({ headers }: { headers: AgentHttpHeaderDto[] }) {
   const t = useT();
   if (headers.length === 0) {
     return (
-      <p className="text-xs text-muted-foreground">
+      <p className="text-sm text-muted-foreground">
         {t('agents.network.detail.noHeaders')}
       </p>
     );
   }
   return (
-    <Pairs>
+    <Pairs mono>
       {headers.map((header, i) => (
         <Pair key={`${header.name}-${i}`} name={header.name}>
           {header.value}
@@ -92,7 +102,7 @@ function Body({
 }) {
   const t = useT();
   const [showBase64, setShowBase64] = useState(false);
-  if (!body) return <p className="text-xs text-muted-foreground">{empty}</p>;
+  if (!body) return <p className="text-sm text-muted-foreground">{empty}</p>;
   const binary = encoding === 'base64';
   return (
     <div className="space-y-2">
@@ -100,7 +110,7 @@ function Body({
         <div className="flex flex-wrap items-center gap-2">
           {binary && (
             <>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-sm text-muted-foreground">
                 {t('agents.network.detail.binary', {
                   size: formatBytes(base64Size(body)),
                 })}
@@ -108,7 +118,6 @@ function Body({
               <Button
                 variant="outline"
                 size="sm"
-                className="h-6 px-2 text-xs"
                 aria-pressed={showBase64}
                 onClick={() => setShowBase64((v) => !v)}
               >
@@ -126,7 +135,7 @@ function Body({
         </div>
       )}
       {(!binary || showBase64) && (
-        <pre className="overflow-x-auto rounded-md border bg-muted/30 p-2.5 font-mono text-[11px] leading-relaxed whitespace-pre-wrap break-all">
+        <pre className="max-h-80 overflow-auto rounded-lg bg-muted/60 p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap break-all">
           {body}
         </pre>
       )}
@@ -137,8 +146,8 @@ function Body({
 function TunnelNote() {
   const t = useT();
   return (
-    <p className="flex gap-2 rounded-md border border-dashed p-2.5 text-xs text-muted-foreground">
-      <Lock className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+    <p className="flex gap-2.5 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+      <Lock className="mt-0.5 size-4 shrink-0" aria-hidden />
       {t('agents.network.detail.tunnelNote')}
     </p>
   );
@@ -155,21 +164,17 @@ function DetailSkeleton() {
 }
 
 /**
- * One request inside the Network tab, in place of the list: what it was,
- * the command that made it, and DevTools' Headers / Payload / Response /
- * Timing views. A tunnel has only metadata, so it gets Headers and Timing.
+ * One request unfolded under its row in the Network tab: the command that
+ * made it, and DevTools' Headers / Payload / Response / Timing views. A
+ * tunnel has only metadata, so it gets Headers and Timing.
  */
 export function NetworkRequestDetail({
   request,
-  onBack,
   onShowInChat,
-  backRef,
 }: {
-  /** The row picked in the list; the rest loads from the detail API */
+  /** The unfolded row; the rest loads from the detail API */
   request: AgentHttpRequestListItemDto;
-  onBack: () => void;
   onShowInChat?: (toolCallId: string) => void;
-  backRef?: Ref<HTMLButtonElement>;
 }) {
   const t = useT();
   const {
@@ -194,44 +199,17 @@ export function NetworkRequestDetail({
   const pending = isLoading ? (
     <DetailSkeleton />
   ) : isError || !data ? (
-    <p role="status" className="text-xs text-muted-foreground">
+    <p role="status" className="text-sm text-muted-foreground">
       {t('agents.network.detail.loadFailed')}
     </p>
   ) : null;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-10 shrink-0 items-center gap-2 border-b px-2">
-        <Button
-          ref={backRef}
-          variant="ghost"
-          size="icon-xs"
-          className="shrink-0 text-muted-foreground"
-          aria-label={t('agents.network.detail.back')}
-          title={t('agents.network.detail.back')}
-          onClick={onBack}
-        >
-          <ArrowLeft />
-        </Button>
-        <span className="shrink-0 font-mono text-[11px] font-medium text-muted-foreground">
-          {displayMethod(request.method)}
-        </span>
-        <h3
-          className={cn(
-            'min-w-0 flex-1 truncate font-mono text-xs font-medium',
-            isErrorRequest(request) && 'text-red-600 dark:text-red-400',
-          )}
-          title={requestUrl(request)}
-        >
-          {requestName(request)}
-        </h3>
-        <StatusCell request={request} className="shrink-0 text-[11px]" />
-      </div>
-
+    <div className="border-t border-border/60 bg-muted/20">
       {data?.command && (
-        <div className="flex shrink-0 items-center gap-2 border-b bg-muted/30 px-3 py-1.5">
+        <div className="flex items-center gap-2 border-b border-border/60 px-3 py-1.5">
           <code
-            className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground"
+            className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground"
             title={data.command}
           >
             <span className="text-emerald-600 dark:text-emerald-400">$ </span>
@@ -241,10 +219,10 @@ export function NetworkRequestDetail({
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 shrink-0 gap-1 px-1.5 text-[11px]"
+              className="shrink-0 text-muted-foreground"
               onClick={() => onShowInChat(request.toolCallId!)}
             >
-              <LocateFixed className="size-3" />
+              <LocateFixed />
               {t('agents.network.detail.showInChat')}
             </Button>
           )}
@@ -254,9 +232,9 @@ export function NetworkRequestDetail({
       <Tabs
         value={tab}
         onValueChange={(value) => setTab(value as DetailTab)}
-        className="min-h-0 flex-1 gap-0"
+        className="gap-0"
       >
-        <div className="@container/tabs flex h-9 shrink-0 items-center border-b px-3">
+        <div className="@container/tabs flex h-9 items-center border-b border-border/60 px-3">
           <PanelTabStrip
             value={tab}
             className="gap-4"
@@ -266,14 +244,12 @@ export function NetworkRequestDetail({
               value="headers"
               active={tab === 'headers'}
               label={t('agents.network.detail.headers')}
-              className="text-xs"
             />
             {!tunnel && (
               <PanelTab
                 value="payload"
                 active={tab === 'payload'}
                 label={t('agents.network.detail.payload')}
-                className="text-xs"
               />
             )}
             {!tunnel && (
@@ -281,21 +257,19 @@ export function NetworkRequestDetail({
                 value="response"
                 active={tab === 'response'}
                 label={t('agents.network.detail.response')}
-                className="text-xs"
               />
             )}
             <PanelTab
               value="timing"
               active={tab === 'timing'}
               label={t('agents.network.detail.timing')}
-              className="text-xs"
             />
           </PanelTabStrip>
         </div>
 
         <TabsContent
           value="headers"
-          className="min-h-0 space-y-4 overflow-y-auto px-3 py-3"
+          className="space-y-5 px-3 py-3"
         >
           <Section title={t('agents.network.detail.general')}>
             <Pairs>
@@ -303,7 +277,7 @@ export function NetworkRequestDetail({
                 {requestUrl(request)}
               </Pair>
               <Pair name={t('agents.network.detail.method')}>
-                {displayMethod(request.method)}
+                <MethodBadge method={request.method} />
               </Pair>
               <Pair name={t('agents.network.detail.status')}>
                 <StatusCell request={request} />
@@ -313,7 +287,7 @@ export function NetworkRequestDetail({
               </Pair>
               {request.error && (
                 <Pair name={t('agents.network.detail.error')}>
-                  <span className="text-red-600 dark:text-red-400">
+                  <span className="text-destructive">
                     {request.error}
                   </span>
                 </Pair>
@@ -349,7 +323,7 @@ export function NetworkRequestDetail({
         {!tunnel && (
           <TabsContent
             value="payload"
-            className="min-h-0 overflow-y-auto px-3 py-3"
+            className="px-3 py-3"
           >
             {pending ?? (
               <Body
@@ -364,7 +338,7 @@ export function NetworkRequestDetail({
         {!tunnel && (
           <TabsContent
             value="response"
-            className="min-h-0 overflow-y-auto px-3 py-3"
+            className="px-3 py-3"
           >
             {pending ?? (
               <Body
@@ -378,20 +352,20 @@ export function NetworkRequestDetail({
         )}
         <TabsContent
           value="timing"
-          className="min-h-0 space-y-4 overflow-y-auto px-3 py-3"
+          className="space-y-5 px-3 py-3"
         >
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
               <span>{t('agents.network.detail.duration')}</span>
-              <span className="font-mono tabular-nums text-foreground">
+              <span className="font-medium tabular-nums text-foreground">
                 {formatDuration(request.durationMs)}
               </span>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-muted">
+            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
               <div
                 className={cn(
                   'h-full w-full rounded-full',
-                  isErrorRequest(request) ? 'bg-red-500/70' : 'bg-sky-500/70',
+                  isErrorRequest(request) ? 'bg-destructive/70' : 'bg-primary/70',
                 )}
               />
             </div>
