@@ -143,6 +143,22 @@ describe('useConversationHttpRequests', () => {
       expect(fn).toHaveBeenCalledTimes(3);
     });
 
+    it('drops a pending throttled reload on unmount', async () => {
+      const { fn, unmount } = await mounted();
+      act(() => liveEvents.emit(recorded('c1')));
+      await waitFor(() => expect(fn).toHaveBeenCalledTimes(2));
+
+      const schedule = vi.spyOn(globalThis, 'setTimeout');
+      const clear = vi.spyOn(globalThis, 'clearTimeout');
+      act(() => liveEvents.emit(recorded('c1')));
+      const timer = schedule.mock.results.at(-1)?.value as unknown;
+      expect(timer).toBeDefined();
+
+      unmount();
+
+      expect(clear).toHaveBeenCalledWith(timer);
+    });
+
     it('ignores other conversations and other event types', async () => {
       const { fn } = await mounted();
       act(() => {

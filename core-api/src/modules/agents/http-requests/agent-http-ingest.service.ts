@@ -210,42 +210,56 @@ export class AgentHttpIngestService {
       list.push(row);
       byConversation.set(row.conversationId, list);
     }
-    await Promise.allSettled(
-      [...byConversation].map(([conversationId, list]) =>
-        // `actor.id` is what `/events/stream` routes on: only the owner's
-        // connection to this workspace receives it.
-        this.eventBridge.publishSafely(
-          EVENT_CATALOG.agent.http_requests.recorded,
-          {
-            workspaceId: list[0].workspaceId,
-            outcome: AuditOutcome.Success,
-            actor: { type: AuditActorType.Agent, id: list[0].createdBy },
-            resourceType: 'conversation',
-            resourceId: conversationId,
-            metadata: { count: list.length },
-          },
-        ),
-      ),
-    );
+    // Concurrent, so the inline push never waits on the bus XADD. Neither
+    // helper rejects, so one path failing cannot block the other.
     await Promise.all(
-      [...byConversation].map(async ([conversationId, list]) => {
-        const body =
-          list.length > MAX_PUSH_ROWS
-            ? { refetch: true }
-            : { requests: list.map((row) => toListItem(row)) };
-        try {
-          await this.redisService.publish(
-            httpLogChannel(conversationId),
-            JSON.stringify(body),
-          );
-        } catch (error) {
-          this.logger.warn(
-            `Could not announce agent HTTP requests of ${conversationId}: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
-          );
-        }
-      }),
+      [...byConversation].flatMap(([conversationId, list]) => [
+        this.pushToChatStream(conversationId, list),
+        this.publishRecorded(conversationId, list),
+      ]),
+    );
+  }
+
+  private async pushToChatStream(
+    conversationId: string,
+    list: AgentHttpRequestRow[],
+  ): Promise<void> {
+    const body =
+      list.length > MAX_PUSH_ROWS
+        ? { refetch: true }
+        : { requests: list.map((row) => toListItem(row)) };
+    try {
+      await this.redisService.publish(
+        httpLogChannel(conversationId),
+        JSON.stringify(body),
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Could not announce agent HTTP requests of ${conversationId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  /**
+   * `actor.id` is what `/events/stream` routes on: only the owner's connection
+   * to this workspace receives it. `publishSafely` logs and swallows failures.
+   */
+  private async publishRecorded(
+    conversationId: string,
+    list: AgentHttpRequestRow[],
+  ): Promise<void> {
+    await this.eventBridge.publishSafely(
+      EVENT_CATALOG.agent.http_requests.recorded,
+      {
+        workspaceId: list[0].workspaceId,
+        outcome: AuditOutcome.Success,
+        actor: { type: AuditActorType.Agent, id: list[0].createdBy },
+        resourceType: 'conversation',
+        resourceId: conversationId,
+        metadata: { count: list.length },
+      },
     );
   }
 }

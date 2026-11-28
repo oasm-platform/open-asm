@@ -19,7 +19,7 @@
 
 ## Invariants
 
-- **Allowlist, not denylist.** Only `notification.*`, `worker.*`, `target.*`, `workflow.*` reach browsers. The stream also carries API key rotations, permission changes and audit exports, so a new catalog event is private until someone adds it to `CLIENT_EVENTS`.
+- **Allowlist, not denylist.** Only `notification.*`, `worker.*`, `target.*`, `workflow.*` reach browsers. The stream also carries API key rotations, permission changes and audit exports, so a new catalog event is private until someone adds it to `CLIENT_EVENTS`. The one exception is `OWNER_ONLY_EVENTS` (below): sent without an allowlist entry, but only to the actor's own connection.
 - **Ids only, never payloads.** A client gets name, ids and time and refetches through REST, which applies permissions. The only metadata passed through is `metadata.joinKeyId` on `worker.joined`. Do not add `payload`, `changes`, actor or IP fields.
 - Workspace events are matched on `data.workspaceId`, decoded with the bridge's own `parseData`, so an entry missing `workspaceId` or `outcome` is not forwarded.
 - Membership is the only check for `CLIENT_EVENTS`: any member, whatever their permissions, sees the ids/types of allowlisted events of that workspace.
@@ -37,6 +37,7 @@
 
 - `notification.*` also matches the bridge leaves `notification.sent` / `notification.failed`. Nothing publishes them today; if something starts to, they will reach every member's tab.
 - All listener state is in memory per replica; there is nothing to clean up in Redis.
+- `agent.http_requests.recorded` adds one bus entry per conversation per worker flush (at most about one per second per running command). If that volume ever matters, throttle it per conversation in agents ingest, server-side.
 
 ## Testing
 

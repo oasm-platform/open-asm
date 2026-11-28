@@ -155,8 +155,11 @@ function connect(workspaceId: string | null) {
  *
  *   useLiveEvents(['worker.*', 'target.created'], () => refetch());
  *
- * Only events the server allowlists (`core-api/src/modules/events/client-events.ts`)
- * ever arrive; workspace events only once a workspace is selected.
+ * Only events the server allowlists (`CLIENT_EVENTS` in
+ * `core-api/src/modules/events/client-events.ts`) ever arrive, plus the
+ * `OWNER_ONLY_EVENTS` addressed to this user (e.g.
+ * `agent.http_requests.recorded` for their own conversations); workspace
+ * events only once a workspace is selected.
  * `handler` may change between renders without reconnecting.
  */
 export function useLiveEvents(

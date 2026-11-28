@@ -641,12 +641,28 @@ describe('AgentHttpIngestService', () => {
       expect(h.publishSafely).not.toHaveBeenCalled();
     });
 
-    it('still accepts the batch when the bus publish rejects', async () => {
+    it('pushes to the chat stream without waiting for the bus publish', async () => {
+      let release!: () => void;
       const h = setup({
-        publishSafely: jest.fn(() => Promise.reject(new Error('bus down'))),
+        publishSafely: jest.fn(
+          () => new Promise<null>((resolve) => (release = () => resolve(null))),
+        ),
+      });
+      const done = h.service.ingest(WORKER, [log()], 0);
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(h.publishSafely).toHaveBeenCalledTimes(1);
+      expect(h.publish).toHaveBeenCalledTimes(1);
+      release();
+      await expect(done).resolves.toEqual({ accepted: 1, rejected: 0 });
+    });
+
+    it('still publishes on the bus when the chat push fails', async () => {
+      const h = setup({
+        publish: jest.fn(() => Promise.reject(new Error('redis down'))),
       });
       const result = await h.service.ingest(WORKER, [log()], 0);
       expect(result).toEqual({ accepted: 1, rejected: 0 });
+      expect(h.publishSafely).toHaveBeenCalledTimes(1);
     });
   });
 });
