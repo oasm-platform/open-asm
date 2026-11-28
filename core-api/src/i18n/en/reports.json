@@ -4,9 +4,7 @@
   "severity.medium": "Medium",
   "severity.low": "Low",
   "severity.info": "Info",
-  "toast.summaryGenerated": "Summary report generated successfully",
   "toast.summaryFailed": "Failed to generate summary report",
-  "toast.vulnGenerated": "Vulnerability report generated successfully",
   "toast.vulnFailed": "Failed to generate vulnerability report",
   "toast.deleted": "Report deleted successfully",
   "toast.deleteFailed": "Failed to delete report",
@@ -30,5 +28,17 @@
   "tabs.all": "All",
   "tabs.summary": "Summary",
   "tabs.vulnerability": "Vulnerability",
-  "tabs.templates": "Templates"
+  "tabs.templates": "Templates",
+  "toast.queued": "Report queued. You will get a notification when it is ready.",
+  "toast.scheduleCreated": "Report schedule saved",
+  "toast.scheduleFailed": "Failed to save report schedule",
+  "toast.scheduleDeleted": "Report schedule deleted",
+  "generate.schedule": "Repeat on a schedule",
+  "generate.saveSchedule": "Save schedule",
+  "tabs.schedules": "Schedules",
+  "schedules.columns.report": "Report",
+  "schedules.columns.runs": "Runs",
+  "schedules.empty": "No report schedules yet",
+  "schedules.delete.title": "Delete schedule",
+  "schedules.delete.description": "Stop generating this report on its schedule?"
 }

@@ -5,5 +5,7 @@
   "SCAN_INCOMPLETE": "Quá trình quét {targetValue} chưa hoàn tất. {details}",
   "NEW_VULNERABILITY_FOUND": "Phát hiện {count} lỗ hổng mới trên {assetValue}",
   "WORKSPACE_INVITATION": "{action, select, created {Bạn được mời vào workspace {workspaceName}} accepted {{userName} đã chấp nhận lời mời vào workspace {workspaceName}} declined {{userName} đã từ chối lời mời vào workspace {workspaceName}} other {Lời mời tham gia workspace}}",
-  "NEW_URL_FOUND": "Phát hiện {count} URL mới trên {targetValue}"
+  "NEW_URL_FOUND": "Phát hiện {count} URL mới trên {targetValue}",
+  "REPORT_GENERATED": "Báo cáo {fileName} đã sẵn sàng",
+  "REPORT_FAILED": "Tạo báo cáo thất bại: {error}"
 }

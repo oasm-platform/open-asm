@@ -863,6 +863,7 @@ export const ArtifactDtoSource = {
   upload: 'upload',
   agent: 'agent',
   template: 'template',
+  report: 'report',
 } as const;
 
 export type ArtifactDtoShareType =
@@ -917,6 +918,7 @@ export const ArtifactUsageBySourceDtoSource = {
   upload: 'upload',
   agent: 'agent',
   template: 'template',
+  report: 'report',
 } as const;
 
 export type ArtifactUsageBySourceDto = {
@@ -7558,10 +7560,6 @@ export type ReportResponseDto = {
   fileName: string;
   type: ReportResponseDtoType;
   createdAt: string;
-  /** Presigned S3 download URL (hour-bucketed signature, default 2 days) */
-  downloadUrl: string;
-  /** Presigned URL lifetime in seconds */
-  downloadExpiresIn: number;
 };
 
 export type GetManyReportResponseDtoDto = {
@@ -7612,6 +7610,80 @@ export type GenerateVulReportBodyDto = {
 export type GenerateQueryReportBodyDto = {
   /** Saved attack surface query to render */
   savedQueryId: string;
+};
+
+export type ReportScheduleOptionsDtoMinSeverity =
+  (typeof ReportScheduleOptionsDtoMinSeverity)[keyof typeof ReportScheduleOptionsDtoMinSeverity];
+
+export const ReportScheduleOptionsDtoMinSeverity = {
+  CRITICAL: 'CRITICAL',
+  HIGH: 'HIGH',
+  MEDIUM: 'MEDIUM',
+  LOW: 'LOW',
+  INFO: 'INFO',
+} as const;
+
+export type ReportScheduleOptionsDto = {
+  targetIds?: string[];
+  minSeverity?: ReportScheduleOptionsDtoMinSeverity;
+};
+
+export type ReportScheduleResponseDtoType =
+  (typeof ReportScheduleResponseDtoType)[keyof typeof ReportScheduleResponseDtoType];
+
+export const ReportScheduleResponseDtoType = {
+  SUMMARY: 'SUMMARY',
+  VULNERABILITY: 'VULNERABILITY',
+} as const;
+
+export type ReportScheduleResponseDto = {
+  id: string;
+  /** Owner: the report runs with their permissions */
+  userId: string;
+  type: ReportScheduleResponseDtoType;
+  /** 5-field cron expression in UTC */
+  cron: string;
+  options: ReportScheduleOptionsDto;
+  createdAt: string;
+};
+
+export type CreateReportScheduleDtoType =
+  (typeof CreateReportScheduleDtoType)[keyof typeof CreateReportScheduleDtoType];
+
+export const CreateReportScheduleDtoType = {
+  SUMMARY: 'SUMMARY',
+  VULNERABILITY: 'VULNERABILITY',
+} as const;
+
+/**
+ * Vulnerability report only
+ */
+export type CreateReportScheduleDtoMinSeverity =
+  (typeof CreateReportScheduleDtoMinSeverity)[keyof typeof CreateReportScheduleDtoMinSeverity];
+
+export const CreateReportScheduleDtoMinSeverity = {
+  CRITICAL: 'CRITICAL',
+  HIGH: 'HIGH',
+  MEDIUM: 'MEDIUM',
+  LOW: 'LOW',
+  INFO: 'INFO',
+} as const;
+
+export type CreateReportScheduleDto = {
+  type: CreateReportScheduleDtoType;
+  /** 5-field cron expression in UTC, at most hourly (a fixed minute) */
+  cron: string;
+  /** Target IDs to filter */
+  targetIds?: string[];
+  /** Vulnerability report only */
+  minSeverity?: CreateReportScheduleDtoMinSeverity;
+};
+
+export type ReportDownloadResponseDto = {
+  /** Presigned URL that downloads the PDF as an attachment */
+  url: string;
+  /** URL lifetime in seconds */
+  expiresIn: number;
 };
 
 /**
@@ -60047,7 +60119,7 @@ export function useReportsControllerPreviewVulReport<
 }
 
 /**
- * Generates a summary (Attack Surface Discovery) PDF report.
+ * Queues a summary (Attack Surface Discovery) PDF report; a notification tells you when it is ready.
  * @summary Generate summary PDF report
  */
 export const reportsControllerGenerateSummaryReport = (
@@ -60142,7 +60214,7 @@ export const useReportsControllerGenerateSummaryReport = <
 };
 
 /**
- * Generates a vulnerability assessment PDF report.
+ * Queues a vulnerability assessment PDF report; a notification tells you when it is ready.
  * @summary Generate vulnerability PDF report
  */
 export const reportsControllerGenerateVulReport = (
@@ -60237,7 +60309,7 @@ export const useReportsControllerGenerateVulReport = <
 };
 
 /**
- * Renders a saved attack surface query (one table per query) as a PDF report, run with your current permissions.
+ * Queues a saved attack surface query (one table per query) as a PDF report, run with your current permissions.
  * @summary Generate query PDF report
  */
 export const reportsControllerGenerateQueryReport = (
@@ -60330,6 +60402,512 @@ export const useReportsControllerGenerateQueryReport = <
     queryClient,
   );
 };
+
+/**
+ * @summary List report schedules
+ */
+export const reportsControllerListSchedules = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ReportScheduleResponseDto[]>(
+    { url: `/api/reports/schedules`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getReportsControllerListSchedulesQueryKey = () => {
+  return [`/api/reports/schedules`] as const;
+};
+
+export const getReportsControllerListSchedulesQueryOptions = <
+  TData = Awaited<ReturnType<typeof reportsControllerListSchedules>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof reportsControllerListSchedules>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getReportsControllerListSchedulesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof reportsControllerListSchedules>>
+  > = ({ signal }) => reportsControllerListSchedules(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof reportsControllerListSchedules>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ReportsControllerListSchedulesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof reportsControllerListSchedules>>
+>;
+export type ReportsControllerListSchedulesQueryError = unknown;
+
+export function useReportsControllerListSchedules<
+  TData = Awaited<ReturnType<typeof reportsControllerListSchedules>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerListSchedules>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof reportsControllerListSchedules>>,
+          TError,
+          Awaited<ReturnType<typeof reportsControllerListSchedules>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useReportsControllerListSchedules<
+  TData = Awaited<ReturnType<typeof reportsControllerListSchedules>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerListSchedules>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof reportsControllerListSchedules>>,
+          TError,
+          Awaited<ReturnType<typeof reportsControllerListSchedules>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useReportsControllerListSchedules<
+  TData = Awaited<ReturnType<typeof reportsControllerListSchedules>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerListSchedules>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List report schedules
+ */
+
+export function useReportsControllerListSchedules<
+  TData = Awaited<ReturnType<typeof reportsControllerListSchedules>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerListSchedules>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getReportsControllerListSchedulesQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Generates the report on a cron (UTC), with your permissions at each run.
+ * @summary Create report schedule
+ */
+export const reportsControllerCreateSchedule = (
+  createReportScheduleDto: CreateReportScheduleDto,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ReportScheduleResponseDto>(
+    {
+      url: `/api/reports/schedules`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createReportScheduleDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getReportsControllerCreateScheduleMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reportsControllerCreateSchedule>>,
+    TError,
+    { data: CreateReportScheduleDto },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reportsControllerCreateSchedule>>,
+  TError,
+  { data: CreateReportScheduleDto },
+  TContext
+> => {
+  const mutationKey = ['reportsControllerCreateSchedule'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reportsControllerCreateSchedule>>,
+    { data: CreateReportScheduleDto }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return reportsControllerCreateSchedule(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReportsControllerCreateScheduleMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reportsControllerCreateSchedule>>
+>;
+export type ReportsControllerCreateScheduleMutationBody =
+  CreateReportScheduleDto;
+export type ReportsControllerCreateScheduleMutationError = unknown;
+
+/**
+ * @summary Create report schedule
+ */
+export const useReportsControllerCreateSchedule = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof reportsControllerCreateSchedule>>,
+      TError,
+      { data: CreateReportScheduleDto },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof reportsControllerCreateSchedule>>,
+  TError,
+  { data: CreateReportScheduleDto },
+  TContext
+> => {
+  return useMutation(
+    getReportsControllerCreateScheduleMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * @summary Delete report schedule
+ */
+export const reportsControllerDeleteSchedule = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<DefaultMessageResponseDto>(
+    { url: `/api/reports/schedules/${id}`, method: 'DELETE', signal },
+    options,
+  );
+};
+
+export const getReportsControllerDeleteScheduleMutationOptions = <
+  TError = unknown,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reportsControllerDeleteSchedule>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reportsControllerDeleteSchedule>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ['reportsControllerDeleteSchedule'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reportsControllerDeleteSchedule>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return reportsControllerDeleteSchedule(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReportsControllerDeleteScheduleMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reportsControllerDeleteSchedule>>
+>;
+
+export type ReportsControllerDeleteScheduleMutationError = unknown;
+
+/**
+ * @summary Delete report schedule
+ */
+export const useReportsControllerDeleteSchedule = <
+  TError = unknown,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof reportsControllerDeleteSchedule>>,
+      TError,
+      { id: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof reportsControllerDeleteSchedule>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(
+    getReportsControllerDeleteScheduleMutationOptions(options),
+    queryClient,
+  );
+};
+
+/**
+ * Returns a presigned URL that downloads the report PDF as an attachment.
+ * @summary Get a report download URL
+ */
+export const reportsControllerGetDownloadUrl = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<ReportDownloadResponseDto>(
+    { url: `/api/reports/${id}/download`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getReportsControllerGetDownloadUrlQueryKey = (id: string) => {
+  return [`/api/reports/${id}/download`] as const;
+};
+
+export const getReportsControllerGetDownloadUrlQueryOptions = <
+  TData = Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getReportsControllerGetDownloadUrlQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>
+  > = ({ signal }) =>
+    reportsControllerGetDownloadUrl(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ReportsControllerGetDownloadUrlQueryResult = NonNullable<
+  Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>
+>;
+export type ReportsControllerGetDownloadUrlQueryError = unknown;
+
+export function useReportsControllerGetDownloadUrl<
+  TData = Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+          TError,
+          Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useReportsControllerGetDownloadUrl<
+  TData = Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+          TError,
+          Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useReportsControllerGetDownloadUrl<
+  TData = Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get a report download URL
+ */
+
+export function useReportsControllerGetDownloadUrl<
+  TData = Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof reportsControllerGetDownloadUrl>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getReportsControllerGetDownloadUrlQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
 
 /**
  * Deletes a generated report PDF.
@@ -63049,6 +63627,336 @@ export function useEventsControllerStream<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions = getEventsControllerStreamQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Language codes the backend has translations for. The console uses this to offer a language switcher.
+ * @summary List supported languages
+ */
+export const i18nDictionaryControllerGetLanguages = (
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/i18n/languages`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getI18nDictionaryControllerGetLanguagesQueryKey = () => {
+  return [`/api/i18n/languages`] as const;
+};
+
+export const getI18nDictionaryControllerGetLanguagesQueryOptions = <
+  TData = Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof orvalClient>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getI18nDictionaryControllerGetLanguagesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>
+  > = ({ signal }) =>
+    i18nDictionaryControllerGetLanguages(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type I18nDictionaryControllerGetLanguagesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>
+>;
+export type I18nDictionaryControllerGetLanguagesQueryError = unknown;
+
+export function useI18nDictionaryControllerGetLanguages<
+  TData = Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+          TError,
+          Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useI18nDictionaryControllerGetLanguages<
+  TData = Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+          TError,
+          Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useI18nDictionaryControllerGetLanguages<
+  TData = Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List supported languages
+ */
+
+export function useI18nDictionaryControllerGetLanguages<
+  TData = Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof i18nDictionaryControllerGetLanguages>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getI18nDictionaryControllerGetLanguagesQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Merged namespaces from backend memory (same source the API translates with). Missing languages fall back only when the service resolves them; unknown codes give 404.
+ * @summary Get UI dictionary for a language
+ */
+export const i18nDictionaryControllerGetDictionary = (
+  lang: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AppResponseSerialization>(
+    { url: `/api/i18n/${lang}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getI18nDictionaryControllerGetDictionaryQueryKey = (
+  lang: string,
+) => {
+  return [`/api/i18n/${lang}`] as const;
+};
+
+export const getI18nDictionaryControllerGetDictionaryQueryOptions = <
+  TData = Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+  TError = unknown,
+>(
+  lang: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getI18nDictionaryControllerGetDictionaryQueryKey(lang);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>
+  > = ({ signal }) =>
+    i18nDictionaryControllerGetDictionary(lang, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: lang !== null && lang !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type I18nDictionaryControllerGetDictionaryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>
+>;
+export type I18nDictionaryControllerGetDictionaryQueryError = unknown;
+
+export function useI18nDictionaryControllerGetDictionary<
+  TData = Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+  TError = unknown,
+>(
+  lang: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+          TError,
+          Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useI18nDictionaryControllerGetDictionary<
+  TData = Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+  TError = unknown,
+>(
+  lang: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+          TError,
+          Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useI18nDictionaryControllerGetDictionary<
+  TData = Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+  TError = unknown,
+>(
+  lang: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get UI dictionary for a language
+ */
+
+export function useI18nDictionaryControllerGetDictionary<
+  TData = Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+  TError = unknown,
+>(
+  lang: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof i18nDictionaryControllerGetDictionary>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getI18nDictionaryControllerGetDictionaryQueryOptions(
+    lang,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

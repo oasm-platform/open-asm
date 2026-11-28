@@ -4,9 +4,7 @@
   "severity.medium": "중간",
   "severity.low": "낮음",
   "severity.info": "정보",
-  "toast.summaryGenerated": "요약 보고서를 생성했습니다",
   "toast.summaryFailed": "요약 보고서를 생성하지 못했습니다",
-  "toast.vulnGenerated": "취약점 보고서를 생성했습니다",
   "toast.vulnFailed": "취약점 보고서를 생성하지 못했습니다",
   "toast.deleted": "보고서를 삭제했습니다",
   "toast.deleteFailed": "보고서를 삭제하지 못했습니다",
@@ -30,5 +28,17 @@
   "tabs.all": "전체",
   "tabs.summary": "요약",
   "tabs.vulnerability": "취약점",
-  "tabs.templates": "템플릿"
+  "tabs.templates": "템플릿",
+  "toast.queued": "보고서를 대기열에 추가했습니다. 준비되면 알림을 보내드립니다.",
+  "toast.scheduleCreated": "보고서 일정을 저장했습니다",
+  "toast.scheduleFailed": "보고서 일정을 저장하지 못했습니다",
+  "toast.scheduleDeleted": "보고서 일정을 삭제했습니다",
+  "generate.schedule": "일정에 따라 반복",
+  "generate.saveSchedule": "일정 저장",
+  "tabs.schedules": "일정",
+  "schedules.columns.report": "보고서",
+  "schedules.columns.runs": "실행",
+  "schedules.empty": "보고서 일정이 없습니다",
+  "schedules.delete.title": "일정 삭제",
+  "schedules.delete.description": "이 보고서의 예약 생성을 중지하시겠습니까?"
 }

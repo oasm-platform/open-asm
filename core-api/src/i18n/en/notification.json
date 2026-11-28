@@ -5,5 +5,7 @@
   "SCAN_INCOMPLETE": "Scan of {targetValue} did not finish. {details}",
   "NEW_VULNERABILITY_FOUND": "{count, plural, =1 {# new vulnerability} other {# new vulnerabilities}} found on {assetValue}",
   "WORKSPACE_INVITATION": "{action, select, created {You have been invited to workspace {workspaceName}} accepted {{userName} accepted your invitation to workspace {workspaceName}} declined {{userName} declined your invitation to workspace {workspaceName}} other {Workspace invitation}}",
-  "NEW_URL_FOUND": "{count, plural, =1 {# new URL} other {# new URLs}} found on {targetValue}"
+  "NEW_URL_FOUND": "{count, plural, =1 {# new URL} other {# new URLs}} found on {targetValue}",
+  "REPORT_GENERATED": "Report {fileName} is ready",
+  "REPORT_FAILED": "Report generation failed: {error}"
 }

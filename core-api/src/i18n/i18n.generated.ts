@@ -1914,9 +1914,11 @@ export type I18nTranslations = {
         "recordSameValuesAlreadyExists": string;
         "repliedCommentDoesNotBelongThread": string;
         "reportNotFound": string;
+        "reportScheduleNotFound": string;
         "repositoriesCanOnlyListedIntegrationsSource": string;
         "repositoriesOnlyExistGitOrganizationTargets": string;
         "requiresArtifactManage": string;
+        "requiresReportWrite": string;
         "reservedRoot": string;
         "resolutionRequiredMarkIssue": string;
         "resourceTypeResourceIdMustGiven": string;
@@ -2663,6 +2665,8 @@ export type I18nTranslations = {
         "NEW_VULNERABILITY_FOUND": string;
         "WORKSPACE_INVITATION": string;
         "NEW_URL_FOUND": string;
+        "REPORT_GENERATED": string;
+        "REPORT_FAILED": string;
     };
     "projects": {
         "tabs.overview": string;
@@ -3112,9 +3116,7 @@ export type I18nTranslations = {
         "severity.medium": string;
         "severity.low": string;
         "severity.info": string;
-        "toast.summaryGenerated": string;
         "toast.summaryFailed": string;
-        "toast.vulnGenerated": string;
         "toast.vulnFailed": string;
         "toast.deleted": string;
         "toast.deleteFailed": string;
@@ -3139,6 +3141,18 @@ export type I18nTranslations = {
         "tabs.summary": string;
         "tabs.vulnerability": string;
         "tabs.templates": string;
+        "toast.queued": string;
+        "toast.scheduleCreated": string;
+        "toast.scheduleFailed": string;
+        "toast.scheduleDeleted": string;
+        "generate.schedule": string;
+        "generate.saveSchedule": string;
+        "tabs.schedules": string;
+        "schedules.columns.report": string;
+        "schedules.columns.runs": string;
+        "schedules.empty": string;
+        "schedules.delete.title": string;
+        "schedules.delete.description": string;
     };
     "search": {
         "empty.description": string;

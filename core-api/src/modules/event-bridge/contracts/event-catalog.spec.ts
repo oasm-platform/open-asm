@@ -78,7 +78,7 @@ describe('event catalog', () => {
     // The tree is the authored source; EVENT_DEFINITIONS is derived. If the
     // walk ever stops matching the shape, these fail rather than the bridge
     // publishing half a catalog.
-    it('exposes 115 leaves', () => {
+    it('exposes 116 leaves', () => {
       // 96 = the 85 left once `worker.alive` was removed (a heartbeat is read
       // from `workers.lastSeenAt`, not streamed, and on the shared stream it
       // would be the entry MAXLEN evicts first), plus `asset.url.discovered`,
@@ -90,10 +90,10 @@ describe('event catalog', () => {
       // approved/rejected/merged, settings.updated, comment.created and the
       // issue updated/resolved/assigned/deleted/link.added/link.removed facts),
       // minus `job.secrets.released` (a persisted row per dispatched job),
-      // plus the `worker.removed` audit event.
+      // plus the `worker.removed` audit event and the `report.completed` fact.
       // Asserting the
       // count means the removal cannot be half-reverted without failing here.
-      expect(EVENT_DEFINITIONS).toHaveLength(115);
+      expect(EVENT_DEFINITIONS).toHaveLength(116);
     });
 
     it('has no worker.alive leaf, so nothing can publish a heartbeat', () => {

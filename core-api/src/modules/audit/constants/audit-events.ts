@@ -66,7 +66,7 @@ export const AUDIT_ACTION_CATALOG = [
   { action: 'vulnerability.review.merged', label: 'Merged AI vulnerability proposal', controller: 'VulnerabilitiesController', method: 'mergeProposal' },
   { action: 'vulnerability.settings.updated', label: 'Updated vulnerability settings', controller: 'VulnerabilitiesController', method: 'updateSettings' },
   // reports (23–25)
-  { action: 'report.generated', label: 'Generated report', controller: 'ReportsController', method: 'generateSummaryReport' },
+  { action: 'report.generated', label: 'Requested report', controller: 'ReportsController', method: 'generateSummaryReport' },
   { action: 'report.exported', label: 'Exported report', controller: 'ReportsController', method: 'previewSummaryReport' },
   { action: 'report.deleted', label: 'Deleted report', controller: 'ReportsController', method: 'deleteReport' },
   // jobs (26)

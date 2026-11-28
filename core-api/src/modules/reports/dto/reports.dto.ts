@@ -1,6 +1,7 @@
 import { GetManyBaseQueryParams } from '@/common/dtos/get-many-base.dto';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsOptional, IsString, IsEnum, IsUUID } from 'class-validator';
+import { IsArray, IsOptional, IsString, IsEnum, IsUUID, IsIn, IsNotIn, Matches } from 'class-validator';
+import { IsCronSchedule } from '@/modules/projects/dto/cron-schedule.validator';
 
 const ReportType = {
   SUMMARY: 'SUMMARY',
@@ -26,18 +27,14 @@ export class ReportResponseDto {
 
   @ApiProperty()
   createdAt: Date;
+}
 
-  @ApiProperty({
-    description:
-      'Presigned S3 download URL (hour-bucketed signature, default 2 days)',
-  })
-  downloadUrl: string;
+export class ReportDownloadResponseDto {
+  @ApiProperty({ description: 'Presigned URL that downloads the PDF as an attachment' })
+  url: string;
 
-  @ApiProperty({
-    example: 172800,
-    description: 'Presigned URL lifetime in seconds',
-  })
-  downloadExpiresIn: number;
+  @ApiProperty({ example: 172800, description: 'URL lifetime in seconds' })
+  expiresIn: number;
 }
 
 export class GenerateSummaryReportBodyDto {
@@ -177,4 +174,56 @@ export class GetManyReportsQueryDto extends GetManyBaseQueryParams {
   @IsOptional()
   @IsEnum(ReportType)
   type?: ReportType;
+}
+
+export class CreateReportScheduleDto {
+  @ApiProperty({ enum: ['SUMMARY', 'VULNERABILITY'] })
+  @IsIn(['SUMMARY', 'VULNERABILITY'])
+  type: 'SUMMARY' | 'VULNERABILITY';
+
+  @ApiProperty({ example: '0 8 * * 1', description: '5-field cron expression in UTC, at most hourly (a fixed minute)' })
+  @IsCronSchedule()
+  @IsNotIn(['disabled'])
+  // Each run stores a PDF against the quota and holds the single schedule worker.
+  @Matches(/^\s*\d{1,2}\s/, { message: 'cron must run at most once an hour (a fixed minute)' })
+  cron: string;
+
+  @ApiProperty({ required: false, type: [String], description: 'Target IDs to filter' })
+  @IsOptional()
+  @IsArray()
+  @IsUUID('all', { each: true })
+  targetIds?: string[];
+
+  @ApiProperty({ required: false, enum: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'], description: 'Vulnerability report only' })
+  @IsOptional()
+  @IsEnum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'])
+  minSeverity?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
+}
+
+class ReportScheduleOptionsDto {
+  @ApiProperty({ required: false, type: [String] })
+  targetIds?: string[];
+
+  @ApiProperty({ required: false, enum: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'] })
+  minSeverity?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
+}
+
+export class ReportScheduleResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty({ description: 'Owner: the report runs with their permissions' })
+  userId: string;
+
+  @ApiProperty({ enum: ['SUMMARY', 'VULNERABILITY'] })
+  type: 'SUMMARY' | 'VULNERABILITY';
+
+  @ApiProperty({ description: '5-field cron expression in UTC' })
+  cron: string;
+
+  @ApiProperty({ type: ReportScheduleOptionsDto })
+  options: ReportScheduleOptionsDto;
+
+  @ApiProperty()
+  createdAt: Date;
 }

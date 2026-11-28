@@ -161,6 +161,15 @@ export interface VulnerabilityAnalysisCompletedPayload {
   vulnerabilityName: string;
 }
 
+/** `report.completed` — a queued report, addressed to who asked for it (or the schedule owner). */
+export interface ReportCompletedPayload {
+  userId: string;
+  reportType: string;
+  fileName?: string;
+  /** Why it failed, on outcome `failure`. */
+  error?: string;
+}
+
 export interface EventPayloadMap {
   'asset.discovered': AssetDiscoveredPayload;
   'vulnerability.detected': VulnerabilityDetectedPayload;
@@ -173,6 +182,7 @@ export interface EventPayloadMap {
   'asset.url.discovered': UrlDiscoveredPayload;
   'project.assets.added': ProjectAssetsAddedPayload;
   'project.run.completed': ProjectRunCompletedPayload;
+  'report.completed': ReportCompletedPayload;
 }
 
 export type PayloadEventName = keyof EventPayloadMap & EventName;

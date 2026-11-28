@@ -4,9 +4,7 @@
   "severity.medium": "Trung bình",
   "severity.low": "Thấp",
   "severity.info": "Thông tin",
-  "toast.summaryGenerated": "Đã tạo báo cáo tổng hợp",
   "toast.summaryFailed": "Không thể tạo báo cáo tổng hợp",
-  "toast.vulnGenerated": "Đã tạo báo cáo lỗ hổng",
   "toast.vulnFailed": "Không thể tạo báo cáo lỗ hổng",
   "toast.deleted": "Đã xóa báo cáo",
   "toast.deleteFailed": "Không thể xóa báo cáo",
@@ -30,5 +28,17 @@
   "tabs.all": "Tất cả",
   "tabs.summary": "Tổng hợp",
   "tabs.vulnerability": "Lỗ hổng",
-  "tabs.templates": "Mẫu"
+  "tabs.templates": "Mẫu",
+  "toast.queued": "Đã đưa báo cáo vào hàng đợi. Bạn sẽ nhận thông báo khi báo cáo sẵn sàng.",
+  "toast.scheduleCreated": "Đã lưu lịch tạo báo cáo",
+  "toast.scheduleFailed": "Không thể lưu lịch tạo báo cáo",
+  "toast.scheduleDeleted": "Đã xóa lịch tạo báo cáo",
+  "generate.schedule": "Lặp lại theo lịch",
+  "generate.saveSchedule": "Lưu lịch",
+  "tabs.schedules": "Lịch",
+  "schedules.columns.report": "Báo cáo",
+  "schedules.columns.runs": "Chạy lúc",
+  "schedules.empty": "Chưa có lịch tạo báo cáo",
+  "schedules.delete.title": "Xóa lịch",
+  "schedules.delete.description": "Ngừng tạo báo cáo này theo lịch?"
 }

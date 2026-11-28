@@ -4,9 +4,7 @@
   "severity.medium": "Media",
   "severity.low": "Baja",
   "severity.info": "Info",
-  "toast.summaryGenerated": "Informe resumen generado correctamente",
   "toast.summaryFailed": "No se pudo generar el informe resumen",
-  "toast.vulnGenerated": "Informe de vulnerabilidades generado correctamente",
   "toast.vulnFailed": "No se pudo generar el informe de vulnerabilidades",
   "toast.deleted": "Informe eliminado correctamente",
   "toast.deleteFailed": "No se pudo eliminar el informe",
@@ -30,5 +28,17 @@
   "tabs.all": "Todos",
   "tabs.summary": "Resumen",
   "tabs.vulnerability": "Vulnerabilidades",
-  "tabs.templates": "Plantillas"
+  "tabs.templates": "Plantillas",
+  "toast.queued": "Informe en cola. Recibirás una notificación cuando esté listo.",
+  "toast.scheduleCreated": "Programación del informe guardada",
+  "toast.scheduleFailed": "No se pudo guardar la programación del informe",
+  "toast.scheduleDeleted": "Programación del informe eliminada",
+  "generate.schedule": "Repetir según una programación",
+  "generate.saveSchedule": "Guardar programación",
+  "tabs.schedules": "Programaciones",
+  "schedules.columns.report": "Informe",
+  "schedules.columns.runs": "Se ejecuta",
+  "schedules.empty": "Aún no hay programaciones de informes",
+  "schedules.delete.title": "Eliminar programación",
+  "schedules.delete.description": "¿Dejar de generar este informe según su programación?"
 }

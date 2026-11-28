@@ -5,5 +5,7 @@
   "SCAN_INCOMPLETE": "{targetValue} 스캔이 완료되지 않았습니다. {details}",
   "NEW_VULNERABILITY_FOUND": "{assetValue}에서 새 취약점 {count}개 발견",
   "WORKSPACE_INVITATION": "{action, select, created {워크스페이스 {workspaceName}에 초대되었습니다} accepted {{userName}님이 워크스페이스 {workspaceName} 초대를 수락했습니다} declined {{userName}님이 워크스페이스 {workspaceName} 초대를 거절했습니다} other {워크스페이스 초대}}",
-  "NEW_URL_FOUND": "{targetValue}에서 새 URL {count}개 발견"
+  "NEW_URL_FOUND": "{targetValue}에서 새 URL {count}개 발견",
+  "REPORT_GENERATED": "보고서 {fileName}이(가) 준비되었습니다",
+  "REPORT_FAILED": "보고서 생성 실패: {error}"
 }

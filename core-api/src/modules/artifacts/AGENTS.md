@@ -4,9 +4,9 @@ Workspace files ("Files" in the console): objects in the `artifacts` bucket, the
 
 ## Layout
 
-- `artifacts.service.ts`: `ArtifactsService` (upload lifecycle, read checks, sharing, purge) and constants `ARTIFACTS_BUCKET`, `TEMPLATES_FOLDER_NAME`, `TEMPLATE_NAME_RE`, `PENDING_UPLOAD_TTL_SECONDS`, `PENDING_PURGE_GRACE_MS`, `toObjectKey`.
+- `artifacts.service.ts`: `ArtifactsService` (upload lifecycle, read checks, sharing, purge) and constants `ARTIFACTS_BUCKET`, `TEMPLATES_FOLDER_NAME`, `REPORTS_FOLDER_NAME`, `WORKSPACE_FOLDER_NAMES`, `TEMPLATE_NAME_RE`, `PENDING_UPLOAD_TTL_SECONDS`, `PENDING_PURGE_GRACE_MS`, `toObjectKey`.
 - `artifact-quota.service.ts`: `ArtifactQuotaService`, sole writer of `workspace_storage_usage`.
-- `artifact-folders.service.ts`: `ArtifactFoldersService` (personal folders, the shared templates folder).
+- `artifact-folders.service.ts`: `ArtifactFoldersService` (personal folders, the workspace folders `custom-templates` and `reports`).
 - `artifact-sweep.service.ts`: `@Cron('*/5 * * * *')` + `@Lock('cron:artifacts-sweep')` calling `purgeStale()`.
 - Controllers: `artifacts.controller.ts`, `artifact-folders.controller.ts`, `public-artifacts.controller.ts`.
 - `entities/`: `Artifact`, `ArtifactShare`, `ArtifactFolder`, `WorkspaceStorageUsage`, `bigintTransformer`.
@@ -25,16 +25,16 @@ Workspace files ("Files" in the console): objects in the `artifacts` bucket, the
 | `GET public/artifacts/:id` | `@Public()`, redirects to a 5-minute URL; 404 unless ready and `public` |
 
 - Registered in `combine.module.ts`. Exports `ArtifactsService`, `ArtifactFoldersService`, `ArtifactQuotaService`.
-- There is no upload route here. Uploads come from `projects/project-files.service.ts` (`presignUpload` / `completeUpload`), the agent tool `save_file` in `agents/tools/artifact.tools.ts` (`createFromBuffer`), and `templates` (`createFromBuffer`, `replaceContent`).
+- There is no upload route here. Uploads come from `projects/project-files.service.ts` (`presignUpload` / `completeUpload`), the agent tool `save_file` in `agents/tools/artifact.tools.ts` (`createFromBuffer`), `templates` (`createFromBuffer`, `replaceContent`) and `reports` (`createFromBuffer` with `source: 'report'`, private, inside the `reports` workspace folder; `deleteServerFile` on report delete, no owner check: the caller authorized it).
 - Events: `@PublishEvent` on download, update, delete, share, unshare (`EVENT_CATALOG.artifact.*`); `artifact.created` is published from the service (`publishCreated`), actor type `Agent` unless the caller passes one. `storage.quota.updated` comes from `admin/workspaces` (`PATCH admin/workspaces/:id/storage-quota` → `setQuota`).
 
 ## Data model
 
-- `artifacts`: `workspaceId` (CASCADE), `createdByUserId` (SET NULL), `parentFolderId` (NO ACTION), `source` (`upload`/`agent`/`template`), `bucket` + `objectKey` UNIQUE, `sizeBytes` bigint (mapped to number), `shareType` (`private`/`shared`/`public`), `status` (`pending`/`ready`/`deleted`), `metadata` jsonb, `expiresAt`. No TypeORM soft delete: `deleted` is a status.
+- `artifacts`: `workspaceId` (CASCADE), `createdByUserId` (SET NULL), `parentFolderId` (NO ACTION), `source` (`upload`/`agent`/`template`/`report`), `bucket` + `objectKey` UNIQUE, `sizeBytes` bigint (mapped to number), `shareType` (`private`/`shared`/`public`), `status` (`pending`/`ready`/`deleted`), `metadata` jsonb, `expiresAt`. No TypeORM soft delete: `deleted` is a status.
 - `artifact_shares`: unique `(artifactId, userId)`, both FKs CASCADE.
-- `artifact_folders`: tree via `parentFolderId` (NO ACTION), `createdByUserId` null only for the workspace templates folder.
+- `artifact_folders`: tree via `parentFolderId` (NO ACTION), `createdByUserId` null only for the workspace folders (`WORKSPACE_FOLDER_NAMES`).
 - `workspace_storage_usage`: PK `workspaceId`, `usedBytes`, `reservedBytes`, nullable `quotaBytes` (null = `ARTIFACT_WORKSPACE_QUOTA_BYTES`, 1 GiB), CHECKs keep all three non-negative. Created lazily on first reservation.
-- `project_artifacts` (projects module) references `artifacts`.
+- `project_artifacts` (projects module) and `reports.artifactId` (reports module, CASCADE) reference `artifacts`.
 
 ## Invariants
 
@@ -44,12 +44,12 @@ Workspace files ("Files" in the console): objects in the `artifacts` bucket, the
 - Object keys are `workspaces/<workspaceId>/<artifactId>/<sanitized name>` (`toObjectKey`). The display name lives only in the row.
 - Downloads always use content type `application/octet-stream` with an attachment disposition, because storage is proxied on the app origin.
 - Not visible = 404, not 403 (`findVisible`), so ids do not leak. Shares resolve emails to members of the same workspace only; others count as `skipped`.
-- Folders are personal: `findOwnedFolder` requires the caller as creator. `findReadableFolder` also accepts the workspace templates folder (root, no creator, name `custom-templates`), created on demand by `ensureTemplatesFolder` under an advisory lock. A user folder named `custom-templates` at the root is refused (`assertNotReservedRoot`): once its owner is deleted, `createdByUserId` goes NULL and it would match the templates folder.
+- Folders are personal: `findOwnedFolder` requires the caller as creator. `findReadableFolder` also accepts the workspace folders (root, no creator, name in `WORKSPACE_FOLDER_NAMES`: `custom-templates`, `reports`), created on demand by `ensureWorkspaceFolder` (`ensureTemplatesFolder` wraps it) under an advisory lock `artifact-folders:<name>:<workspaceId>`. The root listing ensures only the templates folder; `reports` appears once the first report is stored. A user root folder with one of those names is refused (`assertNotReservedRoot`): once its owner is deleted, `createdByUserId` goes NULL and it would match the workspace folder. Files inside keep their own visibility (reports are private, so other members see the folder but not someone else's PDFs).
 - Workspace deletion: rows go by FK cascade; `WorkspacesService` then calls `deleteWorkspaceObjects` (fire-and-forget `deleteByPrefix`).
 
 ## Coupling
 
-- Imported by `workspaces`, `projects`, `templates`, `agents`, `admin/workspaces`. Imports `StorageModule`; uses the global `EventBridgeService`, and the `WorkspaceMembers` repository through `DataSource`.
+- Imported by `workspaces`, `projects`, `templates`, `agents`, `reports`, `admin/workspaces`. Imports `StorageModule`; uses the global `EventBridgeService`, and the `WorkspaceMembers` repository through `DataSource`.
 - `ArtifactFoldersService` injects `ArtifactsService`, not the reverse.
 - `jobs-registry/jobs-registry.service.ts` reads `Artifact` rows directly (`signCustomTemplates`) and `templates` queries `artifacts` directly; keep `source`, `status`, `bucket`, `objectKey` and `updatedAt` semantics stable.
 

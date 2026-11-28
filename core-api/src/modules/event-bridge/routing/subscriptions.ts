@@ -41,6 +41,7 @@ export const SUBSCRIPTIONS = {
     'worker',
     'scan',
     'integration',
+    'report',
   ],
   [EventBusGroup.Integrations]: [
     'vulnerability',

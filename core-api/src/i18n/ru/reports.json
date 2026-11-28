@@ -4,9 +4,7 @@
   "severity.medium": "Средняя",
   "severity.low": "Низкая",
   "severity.info": "Инфо",
-  "toast.summaryGenerated": "Сводный отчёт создан",
   "toast.summaryFailed": "Не удалось создать сводный отчёт",
-  "toast.vulnGenerated": "Отчёт об уязвимостях создан",
   "toast.vulnFailed": "Не удалось создать отчёт об уязвимостях",
   "toast.deleted": "Отчёт удалён",
   "toast.deleteFailed": "Не удалось удалить отчёт",
@@ -30,5 +28,17 @@
   "tabs.all": "Все",
   "tabs.summary": "Сводка",
   "tabs.vulnerability": "Уязвимости",
-  "tabs.templates": "Шаблоны"
+  "tabs.templates": "Шаблоны",
+  "toast.queued": "Отчёт поставлен в очередь. Вы получите уведомление, когда он будет готов.",
+  "toast.scheduleCreated": "Расписание отчёта сохранено",
+  "toast.scheduleFailed": "Не удалось сохранить расписание отчёта",
+  "toast.scheduleDeleted": "Расписание отчёта удалено",
+  "generate.schedule": "Повторять по расписанию",
+  "generate.saveSchedule": "Сохранить расписание",
+  "tabs.schedules": "Расписания",
+  "schedules.columns.report": "Отчёт",
+  "schedules.columns.runs": "Запуск",
+  "schedules.empty": "Расписаний отчётов пока нет",
+  "schedules.delete.title": "Удалить расписание",
+  "schedules.delete.description": "Прекратить создание этого отчёта по расписанию?"
 }
