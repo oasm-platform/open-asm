@@ -26,7 +26,8 @@ export function useGenerateReport() {
   const query = useReportsControllerGenerateQueryReport();
   const schedule = useReportsControllerCreateSchedule();
 
-  const generate = async (draft: ReportDraft): Promise<boolean> => {
+  /** Sends the request only; resolves false when the API refused it. */
+  const send = async (draft: ReportDraft): Promise<boolean> => {
     const targetIds = draft.targetIds.length > 0 ? draft.targetIds : undefined;
     try {
       if (draft.template === 'QUERY') {
@@ -41,9 +42,6 @@ export function useGenerateReport() {
             minSeverity: draft.template === 'VULNERABILITY' ? draft.minSeverity : undefined,
           },
         });
-        void queryClient.invalidateQueries({ queryKey: reportSchedulesKey(selectedWorkspaceId) });
-        toast.success(t('reports.toast.scheduleCreated'));
-        return true;
       } else if (draft.template === 'SUMMARY') {
         await summary.mutateAsync({
           data: { ...periodRange(draft.period, draft.customRange), targetIds },
@@ -57,21 +55,6 @@ export function useGenerateReport() {
           },
         });
       }
-      if (selectedWorkspaceId) {
-        const allReports = queryClient.getQueryData<{ total?: number }>(
-          reportCountKey(selectedWorkspaceId),
-        );
-        addPendingReport({
-          workspaceId: selectedWorkspaceId,
-          template: draft.template,
-          detailKey:
-            draft.template === 'QUERY'
-              ? undefined
-              : PERIOD_PRESETS.find((preset) => preset.value === draft.period)?.labelKey,
-          total: allReports?.total ?? 0,
-        });
-      }
-      toast.success(t('reports.toast.queued'));
       return true;
     } catch {
       toast.error(
@@ -87,6 +70,35 @@ export function useGenerateReport() {
       );
       return false;
     }
+  };
+
+  // Bookkeeping stays out of `send`'s try: once the API accepted the report,
+  // nothing here may turn that into a "failed to generate" message.
+  const generate = async (draft: ReportDraft): Promise<boolean> => {
+    if (!(await send(draft))) return false;
+
+    if (draft.repeat && draft.template !== 'QUERY') {
+      void queryClient.invalidateQueries({ queryKey: reportSchedulesKey(selectedWorkspaceId) });
+      toast.success(t('reports.toast.scheduleCreated'));
+      return true;
+    }
+
+    if (selectedWorkspaceId) {
+      const allReports = queryClient.getQueryData<{ total?: number }>(
+        reportCountKey(selectedWorkspaceId),
+      );
+      addPendingReport({
+        workspaceId: selectedWorkspaceId,
+        template: draft.template,
+        detailKey:
+          draft.template === 'QUERY'
+            ? undefined
+            : PERIOD_PRESETS.find((preset) => preset.value === draft.period)?.labelKey,
+        total: allReports?.total ?? 0,
+      });
+    }
+    toast.success(t('reports.toast.queued'));
+    return true;
   };
 
   return {

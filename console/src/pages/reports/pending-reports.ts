@@ -23,6 +23,9 @@ export interface PendingReport {
 export const PENDING_EXPIRES_AFTER_MS = 10 * 60_000;
 
 let pending: PendingReport[] = [];
+// A counter, not crypto.randomUUID: that only exists in secure contexts, and
+// the console is also served over plain http on LAN addresses.
+let nextId = 0;
 const listeners = new Set<() => void>();
 
 function emit(next: PendingReport[]) {
@@ -41,7 +44,7 @@ export function addPendingReport(entry: {
   emit([
     ...pending,
     {
-      id: crypto.randomUUID(),
+      id: String((nextId += 1)),
       workspaceId: entry.workspaceId,
       template: entry.template,
       detailKey: entry.detailKey,
