@@ -60,6 +60,8 @@ export interface AgentFunctionBuildContext {
   projectId?: string | null;
   /** Agent definition running the tools (a subagent's name); unset = main. */
   agentName?: string;
+  /** The subagent run (agent_subagents.id) using the tools; unset = main. */
+  subagentId?: string;
   /** Present => every gated tool goes through the guard and the approval flow. */
   approval?: ApprovalSettings;
   emitter?: EventEmitter;

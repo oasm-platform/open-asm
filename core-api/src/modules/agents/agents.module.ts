@@ -51,6 +51,13 @@ import { AgentSubagent } from './entities/agent-subagent.entity';
 import { AgentToolRule } from './entities/agent-tool-rule.entity';
 import { AgentsGuardService } from './agents.guard';
 import { AgentWorkflowNote } from './entities/agent-workflow-note.entity';
+import { AgentHttpRequestPayload } from './http-requests/agent-http-request-payload.entity';
+import { AgentHttpRequest } from './http-requests/agent-http-request.entity';
+import { AgentHttpIngestService } from './http-requests/agent-http-ingest.service';
+import { AgentHttpLogGrpcController } from './http-requests/agent-http-log.grpc.controller';
+import { AgentHttpRequestRetentionCron } from './http-requests/agent-http-request-retention.cron';
+import { AgentHttpRequestsService } from './http-requests/agent-http-requests.service';
+import { AgentHttpRequestsController } from './agent-http-requests.controller';
 import { HttpModule } from '@nestjs/axios';
 import { VulnerabilityAnalyzerAdapter } from './vulnerability-analyzer.adapter';
 import { IssuesModule } from '../issues/issues.module';
@@ -83,6 +90,8 @@ export const AGENT_FUNCTION_HOSTS = [
       AgentWorkflowNote,
       AgentDefinition,
       AgentToolRule,
+      AgentHttpRequest,
+      AgentHttpRequestPayload,
       Project,
     ]),
     AttackSurfaceQueryModule,
@@ -107,6 +116,8 @@ export const AGENT_FUNCTION_HOSTS = [
     AgentMcpConfigsController,
     AgentSettingsController,
     AgentCustomizationController,
+    AgentHttpLogGrpcController,
+    AgentHttpRequestsController,
   ],
   providers: [
     AgentsService,
@@ -129,6 +140,9 @@ export const AGENT_FUNCTION_HOSTS = [
     AgentsStreamBufferService,
     AgentsUsageService,
     VulnerabilityAnalyzerAdapter,
+    AgentHttpIngestService,
+    AgentHttpRequestsService,
+    AgentHttpRequestRetentionCron,
     ...AGENT_TOOL_CLASSES,
   ],
   exports: [

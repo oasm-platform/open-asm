@@ -665,7 +665,8 @@ describe('AgentsSubagentsService', () => {
 
     // Its own emitter carries only its browser pages; no approval settings,
     // and the conversation's project (none here). The member is still passed,
-    // so its tools keep the member's workspace permissions.
+    // so its tools keep the member's workspace permissions. Its run id labels
+    // the HTTP logs of its commands.
     expect(agentTool.getTools).toHaveBeenCalledWith(
       'w1',
       'u1',
@@ -675,6 +676,7 @@ describe('AgentsSubagentsService', () => {
       undefined,
       undefined,
       'researcher',
+      's1',
     );
     const call = (streamText as jest.Mock).mock.calls[0][0];
     const toolNames = Object.keys(call.tools).filter(

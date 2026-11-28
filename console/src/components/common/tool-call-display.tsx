@@ -12,6 +12,7 @@ import {
   XCircleIcon,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import type { ReactNode } from 'react';
 import type { RemoteExecuteStreamEvent } from '@/hooks/use-remote-execute-stream';
 import { RemoteExecuteTerminal } from './remote-execute-terminal';
 
@@ -133,13 +134,20 @@ function PlanCallDisplay({ toolCall }: { toolCall: ToolCallState }) {
 export function ToolCallDisplay({
   toolCall,
   streamEvents,
+  terminalActions,
 }: {
   toolCall: ToolCallState;
   streamEvents?: RemoteExecuteStreamEvent[];
+  /** Extra buttons in a remote command's terminal header */
+  terminalActions?: ReactNode;
 }) {
   if (toolCall.toolName === 'execute_remote_command') {
     return (
-      <RemoteExecuteTerminal toolCall={toolCall} streamEvents={streamEvents} />
+      <RemoteExecuteTerminal
+        toolCall={toolCall}
+        streamEvents={streamEvents}
+        actions={terminalActions}
+      />
     );
   }
   if (toolCall.toolName === PLAN_TOOL) {

@@ -7389,6 +7389,148 @@ export type UpdateToolRuleDto = {
   description?: UpdateToolRuleDtoDescription;
 };
 
+export type AgentHttpRequestListItemDtoOutcome =
+  (typeof AgentHttpRequestListItemDtoOutcome)[keyof typeof AgentHttpRequestListItemDtoOutcome];
+
+export const AgentHttpRequestListItemDtoOutcome = {
+  allowed: 'allowed',
+  denied: 'denied',
+  upstream_error: 'upstream_error',
+  cancelled: 'cancelled',
+} as const;
+
+export type AgentHttpRequestListItemDto = {
+  id: string;
+  conversationId: string;
+  /** @nullable */
+  conversationTitle: string | null;
+  /** @nullable */
+  toolCallId: string | null;
+  /** Remote-execute session of the command */
+  runId: string;
+  /** @nullable */
+  subagentId: string | null;
+  /** Subagent name, or `main` */
+  agentName: string;
+  /** @nullable */
+  workerId: string | null;
+  scheme: string;
+  /**
+   * Null for a CONNECT tunnel that was not intercepted
+   * @nullable
+   */
+  method: string | null;
+  host: string;
+  port: number;
+  /** @nullable */
+  path: string | null;
+  /** @nullable */
+  statusCode: number | null;
+  outcome: AgentHttpRequestListItemDtoOutcome;
+  /** @nullable */
+  error: string | null;
+  requestBytes: number;
+  responseBytes: number;
+  sentAt: string;
+  completedAt: string;
+  durationMs: number;
+  tlsIntercepted: boolean;
+  createdAt: string;
+};
+
+export type AgentHttpRequestListResponseDto = {
+  data: AgentHttpRequestListItemDto[];
+  /** @nullable */
+  nextCursor: string | null;
+};
+
+export type AgentHttpHeaderDto = {
+  name: string;
+  /** Sensitive values are masked as `***` */
+  value: string;
+};
+
+export type AgentHttpRequestPayloadDto = {
+  requestHeaders: AgentHttpHeaderDto[];
+  responseHeaders: AgentHttpHeaderDto[];
+  /** @nullable */
+  requestBody: string | null;
+  /** @nullable */
+  responseBody: string | null;
+  /**
+   * `base64` for a binary or non-UTF-8 body
+   * @nullable
+   */
+  requestBodyEncoding: string | null;
+  /** @nullable */
+  responseBodyEncoding: string | null;
+  requestBodyTruncated: boolean;
+  responseBodyTruncated: boolean;
+  /** @nullable */
+  contentType: string | null;
+};
+
+export type AgentHttpRequestDetailDtoOutcome =
+  (typeof AgentHttpRequestDetailDtoOutcome)[keyof typeof AgentHttpRequestDetailDtoOutcome];
+
+export const AgentHttpRequestDetailDtoOutcome = {
+  allowed: 'allowed',
+  denied: 'denied',
+  upstream_error: 'upstream_error',
+  cancelled: 'cancelled',
+} as const;
+
+export type AgentHttpRequestDetailDto = {
+  id: string;
+  conversationId: string;
+  /** @nullable */
+  conversationTitle: string | null;
+  /** @nullable */
+  toolCallId: string | null;
+  /** Remote-execute session of the command */
+  runId: string;
+  /** @nullable */
+  subagentId: string | null;
+  /** Subagent name, or `main` */
+  agentName: string;
+  /** @nullable */
+  workerId: string | null;
+  scheme: string;
+  /**
+   * Null for a CONNECT tunnel that was not intercepted
+   * @nullable
+   */
+  method: string | null;
+  host: string;
+  port: number;
+  /** @nullable */
+  path: string | null;
+  /** @nullable */
+  statusCode: number | null;
+  outcome: AgentHttpRequestDetailDtoOutcome;
+  /** @nullable */
+  error: string | null;
+  requestBytes: number;
+  responseBytes: number;
+  sentAt: string;
+  completedAt: string;
+  durationMs: number;
+  tlsIntercepted: boolean;
+  createdAt: string;
+  /**
+   * Null for a CONNECT tunnel with no recorded payload
+   * @nullable
+   */
+  payload: AgentHttpRequestPayloadDto | null;
+  /**
+   * Shell command of the tool call that made the request
+   * @nullable
+   */
+  command: string | null;
+  /** @nullable */
+  messageId: string | null;
+};
+
 export type SchemaFieldDto = {
   name: string;
   type: string;
@@ -8999,6 +9141,67 @@ export type AgentsControllerGetWorkspaceMemoryParams = {
   sortBy?: string;
   sortOrder?: string;
 };
+
+export type AgentHttpRequestsControllerGetHttpRequestsParams = {
+  conversationId?: string;
+  /**
+   * Remote-execute session of the command
+   */
+  runId?: string;
+  /**
+   * Subagent name, or `main`
+   */
+  agentName?: string;
+  subagentId?: string;
+  /**
+   * Host prefix, case-insensitive
+   */
+  host?: string;
+  method?: string;
+  statusClass?: AgentHttpRequestsControllerGetHttpRequestsStatusClass;
+  outcome?: AgentHttpRequestsControllerGetHttpRequestsOutcome;
+  /**
+   * Only requests that were not allowed or got a status >= 400
+   */
+  errorsOnly?: boolean;
+  /**
+   * Sent at or after (ISO date)
+   */
+  from?: string;
+  /**
+   * Sent at or before (ISO date)
+   */
+  to?: string;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  /**
+   * Opaque keyset cursor; page forward with the nextCursor of the previous response
+   */
+  cursor?: string;
+};
+
+export type AgentHttpRequestsControllerGetHttpRequestsStatusClass =
+  (typeof AgentHttpRequestsControllerGetHttpRequestsStatusClass)[keyof typeof AgentHttpRequestsControllerGetHttpRequestsStatusClass];
+
+export const AgentHttpRequestsControllerGetHttpRequestsStatusClass = {
+  '2xx': '2xx',
+  '3xx': '3xx',
+  '4xx': '4xx',
+  '5xx': '5xx',
+} as const;
+
+export type AgentHttpRequestsControllerGetHttpRequestsOutcome =
+  (typeof AgentHttpRequestsControllerGetHttpRequestsOutcome)[keyof typeof AgentHttpRequestsControllerGetHttpRequestsOutcome];
+
+export const AgentHttpRequestsControllerGetHttpRequestsOutcome = {
+  allowed: 'allowed',
+  denied: 'denied',
+  upstream_error: 'upstream_error',
+  cancelled: 'cancelled',
+} as const;
 
 export type ReportsControllerGetManyParams = {
   search?: string;
@@ -58227,6 +58430,361 @@ export const useAgentsControllerDeleteToolRule = <
     queryClient,
   );
 };
+
+/**
+ * Keyset-paginated HTTP requests made by the current user's agent commands, newest first
+ * @summary List agent HTTP requests
+ */
+export const agentHttpRequestsControllerGetHttpRequests = (
+  params?: AgentHttpRequestsControllerGetHttpRequestsParams,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AgentHttpRequestListResponseDto>(
+    { url: `/api/agents/http-requests`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getAgentHttpRequestsControllerGetHttpRequestsQueryKey = (
+  params?: AgentHttpRequestsControllerGetHttpRequestsParams,
+) => {
+  return [`/api/agents/http-requests`, ...(params ? [params] : [])] as const;
+};
+
+export const getAgentHttpRequestsControllerGetHttpRequestsQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>
+  >,
+  TError = unknown,
+>(
+  params?: AgentHttpRequestsControllerGetHttpRequestsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAgentHttpRequestsControllerGetHttpRequestsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>>
+  > = ({ signal }) =>
+    agentHttpRequestsControllerGetHttpRequests(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentHttpRequestsControllerGetHttpRequestsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>>
+>;
+export type AgentHttpRequestsControllerGetHttpRequestsQueryError = unknown;
+
+export function useAgentHttpRequestsControllerGetHttpRequests<
+  TData = Awaited<
+    ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>
+  >,
+  TError = unknown,
+>(
+  params: undefined | AgentHttpRequestsControllerGetHttpRequestsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>
+          >,
+          TError,
+          Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentHttpRequestsControllerGetHttpRequests<
+  TData = Awaited<
+    ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>
+  >,
+  TError = unknown,
+>(
+  params?: AgentHttpRequestsControllerGetHttpRequestsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<
+            ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>
+          >,
+          TError,
+          Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentHttpRequestsControllerGetHttpRequests<
+  TData = Awaited<
+    ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>
+  >,
+  TError = unknown,
+>(
+  params?: AgentHttpRequestsControllerGetHttpRequestsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List agent HTTP requests
+ */
+
+export function useAgentHttpRequestsControllerGetHttpRequests<
+  TData = Awaited<
+    ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>
+  >,
+  TError = unknown,
+>(
+  params?: AgentHttpRequestsControllerGetHttpRequestsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequests>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getAgentHttpRequestsControllerGetHttpRequestsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * One logged request with its headers, bodies and the command that made it
+ * @summary Get an agent HTTP request
+ */
+export const agentHttpRequestsControllerGetHttpRequest = (
+  id: string,
+  options?: SecondParameter<typeof orvalClient>,
+  signal?: AbortSignal,
+) => {
+  return orvalClient<AgentHttpRequestDetailDto>(
+    { url: `/api/agents/http-requests/${id}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getAgentHttpRequestsControllerGetHttpRequestQueryKey = (
+  id: string,
+) => {
+  return [`/api/agents/http-requests/${id}`] as const;
+};
+
+export const getAgentHttpRequestsControllerGetHttpRequestQueryOptions = <
+  TData = Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getAgentHttpRequestsControllerGetHttpRequestQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>
+  > = ({ signal }) =>
+    agentHttpRequestsControllerGetHttpRequest(id, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AgentHttpRequestsControllerGetHttpRequestQueryResult = NonNullable<
+  Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>
+>;
+export type AgentHttpRequestsControllerGetHttpRequestQueryError = unknown;
+
+export function useAgentHttpRequestsControllerGetHttpRequest<
+  TData = Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+  TError = unknown,
+>(
+  id: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+          TError,
+          Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentHttpRequestsControllerGetHttpRequest<
+  TData = Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+          TError,
+          Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useAgentHttpRequestsControllerGetHttpRequest<
+  TData = Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get an agent HTTP request
+ */
+
+export function useAgentHttpRequestsControllerGetHttpRequest<
+  TData = Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+  TError = unknown,
+>(
+  id: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof agentHttpRequestsControllerGetHttpRequest>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof orvalClient>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getAgentHttpRequestsControllerGetHttpRequestQueryOptions(
+    id,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
 
 /**
  * Resources, fields, operators and relations the caller may query.

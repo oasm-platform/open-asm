@@ -199,6 +199,36 @@ describe('RemoteExecuteService', () => {
       expect(result).not.toHaveProperty('image');
     });
 
+    it('hands beforePush to the push', async () => {
+      const { getCallback } = setupCapturedSubscribe();
+      setupPushSuccess();
+      const beforePush = jest.fn().mockResolvedValue(undefined);
+
+      const resultPromise = service.waitForResult(
+        testCommand,
+        testSessionId,
+        testConversationId,
+        testWorkspaceId,
+        5000,
+        undefined,
+        undefined,
+        beforePush,
+      );
+      await new Promise((r) => setTimeout(r, 10));
+      fireMessage(getCallback(), channel, 'REMOTE_EXECUTE_RESULT_EXIT', '', 0);
+      await resultPromise;
+
+      expect(
+        mockRemoteExecuteSubscribeService.pushCommandWithConversation,
+      ).toHaveBeenCalledWith(
+        testConversationId,
+        testWorkspaceId,
+        testSessionId,
+        testCommand,
+        beforePush,
+      );
+    });
+
     it('should keep a browser screenshot for the result only, without ending the wait', async () => {
       const { getCallback } = setupCapturedSubscribe();
       setupPushSuccess();

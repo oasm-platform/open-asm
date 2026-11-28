@@ -99,7 +99,7 @@ describe('SubagentsPanel', () => {
     expect(screen.getByText('1 running')).toBeInTheDocument();
     expect(screen.getByText('@researcher')).toBeInTheDocument();
     expect(screen.getByText('@asset-analyst')).toBeInTheDocument();
-    expect(screen.getByText('4.2s')).toBeInTheDocument();
+    expect(screen.getByText('4s')).toBeInTheDocument();
     expect(screen.getByLabelText('Running')).toBeInTheDocument();
     // Nothing is loaded until a subagent is opened
     expect(useDetail).not.toHaveBeenCalled();

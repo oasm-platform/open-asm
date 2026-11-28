@@ -18,7 +18,7 @@ func TestSetupCmdEnv_DropsSecretEnv(t *testing.T) {
 	t.Setenv("SANDBOX_KEEP_ME", "kept")
 	t.Setenv("MYWORKER_API", "kept-too") // prefix match only, not substring
 
-	env := setupCmdEnv("/opt/tools")
+	env := setupCmdEnv("/opt/tools", false)
 
 	for _, e := range env {
 		u := strings.ToUpper(e)
@@ -34,7 +34,7 @@ func TestSetupCmdEnv_DropsSecretEnv(t *testing.T) {
 // PATH handling is unchanged: one PATH entry, tool dir first.
 func TestSetupCmdEnv_ToolPathFirstOnPath(t *testing.T) {
 	t.Setenv("PATH", "/usr/bin")
-	env := setupCmdEnv("/opt/tools")
+	env := setupCmdEnv("/opt/tools", false)
 
 	var paths []string
 	for _, e := range env {

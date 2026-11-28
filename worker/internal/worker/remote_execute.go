@@ -163,8 +163,9 @@ func (s *sessionSandbox) close() error {
 
 // startRemoteExecuteHandler serves the remote execute stream. cmdSandbox nil
 // runs agent commands on the host; non-nil runs them through it (see
-// selectCommandSandbox).
-func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Client, workspaceRoot string, toolPath string, cmdSandbox agentCommandSandbox, browsers *agentBrowsers, events chan<- TuiEvent, runTool func(sessionID string, run *pb.ToolRun, send toolResultSender), cancelTool func(sessionID string) bool) {
+// selectCommandSandbox). proxy (nil = direct egress) only applies to host
+// commands: the sandbox cannot reach the egress listener.
+func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Client, workspaceRoot string, toolPath string, cmdSandbox agentCommandSandbox, proxy *agentProxy, browsers *agentBrowsers, events chan<- TuiEvent, runTool func(sessionID string, run *pb.ToolRun, send toolResultSender), cancelTool func(sessionID string) bool) {
 	log := NewTuiLogger(events, "RemoteExec")
 	remoteSem := make(chan struct{}, 16)
 
@@ -306,7 +307,7 @@ func startRemoteExecuteHandler(ctx context.Context, grpcClient *grpcclient.Clien
 				case remoteSem <- struct{}{}:
 					go func() {
 						defer func() { <-remoteSem }()
-						executeRemoteCommand(ctx, send, sessionID, command, sb, events, toolPath)
+						executeRemoteCommand(ctx, send, sessionID, command, sb, events, toolPath, proxy)
 					}()
 				default:
 					log.Warning("remote exec concurrency limit reached")
@@ -390,7 +391,7 @@ func startSandboxedCommand(ctx context.Context, handler *grpcclient.RemoteExecut
 		go func() {
 			defer func() { <-remoteSem }()
 			defer sbSessions.end(sessionID)
-			executeRemoteCommand(ctx, send, sessionID, command, sb, events, toolPath)
+			executeRemoteCommand(ctx, send, sessionID, command, sb, events, toolPath, nil)
 		}()
 	default:
 		sbSessions.end(sessionID)
@@ -427,7 +428,7 @@ func browserCommandLine(command string) (string, bool) {
 	return strings.CutPrefix(command, "browser ")
 }
 
-func executeRemoteCommand(ctx context.Context, handler remoteResultSender, sessionID, command string, sandbox *sessionSandbox, events chan<- TuiEvent, toolPath string) {
+func executeRemoteCommand(ctx context.Context, handler remoteResultSender, sessionID, command string, sandbox *sessionSandbox, events chan<- TuiEvent, toolPath string, proxy *agentProxy) {
 	log := NewTuiLogger(events, "RemoteExec")
 	log.Info("Executing in session %s: %s", sessionID, loggableCommand(command))
 
@@ -446,7 +447,9 @@ func executeRemoteCommand(ctx context.Context, handler remoteResultSender, sessi
 	cmd := exec.CommandContext(ctx, "sh", "-c", wrappedCmd)
 	cmd.Dir = sandbox.rootPath
 	cmd.SysProcAttr = newSysProcAttr()
-	cmd.Env = setupCmdEnv(toolPath)
+	env, runID, release := proxy.commandEnv(toolPath, sessionID, log)
+	defer release()
+	cmd.Env = env
 
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
@@ -488,13 +491,18 @@ func executeRemoteCommand(ctx context.Context, handler remoteResultSender, sessi
 	}
 
 	exitCode := int32(0)
-	if err := cmd.Wait(); err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
+	waitErr := cmd.Wait()
+	// Before EXIT is reported: background children that outlive the shell
+	// must not keep egress under this command's identity.
+	release()
+	proxy.flush(runID)
+	if waitErr != nil {
+		if exitErr, ok := waitErr.(*exec.ExitError); ok {
 			exitCode = int32(exitErr.ExitCode())
 			log.Warning("Command failed (code %d): %s", exitCode, command)
 		} else {
-			log.ErrorE(fmt.Sprintf("Command failed: %s", command), err)
-			_ = handler.SendError(ctx, fmt.Sprintf("command execution failed: %v", err))
+			log.ErrorE(fmt.Sprintf("Command failed: %s", command), waitErr)
+			_ = handler.SendError(ctx, fmt.Sprintf("command execution failed: %v", waitErr))
 			_ = handler.SendExit(ctx, 1)
 			return
 		}

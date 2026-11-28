@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type {
+  AgentHttpRequestListItemDto,
   ConversationMetadataDto,
   SubagentResponseDto,
 } from '@/services/apis/gen/queries';
@@ -8,8 +9,23 @@ import type { RemoteExecuteStreamEvent } from '@/hooks/use-remote-execute-stream
 import type { UIMessage } from 'ai';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('@/hooks/useWorkspaceSelector', () => ({
+  useWorkspaceState: () => ({ state: { selectedWorkspaceId: 'ws-1' } }),
+}));
+
+// The Network tab's request details
+vi.mock('@/services/apis/gen/queries', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/services/apis/gen/queries')>()),
+  useAgentHttpRequestsControllerGetHttpRequest: () => ({
+    data: undefined,
+    isLoading: true,
+    isError: false,
+  }),
+}));
 import type { AgentTodoItem } from './agent-todo-panel';
 import type { LiveBrowserScreenshot } from './browser-panel';
+import type { NetworkData } from './network/network-panel';
 import {
   ChatSidePanel,
   sidePanelContent,
@@ -80,6 +96,68 @@ const browserCommand = (
   ],
 });
 
+const remoteCommand = (toolCallId: string, command: string): UIMessage => ({
+  id: `m-${toolCallId}`,
+  role: 'assistant',
+  parts: [
+    {
+      type: 'dynamic-tool',
+      toolName: 'execute_remote_command',
+      toolCallId,
+      state: 'output-available',
+      input: { command },
+      output: { stdout: '' },
+    },
+  ],
+});
+
+const httpRow = (
+  id: string,
+  toolCallId: string,
+  statusCode: number,
+): AgentHttpRequestListItemDto => ({
+  id,
+  conversationId: 'conv-1',
+  conversationTitle: null,
+  toolCallId,
+  runId: 'run-1',
+  subagentId: null,
+  agentName: 'main',
+  workerId: null,
+  scheme: 'https',
+  method: 'GET',
+  host: 'api.example.com',
+  port: 443,
+  path: `/${id}`,
+  statusCode,
+  outcome: 'allowed',
+  error: null,
+  requestBytes: 0,
+  responseBytes: 10,
+  sentAt: '2026-11-27T10:00:00.000Z',
+  completedAt: '2026-11-27T10:00:00.100Z',
+  durationMs: 100,
+  tlsIntercepted: false,
+  createdAt: '2026-11-27T10:00:00.100Z',
+});
+
+const fakeNetwork = (
+  requests: AgentHttpRequestListItemDto[],
+  hasNextPage = false,
+) =>
+  ({
+    requests,
+    errorCount: requests.filter((r) => (r.statusCode ?? 0) >= 400).length,
+    data: { pages: [{ data: requests, nextCursor: null }], pageParams: [] },
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    hasNextPage,
+    isFetchingNextPage: false,
+    fetchNextPage: vi.fn(),
+    refetch: vi.fn(),
+  }) as unknown as NetworkData;
+
 const liveShot: LiveBrowserScreenshot = {
   toolCallId: 'b2',
   command: 'browser -s b-1 click @e3',
@@ -94,7 +172,17 @@ function Harness({
   browserScreenshots,
   onClose = () => {},
   onSelectToolCall,
+  network,
+  networkToolCallId,
+  networkResetKey,
+  conversationId,
+  initialTab = 'plan',
 }: {
+  network?: NetworkData;
+  networkToolCallId?: string;
+  networkResetKey?: number;
+  conversationId?: string;
+  initialTab?: SidePanelTab;
   subagents?: SubagentResponseDto[];
   messages?: UIMessage[];
   remoteExecuteEvents?: Map<string, RemoteExecuteStreamEvent[]>;
@@ -102,7 +190,7 @@ function Harness({
   onClose?: () => void;
   onSelectToolCall?: (id: string) => void;
 }) {
-  const [tab, setTab] = useState<SidePanelTab>('plan');
+  const [tab, setTab] = useState<SidePanelTab>(initialTab);
   return (
     <ChatSidePanel
       tab={tab}
@@ -116,6 +204,10 @@ function Harness({
       onSelectToolCall={onSelectToolCall}
       remoteExecuteEvents={remoteExecuteEvents}
       browserScreenshots={browserScreenshots}
+      network={network}
+      networkToolCallId={networkToolCallId}
+      networkResetKey={networkResetKey}
+      conversationId={conversationId}
     />
   );
 }
@@ -294,6 +386,115 @@ describe('ChatSidePanel', () => {
     expect(screen.getByText('No stats yet')).toBeInTheDocument();
   });
 
+  it('labels the selected tab once there is room, and every tab on a wide strip', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    const label = (name: RegExp) =>
+      screen
+        .getByRole('tab', { name })
+        .querySelector('[data-slot="tab-label"]')!;
+    // Shown once the strip has room; never wrapping, whatever the language
+    expect(label(/Plan/)).toHaveClass('@md/tabs:not-sr-only', 'whitespace-nowrap');
+    // The others keep theirs for screen readers, and show it on a desktop-wide
+    // strip; a narrow or mobile one stays icons only
+    expect(label(/Stats/)).toHaveClass('sr-only', '@4xl/tabs:not-sr-only', 'whitespace-nowrap');
+    expect(label(/Stats/)).not.toHaveClass('@md/tabs:not-sr-only');
+
+    await user.click(screen.getByRole('tab', { name: /Stats/ }));
+    expect(label(/Stats/)).toHaveClass('@md/tabs:not-sr-only');
+    expect(label(/Plan/)).not.toHaveClass('@md/tabs:not-sr-only');
+    expect(label(/Plan/)).toHaveClass('@4xl/tabs:not-sr-only');
+  });
+
+  it('counts the HTTP requests on the Network tab, and flags failures', async () => {
+    const user = userEvent.setup();
+    const rows = [
+      httpRow('h1', 'k1', 200),
+      httpRow('h2', 'k1', 503),
+      httpRow('h3', 'k2', 200),
+    ];
+    render(
+      <Harness
+        messages={[remoteCommand('k1', 'curl -s https://api.example.com')]}
+        network={fakeNetwork(rows)}
+        networkToolCallId="k1"
+      />,
+    );
+
+    const tab = screen.getByRole('tab', { name: /Network/ });
+    expect(tab).toHaveTextContent('3');
+    expect(tab).toHaveAccessibleName(/Errors: 1/);
+
+    await user.click(tab);
+    // Filtered to the picked command, named by it
+    expect(
+      screen.getByText('Command: curl -s https://api.example.com'),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('list', { name: 'HTTP requests' })).getAllByRole(
+        'button',
+      ),
+    ).toHaveLength(2);
+  });
+
+  it('marks the Network count as partial while older requests are not loaded', () => {
+    render(
+      <Harness network={fakeNetwork([httpRow('h1', 'k1', 500)], true)} />,
+    );
+    const tab = screen.getByRole('tab', { name: /Network/ });
+    expect(tab).toHaveTextContent('1+');
+    expect(tab).toHaveAccessibleName(/Errors: 1\+/);
+  });
+
+  it("a tool card's link shows its requests, folded, even with a request unfolded", async () => {
+    const user = userEvent.setup();
+    const rows = [httpRow('h1', 'k1', 200), httpRow('h2', 'k2', 200)];
+    const props = {
+      messages: [
+        remoteCommand('k1', 'curl https://a.example.com'),
+        remoteCommand('k2', 'curl https://b.example.com'),
+      ],
+      network: fakeNetwork(rows),
+      conversationId: 'conv-1',
+      initialTab: 'network' as const,
+    };
+    const { rerender } = render(<Harness {...props} networkResetKey={0} />);
+
+    await user.click(screen.getByRole('button', { name: /^GET\s*h1/ }));
+    expect(screen.getByRole('button', { name: /^GET\s*h1/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+
+    rerender(<Harness {...props} networkToolCallId="k2" networkResetKey={1} />);
+    expect(screen.queryByRole('button', { name: /^GET\s*h1/ })).toBeNull();
+    expect(screen.getByText('Command: curl https://b.example.com')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^GET\s*h2/ })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+  });
+
+  it('starts the Network tab over in another conversation', async () => {
+    const user = userEvent.setup();
+    const props = {
+      network: fakeNetwork([httpRow('h1', 'k1', 200), httpRow('h2', 'k1', 500)]),
+      initialTab: 'network' as const,
+    };
+    const { rerender } = render(<Harness {...props} conversationId="conv-1" />);
+
+    await user.click(screen.getByRole('button', { name: 'Errors' }));
+    await user.type(screen.getByRole('searchbox', { name: 'Filter requests' }), 'h2');
+
+    rerender(<Harness {...props} conversationId="conv-2" />);
+    expect(screen.getByRole('searchbox', { name: 'Filter requests' })).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
   it('closes from its own button', async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
@@ -315,6 +516,7 @@ describe('sidePanelContent', () => {
       subagents: false,
       browser: false,
       tools: false,
+      network: false,
       stats: false,
     });
     expect(
@@ -324,6 +526,7 @@ describe('sidePanelContent', () => {
         messages: toolMessages,
         metadata,
         browserScreenshots: [liveShot],
+        httpRequestCount: 2,
       }),
     ).toEqual({
       plan: false,
@@ -331,6 +534,7 @@ describe('sidePanelContent', () => {
       subagents: true,
       browser: true,
       tools: true,
+      network: true,
       stats: true,
     });
   });

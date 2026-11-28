@@ -92,7 +92,11 @@ describe('TurnStatsPanel', () => {
 describe('formatters', () => {
   it('formats durations, tokens and cost', () => {
     expect(formatDuration(850)).toBe('850ms');
-    expect(formatDuration(4_200)).toBe('4.2s');
+    // Whole seconds, never a decimal
+    expect(formatDuration(4_200)).toBe('4s');
+    expect(formatDuration(4_600)).toBe('5s');
+    expect(formatDuration(59_600)).toBe('1m0s');
+    expect(formatDuration(249_000)).toBe('4m9s');
     expect(formatDuration(null)).toBe('—');
     expect(formatTokens(1_234)).toBe('1.2K');
     expect(formatCost(0)).toBe('$0');

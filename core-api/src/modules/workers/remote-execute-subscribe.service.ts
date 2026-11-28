@@ -397,17 +397,27 @@ export class RemoteExecuteSubscribeService implements OnModuleDestroy {
     return workerId ? this.pushCommand(workerId, sessionId, command) : null;
   }
 
+  /**
+   * `beforePush` runs with the picked worker before the command reaches it,
+   * so whatever the worker reports for the session (HTTP logs) can never
+   * arrive before core knows the session.
+   */
   async pushCommandWithConversation(
     conversationId: string,
     workspaceId: string,
     sessionId: string,
     command: string,
+    beforePush?: (workerId: string) => Promise<void>,
   ): Promise<RemoteExecuteCommand | null> {
     if (!conversationId) {
-      return this.pushCommandWithSession(sessionId, command, workspaceId);
+      const workerId = this.getOrAssignWorker(sessionId, workspaceId);
+      if (!workerId) return null;
+      await beforePush?.(workerId);
+      return this.pushCommand(workerId, sessionId, command);
     }
     const pick = await this.pickConversationWorker(conversationId, workspaceId);
     if (!pick) return null;
+    await beforePush?.(pick.workerId);
     const pushed = this.pushCommand(pick.workerId, sessionId, command);
     if (pushed && pick.pin) {
       await this.pinConversationWorker(conversationId, pick.workerId);

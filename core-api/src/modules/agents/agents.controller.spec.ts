@@ -2,6 +2,7 @@ import { WorkspacePermissions } from '@/common/decorators/workspace-permissions.
 import { HttpStatus, NotFoundException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AgentApprovalsController } from './agent-approvals.controller';
+import { AgentHttpRequestsController } from './agent-http-requests.controller';
 import { AgentCustomizationController } from './agent-customization.controller';
 import { AgentMcpConfigsController } from './agent-mcp-configs.controller';
 import { AgentModelsController } from './agent-models.controller';
@@ -20,6 +21,7 @@ const AGENT_CONTROLLERS = [
   AgentMcpConfigsController,
   AgentSettingsController,
   AgentCustomizationController,
+  AgentHttpRequestsController,
 ];
 
 /** The handler and the controller that declares it. */
@@ -58,6 +60,8 @@ describe('Agents controllers workspace permission guards', () => {
     ['getSkills', 'GET /skills'],
     ['getAgentConfig', 'GET /config'],
     ['getAgentDefinitions', 'GET /definitions'],
+    ['getHttpRequests', 'GET /http-requests'],
+    ['getHttpRequest', 'GET /http-requests/:id'],
   ];
 
   const write: Array<[string, string]> = [
@@ -146,6 +150,61 @@ describe('AgentsController.resumeStream', () => {
       controller.resumeStream('c1', 'w1', 'u1', res as never),
     ).rejects.toThrow('db down');
     expect(res.status).not.toHaveBeenCalled();
+  });
+});
+
+describe('AgentsController.streamMessage live-only parts', () => {
+  it('publishes screenshots and HTTP request pushes live, buffers the rest', async () => {
+    const chunks = [
+      { type: 'text-delta', delta: 'hi' },
+      { type: 'data-browser-screenshot', data: {}, transient: true },
+      { type: 'data-http-requests-updated', data: { requests: [] }, transient: true },
+    ];
+    const append = jest.fn(() => Promise.resolve());
+    const publishLive = jest.fn(() => Promise.resolve());
+    const controller = Object.assign(
+      Object.create(AgentsController.prototype) as AgentsController,
+      {
+        agentsCompletionsService: {
+          streamMessage: jest.fn().mockResolvedValue({
+            conversationId: 'c1',
+            settled: Promise.resolve(),
+            stream: new ReadableStream({
+              start: (c) => {
+                chunks.forEach((chunk) => c.enqueue(chunk));
+                c.close();
+              },
+            }),
+          }),
+        },
+        agentsStreamBuffer: {
+          reset: jest.fn(() => Promise.resolve()),
+          append,
+          publishLive,
+          finish: jest.fn(() => Promise.resolve()),
+        },
+        activeRuns: { register: jest.fn(), clear: jest.fn() },
+      },
+    );
+    const res = {
+      on: jest.fn(),
+      off: jest.fn(),
+      setHeader: jest.fn(),
+      flushHeaders: jest.fn(),
+      write: jest.fn(),
+      end: jest.fn(),
+      writableEnded: false,
+    };
+
+    await controller.streamMessage({}, 'w1', 'u1', res);
+
+    const types = (calls: unknown[][]) =>
+      calls.map(([, json]) => (JSON.parse(json as string) as { type: string }).type);
+    expect(types(publishLive.mock.calls)).toEqual([
+      'data-browser-screenshot',
+      'data-http-requests-updated',
+    ]);
+    expect(types(append.mock.calls)).toEqual(['text-delta']);
   });
 });
 

@@ -193,6 +193,7 @@ export class AgentTool {
    * `projectId` (the conversation's project) the project-aware tools are
    * locked to it. `agentName` names the agent definition running them (a
    * subagent); tools that record provenance (propose_vulnerability) use it.
+   * `subagentId` is that subagent's run, for the HTTP logs of its commands.
    */
   getTools(
     workspaceId: string,
@@ -203,6 +204,7 @@ export class AgentTool {
     approval?: ApprovalSettings,
     projectId?: string | null,
     agentName?: string,
+    subagentId?: string,
   ): Record<string, Tool> {
     return this.build(BUILTIN_TOOL_CLASSES, {
       workspaceId,
@@ -213,6 +215,7 @@ export class AgentTool {
       approval,
       projectId,
       agentName,
+      subagentId,
     });
   }
 

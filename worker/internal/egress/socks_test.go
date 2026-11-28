@@ -102,3 +102,26 @@ func TestSinglePortHTTPAndSocksCoexist(t *testing.T) {
 		t.Fatalf("body = %q", body)
 	}
 }
+
+// Run tokens are HTTP-only: agent commands get no ALL_PROXY, so a SOCKS
+// client presenting one is refused.
+func TestSocks5RejectsRunToken(t *testing.T) {
+	runs := NewRunCredentials()
+	srv, err := NewServer("127.0.0.1:0", testAuth(""), Options{Runs: runs})
+	if err != nil {
+		t.Fatalf("NewServer: %v", err)
+	}
+	t.Cleanup(func() { _ = srv.Close() })
+	go func() { _ = srv.Serve(t.Context()) }()
+	tok, revoke := runs.Issue("sess-socks")
+	defer revoke()
+	dialer, err := proxy.SOCKS5("tcp", srv.Addr().String(), &proxy.Auth{User: tok}, proxy.Direct)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := dialer.Dial("tcp", "localhost:1")
+	if err == nil {
+		c.Close()
+		t.Fatal("socks5 with a run token must fail")
+	}
+}

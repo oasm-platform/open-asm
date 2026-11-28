@@ -378,7 +378,7 @@ func processJob(ctx context.Context, job *pb.Job, grpcClient *grpcclient.Client,
 			cmd = exec.CommandContext(ctx, "sh", "-c", cmdStr)
 		}
 		cmd.SysProcAttr = newSysProcAttr()
-		cmd.Env = setupCmdEnv(toolPath)
+		cmd.Env = setupCmdEnv(toolPath, false)
 
 		output, err := cmd.CombinedOutput()
 		if err != nil {

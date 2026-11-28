@@ -329,6 +329,49 @@ message CancelRequest {
   optional string cancelled_by = 3;
 }
 
+message EgressHttpLogBatch {
+  repeated EgressHttpLog logs = 1;
+  uint64 dropped = 2; // events dropped on the worker since the last batch (buffer full)
+}
+
+message EgressHttpLog {
+  string id = 1;          // UUIDv7, idempotency key = agent_http_requests.id
+  string session_id = 2;  // remote-execute session the proxy credential was issued for
+  string scheme = 3;
+  string method = 4;      // "" for CONNECT
+  string host = 5;
+  uint32 port = 6;
+  string path = 7;        // "" for CONNECT
+  uint32 status_code = 8; // 0 when none
+  EgressHttpOutcome outcome = 9;
+  string error = 10;
+  uint64 request_bytes = 11;
+  uint64 response_bytes = 12;
+  google.protobuf.Timestamp sent_at = 13;
+  google.protobuf.Timestamp completed_at = 14;
+  repeated HttpHeader request_headers = 15;  // masked
+  repeated HttpHeader response_headers = 16; // masked
+  bytes request_body = 17;  // capped
+  bytes response_body = 18; // capped
+  bool request_body_truncated = 19;
+  bool response_body_truncated = 20;
+}
+
+message HttpHeader { string name = 1; string value = 2; }
+
+enum EgressHttpOutcome {
+  EGRESS_HTTP_OUTCOME_UNSPECIFIED = 0;
+  EGRESS_HTTP_OUTCOME_ALLOWED = 1;
+  EGRESS_HTTP_OUTCOME_DENIED = 2;
+  EGRESS_HTTP_OUTCOME_UPSTREAM_ERROR = 3;
+  EGRESS_HTTP_OUTCOME_CANCELLED = 4;
+}
+
+message EgressHttpLogAck {
+  uint32 accepted = 1;
+  uint32 rejected = 2; // unknown session, wrong worker, invalid fields
+}
+
 service WorkersService {
   rpc Join(JoinRequest) returns (JoinResponse);
   rpc Alive(AliveRequest) returns (stream AliveResponse);
@@ -339,6 +382,7 @@ service WorkersService {
   rpc BuiltinToolRegistry(BuiltinToolRegistryRequest) returns (BuiltinToolRegistryResponse);
   rpc RemoteExecuteSubscribe(RemoteExecuteSubscribeRequest) returns (stream RemoteExecuteSubscribeResponse);
   rpc RemoteExecuteResult(RemoteExecuteResultStream) returns (RemoteExecuteResultAck);
+  rpc ReportEgressHttpLogs(EgressHttpLogBatch) returns (EgressHttpLogAck);
   // Long-lived bidirectional channel: the push half is what lets core-api stop a
   // running job instead of only flipping its status in the database.
   rpc Connect(stream WorkerToCore) returns (stream CoreToWorker);

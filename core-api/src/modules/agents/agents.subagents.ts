@@ -784,6 +784,7 @@ export class AgentsSubagentsService implements OnModuleInit, OnModuleDestroy {
         conversation.projectId,
         // Provenance of what it records (propose_vulnerability)
         job.name,
+        job.id,
       );
       // The skills the definition declares, offered as the main agent's are:
       // listed in the prompt, loaded on demand with load_skill

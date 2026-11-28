@@ -13,6 +13,7 @@ import {
   type ClientEvent,
   isClientEvent,
   NOTIFICATION_CREATED,
+  OWNER_ONLY_EVENTS,
 } from './client-events';
 
 type Listener = (event: ClientEvent) => void;
@@ -47,6 +48,8 @@ export class EventsService implements OnModuleDestroy {
   private readonly logger = new Logger(EventsService.name);
   private readonly workspaces = new Map<string, Set<Listener>>();
   private readonly users = new Map<string, Set<Listener>>();
+  /** Workspace connections by `ownerKey`, for {@link OWNER_ONLY_EVENTS}. */
+  private readonly owners = new Map<string, Set<Listener>>();
   /** Pending or established pattern subscription; cleared on failure. */
   private notifications?: Promise<void>;
   private reading = false;
@@ -64,6 +67,9 @@ export class EventsService implements OnModuleDestroy {
       const leaveWorkspace = workspaceId
         ? this.join(this.workspaces, workspaceId, listener)
         : undefined;
+      const leaveOwner = workspaceId
+        ? this.join(this.owners, ownerKey(workspaceId, userId), listener)
+        : undefined;
       const leaveUser = this.join(this.users, userId, listener);
       // A named event: SSE clients only dispatch unnamed ones as data, so
       // heartbeats never reach a handler.
@@ -78,6 +84,7 @@ export class EventsService implements OnModuleDestroy {
       return () => {
         clearInterval(heartbeat);
         leaveWorkspace?.();
+        leaveOwner?.();
         leaveUser();
       };
     });
@@ -180,16 +187,27 @@ export class EventsService implements OnModuleDestroy {
 
   private dispatchEntry(entry: StreamEntry): void {
     const { type, id, time } = entry.fields;
+    if (!type || !id) return;
+    const ownerOnly = OWNER_ONLY_EVENTS.includes(type);
     // Filter on the name first, so most entries are skipped undecoded.
-    if (!type || !id || !isClientEvent(type)) return;
+    if (!ownerOnly && !isClientEvent(type)) return;
 
     // The bridge's own decoder: an entry every sink drops as unattributable
     // is not forwarded either.
     const data = parseData(entry.fields.data);
     if (!data) return;
 
+    let listeners: Set<Listener> | undefined;
+    if (ownerOnly) {
+      const ownerId = data.actor?.id;
+      if (typeof ownerId !== 'string' || !ownerId) return;
+      listeners = this.owners.get(ownerKey(data.workspaceId, ownerId));
+    } else {
+      listeners = this.workspaces.get(data.workspaceId);
+    }
+
     const joinKeyId = data.metadata?.joinKeyId;
-    this.emit(this.workspaces.get(data.workspaceId), {
+    this.emit(listeners, {
       id,
       type,
       time,
@@ -213,6 +231,11 @@ export class EventsService implements OnModuleDestroy {
       }`,
     );
   }
+}
+
+/** Workspace ids are UUIDs, so the first `:` always ends the workspace part. */
+function ownerKey(workspaceId: string, userId: string): string {
+  return `${workspaceId}:${userId}`;
 }
 
 function parseJson<T>(raw: string): T | undefined {
