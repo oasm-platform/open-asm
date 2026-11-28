@@ -6,7 +6,6 @@ import {
   startOfMonth,
   subMonths,
 } from 'date-fns';
-import { BarChart3, SearchCode, ShieldAlert, type LucideIcon } from 'lucide-react';
 import { type DateRange } from 'react-day-picker';
 
 /** Every template a report can come from; the list API filters only the first two. */
@@ -36,31 +35,32 @@ export const EMPTY_DRAFT: ReportDraft = {
 };
 
 interface TemplateMeta {
-  icon: LucideIcon;
   labelKey: string;
   descriptionKey: string;
-  /** Tile and badge colours. */
+  /** Badge colours. */
   tone: string;
+  /** The template's colour on its own: dots and accent bars. */
+  dot: string;
 }
 
 export const TEMPLATE_META: Record<ReportTemplate, TemplateMeta> = {
   SUMMARY: {
-    icon: BarChart3,
     labelKey: 'reports.type.summary',
     descriptionKey: 'reports.generate.summaryDescription',
     tone: 'bg-primary/12 text-primary',
+    dot: 'bg-primary',
   },
   VULNERABILITY: {
-    icon: ShieldAlert,
     labelKey: 'reports.type.vulnerability',
     descriptionKey: 'reports.generate.vulnerabilityDescription',
     tone: 'bg-destructive/12 text-destructive',
+    dot: 'bg-destructive',
   },
   QUERY: {
-    icon: SearchCode,
     labelKey: 'reports.type.query',
     descriptionKey: 'reports.generate.queryDescription',
     tone: 'bg-chart-2/12 text-chart-2',
+    dot: 'bg-chart-2',
   },
 };
 

@@ -27,22 +27,15 @@ export function buildReportColumns(
       accessorKey: 'fileName',
       header: t('reports.columns.report'),
       enableSorting: true,
-      cell: ({ row }) => {
-        const meta = TEMPLATE_META[templateOf(row.original.type)];
-        return (
-          <div className="flex min-w-0 items-center gap-3">
-            <span className={cn('grid size-9 shrink-0 place-items-center rounded-lg', meta.tone)}>
-              <meta.icon className="size-4" />
-            </span>
-            <div className="min-w-0">
-              <div className="truncate font-medium">{t(meta.labelKey)}</div>
-              <div className="truncate font-mono text-xs text-muted-foreground">
-                {row.original.fileName}
-              </div>
-            </div>
-          </div>
-        );
-      },
+      cell: ({ row }) => (
+        <div className="flex min-w-0 items-center gap-3">
+          {/* The template's colour marks the row; the type column names it. */}
+          <span
+            className={cn('h-8 w-1 shrink-0 rounded-full', TEMPLATE_META[templateOf(row.original.type)].dot)}
+          />
+          <span className="truncate font-medium">{row.original.fileName}</span>
+        </div>
+      ),
     },
     {
       accessorKey: 'type',
@@ -52,7 +45,6 @@ export function buildReportColumns(
         const meta = TEMPLATE_META[templateOf(row.original.type)];
         return (
           <Badge variant="soft" className={cn('rounded-full', meta.tone)}>
-            <meta.icon />
             {t(meta.labelKey)}
           </Badge>
         );
@@ -63,7 +55,10 @@ export function buildReportColumns(
       header: t('reports.columns.created'),
       enableSorting: true,
       cell: ({ row }) => (
-        <span className="whitespace-nowrap" title={formatDate(row.original.createdAt, 'PPpp')}>
+        <span
+          className="whitespace-nowrap text-muted-foreground"
+          title={formatDate(row.original.createdAt, 'PPpp')}
+        >
           {fromNow(row.original.createdAt)}
         </span>
       ),
@@ -75,7 +70,7 @@ export function buildReportColumns(
       cell: ({ row }) => (
         // Row clicks open the preview, so every action stops its own click.
         <div
-          className="flex justify-end gap-0.5 opacity-60 transition-opacity group-hover/row:opacity-100 focus-within:opacity-100"
+          className="flex justify-end gap-0.5 text-muted-foreground"
           onClick={(e) => e.stopPropagation()}
         >
           <Button
@@ -107,7 +102,7 @@ export function buildReportColumns(
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-8 text-destructive hover:text-destructive"
+                className="size-8 text-muted-foreground hover:text-destructive"
                 aria-label={t('reports.delete.title')}
               >
                 <Trash2 className="size-4" />

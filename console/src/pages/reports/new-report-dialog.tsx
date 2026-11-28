@@ -1,4 +1,3 @@
-import { CalendarClock, Check, FileText, Repeat } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -93,7 +92,6 @@ export function NewReportDialog({ open, onOpenChange, initialDraft }: NewReportD
             <div role="radiogroup" className="grid gap-2 sm:grid-cols-3">
               {TEMPLATES.map((template) => {
                 const meta = TEMPLATE_META[template];
-                const Icon = meta.icon;
                 const selected = draft.template === template;
                 return (
                   <button
@@ -109,19 +107,15 @@ export function NewReportDialog({ open, onOpenChange, initialDraft }: NewReportD
                       })
                     }
                     className={cn(
-                      'relative flex flex-col gap-2 rounded-xl border-[1.5px] p-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      // The fill outlines the card in dark mode, where borders are not drawn.
+                      'flex flex-col gap-1.5 rounded-xl border-[1.5px] bg-muted/40 p-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                       selected && 'border-primary bg-primary/5 hover:bg-primary/5',
                     )}
                   >
-                    {selected && (
-                      <span className="absolute right-2.5 top-2.5 grid size-4 place-items-center rounded-full bg-primary text-primary-foreground">
-                        <Check className="size-2.5" strokeWidth={3.5} />
-                      </span>
-                    )}
-                    <span className={cn('grid size-8 place-items-center rounded-lg', meta.tone)}>
-                      <Icon className="size-4" />
+                    <span className="flex items-center gap-2 text-sm font-semibold">
+                      <span className={cn('size-2 rounded-full', meta.dot)} />
+                      {t(meta.labelKey)}
                     </span>
-                    <span className="text-sm font-semibold">{t(meta.labelKey)}</span>
                     <span className="text-xs leading-snug text-muted-foreground">
                       {t(meta.descriptionKey)}
                     </span>
@@ -210,7 +204,6 @@ export function NewReportDialog({ open, onOpenChange, initialDraft }: NewReportD
             <div role="radiogroup" className="overflow-hidden rounded-xl border">
               <DeliveryOption
                 selected={!draft.repeat}
-                icon={FileText}
                 title={t('reports.generate.now')}
                 description={t('reports.generate.nowHint')}
                 onSelect={() => update({ repeat: false })}
@@ -218,7 +211,6 @@ export function NewReportDialog({ open, onOpenChange, initialDraft }: NewReportD
               <DeliveryOption
                 selected={scheduled}
                 disabled={isQuery}
-                icon={Repeat}
                 title={t('reports.generate.schedule')}
                 description={
                   isQuery ? t('reports.generate.queryNoSchedule') : t('reports.generate.scheduleHint')
@@ -240,7 +232,6 @@ export function NewReportDialog({ open, onOpenChange, initialDraft }: NewReportD
             {t('common.cancel')}
           </Button>
           <Button onClick={() => void submit()} disabled={!canSubmit}>
-            {scheduled ? <CalendarClock className="size-4" /> : <FileText className="size-4" />}
             {isPending
               ? t('reports.generate.generating')
               : scheduled
@@ -304,7 +295,6 @@ function SeverityThreshold({
 function DeliveryOption({
   selected,
   disabled,
-  icon: Icon,
   title,
   description,
   onSelect,
@@ -312,7 +302,6 @@ function DeliveryOption({
 }: {
   selected: boolean;
   disabled?: boolean;
-  icon: typeof FileText;
   title: string;
   description: string;
   onSelect: () => void;
@@ -344,10 +333,7 @@ function DeliveryOption({
         )}
       />
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <Icon className="size-4 text-muted-foreground" />
-          {title}
-        </div>
+        <div className="text-sm font-medium">{title}</div>
         <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
         {/* The schedule builder's own clicks must not re-select the option. */}
         <div onClick={(e) => e.stopPropagation()}>{children}</div>

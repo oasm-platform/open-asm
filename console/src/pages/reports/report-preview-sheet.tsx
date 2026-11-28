@@ -1,4 +1,4 @@
-import { Download, ExternalLink, Loader2, Trash2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -57,8 +57,7 @@ export function ReportPreviewSheet({
           <>
             <SheetHeader className="gap-2 border-b pr-12">
               <div className="flex items-center gap-2">
-                <Badge variant="soft" className={cn('gap-1', meta.tone)}>
-                  <meta.icon />
+                <Badge variant="soft" className={cn('rounded-full', meta.tone)}>
                   {t(meta.labelKey)}
                 </Badge>
                 <span className="text-xs text-muted-foreground">
@@ -69,13 +68,11 @@ export function ReportPreviewSheet({
               <SheetDescription className="sr-only">{t('reports.preview.title')}</SheetDescription>
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 <Button size="sm" onClick={() => onDownload(report)}>
-                  <Download className="size-4" />
                   {t('reports.preview.download')}
                 </Button>
                 {data?.url && (
                   <Button size="sm" variant="outline" asChild>
                     <a href={data.url} target="_blank" rel="noreferrer noopener">
-                      <ExternalLink className="size-4" />
                       {t('reports.preview.openInNewTab')}
                     </a>
                   </Button>
@@ -92,7 +89,6 @@ export function ReportPreviewSheet({
                       variant="ghost"
                       className="ml-auto text-destructive hover:text-destructive"
                     >
-                      <Trash2 className="size-4" />
                       {t('common.delete')}
                     </Button>
                   }

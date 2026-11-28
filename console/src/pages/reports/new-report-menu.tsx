@@ -1,4 +1,4 @@
-import { ChevronDown, Plus, Settings2 } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
@@ -44,12 +44,10 @@ export function NewReportMenu({ onCustomize, disabled }: NewReportMenuProps) {
   const t = useT();
   const { generate, isPending } = useGenerateReport();
   const { data: savedQueries } = useAttackSurfaceQueryControllerListSaved();
-  const queryMeta = TEMPLATE_META.QUERY;
 
   return (
     <ButtonGroup>
       <Button onClick={onCustomize} disabled={disabled}>
-        <Plus className="size-4" />
         {t('reports.actions.newReport')}
       </Button>
       <DropdownMenu>
@@ -67,18 +65,12 @@ export function NewReportMenu({ onCustomize, disabled }: NewReportMenuProps) {
           <DropdownMenuLabel className="text-xs text-muted-foreground">
             {t('reports.quick.title')}
           </DropdownMenuLabel>
-          {QUICK_DRAFTS.map(({ labelKey, draft }) => {
-            const meta = TEMPLATE_META[draft.template];
-            const Icon = meta.icon;
-            return (
-              <DropdownMenuItem key={labelKey} onSelect={() => void generate(draft)}>
-                <span className={cn('grid size-7 place-items-center rounded-md', meta.tone)}>
-                  <Icon className="size-3.5" />
-                </span>
-                {t(labelKey)}
-              </DropdownMenuItem>
-            );
-          })}
+          {QUICK_DRAFTS.map(({ labelKey, draft }) => (
+            <DropdownMenuItem key={labelKey} onSelect={() => void generate(draft)}>
+              <span className={cn('size-2 shrink-0 rounded-full', TEMPLATE_META[draft.template].dot)} />
+              {t(labelKey)}
+            </DropdownMenuItem>
+          ))}
           {savedQueries && savedQueries.length > 0 && (
             <>
               <DropdownMenuSeparator />
@@ -92,9 +84,7 @@ export function NewReportMenu({ onCustomize, disabled }: NewReportMenuProps) {
                     void generate({ ...EMPTY_DRAFT, template: 'QUERY', savedQueryId: saved.id })
                   }
                 >
-                  <span className={cn('grid size-7 place-items-center rounded-md', queryMeta.tone)}>
-                    <queryMeta.icon className="size-3.5" />
-                  </span>
+                  <span className={cn('size-2 shrink-0 rounded-full', TEMPLATE_META.QUERY.dot)} />
                   <span className="truncate">{saved.name}</span>
                 </DropdownMenuItem>
               ))}
@@ -102,7 +92,6 @@ export function NewReportMenu({ onCustomize, disabled }: NewReportMenuProps) {
           )}
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={onCustomize}>
-            <Settings2 className="size-4" />
             {t('reports.quick.custom')}
           </DropdownMenuItem>
         </DropdownMenuContent>

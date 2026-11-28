@@ -1,5 +1,4 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { CalendarClock, Repeat } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -22,6 +21,7 @@ import { getLocalTimezone, getNextRun } from '@/lib/cron-schedule';
 import { formatDate, fromNow } from '@/lib/date-locale';
 import { handleServerError } from '@/lib/handle-server-error';
 import { useT } from '@/lib/i18n-dictionary';
+import { cn } from '@/lib/utils';
 import type { ReportResponseDto } from '@/services/apis/gen/queries';
 import {
   reportsControllerGetDownloadUrl,
@@ -159,7 +159,6 @@ export default function Reports() {
         hasWorkspace ? (
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={() => setSchedulesOpen(true)}>
-              <Repeat className="size-4" />
               {t('reports.actions.schedules')}
               {schedules && schedules.length > 0 && (
                 <span className="rounded-full bg-muted px-1.5 text-[11px] tabular-nums text-muted-foreground">
@@ -180,7 +179,9 @@ export default function Reports() {
         <div className="flex flex-col gap-4">
           {nextRun && (
             <div className="flex flex-wrap items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 text-sm">
-              <CalendarClock className="size-4 shrink-0 text-primary" />
+              <span
+                className={cn('size-2 shrink-0 rounded-full', TEMPLATE_META[nextRun.schedule.type].dot)}
+              />
               <span>
                 <span className="font-medium">{t('reports.nextRun.label')}</span>{' '}
                 {t(TEMPLATE_META[nextRun.schedule.type].labelKey)} ·{' '}
@@ -266,7 +267,6 @@ export default function Reports() {
                   openDialog({ repeat: true });
                 }}
               >
-                <CalendarClock className="size-4" />
                 {t('reports.schedules.add')}
               </Button>
             </div>
