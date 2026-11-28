@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   setMessages: vi.fn(),
   resumeStream: vi.fn(),
   locationState: null as unknown,
+  mergeHttpRequests: vi.fn(),
   transportOptions: undefined as
     | { fetch: (input: string, init?: RequestInit) => Promise<Response> }
     | undefined,
@@ -100,6 +101,10 @@ vi.mock('@/services/apis/gen/queries', () => ({
     isFetchingNextPage: false,
     refetch: mocks.refetch,
   }),
+}));
+
+vi.mock('@/pages/agents/components/network/use-conversation-http-requests', () => ({
+  mergeHttpRequestsIntoCache: mocks.mergeHttpRequests,
 }));
 
 vi.mock('@/services/apis/axios-client', () => ({
@@ -587,6 +592,30 @@ describe('useAgentChat subagents', () => {
       ...subagent('completed'),
       id: 's3',
     });
+  });
+});
+
+describe('useAgentChat HTTP requests', () => {
+  beforeEach(() => {
+    mocks.onData = undefined;
+    mocks.orvalClient.mockReset();
+    mocks.orvalClient.mockResolvedValue({});
+  });
+
+  it('hands pushed requests to the Network tab cache', () => {
+    renderHook(() => useAgentChat({ conversationId: 'c1' }));
+    const payload = { requests: [{ id: 'r1' }] };
+
+    act(() => {
+      mocks.onData?.({ type: 'data-http-requests-updated', data: payload });
+    });
+
+    expect(mocks.mergeHttpRequests).toHaveBeenCalledWith(
+      expect.anything(),
+      'w1',
+      'c1',
+      payload,
+    );
   });
 });
 

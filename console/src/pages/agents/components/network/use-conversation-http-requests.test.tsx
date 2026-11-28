@@ -1,8 +1,15 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  QueryClient,
+  QueryClientProvider,
+  type InfiniteData,
+} from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AgentHttpRequestListResponseDto } from '@/services/apis/gen/queries';
 import {
+  conversationHttpRequestsKey,
+  mergeHttpRequestsIntoCache,
   NETWORK_POLL_MS,
   useConversationHttpRequests,
 } from './use-conversation-http-requests';
@@ -64,6 +71,10 @@ describe('useConversationHttpRequests', () => {
     );
   });
 
+  it('polls only as a safety net, every 10 s', () => {
+    expect(NETWORK_POLL_MS).toBe(10_000);
+  });
+
   it('polls while a run is active and watched', async () => {
     const fn = await fetcher();
     renderHook(() => useConversationHttpRequests('c1', { running: true }), {
@@ -112,5 +123,72 @@ describe('useConversationHttpRequests', () => {
     rerender({ running: false });
     await act(() => vi.advanceTimersByTimeAsync(NETWORK_POLL_MS));
     expect(fn).not.toHaveBeenCalled();
+  });
+});
+
+describe('mergeHttpRequestsIntoCache', () => {
+  type Data = InfiniteData<AgentHttpRequestListResponseDto, string | undefined>;
+  const at = (id: string, second: number) =>
+    ({
+      id,
+      sentAt: `2026-11-27T10:00:${String(second).padStart(2, '0')}.000Z`,
+    }) as AgentHttpRequestListResponseDto['data'][number];
+  const key = conversationHttpRequestsKey('ws-1', 'c1');
+
+  function seed(pages: AgentHttpRequestListResponseDto[]) {
+    const client = new QueryClient();
+    client.setQueryData<Data>(key, {
+      pages,
+      pageParams: pages.map((_, i) => (i ? `cursor-${i}` : undefined)),
+    });
+    return client;
+  }
+  const ids = (client: QueryClient) =>
+    client.getQueryData<Data>(key)!.pages.map((p) => p.data.map((r) => r.id));
+
+  it('inserts new rows into the newest page, newest first, skipping known ids', () => {
+    const client = seed([
+      { data: [at('b', 20), at('a', 10)], nextCursor: 'cursor-1' },
+      { data: [at('z', 5)], nextCursor: null },
+    ]);
+
+    mergeHttpRequestsIntoCache(client, 'ws-1', 'c1', {
+      requests: [at('c', 30), at('b', 20), at('d', 40)],
+    });
+
+    expect(ids(client)).toEqual([['d', 'c', 'b', 'a'], ['z']]);
+    expect(client.getQueryData<Data>(key)!.pages[0].nextCursor).toBe('cursor-1');
+  });
+
+  it('refetches instead when a row would sort past the newest page cursor', () => {
+    const client = seed([
+      { data: [at('b', 20), at('a', 10)], nextCursor: 'cursor-1' },
+      { data: [at('z', 5)], nextCursor: null },
+    ]);
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
+
+    mergeHttpRequestsIntoCache(client, 'ws-1', 'c1', { requests: [at('late', 1)] });
+
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: key });
+    expect(ids(client)).toEqual([['b', 'a'], ['z']]);
+  });
+
+  it('accepts an old row when the newest page is the only one', () => {
+    const client = seed([{ data: [at('b', 20)], nextCursor: null }]);
+    mergeHttpRequestsIntoCache(client, 'ws-1', 'c1', { requests: [at('late', 1)] });
+    expect(ids(client)).toEqual([['b', 'late']]);
+  });
+
+  it('does nothing while the list has not loaded', () => {
+    const client = new QueryClient();
+    mergeHttpRequestsIntoCache(client, 'ws-1', 'c1', { requests: [at('a', 1)] });
+    expect(client.getQueryData(key)).toBeUndefined();
+  });
+
+  it('invalidates the list on a refetch push', () => {
+    const client = seed([{ data: [], nextCursor: null }]);
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
+    mergeHttpRequestsIntoCache(client, 'ws-1', 'c1', { refetch: true });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: key });
   });
 });

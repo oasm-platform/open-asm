@@ -108,6 +108,10 @@ class LeftConversationError extends Error {
 
 import { useLocation, useNavigate } from '@tanstack/react-router';
 import { useWorkspaceState } from '@/hooks/useWorkspaceSelector';
+import {
+  mergeHttpRequestsIntoCache,
+  type HttpRequestsPush,
+} from '@/pages/agents/components/network/use-conversation-http-requests';
 
 export interface ApprovalDecisionOptions {
   /** Approve everything else in this conversation too */
@@ -757,6 +761,15 @@ export function useAgentChat({
           receivedAt: Date.now(),
         };
         setBrowserScreenshots((prev) => mergeBrowserScreenshot(prev, shot));
+      }
+      if (data.type === 'data-http-requests-updated' && conversationId) {
+        // New rows of the Network tab, written straight into its query cache
+        mergeHttpRequestsIntoCache(
+          queryClient,
+          selectedWorkspaceId,
+          conversationId,
+          data.data as HttpRequestsPush,
+        );
       }
     },
   });
