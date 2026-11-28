@@ -6,22 +6,16 @@ import type { Repository, SelectQueryBuilder } from 'typeorm';
 import { AgentMessageToolCall } from '../entities/tool-call.entity';
 import { AgentHttpRequestPayload } from './agent-http-request-payload.entity';
 import { AgentHttpRequest } from './agent-http-request.entity';
-import { AgentHttpOutcome } from './agent-http-request.enums';
+import type { AgentHttpOutcome } from './agent-http-request.enums';
+import { OUTCOME_NAMES, toListItem } from './agent-http-request.mapper';
 import {
   AgentHttpOutcomeName,
   AgentHttpRequestDetailDto,
-  AgentHttpRequestListItemDto,
   AgentHttpRequestListResponseDto,
   AgentHttpRequestPayloadDto,
   GetAgentHttpRequestsQueryDto,
 } from './dto/agent-http-request.dto';
 
-const OUTCOME_NAMES: Record<AgentHttpOutcome, AgentHttpOutcomeName> = {
-  [AgentHttpOutcome.ALLOWED]: 'allowed',
-  [AgentHttpOutcome.DENIED]: 'denied',
-  [AgentHttpOutcome.UPSTREAM_ERROR]: 'upstream_error',
-  [AgentHttpOutcome.CANCELLED]: 'cancelled',
-};
 const OUTCOME_VALUES = Object.fromEntries(
   Object.entries(OUTCOME_NAMES).map(([value, name]) => [name, Number(value)]),
 ) as Record<AgentHttpOutcomeName, AgentHttpOutcome>;
@@ -68,34 +62,6 @@ export function decodeAgentHttpCursor(cursor: string): AgentHttpCursor {
 /** LIKE treats `%`, `_` and `\` as syntax; a host prefix is literal text. */
 function likePrefix(value: string): string {
   return `${value.toLowerCase().replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-}
-
-function toListItem(row: AgentHttpRequest): AgentHttpRequestListItemDto {
-  return {
-    id: row.id,
-    conversationId: row.conversationId,
-    conversationTitle: row.conversation?.title ?? null,
-    toolCallId: row.toolCallId,
-    runId: row.runId,
-    subagentId: row.subagentId,
-    agentName: row.agentName,
-    workerId: row.workerId,
-    scheme: row.scheme,
-    method: row.method,
-    host: row.host,
-    port: row.port,
-    path: row.path,
-    statusCode: row.statusCode,
-    outcome: OUTCOME_NAMES[row.outcome],
-    error: row.error,
-    requestBytes: row.requestBytes,
-    responseBytes: row.responseBytes,
-    sentAt: row.sentAt,
-    completedAt: row.completedAt,
-    durationMs: row.durationMs,
-    tlsIntercepted: row.tlsIntercepted,
-    createdAt: row.createdAt,
-  };
 }
 
 function toPayload(p: AgentHttpRequestPayload): AgentHttpRequestPayloadDto {
@@ -169,7 +135,7 @@ export class AgentHttpRequestsService {
       .getMany();
     const page = rows.slice(0, limit);
     return {
-      data: page.map(toListItem),
+      data: page.map((row) => toListItem(row, row.conversation?.title ?? null)),
       nextCursor:
         rows.length > limit ? encodeAgentHttpCursor(page[page.length - 1]) : null,
     };
@@ -192,7 +158,7 @@ export class AgentHttpRequestsService {
     ]);
     const command = toolCall?.args?.command;
     return {
-      ...toListItem(row),
+      ...toListItem(row, row.conversation?.title ?? null),
       payload: payload ? toPayload(payload) : null,
       command: typeof command === 'string' ? command : null,
       messageId: toolCall?.messageId ?? null,

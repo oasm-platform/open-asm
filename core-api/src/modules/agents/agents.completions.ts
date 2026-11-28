@@ -2,6 +2,7 @@ import { ActiveRunRegistry } from './active-run.registry';
 import { LlmConfigResolver } from './llm-config.resolver';
 import { ConversationTitleService } from './conversation-title.service';
 import { ContextCompactionService } from './context-compaction.service';
+import { httpLogChannel } from './http-requests/http-log-session';
 import {
   Injectable,
   Logger,
@@ -31,6 +32,7 @@ import { ProjectFilesService } from '@/modules/projects/project-files.service';
 /** Project files in the prompt: each one cut here, all of them together at the total. */
 const PROJECT_FILE_PROMPT_CHARS = 8_000;
 const PROJECT_FILES_PROMPT_CHARS = 30_000;
+import { RedisService } from '@/services/redis/redis.service';
 import { WorkspaceEncryptionService } from '@/services/workspace-encryption/workspace-encryption.service';
 import {
   AgentsApprovalsService,
@@ -413,6 +415,7 @@ export class AgentsCompletionsService {
     private readonly llmConfigs: LlmConfigResolver,
     private readonly titles: ConversationTitleService,
     private readonly compaction: ContextCompactionService,
+    private readonly redisService: RedisService,
   ) {}
 
   private getPrompt(fileName: string, data?: Record<string, unknown>): string {
@@ -1795,6 +1798,31 @@ export class AgentsCompletionsService {
           onBrowserScreenshot,
         );
 
+      // HTTP requests ingest stored for this conversation, for the Network
+      // tab. Through Redis because the worker may report to another instance.
+      const httpLogChan = httpLogChannel(conversationId);
+      const onHttpRequests = (channel: string, message: string) => {
+        if (channel !== httpLogChan || controllerClosed) return;
+        let data: unknown;
+        try {
+          data = JSON.parse(message);
+        } catch {
+          return;
+        }
+        controller.enqueue({
+          type: 'data-http-requests-updated',
+          data,
+          transient: true,
+        } as unknown as UIMessageChunk);
+      };
+      this.redisService
+        .subscribe(httpLogChan, onHttpRequests)
+        .catch((error: unknown) =>
+          this.logger.warn(
+            `HTTP log subscribe failed for ${conversationId}: ${String(error)}`,
+          ),
+        );
+
       // Emit initial conversation-created event
       controller.enqueue({
         type: 'data-conversation-created',
@@ -2052,6 +2080,13 @@ export class AgentsCompletionsService {
       } finally {
         unsubscribeSubagents();
         unsubscribeSubagentScreenshots();
+        this.redisService
+          .unsubscribe(httpLogChan, onHttpRequests)
+          .catch((error: unknown) =>
+            this.logger.warn(
+              `HTTP log unsubscribe failed for ${conversationId}: ${String(error)}`,
+            ),
+          );
         // A placeholder no iteration finished (stopped mid-iteration or
         // between iterations, or every retry failed) must not stay
         // 'streaming'

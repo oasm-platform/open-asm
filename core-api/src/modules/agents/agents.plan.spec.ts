@@ -646,6 +646,10 @@ describe('AgentsCompletionsService plan execution', () => {
       waitForSettled: jest.fn(() => Promise.resolve('settled')),
       formatResultsMessage: jest.fn(() => 'RESULTS'),
     };
+    service.redisService = {
+      subscribe: jest.fn(() => Promise.resolve()),
+      unsubscribe: jest.fn(() => Promise.resolve()),
+    };
     iteration = jest.fn();
     service.executeStreamText = jest.fn(() => {
       iteration();
@@ -1094,6 +1098,53 @@ describe('AgentsCompletionsService plan execution', () => {
         }),
       );
       expect(unsubscribe).toHaveBeenCalled();
+    });
+
+    it('forwards new HTTP requests of the conversation as transient chunks', async () => {
+      const CHAN = 'agent:http-log:chan:c1';
+      service.redisService.subscribe.mockImplementation(
+        (_channel: string, cb: (channel: string, message: string) => void) => {
+          cb('agent:http-log:chan:other', JSON.stringify({ refetch: true }));
+          cb(CHAN, 'not json');
+          cb(CHAN, JSON.stringify({ requests: [{ id: 'r1' }] }));
+          return Promise.resolve();
+        },
+      );
+
+      const stream: ReadableStream = service.createContinuationStream({
+        llmConfig: {},
+        model: {},
+        modelMessages: [],
+        contextParts: ['ctx'],
+        assistantMessageId: 'm1',
+        conversationId: 'c1',
+        assistantMessageMetadata: {},
+        tools: undefined,
+        todosEmitter: new EventEmitter(),
+        agentMode: AgentMode.ASK,
+        approvalMode: AgentApprovalMode.MANUAL,
+        workspaceId: 'w1',
+        userId: 'u1',
+      });
+      const chunks: Array<{ type: string; data?: unknown }> = [];
+      const reader = stream.getReader();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+
+      const http = chunks.filter((c) => c.type === 'data-http-requests-updated');
+      expect(http).toEqual([
+        {
+          type: 'data-http-requests-updated',
+          data: { requests: [{ id: 'r1' }] },
+          transient: true,
+        },
+      ]);
+      const listener = service.redisService.subscribe.mock.calls[0][1];
+      expect(service.redisService.subscribe).toHaveBeenCalledWith(CHAN, listener);
+      expect(service.redisService.unsubscribe).toHaveBeenCalledWith(CHAN, listener);
     });
   });
 

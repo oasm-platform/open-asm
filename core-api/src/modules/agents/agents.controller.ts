@@ -32,6 +32,12 @@ import { isInvalidInput, isNotFound } from '@/common/errors/error-checks';
 /** Longest a stopped run is still reported as running while it saves */
 const STOP_SETTLE_TIMEOUT_MS = 30_000;
 
+/** SSE parts streamed to resumers but never kept in the replay buffer. */
+const LIVE_ONLY_PARTS = new Set([
+  'data-browser-screenshot',
+  'data-http-requests-updated',
+]);
+
 /** Resolves `ms` after the signal aborts; never resolves while it does not */
 function afterAbort(signal: AbortSignal, ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -398,13 +404,12 @@ export class AgentsController {
           }
           // Buffer every chunk so a reconnecting client can replay it. Await
           // to keep Redis order matching the write order; it swallows its own
-          // errors, so it never breaks the live stream. Browser screenshots
-          // are a live view: resumers get them as they come, but none is
-          // kept, so Redis never holds every image of the run.
+          // errors, so it never breaks the live stream. Live-only parts
+          // reach resumers as they come but are never kept: screenshots so
+          // Redis never holds every image of the run, HTTP request pushes
+          // because a resumer refetches the list anyway.
           if (activeConversationId) {
-            if (
-              (value as { type?: string }).type === 'data-browser-screenshot'
-            ) {
+            if (LIVE_ONLY_PARTS.has((value as { type?: string }).type ?? '')) {
               await this.agentsStreamBuffer.publishLive(
                 activeConversationId,
                 chunkJson,

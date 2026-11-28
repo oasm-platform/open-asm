@@ -33,6 +33,7 @@ const nextId = () =>
   `0190a000-0000-7000-8000-${String(++seq).padStart(12, '0')}`;
 
 const SENT_S = Math.floor(Date.now() / 1000) - 60;
+const CREATED_AT = new Date('2026-01-01T00:00:00.000Z');
 
 const log = (over: Partial<EgressHttpLogInput> = {}): EgressHttpLogInput => ({
   id: nextId(),
@@ -64,6 +65,7 @@ interface Harness {
   query: jest.Mock;
   mget: jest.Mock;
   transaction: jest.Mock;
+  publish: jest.Mock;
 }
 
 /**
@@ -74,6 +76,7 @@ function setup(opts: {
   sessions?: Record<string, unknown>;
   conversations?: string[];
   existing?: string[];
+  publish?: jest.Mock;
 } = {}): Harness {
   const sessions = opts.sessions ?? { 'sess-1': session() };
   const conversations = opts.conversations ?? [CONV];
@@ -95,7 +98,9 @@ function setup(opts: {
           entity === AgentHttpRequest
             ? values.filter((v) => !existing.has(v.id as string))
             : [];
-        return Promise.resolve({ raw: fresh.map((v) => ({ id: v.id })) });
+        return Promise.resolve({
+          raw: fresh.map((v) => ({ id: v.id, createdAt: CREATED_AT })),
+        });
       }),
     };
     return qb;
@@ -117,15 +122,25 @@ function setup(opts: {
       }),
     ),
   );
+  const publish = opts.publish ?? jest.fn(() => Promise.resolve(1));
   const service = new AgentHttpIngestService(
     { query, transaction } as unknown as DataSource,
-    { cacheClient: { mget } } as unknown as RedisService,
+    { cacheClient: { mget }, publish } as unknown as RedisService,
   );
-  return { service, inserted, query, mget, transaction };
+  return { service, inserted, query, mget, transaction, publish };
 }
 
 const rowsOf = (h: Harness, entity: unknown) =>
   h.inserted.filter((i) => i.entity === entity).flatMap((i) => i.values);
+
+const published = (h: Harness) =>
+  h.publish.mock.calls.map(([channel, message]: [string, string]) => ({
+    channel,
+    body: JSON.parse(message) as {
+      requests?: Record<string, unknown>[];
+      refetch?: boolean;
+    },
+  }));
 
 describe('AgentHttpIngestService', () => {
   beforeEach(() => {
@@ -475,5 +490,98 @@ describe('AgentHttpIngestService', () => {
       expect.stringContaining(WORKER),
     );
     expect(h.mget).not.toHaveBeenCalled();
+  });
+
+  describe('realtime push', () => {
+    const CONV_B = '77777777-7777-4777-8777-777777777777';
+
+    it('publishes the newly inserted rows once per conversation, in list-item shape', async () => {
+      const h = setup({
+        sessions: {
+          'sess-1': session(),
+          'sess-2': session({ conversationId: CONV_B }),
+        },
+        conversations: [CONV, CONV_B],
+      });
+      const a1 = log();
+      const a2 = log();
+      const b1 = log({ sessionId: 'sess-2' });
+
+      await h.service.ingest(WORKER, [a1, b1, a2], 0);
+
+      const msgs = published(h);
+      expect(msgs.map((m) => m.channel).sort()).toEqual(
+        [`agent:http-log:chan:${CONV}`, `agent:http-log:chan:${CONV_B}`].sort(),
+      );
+      const forA = msgs.find((m) => m.channel.endsWith(CONV))!;
+      expect(forA.body.requests!.map((r) => r.id)).toEqual([a1.id, a2.id]);
+      expect(forA.body.requests![0]).toEqual({
+        id: a1.id,
+        conversationId: CONV,
+        conversationTitle: null,
+        toolCallId: 'call-1',
+        runId: 'sess-1',
+        subagentId: SUB,
+        agentName: 'recon',
+        workerId: WORKER,
+        scheme: 'https',
+        method: 'GET',
+        host: 'example.com',
+        port: 443,
+        path: '/a?b=1',
+        statusCode: 200,
+        outcome: 'allowed',
+        error: null,
+        requestBytes: 10,
+        responseBytes: 20,
+        sentAt: new Date(SENT_S * 1000).toISOString(),
+        completedAt: new Date(SENT_S * 1000 + 250).toISOString(),
+        durationMs: 250,
+        tlsIntercepted: false,
+        createdAt: CREATED_AT.toISOString(),
+      });
+    });
+
+    it('does not announce ids that were already stored', async () => {
+      const dup = log();
+      const fresh = log();
+      const h = setup({ existing: [dup.id] });
+
+      await h.service.ingest(WORKER, [dup, fresh], 0);
+
+      const [msg] = published(h);
+      expect(h.publish).toHaveBeenCalledTimes(1);
+      expect(msg.body.requests!.map((r) => r.id)).toEqual([fresh.id]);
+    });
+
+    it('publishes nothing when every id was already stored', async () => {
+      const dup = log();
+      const h = setup({ existing: [dup.id] });
+      await h.service.ingest(WORKER, [dup], 0);
+      expect(h.publish).not.toHaveBeenCalled();
+    });
+
+    it('asks for a refetch instead of sending more than 200 rows', async () => {
+      const h = setup();
+      await h.service.ingest(
+        WORKER,
+        Array.from({ length: 201 }, () => log()),
+        0,
+      );
+      expect(published(h)).toEqual([
+        { channel: `agent:http-log:chan:${CONV}`, body: { refetch: true } },
+      ]);
+    });
+
+    it('still accepts the batch when publishing fails', async () => {
+      const h = setup({
+        publish: jest.fn(() => Promise.reject(new Error('redis down'))),
+      });
+      const result = await h.service.ingest(WORKER, [log()], 0);
+      expect(result).toEqual({ accepted: 1, rejected: 0 });
+      expect(Logger.prototype.warn).toHaveBeenCalledWith(
+        expect.stringContaining('redis down'),
+      );
+    });
   });
 });

@@ -8,7 +8,12 @@ import {
 } from './agent-http-request-payload.entity';
 import { AgentHttpRequest } from './agent-http-request.entity';
 import { AgentHttpOutcome } from './agent-http-request.enums';
-import { type HttpLogSession, loadHttpLogSessions } from './http-log-session';
+import { toListItem } from './agent-http-request.mapper';
+import {
+  type HttpLogSession,
+  httpLogChannel,
+  loadHttpLogSessions,
+} from './http-log-session';
 
 interface ProtoTimestamp {
   seconds: string;
@@ -45,9 +50,12 @@ export interface IngestResult {
 }
 
 type RequestRow = Omit<AgentHttpRequest, 'conversation' | 'createdAt'>;
+type AgentHttpRequestRow = Omit<AgentHttpRequest, 'conversation'>;
 type PayloadRow = Omit<AgentHttpRequestPayload, 'request'>;
 
 const BODY_CAP = 64 * 1024;
+/** Above this a push would be a large Redis message; the console refetches instead. */
+const MAX_PUSH_ROWS = 200;
 const MAX_HEADERS = 100;
 const MAX_HEADER_NAME = 256;
 const MAX_HEADER_VALUE = 8192;
@@ -124,7 +132,10 @@ export class AgentHttpIngestService {
       mapped.map((m) => m.request.conversationId),
     );
     const kept = mapped.filter((m) => live.has(m.request.conversationId));
-    if (kept.length) await this.insert(kept);
+    if (kept.length) {
+      const inserted = await this.insert(kept);
+      await this.announce(inserted);
+    }
 
     return { accepted: kept.length, rejected: logs.length - kept.length };
   }
@@ -139,39 +150,80 @@ export class AgentHttpIngestService {
     return new Set(rows.map((r) => r.id));
   }
 
+  /** Returns only the rows this call stored, so a retried batch announces nothing twice. */
   private async insert(
     rows: { request: RequestRow; payload: PayloadRow }[],
-  ): Promise<void> {
+  ): Promise<AgentHttpRequestRow[]> {
     // One INSERT cannot carry the same key twice and still map RETURNING ids
     // back to payloads; the first copy of an id wins.
     const byId = new Map<string, (typeof rows)[number]>();
     for (const r of rows) if (!byId.has(r.request.id)) byId.set(r.request.id, r);
     const unique = [...byId.values()];
 
-    await this.dataSource.transaction(async (manager) => {
+    return this.dataSource.transaction(async (manager) => {
       const result = await manager
         .createQueryBuilder()
         .insert()
         .into(AgentHttpRequest)
         .values(unique.map((r) => r.request))
         .orIgnore()
-        .returning('id')
+        .returning(['id', 'createdAt'])
         .execute();
-      const insertedIds = new Set(
-        (result.raw as { id: string }[]).map((r) => r.id),
+      const createdAt = new Map(
+        (result.raw as { id: string; createdAt: Date | string }[]).map((r) => [
+          r.id,
+          new Date(r.createdAt),
+        ]),
       );
-      const payloads = unique
-        .filter((r) => insertedIds.has(r.request.id))
-        .map((r) => r.payload);
-      if (!payloads.length) return;
+      const fresh = unique.filter((r) => createdAt.has(r.request.id));
+      const stored = fresh.map((r) => ({
+        ...r.request,
+        createdAt: createdAt.get(r.request.id)!,
+      }));
+      if (!fresh.length) return stored;
       await manager
         .createQueryBuilder()
         .insert()
         .into(AgentHttpRequestPayload)
-        .values(payloads)
+        .values(fresh.map((r) => r.payload))
         .orIgnore()
         .execute();
+      return stored;
     });
+  }
+
+  /**
+   * Tells open chat streams about new rows (the stream forwards them to the
+   * console's Network tab). Runs after the commit so a reader never sees a row
+   * the list route cannot return yet. Best effort: the tab also polls.
+   */
+  private async announce(rows: AgentHttpRequestRow[]): Promise<void> {
+    const byConversation = new Map<string, AgentHttpRequestRow[]>();
+    for (const row of rows) {
+      const list = byConversation.get(row.conversationId) ?? [];
+      list.push(row);
+      byConversation.set(row.conversationId, list);
+    }
+    await Promise.all(
+      [...byConversation].map(async ([conversationId, list]) => {
+        const body =
+          list.length > MAX_PUSH_ROWS
+            ? { refetch: true }
+            : { requests: list.map((row) => toListItem(row)) };
+        try {
+          await this.redisService.publish(
+            httpLogChannel(conversationId),
+            JSON.stringify(body),
+          );
+        } catch (error) {
+          this.logger.warn(
+            `Could not announce agent HTTP requests of ${conversationId}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        }
+      }),
+    );
   }
 }
 

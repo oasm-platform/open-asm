@@ -21,6 +21,10 @@ export const HTTP_LOG_SESSION_TTL_S = 900;
 export const httpLogSessionKey = (sessionId: string) =>
   `agent:http-log:session:${sessionId}`;
 
+/** Pub/sub channel announcing a conversation's newly stored HTTP requests. */
+export const httpLogChannel = (conversationId: string) =>
+  `agent:http-log:chan:${conversationId}`;
+
 type SessionRedis = Pick<RedisService, 'setWithExpiry'> & {
   cacheClient: Pick<RedisService['cacheClient'], 'mget'>;
 };
